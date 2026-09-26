@@ -71,6 +71,121 @@
             </field>
         </record>
 
+        <!-- KMS Monthly Recognition Form with Chatter -->
+        <record id="view_kms_monthly_recognition_form" model="ir.ui.view">
+            <field name="name">kms.monthly.recognition.form</field>
+            <field name="model">kms.monthly.recognition</field>
+            <field name="arch" type="xml">
+                <form string="Monthly Best Contributor">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group string="Honoree Details">
+                                <field name="employee_id" widget="many2one_avatar_employee"/>
+                                <field name="department_id"/>
+                                <field name="operating_unit_id"/>
+                            </group>
+                            <group string="Award Metrics">
+                                <field name="period_date"/>
+                                <field name="points_total"/>
+                                <field name="badge" widget="badge"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Citation &amp; Highlights">
+                                <field name="citation" placeholder="Reason and highlights for this month's recognition..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- LEADERBOARD VIEWS (FR-REC-001 through FR-REC-007)         -->
+        <!-- ========================================================= -->
+        <record id="view_recognition_leaderboard_list" model="ir.ui.view">
+            <field name="name">recognition.leaderboard.line.list</field>
+            <field name="model">recognition.leaderboard.line</field>
+            <field name="arch" type="xml">
+                <list string="Gamification Leaderboards" create="0" delete="0">
+                    <field name="rank" string="Rank" decoration-bf="rank in [1, 2, 3]"/>
+                    <field name="employee_id" widget="many2one_avatar_employee"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
+                    <field name="points_total" string="Total Points" decoration-success="points_total > 0"/>
+                    <field name="badge" widget="badge" decoration-danger="badge == 'platinum'" decoration-warning="badge == 'gold'" decoration-info="badge == 'silver'"/>
+                    <field name="source_module" widget="badge"/>
+                    <field name="period" widget="badge"/>
+                    <field name="period_date"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_recognition_leaderboard_kanban" model="ir.ui.view">
+            <field name="name">recognition.leaderboard.line.kanban</field>
+            <field name="model">recognition.leaderboard.line</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="rank"/>
+                    <field name="employee_id"/>
+                    <field name="department_id"/>
+                    <field name="points_total"/>
+                    <field name="badge"/>
+                    <field name="source_module"/>
+                    <field name="period"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click p-3 rounded shadow-sm border mb-2 bg-white text-center">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-secondary">Rank #<t t-esc="record.rank.value"/></span>
+                                    <span class="badge bg-warning text-dark"><i class="fa fa-trophy me-1"/><t t-esc="record.badge.value"/></span>
+                                </div>
+                                <div class="my-2">
+                                    <field name="employee_id" widget="image" options="{'preview_image': 'avatar_128', 'size': [64, 64]}" class="rounded-circle border border-primary border-2 shadow-sm mx-auto"/>
+                                </div>
+                                <div class="fw-bold fs-6 text-dark mb-1"><t t-esc="record.employee_id.value"/></div>
+                                <div class="text-muted small mb-2"><t t-esc="record.department_id.value"/></div>
+                                <div class="badge bg-success fs-6">
+                                    <i class="fa fa-star me-1"/><t t-esc="record.points_total.value"/> Points
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <record id="view_recognition_leaderboard_search" model="ir.ui.view">
+            <field name="name">recognition.leaderboard.line.search</field>
+            <field name="model">recognition.leaderboard.line</field>
+            <field name="arch" type="xml">
+                <search string="Search Leaderboard">
+                    <field name="employee_id"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
+                    <filter string="All-Time Leaderboard" name="filter_all_time" domain="[('period', '=', 'all_time')]"/>
+                    <filter string="Monthly Leaderboard" name="filter_monthly" domain="[('period', '=', 'monthly')]"/>
+                    <separator/>
+                    <filter string="Unified (All)" name="filter_mod_all" domain="[('source_module', '=', 'all')]"/>
+                    <filter string="KMS Leaderboard" name="filter_mod_kms" domain="[('source_module', '=', 'kms')]"/>
+                    <filter string="LMS Leaderboard" name="filter_mod_lms" domain="[('source_module', '=', 'lms')]"/>
+                    <separator/>
+                    <group>
+                        <filter string="Period" name="group_by_period" context="{'group_by': 'period'}"/>
+                        <filter string="Module" name="group_by_module" context="{'group_by': 'source_module'}"/>
+                        <filter string="Department" name="group_by_department" context="{'group_by': 'department_id'}"/>
+                        <filter string="Badge Tier" name="group_by_badge" context="{'group_by': 'badge'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
         <!-- Actions -->
         <record id="action_kms_recognition_all" model="ir.actions.act_window">
             <field name="name">Best Contributor of the Month (KMS)</field>
@@ -82,6 +197,24 @@
             <field name="name">Knowledge Contribution Points Ledger</field>
             <field name="res_model">kms.contributor.point</field>
             <field name="view_mode">list</field>
+        </record>
+
+        <record id="action_recognition_leaderboard" model="ir.actions.act_window">
+            <field name="name">Gamification Leaderboards</field>
+            <field name="res_model">recognition.leaderboard.line</field>
+            <field name="view_mode">list,kanban</field>
+            <field name="search_view_id" ref="view_recognition_leaderboard_search"/>
+            <field name="context">{'search_default_filter_all_time': 1, 'search_default_filter_mod_all': 1}</field>
+        </record>
+
+        <record id="action_server_rebuild_leaderboards" model="ir.actions.server">
+            <field name="name">Recalculate Leaderboards</field>
+            <field name="model_id" ref="model_recognition_leaderboard_line"/>
+            <field name="binding_model_id" ref="model_recognition_leaderboard_line"/>
+            <field name="state">code</field>
+            <field name="code">
+                model.rebuild_leaderboards()
+            </field>
         </record>
 
     </data>

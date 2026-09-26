@@ -7,7 +7,7 @@
             <field name="name">competency.matrix.config.form</field>
             <field name="model">competency.matrix.config</field>
             <field name="arch" type="xml">
-                <form string="Proficiency Matrix Guidelines">
+                <form string="Proficiency Matrix Guidelines" create="false" delete="false">
                     <sheet>
                         <div class="oe_title" style="margin-bottom: 20px;">
                             <h1 style="color: #541718; font-weight: bold;">
@@ -53,7 +53,7 @@
             <field name="name">competency.360.config.form</field>
             <field name="model">competency.matrix.config</field>
             <field name="arch" type="xml">
-                <form string="Behavioral &amp; 360° Rules">
+                <form string="Behavioral &amp; 360° Rules" create="false" delete="false">
                     <sheet>
                         <div class="oe_title" style="margin-bottom: 20px;">
                             <h1 style="color: #541718; font-weight: bold;">
@@ -78,7 +78,6 @@
                                             <field name="weight_supervisor"/>
                                             <field name="weight_peer"/>
                                             <field name="weight_subordinate"/>
-                                            <field name="weight_team"/>
                                         </group>
                                         <group string="Random Sampling Caps per Cycle">
                                             <field name="max_peer_assessments"/>
@@ -111,13 +110,6 @@
                                             <field name="supervisor_eval_leadership" string="Include Leadership"/>
                                             <field name="supervisor_eval_technical" string="Include Technical"/>
                                         </group>
-                                        <group string="Team Evaluation Pillars">
-                                            <field name="team_eval_core" string="Include Core"/>
-                                            <field name="team_eval_leadership" string="Include Leadership"/>
-                                            <field name="team_eval_technical" string="Include Technical"/>
-                                        </group>
-                                    </group>
-                                    <group>
                                         <group string="Self Evaluation Pillars">
                                             <field name="self_eval_core" string="Include Core"/>
                                             <field name="self_eval_leadership" string="Include Leadership"/>
@@ -163,6 +155,87 @@
             <field name="code">
                 action = model.action_open_360_rules()
             </field>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- Searchable Views: Job Position Proficiency Matrix Guidelines   -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <record id="view_competency_job_matrix_list" model="ir.ui.view">
+            <field name="name">competency.job.matrix.list</field>
+            <field name="model">competency.job.matrix</field>
+            <field name="arch" type="xml">
+                <list editable="bottom" string="Job Position Matrix Guidelines (Exceptions)">
+                    <field name="job_id" options="{'no_create': True, 'no_open': True}"/>
+                    <field name="required_leadership_level"/>
+                    <field name="required_core_level"/>
+                    <field name="required_technical_level"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_competency_job_matrix_search" model="ir.ui.view">
+            <field name="name">competency.job.matrix.search</field>
+            <field name="model">competency.job.matrix</field>
+            <field name="arch" type="xml">
+                <search string="Search Job Position Matrix">
+                    <field name="job_id"/>
+                    <filter string="Leadership: Advanced / Expert" name="filter_leadership_high" domain="[('required_leadership_level', 'in', ['3', '4'])]"/>
+                    <filter string="Core: Advanced / Expert" name="filter_core_high" domain="[('required_core_level', 'in', ['3', '4'])]"/>
+                    <filter string="Technical: Expert" name="filter_technical_expert" domain="[('required_technical_level', '=', '4')]"/>
+                    <group>
+                        <filter string="Leadership Level" name="group_leadership" context="{'group_by': 'required_leadership_level'}"/>
+                        <filter string="Core Level" name="group_core" context="{'group_by': 'required_core_level'}"/>
+                        <filter string="Technical Level" name="group_technical" context="{'group_by': 'required_technical_level'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_competency_job_matrix" model="ir.actions.act_window">
+            <field name="name">Job Position Matrix Guidelines (Exceptions)</field>
+            <field name="res_model">competency.job.matrix</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_competency_job_matrix_search"/>
+            <field name="view_id" ref="view_competency_job_matrix_list"/>
+        </record>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- Searchable Views: Job Grade Proficiency Matrix Guidelines      -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <record id="view_competency_grade_matrix_list" model="ir.ui.view">
+            <field name="name">competency.grade.matrix.list</field>
+            <field name="model">competency.grade.matrix</field>
+            <field name="arch" type="xml">
+                <list editable="bottom" string="Job Grade Matrix Guidelines">
+                    <field name="grade_id" options="{'no_create': True, 'no_open': True}"/>
+                    <field name="required_leadership_level"/>
+                    <field name="required_core_level"/>
+                    <field name="required_technical_level"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_competency_grade_matrix_search" model="ir.ui.view">
+            <field name="name">competency.grade.matrix.search</field>
+            <field name="model">competency.grade.matrix</field>
+            <field name="arch" type="xml">
+                <search string="Search Job Grade Matrix">
+                    <field name="grade_id"/>
+                    <group>
+                        <filter string="Leadership Level" name="group_grade_leadership" context="{'group_by': 'required_leadership_level'}"/>
+                        <filter string="Core Level" name="group_grade_core" context="{'group_by': 'required_core_level'}"/>
+                        <filter string="Technical Level" name="group_grade_technical" context="{'group_by': 'required_technical_level'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_competency_grade_matrix" model="ir.actions.act_window">
+            <field name="name">Job Grade Matrix Guidelines</field>
+            <field name="res_model">competency.grade.matrix</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_competency_grade_matrix_search"/>
+            <field name="view_id" ref="view_competency_grade_matrix_list"/>
         </record>
 
     </data>

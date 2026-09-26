@@ -127,8 +127,11 @@
                                 <field name="duration_days"/>
                                 <field name="version" readonly="1"/>
                             </group>
-                            <group string="Target &amp; Prerequisites">
-                                <field name="target_audience_ids" widget="many2many_tags"/>
+                            <group string="Target Scope &amp; Eligibility">
+                                <field name="target_scope" widget="badge"/>
+                                <field name="department_ids" widget="many2many_tags" placeholder="Bank-Wide (All Departments) if empty"/>
+                                <field name="operating_unit_ids" widget="many2many_tags" placeholder="All Operating Units / Branches if empty"/>
+                                <field name="target_audience_ids" widget="many2many_tags" placeholder="All Job Positions if empty"/>
                                 <field name="prerequisite_course_ids" widget="many2many_tags"/>
                                 <field name="current_curriculum_id" readonly="1"/>
                                 <field name="schedule"/>
@@ -149,8 +152,8 @@
                                     type="object" invisible="sourcing_state != 'director_review'"
                                     groups="employee_development_system.group_eds_manager"/>
                         </group>
-                        <group string="Description">
-                            <field name="description"/>
+                        <group string="Course Definition / Summary">
+                            <field name="description" placeholder="Provide general definition, target competencies and objectives..."/>
                         </group>
                         <notebook>
                             <page string="Competency Mapping &amp; Behavioral Standards" name="competency_mapping">
@@ -172,6 +175,25 @@
                                     Click <strong>Auto-Compile Learning Outcomes</strong> in the header to automatically assemble structured course learning objectives and demonstrated behavioral indicators from the mapped competencies.
                                 </div>
                                 <field name="learning_outcomes" widget="html"/>
+                            </page>
+                            <page string="Certificate Template &amp; Signatures" name="certificate_config">
+                                <group>
+                                    <group string="Certificate Wording">
+                                        <field name="certificate_title"/>
+                                        <field name="certificate_body_text" placeholder="Custom certificate awarding statement... Use placeholders like {employee_name}, {course_name}..."/>
+                                    </group>
+                                    <group string="Signatory Details">
+                                        <field name="certificate_signatory_name" placeholder="e.g. Director Name"/>
+                                        <field name="certificate_signatory_title"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Evaluation &amp; Assessment Questionnaires" name="evaluation_instruments">
+                                <group>
+                                    <field name="level1_instrument_id"/>
+                                    <field name="level2_instrument_id"/>
+                                    <field name="level3_instrument_id"/>
+                                </group>
                             </page>
                             <page string="Training Materials ()" name="materials">
                                 <field name="material_ids">

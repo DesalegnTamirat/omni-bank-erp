@@ -149,10 +149,10 @@
                     <field name="cycle_id"/>
                     <field name="employee_id"/>
                     <field name="work_unit_id"/>
-                    <field name="competency_id"/>
-                    <field name="gap_severity" widget="badge"/>
-                    <field name="course_match_status" widget="badge" optional="show"/>
-                    <field name="recommended_course_id" optional="show"/>
+                    <field name="course_id" optional="show"/>
+                    <field name="proposed_program" optional="show"/>
+                    <field name="urgency" widget="badge"/>
+                    <field name="competency_id" optional="show"/>
                     <field name="delivery_mode" widget="badge"/>
                     <field name="source"/>
                     <field name="priority_score"/>
@@ -187,6 +187,18 @@
                     </header>
                     <sheet>
                         <group>
+                            <group string="Course Selection &amp; Urgency">
+                                <field name="is_custom_course" widget="boolean_toggle" readonly="state != 'draft'"/>
+                                <field name="course_id" invisible="is_custom_course" readonly="state != 'draft'"
+                                       options="{'no_create': True}" placeholder="Select from Course Catalog / Pool..."/>
+                                <field name="custom_course_title" invisible="not is_custom_course" required="is_custom_course"
+                                       placeholder="e.g. Advanced Branch AML Risk Controls" readonly="state != 'draft'"/>
+                                <field name="custom_course_description" invisible="not is_custom_course"
+                                       placeholder="Describe what the course is about and expected learning objectives..." readonly="state != 'draft'"/>
+                                <field name="urgency" widget="badge" readonly="state != 'draft'"/>
+                                <field name="delivery_mode" readonly="state != 'draft'"/>
+                                <field name="proposed_program" readonly="state != 'draft'"/>
+                            </group>
                             <group string="Employee &amp; Organization">
                                 <field name="name" readonly="1"/>
                                 <field name="cycle_id" readonly="state != 'draft'"/>
@@ -194,23 +206,17 @@
                                 <field name="job_position_id" readonly="1"/>
                                 <field name="department_id" readonly="1"/>
                                 <field name="work_unit_id" readonly="1"/>
-                            </group>
-                            <group string="Learning Need Classification">
-                                <field name="competency_id" readonly="state != 'draft'"/>
-                                <field name="competency_gap_level_diff" invisible="source != 'competency_gap'" readonly="state != 'draft'"/>
-                                <field name="pms_kpi_reference" invisible="source != 'pms'" readonly="state != 'draft'"/>
-                                <field name="pms_appraisal_score" invisible="source != 'pms'" readonly="state != 'draft'"/>
-                                <field name="gap_severity" readonly="state != 'draft'"/>
                                 <field name="source" readonly="state != 'draft'"/>
-                                <field name="delivery_mode" readonly="state != 'draft'"/>
-                                <field name="proposed_program" placeholder="e.g. Advanced Microservices Security" readonly="state != 'draft'"/>
-                                <field name="estimated_cost" readonly="state != 'draft'"/>
+                                <field name="competency_id" readonly="state != 'draft'"/>
                             </group>
                         </group>
                         <group>
-                            <group string="Catalog Alignment &amp; Course Match">
+                            <group string="Catalog Alignment &amp; Diagnostic Gaps">
                                 <field name="course_match_status" widget="badge"/>
                                 <field name="recommended_course_id" readonly="1"/>
+                                <field name="competency_gap_level_diff" invisible="source != 'competency_gap'" readonly="state != 'draft'"/>
+                                <field name="pms_kpi_reference" invisible="source != 'pms'" readonly="state != 'draft'"/>
+                                <field name="pms_appraisal_score" invisible="source != 'pms'" readonly="state != 'draft'"/>
                                 <button name="action_view_recommended_course" string="Open Mapped Catalog Course"
                                         type="object" class="btn-outline-primary" icon="fa-arrow-right"
                                         invisible="not recommended_course_id"/>
@@ -221,8 +227,21 @@
                                 <field name="converted_course_ref" invisible="state != 'converted'" readonly="1"/>
                             </group>
                         </group>
-                        <notebook groups="employee_development_system.group_eds_officer">
-                            <page string="L&amp;D Consolidation &amp; Priority Analysis">
+                        <notebook>
+                            <page string="HR Planning &amp; Consolidation Review" groups="employee_development_system.group_eds_officer">
+                                <group>
+                                    <group string="Target Schedule &amp; Budget">
+                                        <field name="hr_target_quarter"/>
+                                        <field name="hr_target_delivery_date"/>
+                                        <field name="estimated_cost"/>
+                                    </group>
+                                    <group string="Target Assigned Employees">
+                                        <field name="hr_assigned_participant_ids" widget="many2many_tags"
+                                               placeholder="Select employees nominated to attend..."/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="L&amp;D Priority Scoring Analysis" groups="employee_development_system.group_eds_officer">
                                 <group>
                                     <group string="Consolidation Status">
                                         <field name="priority_score" readonly="1"/>

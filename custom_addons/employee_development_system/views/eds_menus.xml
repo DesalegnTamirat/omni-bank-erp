@@ -93,9 +93,9 @@
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_learning_partners"
-                  name="Strategic Learning Partnerships"
+                  name="Strategic Learning Partnerships &amp; MoUs"
                   parent="menu_eds_annual_planning_mgmt"
-                  action="action_eds_learning_partner"
+                  action="action_eds_learning_partnership"
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
 
@@ -361,17 +361,52 @@
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <!-- Internships -->
-        <menuitem id="menu_eds_university_relations"
-                  name="University Relations"
+        <!-- Workplace Learning (Buddy, Mentoring, Coaching) -->
+        <menuitem id="menu_eds_workplace_learning"
+                  name="Workplace Learning"
                   parent="menu_eds_talent_programs"
+                  sequence="15"
+                  groups="employee_development_system.group_eds_employee"/>
+
+        <menuitem id="menu_eds_workplace_assignments"
+                  name="Buddy &amp; Mentorship Assignments"
+                  parent="menu_eds_workplace_learning"
+                  action="action_eds_workplace_assignment"
+                  sequence="10"
+                  groups="employee_development_system.group_eds_employee"/>
+
+        <!-- IDP & Self Development -->
+        <menuitem id="menu_eds_idp_mgmt"
+                  name="IDP &amp; Self-Development"
+                  parent="menu_eds_talent_programs"
+                  sequence="18"
+                  groups="employee_development_system.group_eds_employee"/>
+
+        <menuitem id="menu_eds_idp_plans"
+                  name="Individual Development Plans"
+                  parent="menu_eds_idp_mgmt"
+                  action="action_eds_idp"
+                  sequence="10"
+                  groups="employee_development_system.group_eds_employee"/>
+
+        <menuitem id="menu_eds_self_development_activities"
+                  name="Self-Development Activities"
+                  parent="menu_eds_idp_mgmt"
+                  action="action_eds_self_development"
                   sequence="20"
+                  groups="employee_development_system.group_eds_employee"/>
+
+        <!-- Assessment Center -->
+        <menuitem id="menu_eds_assessment_center_mgmt"
+                  name="Assessment Centers"
+                  parent="menu_eds_talent_programs"
+                  sequence="25"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <menuitem id="menu_eds_internships"
-                  name="Internships"
-                  parent="menu_eds_university_relations"
-                  action="action_eds_internship_application"
+        <menuitem id="menu_eds_assessment_centers"
+                  name="Assessment Center Batches"
+                  parent="menu_eds_assessment_center_mgmt"
+                  action="action_eds_assessment_center_batch"
                   sequence="10"
                   groups="employee_development_system.group_eds_officer"/>
 

@@ -11,12 +11,12 @@ class CompetencyDirectorPeerConfig(models.Model):
     Restricts peer candidate dropdown strictly to employees with same coach & different position.
     """
     _name = 'competency.director.peer.config'
-    _description = 'Director Peer Evaluation Configuration'
+    _description = 'Executive Peer Evaluation Configuration'
     _order = 'director_id'
     _rec_name = 'director_id'
 
     director_id = fields.Many2one(
-        'hr.employee', string='Director', required=True, ondelete='cascade',
+        'hr.employee', string='Executive (Director / Chief)', required=True, ondelete='cascade',
         domain="[('is_director_or_chief', '=', True), ('active', '=', True)]",
         index=True)
     job_id = fields.Many2one(
@@ -24,7 +24,7 @@ class CompetencyDirectorPeerConfig(models.Model):
     grade_id = fields.Many2one(
         'employee.grade', string='Job Grade', compute='_compute_grade_id', store=True, readonly=True)
     department_id = fields.Many2one(
-        'hr.department', related='director_id.department_id', string='Department', store=True, readonly=True)
+        'hr.department', string='Department', compute='_compute_department_id', store=True, readonly=True)
     operating_unit_id = fields.Many2one(
         'operating.unit', string='Operating Unit', compute='_compute_operating_unit_id', store=True, readonly=True)
     coach_id = fields.Many2one(
@@ -32,17 +32,39 @@ class CompetencyDirectorPeerConfig(models.Model):
     candidate_peer_ids = fields.Many2many(
         'hr.employee', compute='_compute_candidate_peer_ids',
         string='Candidate Peers Pool',
-        help="Calculated pool of eligible peers sharing the director's coach with a different position.")
+        help="Calculated pool of eligible peers sharing the executive's coach with a different position.")
     peer_ids = fields.Many2many(
         'hr.employee', 'competency_director_peer_rel', 'config_id', 'peer_id',
         string='Assigned 360° Peers',
-        domain="[('id', 'in', candidate_peer_ids)]",
-        help="Select peers for this Director. Restricted strictly to candidates sharing the same coach with a different position.")
+        domain="[('is_director_or_chief', '=', True), ('active', '=', True)]",
+        help="Select peers for this Director/Chief. Restricted strictly to candidates sharing the same coach with a different position.")
+    peer_count = fields.Integer(string='Assigned Peers', compute='_compute_peer_count')
     notes = fields.Text(string='Notes / Rationale')
     has_open_cycle = fields.Boolean(
         string='Has Open Cycle', compute='_compute_has_open_cycle',
         help="Technical flag indicating if there is at least one currently open assessment cycle."
     )
+
+    @api.depends('director_id')
+    def _compute_department_id(self):
+        for rec in self:
+            rec.department_id = rec.sudo().director_id.department_id if rec.director_id else False
+
+    @api.depends('peer_ids')
+    def _compute_peer_count(self):
+        for rec in self:
+            rec.peer_count = len(rec.peer_ids)
+
+    def web_read(self, specification):
+        self.check_access_rule('read')
+        return super(CompetencyDirectorPeerConfig, self.sudo()).web_read(specification)
+
+    def read(self, fields=None, load='_classic_read'):
+        self.check_access_rule('read')
+        return super(CompetencyDirectorPeerConfig, self.sudo()).read(fields=fields, load=load)
+
+    def onchange(self, values, field_name, field_onchange):
+        return super(CompetencyDirectorPeerConfig, self.sudo()).onchange(values, field_name, field_onchange)
 
     def _compute_has_open_cycle(self):
         has_open = bool(self.env['competency.assessment.cycle'].search_count([('state', '=', 'open')]))
@@ -56,20 +78,21 @@ class CompetencyDirectorPeerConfig(models.Model):
         - Peers removed from configuration have their unsubmitted draft assessment deleted.
         """
         self.ensure_one()
-        open_cycle = self.env['competency.assessment.cycle'].search([('state', '=', 'open')], order='id desc', limit=1)
+        self_sudo = self.sudo()
+        open_cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], order='id desc', limit=1)
         if not open_cycle:
             raise UserError(_("There is currently no Open assessment cycle. This action can only be performed during an active open cycle."))
 
-        director = self.director_id
+        director = self_sudo.director_id
         if not director:
             raise UserError(_("Please specify a Director or Chief before synchronizing peers."))
 
         # 1. Assigned peers in this configuration
-        target_peers = self.peer_ids.filtered(lambda p: p.active and p.user_id)
+        target_peers = self_sudo.peer_ids.filtered(lambda p: p.active and p.user_id)
         target_user_ids = set(target_peers.mapped('user_id.id'))
 
         # 2. Existing peer assessments for this director in the open cycle
-        existing_peer_asms = self.env['competency.assessment'].search([
+        existing_peer_asms = self.env['competency.assessment'].sudo().search([
             ('cycle_id', '=', open_cycle.id),
             ('employee_id', '=', director.id),
             ('assessment_type', '=', 'peer'),
@@ -133,7 +156,7 @@ class CompetencyDirectorPeerConfig(models.Model):
     @api.depends('director_id', 'director_id.job_id')
     def _compute_job_id(self):
         for rec in self:
-            rec.job_id = self._get_employee_job(rec.director_id) if rec.director_id else False
+            rec.job_id = self.sudo()._get_employee_job(rec.sudo().director_id) if rec.director_id else False
 
     @api.model
     def _resolve_employee_grade(self, emp):
@@ -218,7 +241,7 @@ class CompetencyDirectorPeerConfig(models.Model):
     def _compute_grade_id(self):
         for rec in self:
             if rec.director_id:
-                rec.grade_id = self._resolve_employee_grade(rec.director_id)
+                rec.grade_id = self.sudo()._resolve_employee_grade(rec.sudo().director_id)
             else:
                 rec.grade_id = False
 
@@ -226,7 +249,7 @@ class CompetencyDirectorPeerConfig(models.Model):
     def _compute_operating_unit_id(self):
         for rec in self:
             if rec.director_id:
-                emp = rec.director_id
+                emp = rec.sudo().director_id
                 rec.operating_unit_id = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
             else:
                 rec.operating_unit_id = False
@@ -235,7 +258,7 @@ class CompetencyDirectorPeerConfig(models.Model):
     def _compute_coach_id(self):
         for rec in self:
             if rec.director_id:
-                emp = rec.director_id
+                emp = rec.sudo().director_id
                 rec.coach_id = getattr(emp, 'coach_id', False) or emp.parent_id
             else:
                 rec.coach_id = False
@@ -296,10 +319,10 @@ class CompetencyDirectorPeerConfig(models.Model):
     def _compute_candidate_peer_ids(self):
         """Calculate pool of eligible peers for Directors (Grade 16) & Chiefs (Grade 17) matching the exception rule: Same Job Grade."""
         # Retrieve all active executive peers from existing configurations or active directors
-        all_configs = self.search([])
+        all_configs = self.sudo().search([])
         dir_pool = all_configs.mapped('director_id').filtered(lambda e: e.active)
         if not dir_pool:
-            all_active = self.env['hr.employee'].search([('active', '=', True)])
+            all_active = self.env['hr.employee'].sudo().search([('active', '=', True)])
             dir_pool = all_active.filtered(lambda e: self._is_director_or_chief(e))
 
         for rec in self:
@@ -307,7 +330,7 @@ class CompetencyDirectorPeerConfig(models.Model):
                 rec.candidate_peer_ids = self.env['hr.employee']
                 continue
 
-            dir_emp = rec.director_id
+            dir_emp = rec.sudo().director_id
             dir_g_num = self._get_grade_number(dir_emp)
             pool = dir_pool.filtered(lambda e: e.id != dir_emp.id)
 
@@ -324,37 +347,37 @@ class CompetencyDirectorPeerConfig(models.Model):
     def _check_unique_director(self):
         for rec in self:
             if rec.director_id:
-                existing = self.search([
+                existing = self.sudo().search([
                     ('id', '!=', rec.id),
                     ('director_id', '=', rec.director_id.id)
                 ], limit=1)
                 if existing:
-                    raise ValidationError(_("A peer configuration record already exists for Director '%s'.") % rec.director_id.name)
+                    raise ValidationError(_("A peer configuration record already exists for Director '%s'.") % rec.sudo().director_id.name)
 
     @api.constrains('director_id')
     def _check_director_grade(self):
         for rec in self:
-            if rec.director_id and not self._is_director_or_chief(rec.director_id):
-                raise ValidationError(_("Employee '%s' cannot be configured here. Director Peer Configuration is strictly reserved for Directors (Grade XVI) and Chiefs (Grade XVII).") % rec.director_id.name)
+            if rec.director_id and not self._is_director_or_chief(rec.sudo().director_id):
+                raise ValidationError(_("Employee '%s' cannot be configured here. Director Peer Configuration is strictly reserved for Directors (Grade XVI) and Chiefs (Grade XVII).") % rec.sudo().director_id.name)
 
     def action_generate_director_records(self, *args, **kwargs):
         """Scan active hr.employee records strictly for Directors (Grade 16) and Chiefs (Grade 17) and create missing configuration records, purging non-executive entries."""
-        all_employees = self.env['hr.employee'].search([('active', '=', True)])
+        all_employees = self.env['hr.employee'].sudo().search([('active', '=', True)])
         director_emps = all_employees.filtered(lambda e: self._is_director_or_chief(e))
         director_emp_ids = set(director_emps.ids)
 
         # Purge non-director/non-chief config records (e.g. Grade II, III, IV, etc.)
         if director_emp_ids:
-            invalid_configs = self.search([('director_id', 'not in', list(director_emp_ids))])
+            invalid_configs = self.sudo().search([('director_id', 'not in', list(director_emp_ids))])
             if invalid_configs:
                 invalid_configs.unlink()
 
-        existing_director_ids = set(self.search([]).mapped('director_id.id'))
+        existing_director_ids = set(self.sudo().search([]).mapped('director_id.id'))
         created_count = 0
 
         for emp_id in director_emp_ids:
             if emp_id not in existing_director_ids:
-                self.create({'director_id': emp_id})
+                self.sudo().create({'director_id': emp_id})
                 existing_director_ids.add(emp_id)
                 created_count += 1
 

@@ -707,42 +707,49 @@ class CompetencyDashboard(models.TransientModel):
             missing_sups_cnt = self.env['hr.employee'].search_count([('active', '=', True), ('parent_id', '=', False)])
 
         # Personal Metrics (Employee)
+        # Personal Metrics (Logged in Employee)
         my_asm = False
-        if emp and cycle:
-            my_asm = self.env['competency.assessment'].search([
-                ('employee_id', '=', emp.id),
-                ('cycle_id', '=', cycle.id)
-            ], limit=1)
+        if emp:
+            if cycle:
+                my_asm = self.env['competency.assessment'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('cycle_id', '=', cycle.id)
+                ], order='id desc', limit=1)
+            if not my_asm:
+                my_asm = self.env['competency.assessment'].sudo().search([
+                    ('employee_id', '=', emp.id)
+                ], order='id desc', limit=1)
 
-        # Radar chart labels and values
+        # Radar chart labels and values (strictly for the logged-in person, never summarized across different people)
         radar_labels = []
         radar_assessed = []
         radar_required = []
         if my_asm and my_asm.line_ids:
-            for l in my_asm.line_ids[:8]:
-                radar_labels.append(l.competency_id.name)
-                c_val = int(l.current_level) if l.current_level and str(l.current_level).isdigit() else (int(round(l.weighted_current_level)) if l.weighted_current_level else 0)
-                r_val = int(l.required_level) if l.required_level and str(l.required_level).isdigit() else 0
-                radar_assessed.append(c_val)
-                radar_required.append(r_val)
-        elif lines:
-            grouped_comp = {}
-            for l in lines[:50]:
-                cid = l.competency_id
-                c_val = int(l.current_level) if l.current_level and str(l.current_level).isdigit() else (int(round(l.weighted_current_level)) if l.weighted_current_level else None)
-                r_val = int(l.required_level) if l.required_level and str(l.required_level).isdigit() else 1
-                if cid not in grouped_comp:
-                    grouped_comp[cid] = {'assessed': [], 'required': []}
-                if c_val is not None:
-                    grouped_comp[cid]['assessed'].append(c_val)
-                grouped_comp[cid]['required'].append(r_val)
-
-            for comp, vals in list(grouped_comp.items())[:6]:
-                radar_labels.append(comp.name)
-                avg_ass = round(sum(vals['assessed']) / len(vals['assessed']), 1) if vals['assessed'] else 0.0
-                avg_req = round(sum(vals['required']) / len(vals['required']), 1) if vals['required'] else 0.0
-                radar_assessed.append(avg_ass)
-                radar_required.append(avg_req)
+            for l in my_asm.line_ids:
+                if l.competency_id and l.competency_id.name not in radar_labels:
+                    radar_labels.append(l.competency_id.name)
+                    c_val = int(l.current_level) if l.current_level and str(l.current_level).isdigit() else (int(round(l.weighted_current_level)) if l.weighted_current_level else 0)
+                    r_val = int(l.required_level) if l.required_level and str(l.required_level).isdigit() else 1
+                    radar_assessed.append(c_val)
+                    radar_required.append(r_val)
+        elif emp:
+            job = getattr(emp, 'job_position', False) or emp.job_id
+            if job:
+                mapping = self.env['competency.role.mapping'].sudo().search([
+                    ('job_position_id', '=', job.id),
+                    ('state', '=', 'approved')
+                ], limit=1)
+                if not mapping:
+                    mapping = self.env['competency.role.mapping'].sudo().search([
+                        ('job_position_id', '=', job.id)
+                    ], limit=1)
+                if mapping and mapping.line_ids:
+                    for mline in mapping.line_ids:
+                        if mline.competency_id and mline.competency_id.name not in radar_labels:
+                            radar_labels.append(mline.competency_id.name)
+                            req = int(mline.required_level) if mline.required_level and str(mline.required_level).isdigit() else 1
+                            radar_required.append(req)
+                            radar_assessed.append(0)
 
         # Multi-cycle trend history for Employee
         trend_cycles = self.env['competency.assessment.cycle'].sudo().search([], order='id asc', limit=5)

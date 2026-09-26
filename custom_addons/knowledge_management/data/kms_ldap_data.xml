@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- FR-SYS-001: Centralized Active Directory / LDAP Authentication Config -->
+        <record id="bunna_ad_ldap_configuration" model="res.company.ldap">
+            <field name="company" ref="base.main_company"/>
+            <field name="sequence">10</field>
+            <field name="ldap_server">ldap.bunnabanksc.com</field>
+            <field name="ldap_server_port">389</field>
+            <field name="ldap_binddn">cn=odoo_kms_svc,ou=ServiceAccounts,dc=bunnabanksc,dc=com</field>
+            <field name="ldap_password">BunnaBankLDAP2026!</field>
+            <field name="ldap_filter">(&amp;(objectCategory=person)(objectClass=user)(sAMAccountName=%s))</field>
+            <field name="ldap_base">ou=BankStaff,dc=bunnabanksc,dc=com</field>
+            <field name="create_user">True</field>
+            <field name="ldap_tls">True</field>
+        </record>
+    </data>
+</odoo>

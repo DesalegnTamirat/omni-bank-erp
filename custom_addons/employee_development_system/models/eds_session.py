@@ -12,10 +12,27 @@ class EdsVenue(models.Model):
     _order = 'name'
     _rec_name = 'name'
 
-    name = fields.Char(string='Venue Name', required=True, tracking=True)
-    location = fields.Char(string='Location')
-    capacity = fields.Integer(string='Capacity', default=30, tracking=True)
-    facilities = fields.Text(string='Facilities / Equipment')
+    name = fields.Char(string='Venue / Hotel Name', required=True, tracking=True)
+    venue_type = fields.Selection([
+        ('hotel', 'Hotel / Conference Center'),
+        ('internal_hall', 'Bank Internal Training Facility'),
+        ('external_hall', 'External Hall / Auditorium'),
+        ('other', 'Other Facility'),
+    ], string='Venue / Facility Type', default='hotel', required=True, tracking=True)
+    contact_person = fields.Char(string='Contact Person')
+    contact_phone = fields.Char(string='Contact Phone')
+    contact_email = fields.Char(string='Contact Email')
+    city = fields.Char(string='City / Sub-City', default='Addis Ababa')
+    address = fields.Text(string='Address / Location Details')
+    location = fields.Char(string='Location Summary')
+    capacity = fields.Integer(string='Seating / Hall Capacity', default=30, tracking=True)
+    facilities = fields.Text(string='Facilities / Equipment (Audio/Visual, Projector, WiFi)')
+    has_lodging = fields.Boolean(string='Hotel Lodging Available', default=False)
+    has_catering = fields.Boolean(string='Catering & Refreshments Available', default=True)
+    attachment_ids = fields.Many2many(
+        'ir.attachment', 'eds_venue_attachment_rel', 'venue_id', 'attachment_id',
+        string='Hotel / Venue Documents & Proposals')
+    notes = fields.Text(string='General Notes')
     active = fields.Boolean(string='Active', default=True)
     booking_ids = fields.One2many('eds.venue.booking', 'venue_id', string='Bookings')
     booking_count = fields.Integer(string='Bookings', compute='_compute_booking_count')
@@ -216,6 +233,25 @@ class EdsSession(models.Model):
     capacity = fields.Integer(
         string='Capacity', default=lambda self: self._get_default_capacity(),
         help='Maximum number of participants (default 25-30 from EDS settings, ).')
+
+    # Awarded Sourcing & Venue Winners (FREDS034/036/037)
+    awarded_provider_id = fields.Many2one(
+        'eds.external.provider', string='Awarded Training Provider / Vendor', tracking=True,
+        help='Vendor selected / awarded for delivering this course session.')
+    awarded_venue_id = fields.Many2one(
+        'eds.venue', string='Awarded Hotel / Venue', tracking=True,
+        help='Hotel or venue selected / awarded for hosting this session.')
+
+    # Customizable Certificate Template & Wording
+    certificate_title = fields.Char(
+        string='Certificate Title', default='Certificate of Completion')
+    certificate_body_text = fields.Text(
+        string='Certificate Body Content',
+        help='Custom body text for certificates issued for this session. Use placeholders like {employee_name}, {course_name}...')
+    certificate_signatory_name = fields.Char(string='Authorized Signatory Name')
+    certificate_signatory_title = fields.Char(
+        string='Authorized Signatory Title', default='Director - People Performance & Development')
+
     approval_flow = fields.Selection([
         ('standard', 'Standard (Line Manager -> L&D)'),
         ('budget_hr', 'With Budget/HR Gate'),
@@ -581,6 +617,25 @@ class EdsSession(models.Model):
             rec.status = 'rescheduled'
             rec._notify_participants(_('Session %s has been rescheduled. Check the new dates.')
                                      % rec.name)
+
+    def action_mark_all_attended(self):
+        """Quickly mark all roster records as attended."""
+        for rec in self:
+            rec._ensure_attendance_records()
+            rec.attendance_ids.write({'attended': True})
+            rec.message_post(body=_("All session participants marked as attended."))
+
+    def action_open_attendance_import(self):
+        """Open the spreadsheet attendance import wizard for this session."""
+        self.ensure_one()
+        return {
+            'name': _('Import Attendance Data'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.attendance.import.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_session_id': self.id},
+        }
 
     def action_confirm_reschedule(self):
         """Rescheduled -> Scheduled: re-validate conflicts + material gate, re-book."""

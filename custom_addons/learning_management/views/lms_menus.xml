@@ -154,6 +154,12 @@
                   action="action_lms_monthly_scorer"
                   sequence="10"/>
 
+        <menuitem id="menu_lms_leaderboard"
+                  name="Gamification Leaderboards"
+                  parent="menu_lms_recognition_root"
+                  action="knowledge_management.action_recognition_leaderboard"
+                  sequence="15"/>
+
         <menuitem id="menu_lms_points_ledger"
                   name="Learning Points Ledger"
                   parent="menu_lms_recognition_root"

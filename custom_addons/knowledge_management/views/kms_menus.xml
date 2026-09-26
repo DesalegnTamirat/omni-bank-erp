@@ -91,6 +91,12 @@
                   action="action_kms_recognition_all"
                   sequence="10"/>
 
+        <menuitem id="menu_kms_leaderboard"
+                  name="Gamification Leaderboards"
+                  parent="menu_kms_recognition_root"
+                  action="action_recognition_leaderboard"
+                  sequence="15"/>
+
         <menuitem id="menu_kms_points_ledger"
                   name="Points Ledger"
                   parent="menu_kms_recognition_root"

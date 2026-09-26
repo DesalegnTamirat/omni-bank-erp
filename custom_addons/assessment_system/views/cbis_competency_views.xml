@@ -11,7 +11,7 @@
                 <field name="evaluation_method"/>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page string="Suggested Interview Questions (CBIS)">
+                <page string="Suggested Interview Questions (CBIS)" groups="assessment_system.group_assessment_administrator">
                     <field name="question_ids">
                         <list editable="bottom">
                             <field name="sequence" widget="handle"/>

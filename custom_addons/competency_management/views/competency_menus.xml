@@ -120,7 +120,7 @@
             sequence="15"
             groups="competency_management.group_competency_officer" />
         <menuitem id="menu_competency_director_peer_config"
-            name="Director Peer Configuration"
+            name="Executive Peer Configuration"
             parent="menu_competency_config_categ"
             action="action_competency_director_peer_config"
             sequence="18"

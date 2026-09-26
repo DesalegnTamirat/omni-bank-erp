@@ -46,5 +46,16 @@
             <field name="active">True</field>
         </record>
 
+        <!-- Daily Cron: Sync Coach Supervisor Access Role -->
+        <record id="cron_sync_coach_supervisor_access" model="ir.cron">
+            <field name="name">Competency Management: Sync Coach Supervisor Access</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="state">code</field>
+            <field name="code">model._sync_all_coach_supervisor_groups()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
     </data>
 </odoo>

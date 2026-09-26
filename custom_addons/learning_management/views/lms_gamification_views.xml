@@ -40,6 +40,42 @@
             </field>
         </record>
 
+        <!-- Best Scorer of the Month Form View with Chatter -->
+        <record id="view_lms_monthly_scorer_form" model="ir.ui.view">
+            <field name="name">lms.monthly.scorer.form</field>
+            <field name="model">lms.monthly.scorer</field>
+            <field name="arch" type="xml">
+                <form string="Monthly Best Scorer">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group string="Learner Information">
+                                <field name="employee_id" widget="many2one_avatar_employee"/>
+                                <field name="department_id"/>
+                                <field name="operating_unit_id"/>
+                            </group>
+                            <group string="Achievement Metrics">
+                                <field name="period_date"/>
+                                <field name="average_score"/>
+                                <field name="courses_completed"/>
+                                <field name="badge" widget="badge"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Citation &amp; Highlights">
+                                <field name="citation" placeholder="Reason and highlights for this month's recognition..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
         <!-- Points Ledger List -->
         <record id="view_lms_points_ledger_list" model="ir.ui.view">
             <field name="name">lms.gamification.point.list</field>

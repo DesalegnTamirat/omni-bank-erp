@@ -47,8 +47,39 @@ class EdsCourse(models.Model):
     curriculum_ids = fields.One2many('eds.curriculum', 'course_id', string='Curriculum Versions')
     current_curriculum_id = fields.Many2one(
         'eds.curriculum', string='Current Curriculum', compute='_compute_current_curriculum')
+    department_ids = fields.Many2many(
+        'hr.department', 'eds_course_department_rel', 'course_id', 'department_id',
+        string='Target Departments', help='Leave empty if course applies to all departments.')
+    operating_unit_ids = fields.Many2many(
+        'operating.unit', 'eds_course_operating_unit_rel', 'course_id', 'operating_unit_id',
+        string='Target Operating Units / Branches', help='Leave empty if course applies to all operating units.')
     target_audience_ids = fields.Many2many(
-        'hr.job', string='Target Audience (Job Positions)')
+        'hr.job', string='Target Job Positions',
+        help='Leave empty if course applies to all job positions.')
+    target_scope = fields.Selection([
+        ('all', 'Bank-Wide (All Employees)'),
+        ('targeted', 'Targeted Scope'),
+    ], string='Target Scope', compute='_compute_target_scope', store=True)
+
+    # Customizable Certificate Template Fields
+    certificate_title = fields.Char(string='Certificate Title', default='Certificate of Completion')
+    certificate_body_text = fields.Text(
+        string='Certificate Body Content',
+        default="This is to certify that {employee_name} has successfully completed the training program '{course_name}' with satisfactory attendance and evaluation performance.")
+    certificate_signatory_name = fields.Char(string='Authorized Signatory Name')
+    certificate_signatory_title = fields.Char(string='Authorized Signatory Title', default='Director - People Performance & Development')
+
+    # Linked Evaluation & Assessment Instruments
+    level1_instrument_id = fields.Many2one(
+        'eds.evaluation.instrument', string='Level 1 Reaction Questionnaire',
+        domain="[('instrument_type', '=', 'level1')]")
+    level2_instrument_id = fields.Many2one(
+        'eds.evaluation.instrument', string='Level 2 Assessment Questionnaire',
+        domain="[('instrument_type', '=', 'level2')]")
+    level3_instrument_id = fields.Many2one(
+        'eds.evaluation.instrument', string='Level 3 Behavioral Questionnaire',
+        domain="[('instrument_type', '=', 'level3')]")
+
     prerequisite_course_ids = fields.Many2many(
         'eds.course', 'eds_course_prereq_rel', 'course_id', 'prerequisite_id',
         string='Prerequisite Courses')
@@ -130,6 +161,33 @@ class EdsCourse(models.Model):
             # lexicographically: 'v1.10' would sort before 'v1.2').
             approved = rec.curriculum_ids.filtered(lambda c: c.state == 'approved')
             rec.current_curriculum_id = approved.sorted('id', reverse=True).ids[0] if approved else False
+
+    @api.depends('department_ids', 'operating_unit_ids', 'target_audience_ids')
+    def _compute_target_scope(self):
+        for rec in self:
+            if rec.department_ids or rec.operating_unit_ids or rec.target_audience_ids:
+                rec.target_scope = 'targeted'
+            else:
+                rec.target_scope = 'all'
+
+    def is_applicable_for_employee(self, employee):
+        """Check if course applies to the given employee based on unit/dept/job targeting."""
+        self.ensure_one()
+        if not employee:
+            return True
+        if self.target_scope == 'all':
+            return True
+        if self.department_ids and employee.department_id and employee.department_id not in self.department_ids:
+            return False
+        if self.operating_unit_ids:
+            emp_ou = getattr(employee, 'default_operating_unit_id', False)
+            if emp_ou and emp_ou not in self.operating_unit_ids:
+                return False
+        if self.target_audience_ids:
+            emp_job = getattr(employee, 'job_position', False) or employee.job_id
+            if emp_job and emp_job not in self.target_audience_ids:
+                return False
+        return True
 
     @api.depends('curriculum_ids', 'development_request_ids', 'material_ids', 'competency_line_ids')
     def _compute_counts(self):

@@ -166,7 +166,7 @@
                     <field name="accreditation"/>
                     <field name="pre_qualified" widget="boolean_toggle"/>
                     <field name="rating" widget="progressbar"/>
-                    <field name="contract_count"/>
+                    <field name="rating_count"/>
                 </list>
             </field>
         </record>
@@ -188,19 +188,36 @@
                                 <field name="partner_id"/>
                                 <field name="category"/>
                                 <field name="country_id"/>
+                                <field name="tax_id"/>
                             </group>
-                            <group string="Qualification">
+                            <group string="Contact &amp; Experience">
+                                <field name="contact_name"/>
+                                <field name="phone"/>
+                                <field name="email"/>
+                                <field name="website"/>
+                                <field name="years_of_experience"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group>
+                            <group string="Qualification &amp; Rating">
                                 <field name="accreditation"/>
                                 <field name="pre_qualified"/>
                                 <field name="rating"/>
                                 <field name="rating_count"/>
-                                <field name="active"/>
+                            </group>
+                            <group string="Specialization Domains">
+                                <field name="specialization_areas"/>
                             </group>
                         </group>
-                        <group string="Service Offerings">
+                        <group string="Service Offerings &amp; Profile Summary">
                             <field name="service_offerings"/>
+                            <field name="notes"/>
                         </group>
                         <notebook>
+                            <page string="Profile Documents &amp; Certifications" name="documents">
+                                <field name="attachment_ids" widget="many2many_binary"/>
+                            </page>
                             <page string="Performance History ()" name="performance">
                                 <field name="performance_history_ids">
                                     <list editable="bottom">

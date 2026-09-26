@@ -378,6 +378,30 @@ class EdsTnaEntry(models.Model):
     ], string='Delivery Mode', default='classroom', required=True, tracking=True,
         help='Decided at TNA stage : only Classroom (and the classroom part of '
              'Blended) are actioned within EDS; E-Learning routes to the LMS.')
+    # Course Pool Selection & Ad-Hoc Requests
+    course_id = fields.Many2one('eds.course', string='Course from Catalog', tracking=True)
+    is_custom_course = fields.Boolean(string='Course Not in Catalog', default=False, tracking=True)
+    custom_course_title = fields.Char(string='Custom Course Title', tracking=True)
+    custom_course_description = fields.Text(string='What the Course is About / Content Summary')
+    urgency = fields.Selection([
+        ('critical', 'Critical (Immediate Operational Urgency)'),
+        ('high', 'High Priority'),
+        ('medium', 'Medium Priority'),
+        ('low', 'Low / Discretionary'),
+    ], string='Urgency', default='medium', required=True, tracking=True)
+
+    # HR Planning & Scheduling Decision Fields
+    hr_target_quarter = fields.Selection([
+        ('q1', 'Q1'),
+        ('q2', 'Q2'),
+        ('q3', 'Q3'),
+        ('q4', 'Q4'),
+    ], string='Planned Quarter', tracking=True)
+    hr_target_delivery_date = fields.Date(string='Target Delivery Date', tracking=True)
+    hr_assigned_participant_ids = fields.Many2many(
+        'hr.employee', 'eds_tna_entry_participant_rel', 'entry_id', 'employee_id',
+        string='Assigned Target Employees', help='HR specifies which employee(s) will take this training.')
+
     priority_score = fields.Float(string='Priority Score', compute='_compute_priority_score', store=True)
     justification = fields.Text(string='Justification', required=True)
     proposed_program = fields.Char(string='Proposed Program / Course')
@@ -495,6 +519,28 @@ class EdsTnaEntry(models.Model):
                 else:
                     rec.recommended_course_id = False
                     rec.course_match_status = 'no_course'
+
+    @api.onchange('course_id')
+    def _onchange_course_id(self):
+        if self.course_id:
+            self.proposed_program = self.course_id.name
+            if not self.competency_id and self.course_id.competency_line_ids:
+                self.competency_id = self.course_id.competency_line_ids[0].competency_id.id
+            if not self.justification and self.course_id.description:
+                self.justification = self.course_id.description
+
+    @api.onchange('urgency')
+    def _onchange_urgency(self):
+        if self.urgency:
+            self.gap_severity = self.urgency
+
+    @api.onchange('is_custom_course', 'custom_course_title', 'custom_course_description')
+    def _onchange_custom_course(self):
+        if self.is_custom_course:
+            if self.custom_course_title:
+                self.proposed_program = self.custom_course_title
+            if self.custom_course_description and not self.justification:
+                self.justification = self.custom_course_description
 
     def action_view_recommended_course(self):
         self.ensure_one()

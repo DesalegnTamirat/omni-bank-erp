@@ -53,6 +53,48 @@ class HrEmployeeCompetency(models.Model):
         for emp in self:
             emp.is_director_or_chief = peer_config_model._is_director_or_chief(emp)
 
+    def _is_competency_scoped_context(self):
+        ctx = self.env.context
+        is_competency_ctx = bool(
+            ctx.get('competency_employee_select')
+            or ctx.get('competency_peer_select')
+            or ctx.get('active_model') in ('competency.director.peer.config', 'competency.report.wizard', 'competency.assessment', 'competency.assessment.line', 'competency.assessment.cycle')
+            or (ctx.get('params') and ctx.get('params').get('model') in ('competency.director.peer.config', 'competency.report.wizard', 'competency.assessment', 'competency.assessment.line', 'competency.assessment.cycle'))
+        )
+        if not is_competency_ctx:
+            return False
+        user = self.env.user
+        return bool(
+            user.has_group('competency_management.group_competency_admin')
+            or user.has_group('competency_management.group_competency_officer')
+            or user.has_group('competency_management.group_competency_supervisor')
+            or self.env.su
+            or self.env.is_admin()
+        )
+
+    def check_access_rule(self, operation):
+        if operation == 'read' and self._is_competency_scoped_context():
+            return None
+        return super().check_access_rule(operation)
+
+    def _filter_access_rules_python(self, operation='read'):
+        if operation == 'read' and self._is_competency_scoped_context():
+            return self
+        return super()._filter_access_rules_python(operation=operation)
+
+    @api.model
+    def name_search(self, name='', domain=None, operator='ilike', limit=100, **kwargs):
+        if self._is_competency_scoped_context():
+            return super(HrEmployeeCompetency, self.sudo()).name_search(name=name, domain=domain, operator=operator, limit=limit, **kwargs)
+        return super().name_search(name=name, domain=domain, operator=operator, limit=limit, **kwargs)
+
+    @api.model
+    def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
+        if self._is_competency_scoped_context():
+            return super(HrEmployeeCompetency, self.sudo()).web_search_read(
+                domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit
+            )
+        return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
 
     @api.depends('competency_assessment_ids', 'competency_assessment_ids.state', 'competency_assessment_ids.create_date', 'competency_assessment_ids.line_ids')
     def _compute_latest_competency_assessment(self):
@@ -192,3 +234,114 @@ class HrEmployeeCompetency(models.Model):
             'view_mode': 'list,form',
             'domain': [('employee_id', '=', self.id)],
         }
+
+    # ── Coach Supervisor Role Auto-Assignment ─────────────────────────────────
+
+    @api.model
+    def _sync_coach_supervisor_group(self, coach_ids=None):
+        """Automatically grant group_competency_supervisor to users whose employee is a coach/manager."""
+        sup_group = self.env.ref('competency_management.group_competency_supervisor', raise_if_not_found=False)
+        if not sup_group:
+            return
+
+        domain = [('active', '=', True), ('user_id', '!=', False)]
+        if coach_ids:
+            domain.append(('id', 'in', list(coach_ids)))
+        else:
+            # All coaches/managers of active employees
+            self.env.cr.execute("""
+                SELECT DISTINCT coach.id
+                FROM hr_employee sub
+                JOIN hr_employee coach ON (coach.id = sub.coach_id OR coach.id = sub.parent_id)
+                WHERE sub.active = TRUE AND coach.active = TRUE AND coach.user_id IS NOT NULL;
+            """)
+            c_ids = [r[0] for r in self.env.cr.fetchall() if r[0]]
+            if not c_ids:
+                return
+            domain.append(('id', 'in', c_ids))
+
+        coaches = self.sudo().search(domain)
+        for coach in coaches:
+            user = coach.user_id
+            if user:
+                user_groups = user.group_ids if 'group_ids' in user._fields else getattr(user, 'groups_id', self.env['res.groups'])
+                if sup_group not in user_groups:
+                    field_name = 'group_ids' if 'group_ids' in user._fields else 'groups_id'
+                    user.sudo().write({field_name: [(4, sup_group.id)]})
+
+    @api.model
+    def _sync_all_coach_supervisor_groups(self):
+        """Batch maintenance cron / upgrade hook: Ensures all active coaches have Supervisor access."""
+        self._sync_coach_supervisor_group()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        coach_ids = set()
+        for vals in vals_list:
+            if vals.get('coach_id'):
+                coach_ids.add(vals['coach_id'])
+            if vals.get('parent_id'):
+                coach_ids.add(vals['parent_id'])
+        for rec in records:
+            if rec.user_id:
+                # If newly created employee is already a coach
+                has_coachees = self.sudo().search_count([
+                    ('active', '=', True),
+                    '|', ('coach_id', '=', rec.id), ('parent_id', '=', rec.id)
+                ]) > 0
+                if has_coachees:
+                    coach_ids.add(rec.id)
+        if coach_ids:
+            self._sync_coach_supervisor_group(coach_ids)
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        trigger_fields = {'coach_id', 'parent_id', 'user_id', 'active'}
+        if trigger_fields.intersection(vals.keys()):
+            coach_ids = set()
+            if vals.get('coach_id'):
+                coach_ids.add(vals['coach_id'])
+            if vals.get('parent_id'):
+                coach_ids.add(vals['parent_id'])
+            for emp in self:
+                if emp.coach_id:
+                    coach_ids.add(emp.coach_id.id)
+                if emp.parent_id:
+                    coach_ids.add(emp.parent_id.id)
+                if 'user_id' in vals and emp.user_id:
+                    has_coachees = self.sudo().search_count([
+                        ('active', '=', True),
+                        '|', ('coach_id', '=', emp.id), ('parent_id', '=', emp.id)
+                    ]) > 0
+                    if has_coachees:
+                        coach_ids.add(emp.id)
+            if coach_ids:
+                self._sync_coach_supervisor_group(coach_ids)
+        return res
+
+    def _register_hook(self):
+        super()._register_hook()
+        try:
+            with self.env.cr.savepoint():
+                # 1. Enforce strict menu groups for reporting menus (purge supervisor/employee groups)
+                officer_group = self.env.ref('competency_management.group_competency_officer', raise_if_not_found=False)
+                if officer_group:
+                    reporting_menu_xmls = [
+                        'competency_management.menu_competency_reports_categ',
+                        'competency_management.menu_competency_report_wizard',
+                        'competency_management.menu_competency_tna_analytics_report',
+                        'competency_management.menu_competency_dashboard_snapshot',
+                    ]
+                    for m_xml in reporting_menu_xmls:
+                        menu = self.env.ref(m_xml, raise_if_not_found=False)
+                        if menu:
+                            menu.sudo().write({'group_ids': [(6, 0, [officer_group.id])]})
+
+                # 2. Sync all coaches to have group_competency_supervisor
+                self.sudo()._sync_all_coach_supervisor_groups()
+        except Exception:
+            pass
+
+

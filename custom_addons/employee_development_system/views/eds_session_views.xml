@@ -47,15 +47,26 @@
                             </button>
                         </div>
                         <group>
-                            <group string="Venue">
+                            <group string="Venue Details">
                                 <field name="name"/>
-                                <field name="location"/>
+                                <field name="venue_type" widget="badge"/>
                                 <field name="capacity"/>
+                                <field name="city"/>
+                                <field name="location"/>
                                 <field name="active"/>
                             </group>
-                            <group string="Facilities">
-                                <field name="facilities"/>
+                            <group string="Contact &amp; Amenities">
+                                <field name="contact_person"/>
+                                <field name="contact_phone"/>
+                                <field name="contact_email"/>
+                                <field name="has_lodging"/>
+                                <field name="has_catering"/>
+                                <field name="address"/>
                             </group>
+                        </group>
+                        <group string="Facilities &amp; Equipment">
+                            <field name="facilities" placeholder="Projector, sound system, WiFi, etc..."/>
+                            <field name="notes"/>
                         </group>
                         <notebook>
                             <page string="Bookings" name="bookings">
@@ -68,6 +79,9 @@
                                         <field name="state" widget="badge"/>
                                     </list>
                                 </field>
+                            </page>
+                            <page string="Proposals &amp; Documents" name="documents">
+                                <field name="attachment_ids" widget="many2many_binary"/>
                             </page>
                         </notebook>
                     </sheet>
@@ -333,6 +347,14 @@
                                 <field name="conflict_flag" readonly="1"/>
                             </group>
                         </group>
+                        <group string="Awarded Training Provider &amp; Hotel Winners (FREDS034/036)">
+                            <group>
+                                <field name="awarded_provider_id" options="{'no_create': True}" placeholder="Select awarded vendor/provider..."/>
+                            </group>
+                            <group>
+                                <field name="awarded_venue_id" options="{'no_create': True}" placeholder="Select awarded hotel/venue..."/>
+                            </group>
+                        </group>
                         <group string="Notes">
                             <field name="notes"/>
                         </group>
@@ -362,19 +384,37 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Attendance" name="attendance"
-                                  invisible="status not in ('ongoing','completed')">
+                            <page string="Attendance &amp; Roster" name="attendance">
+                                <div class="mb-2">
+                                    <button name="action_mark_all_attended" string="Mark All Attended" type="object"
+                                            class="btn btn-success btn-sm me-2" icon="fa-check-circle"/>
+                                    <button name="action_open_attendance_import" string="Import Attendance CSV" type="object"
+                                            class="btn btn-secondary btn-sm" icon="fa-upload"/>
+                                </div>
                                 <field name="attendance_ids">
                                     <list editable="bottom">
                                         <field name="name" readonly="1"/>
                                         <field name="employee_id"/>
                                         <field name="attendance_date"/>
-                                        <field name="attended"/>
+                                        <field name="attended" widget="boolean_toggle"/>
                                         <field name="hours_attended" widget="float_time"/>
-                                        <field name="notes"/>
                                         <field name="attendance_percentage" string="Program %"/>
+                                        <field name="meets_min_attendance" widget="badge"/>
+                                        <field name="notes"/>
                                     </list>
                                 </field>
+                            </page>
+                            <page string="Certificate Customization" name="certificate_config">
+                                <group>
+                                    <group string="Certificate Wording">
+                                        <field name="certificate_title"/>
+                                        <field name="certificate_body_text" placeholder="Session-specific certificate statement... Use {employee_name}, {course_name}..."/>
+                                    </group>
+                                    <group string="Signatory Details">
+                                        <field name="certificate_signatory_name" placeholder="Leave empty to use course default"/>
+                                        <field name="certificate_signatory_title"/>
+                                    </group>
+                                </group>
                             </page>
                             <page string="Daily Feedback" name="feedback">
                                 <field name="feedback_ids">

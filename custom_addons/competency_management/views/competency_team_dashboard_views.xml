@@ -33,7 +33,12 @@
             <field name="arch" type="xml">
                 <search string="Competency Assessment Lines">
                     <field name="assessment_id"/>
+                    <field name="employee_id"/>
+                    <field name="cycle_id"/>
                     <field name="competency_id"/>
+                    <filter string="Current / Latest Cycle" name="filter_current_cycle" domain="[('cycle_id.is_open_or_latest', '=', True)]"/>
+                    <filter string="Primary Reporting Lines" name="filter_primary_reporting" domain="[('is_primary_reporting_line', '=', True)]"/>
+                    <separator/>
                     <filter string="Below Required Level" name="below_required" domain="[('achievement_status', '=', 'below')]"/>
                     <filter string="Meets Required Level" name="meets_required" domain="[('achievement_status', '=', 'meets')]"/>
                     <filter string="Exceeds Required Level" name="exceeds_required" domain="[('achievement_status', '=', 'exceeds')]"/>

@@ -100,6 +100,14 @@
                         <page string="Eligibility Analysis">
                             <field name="eligibility_reason" readonly="1"/>
                         </page>
+                        <page string="Certificate Content &amp; Signatures">
+                            <group>
+                                <field name="certificate_title"/>
+                                <field name="certificate_body_text"/>
+                                <field name="signatory_name"/>
+                                <field name="signatory_title"/>
+                            </group>
+                        </page>
                         <page string="Certificate Attachment">
                             <group>
                                 <field name="file" filename="file_name"/>

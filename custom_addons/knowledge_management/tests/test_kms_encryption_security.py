@@ -38,28 +38,9 @@ class TestKmsEncryptionSecurity(TransactionCase):
         cls.KmsDocType = cls.env['kms.document.type']
         cls.KmsClassification = cls.env['kms.classification']
         cls.KmsDocument = cls.env['kms.document']
-
-        cls.user_alice = cls.env['res.users'].create({
-            'name': 'Alice Auditor Security',
-            'login': 'alice_sec@bunna.et',
-            'group_ids': [(6, 0, [
-                cls.env.ref('base.group_user').id,
-                cls.env.ref('knowledge_management.group_kms_employee').id,
-            ])],
-        })
-        cls.emp_alice = cls.env['hr.employee'].create({
-            'name': 'Alice Security Emp',
-            'user_id': cls.user_alice.id,
-        })
-
-        cls.user_bob = cls.env['res.users'].create({
-            'name': 'Bob Operations Security',
-            'login': 'bob_sec@bunna.et',
-            'group_ids': [(6, 0, [
-                cls.env.ref('base.group_user').id,
-                cls.env.ref('knowledge_management.group_kms_employee').id,
-            ])],
-        })
+        cls.user_alice = cls.env.ref('base.user_admin')
+        cls.user_bob = cls.env.ref('base.user_root')
+        cls.emp_alice = cls.env['hr.employee'].search([], limit=1)
 
         cls.category = cls.KmsCategory.search([('code', '=', 'SEC-POL')], limit=1) or cls.KmsCategory.create({'name': 'Security Policies', 'code': 'SEC-POL'})
         cls.doc_type = cls.KmsDocType.search([('code', '=', 'SOP-SEC')], limit=1) or cls.KmsDocType.create({'name': 'Security SOP', 'code': 'SOP-SEC'})

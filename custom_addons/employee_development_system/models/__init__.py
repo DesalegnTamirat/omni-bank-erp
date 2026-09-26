@@ -21,3 +21,7 @@ from . import eds_education
 from . import eds_internship
 from . import eds_reporting
 from . import hr_employee
+from . import eds_workplace_learning
+from . import eds_idp
+from . import eds_assessment_center
+from . import eds_partnership

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_workplace_assignment_tree" model="ir.ui.view">
+        <field name="name">eds.workplace.assignment.tree</field>
+        <field name="model">eds.workplace.assignment</field>
+        <field name="arch" type="xml">
+            <list string="Workplace Learning Assignments">
+                <field name="name"/>
+                <field name="program_type" widget="badge"/>
+                <field name="employee_id"/>
+                <field name="mentor_id"/>
+                <field name="department_id"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'active'" decoration-muted="state == 'completed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_workplace_assignment_form" model="ir.ui.view">
+        <field name="name">eds.workplace.assignment.form</field>
+        <field name="model">eds.workplace.assignment</field>
+        <field name="arch" type="xml">
+            <form string="Workplace Learning Assignment">
+                <header>
+                    <button name="action_activate" string="Activate Assignment" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_complete" string="Mark Completed" type="object" class="oe_highlight" invisible="state != 'active'"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('completed', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Program &amp; Assignees">
+                            <field name="program_type" widget="badge"/>
+                            <field name="employee_id"/>
+                            <field name="mentor_id"/>
+                            <field name="department_id"/>
+                            <field name="job_id"/>
+                        </group>
+                        <group string="Timeline &amp; Objectives">
+                            <field name="start_date"/>
+                            <field name="end_date"/>
+                            <field name="focus_areas"/>
+                        </group>
+                    </group>
+                    <group string="Objectives, Guidance &amp; Expectations">
+                        <field name="notes" placeholder="Enter key guidance, expectations, orientation topics, or check-in rhythm..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_eds_workplace_assignment_search" model="ir.ui.view">
+        <field name="name">eds.workplace.assignment.search</field>
+        <field name="model">eds.workplace.assignment</field>
+        <field name="arch" type="xml">
+            <search string="Search Workplace Learning">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="mentor_id"/>
+                <field name="department_id"/>
+                <filter string="Active" name="active" domain="[('state', '=', 'active')]"/>
+                <filter string="Buddy" name="buddy" domain="[('program_type', '=', 'buddy')]"/>
+                <filter string="Mentoring" name="mentoring" domain="[('program_type', '=', 'mentoring')]"/>
+                <filter string="Coaching" name="coaching" domain="[('program_type', '=', 'coaching')]"/>
+                <filter string="OJT" name="ojt" domain="[('program_type', '=', 'ojt')]"/>
+                <group>
+                    <filter string="Program Type" name="group_program" context="{'group_by': 'program_type'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Department" name="group_dept" context="{'group_by': 'department_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_eds_workplace_assignment" model="ir.actions.act_window">
+        <field name="name">Workplace Learning (Buddy / Mentoring)</field>
+        <field name="res_model">eds.workplace.assignment</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_eds_workplace_assignment_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Assign a Buddy, Mentor, Coach, or OJT guide to an employee.
+            </p>
+        </field>
+    </record>
+</odoo>

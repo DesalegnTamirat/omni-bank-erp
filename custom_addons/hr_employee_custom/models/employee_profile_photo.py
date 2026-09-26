@@ -14,6 +14,9 @@ class EmployeeProfilePhoto(models.Model):
     )
     profile_picture = fields.Binary("Profile Image", attachment=False)
 
-    _sql_constraints = [
-        ('employee_id_uniq', 'unique(employee_id)', 'An employee can only have one profile photo record.')
-    ]
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS employee_profile_photo_employee_id_uniq 
+            ON employee_profile_photo (employee_id);
+        """)

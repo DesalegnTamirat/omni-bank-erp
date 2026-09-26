@@ -35,11 +35,33 @@ class EdsCertificate(models.Model):
     file = fields.Binary(string='Certificate File (PDF)', attachment=True)
     file_name = fields.Char(string='File Name')
     issued_by = fields.Many2one('res.users', string='Issued By', default=lambda self: self.env.user)
+    
+    # HR Editable Certificate Content
+    certificate_title = fields.Char(string='Certificate Title', compute='_compute_certificate_content', store=True, readonly=False)
+    certificate_body_text = fields.Text(string='Certificate Body', compute='_compute_certificate_content', store=True, readonly=False)
+    signatory_name = fields.Char(string='Signatory Name', compute='_compute_certificate_content', store=True, readonly=False)
+    signatory_title = fields.Char(string='Signatory Title', compute='_compute_certificate_content', store=True, readonly=False)
+
     state = fields.Selection([
         ('pending', 'Pending Eligibility Check'),
         ('issued', 'Issued'),
         ('void', 'Voided'),
     ], string='Status', default='pending', required=True, tracking=True)
+
+    @api.depends('session_id', 'course_id', 'employee_id')
+    def _compute_certificate_content(self):
+        for rec in self:
+            session = rec.session_id
+            course = rec.course_id or (session and session.course_id)
+            rec.certificate_title = (session and session.certificate_title) or (course and course.certificate_title) or _("Certificate of Completion")
+            raw_body = (session and session.certificate_body_text) or (course and course.certificate_body_text) or _(
+                "This is to certify that {employee_name} has successfully completed the training program '{course_name}' with satisfactory attendance and performance."
+            )
+            emp_name = rec.employee_id.name if rec.employee_id else _("Participant")
+            c_name = (course.name if course else (session.program_name if session else _("Training Course")))
+            rec.certificate_body_text = raw_body.replace("{employee_name}", emp_name).replace("{course_name}", c_name)
+            rec.signatory_name = (session and session.certificate_signatory_name) or (course and course.certificate_signatory_name) or ""
+            rec.signatory_title = (session and session.certificate_signatory_title) or (course and course.certificate_signatory_title) or _("Director - People Performance & Development")
 
     @api.constrains('session_id', 'employee_id')
     def _check_unique_session_emp_cert(self):

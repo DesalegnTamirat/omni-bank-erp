@@ -36,6 +36,10 @@ class TestKmsFulltextSearch(TransactionCase):
                 'security_level': 1,
             })
 
+        cls.emp = cls.env['hr.employee'].search([], limit=1)
+        if not cls.emp:
+            cls.emp = cls.env['hr.employee'].create({'name': 'KMS Search Owner'})
+
         # Ensure index is applied in test DB
         cls.env['kms.document'].init()
 
@@ -45,6 +49,7 @@ class TestKmsFulltextSearch(TransactionCase):
             'category_id': cls.category.id,
             'doc_type_id': cls.doc_type.id,
             'classification_id': cls.classification.id,
+            'owner_id': cls.emp.id,
             'summary': 'Framework for detecting suspicious financial transactions and AML/CFT compliance.',
             'content_text': 'All branch compliance officers must file CTR and STR reports to the Financial Intelligence Center.',
             'state': 'approved',
@@ -55,6 +60,7 @@ class TestKmsFulltextSearch(TransactionCase):
             'category_id': cls.category.id,
             'doc_type_id': cls.doc_type.id,
             'classification_id': cls.classification.id,
+            'owner_id': cls.emp.id,
             'summary': 'Standard operating procedures for outgoing international SWIFT payments.',
             'content_text': 'Dual authorization is mandatory for MT103 and MT202 messages exceeding threshold.',
             'state': 'approved',
@@ -65,6 +71,7 @@ class TestKmsFulltextSearch(TransactionCase):
             'category_id': cls.category.id,
             'doc_type_id': cls.doc_type.id,
             'classification_id': cls.classification.id,
+            'owner_id': cls.emp.id,
             'summary': 'Core banking cybersecurity rules and firewall configurations.',
             'content_text': 'Zero trust architecture is enforced. Two-factor authentication is required for all administrative access.',
             'state': 'approved',

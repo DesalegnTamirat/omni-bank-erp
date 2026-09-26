@@ -40,3 +40,4 @@ access_lms_points_user,lms.gamification.point.user,model_lms_gamification_point,
 access_lms_points_manager,lms.gamification.point.manager,model_lms_gamification_point,learning_management.group_lms_manager,1,1,1,1
 access_lms_monthly_scorer_user,lms.monthly.scorer.user,model_lms_monthly_scorer,learning_management.group_lms_learner,1,0,0,0
 access_lms_monthly_scorer_manager,lms.monthly.scorer.manager,model_lms_monthly_scorer,learning_management.group_lms_manager,1,1,1,1
+access_recognition_leaderboard_line_lms_mgr,recognition.leaderboard.line.lms_mgr,knowledge_management.model_recognition_leaderboard_line,learning_management.group_lms_manager,1,1,1,1

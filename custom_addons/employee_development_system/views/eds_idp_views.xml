@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_idp_tree" model="ir.ui.view">
+        <field name="name">eds.idp.tree</field>
+        <field name="model">eds.idp</field>
+        <field name="arch" type="xml">
+            <list string="Individual Development Plans">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="year"/>
+                <field name="manager_id"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-primary="state == 'submitted'" decoration-success="state in ('approved', 'completed')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_idp_form" model="ir.ui.view">
+        <field name="name">eds.idp.form</field>
+        <field name="model">eds.idp</field>
+        <field name="arch" type="xml">
+            <form string="Individual Development Plan (IDP)">
+                <header>
+                    <button name="action_submit" string="Submit for Review" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_approve" string="Approve IDP" type="object" class="oe_highlight" invisible="state != 'submitted'" groups="employee_development_system.group_eds_line_manager"/>
+                    <button name="action_start" string="Set In Progress" type="object" invisible="state != 'approved'"/>
+                    <button name="action_complete" string="Mark Completed" type="object" class="oe_highlight" invisible="state != 'in_progress'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Employee Information">
+                            <field name="employee_id"/>
+                            <field name="department_id"/>
+                            <field name="job_id"/>
+                            <field name="manager_id"/>
+                        </group>
+                        <group string="Plan Details">
+                            <field name="year"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Development Goals &amp; Activities" name="goals">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="target_skill"/>
+                                    <field name="competency_id"/>
+                                    <field name="learning_action"/>
+                                    <field name="proposed_course_id"/>
+                                    <field name="target_date"/>
+                                    <field name="status" widget="badge"/>
+                                    <field name="progress_notes"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Career Aspirations &amp; Notes" name="notes">
+                            <field name="notes" placeholder="Summarize career objectives and key focus areas for the year..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_idp" model="ir.actions.act_window">
+        <field name="name">Individual Development Plans (IDP)</field>
+        <field name="res_model">eds.idp</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Self-Development Views -->
+    <record id="view_eds_self_development_tree" model="ir.ui.view">
+        <field name="name">eds.self.development.tree</field>
+        <field name="model">eds.self.development</field>
+        <field name="arch" type="xml">
+            <list string="Self-Development Activities">
+                <field name="title"/>
+                <field name="employee_id"/>
+                <field name="activity_type" widget="badge"/>
+                <field name="activity_date"/>
+                <field name="hours_spent"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_self_development_form" model="ir.ui.view">
+        <field name="name">eds.self.development.form</field>
+        <field name="model">eds.self.development</field>
+        <field name="arch" type="xml">
+            <form string="Self-Development Activity">
+                <header>
+                    <button name="action_submit" string="Record Activity" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="title" placeholder="e.g. Read 'Principles of Banking Risk Management'"/></h1>
+                    </div>
+                    <group>
+                        <group string="Activity Information">
+                            <field name="employee_id"/>
+                            <field name="activity_type"/>
+                            <field name="activity_date"/>
+                            <field name="hours_spent"/>
+                        </group>
+                        <group string="Proof / Certificate">
+                            <field name="certificate_attachment" filename="certificate_name"/>
+                            <field name="certificate_name" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Key Learnings &amp; Impact">
+                        <field name="key_takeaways" placeholder="Describe key insights, ideas learned, and how they apply to your role at Bunna Bank..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_self_development" model="ir.actions.act_window">
+        <field name="name">Self-Development Activities</field>
+        <field name="res_model">eds.self.development</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

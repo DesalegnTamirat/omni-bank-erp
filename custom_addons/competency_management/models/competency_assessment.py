@@ -31,12 +31,48 @@ class CompetencyAssessmentCycle(models.Model):
     eligible_rater_count = fields.Integer(string='Eligible Raters Pool Size', default=0, readonly=True)
     selected_rater_count = fields.Integer(string='Sampled Raters Size', default=0, readonly=True)
     notes = fields.Text(string='Notes')
+    is_open_or_latest = fields.Boolean(
+        string='Is Current or Latest Cycle',
+        compute='_compute_is_open_or_latest', store=True, index=True
+    )
+
+    @api.constrains('name')
+    def _check_unique_name(self):
+        for rec in self:
+            if rec.name:
+                duplicate = self.search([
+                    ('id', '!=', rec.id),
+                    ('name', '=ilike', rec.name.strip()),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_("An Assessment Cycle named '%s' already exists. Cycle names must be unique.") % rec.name.strip())
+
+    @api.depends('state', 'active')
+    def _compute_is_open_or_latest(self):
+        all_cycles = self.search([('active', '=', True)])
+        open_cycles = all_cycles.filtered(lambda c: c.state == 'open')
+        if open_cycles:
+            target_ids = set(open_cycles.ids)
+        else:
+            latest = all_cycles.sorted(key=lambda c: (c.period_end or fields.Date.today(), c.id), reverse=True)
+            target_ids = {latest[0].id} if latest else set()
+
+        for rec in self:
+            rec.is_open_or_latest = rec.id in target_ids
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'state' in vals or 'active' in vals:
+            self.search([])._compute_is_open_or_latest()
+        return res
 
     @api.model_create_multi
     def create(self, vals_list):
         if not self.env.user.has_group('competency_management.group_competency_admin') and not self.env.su:
             raise UserError(_("Only Competency Administrators can create new Assessment Cycles."))
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        self.search([])._compute_is_open_or_latest()
+        return records
 
     @api.depends('assessment_ids', 'assessment_ids.state')
     def _compute_assessment_counts(self):
@@ -411,13 +447,26 @@ class CompetencyAssessmentCycle(models.Model):
                 is_dir = self.env['competency.assessment']._is_director_or_chief(emp)
 
             is_chief = is_dir and ('chief' in j_name or 'president' in j_name or 'vp' in j_name)
-            is_bm = 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name
-            is_mgr = is_dir or is_bm or any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'supervisor', 'controller'])
+            is_mgr_title = any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'supervisor', 'controller'])
+            is_mgr = is_dir or is_mgr_title or (getattr(ou, 'manager_id', False) and ou.manager_id.id == emp.id)
+
+            ou_type = (getattr(ou, 'work_unit_type', '') or '').strip().lower()
+            is_bm = False
+            is_district_mgr = False
+            is_ho_mgr = False
+            if is_mgr and not is_dir:
+                if ou_type in ('branch', 'sub_branch') or 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name or 'bm ' in j_name:
+                    is_bm = True
+                elif ou_type in ('district_office', 'regional_office') or 'district manager' in j_name or ('district' in j_name and 'manager' in j_name):
+                    is_district_mgr = True
+                else:
+                    is_ho_mgr = True
 
             emp_cache[emp.id] = {
                 'user_id': u_id,
                 'coach_id': c_id,
                 'ou_id': ou_id,
+                'ou_type': ou_type,
                 'job_id': j_id,
                 'job_name': j_name,
                 'grade_id': g_id,
@@ -426,6 +475,8 @@ class CompetencyAssessmentCycle(models.Model):
                 'is_director': is_dir,
                 'is_chief': is_chief,
                 'is_bm': is_bm,
+                'is_district_mgr': is_district_mgr,
+                'is_ho_mgr': is_ho_mgr,
                 'is_manager': is_mgr,
             }
             if c_id:
@@ -480,7 +531,7 @@ class CompetencyAssessmentCycle(models.Model):
         # If eligible raters < max_subs (e.g. 3, 2, 1), they are assessed by all of them.
         # Evaluators with lower current workload are prioritized to balance assessor assignments.
 
-        # A. Teammates assessing their subordinates under the same coach (Higher Grade assesses Lower Grade)
+        # A. Teammates assessing subordinates under the same coach (Different Job Grade)
         sub_candidates = {}
         for c_id, teammates in coached_by.items():
             for cand_id in teammates:
@@ -497,13 +548,13 @@ class CompetencyAssessmentCycle(models.Model):
                         continue
 
                     # 1. Same Coach: guaranteed by teammates
-                    # 2. Different Job Grade: Evaluator has higher grade than candidate
-                    diff_grade = (eval_data['grade_num'] > cand_data['grade_num']) if (eval_data['grade_num'] and cand_data['grade_num']) else (eval_data['grade_id'] != cand_data['grade_id'])
+                    # 2. Different Job Grade: Evaluator has different grade than candidate
+                    diff_grade = (eval_data['grade_num'] != cand_data['grade_num']) if (eval_data['grade_num'] and cand_data['grade_num']) else (eval_data['grade_id'] != cand_data['grade_id'])
                     if not diff_grade:
                         continue
 
-                    if eval_data['is_chief']:
-                        # Chiefs: 1. Same Coach, 2. Different Job Grade
+                    if eval_data['is_chief'] or eval_data['is_director'] or cand_data['is_chief'] or cand_data['is_director']:
+                        # Chiefs & Directors: 1. Same Coach, 2. Different Job Grade
                         eligible_evaluators.append(eval_id)
                     else:
                         # Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
@@ -538,6 +589,7 @@ class CompetencyAssessmentCycle(models.Model):
                         break
 
         # B. Direct reports evaluating their coach/superior upward (When someone assesses his coach that is subordinate)
+        # Rule: A coach is always evaluated upward by their team, whether in the same work unit or not.
         for m_id, dr_ids in reports_by_manager.items():
             m_data = emp_cache.get(m_id)
             if not m_data or not m_data['user_id']:
@@ -549,21 +601,16 @@ class CompetencyAssessmentCycle(models.Model):
                 if not r_data or not r_data['user_id']:
                     continue
 
-                # 1. Same Coach: guaranteed by dr_ids
+                # 1. Same Coach / Direct Reporting Line: guaranteed by dr_ids
                 # 2. Different Job Grade:
                 diff_grade = (r_data['grade_num'] != m_data['grade_num']) if (r_data['grade_num'] and m_data['grade_num']) else (r_data['grade_id'] != m_data['grade_id'])
                 if not diff_grade:
                     continue
 
-                if m_data['is_chief']:
-                    # Chiefs: 1. Same Coach, 2. Different Job Grade
+                # 3. Different Job Position:
+                diff_job = (r_data['job_id'] != m_data['job_id']) if (r_data['job_id'] and m_data['job_id']) else True
+                if diff_job:
                     eligible_subs.append(r)
-                else:
-                    # Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
-                    same_ou = (r_data['ou_id'] == m_data['ou_id']) if (r_data['ou_id'] and m_data['ou_id']) else True
-                    diff_job = (r_data['job_id'] != m_data['job_id']) if (r_data['job_id'] and m_data['job_id']) else True
-                    if same_ou and diff_job:
-                        eligible_subs.append(r)
 
             if not eligible_subs:
                 continue
@@ -643,9 +690,12 @@ class CompetencyAssessmentCycle(models.Model):
             if e_data['is_bm']:
                 # Rule 3: Branch Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Job Position
                 b_key = ('BM', c_id, g_id, 'BM_ROLE')
+            elif e_data.get('is_district_mgr'):
+                # Rule 2b: District Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
+                b_key = ('DISTRICT_MGR', c_id, g_id, ou_id)
             elif e_data['is_manager']:
-                # Rule 2: Managerial Positions HO & District: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
-                b_key = ('MGR', c_id, g_id, ou_id)
+                # Rule 2a: Head Office Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
+                b_key = ('HO_MGR', c_id, g_id, ou_id)
             else:
                 # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
                 b_key = ('NON_MGR', c_id, g_id, ou_id, j_id)
@@ -819,6 +869,18 @@ class CompetencyAssessment(models.Model):
         'hr.employee', string='Assessor Employee',
         compute='_compute_assessor_employee_id', store=True, index=True
     )
+    assessor_job_id = fields.Many2one(
+        'hr.job', string='Assessor Job Position',
+        compute='_compute_assessor_job_and_grade', store=True, index=True
+    )
+    assessor_grade_id = fields.Many2one(
+        'employee.grade', string='Assessor Job Grade',
+        compute='_compute_assessor_job_and_grade', store=True, index=True
+    )
+    is_current_or_latest_cycle = fields.Boolean(
+        string='Current or Latest Cycle',
+        related='cycle_id.is_open_or_latest', store=True, index=True
+    )
     assessment_type = fields.Selection(
         selection='_get_assessment_type_selection', string='Assessment Type',
         required=True, tracking=True)
@@ -827,6 +889,17 @@ class CompetencyAssessment(models.Model):
     def _compute_assessor_employee_id(self):
         for rec in self:
             rec.assessor_employee_id = rec.assessor_id.employee_id if rec.assessor_id else False
+
+    @api.depends('assessor_employee_id')
+    def _compute_assessor_job_and_grade(self):
+        for rec in self:
+            emp = rec.assessor_employee_id
+            if emp:
+                rec.assessor_job_id = self._get_employee_job(emp)
+                rec.assessor_grade_id = self._resolve_employee_grade(emp)
+            else:
+                rec.assessor_job_id = False
+                rec.assessor_grade_id = False
 
     @api.model
     def _get_employee_ou_id(self, emp):
@@ -995,22 +1068,29 @@ class CompetencyAssessment(models.Model):
         return False
 
     @api.model
-    def _is_branch_manager(self, emp):
-        job = self._get_employee_job(emp)
-        if not emp or not job:
-            return False
-        j_name = (job.name or '').lower()
-        return 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name or 'bm ' in j_name
-
-    @api.model
     def _is_manager(self, emp):
-        if not emp:
+        if not emp or not emp.active:
             return False
-        if self._is_director_or_chief(emp) or self._is_branch_manager(emp) or self._is_district_manager_emp(emp):
+        if self._is_director_or_chief(emp):
+            return True
+        ou = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
+        if getattr(ou, 'manager_id', False) and ou.manager_id.id == emp.id:
             return True
         job = self._get_employee_job(emp)
         j_name = (job.name or '').lower() if job else ''
-        return any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'president', 'vp', 'supervisor'])
+        return any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'president', 'vp', 'supervisor', 'controller'])
+
+    @api.model
+    def _is_branch_manager(self, emp):
+        if not emp or not self._is_manager(emp):
+            return False
+        ou = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
+        ou_type = (getattr(ou, 'work_unit_type', '') or '').strip().lower()
+        if ou_type in ('branch', 'sub_branch'):
+            return True
+        job = self._get_employee_job(emp)
+        j_name = (job.name or '').lower() if job else ''
+        return 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name or 'bm ' in j_name
 
     @api.model
     def _is_director_emp(self, emp):
@@ -1018,11 +1098,15 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _is_district_manager_emp(self, emp):
-        job = self._get_employee_job(emp)
-        if not emp or not job:
+        if not emp or not self._is_manager(emp):
             return False
-        job_name = job.name or ''
-        return 'district manager' in job_name.lower() or ('district' in job_name.lower() and 'manager' in job_name.lower())
+        ou = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
+        ou_type = (getattr(ou, 'work_unit_type', '') or '').strip().lower()
+        if ou_type in ('district_office', 'regional_office'):
+            return True
+        job = self._get_employee_job(emp)
+        job_name = (job.name or '').lower() if job else ''
+        return 'district manager' in job_name or ('district' in job_name and 'manager' in job_name)
 
     @api.model
     def _get_eligible_peers_for_emp(self, emp):
@@ -2243,6 +2327,10 @@ class CompetencyAssessmentLine(models.Model):
     assessment_id = fields.Many2one(
         'competency.assessment', string='Assessment', required=True, ondelete='cascade')
     cycle_id = fields.Many2one(related='assessment_id.cycle_id', string='Assessment Cycle', store=True, readonly=True, index=True)
+    is_current_or_latest_cycle = fields.Boolean(
+        string='Current or Latest Cycle',
+        related='cycle_id.is_open_or_latest', store=True, index=True
+    )
     employee_id = fields.Many2one(related='assessment_id.employee_id', string='Employee', store=True, readonly=True, index=True)
     department_id = fields.Many2one(related='assessment_id.department_id', string='Department', store=True, readonly=True, index=True)
     operating_unit_id = fields.Many2one(related='assessment_id.employee_id.default_operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
@@ -2346,18 +2434,22 @@ class CompetencyAssessmentLine(models.Model):
                 rec.indicator_level_4 = l4
 
                 rec.behavioral_guide_html = f"""
-                <div style="font-family: inherit; font-size: 13px; color: #1d2b32;">
-                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #726732; border-radius: 4px;">
-                        <strong style="color: #726732;">Level 1 (Basic):</strong> {l1}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; width: 100%; margin-top: 6px; font-family: inherit;">
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #726732; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                        <div style="font-size: 11px; font-weight: 800; color: #726732; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Level 1 &bull; Basic</div>
+                        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; flex-grow: 1;">{l1}</div>
                     </div>
-                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #1d2b32; border-radius: 4px;">
-                        <strong style="color: #1d2b32;">Level 2 (Intermediate):</strong> {l2}
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #1d2b32; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                        <div style="font-size: 11px; font-weight: 800; color: #1d2b32; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Level 2 &bull; Intermediate</div>
+                        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; flex-grow: 1;">{l2}</div>
                     </div>
-                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #c17540; border-radius: 4px;">
-                        <strong style="color: #c17540;">Level 3 (Advanced):</strong> {l3}
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #c17540; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                        <div style="font-size: 11px; font-weight: 800; color: #c17540; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Level 3 &bull; Advanced</div>
+                        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; flex-grow: 1;">{l3}</div>
                     </div>
-                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #541718; border-radius: 4px;">
-                        <strong style="color: #541718;">Level 4 (Expert):</strong> {l4}
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #541718; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                        <div style="font-size: 11px; font-weight: 800; color: #541718; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Level 4 &bull; Expert</div>
+                        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; flex-grow: 1;">{l4}</div>
                     </div>
                 </div>
                 """

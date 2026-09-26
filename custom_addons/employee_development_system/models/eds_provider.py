@@ -36,10 +36,21 @@ class EdsExternalProvider(models.Model):
     performance_history_ids = fields.One2many(
         'eds.provider.performance.history', 'provider_id',
         string='Performance History',
-        help='Post-training vendor/venue evaluations ().')
+        help='Post-training vendor/venue evaluations.')
     contract_ids = fields.One2many('eds.training.contract', 'provider_id', string='Contracts')
     contract_count = fields.Integer(string='Contracts', compute='_compute_contract_count')
     trainer_ids = fields.One2many('eds.trainer', 'external_provider_id', string='External Trainers')
+    contact_name = fields.Char(string='Contact Person')
+    phone = fields.Char(string='Phone Number')
+    email = fields.Char(string='Email Address')
+    website = fields.Char(string='Website')
+    years_of_experience = fields.Integer(string='Years of Experience', default=1)
+    specialization_areas = fields.Text(string='Specialization & Training Domains')
+    tax_id = fields.Char(string='TIN / Business License Number')
+    attachment_ids = fields.Many2many(
+        'ir.attachment', 'eds_provider_attachment_rel', 'provider_id', 'attachment_id',
+        string='Profile Documents & Certifications')
+    notes = fields.Text(string='Vendor Profile Notes')
     active = fields.Boolean(string='Active', default=True)
 
     @api.depends('performance_history_ids.rating')

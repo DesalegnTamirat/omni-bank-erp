@@ -22,6 +22,8 @@ Operationalizes BRD Part 3 Module 1 requirements for institutional knowledge man
     """,
     'depends': [
         'base',
+        'auth_ldap',
+        'auth_totp',
         'hr',
         'mail',
         'portal',
@@ -35,6 +37,7 @@ Operationalizes BRD Part 3 Module 1 requirements for institutional knowledge man
         'security/ir.model.access.csv',
         'data/kms_sequence.xml',
         'data/kms_default_data.xml',
+        'data/kms_ldap_data.xml',
         'views/kms_category_views.xml',
         'views/kms_document_views.xml',
         'views/kms_digital_library_views.xml',

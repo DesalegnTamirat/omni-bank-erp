@@ -23,6 +23,8 @@ Operationalizes BRD Part 3 Module 2 requirements for employee training and compl
     """,
     'depends': [
         'base',
+        'auth_ldap',
+        'auth_totp',
         'hr',
         'mail',
         'portal',

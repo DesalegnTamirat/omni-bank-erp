@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_assessment_center_batch_tree" model="ir.ui.view">
+        <field name="name">eds.assessment.center.batch.tree</field>
+        <field name="model">eds.assessment.center.batch</field>
+        <field name="arch" type="xml">
+            <list string="Assessment Center Batches">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="target_role_level" widget="badge"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="candidate_count"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'evaluated'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_assessment_center_batch_form" model="ir.ui.view">
+        <field name="name">eds.assessment.center.batch.form</field>
+        <field name="model">eds.assessment.center.batch</field>
+        <field name="arch" type="xml">
+            <form string="Assessment Center Batch">
+                <header>
+                    <button name="action_schedule" string="Confirm Schedule" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_start" string="Start Sessions" type="object" class="oe_highlight" invisible="state != 'scheduled'"/>
+                    <button name="action_finalize" string="Finalize Evaluations" type="object" class="oe_highlight" invisible="state != 'ongoing'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,ongoing,evaluated"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                        <h3><field name="title" placeholder="e.g. 2026 Branch Manager Leadership Assessment Center"/></h3>
+                    </div>
+                    <group>
+                        <group string="Cohort Information">
+                            <field name="target_role_level"/>
+                            <field name="lead_assessor_id"/>
+                        </group>
+                        <group string="Schedule">
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="candidate_count"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Candidate Assessments &amp; Readiness" name="candidates">
+                            <field name="candidate_line_ids">
+                                <list editable="bottom">
+                                    <field name="employee_id"/>
+                                    <field name="department_id" optional="show"/>
+                                    <field name="job_id" optional="show"/>
+                                    <field name="overall_score"/>
+                                    <field name="readiness_rating" widget="badge"/>
+                                    <field name="strengths"/>
+                                    <field name="development_needs"/>
+                                    <field name="assessor_notes" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Simulation Methodologies" name="methodologies">
+                            <field name="notes" placeholder="Specify assessment exercises: in-basket simulation, case study, role play, group discussion..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_assessment_center_batch" model="ir.actions.act_window">
+        <field name="name">Assessment Centers</field>
+        <field name="res_model">eds.assessment.center.batch</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

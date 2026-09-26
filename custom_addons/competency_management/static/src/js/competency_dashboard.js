@@ -83,6 +83,8 @@ export class CompetencyDashboard extends Component {
             this.state.persona = result.persona || "executive";
             if (!this.state.cycleId && result.cycle && result.cycle.id) {
                 this.state.cycleId = result.cycle.id;
+            } else if (!this.state.cycleId && result.all_cycles && result.all_cycles.length > 0) {
+                this.state.cycleId = result.all_cycles[0].id;
             }
             if (result.is_dept_readonly || (!this.state.departmentId && result.selected_department_id)) {
                 this.state.departmentId = result.selected_department_id;
@@ -113,7 +115,7 @@ export class CompetencyDashboard extends Component {
     }
 
     onCycleChange(ev) {
-        this.state.cycleId = ev.target.value ? parseInt(ev.target.value) : false;
+        this.state.cycleId = ev.target.value ? parseInt(ev.target.value) : (this.state.data.all_cycles && this.state.data.all_cycles[0] ? this.state.data.all_cycles[0].id : false);
         this.loadData();
     }
 
