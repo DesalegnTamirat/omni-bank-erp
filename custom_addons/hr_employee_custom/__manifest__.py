@@ -34,7 +34,6 @@
         'data/hr_contract_data.xml',
         'views/hr_contract_views.xml',
         'views/hr_contract_history_views.xml',
-        'wizards/contract_wizard.xml',
         'views/hr_department_views.xml',
         'views/hr_operating_unit_views.xml',
         'data/operating_unit_data.xml',
@@ -98,7 +97,6 @@
         # -- Increment --
         'views/increment.xml',
         'views/employee_increment_setup.xml',
-        'wizards/increment_transfer_wizard.xml',
 
         # -- Insurance / Training / Report Codes / Service Award --
         'views/hr_employee_insurance_views.xml',
@@ -131,6 +129,7 @@
         'views/employee_category_views.xml',
         # -- Misc utility wizards --
         'wizards/print_employee_report_views.xml',
+        'views/hr_employee_views.xml',
         'views/hr_employee_master_views.xml',
         'views/employee_history.xml',
         'views/hr_employee_document_views.xml',
@@ -150,4 +149,5 @@
     },
     'installable': True,
     'application': False,
+    'post_init_hook': '_post_init_sync_photos',
 }

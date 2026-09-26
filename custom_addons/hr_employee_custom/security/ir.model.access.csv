@@ -90,10 +90,6 @@ view_transfer_history_base_user,view.transfer_history.user,model_transfer_histor
 view_training_history_base_user,view.training.history.user,model_training_history,hr.group_hr_user,1,1,1,0
 view_education_fee_sponsorship_base_user,view.education.fee.sponsorship.user,model_education_fee_sponsorship,hr.group_hr_user,1,1,1,0
 view_training_commitment_base_user,view.training.commitment.user,model_training_commitment,hr.group_hr_user,1,1,1,0
-access_populate_salary_details_populate_salary_details,populate_salary_details.populate_salary_details,model_populate_salary_details,hr.group_hr_manager,1,1,1,1
-access_populate_salary_information_populate_salary_information,populate_salary_information.populate_salary_information,model_populate_salary_information,hr.group_hr_manager,1,1,1,1
-access_preprocessing_salary_information_preprocessing_salary_information,preprocessing_salary_information.preprocessing_salary_information,model_preprocessing_salary_information,hr.group_hr_manager,1,1,1,1
-access_net_salary_payment,access.net.salary.payment,model_net_salary_payment,hr.group_hr_manager,1,1,1,1
 access_salary_detail_changes,access.salary.detail.changes,model_salary_detail_changes,hr.group_hr_manager,1,1,1,1
 access_pension_multi_record_pension_multi_record,pension_multi_record.pension_multi_record,model_pension_multi_record,hr.group_hr_manager,1,1,1,1
 access_employee_grade_employee_grade,employee_grade.employee_grade,model_employee_grade,hr.group_hr_manager,1,1,1,1
@@ -135,8 +131,6 @@ access_employee_increment_setup,access.employee.increment.setup,model_employee_i
 access_emp_service_request,access.emp.service.request,model_emp_service_request,,1,1,1,1
 access_emp_transfer_service_request,access.emp.transfer.service.request.request,model_emp_transfer_service_request,,1,1,1,1
 access_generate_employee_attendance_report,access.generate.employee.attendance.report,model_generate_employee_attendance_report,,1,1,1,1
-access_increment_transfer_wizard,access.increment.transfer.wizard,model_increment_transfer_wizard,hr.group_hr_manager,1,1,1,1
-access_post_processing_salary_information,access.post.processing.salary.information,model_post_processing_salary_information,,1,1,1,1
 access_hr_resource_manager,hr.employee.resource.manager,resource.model_resource_resource,hr.group_hr_manager,1,1,1,1
 access_hr_resource_calendar_user,hr.employee.resource.calendar.user,resource.model_resource_calendar,hr.group_hr_user,1,1,1,0
 access_hr_resource_calendar_attendance_user,hr.employee.resource.calendar.attendance.user,resource.model_resource_calendar_attendance,hr.group_hr_user,1,1,1,0

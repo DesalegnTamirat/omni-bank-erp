@@ -45,7 +45,7 @@
                         <br/>
                         <p>However, this is to inform you that you are transferred to<strong><span t-field="o.requested_operating_unit"/></strong> effective <strong><span t-field="o.releiving_date"/></strong> maintaining your current position of <strong><span t-field="o.job_position"/></strong>, Job grade of <strong><span t-field="o.job_grade"/> </strong>, monthly gross salary of <strong>Birr <span t-field="o.job_grade_id.base_salary"/></strong> and other benefits attached to the post.</p>
                         <br/>
-                        <p>By copy of this letter, <strong><span t-field="o.operating_unit"/></strong> is advised to release <strong><span t-field="o.employee_name"/></strong>and <strong>Finance Directorate </strong>also forward payroll related information, Outstanding Loan Account details, Leave Status and any other necessary information to <strong><span t-field="o.requested_operating_unit"/> and Talent Management Directorate.</p><br/></strong> 
+                        <p>By copy of this letter, <strong><span t-field="o.operating_unit"/></strong> is advised to release <strong><span t-field="o.employee_name"/></strong>and <strong>Finance Directorate </strong>also forward payroll related information, Outstanding Loan Account details, Leave Status and any other necessary information to <strong><span t-field="o.requested_operating_unit"/> and Talent Management Directorate.</strong></p><br/> 
                         <br/>
                         <br/>
                     </div>

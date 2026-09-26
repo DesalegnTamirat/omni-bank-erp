@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 import logging
 
@@ -29,7 +29,17 @@ class HrEmployee(models.Model):
         string='Contract Count')
     contract_warning = fields.Boolean(
         string='Contract Warning',
-        compute='_compute_contract_warning')
+        compute='_compute_contract_warning',
+        search='_search_contract_warning')
+
+    def _search_contract_warning(self, operator, value):
+        employees_with_open = self.env['hr.version'].sudo().search([
+            ('state', 'in', ('open', 'probation')),
+            ('employee_id', '!=', False)
+        ]).mapped('employee_id.id')
+        if (operator == '=' and value) or (operator == '!=' and not value):
+            return ['|', ('id', 'not in', employees_with_open), ('contract_id', '=', False)]
+        return [('id', 'in', employees_with_open)]
     first_contract_date = fields.Date(
         compute='_compute_first_contract_date')
     calendar_mismatch = fields.Boolean(

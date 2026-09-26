@@ -29,6 +29,6 @@
         <field name="target">new</field>
     </record>
 
-     <menuitem id="menu_copy_manpower_plan_wizard" name="Copy Manpower Plan Wizard" parent="hr_employee_custom.menu_hr_payroll_community_wizards_stub" action="action_copy_manpower_plan_wizard"/>
+     <menuitem id="menu_copy_manpower_plan_wizard" name="Copy Manpower Plan Wizard" parent="hr.menu_human_resources_configuration" action="action_copy_manpower_plan_wizard"/>
 
 </odoo>

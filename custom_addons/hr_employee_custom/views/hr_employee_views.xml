@@ -1,49 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
 
-
-
-    <!-- ═══════════════════════════════════════════
-         EMPLOYEE GRADE — Form view
-    ════════════════════════════════════════════ -->
-    <record id="view_hr_employee_grade_form" model="ir.ui.view">
-        <field name="name">hr.employee.grade.form</field>
-        <field name="model">hr.employee.grade</field>
-        <field name="arch" type="xml">
-            <form string="Employee Grade">
-                <header>
-                    <button name="action_save_grade" string="Save Grade" type="object" class="btn-primary" save="1"/>
-                    <button name="action_archive_grade" string="Archive" type="object" class="btn-warning" invisible="not id or not active" confirm="Archive this Employee Grade?"/>
-                    <button name="action_archive_grade" string="Unarchive" type="object" class="btn-secondary" invisible="not id or active"/>
-                </header>
-                <sheet>
-                    <div class="oe_title">
-                        <h1>
-                            <field name="name" placeholder="e.g. Senior Grade" required="1"/>
-                        </h1>
-                    </div>
-                    <group>
-                        <field name="code" placeholder="e.g. GR-A" required="1"/>
-                    </group>
-                </sheet>
-            </form>
-        </field>
-    </record>
-
-    <!-- Employee Grade: Action -->
-    <record id="action_hr_employee_grade" model="ir.actions.act_window">
-        <field name="name">Employee Grades</field>
-        <field name="res_model">hr.employee.grade</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
-
-    <!-- ═══════════════════════════════════════════
-         CONFIGURATION MENUS
-    ════════════════════════════════════════════ -->
-    <menuitem id="menu_hr_employee_grade" name="Employee Grades" parent="hr.menu_human_resources_configuration" action="action_hr_employee_grade" sequence="20"/>
-
-
     <!-- ═══════════════════════════════════════════
          EMPLOYEE FORM — Inherit: Save + Delete buttons
                         + Contracts stat button
@@ -94,9 +51,6 @@
             <xpath expr="//page[@name='work_information']" position="attributes">
                 <attribute name="string">Work Information</attribute>
             </xpath>
-
-            <!-- 4. Hide the right-side chatter -->
-            <xpath expr="//chatter" position="replace"/>
 
             <!-- 5. Rename 'Personal' tab to 'Personal Information' -->
             <xpath expr="//page[@name='personal_information']" position="attributes">
@@ -198,6 +152,33 @@
                 <separator/>
                 <filter string="Contract Warning" name="with_contract_warning" domain="[('contract_warning','=',True)]" groups="hr_employee_custom.group_hr_contract_manager"/>
             </xpath>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         SERVER ACTION — Sync Profile Photos
+    ════════════════════════════════════════════ -->
+    <record id="action_sync_employee_profile_photos" model="ir.actions.server">
+        <field name="name">Sync Profile Photos</field>
+        <field name="model_id" ref="hr.model_hr_employee"/>
+        <field name="binding_model_id" ref="hr.model_hr_employee"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">
+res = model.action_sync_all_profile_photos()
+count = res.get('count', 0) if isinstance(res, dict) else res
+total = res.get('total_table', 0) if isinstance(res, dict) else count
+msg = f"Synced {count} photos from database (Total table rows: {total})."
+action = {
+    'type': 'ir.actions.client',
+    'tag': 'display_notification',
+    'params': {
+        'title': 'Photo Sync Completed',
+        'message': msg,
+        'type': 'success' if count > 0 else 'warning',
+        'sticky': False,
+    }
+}
         </field>
     </record>
 
