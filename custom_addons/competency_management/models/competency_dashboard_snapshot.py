@@ -4,7 +4,7 @@ from odoo import api, fields, models, _
 
 
 class CompetencyDashboardSnapshot(models.Model):
-    """Stored snapshot model for cycle-over-cycle trend analytics (FR-RPT-010)."""
+    """Stored periodic snapshot for cycle-over-cycle trend analytics."""
     _name = 'competency.dashboard.snapshot'
     _description = 'Competency Dashboard Cycle Snapshot'
     _order = 'snapshot_date desc, cycle_id desc, department_id asc'
@@ -37,7 +37,7 @@ class CompetencyDashboardSnapshot(models.Model):
 
     @api.model
     def _cron_take_dashboard_snapshot(self):
-        """Cron method to calculate and store trend snapshots across active cycles (FR-RPT-010)."""
+        """Cron: calculate and store trend snapshots for all active open cycles."""
         # Guard 1: Only snapshot active open cycles
         cycles = self.env['competency.assessment.cycle'].search([('state', '=', 'open')])
         departments = self.env['hr.department'].search([])
@@ -117,7 +117,7 @@ class CompetencyDashboardSnapshot(models.Model):
 
     @api.model
     def _cron_send_scheduled_competency_reports(self):
-        """Scheduled distribution cron method with supervisor group support and error handling (FR-RPT-008)."""
+        """Cron: generate and email the organizational capability report to admins and supervisors."""
         import logging
         _logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ class CompetencyDashboardSnapshot(models.Model):
         meets_cnt = len(lines.filtered(lambda l: l.tna_measure == 'meets'))
         exceeds_cnt = len(lines.filtered(lambda l: l.tna_measure == 'exceeds'))
 
-        # Generate PDF report document attachment per FR-RPT-008
+        # Generate PDF report attachment
         pdf_attachment = False
         if active_cycle:
             try:

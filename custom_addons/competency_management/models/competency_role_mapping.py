@@ -4,10 +4,10 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class CompetencyRoleMapping(models.Model):
-    """Role-Competency mapping: master reference for assessment & gap analysis (FR-COM-006, FR-MAP-001..006).
+    """Role-Competency mapping: master reference for assessment & gap analysis.
     
-    NOTE: Shared globally across all companies (intentionally not company-scoped
-    to maintain a unified bank-wide competency framework for Bunna Bank S.C.).
+    Shared globally across all companies to maintain a unified bank-wide
+    competency framework.
     """
     _name = 'competency.role.mapping'
     _description = 'Role-Competency Mapping'
@@ -301,7 +301,7 @@ class CompetencyRoleMapping(models.Model):
 
     @api.model
     def get_role_competency_requirements(self, job_position_id):
-        """API method for Recruitment candidate screening to retrieve required competencies & levels (FR-COM-029)."""
+        """Returns required competencies and levels for a given job position."""
         if not job_position_id:
             return []
         mapping = self.search([

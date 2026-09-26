@@ -6,7 +6,7 @@ from odoo.exceptions import UserError
 
 
 class CompetencyDashboard(models.TransientModel):
-    """Executive & Employee Self-Service Competency Dashboard (FR-RPT-002, FR-RPT-010)."""
+    """Executive & Employee Self-Service Competency Dashboard."""
     _name = 'competency.dashboard'
     _description = 'Executive & Employee Competency Dashboard'
 
@@ -449,7 +449,7 @@ class CompetencyDashboard(models.TransientModel):
 
     @api.model
     def get_dashboard_data(self, cycle_id=None, department_id=None, operating_unit_id=None, persona=None):
-        """RPC API endpoint supplying structured JSON metrics and Chart.js datasets to OWL frontend (FR-RPT-002, FR-RPT-010)."""
+        """RPC API endpoint supplying structured JSON metrics and Chart.js datasets to the OWL frontend."""
         user = self.env.user.sudo()
         emp = user.employee_id
         is_admin = bool(
@@ -888,7 +888,7 @@ class CompetencyDashboard(models.TransientModel):
                         'top_gaps': ", ".join([l.competency_id.name for l in top_gaps]) if (is_sub_fully_assessed and top_gaps) else ('Fit / Qualified' if is_sub_fully_assessed else ('Awaiting Evaluation' if all_sub_asms else 'Not Assigned'))
                     })
 
-        # Department Heatmap Data Matrix (Fix 5: Single-pass in-memory grouping)
+        # Department Heatmap Data Matrix (single-pass in-memory grouping)
         heatmap_rows = []
         if persona != 'employee' and has_real_data and lines:
             dept_lines_map = {}

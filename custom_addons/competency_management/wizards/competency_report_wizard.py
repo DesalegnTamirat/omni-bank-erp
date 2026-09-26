@@ -7,7 +7,7 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError, AccessError
 
 class CompetencyReportWizard(models.TransientModel):
-    """Ad-hoc Cascading Report Filtering & Multi-Format Export Wizard (PDF, Excel, CSV) (FR-RPT-007, FR-RPT-009)."""
+    """Multi-format export wizard (PDF, Excel, CSV) with cascading department/pillar filters."""
     _name = 'competency.report.wizard'
     _description = 'Competency Cascading Report & Export Wizard'
 

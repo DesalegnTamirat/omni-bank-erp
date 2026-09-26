@@ -5,7 +5,7 @@ from odoo.exceptions import UserError, ValidationError, AccessError
 
 
 class CompetencyAssessmentCycle(models.Model):
-    """Scheduled competency assessment cycle /010,."""
+    """Scheduled competency assessment cycle."""
     _name = 'competency.assessment.cycle'
     _description = 'Competency Assessment Cycle'
     _inherit = ['mail.thread']
@@ -391,8 +391,8 @@ class CompetencyAssessmentCycle(models.Model):
 
     def _generate_cycle_assessments_batch(self):
         """High-performance in-memory 360 assessment batch generator.
-        Pre-caches employee metadata and indices in 1 pass ($O(1)$ lookups)
-        to generate thousands of assessments in seconds rather than minutes.
+        Pre-caches employee metadata in a single pass (O(1) lookups) to
+        generate assessments efficiently at scale.
         """
         self.ensure_one()
         import random
@@ -811,7 +811,7 @@ class CompetencyAssessmentCycle(models.Model):
 
 
 class CompetencyAssessment(models.Model):
-    """A single employee assessment within a cycle (FR-COM-011, FR-COM-012)."""
+    """A single employee assessment within a cycle."""
     _name = 'competency.assessment'
     _description = 'Competency Assessment'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -1439,7 +1439,7 @@ class CompetencyAssessment(models.Model):
             # 4. Default: Read-only
             rec.can_edit_ratings = False
 
-    # 360 Multi-Rater extension fields (FR-COM-012, FR-ASM-002, FR-ASM-005)
+    # 360 Multi-Rater extension fields
     parent_assessment_id = fields.Many2one('competency.assessment', string='Parent 360 Assessment', ondelete='cascade', tracking=True)
     child_assessment_ids = fields.One2many('competency.assessment', 'parent_assessment_id', string='Rater Assessments')
     is_rater_assessment = fields.Boolean(string='Is Child Rater Assessment', default=False)
@@ -1452,7 +1452,7 @@ class CompetencyAssessment(models.Model):
     ], string='Rater Type')
     rater_id = fields.Many2one('res.users', string='Rater User')
     is_anonymous = fields.Boolean(string='Anonymize 360 Feedback', default=False,
-                                   help='Hide rater name from line managers for peer/subordinate 360 reviews (FR-ASM-002).')
+                                   help='Hide rater name from line managers for peer/subordinate 360 reviews.')
     anonymized_rater_label = fields.Char(string='Display Rater Label', compute='_compute_anonymized_rater_label')
 
     @api.depends('is_anonymous', 'rater_type', 'rater_id')
@@ -1467,12 +1467,7 @@ class CompetencyAssessment(models.Model):
 
     def action_consolidate_multi_source(self):
         """Consolidate Self, Manager, 360 Feedback, and Skills Test scores into one weighted
-        achievement determination (FR-ASM-005).
-
-        Uses the same configured rater weights (competency.matrix.config) as the live 360°
-        calculation on assessment lines (_compute_360_ratings), so the consolidated result is
-        consistent with Scenario 5's Weighted Gap Calculation instead of a naive unweighted
-        average across however many raters happened to submit.
+        achievement determination using configured rater weights from competency.matrix.config.
         """
         config = self.env['competency.matrix.config'].sudo().get_active_config()
         sup_weight = float(config.weight_supervisor or 3.0)
@@ -1504,7 +1499,7 @@ class CompetencyAssessment(models.Model):
                     competency_scores.setdefault(cid, []).append((int(line.current_level), rater_weight))
                     competency_reqs[cid] = line.required_level
 
-            # 2. Skills Tests (FR-ASM-003) — verified/objective evidence
+            # 2. Skills Tests — verified/objective evidence
             skills_tests = self.env['competency.skills.test'].search([('employee_id', '=', parent.employee_id.id)])
             for test in skills_tests:
                 if test.verified_level:
@@ -1840,7 +1835,7 @@ class CompetencyAssessment(models.Model):
         return self.action_populate_competencies()
 
     def _check_submission_deadline(self):
-        """Guard method: Enforce cycle submission deadline (FR-ASM-005). Competency Admins can override."""
+        """Enforce cycle submission deadline. Competency Admins can override."""
         is_admin = bool(
             self.env.user.has_group('competency_management.group_competency_admin')
             or self.env.user.has_group('base.group_system')
@@ -2034,7 +2029,7 @@ class CompetencyAssessment(models.Model):
                 pass
 
     def action_submit(self):
-        """Draft -> Submitted with deadline checks, unrated checks, and bidirectional employee/coach notifications (FR-COM-047)."""
+        """Submit assessment: validates deadline, ratings completeness, and notifies supervisor."""
         for rec in self:
             rec._check_submission_deadline()
             if not rec.line_ids:
@@ -2154,7 +2149,7 @@ class CompetencyAssessment(models.Model):
         return self.action_consolidate_multi_source()
 
     def _check_segregation_of_duties(self):
-        """Segregation of duties guard: Block self-approval by subject, assessor, or creator (FR-COM-055)."""
+        """Block self-approval by the assessed subject, assessor, or record creator."""
         for rec in self:
             subject_user = rec.sudo().employee_id.user_id if rec.employee_id else False
             assessor_user = rec.assessor_id or False
@@ -2168,7 +2163,7 @@ class CompetencyAssessment(models.Model):
                     raise ValidationError(_("You cannot approve your own assessment/IDP. This action must be performed by a different authorized user."))
 
     def action_supervisor_review(self):
-        """Submitted -> Supervisor Review with supervisor activity notification (FR-COM-048)."""
+        """Transition assessment to Supervisor Review state and notify supervisor."""
         for rec in self:
             rec.with_context(force_write=True).sudo().write({'state': 'supervisor_review'})
             supervisor_user = rec.sudo().employee_id.parent_id.user_id if (rec.employee_id and rec.sudo().employee_id.parent_id) else False
@@ -2190,7 +2185,7 @@ class CompetencyAssessment(models.Model):
             rec.with_context(force_write=True).write({'state': 'hr_verified'})
 
     def action_approve(self):
-        """Approved -> final approval with Segregation of Duties guard (FR-COM-055)."""
+        """Approve assessment with Segregation of Duties guard."""
         for rec in self:
             rec._check_segregation_of_duties()
             rec.with_context(force_write=True).write({'state': 'approved'})
@@ -2236,7 +2231,7 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _cron_pending_assessment_reminders(self):
-        """Daily cron: pending assessment reminders, upcoming deadline alerts & overdue escalations (FR-COM-046, FR-COM-048)."""
+        """Daily cron: pending assessment reminders, upcoming deadline alerts & overdue escalations."""
         today = fields.Date.context_today(self)
         
         # 1. Upcoming Deadline Alerts (7 days, 3 days, 1 day before deadline)
@@ -2294,7 +2289,7 @@ class CompetencyAssessment(models.Model):
                     pass
 
     def get_achievement_summary_sentence(self):
-        """Returns plain-language alignment sentence (FR-RPT-001 / FR-GAP-007)."""
+        """Returns plain-language alignment sentence for this assessment."""
         self.ensure_one()
         total = len(self.line_ids)
         if not total:
@@ -2307,7 +2302,7 @@ class CompetencyAssessment(models.Model):
         )
 
     def get_recommended_development_actions(self):
-        """Returns recommended action mappings for below-status competencies (FR-GAP-004)."""
+        """Returns recommended development action mappings for below-target competencies."""
         self.ensure_one()
         below_lines = self.line_ids.filtered(lambda l: l.achievement_status == 'below')
         recommendations = []
@@ -2335,7 +2330,7 @@ class CompetencyAssessment(models.Model):
 
 
 class CompetencyAssessmentLine(models.Model):
-    """One competency rating inside an assessment (FR-ASM-006, FR-GAP-005)."""
+    """One competency rating line inside an assessment."""
     _name = 'competency.assessment.line'
     _description = 'Competency Assessment Line'
 
