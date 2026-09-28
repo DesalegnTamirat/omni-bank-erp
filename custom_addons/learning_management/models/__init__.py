@@ -10,3 +10,4 @@ from . import lms_exam_session
 from . import lms_certificate
 from . import lms_analytics
 from . import lms_gamification
+from . import res_config_settings
