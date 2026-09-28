@@ -2,7 +2,7 @@
 from datetime import date
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 class EdsCourse(models.Model):

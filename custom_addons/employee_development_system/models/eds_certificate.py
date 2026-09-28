@@ -30,8 +30,8 @@ class EdsCertificate(models.Model):
     session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', tracking=True)
     course_id = fields.Many2one('eds.course', related='session_id.course_id', string='Course', store=True)
     issue_date = fields.Date(string='Issue Date', default=fields.Date.context_today, required=True, tracking=True)
-    is_eligible = fields.Boolean(string='Eligible for Certification', compute='_compute_eligibility', store=True)
-    eligibility_reason = fields.Text(string='Eligibility Details', compute='_compute_eligibility', store=True)
+    is_eligible = fields.Boolean(string='Eligible for Certification', compute='_compute_eligibility', store=False)
+    eligibility_reason = fields.Text(string='Eligibility Details', compute='_compute_eligibility', store=False)
     file = fields.Binary(string='Certificate File (PDF)', attachment=True)
     file_name = fields.Char(string='File Name')
     issued_by = fields.Many2one('res.users', string='Issued By', default=lambda self: self.env.user)
@@ -48,6 +48,11 @@ class EdsCertificate(models.Model):
         ('void', 'Voided'),
     ], string='Status', default='pending', required=True, tracking=True)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     @api.depends('session_id', 'course_id', 'employee_id')
     def _compute_certificate_content(self):
         for rec in self:
@@ -63,13 +68,18 @@ class EdsCertificate(models.Model):
             rec.signatory_name = (session and session.certificate_signatory_name) or (course and course.certificate_signatory_name) or ""
             rec.signatory_title = (session and session.certificate_signatory_title) or (course and course.certificate_signatory_title) or _("Director - People Performance & Development")
 
-    @api.constrains('session_id', 'employee_id')
+    @api.constrains('session_id', 'employee_id', 'state')
     def _check_unique_session_emp_cert(self):
         for rec in self:
-            if rec.session_id and rec.employee_id:
-                domain = [('session_id', '=', rec.session_id.id), ('employee_id', '=', rec.employee_id.id), ('id', '!=', rec.id)]
+            if rec.session_id and rec.employee_id and rec.state != 'void':
+                domain = [
+                    ('session_id', '=', rec.session_id.id),
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('state', '!=', 'void'),
+                    ('id', '!=', rec.id),
+                ]
                 if self.search_count(domain) > 0:
-                    raise ValidationError(_("A certificate record already exists for participant %s in session %s.") % (
+                    raise ValidationError(_("An active certificate record already exists for participant %s in session %s.") % (
                         rec.employee_id.name, rec.session_id.name
                     ))
 
@@ -80,7 +90,6 @@ class EdsCertificate(models.Model):
                 vals['code'] = self.env['ir.sequence'].sudo().next_by_code('eds.certificate') or _('New')
         return super(EdsCertificate, self).create(vals_list)
 
-    @api.depends('session_id', 'employee_id')
     def _compute_eligibility(self):
         for rec in self:
             if not rec.session_id or not rec.employee_id:
@@ -102,13 +111,13 @@ class EdsCertificate(models.Model):
             ], limit=1)
             att_pct = attendance.attendance_percentage if attendance else (100.0 if attendance and attendance.attended else 0.0)
 
-            # Calculate level 2 post-assessment pass
+            # Calculate level 2 post-assessment
             l2_eval = self.env['eds.evaluation.level2'].search([
                 ('session_id', '=', rec.session_id.id),
                 ('employee_id', '=', rec.employee_id.id)
             ], limit=1)
-            l2_passed = l2_eval.passed if l2_eval else False
             post_score = l2_eval.post_score if l2_eval else 0.0
+            l2_is_pass = (l2_eval.passed if l2_eval else False) or (post_score >= min_l2)
 
             reasons = []
             eligible = True
@@ -120,7 +129,7 @@ class EdsCertificate(models.Model):
                 reasons.append(_("Attendance %.1f%% meets requirement (≥%.1f%%).") % (att_pct, min_att))
 
             if req_l2:
-                if not l2_eval or post_score < min_l2:
+                if not l2_eval or not l2_is_pass or post_score < min_l2:
                     eligible = False
                     reasons.append(_("Level 2 post-assessment score %.1f%% below required %.1f%%.") % (post_score, min_l2))
                 else:
@@ -131,6 +140,9 @@ class EdsCertificate(models.Model):
 
     def action_issue(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.state != 'pending':
+                raise UserError(_("Only certificates pending eligibility check can be issued."))
             rec._compute_eligibility()
             if not rec.is_eligible:
                 raise ValidationError(_("Cannot issue certificate: participant is not eligible.\n%s") % rec.eligibility_reason)
@@ -140,5 +152,8 @@ class EdsCertificate(models.Model):
 
     def action_void(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'issued':
+                raise UserError(_("Only issued certificates can be voided."))
             rec.state = 'void'
             rec.message_post(body=_("Certificate %s voided.") % rec.code)

@@ -26,6 +26,21 @@ class EdsSponsorship(models.Model):
     bond_duration_months = fields.Integer(string='Bond Period (Months)', default=24)
     outstanding_obligation = fields.Monetary(string='Outstanding Bond Obligation', compute='_compute_obligation', currency_field='currency_id', store=True)
     repayment_line_ids = fields.One2many('eds.sponsorship.repayment.line', 'sponsorship_id', string='Repayment Lines')
+    breach_reason = fields.Selection([
+        ('resignation', 'Resignation'),
+        ('breach', 'Contract Breach'),
+        ('withdrawal', 'Course / Study Withdrawal'),
+        ('non_completion', 'Non-Completion / Academic Failure'),
+    ], string='Breach Reason', default='breach', tracking=True)
+    recovery_policy = fields.Selection([
+        ('pro_rata', 'Pro-Rata Unamortised Balance (Default)'),
+        ('full', 'Full Amount (Documented Policy Clause)'),
+    ], string='Recovery Policy', default='pro_rata', tracking=True)
+    recovery_amount = fields.Monetary(
+        string='Calculated Breach Recovery Amount',
+        currency_field='currency_id',
+        readonly=True, tracking=True)
+
     state = fields.Selection([
         ('draft', 'Draft'),
         ('eligibility_check', 'Eligibility Verified'),
@@ -35,6 +50,11 @@ class EdsSponsorship(models.Model):
         ('breached', 'Bond Breached'),
     ], string='Status', default='draft', required=True, tracking=True)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -42,21 +62,21 @@ class EdsSponsorship(models.Model):
                 vals['name'] = self.env['ir.sequence'].next_by_code('eds.sponsorship') or _('New')
         return super(EdsSponsorship, self).create(vals_list)
 
-    @api.depends('employee_id', 'employee_id.first_contract_date')
+    @api.depends('employee_id')
     def _compute_eligibility(self):
         for rec in self:
-            if rec.employee_id and (hasattr(rec.employee_id, 'first_contract_date') and rec.employee_id.first_contract_date or rec.employee_id.create_date):
-                start = getattr(rec.employee_id, 'first_contract_date', False) or rec.employee_id.create_date.date()
+            start = self.env['eds.hr.compat'].get_employee_service_start(rec.employee_id)
+            if start:
                 today = fields.Date.context_today(self)
                 days = (today - start).days
                 months = int(days / 30.4375)
                 rec.service_months = months
-                rec.eligible = months >= 12 #  requirement
+                rec.eligible = months >= 12  # requirement
             else:
                 rec.service_months = 12
                 rec.eligible = True
 
-    @api.depends('approved_amount', 'bond_start_date', 'bond_end_date', 'state')
+    @api.depends('approved_amount', 'bond_start_date', 'bond_end_date', 'state', 'recovery_amount')
     def _compute_obligation(self):
         for rec in self:
             if rec.state == 'active' and rec.bond_start_date and rec.bond_end_date:
@@ -69,12 +89,17 @@ class EdsSponsorship(models.Model):
                     remaining_ratio = max(0.0, (total_days - elapsed_days) / float(total_days))
                     rec.outstanding_obligation = rec.approved_amount * remaining_ratio
             elif rec.state == 'breached':
-                rec.outstanding_obligation = rec.approved_amount
+                rec.outstanding_obligation = rec.recovery_amount
+            elif rec.state == 'completed':
+                rec.outstanding_obligation = 0.0
             else:
                 rec.outstanding_obligation = rec.approved_amount
 
     def action_verify_eligibility(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.state != 'draft':
+                raise UserError(_("Only draft sponsorships can have eligibility verified."))
             rec._compute_eligibility()
             if not rec.eligible:
                 raise ValidationError(_("Employee does not meet the minimum 12 months continuous service requirement (Current: %d months).") % rec.service_months)
@@ -82,10 +107,16 @@ class EdsSponsorship(models.Model):
 
     def action_approve(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'eligibility_check':
+                raise UserError(_("Only sponsorships with verified eligibility can be approved."))
             rec.state = 'approved'
 
     def action_activate_bond(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.state != 'approved':
+                raise UserError(_("Only approved sponsorships can have their bond activated."))
             if not rec.bond_agreement:
                 raise ValidationError(_("Please attach the signed bond agreement document before activating."))
             rec.state = 'active'
@@ -94,25 +125,50 @@ class EdsSponsorship(models.Model):
             if not rec.bond_end_date and rec.bond_duration_months:
                 rec.bond_end_date = rec.bond_start_date + timedelta(days=int(30.4375 * rec.bond_duration_months))
 
-    def action_mark_breached(self):
+    def action_mark_breached(self, breach_reason=None):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'active':
+                raise UserError(_("Only active bonds can be marked as breached."))
+            if breach_reason:
+                rec.breach_reason = breach_reason
+
+            # Compute recovery amount BEFORE state change
+            today = fields.Date.context_today(self)
+            if rec.recovery_policy == 'full':
+                recovery_amt = rec.approved_amount
+            else:  # pro_rata by default
+                if rec.bond_end_date and today >= rec.bond_end_date:
+                    recovery_amt = 0.0
+                elif rec.bond_start_date and rec.bond_end_date:
+                    total_days = (rec.bond_end_date - rec.bond_start_date).days or 1
+                    elapsed_days = max(0, (today - rec.bond_start_date).days)
+                    remaining_ratio = max(0.0, (total_days - elapsed_days) / float(total_days))
+                    recovery_amt = round(rec.approved_amount * remaining_ratio, 2)
+                else:
+                    recovery_amt = rec.approved_amount
+
+            rec.recovery_amount = recovery_amt
             rec.state = 'breached'
+
             # Create repayment line and payroll payload
             line = self.env['eds.sponsorship.repayment.line'].create({
                 'sponsorship_id': rec.id,
-                'date': fields.Date.context_today(self),
-                'amount': rec.outstanding_obligation,
+                'date': today,
+                'amount': recovery_amt,
                 'schedule_type': 'salary_deduction',
             })
             payload = self.env['eds.payroll.payload'].create({
                 'payload_type': 'sponsorship_recovery',
                 'employee_id': rec.employee_id.id,
-                'amount': rec.outstanding_obligation,
-                'effective_date': fields.Date.context_today(self),
-                'source_ref': f"Sponsorship Breach: {rec.name}",
+                'amount': recovery_amt,
+                'effective_date': today,
+                'source_ref': f"Sponsorship Breach ({rec.breach_reason}): {rec.name}",
             })
             line.payload_id = payload.id
-            rec.message_post(body=_("Bond marked as breached. Recovery payload %s generated for Payroll.") % payload.name)
+            rec.message_post(body=_("Bond marked as breached (Reason: %s, Policy: %s). Calculated recovery: %s. Payroll payload %s generated.") % (
+                rec.breach_reason, rec.recovery_policy, recovery_amt, payload.name
+            ))
 
 class EdsSponsorshipRepaymentLine(models.Model):
     _name = 'eds.sponsorship.repayment.line'

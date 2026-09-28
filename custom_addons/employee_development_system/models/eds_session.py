@@ -85,10 +85,10 @@ class EdsVenueBooking(models.Model):
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    _sql_constraints = [
-        ('date_range_valid', 'check(date_end > date_start)',
-         'The booking end must be after its start!'),
-    ]
+    _check_date_range_valid = models.Constraint(
+        'CHECK(date_end > date_start)',
+        'The booking end must be after its start!',
+    )
 
     @api.model_create_multi
     def create(self, vals_list):

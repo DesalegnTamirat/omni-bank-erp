@@ -56,5 +56,83 @@
             <field name="context">{'search_default_group_ou': 1}</field>
         </record>
 
+        <!-- Engagement Search View -->
+        <record id="view_lms_engagement_search" model="ir.ui.view">
+            <field name="name">lms.engagement.report.search</field>
+            <field name="model">lms.engagement.report</field>
+            <field name="arch" type="xml">
+                <search string="Course Engagement Search">
+                    <field name="course_id"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
+                    <separator/>
+                    <group>
+                        <filter string="Course" name="group_course" context="{'group_by': 'course_id'}"/>
+                        <filter string="Department" name="group_dept" context="{'group_by': 'department_id'}"/>
+                        <filter string="Branch / Unit" name="group_ou" context="{'group_by': 'operating_unit_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Engagement Pivot View -->
+        <record id="view_lms_engagement_pivot" model="ir.ui.view">
+            <field name="name">lms.engagement.report.pivot</field>
+            <field name="model">lms.engagement.report</field>
+            <field name="arch" type="xml">
+                <pivot string="Course Engagement &amp; Analytics">
+                    <field name="course_id" type="row"/>
+                    <field name="department_id" type="col"/>
+                    <field name="total_enrolled" type="measure"/>
+                    <field name="total_completed" type="measure"/>
+                    <field name="completion_rate" type="measure"/>
+                    <field name="pass_rate" type="measure"/>
+                    <field name="avg_score" type="measure"/>
+                    <field name="avg_time_spent_minutes" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <!-- Engagement Graph View -->
+        <record id="view_lms_engagement_graph" model="ir.ui.view">
+            <field name="name">lms.engagement.report.graph</field>
+            <field name="model">lms.engagement.report</field>
+            <field name="arch" type="xml">
+                <graph string="Course Completion &amp; Pass Rate" type="bar" sample="1">
+                    <field name="course_id"/>
+                    <field name="completion_rate" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <!-- Engagement List View -->
+        <record id="view_lms_engagement_list" model="ir.ui.view">
+            <field name="name">lms.engagement.report.list</field>
+            <field name="model">lms.engagement.report</field>
+            <field name="arch" type="xml">
+                <list string="Course Engagement &amp; Analytics">
+                    <field name="course_id"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
+                    <field name="total_enrolled"/>
+                    <field name="total_completed"/>
+                    <field name="total_passed"/>
+                    <field name="completion_rate" widget="progressbar"/>
+                    <field name="pass_rate" widget="progressbar"/>
+                    <field name="avg_score"/>
+                    <field name="avg_time_spent_minutes"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Engagement Action -->
+        <record id="action_lms_engagement_report" model="ir.actions.act_window">
+            <field name="name">Course Engagement &amp; Analytics</field>
+            <field name="res_model">lms.engagement.report</field>
+            <field name="view_mode">pivot,graph,list</field>
+            <field name="search_view_id" ref="view_lms_engagement_search"/>
+            <field name="context">{'search_default_group_course': 1}</field>
+        </record>
+
     </data>
 </odoo>

@@ -56,10 +56,10 @@ class EdsCurriculum(models.Model):
     active = fields.Boolean(string='Active', default=True,
                             help='Archived when superseded by a newer version ().')
 
-    _sql_constraints = [
-        ('course_version_uniq', 'unique(course_id, version)',
-         'A curriculum version already exists for this course!'),
-    ]
+    _check_course_version_uniq = models.Constraint(
+        'UNIQUE(course_id, version)',
+        'A curriculum version already exists for this course!',
+    )
 
     @api.depends('create_date')
     def _compute_review_sla(self):

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models, _
+from odoo import fields, models, _
+from odoo.exceptions import UserError
 
 
 class EdsLearningPartnership(models.Model):
@@ -44,17 +45,31 @@ class EdsLearningPartnership(models.Model):
     notes = fields.Text(string='Review Notes & Next Steps')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     def action_activate(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'draft':
+                raise UserError(_('Only draft partnership agreements can be activated.'))
             rec.state = 'active'
             rec.message_post(body=_("Partnership with '%s' is now active.") % rec.partner_name)
 
     def action_expire(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'active':
+                raise UserError(_('Only active partnerships can be expired.'))
             rec.state = 'expired'
             rec.message_post(body=_("Partnership agreement expired."))
 
     def action_terminate(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state not in ('draft', 'active'):
+                raise UserError(_('Only draft or active partnerships can be terminated.'))
             rec.state = 'terminated'
             rec.message_post(body=_("Partnership terminated."))

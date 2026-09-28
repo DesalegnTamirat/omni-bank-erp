@@ -91,7 +91,7 @@
                                 <h3 class="fw-bold mt-1 text-white mb-0"><t t-esc="lesson.name"/></h3>
                             </div>
                             <div>
-                                <span class="badge bg-secondary me-2"><i class="fa fa-clock-o me-1"/><t t-esc="int(lesson.duration or 0)"/> mins</span>
+                                <span class="badge bg-secondary me-2"><i class="fa fa-clock-o me-1"/><t t-esc="int(lesson.duration_minutes or (lesson.video_duration_seconds // 60) or 0)"/> mins</span>
                                 <a t-att-href="'/web#id=%s&amp;model=lms.course&amp;view_type=form' % course.id" class="btn btn-outline-light btn-sm">
                                     <i class="fa fa-arrow-left me-1"/> Back to Course
                                 </a>

@@ -30,10 +30,10 @@ class EdsTnaPriorityRule(models.Model):
     active = fields.Boolean(string='Active', default=True)
     description = fields.Text(string='Description')
 
-    _sql_constraints = [
-        ('criteria_uniq', 'unique(criteria)',
-         'A priority rule for this criteria already exists!'),
-    ]
+    _check_criteria_uniq = models.Constraint(
+        'UNIQUE(criteria)',
+        'A priority rule for this criteria already exists!',
+    )
 
     def write(self, vals):
         """Re-score all consolidated entries when weights/rules change ()."""
@@ -428,7 +428,6 @@ class EdsTnaConsolidation(models.Model):
             grouped.setdefault(prog_name, []).append(entry)
 
         for prog_name, entries in grouped.items():
-            first = entries[0]
             existing_course = Course.search([('name', '=ilike', prog_name)], limit=1)
             if not existing_course:
                 comp_lines = []

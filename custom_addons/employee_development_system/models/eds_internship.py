@@ -33,6 +33,11 @@ class EdsInternshipApplication(models.Model):
         ('rejected', 'Application Rejected'),
     ], string='Status', default='received', required=True, tracking=True)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -42,11 +47,17 @@ class EdsInternshipApplication(models.Model):
 
     def action_notify_units(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.status != 'received':
+                raise UserError(_('Only received applications can be notified to work units.'))
             rec.status = 'notified'
             rec.message_post(body=_("Application notified to potential host work units."))
 
     def action_accept(self):
         for rec in self:
+            rec._require_group('group_eds_line_manager')
+            if rec.status != 'notified':
+                raise UserError(_('Only notified applications can be accepted by a work unit.'))
             if not rec.work_unit_id:
                 raise ValidationError(_("Please select an assigned work unit before accepting."))
             rec.status = 'accepted'
@@ -54,6 +65,9 @@ class EdsInternshipApplication(models.Model):
 
     def action_place(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.status != 'accepted':
+                raise UserError(_('Only accepted applications can be placed.'))
             if not rec.supervisor_id or not rec.start_date:
                 raise ValidationError(_("Please assign a supervisor and start date before placement."))
             rec.status = 'placed'
@@ -61,10 +75,16 @@ class EdsInternshipApplication(models.Model):
 
     def action_start(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.status != 'placed':
+                raise UserError(_('Only placed applications can be marked ongoing.'))
             rec.status = 'ongoing'
 
     def action_complete(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.status != 'ongoing':
+                raise UserError(_('Only ongoing internships can be completed.'))
             if not rec.outcome_report:
                 raise ValidationError(_("Please enter an outcome report summary before marking completed."))
             rec.status = 'completed'
@@ -72,7 +92,11 @@ class EdsInternshipApplication(models.Model):
 
     def action_reject(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.status in ('completed', 'rejected'):
+                raise UserError(_('Cannot reject an internship that is already completed or rejected.'))
             rec.status = 'rejected'
+            rec.message_post(body=_("Internship application rejected."))
 
 class EdsInternshipEvaluation(models.Model):
     _name = 'eds.internship.evaluation'

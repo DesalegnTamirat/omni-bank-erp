@@ -47,13 +47,24 @@ class EdsBudget(models.Model):
             rec.remaining = rec.allocated - spent
             rec.utilization_pct = (spent / rec.allocated * 100.0) if rec.allocated > 0 else 0.0
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     def action_approve(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'draft':
+                raise UserError(_('Only draft budgets can be approved.'))
             rec.state = 'approved'
             rec.message_post(body=_("Annual L&D budget %s approved.") % rec.name)
 
     def action_lock(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'approved':
+                raise UserError(_('Only approved budgets can be locked.'))
             rec.state = 'locked'
             rec.message_post(body=_("Annual L&D budget %s locked.") % rec.name)
 
@@ -148,8 +159,16 @@ class EdsLearningPartner(models.Model):
             else:
                 rec.renewal_alert_date = False
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     def action_screen(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.state != 'received':
+                raise UserError(_('Only received proposals can be screened.'))
             if not rec.is_eligible:
                 raise ValidationError(_("Partner screening score (%.1f%%) is below the mandatory 70%% threshold.") % rec.screening_score)
             rec.state = 'screened'
@@ -157,19 +176,33 @@ class EdsLearningPartner(models.Model):
 
     def action_ppdd_endorse(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'screened':
+                raise UserError(_('Only screened partner proposals can be endorsed by PPDD.'))
             rec.state = 'ppdd_endorsement'
 
     def action_cpco_review(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'ppdd_endorsement':
+                raise UserError(_('Only PPDD-endorsed proposals can be reviewed by CPCO.'))
             rec.state = 'cpco_review'
 
     def action_ceo_approve(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'cpco_review':
+                raise UserError(_('Only CPCO-reviewed proposals can be approved by CEO.'))
             rec.state = 'ceo_approval'
 
     def action_sign_mou(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'ceo_approval':
+                raise UserError(_('Only CEO-approved proposals can be signed and activated.'))
             if not rec.mou_document:
                 raise ValidationError(_("Please attach the signed MoU document before finalizing."))
+            rec.state = 'active'
+            rec.message_post(body=_("Strategic MoU activated."))
             rec.state = 'active'
             rec.message_post(body=_("Strategic MoU activated."))

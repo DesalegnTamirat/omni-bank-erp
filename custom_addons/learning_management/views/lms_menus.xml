@@ -142,6 +142,12 @@
                   action="action_lms_compliance_matrix"
                   sequence="10"/>
 
+        <menuitem id="menu_lms_engagement_report"
+                  name="Course Engagement &amp; Analytics"
+                  parent="menu_lms_analytics_root"
+                  action="action_lms_engagement_report"
+                  sequence="20"/>
+
         <!-- 7. Recognition & Gamification -->
         <menuitem id="menu_lms_recognition_root"
                   name="Recognition"
@@ -173,6 +179,12 @@
                   parent="menu_lms_root"
                   sequence="90"
                   groups="learning_management.group_lms_admin"/>
+
+        <menuitem id="menu_lms_settings"
+                  name="Settings"
+                  parent="menu_lms_config"
+                  action="action_lms_configuration"
+                  sequence="1"/>
 
         <menuitem id="menu_lms_config_category"
                   name="Course Categories"

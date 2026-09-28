@@ -50,6 +50,7 @@ Operationalizes BRD Part 3 Module 2 requirements for employee training and compl
         'views/lms_gamification_views.xml',
         'views/lms_templates.xml',
         'reports/lms_certificate_report_templates.xml',
+        'views/res_config_settings_views.xml',
         'views/lms_menus.xml',
     ],
     'assets': {

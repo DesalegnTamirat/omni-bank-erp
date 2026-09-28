@@ -37,6 +37,11 @@ class EdsEducationAssistance(models.Model):
         ('disbursed', 'Reimbursed / Paid'),
     ], string='Reimbursement Status', default='pending', tracking=True)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -46,18 +51,32 @@ class EdsEducationAssistance(models.Model):
 
     def action_submit(self):
         for rec in self:
+            if rec.approval_state != 'draft':
+                raise UserError(_('Only draft requests can be submitted.'))
             rec.approval_state = 'submitted'
+            rec.message_post(body=_("Education assistance request submitted for Department Head review."))
 
     def action_dept_approve(self):
         for rec in self:
+            rec._require_group('group_eds_line_manager')
+            if rec.approval_state != 'submitted':
+                raise UserError(_('Only submitted requests can be approved by Department Head.'))
             rec.approval_state = 'dept_approved'
+            rec.message_post(body=_("Education assistance approved by Department Head."))
 
     def action_ppdd_validate(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.approval_state != 'dept_approved':
+                raise UserError(_('Only department-approved requests can be validated by PPDD.'))
             rec.approval_state = 'ppdd_validated'
+            rec.message_post(body=_("Education assistance validated by PPDD."))
 
     def action_cpco_approve(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.approval_state != 'ppdd_validated':
+                raise UserError(_('Only PPDD-validated requests can be approved by CPCO.'))
             if not rec.approved_amount:
                 rec.approved_amount = rec.tuition_amount
             rec.approval_state = 'cpco_approved'
@@ -65,7 +84,10 @@ class EdsEducationAssistance(models.Model):
 
     def action_disburse(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
             if rec.approval_state != 'cpco_approved':
                 raise ValidationError(_("Cannot disburse funds until CPCO approval is completed."))
+            if rec.reimbursement_state != 'pending':
+                raise UserError(_("Reimbursement is already disbursed."))
             rec.reimbursement_state = 'disbursed'
             rec.message_post(body=_("Tuition reimbursement disbursed."))

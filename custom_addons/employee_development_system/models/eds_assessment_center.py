@@ -49,16 +49,30 @@ class EdsAssessmentCenterBatch(models.Model):
                     'eds.assessment.center.batch') or _('New')
         return super().create(vals_list)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     def action_schedule(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.state != 'draft':
+                raise UserError(_('Only draft assessment batches can be scheduled.'))
             rec.state = 'scheduled'
 
     def action_start(self):
         for rec in self:
+            rec._require_group('group_eds_officer')
+            if rec.state != 'scheduled':
+                raise UserError(_('Only scheduled assessment batches can be started.'))
             rec.state = 'ongoing'
 
     def action_finalize(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
+            if rec.state != 'ongoing':
+                raise UserError(_('Only ongoing assessment batches can be finalized.'))
             rec.state = 'evaluated'
             rec.message_post(body=_("Assessment center ratings finalized."))
 

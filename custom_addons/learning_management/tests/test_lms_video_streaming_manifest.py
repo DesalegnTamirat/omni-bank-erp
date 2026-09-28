@@ -15,14 +15,41 @@ class TestLmsVideoStreamingManifest(HttpCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user_admin = cls.env.ref('base.user_admin')
-        cls.emp_admin = cls.user_admin.employee_id
-        if not cls.emp_admin:
-            cls.emp_admin = cls.env['hr.employee'].search([('user_id', '=', cls.user_admin.id)], limit=1)
+        cls.learner_user = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
+            'name': 'Video Test Learner',
+            'login': 'video_test_learner@bunnabank.et',
+            'password': 'LearnerPassword123!',
+            'group_ids': [(6, 0, [cls.env.ref('base.group_user').id, cls.env.ref('learning_management.group_lms_learner').id])],
+        })
+        cls.learner_emp = cls.env['hr.employee'].create({
+            'name': 'Video Test Learner Emp',
+            'user_id': cls.learner_user.id,
+        })
+
+        cls.unauth_user = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
+            'name': 'Unenrolled User',
+            'login': 'unenrolled_test@bunnabank.et',
+            'password': 'UnenrolledPassword123!',
+            'group_ids': [(6, 0, [cls.env.ref('base.group_user').id, cls.env.ref('learning_management.group_lms_learner').id])],
+        })
+        cls.unauth_emp = cls.env['hr.employee'].create({
+            'name': 'Unenrolled Emp',
+            'user_id': cls.unauth_user.id,
+        })
+
+        cls.category = cls.env['lms.category'].search([], limit=1)
+        if not cls.category:
+            cls.category = cls.env['lms.category'].create({
+                'name': 'Streaming Test Category',
+                'code': 'STC-01',
+            })
 
         cls.course = cls.env['lms.course'].create({
-            'name': 'AML & Compliance Video Streaming Course',
+            'name': 'AML Compliance Video Streaming Course',
             'code': 'AML-STREAM-001',
+            'category_id': cls.category.id,
+            'instructor_id': cls.learner_emp.id,
+            'description': '<p>AML Compliance Video Streaming Course Description</p>',
             'state': 'published',
         })
 
@@ -32,19 +59,20 @@ class TestLmsVideoStreamingManifest(HttpCase):
             'course_id': cls.course.id,
             'lesson_type': 'video',
             'video_file': fake_video_data,
-            'duration': 60.0,
+            'duration_minutes': 60.0,
+            'video_duration_seconds': 3600,
             'sequence': 1,
         })
 
         cls.enrollment = cls.env['lms.enrollment'].create({
             'course_id': cls.course.id,
-            'employee_id': cls.emp_admin.id,
+            'employee_id': cls.learner_emp.id,
             'state': 'in_progress',
         })
 
     def test_01_hls_manifest_authorized(self):
         """Verify enrolled employee receives valid HLS VOD manifest with byte ranges."""
-        self.authenticate('admin', 'admin')
+        self.authenticate('video_test_learner@bunnabank.et', 'LearnerPassword123!')
         resp = self.url_open(f'/lms/video/{self.lesson.id}/manifest.m3u8')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('application/vnd.apple.mpegurl', resp.headers.get('Content-Type', ''))
@@ -57,30 +85,13 @@ class TestLmsVideoStreamingManifest(HttpCase):
 
     def test_02_manifest_unauthorized(self):
         """Verify non-enrolled user receives HTTP 403 Access Denied."""
-        # Unlink enrollment
-        self.enrollment.unlink()
-        self.authenticate('admin', 'admin')
-        # Admin as manager has staff access; remove instructor/manager group to test strict learner gating
-        mgr_grp = self.env.ref('learning_management.group_lms_manager')
-        inst_grp = self.env.ref('learning_management.group_lms_instructor')
-        self.user_admin.write({'group_ids': [(3, mgr_grp.id), (3, inst_grp.id)]})
-
-        try:
-            resp = self.url_open(f'/lms/video/{self.lesson.id}/manifest.m3u8')
-            self.assertEqual(resp.status_code, 403)
-        finally:
-            # Restore admin group
-            self.user_admin.write({'group_ids': [(4, mgr_grp.id), (4, inst_grp.id)]})
+        self.authenticate('unenrolled_test@bunnabank.et', 'UnenrolledPassword123!')
+        resp = self.url_open(f'/lms/video/{self.lesson.id}/manifest.m3u8')
+        self.assertEqual(resp.status_code, 403)
 
     def test_03_video_player_rendering(self):
         """Verify secure player page renders with watermark layers and anti-cheat elements."""
-        # Ensure enrollment exists
-        self.env['lms.enrollment'].create({
-            'course_id': self.course.id,
-            'employee_id': self.emp_admin.id,
-            'state': 'in_progress',
-        })
-        self.authenticate('admin', 'admin')
+        self.authenticate('video_test_learner@bunnabank.et', 'LearnerPassword123!')
         resp = self.url_open(f'/lms/video/{self.lesson.id}/player')
         self.assertEqual(resp.status_code, 200)
         content = resp.text

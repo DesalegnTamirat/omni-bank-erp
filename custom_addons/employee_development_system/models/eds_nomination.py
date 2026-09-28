@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from datetime import date, datetime
+from datetime import date
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -98,10 +98,20 @@ class EdsNomination(models.Model):
     withdrawn_date = fields.Datetime(string='Withdrawal Date', readonly=True)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    _sql_constraints = [
-        ('session_employee_uniq', 'unique(session_id, employee_id)',
-         'This employee already has a nomination for this session!'),
-    ]
+    @api.constrains('session_id', 'employee_id', 'state')
+    def _check_unique_active_nomination(self):
+        for rec in self:
+            if rec.session_id and rec.employee_id and rec.state not in ('cancelled', 'rejected', 'withdrawn', 'declined'):
+                domain = [
+                    ('session_id', '=', rec.session_id.id),
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('state', 'not in', ('cancelled', 'rejected', 'withdrawn', 'declined')),
+                    ('id', '!=', rec.id),
+                ]
+                if self.search_count(domain) > 0:
+                    raise ValidationError(_("An active nomination already exists for employee '%s' in session '%s'.") % (
+                        rec.employee_id.name, rec.session_id.name
+                    ))
 
     @api.depends('session_id')
     def _compute_budget_hr_required(self):
@@ -407,10 +417,18 @@ class EdsEnrollment(models.Model):
     waitlist_position = fields.Integer(string='Waitlist Position', default=0)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    _sql_constraints = [
-        ('session_employee_uniq', 'unique(session_id, employee_id)',
-         'This employee is already enrolled (or waitlisted) for this session!'),
-    ]
+    @api.constrains('session_id', 'employee_id', 'state')
+    def _check_unique_active_enrollment(self):
+        for rec in self:
+            if rec.session_id and rec.employee_id and rec.state != 'cancelled':
+                domain = [
+                    ('session_id', '=', rec.session_id.id),
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('state', '!=', 'cancelled'),
+                    ('id', '!=', rec.id),
+                ]
+                if self.search_count(domain) > 0:
+                    raise ValidationError(_("This employee is already actively enrolled or waitlisted for this session."))
 
     @api.model_create_multi
     def create(self, vals_list):

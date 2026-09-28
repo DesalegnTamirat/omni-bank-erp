@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields, api, _
-from odoo.exceptions import UserError, ValidationError
+from odoo import models, fields, _
+from odoo.exceptions import ValidationError
 import base64
 import csv
 import io
@@ -177,8 +177,6 @@ class EdsPmsGapImport(models.TransientModel):
         success_count = 0
         skipped_count = 0
         errors = []
-
-        EmployeeModel = self.env['hr.employee']
         TnaEntryModel = self.env['eds.tna.entry']
 
         for line_no, row in enumerate(reader, start=2):
@@ -194,12 +192,7 @@ class EdsPmsGapImport(models.TransientModel):
                 skipped_count += 1
                 continue
 
-            emp = EmployeeModel.search([
-                '|', '|',
-                ('identification_id', '=', badge),
-                ('barcode', '=', badge),
-                ('name', '=ilike', badge)
-            ], limit=1)
+            emp = self.env['eds.hr.compat'].find_employee(badge)
 
             if not emp:
                 errors.append(_("Row %d: Employee '%s' not found.") % (line_no, badge))
@@ -223,12 +216,15 @@ class EdsPmsGapImport(models.TransientModel):
                 skipped_count += 1
                 continue
 
+            work_unit = self.env['eds.hr.compat'].get_employee_operating_unit(emp)
+            job = self.env['eds.hr.compat'].get_employee_job(emp)
+
             TnaEntryModel.create({
                 'cycle_id': self.cycle_id.id,
                 'employee_id': emp.id,
-                'work_unit_id': getattr(emp, 'default_operating_unit_id', False) and emp.default_operating_unit_id.id or False,
+                'work_unit_id': work_unit.id if work_unit else False,
                 'department_id': emp.department_id.id if emp.department_id else False,
-                'job_position_id': emp.job_position.id if emp.job_position else False,
+                'job_position_id': job.id if job else False,
                 'pms_kpi_reference': kpi_ref,
                 'pms_appraisal_score': score_val,
                 'gap_severity': valid_severity,

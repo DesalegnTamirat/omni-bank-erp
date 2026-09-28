@@ -41,6 +41,8 @@ class LmsEnrollment(models.Model):
     progress_percentage = fields.Float(string='Course Progress (%)', compute='_compute_progress', store=True)
     completed_lessons_count = fields.Integer(string='Completed Lessons Count', compute='_compute_progress', store=True)
     total_lessons_count = fields.Integer(string='Total Lessons', compute='_compute_progress', store=True)
+    threshold_50_notified = fields.Boolean(string='50% Milestone Notified', default=False, copy=False)
+    threshold_100_notified = fields.Boolean(string='100% Milestone Notified', default=False, copy=False)
 
     # Assessment Gates
     pre_assessment_passed = fields.Boolean(string='Pre-Assessment Passed', default=False)
@@ -142,8 +144,31 @@ class LmsEnrollment(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super(LmsEnrollment, self).create(vals_list)
+        todo_activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
         for rec in records:
             rec._initialize_lesson_progress()
+            # Notify learner via chatter
+            due_txt = _(" Please complete it before %s.") % rec.due_date if rec.due_date else ""
+            body = _("You have been enrolled in the course '%(course)s'.%(due)s") % {
+                'course': rec.course_id.name,
+                'due': due_txt,
+            }
+            partner_ids = [rec.user_id.partner_id.id] if rec.user_id and rec.user_id.partner_id else []
+            rec.message_post(
+                body=body,
+                subject=_("Course Enrollment: %s") % rec.course_id.name,
+                partner_ids=partner_ids,
+            )
+            # Schedule To-Do activity if user account is linked
+            if rec.user_id and todo_activity_type:
+                deadline = rec.due_date or fields.Date.today()
+                rec.activity_schedule(
+                    activity_type_id=todo_activity_type.id,
+                    summary=_("Complete Course: %s") % rec.course_id.name,
+                    note=_("Mandatory Course Enrollment") if rec.is_mandatory else _("Course Enrollment"),
+                    date_deadline=deadline,
+                    user_id=rec.user_id.id,
+                )
         return records
 
     def _initialize_lesson_progress(self):
@@ -161,6 +186,27 @@ class LmsEnrollment(models.Model):
                         'employee_id': rec.employee_id.id,
                         'state': 'not_started',
                     })
+
+    def _check_progress_milestones(self):
+        """Check and send chatter notifications when learner hits 50% or 100% progress thresholds."""
+        for rec in self:
+            partner_ids = [rec.user_id.partner_id.id] if rec.user_id and rec.user_id.partner_id else []
+            if rec.progress_percentage >= 50.0 and not rec.threshold_50_notified:
+                rec.threshold_50_notified = True
+                rec.message_post(
+                    body=_("Milestone Reached: You have reached %.1f%% progress in '%s'!") % (
+                        rec.progress_percentage, rec.course_id.name
+                    ),
+                    subject=_("Course Progress: 50% Milestone Reached"),
+                    partner_ids=partner_ids,
+                )
+            if rec.progress_percentage >= 100.0 and not rec.threshold_100_notified:
+                rec.threshold_100_notified = True
+                rec.message_post(
+                    body=_("Course Progress: You have completed 100%% of the lessons in '%s'!") % rec.course_id.name,
+                    subject=_("Course Progress: 100% Milestone Reached"),
+                    partner_ids=partner_ids,
+                )
 
     def action_start_course(self):
         for rec in self:
@@ -182,6 +228,7 @@ class LmsEnrollment(models.Model):
                 'post_assessment_passed': True,
             })
             self.env['lms.enrollment'].invalidate_model(['is_locked'])
+            rec._check_progress_milestones()
             rec.message_post(body=_('Course completed successfully with score of %.1f%%.') % score_pct)
 
             # Issue Certificate (FR-LMS-018)
@@ -205,6 +252,12 @@ class LmsEnrollment(models.Model):
         Notifies learner and their direct manager via chatter/activity.
         """
         today = fields.Date.context_today(self)
+        reminder_days_str = self.env['ir.config_parameter'].sudo().get_param('learning_management.reminder_days_before_due', '3')
+        try:
+            reminder_days = int(reminder_days_str) if reminder_days_str and str(reminder_days_str).strip().isdigit() else 3
+        except (ValueError, TypeError):
+            reminder_days = 3
+
         active_enrollments = self.search([
             ('is_mandatory', '=', True),
             ('state', 'in', ['enrolled', 'in_progress']),
@@ -232,7 +285,7 @@ class LmsEnrollment(models.Model):
                     subject=_("Mandatory Course Overdue: %s") % course_name,
                     partner_ids=partner_ids,
                 )
-            elif (enrollment.due_date - today).days <= 3:
+            elif 0 <= (enrollment.due_date - today).days <= reminder_days:
                 days_left = (enrollment.due_date - today).days
                 body = _(
                     "UPCOMING DEADLINE: Mandatory course '%(course)s' is due in %(days)d day(s) (deadline: %(due)s)."
@@ -336,6 +389,8 @@ class LmsLessonProgress(models.Model):
             })
             if rec.enrollment_id.state == 'enrolled':
                 rec.enrollment_id.write({'state': 'in_progress'})
+            # Trigger milestone checks on enrollment (50% / 100%)
+            rec.enrollment_id._check_progress_milestones()
             # If all lessons completed and course has no post-assessment, certify now
             all_done = all(lp.state == 'completed' for lp in rec.enrollment_id.lesson_progress_ids)
             if all_done and not rec.enrollment_id.course_id.has_post_assessment:

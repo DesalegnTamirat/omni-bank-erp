@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_lms" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.lms</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="70"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Learning Management" string="Learning Management" name="learning_management" groups="learning_management.group_lms_admin">
+                    <block title="LMS Notifications &amp; Reminders" name="lms_reminders_setting">
+                        <setting string="Upcoming Deadline Reminders" help="Configure how many days in advance employees receive course deadline reminders">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <label for="lms_reminder_days_before_due" class="col-lg-3 o_light_label"/>
+                                    <field name="lms_reminder_days_before_due" class="oe_inline"/>
+                                    <span> Days</span>
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_lms_configuration" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module': 'learning_management', 'bin_size': False}</field>
+    </record>
+</odoo>

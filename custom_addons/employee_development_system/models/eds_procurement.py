@@ -162,9 +162,15 @@ class EdsRfp(models.Model):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.rfp') or _('New')
         return super().create(vals_list)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     def action_issue(self):
         """Draft -> Issued: validate venue approval and minimum provider count (/037)."""
         for rec in self:
+            rec._require_group('group_eds_officer')
             if rec.state != 'draft':
                 raise UserError(_('Only draft RFPs can be issued.'))
             if rec.venue_requirement_id and rec.venue_requirement_id.state != 'director_approved':
@@ -182,6 +188,7 @@ class EdsRfp(models.Model):
     def action_receive_proposals(self):
         """Issued -> Receiving: open the submission window ()."""
         for rec in self:
+            rec._require_group('group_eds_officer')
             if rec.state != 'issued':
                 raise UserError(_('Only issued RFPs can start receiving proposals.'))
             rec.state = 'receiving'
@@ -191,6 +198,7 @@ class EdsRfp(models.Model):
     def action_close_receiving(self):
         """Receiving -> Evaluation: receipts closed and envelopes are opened by the committee."""
         for rec in self:
+            rec._require_group('group_eds_officer')
             if rec.state != 'receiving':
                 raise UserError(_('Only RFPs in the receiving stage can move to evaluation.'))
             if not rec.proposal_ids:
@@ -202,6 +210,7 @@ class EdsRfp(models.Model):
     def action_award(self):
         """Evaluation -> Awarded: pick the winning proposal and auto-generate the contract."""
         for rec in self:
+            rec._require_group('group_eds_manager')
             if rec.state != 'evaluation':
                 raise UserError(_('Only RFPs under evaluation can be awarded.'))
             if not rec.awarded_proposal_id:
@@ -549,10 +558,16 @@ class EdsTrainingContract(models.Model):
                     'eds.training.contract') or _('New')
         return super().create(vals_list)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     # ── Workflow () ──────────────────────────────────────────────────
     def action_send_legal(self):
         """Draft -> Legal Review: route the draft agreement to the Legal Directorate."""
         for rec in self:
+            rec._require_group('group_eds_officer')
             if rec.state != 'draft':
                 raise UserError(_('Only draft contracts can be routed to Legal.'))
             rec.state = 'legal_review'
@@ -592,6 +607,7 @@ class EdsTrainingContract(models.Model):
     def action_resubmit(self):
         """Revision -> Legal Review: the updated version goes back to Legal."""
         for rec in self:
+            rec._require_group('group_eds_officer')
             if rec.state != 'revision':
                 raise UserError(_('Only contracts under revision can be resubmitted.'))
             rec.state = 'legal_review'
@@ -600,6 +616,7 @@ class EdsTrainingContract(models.Model):
     def action_record_signature(self):
         """Approved -> Signed: record the authorized signature."""
         for rec in self:
+            rec._require_group('group_eds_manager')
             if rec.state != 'approved':
                 raise UserError(_('Only approved contracts can be signed.'))
             if not rec.signature and not rec.signed_by:
@@ -610,6 +627,7 @@ class EdsTrainingContract(models.Model):
 
     def action_activate(self):
         for rec in self:
+            rec._require_group('group_eds_manager')
             if rec.state != 'signed':
                 raise UserError(_('Only signed contracts can be activated.'))
             rec.state = 'active'

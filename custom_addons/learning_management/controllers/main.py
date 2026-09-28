@@ -129,7 +129,7 @@ class LmsController(http.Controller):
 
         raw_data = base64.b64decode(lesson.video_file)
         file_size = len(raw_data)
-        duration = float(lesson.duration or 60.0)
+        duration = float(lesson.video_duration_seconds or (lesson.duration_minutes * 60) or 60.0)
         target_duration = 10
         num_segments = max(1, int(duration // target_duration))
         chunk_size = max(1024, file_size // num_segments)

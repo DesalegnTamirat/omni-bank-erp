@@ -62,8 +62,14 @@ class EdsWorkplaceAssignment(models.Model):
                     'eds.workplace.assignment') or _('New')
         return super().create(vals_list)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     def action_activate(self):
         for rec in self:
+            rec._require_group('group_eds_line_manager')
             if rec.state != 'draft':
                 raise UserError(_("Only draft assignments can be activated."))
             rec.state = 'active'
@@ -71,6 +77,7 @@ class EdsWorkplaceAssignment(models.Model):
 
     def action_complete(self):
         for rec in self:
+            rec._require_group('group_eds_line_manager')
             if rec.state != 'active':
                 raise UserError(_("Only active assignments can be marked as completed."))
             rec.state = 'completed'
@@ -78,5 +85,8 @@ class EdsWorkplaceAssignment(models.Model):
 
     def action_cancel(self):
         for rec in self:
+            rec._require_group('group_eds_line_manager')
+            if rec.state not in ('draft', 'active'):
+                raise UserError(_("Only draft or active assignments can be cancelled."))
             rec.state = 'cancelled'
             rec.message_post(body=_("Workplace learning assignment '%s' cancelled.") % rec.name)

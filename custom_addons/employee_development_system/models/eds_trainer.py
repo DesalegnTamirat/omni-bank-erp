@@ -71,11 +71,10 @@ class EdsTrainer(models.Model):
     ], string='Status', default='active', required=True, tracking=True)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    _sql_constraints = [
-        ('internal_external_exclusive',
-         'check(not (employee_id is not null and external_partner_id is not null))',
-         'A trainer cannot be both an internal employee and an external partner!'),
-    ]
+    _check_internal_external_exclusive = models.Constraint(
+        'CHECK(NOT (employee_id IS NOT NULL AND external_partner_id IS NOT NULL))',
+        'A trainer cannot be both an internal employee and an external partner!',
+    )
 
     @api.depends('last_review_date', 'review_cycle_months', 'create_date')
     def _compute_next_review(self):
@@ -201,10 +200,10 @@ class EdsTrainerAvailability(models.Model):
     ], string='Type', default='available', required=True)
     note = fields.Text(string='Note')
 
-    _sql_constraints = [
-        ('date_range_valid', 'check(date_end > date_start)',
-         'The "To" datetime must be after the "From" datetime!'),
-    ]
+    _check_date_range_valid = models.Constraint(
+        'CHECK(date_end > date_start)',
+        'The "To" datetime must be after the "From" datetime!',
+    )
 
 
 class EdsTrainerQuarterlyReview(models.Model):

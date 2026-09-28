@@ -50,6 +50,9 @@
                             <field name="bond_start_date"/>
                             <field name="bond_end_date"/>
                             <field name="outstanding_obligation"/>
+                            <field name="recovery_policy"/>
+                            <field name="breach_reason" invisible="state != 'breached'"/>
+                            <field name="recovery_amount" invisible="state != 'breached'"/>
                         </group>
                     </group>
                     <notebook>

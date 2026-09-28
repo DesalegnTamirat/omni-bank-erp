@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from . import eds_compat
 from . import eds_config
 from . import eds_tna
 from . import eds_consolidation

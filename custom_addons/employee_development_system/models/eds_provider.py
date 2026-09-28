@@ -116,9 +116,7 @@ class EdsProviderPerformanceHistory(models.Model):
     notes = fields.Text(string='Notes')
     evaluated_by_id = fields.Many2one('res.users', string='Evaluated By',
                                       default=lambda self: self.env.user)
-
-    _sql_constraints = [
-        ('provider_or_venue_required',
-         'check(provider_id is not null or venue_name is not null)',
-         'Link the evaluation to a provider or enter a venue name!'),
-    ]
+    _check_provider_or_venue_required = models.Constraint(
+        'CHECK(provider_id IS NOT NULL OR venue_name IS NOT NULL)',
+        'Link the evaluation to a provider or enter a venue name!',
+    )

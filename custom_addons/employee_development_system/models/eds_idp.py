@@ -42,6 +42,11 @@ class EdsIdp(models.Model):
     def _default_employee_id(self):
         return self.env['hr.employee'].search([('user_id', '=', self.env.user.id)], limit=1)
 
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -51,20 +56,29 @@ class EdsIdp(models.Model):
 
     def action_submit(self):
         for rec in self:
+            if rec.state != 'draft':
+                raise UserError(_("Only draft IDPs can be submitted."))
             rec.state = 'submitted'
             rec.message_post(body=_("IDP %s submitted for manager review.") % rec.name)
 
     def action_approve(self):
         for rec in self:
+            rec._require_group('group_eds_line_manager')
+            if rec.state != 'submitted':
+                raise UserError(_("Only submitted IDPs can be approved."))
             rec.state = 'approved'
             rec.message_post(body=_("IDP %s approved by manager.") % rec.name)
 
     def action_start(self):
         for rec in self:
+            if rec.state != 'approved':
+                raise UserError(_("Only approved IDPs can be moved to in progress."))
             rec.state = 'in_progress'
 
     def action_complete(self):
         for rec in self:
+            if rec.state not in ('approved', 'in_progress'):
+                raise UserError(_("Only approved or in-progress IDPs can be completed."))
             rec.state = 'completed'
             rec.message_post(body=_("IDP %s marked as completed.") % rec.name)
 
