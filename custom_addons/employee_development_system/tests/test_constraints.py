@@ -34,15 +34,14 @@ class TestEdsConstraints(TransactionCase):
         })
 
     def test_b5_renomination_after_cancellation_and_rejection(self):
-        """B5: Test that re-nomination is allowed when prior nomination was cancelled or rejected."""
-        # 1. First nomination cancelled
+        """B5: Test that re-nomination is allowed when prior nomination was withdrawn or rejected."""
+        # 1. First nomination withdrawn
         nom1 = self.env['eds.nomination'].create({
             'session_id': self.session.id,
             'employee_id': self.employee.id,
-            'state': 'cancelled',
+            'state': 'withdrawn',
         })
-
-        self.assertEqual(nom1.state, 'cancelled')
+        self.assertEqual(nom1.state, 'withdrawn')
 
         # 2. Second nomination for same session and employee succeeds
         nom2 = self.env['eds.nomination'].create({
