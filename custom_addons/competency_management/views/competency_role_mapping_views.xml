@@ -102,6 +102,9 @@
                         <button name="action_create_new_version" string="Create New Version"
                                 type="object" invisible="state != 'approved'"
                                 groups="competency_management.group_competency_officer"/>
+                        <button name="action_open_clone_wizard" string="📋 Replicate to Another Role"
+                                type="object" class="btn-secondary"
+                                groups="competency_management.group_competency_officer"/>
                         <button name="action_archive" string="Archive Mapping"
                                 type="object" invisible="state == 'archived'"
                                 groups="competency_management.group_competency_officer"/>

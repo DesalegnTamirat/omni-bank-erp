@@ -299,6 +299,22 @@ class CompetencyRoleMapping(models.Model):
             'target': 'current',
         }
 
+    def action_open_clone_wizard(self):
+        """Opens the Replicate / Clone wizard pre-loaded with this role mapping."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Replicate Competency Profile: %s') % (self.mapping_name or self.job_position_id.name),
+            'res_model': 'competency.role.mapping.clone.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_source_mapping_id': self.id,
+                'active_id': self.id,
+                'active_model': 'competency.role.mapping',
+            },
+        }
+
     @api.model
     def get_role_competency_requirements(self, job_position_id):
         """Returns required competencies and levels for a given job position."""

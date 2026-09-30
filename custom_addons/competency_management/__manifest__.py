@@ -41,6 +41,7 @@ Features:
         'views/competency_director_peer_config_views.xml',
         'views/competency_report_templates.xml',
         'wizards/competency_role_mapping_clone_wizard_views.xml',
+        'wizards/competency_role_bulk_assign_wizard_views.xml',
         'wizards/competency_report_wizard_views.xml',
         'wizards/competency_role_mapping_import_wizard_views.xml',
         'wizards/competency_multi_cycle_report_wizard_views.xml',

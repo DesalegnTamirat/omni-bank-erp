@@ -91,7 +91,7 @@
                         </div>
                         <group>
                             <group string="Nomination">
-                                <field name="name" readonly="1"/>
+                                <field name="name" readonly="1" invisible="name == 'New'"/>
                                 <field name="session_id"/>
                                 <field name="course_name" readonly="1"/>
                                 <field name="nomination_type"/>

@@ -513,17 +513,25 @@ class CompetencyDashboard(models.TransientModel):
             is_dept_readonly = False
             is_ou_readonly = False
             persona = 'executive'
-            all_departments = self.env['hr.department'].sudo().search_read([], ['id', 'name'], order='name asc')
-            if department_id:
-                dept_recs = self.env['hr.department'].sudo().browse([int(department_id)])
-                ou_direct = self.env['operating.unit'].sudo().search([('department', 'in', dept_recs.ids)])
-                ou_from_dept = dept_recs.mapped('operating_unit_id')
-                dept_emps = self.env['hr.employee'].sudo().search([('department_id', 'in', dept_recs.ids)])
-                ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
-                allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
-                all_operating_units = [{'id': u.id, 'name': u.name} for u in allowed_ous]
+
+            if operating_unit_id:
+                ou_id_int = int(operating_unit_id)
+                direct_depts = self.env['hr.department'].sudo().search([
+                    '|', ('operating_unit_id', '=', ou_id_int),
+                    ('operating_unit', '=', ou_id_int)
+                ])
+                ou_emps = self.env['hr.employee'].sudo().search([
+                    '|', ('default_operating_unit_id', '=', ou_id_int),
+                    '|', ('operating_unit_id', '=', ou_id_int),
+                    ('department_id.operating_unit_id', '=', ou_id_int)
+                ])
+                emp_depts = ou_emps.mapped('department_id')
+                dept_pool = (direct_depts | emp_depts).filtered(lambda d: d.id)
+                all_departments = [{'id': d.id, 'name': d.name} for d in dept_pool.sorted(key=lambda d: d.name or '')]
             else:
-                all_operating_units = self.env['operating.unit'].sudo().search_read([], ['id', 'name'], order='name asc')
+                all_departments = self.env['hr.department'].sudo().search_read([], ['id', 'name'], order='name asc')
+
+            all_operating_units = self.env['operating.unit'].sudo().search_read([], ['id', 'name'], order='name asc')
         elif is_dept_manager:
             is_dept_readonly = True
             is_ou_readonly = False
@@ -648,8 +656,8 @@ class CompetencyDashboard(models.TransientModel):
 
         # Only apply global department_id filter if admin or dept manager with multiple depts or ou leader
         if department_id and (is_admin or (is_dept_manager and len(managed_depts) > 1) or is_ou_leader):
-            line_domain.append(('department_id', '=', int(department_id)))
-            asm_domain.append(('department_id', '=', int(department_id)))
+            line_domain.append(('department_id', 'child_of', int(department_id)))
+            asm_domain.append(('department_id', 'child_of', int(department_id)))
 
         # Only apply global operating_unit_id filter if admin or dept manager
         if operating_unit_id and (is_admin or is_dept_manager):

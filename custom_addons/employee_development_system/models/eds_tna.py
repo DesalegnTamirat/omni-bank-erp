@@ -87,6 +87,18 @@ class EdsTnaCycle(models.Model):
             'context': {'default_cycle_id': self.id},
         }
 
+    def action_open_pull_pms_gaps(self):
+        """Open wizard to pull performance gaps from finalized PMS appraisals."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Pull PMS Performance Gaps'),
+            'res_model': 'eds.pms.gap.import',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_cycle_id': self.id},
+        }
+
     def action_pull_competency_gaps(self):
         """Auto-pull diagnosed gaps from the Competency Assessment framework into this TNA cycle."""
         self.ensure_one()
@@ -443,7 +455,11 @@ class EdsTnaEntry(models.Model):
 
     priority_score = fields.Float(string='Priority Score', compute='_compute_priority_score', store=True)
     justification = fields.Text(string='Justification', required=True)
-    proposed_program = fields.Char(string='Proposed Program / Course')
+    proposed_program = fields.Char(
+        string='Proposed Program / Course',
+        compute='_compute_proposed_program',
+        store=True, readonly=False,
+        help='Unified program title derived from the course catalog, custom title, or diagnostic gap.')
     estimated_cost = fields.Monetary(string='Estimated Cost', currency_field='company_currency_id')
     # Diagnostic Gap Details (Competency & PMS)
     competency_gap_level_diff = fields.Integer(string='Competency Gap (Levels)', default=0,
@@ -529,35 +545,74 @@ class EdsTnaEntry(models.Model):
         }
         return self[mapping[criteria]] or 0.0
 
-    @api.depends('competency_id', 'proposed_program')
+    @api.depends('course_id', 'is_custom_course', 'custom_course_title')
+    def _compute_proposed_program(self):
+        for rec in self:
+            if rec.is_custom_course and rec.custom_course_title:
+                rec.proposed_program = rec.custom_course_title
+            elif not rec.is_custom_course and rec.course_id:
+                rec.proposed_program = rec.course_id.name
+            elif not rec.proposed_program:
+                rec.proposed_program = False
+
+    @api.depends('course_id', 'is_custom_course', 'custom_course_title', 'competency_id', 'proposed_program')
     def _compute_recommended_course(self):
         Course = self.env['eds.course']
         for rec in self:
-            if not rec.competency_id:
-                rec.recommended_course_id = False
-                rec.course_match_status = 'no_course'
+            # 1. Direct Catalog Course Selection
+            if not rec.is_custom_course and rec.course_id:
+                rec.recommended_course_id = rec.course_id
+                rec.course_match_status = 'exact'
                 continue
 
-            course_line = self.env['eds.course.competency.line'].search([
-                ('competency_id', '=', rec.competency_id.id),
-                ('course_id.status', 'in', ('active', 'draft'))
-            ], limit=1)
+            # 2. Match via Diagnosed Competency
+            if rec.competency_id:
+                course_line = self.env['eds.course.competency.line'].search([
+                    ('competency_id', '=', rec.competency_id.id),
+                    ('course_id.status', 'in', ('active', 'draft'))
+                ], limit=1)
+                if course_line:
+                    rec.recommended_course_id = course_line.course_id
+                    rec.course_match_status = 'exact'
+                    continue
 
-            if course_line:
-                rec.recommended_course_id = course_line.course_id.id
-                rec.course_match_status = 'exact'
-            else:
+            # 3. Intelligent Keyword Search in Course Catalog
+            search_terms = []
+            if rec.is_custom_course and rec.custom_course_title:
+                search_terms.append(rec.custom_course_title.strip())
+            if rec.proposed_program and rec.proposed_program.strip() not in search_terms:
+                search_terms.append(rec.proposed_program.strip())
+            if rec.competency_id and rec.competency_id.name and rec.competency_id.name.strip() not in search_terms:
+                search_terms.append(rec.competency_id.name.strip())
+
+            matched_course = False
+            is_exact = False
+            for term in search_terms:
+                if not term or len(term) < 3:
+                    continue
+                c_exact = Course.search([
+                    ('status', 'in', ('active', 'draft')),
+                    ('name', '=ilike', term)
+                ], limit=1)
+                if c_exact:
+                    matched_course = c_exact
+                    is_exact = True
+                    break
                 c_search = Course.search([
-                    '|',
-                    ('name', 'ilike', rec.competency_id.name),
-                    ('name', 'ilike', rec.proposed_program or '')
+                    ('status', 'in', ('active', 'draft')),
+                    ('name', 'ilike', term)
                 ], limit=1)
                 if c_search:
-                    rec.recommended_course_id = c_search.id
-                    rec.course_match_status = 'higher'
-                else:
-                    rec.recommended_course_id = False
-                    rec.course_match_status = 'no_course'
+                    matched_course = c_search
+                    is_exact = False
+                    break
+
+            if matched_course:
+                rec.recommended_course_id = matched_course
+                rec.course_match_status = 'exact' if is_exact else 'higher'
+            else:
+                rec.recommended_course_id = False
+                rec.course_match_status = 'no_course'
 
     @api.onchange('course_id')
     def _onchange_course_id(self):
@@ -567,6 +622,11 @@ class EdsTnaEntry(models.Model):
                 self.competency_id = self.course_id.competency_line_ids[0].competency_id.id
             if not self.justification and self.course_id.description:
                 self.justification = self.course_id.description
+            self.recommended_course_id = self.course_id
+            self.course_match_status = 'exact'
+        else:
+            self.recommended_course_id = False
+            self.course_match_status = 'no_course'
 
     @api.onchange('urgency')
     def _onchange_urgency(self):
@@ -576,10 +636,47 @@ class EdsTnaEntry(models.Model):
     @api.onchange('is_custom_course', 'custom_course_title', 'custom_course_description')
     def _onchange_custom_course(self):
         if self.is_custom_course:
+            self.course_id = False
             if self.custom_course_title:
                 self.proposed_program = self.custom_course_title
+                term = self.custom_course_title.strip()
+                if len(term) >= 3:
+                    c_exact = self.env['eds.course'].search([
+                        ('status', 'in', ('active', 'draft')),
+                        ('name', '=ilike', term)
+                    ], limit=1)
+                    if c_exact:
+                        self.recommended_course_id = c_exact
+                        self.course_match_status = 'exact'
+                    else:
+                        c_partial = self.env['eds.course'].search([
+                            ('status', 'in', ('active', 'draft')),
+                            ('name', 'ilike', term)
+                        ], limit=1)
+                        if c_partial:
+                            self.recommended_course_id = c_partial
+                            self.course_match_status = 'higher'
+                        else:
+                            self.recommended_course_id = False
+                            self.course_match_status = 'no_course'
+                else:
+                    self.recommended_course_id = False
+                    self.course_match_status = 'no_course'
+            else:
+                self.recommended_course_id = False
+                self.course_match_status = 'no_course'
             if self.custom_course_description and not self.justification:
                 self.justification = self.custom_course_description
+        else:
+            self.custom_course_title = False
+            self.custom_course_description = False
+            if self.course_id:
+                self.proposed_program = self.course_id.name
+                self.recommended_course_id = self.course_id
+                self.course_match_status = 'exact'
+            else:
+                self.recommended_course_id = False
+                self.course_match_status = 'no_course'
 
     def action_view_recommended_course(self):
         self.ensure_one()
@@ -635,6 +732,8 @@ class EdsTnaEntry(models.Model):
             ]
             if rec.competency_id:
                 domain.append(('competency_id', '=', rec.competency_id.id))
+            else:
+                domain.append(('competency_id', '=', False))
             if self.search(domain, limit=1):
                 raise ValidationError(
                     _('A training need for this employee/competency already exists in this cycle.'))

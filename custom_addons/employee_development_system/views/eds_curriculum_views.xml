@@ -44,7 +44,7 @@
                     <sheet>
                         <group>
                             <group string="Curriculum">
-                                <field name="name" readonly="1"/>
+                                <field name="name" readonly="1" invisible="name == 'New'"/>
                                 <field name="course_id" readonly="state != 'draft'"/>
                                 <field name="version" readonly="1"/>
                             </group>

@@ -31,7 +31,7 @@
                 </header>
                 <sheet>
                     <div class="oe_title">
-                        <h1><field name="name" readonly="1"/></h1>
+                        <h1><field name="name" readonly="1" invisible="name == 'New'"/></h1>
                     </div>
                     <group>
                         <group>
@@ -105,7 +105,7 @@
                 </header>
                 <sheet>
                     <div class="oe_title">
-                        <h1><field name="name" readonly="1"/></h1>
+                        <h1><field name="name" readonly="1" invisible="name == 'New'"/></h1>
                     </div>
                     <group>
                         <group string="Partner Details">

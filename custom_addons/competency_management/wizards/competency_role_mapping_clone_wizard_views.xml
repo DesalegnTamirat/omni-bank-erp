@@ -5,19 +5,40 @@
             <field name="name">competency.role.mapping.clone.wizard.form</field>
             <field name="model">competency.role.mapping.clone.wizard</field>
             <field name="arch" type="xml">
-                <form string="Clone &amp; Adapt Role Competency Mapping">
+                <form string="Replicate Role-Competency Profile">
                     <sheet>
+                        <div class="alert alert-info" role="alert" style="background-color: #fdf8f4; border-left: 5px solid #541718; padding: 12px 18px;">
+                            <h5 style="color: #541718; margin-bottom: 4px;">
+                                <i class="fa fa-clone"></i> Replicate &amp; Adapt Role Profile
+                            </h5>
+                            <p class="mb-0 text-muted" style="font-size: 13px;">
+                                This copies all competencies from <strong style="color: #541718;"><field name="source_job_id" readonly="1" class="oe_inline"/></strong> to your selected target role. You can review and adapt the required proficiency levels below before creating the profile.
+                            </p>
+                        </div>
                         <group>
-                            <field name="source_mapping_id"/>
-                            <field name="target_version"/>
-                            <field name="copy_lines"/>
+                            <group>
+                                <field name="source_mapping_id" invisible="1"/>
+                                <field name="target_job_id" options="{'no_create': True}" placeholder="Select target Job Position..."/>
+                            </group>
+                            <group>
+                                <field name="target_version"/>
+                            </group>
                         </group>
-                        <group string="Select Target Similar Job Positions">
-                            <field name="target_job_ids" widget="many2many_tags" placeholder="Select job positions..."/>
-                        </group>
+                        <notebook>
+                            <page string="Competency Requirements (Adapt Levels)">
+                                <field name="line_ids">
+                                    <list editable="bottom" create="0" delete="1">
+                                        <field name="competency_id" readonly="1"/>
+                                        <field name="pillar" widget="badge" readonly="1"/>
+                                        <field name="required_proficiency"/>
+                                        <field name="weight"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
                     </sheet>
                     <footer>
-                        <button name="action_clone_and_adapt" string="Clone &amp; Adapt Mappings" type="object" class="oe_highlight" groups="competency_management.group_competency_officer"/>
+                        <button name="action_clone_and_adapt" string="Create &amp; Open Role Profile" type="object" class="oe_highlight" groups="competency_management.group_competency_officer"/>
                         <button string="Cancel" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>

@@ -15,7 +15,7 @@ class CompetencyRoleMappingImportWizard(models.TransientModel):
     _name = 'competency.role.mapping.import.wizard'
     _description = 'Import Role Mappings from Excel'
 
-    file = fields.Binary(string='Excel File (.xlsx)', required=True)
+    file = fields.Binary(string='Excel File (.xlsx)')
     filename = fields.Char(string='Filename', default='role_mappings.xlsx')
     import_mode = fields.Selection([
         ('new_version', 'Create New Version & Archive Prior (Recommended)'),

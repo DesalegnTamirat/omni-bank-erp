@@ -162,7 +162,6 @@ export class CompetencyDashboard extends Component {
             this.radarChartInstance = null;
         }
         this.state.departmentId = ev.target.value ? parseInt(ev.target.value) : false;
-        this.state.operatingUnitId = false;
         this.loadData();
     }
 
@@ -172,6 +171,7 @@ export class CompetencyDashboard extends Component {
             this.radarChartInstance = null;
         }
         this.state.operatingUnitId = ev.target.value ? parseInt(ev.target.value) : false;
+        this.state.departmentId = false;
         this.loadData();
     }
 

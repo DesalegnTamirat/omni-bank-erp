@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_competency_role_bulk_assign_wizard_form" model="ir.ui.view">
+            <field name="name">competency.role.bulk.assign.wizard.form</field>
+            <field name="model">competency.role.bulk.assign.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Bulk Competency Assignment">
+                    <sheet>
+                        <div class="alert alert-info" role="alert" style="background-color: #fdf8f4; border-left: 5px solid #541718; padding: 14px 18px; margin-bottom: 15px;">
+                            <h5 style="color: #541718; margin-bottom: 4px;">
+                                <i class="fa fa-cubes"></i> Bulk Competency Assignment across Roles
+                            </h5>
+                            <p class="mb-0 text-muted" style="font-size: 13px;">
+                                Select multiple Job Positions and define the competencies to assign. If a role already has an <strong>Approved</strong> profile, it will be safely skipped to preserve governance.
+                            </p>
+                        </div>
+                        <group>
+                            <field name="job_ids" widget="many2many_tags" placeholder="Select multiple job positions to assign..." options="{'no_create': True}"/>
+                            <field name="skip_approved"/>
+                        </group>
+                        <notebook>
+                            <page string="Competencies to Assign">
+                                <field name="line_ids">
+                                    <list editable="bottom">
+                                        <field name="competency_id" options="{'no_create': True}"/>
+                                        <field name="pillar" widget="badge"/>
+                                        <field name="required_proficiency"/>
+                                        <field name="weight"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <footer>
+                        <button name="action_bulk_assign" string="⚡ Assign Competencies to All Selected Roles" type="object" class="oe_highlight" groups="competency_management.group_competency_officer"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_competency_role_bulk_assign_wizard" model="ir.actions.act_window">
+            <field name="name">Bulk Competency Assignment</field>
+            <field name="res_model">competency.role.bulk.assign.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="group_ids" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
+        </record>
+    </data>
+</odoo>

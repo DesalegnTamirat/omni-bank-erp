@@ -91,7 +91,7 @@
                         </div>
                         <group>
                             <group string="Plan">
-                                <field name="name" readonly="1"/>
+                                <field name="name" readonly="1" invisible="name == 'New'"/>
                                 <field name="fiscal_year"/>
                                 <field name="calendar_generation_date" readonly="1"/>
                                 <field name="calendar_sla_deadline" readonly="1"/>

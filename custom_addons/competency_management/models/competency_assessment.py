@@ -2596,6 +2596,23 @@ class CompetencyAssessmentLine(models.Model):
         w_sup = float(config.weight_supervisor or 3.0)
         w_team = float(config.weight_team or 0.0)
 
+        lines_with_data = self.filtered(lambda l: l.employee_id and l.cycle_id and l.competency_id)
+        sibling_map = {}
+        if lines_with_data:
+            emp_ids = list({l.employee_id.id for l in lines_with_data})
+            cycle_ids = list({l.cycle_id.id for l in lines_with_data})
+            comp_ids = list({l.competency_id.id for l in lines_with_data})
+
+            all_siblings = self.env['competency.assessment.line'].sudo().search([
+                ('employee_id', 'in', emp_ids),
+                ('cycle_id', 'in', cycle_ids),
+                ('competency_id', 'in', comp_ids),
+                ('current_level', '!=', False)
+            ])
+            for sline in all_siblings:
+                key = (sline.employee_id.id, sline.cycle_id.id, sline.competency_id.id)
+                sibling_map.setdefault(key, []).append(sline)
+
         for line in self:
             emp = line.employee_id
             cycle = line.cycle_id
@@ -2611,12 +2628,7 @@ class CompetencyAssessmentLine(models.Model):
                 line.weighted_current_level = s_init
                 continue
 
-            comp_lines = self.env['competency.assessment.line'].sudo().search([
-                ('employee_id', '=', emp.id),
-                ('cycle_id', '=', cycle.id),
-                ('competency_id', '=', comp.id),
-                ('current_level', '!=', False)
-            ])
+            comp_lines = sibling_map.get((emp.id, cycle.id, comp.id), [])
 
             self_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'self']
             peer_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'peer']
@@ -2752,13 +2764,26 @@ class CompetencyAssessmentLine(models.Model):
             if line.employee_id and line.cycle_id and line.competency_id:
                 emp_cycle_comps.add((line.employee_id.id, line.cycle_id.id, line.competency_id.id))
 
+        if not emp_cycle_comps:
+            return
+
+        emp_ids = list({e[0] for e in emp_cycle_comps})
+        cycle_ids = list({e[1] for e in emp_cycle_comps})
+        comp_ids = list({e[2] for e in emp_cycle_comps})
+
+        all_siblings = self.env['competency.assessment.line'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('cycle_id', 'in', cycle_ids),
+            ('competency_id', 'in', comp_ids),
+        ])
+        sibling_map = {}
+        for sline in all_siblings:
+            key = (sline.employee_id.id, sline.cycle_id.id, sline.competency_id.id)
+            sibling_map.setdefault(key, []).append(sline)
+
         for (emp_id, cycle_id, comp_id) in emp_cycle_comps:
-            comp_lines = self.env['competency.assessment.line'].sudo().search([
-                ('employee_id', '=', emp_id),
-                ('cycle_id', '=', cycle_id),
-                ('competency_id', '=', comp_id),
-                ('current_level', '!=', False)
-            ])
+            lines_for_key = sibling_map.get((emp_id, cycle_id, comp_id), [])
+            comp_lines = [l for l in lines_for_key if l.current_level]
 
             self_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'self']
             peer_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'peer']
@@ -2792,11 +2817,7 @@ class CompetencyAssessmentLine(models.Model):
 
             calc_weighted = round(num / den, 2) if den > 0 else float(s_val or sup_val or sub_val or t_val or 0.0)
 
-            all_lines = self.env['competency.assessment.line'].sudo().search([
-                ('employee_id', '=', emp_id),
-                ('cycle_id', '=', cycle_id),
-                ('competency_id', '=', comp_id),
-            ])
+            all_lines = self.env['competency.assessment.line'].browse([l.id for l in lines_for_key])
             all_lines.with_context(skip_360_recompute=True).write({
                 'self_rating': float(s_val),
                 'peer_avg': float(p_val),
@@ -2825,30 +2846,43 @@ class CompetencyAssessmentLine(models.Model):
 
     @api.depends('assessment_id.assessment_type', 'assessment_id.employee_id', 'assessment_id.cycle_id', 'competency_id')
     def _compute_is_primary_reporting_line(self):
-        emp_cycle_comps = set()
+        lines_with_data = self.filtered(lambda l: l.employee_id and l.cycle_id and l.competency_id)
+        if not lines_with_data:
+            for line in self:
+                line.is_primary_reporting_line = True
+            return
+
+        emp_ids = list({l.employee_id.id for l in lines_with_data})
+        cycle_ids = list({l.cycle_id.id for l in lines_with_data})
+        comp_ids = list({l.competency_id.id for l in lines_with_data})
+
+        all_comp_lines = self.env['competency.assessment.line'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('cycle_id', 'in', cycle_ids),
+            ('competency_id', 'in', comp_ids),
+        ], order='id asc')
+
+        grouped_lines = {}
+        for l in all_comp_lines:
+            key = (l.employee_id.id, l.cycle_id.id, l.competency_id.id)
+            grouped_lines.setdefault(key, []).append(l)
+
+        primary_ids = set()
+        for key, lines_list in grouped_lines.items():
+            self_line = [l for l in lines_list if l.assessment_id.assessment_type == 'self']
+            if self_line:
+                primary_ids.add(self_line[0].id)
+            else:
+                sup_line = [l for l in lines_list if l.assessment_id.assessment_type in ('supervisor', 'team')]
+                if sup_line:
+                    primary_ids.add(sup_line[0].id)
+                elif lines_list:
+                    primary_ids.add(lines_list[0].id)
+
         for line in self:
             if line.employee_id and line.cycle_id and line.competency_id:
-                emp_cycle_comps.add((line.employee_id.id, line.cycle_id.id, line.competency_id.id))
-
-        for (emp_id, cycle_id, comp_id) in emp_cycle_comps:
-            comp_lines = self.env['competency.assessment.line'].sudo().search([
-                ('employee_id', '=', emp_id),
-                ('cycle_id', '=', cycle_id),
-                ('competency_id', '=', comp_id),
-            ], order='id asc')
-
-            self_line = comp_lines.filtered(lambda l: l.assessment_id.assessment_type == 'self')
-            if self_line:
-                primary_id = self_line[0].id
+                line.is_primary_reporting_line = (line.id in primary_ids)
             else:
-                sup_line = comp_lines.filtered(lambda l: l.assessment_id.assessment_type in ('supervisor', 'team'))
-                primary_id = sup_line[0].id if sup_line else (comp_lines[0].id if comp_lines else False)
-
-            for l in comp_lines:
-                l.is_primary_reporting_line = (l.id == primary_id)
-
-        for line in self:
-            if not (line.employee_id and line.cycle_id and line.competency_id):
                 line.is_primary_reporting_line = True
 
     @api.constrains('competency_id')
@@ -2999,7 +3033,6 @@ class CompetencyAssessmentLine(models.Model):
             'peer_avg': self.peer_avg,
             'subordinate_avg': self.subordinate_avg,
             'supervisor_avg': self.supervisor_avg,
-            'team_avg': self.team_avg,
             'weighted_current_level': self.weighted_current_level,
             'rater_line_ids': breakdown_lines_vals,
         })

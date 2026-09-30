@@ -117,15 +117,3 @@ def post_init_hook(env):
     except Exception:
         pass
 
-    # ── 5. Auto-populate Director Peer Configuration for Directors & Chiefs ──
-    try:
-        env['competency.director.peer.config'].action_generate_director_records()
-    except Exception:
-        pass
-
-    # ── 6. Automatically grant Supervisor role to all active Coaches ────────
-    try:
-        env['hr.employee']._sync_all_coach_supervisor_groups()
-    except Exception:
-        pass
-

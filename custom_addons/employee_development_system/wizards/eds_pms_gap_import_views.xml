@@ -1,0 +1,50 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- PMS Appraisal Gaps Ingestion Wizard (Direct Zero-Upload) -->
+        <record id="view_eds_pms_gap_import_form" model="ir.ui.view">
+            <field name="name">eds.pms.gap.import.form</field>
+            <field name="model">eds.pms.gap.import</field>
+            <field name="arch" type="xml">
+                <form string="Pull Performance Appraisal Gaps from PMS">
+                    <div class="alert alert-info" role="alert">
+                        <span class="fa fa-info-circle me-1" title="Information" aria-hidden="true"/>
+                        <strong>Direct PMS Appraisal Gap Ingestion:</strong> Select criteria to automatically scan finalized/evaluated staff appraisals from the Performance Management System (PMS) and generate corresponding TNA development entries without file uploads.
+                    </div>
+                    <group>
+                        <group string="Target &amp; Filters">
+                            <field name="cycle_id" readonly="1" options="{'no_open': True}"/>
+                            <field name="fiscal_year_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="appraisal_period_id" options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                        <group string="Threshold &amp; Scope">
+                            <field name="max_score_threshold"/>
+                            <field name="state_filter"/>
+                            <field name="operating_unit_id" options="{'no_create': True}"/>
+                            <field name="department_id" options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <div invisible="not result_log">
+                        <group string="Ingestion Results">
+                            <field name="result_log" nolabel="1" readonly="1" widget="text"/>
+                        </group>
+                    </div>
+                    <footer>
+                        <button name="action_pull_pms_gaps" string="Pull PMS Performance Gaps"
+                                type="object" class="btn-primary" invisible="result_log"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_pms_gap_import" model="ir.actions.act_window">
+            <field name="name">Pull PMS Performance Gaps</field>
+            <field name="res_model">eds.pms.gap.import</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

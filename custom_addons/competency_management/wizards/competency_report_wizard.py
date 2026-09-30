@@ -1507,6 +1507,7 @@ class CompetencyRaterBreakdownWizard(models.TransientModel):
     peer_avg = fields.Float(string='Peer Avg', readonly=True)
     subordinate_avg = fields.Float(string='Subordinate Avg', readonly=True)
     supervisor_avg = fields.Float(string='Supervisor Avg', readonly=True)
+    team_avg = fields.Float(string='Team Avg', readonly=True)
     weighted_current_level = fields.Float(string='Weighted Current Level', readonly=True)
 
     # Detailed rater line breakdown

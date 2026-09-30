@@ -38,6 +38,7 @@ Complete implementation of all 15 weighted delivery tasks:
         'portal',
         'hr_employee_custom',
         'competency_management',
+        'performance_management',
         'audit_trail',
     ],
     'data': [
@@ -63,6 +64,7 @@ Complete implementation of all 15 weighted delivery tasks:
         'wizards/eds_assessment_import_views.xml',
         'wizards/eds_level1_import_views.xml',
         'wizards/eds_gap_import_views.xml',
+        'wizards/eds_pms_gap_import_views.xml',
         'views/eds_delivery_views.xml',
         'views/eds_tna_views.xml',
         'views/eds_evaluation_views.xml',

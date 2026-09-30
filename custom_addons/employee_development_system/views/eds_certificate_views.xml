@@ -82,7 +82,7 @@
                 </header>
                 <sheet>
                     <div class="oe_title">
-                        <h1><field name="code" readonly="1"/></h1>
+                        <h1><field name="code" readonly="1" invisible="code == 'New'"/></h1>
                     </div>
                     <group>
                         <group>

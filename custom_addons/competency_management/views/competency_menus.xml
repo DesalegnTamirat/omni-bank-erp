@@ -33,6 +33,12 @@
             action="action_competency_role_mapping"
             sequence="40"
             groups="competency_management.group_competency_employee" />
+        <menuitem id="menu_competency_role_bulk_assign"
+            name="Bulk Competency Assignment"
+            parent="menu_competency_framework_categ"
+            action="action_competency_role_bulk_assign_wizard"
+            sequence="42"
+            groups="competency_management.group_competency_officer" />
         <menuitem id="menu_competency_role_mapping_import"
             name="Import Role Mappings (Excel)"
             parent="menu_competency_framework_categ"

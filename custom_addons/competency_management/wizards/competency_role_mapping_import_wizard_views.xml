@@ -29,7 +29,7 @@
 
                         <group>
                             <group string="Excel File">
-                                <field name="file" filename="filename" widget="binary" required="state == 'draft'"/>
+                                <field name="file" filename="filename" widget="binary"/>
                             </group>
                             <group string="Import Settings">
                                 <field name="import_mode" widget="radio"/>
