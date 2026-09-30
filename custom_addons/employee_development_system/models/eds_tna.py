@@ -99,7 +99,7 @@ class EdsTnaCycle(models.Model):
         AssessmentLine = self.env['competency.assessment.line']
 
         # Query all active assessment lines with below proficiency
-        gap_lines = AssessmentLine.search([
+        gap_lines = AssessmentLine.sudo().search([
             '|',
             ('tna_measure', '=', 'below'),
             ('gap', '>', 0),
@@ -147,7 +147,7 @@ class EdsTnaCycle(models.Model):
             })
 
         if new_entries:
-            self.env['eds.tna.entry'].create(new_entries)
+            self.env['eds.tna.entry'].sudo().create(new_entries)
             created_count = len(new_entries)
 
         self.message_post(body=_(
@@ -227,16 +227,22 @@ class EdsTnaCycle(models.Model):
     @api.depends('start_date')
     def _compute_dates(self):
         for rec in self:
-            rec.submission_end_date = rec._add_working_days(
-                rec.start_date, rec._get_int_param('eds.tna_submission_days', 10))
-            month = rec._get_int_param('eds.tna_approval_deadline_month', 5)
-            day = rec._get_int_param('eds.tna_approval_deadline_day', 31)
-            try:
-                rec.approval_deadline = date(rec.start_date.year, month, day)
-            except ValueError:
-                # e.g. 31 February - clamp to the last valid day of the month
-                last_day = calendar.monthrange(rec.start_date.year, month)[1]
-                rec.approval_deadline = date(rec.start_date.year, month, last_day)
+            if not rec.start_date:
+                continue
+            sub_days = rec._get_int_param('eds.tna_submission_days', 10)
+            rec.submission_end_date = rec._add_working_days(rec.start_date, sub_days)
+            approval_days = rec._get_int_param('eds.tna_approval_days', 30)
+            rec.approval_deadline = rec._add_working_days(rec.submission_end_date, approval_days)
+
+    @api.constrains('start_date', 'submission_end_date', 'approval_deadline')
+    def _check_cycle_dates(self):
+        for rec in self:
+            if rec.start_date and rec.submission_end_date and rec.submission_end_date < rec.start_date:
+                raise ValidationError(_("Submission End Date (%s) cannot be earlier than Cycle Start Date (%s).")
+                                      % (rec.submission_end_date, rec.start_date))
+            if rec.submission_end_date and rec.approval_deadline and rec.approval_deadline < rec.submission_end_date:
+                raise ValidationError(_("Approval Deadline (%s) cannot be earlier than Submission End Date (%s).")
+                                      % (rec.approval_deadline, rec.submission_end_date))
 
     @api.depends('entry_ids')
     def _compute_entry_count(self):
@@ -281,9 +287,17 @@ class EdsTnaCycle(models.Model):
     # ── Workflow (/008/009/010) ──────────────────────────────────────
     def action_start_collection(self):
         """Draft -> Collecting (opens the submission window, /002)."""
+        today = fields.Date.today()
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Only draft TNA cycles can start collection.'))
+            if rec.submission_end_date and rec.submission_end_date < today:
+                raise UserError(_(
+                    "Cannot start collection: Submission End Date (%s) has already passed. "
+                    "Please update the submission end date to an active date before opening collection."
+                ) % rec.submission_end_date)
+            if rec.start_date and rec.start_date > today:
+                rec.start_date = today
             rec.state = 'collecting'
             rec.message_post(body=_('TNA cycle %s opened for collection. Submission window: %s to %s.')
                              % (rec.name, rec.start_date, rec.submission_end_date))

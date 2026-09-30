@@ -67,12 +67,12 @@
                         <group>
                             <group string="Cycle">
                                 <field name="name" readonly="1"/>
-                                <field name="year"/>
-                                <field name="start_date"/>
-                                <field name="submission_end_date"/>
+                                <field name="year" readonly="state != 'draft'"/>
+                                <field name="start_date" readonly="state != 'draft'"/>
+                                <field name="submission_end_date" readonly="state not in ('draft', 'collecting')"/>
                             </group>
                             <group string="Deadlines &amp; Status">
-                                <field name="approval_deadline"/>
+                                <field name="approval_deadline" readonly="state in ('approved', 'locked')"/>
                                 <field name="days_until_deadline"/>
                                 <field name="entry_count"/>
                                 <field name="approved_by_id"/>

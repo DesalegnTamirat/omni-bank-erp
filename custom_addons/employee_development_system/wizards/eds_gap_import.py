@@ -58,14 +58,14 @@ class EdsCompetencyGapImport(models.TransientModel):
         if self.department_id:
             domain.append(('department_id', '=', self.department_id.id))
 
-        assessment_lines = self.env['competency.assessment.line'].search(domain)
+        assessment_lines = self.env['competency.assessment.line'].sudo().search(domain)
         if not assessment_lines:
             self.result_log = _(
                 "Scan complete for closed cycle '%s'. No assessment lines found matching the gap criteria (min gap >= %d)."
             ) % (self.competency_cycle_id.name, self.min_gap)
             return self._return_view()
 
-        TnaEntryModel = self.env['eds.tna.entry']
+        TnaEntryModel = self.env['eds.tna.entry'].sudo()
         existing_keys = set(
             self.cycle_id.entry_ids.filtered(lambda e: e.employee_id and e.competency_id).mapped(
                 lambda e: (e.employee_id.id, e.competency_id.id)
