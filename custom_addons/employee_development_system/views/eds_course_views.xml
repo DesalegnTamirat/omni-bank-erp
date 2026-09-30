@@ -86,13 +86,17 @@
                 <form>
                     <header>
                         <button name="action_activate" string="Activate Course"
-                                type="object" class="oe_highlight" invisible="status != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="status != 'draft'"
+                                groups="employee_development_system.group_eds_officer"/>
                         <button name="action_generate_learning_objectives" string="Auto-Compile Learning Outcomes"
-                                type="object" class="btn-secondary" icon="fa-magic" invisible="status == 'retired'"/>
+                                type="object" class="btn-secondary" icon="fa-magic" invisible="status == 'retired'"
+                                groups="employee_development_system.group_eds_officer"/>
                         <button name="action_suspend" string="Suspend"
-                                type="object" invisible="status not in ('draft','active')"/>
+                                type="object" invisible="status not in ('draft','active')"
+                                groups="employee_development_system.group_eds_officer"/>
                         <button name="action_retire" string="Retire"
-                                type="object" invisible="status not in ('draft','active','suspended')"/>
+                                type="object" invisible="status not in ('draft','active','suspended')"
+                                groups="employee_development_system.group_eds_officer"/>
                         <field name="status" widget="statusbar"
                                statusbar_visible="draft,active,suspended,retired"/>
                     </header>
@@ -147,7 +151,8 @@
                             <field name="sourcing_decided_by_id" readonly="1"/>
                             <button name="action_submit_sourcing" string="Submit for Director PPDD Review"
                                     type="object" class="oe_highlight"
-                                    invisible="sourcing_state != 'draft'"/>
+                                    invisible="sourcing_state != 'draft'"
+                                    groups="employee_development_system.group_eds_officer"/>
                             <button name="action_record_sourcing_decision" string="Record Director Decision"
                                     type="object" invisible="sourcing_state != 'director_review'"
                                     groups="employee_development_system.group_eds_manager"/>

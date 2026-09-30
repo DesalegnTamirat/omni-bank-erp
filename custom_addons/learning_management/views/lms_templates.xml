@@ -144,7 +144,7 @@
                             <div class="col-md-8">
                                 <div class="card bg-dark border-secondary p-3 text-light">
                                     <h5 class="fw-bold mb-2">Lesson Overview</h5>
-                                    <p class="text-white-50 mb-0"><t t-esc="lesson.summary or 'Complete this lesson video to satisfy your training requirement.'"/></p>
+                                    <p class="text-white-50 mb-0"><t t-esc="lesson.name"/> - Complete this lesson video to satisfy your training requirement.</p>
                                 </div>
                             </div>
                             <div class="col-md-4">

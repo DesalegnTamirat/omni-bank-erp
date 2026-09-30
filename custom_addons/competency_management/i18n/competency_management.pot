@@ -32,7 +32,7 @@ msgstr ""
 #. module: competency_management
 #: code:addons/competency_management/models/competency_assessment.py:0
 #, python-format
-msgid "You cannot approve your own assessment/IDP. This action must be performed by a different authorized user (FR-COM-055)."
+msgid "You cannot approve your own assessment/IDP. This action must be performed by a different authorized user."
 msgstr ""
 
 #. module: competency_management
@@ -44,5 +44,5 @@ msgstr ""
 #. module: competency_management
 #: code:addons/competency_management/models/competency_competency.py:0
 #, python-format
-msgid "Behavioral Indicators are required for each proficiency level (FR-COM-003, FR-COM-004)."
+msgid "Behavioral Indicators are required for each proficiency level."
 msgstr ""

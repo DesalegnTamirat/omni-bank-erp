@@ -17,7 +17,7 @@
                         </group>
                     </sheet>
                     <footer>
-                        <button name="action_clone_and_adapt" string="Clone &amp; Adapt Mappings" type="object" class="oe_highlight"/>
+                        <button name="action_clone_and_adapt" string="Clone &amp; Adapt Mappings" type="object" class="oe_highlight" groups="competency_management.group_competency_officer"/>
                         <button string="Cancel" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>
@@ -29,6 +29,7 @@
             <field name="res_model">competency.role.mapping.clone.wizard</field>
             <field name="view_mode">form</field>
             <field name="target">new</field>
+            <field name="group_ids" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
         </record>
     </data>
 </odoo>

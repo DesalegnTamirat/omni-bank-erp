@@ -11,7 +11,7 @@ class T3Scorecard(models.Model):
     _rec_name = "employee_id"
     _order = "employee_id"
 
-    employee_id = fields.Many2one("hr.employee", string="Employee", readonly=True)
+    employee_id = fields.Many2one("hr.employee", string="Employee", readonly=True, default=lambda self: self.env.user.employee_id)
     manager_id = fields.Many2one("hr.employee", string="Manager")
 
     planning_name = fields.Char(readonly=True)
@@ -118,18 +118,18 @@ class T3Scorecard(models.Model):
 
                 fyl = False
                 if period and start:
-                    fyl = self.env['performance.fiscal.year.line'].search([
+                    fyl = self.env['fiscal.year.line'].search([
                         ('appraisal_period', '=', period.id),
                         ('date_start', '<=', start),
                         ('date_end', '>=', end or start),
                     ], limit=1)
                     if not fyl:
-                        fyl = self.env['performance.fiscal.year.line'].search([
+                        fyl = self.env['fiscal.year.line'].search([
                             ('appraisal_period', '=', period.id),
                             ('date_start', '=', start),
                         ], limit=1)
                 if not fyl and period:
-                    fyl = self.env['performance.fiscal.year.line'].search([
+                    fyl = self.env['fiscal.year.line'].search([
                         ('appraisal_period', '=', period.id),
                     ], limit=1)
                 if not fyl and start:
@@ -146,7 +146,7 @@ class T3Scorecard(models.Model):
                             rec.fiscal_year_id = fy.id
                             break
                 if fyl:
-                    rec.fiscal_year_id = fyl.fiscal_year_id.id
+                    rec.fiscal_year_id = fyl.year_id.id
 
     @api.depends('appraisal_period_id', 'appraisal_period_id.code', 'appraisal_period_id.name', 'start_date', 'end_date', 'fiscal_year_id')
     def _compute_appraisal_period_code(self):

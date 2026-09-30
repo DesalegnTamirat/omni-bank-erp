@@ -63,7 +63,7 @@ class CompetencyAssessmentCycle(models.Model):
     def write(self, vals):
         res = super().write(vals)
         if 'state' in vals or 'active' in vals:
-            self.search([])._compute_is_open_or_latest()
+            self._recompute_is_open_or_latest_sql()
         return res
 
     @api.model_create_multi
@@ -71,15 +71,55 @@ class CompetencyAssessmentCycle(models.Model):
         if not self.env.user.has_group('competency_management.group_competency_admin') and not self.env.su:
             raise UserError(_("Only Competency Administrators can create new Assessment Cycles."))
         records = super().create(vals_list)
-        self.search([])._compute_is_open_or_latest()
+        self._recompute_is_open_or_latest_sql()
         return records
+
+    @api.model
+    def _recompute_is_open_or_latest_sql(self):
+        # Update is_open_or_latest for all cycles in a single SQL statement.
+        # Open cycles take priority; if none are open, the most recently ended active cycle wins.
+        self.env.cr.execute("""
+            WITH ranked AS (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           ORDER BY
+                               CASE WHEN state = 'open' THEN 0 ELSE 1 END,
+                               COALESCE(period_end, CURRENT_DATE) DESC,
+                               id DESC
+                       ) AS rn
+                FROM competency_assessment_cycle
+                WHERE active = true
+            )
+            UPDATE competency_assessment_cycle
+            SET is_open_or_latest = (id IN (SELECT id FROM ranked WHERE rn = 1));
+        """)
+        self.invalidate_model(['is_open_or_latest'])
 
     @api.depends('assessment_ids', 'assessment_ids.state')
     def _compute_assessment_counts(self):
+        # Query counts in bulk for persisted cycles
+        real_records = self.filtered(lambda r: isinstance(r.id, int))
+        count_map = {}
+        if real_records:
+            grouped = self.env['competency.assessment']._read_group(
+                [('cycle_id', 'in', real_records.ids)], ['cycle_id', 'state'], ['__count']
+            )
+            for cycle_rec, state_val, cnt in grouped:
+                cid = cycle_rec.id
+                if cid not in count_map:
+                    count_map[cid] = {'total': 0, 'draft': 0, 'submitted': 0}
+                count_map[cid]['total'] += cnt
+                if state_val == 'draft':
+                    count_map[cid]['draft'] += cnt
+                else:
+                    count_map[cid]['submitted'] += cnt
+
+        # Always assign every record in self (including NewId during onchange/form creation)
         for rec in self:
-            rec.assessment_count = len(rec.assessment_ids)
-            rec.pending_assessment_count = len(rec.assessment_ids.filtered(lambda a: a.state == 'draft'))
-            rec.submitted_assessment_count = len(rec.assessment_ids.filtered(lambda a: a.state != 'draft'))
+            data = count_map.get(rec.id, {}) if isinstance(rec.id, int) else {}
+            rec.assessment_count = data.get('total', 0)
+            rec.pending_assessment_count = data.get('draft', 0)
+            rec.submitted_assessment_count = data.get('submitted', 0)
 
     def action_view_assessments(self):
         """Smart button action to view all paginated assessments for this cycle."""
@@ -145,7 +185,15 @@ class CompetencyAssessmentCycle(models.Model):
                     if not cycle_rec.exists():
                         return
 
-                    deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y') if cycle_rec.assessment_deadline else _('Not set')
+                    if cycle_rec.assessment_deadline:
+                        deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y')
+                        deadline_phrase = _("The submission deadline is <b>%s</b>. Please complete and submit your assessments before the deadline.") % deadline_str
+                        summary_str = _("URGENT: %d Pending Assessment(s) Due %s") % (pending_count, deadline_str)
+                        note_str = _("You have %d pending assessment(s) for cycle '%s'. Deadline: %s.") % (pending_count, cycle_name, deadline_str)
+                    else:
+                        deadline_phrase = _("Please complete and submit your assessments at your earliest convenience.")
+                        summary_str = _("Action Required: %d Pending Assessment(s)") % pending_count
+                        note_str = _("You have %d pending assessment(s) for cycle '%s'.") % (pending_count, cycle_name)
 
                     new_cr.execute("""
                         SELECT ca.assessor_id,
@@ -175,11 +223,11 @@ class CompetencyAssessmentCycle(models.Model):
                             "⚠️ <b>Competency Assessment Deadline Warning:</b><br/>"
                             "You have %d pending competency assessment(s) assigned to you for cycle '<b>%s</b>' "
                             "(Assessments for: %s%s).<br/>"
-                            "The submission deadline is <b>%s</b>. Please complete and submit your assessments before the deadline."
-                        )) % (pending_count, escape(cycle_name or ''), escape(emp_names_str or ''), escape(extra or ''), escape(deadline_str or ''))
-
-                        summary_str = _("URGENT: %d Pending Assessment(s) Due %s") % (pending_count, deadline_str)
-                        note_str = _("You have %d pending assessment(s) for cycle '%s'. Deadline: %s.") % (pending_count, cycle_name, deadline_str)
+                            "%s"
+                            "<div style='margin-top: 10px;'>"
+                            "<a href='/web#action=competency_management.action_my_competency_assessment' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                            "👉 Open My Competency Assessments</a></div>"
+                        )) % (pending_count, escape(cycle_name or ''), escape(emp_names_str or ''), escape(extra or ''), deadline_phrase)
 
                         target_rec = new_env['competency.assessment'].browse(sample_asm_id) if sample_asm_id else cycle_rec
                         target_rec._notify_user_inbox_and_activity(
@@ -255,7 +303,13 @@ class CompetencyAssessmentCycle(models.Model):
                     if not cycle_rec.exists():
                         return
 
-                    deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y') if cycle_rec.assessment_deadline else _('Not set')
+                    if cycle_rec.assessment_deadline:
+                        deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y')
+                        deadline_line = Markup("<br/><b>Submission Deadline:</b> %s.") % deadline_str
+                        deadline_note_suffix = _(" by %s") % deadline_str
+                    else:
+                        deadline_line = Markup("<br/><i>Please complete your evaluations at your earliest convenience.</i>")
+                        deadline_note_suffix = _(" at your earliest convenience")
 
                     new_cr.execute("""
                         SELECT ca.assessor_id,
@@ -294,13 +348,15 @@ class CompetencyAssessmentCycle(models.Model):
                             "📢 <b>Competency Assessment Campaign Open: %s</b><br/>"
                             "Assessment Cycle '<b>%s</b>' is now open for evaluation.<br/>"
                             "Please navigate to <b>Competency Management → Assessments → My Competency Assessments</b> to complete your evaluations.<br/>"
-                            "<b>Assigned to you:</b> %s.<br/>"
-                            "<b>Submission Deadline:</b> %s."
-                        )) % (escape(cycle_name or ''), escape(cycle_name or ''), escape(details_str or ''), escape(deadline_str or ''))
+                            "<b>Assigned to you:</b> %s.%s"
+                            "<div style='margin-top: 10px;'>"
+                            "<a href='/web#action=competency_management.action_my_competency_assessment' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                            "👉 Open My Competency Assessments</a></div>"
+                        )) % (escape(cycle_name or ''), escape(cycle_name or ''), escape(details_str or ''), deadline_line)
 
                         summary_str = _("Fill Competency Assessment: %s") % cycle_name
-                        note_str = _("Assessment cycle '%s' is open. Please complete your evaluations (%s) on the My Competency Assessments page by %s.") % (
-                            cycle_name, details_str, deadline_str
+                        note_str = _("Assessment cycle '%s' is open. Please complete your evaluations (%s) on the My Competency Assessments page%s.") % (
+                            cycle_name, details_str, deadline_note_suffix
                         )
 
                         target_rec = new_env['competency.assessment'].browse(sample_asm_id) if sample_asm_id else cycle_rec
@@ -390,9 +446,11 @@ class CompetencyAssessmentCycle(models.Model):
         }
 
     def _generate_cycle_assessments_batch(self):
-        """High-performance in-memory 360 assessment batch generator.
-        Pre-caches employee metadata in a single pass (O(1) lookups) to
-        generate assessments efficiently at scale.
+        """Generate all 360-degree assessment records for this cycle in a single batched pass.
+
+        Pre-caches all active employee metadata before building assessment pairs to avoid
+        repeated ORM lookups inside loops. Assessment records are bulk-created in chunks
+        of 1,000 to keep each transaction manageable.
         """
         self.ensure_one()
         import random
@@ -523,13 +581,10 @@ class CompetencyAssessmentCycle(models.Model):
                     })
                     existing_pairs.add(pair_team)
 
-        # 3. Subordinate Assessment (Evaluator assesses subordinate or evaluates coach/superior)
-        # Criteria:
-        # A. For Chiefs: 1. Same Coach, 2. Different Job Grade
-        # B. For Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
-        # Quota Rule: Every assessed employee/manager receives min(len(eligible_raters), max_subs) subordinate assessments.
-        # If eligible raters < max_subs (e.g. 3, 2, 1), they are assessed by all of them.
-        # Evaluators with lower current workload are prioritized to balance assessor assignments.
+        # 3. Subordinate Assessment — teammates within the same coach group evaluate each other upward.
+        # Eligibility: same coach, different job grade, same OU, different job position (non-director).
+        # Chiefs/Directors: same coach + different job grade only.
+        # Each candidate gets min(eligible_count, max_subs) subordinate raters, balanced by current workload.
 
         # A. Teammates assessing subordinates under the same coach (Different Job Grade)
         sub_candidates = {}
@@ -636,15 +691,10 @@ class CompetencyAssessmentCycle(models.Model):
                     if chosen >= k_sub:
                         break
 
-        # 4. Peer Assessment (Strict business rules per position category)
-        # Quota Rule: Every employee receives min(len(eligible_peers), max_peers) peer assessments.
-        # If eligible peers < max_peers (e.g. 3, 2, 1), they are assessed by all of them.
-        # Evaluators with lower current workload are prioritized to balance assessor assignments.
+        # 4. Peer Assessment — matched within category-specific peer buckets.
+        # Each employee gets min(eligible_peers, max_peers) peer raters, balanced by current workload.
 
-        # A. Director & Chief Peer Pool (Strictly manual assignment via competency.director.peer.config)
-        # Unidirectional: The configured Director/Chief evaluates each peer in their assigned peer_ids.
-        # No automatic reciprocal peering: Derese does not evaluate Abayneh unless configured on Derese's own record.
-        # No random fallback: If an executive has no peers assigned in their config, they evaluate 0 peers.
+        # A. Directors/Chiefs: manually configured via competency.director.peer.config (unidirectional, no auto-fallback).
         for d_id, p_ids in dir_peer_map.items():
             d_u_id = emp_cache.get(d_id, {}).get('user_id')
             if not d_u_id or not p_ids:
@@ -778,6 +828,7 @@ class CompetencyAssessmentCycle(models.Model):
         self.with_context(force_write=True).write({'state': 'closed'})
         for rec in self:
             rec.message_post(body=_('Assessment cycle %s closed.') % rec.name)
+            self.env['competency.dashboard.snapshot'].sudo()._cron_take_dashboard_snapshot(cycle_ids=[rec.id])
         return True
 
     def write(self, vals):
@@ -853,6 +904,23 @@ class CompetencyAssessment(models.Model):
     grade_id = fields.Many2one('employee.grade', string='Job Grade', compute='_compute_grade_id', store=True, readonly=True)
 
     @api.model
+    def get_bunna_logo_base64(self):
+        """Returns base64 string of the official Bunna Bank logo for reliable QWeb PDF rendering."""
+        import base64
+        import os
+        logo_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+        )
+        if not os.path.exists(logo_path):
+            alt_path = '/mnt/extra-addons/custom_recruitment/static/src/img/bunna_bank_official_logo.png'
+            if os.path.exists(alt_path):
+                logo_path = alt_path
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        return ""
+
+    @api.model
     def _get_employee_job(self, emp):
         """Safely fetch job position for an employee, prioritizing substantive custom job_position over version job_id."""
         if not emp:
@@ -897,7 +965,7 @@ class CompetencyAssessment(models.Model):
     )
     is_current_or_latest_cycle = fields.Boolean(
         string='Current or Latest Cycle',
-        related='cycle_id.is_open_or_latest', store=True, index=True
+        related='cycle_id.is_open_or_latest', store=False, index=False
     )
     assessment_type = fields.Selection(
         selection='_get_assessment_type_selection', string='Assessment Type',
@@ -1077,11 +1145,11 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _is_director_or_chief(self, emp):
-        """Strictly classify as Director (Grade 16) or Chief (Grade 17). Exclude Grade II, III, IV, etc."""
+        """Strictly classify as Executive: Grade 15, Director (Grade 16) or Chief (Grade 17). Exclude Grade II, III, IV, etc."""
         if not emp or not emp.active:
             return False
         g_num = self._get_grade_number(emp)
-        if g_num in (16, 17):
+        if g_num in (15, 16, 17):
             return True
         return False
 
@@ -1748,29 +1816,30 @@ class CompetencyAssessment(models.Model):
             j_lower = j_name.lower()
             is_managerial = any(k in j_lower for k in ['manager', 'director', 'chief', 'leader', 'head', 'supervisor', 'president', 'vp']) or getattr(employee, 'is_managerial', False)
 
+            core_req_lvl = self._get_matrix_required_level('core', grade=grade_rec, job=job_pos, job_name=j_name) or '2'
             if 'core' in allowed_pillars:
                 core_comps = self.env['competency.competency'].search([('pillar', '=', 'core'), ('status', '=', 'active')])
                 for comp in core_comps:
-                    req_lvl = self._get_matrix_required_level('core', grade=grade_rec, job=job_pos, job_name=j_name)
                     raw_line_vals.append({
                         'competency_id': comp.id,
                         'pillar': 'core',
                         'current_level': False,
-                        'required_level': req_lvl or '2',
+                        'required_level': core_req_lvl,
                     })
 
             if 'leadership' in allowed_pillars and is_managerial:
+                lead_req_lvl = self._get_matrix_required_level('leadership', grade=grade_rec, job=job_pos, job_name=j_name) or '2'
                 lead_comps = self.env['competency.competency'].search([('pillar', '=', 'leadership'), ('status', '=', 'active')])
                 for comp in lead_comps:
-                    req_lvl = self._get_matrix_required_level('leadership', grade=grade_rec, job=job_pos, job_name=j_name)
                     raw_line_vals.append({
                         'competency_id': comp.id,
                         'pillar': 'leadership',
                         'current_level': False,
-                        'required_level': req_lvl or '2',
+                        'required_level': lead_req_lvl,
                     })
 
             if 'technical' in allowed_pillars:
+                tech_req_lvl = self._get_matrix_required_level('technical', grade=grade_rec, job=job_pos, job_name=j_name) or '2'
                 tech_comps = self.env['competency.competency']
                 if job_pos and getattr(job_pos, 'department_id', False):
                     dept_name = job_pos.department_id.name
@@ -1786,12 +1855,11 @@ class CompetencyAssessment(models.Model):
                     ], limit=5)
 
                 for comp in tech_comps:
-                    req_lvl = self._get_matrix_required_level('technical', grade=grade_rec, job=job_pos, job_name=j_name)
                     raw_line_vals.append({
                         'competency_id': comp.id,
                         'pillar': 'technical',
                         'current_level': False,
-                        'required_level': req_lvl or '2',
+                        'required_level': tech_req_lvl,
                     })
 
             mapping_name_str = _("Competency Matrix Guidelines (%s)") % (j_name or 'Default')
@@ -1969,16 +2037,15 @@ class CompetencyAssessment(models.Model):
         return super(CompetencyAssessment, self).write(vals)
 
     def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None):
-        """Ensure notification appears in ALL Odoo notification channels:
+        """Ensure notification appears in standard Odoo notification channels:
         1. Top Header Clock Icon (mail.activity)
-        2. Top Header Speech Bubble Notifications tab (mail.notification with inbox type)
-        3. Direct Discuss Chat Channel popover / popup window (discuss.channel)
+        2. Top Header Notifications Tray / Inbox (mail.notification with inbox type)
         """
         if not target_user:
             return
         rec_to_notify = (target_rec or self).sudo()
-        
-        # 1. Top Header Clock Icon (Activity Badge)
+
+        # 1. Top Header Clock Icon (Planned Activity)
         try:
             rec_to_notify.activity_schedule(
                 'mail.mail_activity_data_todo',
@@ -1989,12 +2056,16 @@ class CompetencyAssessment(models.Model):
         except Exception:
             pass
 
-        # 2. Document Chatter Message & In-App Notification
+        # 2. Document Chatter Message & In-App Notification (authored by OdooBot / System)
         if target_user.partner_id:
             try:
-                msg = rec_to_notify.message_post(
+                odoobot = self.env.ref('base.partner_root', raise_if_not_found=False)
+                author_id = odoobot.id if odoobot else False
+                msg = rec_to_notify.with_context(mail_create_nosubscribe=True).message_post(
                     body=msg_text,
                     partner_ids=[target_user.partner_id.id],
+                    author_id=author_id,
+                    message_type='notification',
                     subtype_xmlid='mail.mt_comment',
                 )
                 # Guarantee an unread in-app inbox notification entry
@@ -2012,19 +2083,6 @@ class CompetencyAssessment(models.Model):
                         'notification_status': 'sent',
                         'is_read': False,
                     })
-            except Exception:
-                pass
-
-            # 3. Direct Discuss Chat Channel Popup / Window (OdooBot Direct Message)
-            try:
-                # Odoo 19 compatible: _get_or_create_chat takes a single partner_id int
-                chat_channel = self.env['discuss.channel'].sudo()._get_or_create_chat(target_user.partner_id.id)
-                if chat_channel:
-                    chat_channel.message_post(
-                        body=msg_text,
-                        message_type='comment',
-                        subtype_xmlid='mail.mt_comment',
-                    )
             except Exception:
                 pass
 
@@ -2363,9 +2421,10 @@ class CompetencyAssessmentLine(models.Model):
     cycle_id = fields.Many2one(related='assessment_id.cycle_id', string='Assessment Cycle', store=True, readonly=True, index=True)
     is_current_or_latest_cycle = fields.Boolean(
         string='Current or Latest Cycle',
-        related='cycle_id.is_open_or_latest', store=True, index=True
+        related='cycle_id.is_open_or_latest', store=False, index=False
     )
     employee_id = fields.Many2one(related='assessment_id.employee_id', string='Employee', store=True, readonly=True, index=True)
+    gender = fields.Selection(related='assessment_id.employee_id.gender', string='Gender', store=True, readonly=True, index=True)
     department_id = fields.Many2one(related='assessment_id.department_id', string='Department', store=True, readonly=True, index=True)
     operating_unit_id = fields.Many2one(related='assessment_id.employee_id.default_operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
     job_id = fields.Many2one('hr.job', string='Job Position', compute='_compute_job_and_grade_id', store=True, readonly=True, index=True)
@@ -2519,6 +2578,14 @@ class CompetencyAssessmentLine(models.Model):
     supervisor_avg = fields.Float(string='Supervisor Rating', compute='_compute_360_ratings', store=True, group_operator='avg')
     team_avg = fields.Float(string='Team Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
     weighted_current_level = fields.Float(string='Weighted Current Level', compute='_compute_360_ratings', store=True, group_operator='avg')
+    self_gap = fields.Float(string='Self Gap', compute='_compute_specific_gaps', store=True, group_operator='avg',
+                            help='Required proficiency minus Self rating.')
+    peer_gap = fields.Float(string='Peer Gap', compute='_compute_specific_gaps', store=True, group_operator='avg',
+                            help='Required proficiency minus Peer average rating.')
+    subordinate_gap = fields.Float(string='Subordinate Gap', compute='_compute_specific_gaps', store=True, group_operator='avg',
+                                   help='Required proficiency minus Subordinate average rating.')
+    supervisor_gap = fields.Float(string='Supervisor Gap', compute='_compute_specific_gaps', store=True, group_operator='avg',
+                                  help='Required proficiency minus Supervisor rating.')
 
     @api.depends('assessment_id.employee_id', 'assessment_id.cycle_id', 'competency_id', 'current_level')
     def _compute_360_ratings(self):
@@ -2809,6 +2876,16 @@ class CompetencyAssessmentLine(models.Model):
             else:
                 rec.gap = False
 
+    @api.depends('required_level_num', 'self_rating', 'peer_avg', 'subordinate_avg', 'supervisor_avg')
+    def _compute_specific_gaps(self):
+        for rec in self:
+            req = float(rec.required_level_num or 0)
+            rec.self_gap = round(req - rec.self_rating, 2) if rec.self_rating else 0.0
+            rec.peer_gap = round(req - rec.peer_avg, 2) if rec.peer_avg else 0.0
+            rec.subordinate_gap = round(req - rec.subordinate_avg, 2) if rec.subordinate_avg else 0.0
+            rec.supervisor_gap = round(req - rec.supervisor_avg, 2) if rec.supervisor_avg else 0.0
+
+
     @api.depends('gap', 'current_level_num')
     def _compute_tna_measure(self):
         for rec in self:
@@ -2858,12 +2935,15 @@ class CompetencyAssessmentLine(models.Model):
                 if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
                     deadline_str = line.assessment_id.cycle_id.assessment_deadline.strftime('%b %d, %Y') if line.assessment_id.cycle_id and line.assessment_id.cycle_id.assessment_deadline else 'N/A'
                     raise UserError(_("The submission deadline (%s) for cycle '%s' has passed. Rating lines cannot be deleted.") % (deadline_str, line.assessment_id.cycle_id.name))
-
     def action_view_360_breakdown(self):
         """Action button to open the 360° Rater Score Breakdown pop-up modal wizard."""
         self.ensure_one()
-        if self.sudo().employee_id.user_id == self.env.user and not self.env.user.has_group('competency_management.group_competency_supervisor') and not self.env.su:
+        is_supervisor = self.env.user.has_group('competency_management.group_competency_supervisor')
+        is_officer = self.env.user.has_group('competency_management.group_competency_officer')
+        if not is_supervisor and not is_officer and not self.env.su:
             raise UserError(_("Individual multi-rater score breakdowns are restricted to Supervisors and HR Officers to maintain 360-degree feedback anonymity."))
+        if self.sudo().employee_id.user_id == self.env.user and not is_officer and not self.env.su:
+            raise UserError(_("You cannot view individual multi-rater score breakdowns for your own assessment to maintain 360-degree feedback anonymity."))
         emp = self.employee_id
         cycle = self.cycle_id
         comp = self.competency_id

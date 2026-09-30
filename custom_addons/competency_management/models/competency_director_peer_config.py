@@ -16,7 +16,7 @@ class CompetencyDirectorPeerConfig(models.Model):
     _rec_name = 'director_id'
 
     director_id = fields.Many2one(
-        'hr.employee', string='Executive (Director / Chief)', required=True, ondelete='cascade',
+        'hr.employee', string='Executive (Grade 15 / Director / Chief)', required=True, ondelete='cascade',
         domain="[('is_director_or_chief', '=', True), ('active', '=', True)]",
         index=True)
     job_id = fields.Many2one(
@@ -424,18 +424,19 @@ class CompetencyDirectorPeerConfig(models.Model):
 
     @api.model
     def _is_director_or_chief(self, emp):
-        """Strictly classify as Director (Grade 16) or Chief (Grade 17). Exclude Grade II, III, IV, etc."""
+        """Strictly classify as Executive: Grade 15, Director (Grade 16) or Chief (Grade 17). Exclude Grade II, III, IV, etc."""
         if not emp or not emp.active:
             return False
         emp_sudo = emp.sudo()
         g_num = self.sudo()._get_grade_number(emp_sudo)
-        if g_num in (16, 17):
+        if g_num in (15, 16, 17):
             return True
         return False
 
     @api.depends('director_id', 'grade_id', 'director_id.job_id', 'director_id.grade_id', 'director_id.job_grade')
     def _compute_candidate_peer_ids(self):
         """Calculate pool of eligible peers strictly matching the executive rank:
+        - For Grade 15: only active Grade 15 employees, excluding themselves.
         - For Directors (Grade 16): only active Directors (Grade 16), excluding themselves.
         - For Chiefs (Grade 17): only active Chiefs (Grade 17), excluding themselves.
         """
@@ -450,7 +451,11 @@ class CompetencyDirectorPeerConfig(models.Model):
             dir_emp = rec.sudo().director_id
             dir_g_num = peer_config._get_grade_number(dir_emp)
 
-            if dir_g_num == 16:
+            if dir_g_num == 15:
+                candidates = all_active.filtered(
+                    lambda e: e.id != dir_emp.id and peer_config._get_grade_number(e) == 15
+                )
+            elif dir_g_num == 16:
                 candidates = all_active.filtered(
                     lambda e: e.id != dir_emp.id and peer_config._get_grade_number(e) == 16
                 )
@@ -471,7 +476,11 @@ class CompetencyDirectorPeerConfig(models.Model):
             dir_emp = self.sudo().director_id
             dir_g_num = self.sudo()._get_grade_number(dir_emp)
             all_active = self.env['hr.employee'].sudo().search([('active', '=', True)])
-            if dir_g_num == 16:
+            if dir_g_num == 15:
+                self.candidate_peer_ids = all_active.filtered(
+                    lambda e: e.id != dir_emp.id and self.sudo()._get_grade_number(e) == 15
+                )
+            elif dir_g_num == 16:
                 self.candidate_peer_ids = all_active.filtered(
                     lambda e: e.id != dir_emp.id and self.sudo()._get_grade_number(e) == 16
                 )
@@ -492,11 +501,13 @@ class CompetencyDirectorPeerConfig(models.Model):
             dir_g_num = self.sudo()._get_grade_number(rec.sudo().director_id)
             for peer in rec.sudo().peer_ids:
                 peer_g_num = self.sudo()._get_grade_number(peer)
-                if dir_g_num == 16 and peer_g_num != 16:
+                if dir_g_num == 15 and peer_g_num != 15:
+                    raise ValidationError(_("Invalid Peer '%s': Peers for a Grade XV executive must also be Grade XV.") % peer.name)
+                elif dir_g_num == 16 and peer_g_num != 16:
                     raise ValidationError(_("Invalid Peer '%s': Peers for a Director (Grade XVI) must also be Directors (Grade XVI).") % peer.name)
                 elif dir_g_num == 17 and peer_g_num != 17:
                     raise ValidationError(_("Invalid Peer '%s': Peers for a Chief (Grade XVII) must also be Chiefs (Grade XVII).") % peer.name)
-                elif dir_g_num not in (16, 17) and peer_g_num != dir_g_num:
+                elif dir_g_num not in (15, 16, 17) and peer_g_num != dir_g_num:
                     raise ValidationError(_("Invalid Peer '%s': Peers must share the same executive grade rank.") % peer.name)
 
     @api.constrains('director_id')
@@ -514,7 +525,7 @@ class CompetencyDirectorPeerConfig(models.Model):
     def _check_director_grade(self):
         for rec in self:
             if rec.director_id and not self._is_director_or_chief(rec.sudo().director_id):
-                raise ValidationError(_("Employee '%s' cannot be configured here. Director Peer Configuration is strictly reserved for Directors (Grade XVI) and Chiefs (Grade XVII).") % rec.sudo().director_id.name)
+                raise ValidationError(_("Employee '%s' cannot be configured here. Executive Peer Configuration is strictly reserved for Grade XV, Directors (Grade XVI), and Chiefs (Grade XVII).") % rec.sudo().director_id.name)
 
     def action_generate_director_records(self, *args, **kwargs):
         """Scan active hr.employee records strictly for Directors (Grade 16) and Chiefs (Grade 17) and create missing configuration records, purging non-executive entries."""
@@ -537,12 +548,12 @@ class CompetencyDirectorPeerConfig(models.Model):
                 existing_director_ids.add(emp_id)
                 created_count += 1
 
-        msg = _("Successfully synchronized Director Peer Configuration.\nCreated: %d, Total Active Directors & Chiefs: %d.\nNon-executive records purged.") % (created_count, len(existing_director_ids))
+        msg = _("Successfully synchronized Executive Peer Configuration.\nCreated: %d, Total Active Executives (Grade XV, Directors & Chiefs): %d.\nNon-executive records purged.") % (created_count, len(existing_director_ids))
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Director Records Synchronized'),
+                'title': _('Executive Records Synchronized'),
                 'message': msg,
                 'type': 'success',
                 'sticky': False,
@@ -553,19 +564,11 @@ class CompetencyDirectorPeerConfig(models.Model):
             }
         }
 
+
     @api.model
     def action_open_director_peer_config(self):
         """Auto-populate any newly appointed Directors/Chiefs before displaying configuration."""
         self.action_generate_director_records()
         return self.env['ir.actions.act_window']._for_xml_id('competency_management.action_competency_director_peer_config')
-
-    def _register_hook(self):
-        super()._register_hook()
-        # Scan and populate when the module / server registry loads
-        try:
-            with self.env.cr.savepoint():
-                self.sudo().action_generate_director_records()
-        except Exception:
-            pass
 
 

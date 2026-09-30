@@ -15,6 +15,7 @@
                                 class="btn-primary"
                                 invisible="not has_open_cycle"
                                 icon="fa-refresh"
+                                confirm="Synchronizing will update peer assignments in the open cycle. Any draft assessments for removed peers will be deleted. Are you sure you want to proceed?"
                                 groups="competency_management.group_competency_admin"/>
                     </header>
                     <sheet>
@@ -22,7 +23,7 @@
                         <widget name="web_ribbon" title="Executive Leadership" bg_color="bg-info"/>
                         <div class="oe_title">
                             <h1>
-                                <field name="director_id" domain="[('is_director_or_chief', '=', True), ('active', '=', True)]" options="{'no_open': True, 'no_create': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select Director or Chief..."/>
+                                <field name="director_id" domain="[('is_director_or_chief', '=', True), ('active', '=', True)]" options="{'no_open': True, 'no_create': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select Executive (Grade 15, Director, Chief)..."/>
                             </h1>
                         </div>
                         <group>
@@ -40,7 +41,7 @@
                         <notebook>
                             <page string="Assigned 360° Peers" name="peers">
                                 <field name="candidate_peer_ids" invisible="1"/>
-                                <field name="peer_ids" widget="many2many_tags" domain="[('id', 'in', candidate_peer_ids)]" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select peer Directors or Chiefs..."/>
+                                <field name="peer_ids" widget="many2many_tags" domain="[('id', 'in', candidate_peer_ids)]" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select peers matching executive grade rank..."/>
                             </page>
                         </notebook>
 
@@ -62,6 +63,7 @@
                                 class="btn-secondary"
                                 display="always"
                                 icon="fa-users"
+                                confirm="This will scan all active Grade 15, Director (Grade 16), and Chief (Grade 17) employees and create missing configuration records. Are you sure you want to proceed?"
                                 groups="competency_management.group_competency_admin"/>
                         <button name="action_sync_all_cycle_peers"
                                 string="Sync All Peers"
@@ -69,6 +71,7 @@
                                 class="btn-primary"
                                 display="always"
                                 icon="fa-refresh"
+                                confirm="This will synchronize all executive peer assignments with the open assessment cycle. Are you sure you want to proceed?"
                                 groups="competency_management.group_competency_admin"/>
                     </header>
                     <field name="has_open_cycle" column_invisible="True"/>

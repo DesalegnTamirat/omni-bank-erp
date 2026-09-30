@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_competency_role_mapping_import_wizard_form" model="ir.ui.view">
+            <field name="name">competency.role.mapping.import.wizard.form</field>
+            <field name="model">competency.role.mapping.import.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Import Role Mappings from Excel">
+                    <field name="state" invisible="1"/>
+                    <field name="is_admin" invisible="1"/>
+                    <field name="filename" invisible="1"/>
+
+                    <!-- State 1: Upload & Configure -->
+                    <div invisible="state != 'draft'">
+                        <div class="alert alert-info d-flex align-items-center justify-content-between" role="alert" style="background-color: #fdf8f4; border-left: 5px solid #541718; padding: 15px 20px;">
+                            <div>
+                                <h5 class="alert-heading" style="color: #541718; margin-bottom: 4px;">
+                                    <i class="fa fa-file-excel-o"></i> Need the Excel format?
+                                </h5>
+                                <p class="mb-0 text-muted" style="font-size: 13px;">
+                                    Download the official Bunna Bank Role Mapping template with built-in data validation and complete reference lists of active Job Positions and approved Competencies.
+                                </p>
+                            </div>
+                            <div>
+                                <button name="action_download_template" string="Download Excel Template (.xlsx)" type="object" icon="fa-download" class="btn btn-outline-danger" style="color: #541718; border-color: #541718; white-space: nowrap; font-weight: 600;"/>
+                            </div>
+                        </div>
+
+                        <group>
+                            <group string="Excel File">
+                                <field name="file" filename="filename" widget="binary" required="state == 'draft'"/>
+                            </group>
+                            <group string="Import Settings">
+                                <field name="import_mode" widget="radio"/>
+                                <field name="import_state" readonly="not is_admin" help="Direct approval requires Competency Administrator privileges."/>
+                            </group>
+                        </group>
+
+                        <div class="text-muted" style="font-size: 12px; margin-top: 10px; padding: 10px; background-color: #f8fafc; border-radius: 4px;">
+                            <i class="fa fa-info-circle text-primary"></i> <strong>Note:</strong>
+                            If <em>Create New Version</em> is selected, existing approved mappings for the specified roles will be automatically archived/superseded and new version numbers will be incremented. If <em>Override</em> is selected, competency lines will be updated directly on the existing mappings.
+                        </div>
+                    </div>
+
+                    <!-- State 2: Completed / Summary -->
+                    <div invisible="state != 'done'">
+                        <field name="result_summary" nolabel="1"/>
+                        <field name="created_mapping_ids" invisible="1"/>
+                    </div>
+
+                    <footer>
+                        <button name="action_import_file" string="Process &amp; Import Role Mappings" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                        <button name="action_view_processed_mappings" string="View Imported Mappings" type="object" class="btn-success" invisible="state != 'done' or not created_mapping_ids"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_competency_role_mapping_import_wizard" model="ir.actions.act_window">
+            <field name="name">Import Role Mappings (Excel)</field>
+            <field name="res_model">competency.role.mapping.import.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

@@ -64,7 +64,7 @@ class EdsHrCompat(models.AbstractModel):
         """Safely retrieve employment start date."""
         if not employee:
             return False
-        for field_name in ('first_contract_date', 'hire_date', 'join_date'):
+        for field_name in ('first_contract_date', 'service_start_date', 'service_hire_date', 'joined_date', 'employment_date', 'hire_date', 'join_date'):
             if hasattr(employee, field_name):
                 val = getattr(employee, field_name)
                 if val:

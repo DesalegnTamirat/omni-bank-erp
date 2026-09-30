@@ -56,6 +56,7 @@ class CorporateAppraisal(models.Model):
         'hr.employee',
         string='Employee',
         required=True,
+        default=lambda self: self.env.user.employee_id,
     )
     employee_image_128 = fields.Image(
         string='Employee Photo',

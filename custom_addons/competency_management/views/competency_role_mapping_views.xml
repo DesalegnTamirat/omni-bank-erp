@@ -95,13 +95,16 @@
                 <form>
                     <header>
                         <button name="action_submit_for_approval" string="Submit for Approval"
-                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="competency_management.group_competency_officer"/>
                         <button name="action_approve" string="Approve Mapping"
                                 type="object" class="oe_highlight" invisible="state != 'under_approval'" groups="competency_management.group_competency_admin"/>
                         <button name="action_create_new_version" string="Create New Version"
-                                type="object" invisible="state != 'approved'"/>
+                                type="object" invisible="state != 'approved'"
+                                groups="competency_management.group_competency_officer"/>
                         <button name="action_archive" string="Archive Mapping"
-                                type="object" invisible="state == 'archived'"/>
+                                type="object" invisible="state == 'archived'"
+                                groups="competency_management.group_competency_officer"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,under_approval,approved,archived"/>
                     </header>
                     <sheet>
@@ -116,7 +119,7 @@
                                 <label for="cluster_ids"/>
                                 <div class="o_row">
                                     <field name="cluster_ids" widget="many2many_tags" readonly="state != 'draft'" options="{'no_create': True}"/>
-                                    <button name="action_populate_from_clusters" string="Populate from Clusters" type="object" class="btn btn-secondary btn-sm ms-2" invisible="state != 'draft'" icon="fa-cubes"/>
+                                    <button name="action_populate_from_clusters" string="Populate from Clusters" type="object" class="btn btn-secondary btn-sm ms-2" invisible="state != 'draft'" icon="fa-cubes" groups="competency_management.group_competency_officer"/>
                                 </div>
                                 <field name="last_review_date"/>
                                 <field name="next_review_date"/>

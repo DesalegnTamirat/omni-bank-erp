@@ -51,7 +51,7 @@ class TestLmsAssignmentsAndAnalytics(TransactionCase):
             'instructor_id': cls.mgr_emp.id,
             'description': '<p>Analytics Course Description</p>',
             'state': 'published',
-            'is_mandatory_default': True,
+            'is_mandatory': True,
         })
         cls.lesson1 = cls.LmsLesson.create({
             'name': 'Lesson 1: Intro',
@@ -132,6 +132,7 @@ class TestLmsAssignmentsAndAnalytics(TransactionCase):
         lp2.write({'total_seconds_watched': 180})
         lp2.mark_completed()
         enrollment.action_mark_completed_and_certify(score_pct=95.0)
+        self.env.flush_all()
         report_records = self.env['lms.engagement.report'].search([('course_id', '=', self.course.id)])
         self.assertTrue(report_records)
         rec = report_records[0]

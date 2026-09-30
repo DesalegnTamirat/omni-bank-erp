@@ -35,8 +35,8 @@ msgstr "የብቃት ዘርፍ"
 #. module: competency_management
 #: code:addons/competency_management/models/competency_assessment.py:0
 #, python-format
-msgid "You cannot approve your own assessment/IDP. This action must be performed by a different authorized user (FR-COM-055)."
-msgstr "የራስዎን ምዘና ወይም IDP ማጽደቅ አይችሉም። ይህ ተግባር በሌላ በተፈቀደለት ተጠቃሚ መከናወን አለበት (FR-COM-055)።"
+msgid "You cannot approve your own assessment/IDP. This action must be performed by a different authorized user."
+msgstr "የራስዎን ምዘና ወይም IDP ማጽደቅ አይችሉም። ይህ ተግባር በሌላ በተፈቀደለት ተጠቃሚ መከናወን አለበት።"
 
 #. module: competency_management
 #: code:addons/competency_management/models/competency_role_mapping.py:0
@@ -47,5 +47,5 @@ msgstr "ለዚህ የሥራ መደብ በዚህ ስሪት የተዘጋጀ ካር
 #. module: competency_management
 #: code:addons/competency_management/models/competency_competency.py:0
 #, python-format
-msgid "Behavioral Indicators are required for each proficiency level (FR-COM-003, FR-COM-004)."
-msgstr "ለእያንዳንዱ የብቃት ደረጃ የባህሪ ማሳያዎች መሞላት አለባቸው (FR-COM-003, FR-COM-004)።"
+msgid "Behavioral Indicators are required for each proficiency level."
+msgstr "ለእያንዳንዱ የብቃት ደረጃ የባህሪ ማሳያዎች መሞላት አለባቸው።"

@@ -38,3 +38,4 @@ access_performance_job_objective_user,performance.job.objective.user,model_perfo
 access_performance_job_objective_manager,performance.job.objective.manager,model_performance_job_objective,group_performance_manager,1,1,1,1
 access_performance_job_measure_user,performance.job.measure.user,model_performance_job_measure,group_performance_user,1,0,0,0
 access_performance_job_measure_manager,performance.job.measure.manager,model_performance_job_measure,group_performance_manager,1,1,1,1
+access_performance_dashboard_user,performance.dashboard.user,model_performance_dashboard,group_performance_user,1,1,1,1

@@ -99,20 +99,20 @@ class EdsCertificate(models.Model):
 
             # Fetch matching rule
             category = rec.course_id.category if rec.course_id else 'developmental'
-            rule = self.env['eds.certificate.rule'].search([('category', '=', category), ('active', '=', True)], limit=1)
+            rule = self.env['eds.certificate.rule'].sudo().search([('category', '=', category), ('active', '=', True)], limit=1)
             min_att = rule.min_attendance_pct if rule else 80.0
             req_l2 = rule.require_level2_pass if rule else True
             min_l2 = rule.min_level2_score if rule else 60.0
 
             # Calculate session attendance %
-            attendance = self.env['eds.session.attendance'].search([
+            attendance = self.env['eds.session.attendance'].sudo().search([
                 ('session_id', '=', rec.session_id.id),
                 ('employee_id', '=', rec.employee_id.id)
             ], limit=1)
             att_pct = attendance.attendance_percentage if attendance else (100.0 if attendance and attendance.attended else 0.0)
 
             # Calculate level 2 post-assessment
-            l2_eval = self.env['eds.evaluation.level2'].search([
+            l2_eval = self.env['eds.evaluation.level2'].sudo().search([
                 ('session_id', '=', rec.session_id.id),
                 ('employee_id', '=', rec.employee_id.id)
             ], limit=1)

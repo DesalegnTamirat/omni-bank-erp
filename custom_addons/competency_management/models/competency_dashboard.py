@@ -242,45 +242,55 @@ class CompetencyDashboard(models.TransientModel):
 
     @api.model
     def _get_fully_assessed_employee_ids(self, cycle_id=False, asm_domain=None):
-        """Return the set of employee IDs who have evaluations assigned in the cycle AND where
-        ALL persons assigned to evaluate them have submitted their results (state != 'draft').
-        If any assigned evaluator has not submitted yet (state == 'draft'), the employee is excluded.
+        """Return the set of employee IDs where every assessment assigned to them in this cycle
+        is in a non-draft state (i.e. all raters have submitted).
+        Uses a single SQL GROUP BY/HAVING query instead of loading all assessment rows into memory.
         """
         if not cycle_id and not asm_domain:
             return set()
-        domain = list(asm_domain) if asm_domain else [('cycle_id', '=', cycle_id)]
-        candidate_asms = self.env['competency.assessment'].sudo().search_read(
-            domain, ['employee_id']
-        )
-        candidate_emp_ids = {a['employee_id'][0] for a in candidate_asms if a.get('employee_id')}
-        if not candidate_emp_ids:
-            return set()
 
+        # Resolve cycle_id from domain if not passed directly
         cid = cycle_id
-        if not cid:
-            for item in domain:
+        if not cid and asm_domain:
+            for item in (asm_domain or []):
                 if isinstance(item, (list, tuple)) and len(item) == 3 and item[0] == 'cycle_id' and item[1] == '=':
                     cid = item[2]
                     break
+        if not cid:
+            return set()
 
-        all_asm_domain = [('employee_id', 'in', list(candidate_emp_ids))]
-        if cid:
-            all_asm_domain.append(('cycle_id', '=', cid))
+        # Resolve optional employee scope from domain
+        scoped_emp_ids = None
+        if asm_domain:
+            for item in asm_domain:
+                if isinstance(item, (list, tuple)) and len(item) == 3 and item[0] == 'employee_id' and item[1] == 'in':
+                    scoped_emp_ids = tuple(item[2])
+                    break
 
-        all_emp_asms = self.env['competency.assessment'].sudo().search_read(
-            all_asm_domain, ['employee_id', 'state']
-        )
+        if scoped_emp_ids is not None and not scoped_emp_ids:
+            return set()
 
-        emp_asms_map = {}
-        for a in all_emp_asms:
-            eid = a['employee_id'][0] if a.get('employee_id') else False
-            if eid:
-                emp_asms_map.setdefault(eid, []).append(a['state'])
+        if scoped_emp_ids:
+            self.env.cr.execute("""
+                SELECT employee_id
+                FROM competency_assessment
+                WHERE cycle_id = %s
+                  AND employee_id IN %s
+                  AND active = true
+                GROUP BY employee_id
+                HAVING COUNT(CASE WHEN state = 'draft' THEN 1 END) = 0
+            """, (cid, scoped_emp_ids))
+        else:
+            self.env.cr.execute("""
+                SELECT employee_id
+                FROM competency_assessment
+                WHERE cycle_id = %s
+                  AND active = true
+                GROUP BY employee_id
+                HAVING COUNT(CASE WHEN state = 'draft' THEN 1 END) = 0
+            """, (cid,))
 
-        return {
-            eid for eid, states in emp_asms_map.items()
-            if states and all(s != 'draft' for s in states)
-        }
+        return {row[0] for row in self.env.cr.fetchall()}
 
     def action_open_tna_analytics_all(self):
         """Open full TNA Analytics and Assessment Line Report grouped by employee."""
@@ -659,31 +669,83 @@ class CompetencyDashboard(models.TransientModel):
         )
 
         if fully_assessed_emp_ids:
-            primary_line_domain = list(line_domain) + [
-                ('is_primary_reporting_line', '=', True),
-                ('employee_id', 'in', list(fully_assessed_emp_ids)),
-                '|', ('weighted_current_level', '>', 0), ('achievement_status', '!=', False)
-            ]
-            lines = self.env['competency.assessment.line'].sudo().search(primary_line_domain)
+            asms_total = len(fully_assessed_emp_ids)
+            emp_ids_tuple = tuple(fully_assessed_emp_ids)
+            cycle_id_val = cycle.id if cycle else 0
+
+            extra_filter = ""
+            params = [cycle_id_val, emp_ids_tuple]
+
+            dept_filter_val = int(department_id) if department_id else None
+            if dept_filter_val:
+                extra_filter += " AND department_id = %s"
+                params.append(dept_filter_val)
+
+            self.env.cr.execute(f"""
+                SELECT
+                    COUNT(CASE WHEN achievement_status = 'below' THEN 1 END)      AS below_cnt,
+                    COUNT(CASE WHEN achievement_status = 'meets' THEN 1 END)       AS meets_cnt,
+                    COUNT(CASE WHEN achievement_status = 'exceeds' THEN 1 END)     AS exceeds_cnt,
+                    ROUND(AVG(CASE WHEN pillar = 'core'       THEN gap END)::numeric, 2) AS core_avg,
+                    ROUND(AVG(CASE WHEN pillar = 'leadership' THEN gap END)::numeric, 2) AS lead_avg,
+                    ROUND(AVG(CASE WHEN pillar = 'technical'  THEN gap END)::numeric, 2) AS tech_avg,
+                    ROUND(AVG(gap)::numeric, 2)                                    AS bank_avg,
+                    COUNT(*)                                                        AS total_lines,
+                    COUNT(CASE WHEN pillar = 'core' AND achievement_status = 'below' THEN 1 END) AS core_below,
+                    COUNT(CASE WHEN pillar = 'leadership' AND achievement_status = 'below' THEN 1 END) AS lead_below,
+                    COUNT(CASE WHEN pillar = 'technical' AND achievement_status = 'below' THEN 1 END) AS tech_below,
+                    COUNT(CASE WHEN pillar = 'core' AND achievement_status = 'meets' THEN 1 END) AS core_meets,
+                    COUNT(CASE WHEN pillar = 'leadership' AND achievement_status = 'meets' THEN 1 END) AS lead_meets,
+                    COUNT(CASE WHEN pillar = 'technical' AND achievement_status = 'meets' THEN 1 END) AS tech_meets,
+                    COUNT(CASE WHEN pillar = 'core' AND achievement_status = 'exceeds' THEN 1 END) AS core_exceeds,
+                    COUNT(CASE WHEN pillar = 'leadership' AND achievement_status = 'exceeds' THEN 1 END) AS lead_exceeds,
+                    COUNT(CASE WHEN pillar = 'technical' AND achievement_status = 'exceeds' THEN 1 END) AS tech_exceeds
+                FROM competency_assessment_line
+                WHERE cycle_id = %s
+                  AND employee_id IN %s
+                  AND is_primary_reporting_line = true
+                  AND active = true
+                  AND (weighted_current_level > 0 OR achievement_status IS NOT NULL)
+                  {extra_filter}
+            """, params)
+
+            row = self.env.cr.fetchone()
+            if row:
+                (below_cnt, meets_cnt, exceeds_cnt, core_avg, lead_avg, tech_avg, bank_avg, _total,
+                 core_below, lead_below, tech_below,
+                 core_meets, lead_meets, tech_meets,
+                 core_exceeds, lead_exceeds, tech_exceeds) = row
+                below_cnt = below_cnt or 0
+                meets_cnt = meets_cnt or 0
+                exceeds_cnt = exceeds_cnt or 0
+                core_avg = float(core_avg or 0.0)
+                lead_avg = float(lead_avg or 0.0)
+                tech_avg = float(tech_avg or 0.0)
+                bank_avg = float(bank_avg or 0.0)
+                core_below = core_below or 0
+                lead_below = lead_below or 0
+                tech_below = tech_below or 0
+                core_meets = core_meets or 0
+                lead_meets = lead_meets or 0
+                tech_meets = tech_meets or 0
+                core_exceeds = core_exceeds or 0
+                lead_exceeds = lead_exceeds or 0
+                tech_exceeds = tech_exceeds or 0
+            else:
+                below_cnt = meets_cnt = exceeds_cnt = 0
+                core_avg = lead_avg = tech_avg = bank_avg = 0.0
+                core_below = lead_below = tech_below = 0
+                core_meets = lead_meets = tech_meets = 0
+                core_exceeds = lead_exceeds = tech_exceeds = 0
+            has_real_data = bool(row and asms_total > 0)
         else:
-            lines = self.env['competency.assessment.line'].sudo().browse([])
-
-        asms_total = len(fully_assessed_emp_ids)
-        has_real_data = bool(lines and asms_total > 0)
-
-        below_cnt = len(lines.filtered(lambda l: l.achievement_status == 'below'))
-        meets_cnt = len(lines.filtered(lambda l: l.achievement_status == 'meets'))
-        exceeds_cnt = len(lines.filtered(lambda l: l.achievement_status == 'exceeds'))
-
-        # Pillar Average Gaps
-        core_lines = lines.filtered(lambda l: l.pillar == 'core')
-        lead_lines = lines.filtered(lambda l: l.pillar == 'leadership')
-        tech_lines = lines.filtered(lambda l: l.pillar == 'technical')
-
-        core_avg = round(sum([l.gap for l in core_lines if l.gap is not None]) / len(core_lines), 2) if core_lines else 0.0
-        lead_avg = round(sum([l.gap for l in lead_lines if l.gap is not None]) / len(lead_lines), 2) if lead_lines else 0.0
-        tech_avg = round(sum([l.gap for l in tech_lines if l.gap is not None]) / len(tech_lines), 2) if tech_lines else 0.0
-        bank_avg = round(sum([l.gap for l in lines if l.gap is not None]) / len(lines), 2) if lines else 0.0
+            asms_total = 0
+            below_cnt = meets_cnt = exceeds_cnt = 0
+            core_avg = lead_avg = tech_avg = bank_avg = 0.0
+            core_below = lead_below = tech_below = 0
+            core_meets = lead_meets = tech_meets = 0
+            core_exceeds = lead_exceeds = tech_exceeds = 0
+            has_real_data = False
 
         # Data Quality Counters (Scoped to selected or fixed OU if set)
         target_ou_ids = [int(operating_unit_id)] if operating_unit_id else []
@@ -860,56 +922,88 @@ class CompetencyDashboard(models.TransientModel):
                 t_gaps = [l.gap for l in t_lines if l.gap is not None and ((l.weighted_current_level or 0) > 0 or l.achievement_status)]
                 team_avg_gap = round(sum(t_gaps) / len(t_gaps), 2) if t_gaps else 0.0
 
+                # Pre-fetch all assessments and group lines for subordinates to avoid N+1 queries in loop
+                all_sub_asms = self.env['competency.assessment'].sudo().search([
+                    ('employee_id', 'in', subordinates.ids),
+                    ('cycle_id', '=', cycle.id if cycle else 0),
+                ])
+                sub_asms_map = {}
+                for a in all_sub_asms:
+                    sub_asms_map.setdefault(a.employee_id.id, []).append(a)
+
+                sub_lines_map = {}
+                for l in t_lines:
+                    sub_lines_map.setdefault(l.employee_id.id, []).append(l)
+
                 for sub in subordinates:
-                    sub_p_lines = t_lines.filtered(lambda l: l.employee_id.id == sub.id)
-                    all_sub_asms = self.env['competency.assessment'].sudo().search([
-                        ('employee_id', '=', sub.id),
-                        ('cycle_id', '=', cycle.id if cycle else 0),
-                    ])
-                    submitted_asms = all_sub_asms.filtered(lambda a: a.state != 'draft')
-                    is_sub_fully_assessed = bool(all_sub_asms and len(submitted_asms) == len(all_sub_asms))
+                    sub_p_lines = sub_lines_map.get(sub.id, [])
+                    sub_asms = sub_asms_map.get(sub.id, [])
+                    submitted_asms = [a for a in sub_asms if a.state != 'draft']
+                    is_sub_fully_assessed = bool(sub_asms and len(submitted_asms) == len(sub_asms))
 
                     if is_sub_fully_assessed:
-                        status_str = _('Fully Assessed (%d/%d raters)') % (len(submitted_asms), len(all_sub_asms))
+                        status_str = _('Fully Assessed (%d/%d raters)') % (len(submitted_asms), len(sub_asms))
                     elif submitted_asms:
-                        status_str = _('In Progress (%d/%d raters submitted)') % (len(submitted_asms), len(all_sub_asms))
-                    elif all_sub_asms:
-                        status_str = _('Pending (%d raters assigned)') % len(all_sub_asms)
+                        status_str = _('In Progress (%d/%d raters submitted)') % (len(submitted_asms), len(sub_asms))
+                    elif sub_asms:
+                        status_str = _('Pending (%d raters assigned)') % len(sub_asms)
                     else:
                         status_str = _('Not Started')
 
-                    top_gaps = sub_p_lines.filtered(lambda l: l.achievement_status == 'below').sorted(key=lambda l: l.gap or 0, reverse=True)[:2]
+                    top_gaps = sorted(
+                        [l for l in sub_p_lines if l.achievement_status == 'below'],
+                        key=lambda l: l.gap or 0,
+                        reverse=True
+                    )[:2]
                     team_roster.append({
                         'id': sub.id,
                         'name': sub.name,
                         'job': sub.job_id.name if sub.job_id else 'N/A',
                         'assessment_id': submitted_asms[0].id if submitted_asms else (sub_p_lines[0].assessment_id.id if sub_p_lines else False),
                         'status': status_str,
-                        'top_gaps': ", ".join([l.competency_id.name for l in top_gaps]) if (is_sub_fully_assessed and top_gaps) else ('Fit / Qualified' if is_sub_fully_assessed else ('Awaiting Evaluation' if all_sub_asms else 'Not Assigned'))
+                        'top_gaps': ", ".join([l.competency_id.name for l in top_gaps]) if (is_sub_fully_assessed and top_gaps) else ('Fit / Qualified' if is_sub_fully_assessed else ('Awaiting Evaluation' if sub_asms else 'Not Assigned'))
                     })
 
-        # Department Heatmap Data Matrix (single-pass in-memory grouping)
+        # Department Heatmap Data Matrix (aggregated via SQL for high performance)
         heatmap_rows = []
-        if persona != 'employee' and has_real_data and lines:
-            dept_lines_map = {}
-            for l in lines:
-                if l.department_id and l.gap is not None and l.gap is not False:
-                    dept_lines_map.setdefault(l.department_id, []).append(l)
+        if persona != 'employee' and has_real_data and fully_assessed_emp_ids:
+            dept_extra_filter = ""
+            dept_params = [cycle_id_val, emp_ids_tuple]
+            if dept_filter_val:
+                dept_extra_filter += " AND cal.department_id = %s"
+                dept_params.append(dept_filter_val)
 
-            sorted_depts = sorted(dept_lines_map.keys(), key=lambda d: d.name)[:15]
-            for d in sorted_depts:
-                d_lines = dept_lines_map[d]
-                d_core = [l.gap for l in d_lines if l.pillar == 'core']
-                d_lead = [l.gap for l in d_lines if l.pillar == 'leadership']
-                d_tech = [l.gap for l in d_lines if l.pillar == 'technical']
-
-                c_val = round(sum(d_core) / len(d_core), 2) if d_core else 0.0
-                l_val = round(sum(d_lead) / len(d_lead), 2) if d_lead else 0.0
-                t_val = round(sum(d_tech) / len(d_tech), 2) if d_tech else 0.0
-
+            self.env.cr.execute(f"""
+                SELECT
+                    d.id,
+                    d.name,
+                    ROUND(AVG(CASE WHEN cal.pillar = 'core' THEN cal.gap END)::numeric, 2) AS core_avg,
+                    ROUND(AVG(CASE WHEN cal.pillar = 'leadership' THEN cal.gap END)::numeric, 2) AS lead_avg,
+                    ROUND(AVG(CASE WHEN cal.pillar = 'technical' THEN cal.gap END)::numeric, 2) AS tech_avg
+                FROM competency_assessment_line cal
+                JOIN hr_department d ON cal.department_id = d.id
+                WHERE cal.cycle_id = %s
+                  AND cal.employee_id IN %s
+                  AND cal.is_primary_reporting_line = true
+                  AND cal.active = true
+                  AND (cal.weighted_current_level > 0 OR cal.achievement_status IS NOT NULL)
+                  AND cal.gap IS NOT NULL
+                  {dept_extra_filter}
+                GROUP BY d.id, d.name
+                ORDER BY d.name
+                LIMIT 15;
+            """, dept_params)
+            for d_id, d_name_raw, c_val, l_val, t_val in self.env.cr.fetchall():
+                c_val = float(c_val or 0.0)
+                l_val = float(l_val or 0.0)
+                t_val = float(t_val or 0.0)
+                if isinstance(d_name_raw, dict):
+                    clean_name = d_name_raw.get(self.env.lang) or d_name_raw.get('en_US') or (next(iter(d_name_raw.values()), '') if d_name_raw else '')
+                else:
+                    clean_name = str(d_name_raw or '')
                 heatmap_rows.append({
-                    'dept_id': d.id,
-                    'dept_name': html.escape(d.name or ''),
+                    'dept_id': d_id,
+                    'dept_name': html.escape(clean_name),
                     'core': c_val,
                     'leadership': l_val,
                     'technical': t_val,
@@ -968,29 +1062,17 @@ class CompetencyDashboard(models.TransientModel):
                     'datasets': [
                         {
                             'label': 'Below Target',
-                            'data': [
-                                len(core_lines.filtered(lambda l: l.achievement_status == 'below')),
-                                len(lead_lines.filtered(lambda l: l.achievement_status == 'below')),
-                                len(tech_lines.filtered(lambda l: l.achievement_status == 'below')),
-                            ],
+                            'data': [core_below, lead_below, tech_below],
                             'backgroundColor': '#541718',
                         },
                         {
                             'label': 'Meets Target',
-                            'data': [
-                                len(core_lines.filtered(lambda l: l.achievement_status == 'meets')),
-                                len(lead_lines.filtered(lambda l: l.achievement_status == 'meets')),
-                                len(tech_lines.filtered(lambda l: l.achievement_status == 'meets')),
-                            ],
+                            'data': [core_meets, lead_meets, tech_meets],
                             'backgroundColor': '#726732',
                         },
                         {
                             'label': 'Exceeds Target',
-                            'data': [
-                                len(core_lines.filtered(lambda l: l.achievement_status == 'exceeds')),
-                                len(lead_lines.filtered(lambda l: l.achievement_status == 'exceeds')),
-                                len(tech_lines.filtered(lambda l: l.achievement_status == 'exceeds')),
-                            ],
+                            'data': [core_exceeds, lead_exceeds, tech_exceeds],
                             'backgroundColor': '#c17540',
                         }
                     ]

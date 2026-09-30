@@ -2,6 +2,7 @@
     'name': 'Performance Management',
     'version': '1.0',
     'summary': 'Custom module to measure employee and work unit performance.',
+    'post_init_hook': 'post_init_hook',
     'description': """
 Custom module to measure employee and work unit performance.
 
@@ -37,6 +38,7 @@ Custom module to measure employee and work unit performance.
         'views/populate_t3_appraisal_wizard_views.xml',
         'views/performance_rejection_wizard_views.xml',
         'views/performance_menus.xml',
+        'views/performance_dashboard_views.xml',
         'views/performance_master_data_views.xml',
         'data/performance_perspective_data.xml',
         'data/pms_ranking_data.xml',
@@ -44,6 +46,8 @@ Custom module to measure employee and work unit performance.
     'assets': {
         'web.assets_backend': [
             'performance_management/static/src/css/performance_management.css',
+            'performance_management/static/src/js/performance_dashboard.js',
+            'performance_management/static/src/xml/performance_dashboard.xml',
         ],
     },
     'application': True,

@@ -36,82 +36,74 @@ class CompetencyDashboardSnapshot(models.Model):
             rec.name = f"{c_name} — {d_name} ({p_name}) [{rec.snapshot_date}]"
 
     @api.model
-    def _cron_take_dashboard_snapshot(self):
-        """Cron: calculate and store trend snapshots for all active open cycles."""
-        # Guard 1: Only snapshot active open cycles
-        cycles = self.env['competency.assessment.cycle'].search([('state', '=', 'open')])
-        departments = self.env['hr.department'].search([])
+    def _cron_take_dashboard_snapshot(self, cycle_ids=None):
+        """Optimized: calculate and store trend snapshots for active/closed cycles using high-speed SQL aggregation."""
         today = fields.Date.context_today(self)
+        
+        if cycle_ids:
+            cycles = self.env['competency.assessment.cycle'].browse(cycle_ids)
+        else:
+            cycles = self.env['competency.assessment.cycle'].search([('state', 'in', ('open', 'closed'))])
+
+        if not cycles:
+            return 0
 
         snapshot_count = 0
-        for cycle in cycles:
-            # 1. Bank-Wide General Snapshot
-            for pillar_val in ['all', 'core', 'leadership', 'technical']:
-                # Guard 2: Prevent duplicate snapshots for same date, cycle, department, pillar
-                existing = self.search([
-                    ('cycle_id', '=', cycle.id),
-                    ('department_id', '=', False),
-                    ('pillar', '=', pillar_val),
-                    ('snapshot_date', '=', today)
-                ], limit=1)
-                if existing:
-                    continue
+        c_ids = tuple(cycles.ids)
 
-                lines = self.env['competency.assessment.line'].search([
-                    ('cycle_id', '=', cycle.id),
-                    ('pillar', '=', pillar_val) if pillar_val != 'all' else (1, '=', 1)
-                ])
-                gaps = [l.gap for l in lines if l.gap is not None]
-                avg_g = round(sum(gaps) / len(gaps), 2) if gaps else 0.0
+        query = """
+            SELECT 
+                a.cycle_id,
+                e.department_id,
+                COALESCE(c.pillar, 'all') AS pillar_val,
+                COUNT(DISTINCT a.id) AS total_assessed,
+                ROUND(AVG(l.gap)::numeric, 2) AS avg_gap,
+                COUNT(CASE WHEN l.tna_measure = 'below' THEN 1 END) AS below_cnt,
+                COUNT(CASE WHEN l.tna_measure = 'meets' THEN 1 END) AS meets_cnt,
+                COUNT(CASE WHEN l.tna_measure = 'exceeds' THEN 1 END) AS exceeds_cnt
+            FROM competency_assessment_line l
+            JOIN competency_assessment a ON a.id = l.assessment_id
+            JOIN hr_employee e ON e.id = a.employee_id
+            LEFT JOIN competency_competency c ON c.id = l.competency_id
+            WHERE a.cycle_id IN %s
+            GROUP BY GROUPING SETS (
+                (a.cycle_id, COALESCE(c.pillar, 'all')),
+                (a.cycle_id, e.department_id, COALESCE(c.pillar, 'all'))
+            );
+        """
+        self.env.cr.execute(query, (c_ids,))
+        rows = self.env.cr.dictfetchall()
 
-                self.create({
-                    'snapshot_date': today,
-                    'cycle_id': cycle.id,
-                    'department_id': False,
-                    'pillar': pillar_val,
-                    'total_assessed': len(lines.mapped('assessment_id')),
-                    'avg_gap': avg_g,
-                    'below_count': len(lines.filtered(lambda l: l.tna_measure == 'below')),
-                    'meets_count': len(lines.filtered(lambda l: l.tna_measure == 'meets')),
-                    'exceeds_count': len(lines.filtered(lambda l: l.tna_measure == 'exceeds')),
-                })
-                snapshot_count += 1
+        for row in rows:
+            cy_id = row['cycle_id']
+            dept_id = row['department_id']
+            pillar_val = row['pillar_val']
 
-            # 2. Per Department Snapshot
-            for dept in departments:
-                for pillar_val in ['all', 'core', 'leadership', 'technical']:
-                    existing_dept = self.search([
-                        ('cycle_id', '=', cycle.id),
-                        ('department_id', '=', dept.id),
-                        ('pillar', '=', pillar_val),
-                        ('snapshot_date', '=', today)
-                    ], limit=1)
-                    if existing_dept:
-                        continue
+            existing = self.search([
+                ('cycle_id', '=', cy_id),
+                ('department_id', '=', dept_id),
+                ('pillar', '=', pillar_val),
+                ('snapshot_date', '=', today)
+            ], limit=1)
+            if existing:
+                continue
 
-                    lines = self.env['competency.assessment.line'].search([
-                        ('cycle_id', '=', cycle.id),
-                        ('department_id', '=', dept.id),
-                        ('pillar', '=', pillar_val) if pillar_val != 'all' else (1, '=', 1)
-                    ])
-                    if not lines:
-                        continue
-                    gaps = [l.gap for l in lines if l.gap is not None]
-                    avg_g = round(sum(gaps) / len(gaps), 2) if gaps else 0.0
+            dept_rec = self.env['hr.department'].browse(dept_id) if dept_id else False
+            ou_id = dept_rec.operating_unit_id.id if dept_rec and hasattr(dept_rec, 'operating_unit_id') else False
 
-                    self.create({
-                        'snapshot_date': today,
-                        'cycle_id': cycle.id,
-                        'department_id': dept.id,
-                        'operating_unit_id': dept.operating_unit_id.id if hasattr(dept, 'operating_unit_id') else False,
-                        'pillar': pillar_val,
-                        'total_assessed': len(lines.mapped('assessment_id')),
-                        'avg_gap': avg_g,
-                        'below_count': len(lines.filtered(lambda l: l.tna_measure == 'below')),
-                        'meets_count': len(lines.filtered(lambda l: l.tna_measure == 'meets')),
-                        'exceeds_count': len(lines.filtered(lambda l: l.tna_measure == 'exceeds')),
-                    })
-                    snapshot_count += 1
+            self.create({
+                'snapshot_date': today,
+                'cycle_id': cy_id,
+                'department_id': dept_id,
+                'operating_unit_id': ou_id,
+                'pillar': pillar_val if pillar_val in ('core', 'leadership', 'technical') else 'all',
+                'total_assessed': row['total_assessed'] or 0,
+                'avg_gap': float(row['avg_gap'] or 0.0),
+                'below_count': row['below_cnt'] or 0,
+                'meets_count': row['meets_cnt'] or 0,
+                'exceeds_count': row['exceeds_cnt'] or 0,
+            })
+            snapshot_count += 1
 
         return snapshot_count
 

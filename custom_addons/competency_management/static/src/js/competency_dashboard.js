@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
-import { Component, onWillStart, onMounted, useEffect, useState, useRef } from "@odoo/owl";
+import { Component, onWillStart, onMounted, onWillUnmount, useEffect, useState, useRef } from "@odoo/owl";
 import { loadBundle } from "@web/core/assets";
 
 export class CompetencyDashboard extends Component {
@@ -55,6 +55,25 @@ export class CompetencyDashboard extends Component {
 
         onMounted(async () => {
             await this.loadData();
+        });
+
+        onWillUnmount(() => {
+            if (this.tnaChartInstance) {
+                try { this.tnaChartInstance.destroy(); } catch (e) {}
+                this.tnaChartInstance = null;
+            }
+            if (this.pillarChartInstance) {
+                try { this.pillarChartInstance.destroy(); } catch (e) {}
+                this.pillarChartInstance = null;
+            }
+            if (this.radarChartInstance) {
+                try { this.radarChartInstance.destroy(); } catch (e) {}
+                this.radarChartInstance = null;
+            }
+            if (this.trendChartInstance) {
+                try { this.trendChartInstance.destroy(); } catch (e) {}
+                this.trendChartInstance = null;
+            }
         });
 
         useEffect(

@@ -26,7 +26,19 @@ class EdsTnaCycle(models.Model):
     approval_deadline = fields.Date(
         string='Approval Deadline', compute='_compute_dates', store=True, readonly=False, tracking=True)
     methodology = fields.Text(string='Assessment Methodology')
-    responsible_team_id = fields.Many2one('hr.department', string='Responsible Team')
+
+    @api.model
+    def _default_responsible_team(self):
+        return self.env['hr.department'].search([
+            '|', ('name', '=ilike', '%learning%'), ('name', '=ilike', '%development%')
+        ], limit=1)
+
+    responsible_team_id = fields.Many2one(
+        'hr.department',
+        string='Responsible Team',
+        default=_default_responsible_team,
+        help='L&D / Talent Development team coordinating this TNA cycle.'
+    )
     state = fields.Selection([
         ('draft', 'Draft'),
         ('collecting', 'Collecting Needs'),
@@ -62,6 +74,18 @@ class EdsTnaCycle(models.Model):
             rec.pms_gap_count = len(rec.entry_ids.filtered(lambda e: e.source == 'pms'))
             rec.employee_sub_count = len(rec.entry_ids.filtered(lambda e: e.source == 'manual' and e.submitted_by.id == e.employee_id.user_id.id))
             rec.manager_sub_count = len(rec.entry_ids.filtered(lambda e: e.source == 'manual' and e.submitted_by.id != e.employee_id.user_id.id))
+
+    def action_open_pull_competency_gaps(self):
+        """Open wizard to pull diagnosed gaps from a closed competency assessment cycle."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Pull Closed Competency Gaps'),
+            'res_model': 'eds.competency.gap.import',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_cycle_id': self.id},
+        }
 
     def action_pull_competency_gaps(self):
         """Auto-pull diagnosed gaps from the Competency Assessment framework into this TNA cycle."""
@@ -379,7 +403,8 @@ class EdsTnaEntry(models.Model):
         help='Decided at TNA stage : only Classroom (and the classroom part of '
              'Blended) are actioned within EDS; E-Learning routes to the LMS.')
     # Course Pool Selection & Ad-Hoc Requests
-    course_id = fields.Many2one('eds.course', string='Course from Catalog', tracking=True)
+    course_id = fields.Many2one(
+        'eds.course', string='Course from Catalog', domain="[('status', '=', 'active')]", tracking=True)
     is_custom_course = fields.Boolean(string='Course Not in Catalog', default=False, tracking=True)
     custom_course_title = fields.Char(string='Custom Course Title', tracking=True)
     custom_course_description = fields.Text(string='What the Course is About / Content Summary')

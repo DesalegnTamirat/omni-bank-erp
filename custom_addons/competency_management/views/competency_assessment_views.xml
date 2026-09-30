@@ -26,15 +26,21 @@
                 <form>
                     <header>
                         <button name="action_start" string="Start Cycle"
-                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                confirm="Are you sure you want to start this assessment cycle? 360-degree assessments will be generated for all active employees."
+                                groups="competency_management.group_competency_admin"/>
                         <button name="action_notify_assessors" string="📢 Notify Employees to Fill Assessments"
-                                type="object" class="btn-primary" invisible="state not in ('open','in_review') or pending_assessment_count == 0"/>
+                                type="object" class="btn-primary" invisible="state not in ('open','in_review') or pending_assessment_count == 0"
+                                groups="competency_management.group_competency_admin"/>
                         <button name="action_start_review" string="Start Review"
-                                type="object" invisible="state != 'open'"/>
+                                type="object" invisible="state != 'open'"
+                                groups="competency_management.group_competency_officer"/>
                         <button name="action_send_deadline_reminders" string="⚠️ Send Deadline Warning to Pending Assessors"
-                                type="object" class="btn-warning" invisible="state not in ('open','in_review') or pending_assessment_count == 0"/>
+                                type="object" class="btn-warning" invisible="state not in ('open','in_review') or pending_assessment_count == 0"
+                                groups="competency_management.group_competency_admin"/>
                         <button name="action_close" string="Close Cycle"
-                                type="object" invisible="state not in ('open','in_review')"/>
+                                type="object" invisible="state not in ('open','in_review')"
+                                groups="competency_management.group_competency_admin"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,open,in_review,closed"/>
                     </header>
                     <sheet>
@@ -417,6 +423,10 @@
                     <field name="pillar" widget="badge"/>
                     <field name="self_rating" string="Self Rating"/>
                     <field name="supervisor_avg" string="Supervisor Rating"/>
+                    <field name="peer_avg" string="Peer Avg Rating"/>
+                    <field name="self_gap" string="Self Gap" optional="hide"/>
+                    <field name="supervisor_gap" string="Supervisor Gap" optional="hide"/>
+                    <field name="peer_gap" string="Peer Gap" optional="hide"/>
                     <field name="weighted_current_level" string="Weighted Level"/>
                     <field name="required_level"/>
                     <field name="gap"/>
@@ -450,11 +460,14 @@
                             <group string="Competency Ratings">
                                 <field name="self_rating" string="Self Rating" readonly="1"/>
                                 <field name="supervisor_avg" string="Supervisor Rating" readonly="1"/>
+                                <field name="peer_avg" string="Peer Avg Rating" readonly="1"/>
                                 <field name="weighted_current_level" string="Weighted Current Level" readonly="1"/>
                             </group>
                             <group string="Matrix Performance &amp; Gap">
                                 <field name="required_level" readonly="1"/>
                                 <field name="gap" readonly="1"/>
+                                <field name="supervisor_gap" string="Supervisor Gap" readonly="1"/>
+                                <field name="peer_gap" string="Peer Gap" readonly="1"/>
                                 <field name="tna_measure" widget="badge" readonly="1"/>
                                 <field name="achievement_status" widget="badge" readonly="1"/>
                             </group>
@@ -503,6 +516,7 @@
                 <list string="Competency &amp; TNA Analytics Lines" create="false" edit="false" delete="false">
                     <field name="cycle_id"/>
                     <field name="employee_id" options="{'no_open': True, 'no_create': True}"/>
+                    <field name="gender" optional="hide"/>
                     <field name="operating_unit_id"/>
                     <field name="department_id"/>
                     <field name="job_id"/>
@@ -510,17 +524,20 @@
                     <field name="competency_id"/>
                     <field name="functional_domain"/>
                     <field name="pillar" widget="badge"/>
-                    <field name="self_rating" optional="show"/>
-                    <field name="peer_avg" optional="show"/>
-                    <field name="subordinate_avg" optional="show"/>
-                    <field name="supervisor_avg" optional="show"/>
-                    <field name="team_avg" optional="hide"/>
-                    <field name="weighted_current_level" string="Weighted Current Level"/>
+                    <field name="self_rating" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'self')"/>
+                    <field name="peer_avg" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'peer')"/>
+                    <field name="subordinate_avg" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'subordinate')"/>
+                    <field name="supervisor_avg" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'supervisor')"/>
+                    <field name="self_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'self')"/>
+                    <field name="peer_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'peer')"/>
+                    <field name="subordinate_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'subordinate')"/>
+                    <field name="supervisor_gap" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'supervisor')"/>
+                    <field name="weighted_current_level" string="Weighted Current Level" column_invisible="context.get('assessment_type_filter') in ('self', 'peer', 'subordinate', 'supervisor')"/>
                     <field name="required_level"/>
-                    <field name="gap"/>
+                    <field name="gap" string="Weighted Gap" column_invisible="context.get('assessment_type_filter') in ('self', 'peer', 'subordinate', 'supervisor')"/>
                     <field name="tna_measure" widget="badge" decoration-danger="tna_measure == 'below'" decoration-success="tna_measure == 'meets'" decoration-info="tna_measure == 'exceeds'"/>
                     <field name="state" widget="badge"/>
-                    <button name="action_view_360_breakdown" string="📊 Breakdown" type="object" class="btn-sm btn-outline-primary"/>
+                    <button name="action_view_360_breakdown" string="📊 Breakdown" type="object" class="btn-sm btn-outline-primary" groups="competency_management.group_competency_supervisor"/>
                 </list>
             </field>
         </record>
@@ -534,7 +551,8 @@
                 <form string="Competency Evaluation Line Details" create="false" edit="false" delete="false">
                     <header>
                         <button name="action_view_360_breakdown" string="🔍 View 360 Rater Score Breakdown"
-                                type="object" class="oe_highlight"/>
+                                type="object" class="oe_highlight"
+                                groups="competency_management.group_competency_supervisor"/>
                     </header>
                     <sheet>
                         <div class="oe_title" style="margin-bottom: 15px;">
@@ -557,9 +575,14 @@
                                 <field name="peer_avg" readonly="1"/>
                                 <field name="subordinate_avg" readonly="1"/>
                                 <field name="supervisor_avg" readonly="1"/>
-                                <field name="team_avg" readonly="1"/>
                             </group>
-                            <group string="Matrix Performance &amp; Gap">
+                            <group string="Rater-Specific Gaps">
+                                <field name="self_gap" readonly="1"/>
+                                <field name="peer_gap" readonly="1"/>
+                                <field name="subordinate_gap" readonly="1"/>
+                                <field name="supervisor_gap" readonly="1"/>
+                            </group>
+                            <group string="Matrix Performance &amp; Composite Gap">
                                 <field name="required_level" readonly="1"/>
                                 <field name="weighted_current_level" readonly="1"/>
                                 <field name="gap" readonly="1"/>
