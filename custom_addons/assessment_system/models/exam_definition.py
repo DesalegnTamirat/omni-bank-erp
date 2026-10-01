@@ -255,15 +255,18 @@ class ExamDefinition(models.Model):
             v_code = f"Version {letter}"
             v_title = f"{self.name} - {v_code}"
 
-            # Sample questions, prioritizing fresh questions not yet used in previous versions
-            sampled_questions = self.generate_question_pool_for_candidate(
-                seed=f"{self.id}_{letter}_{random.random()}",
-                exclude_question_ids=list(used_question_ids)
-            )
+            # Ensure all versions use the EXACT SAME base question pool (same questions & question types),
+            # but randomly shuffled in order for each version paper.
+            if i == 0 or not base_questions:
+                base_questions = self.generate_question_pool_for_candidate(
+                    seed=f"master_{self.id}_{random.random()}",
+                    exclude_question_ids=list(used_question_ids)
+                )
 
-            # Record sampled questions into tracking set
-            for q in sampled_questions:
-                used_question_ids.add(q.id)
+            # Take the master question set and shuffle the question order specifically for this version
+            v_questions = list(base_questions)
+            version_rng = random.Random(f"version_{self.id}_{v_code}_{i}_{random.random()}")
+            version_rng.shuffle(v_questions)
 
             v_vals = {
                 "name": v_title,
@@ -280,7 +283,7 @@ class ExamDefinition(models.Model):
                 "block_copy_paste": self.block_copy_paste,
                 "block_screenshot": self.block_screenshot,
                 "selection_mode": "manual_select",
-                "manual_question_ids": [(6, 0, [q.id for q in sampled_questions])],
+                "manual_question_ids": [(6, 0, [q.id for q in v_questions])],
                 "is_version_paper": True,
                 "version_code": v_code,
                 "parent_exam_id": self.id,
@@ -306,7 +309,7 @@ class ExamDefinition(models.Model):
     def generate_question_pool_for_candidate(self, seed=None, exclude_question_ids=None):
         """
         Pulls questions from Question Bank based on configured distribution rules.
-        If exclude_question_ids is provided, prioritizes fresh unused questions.
+        Strictly enforces selected question_type — NEVER falls back to unselected question types.
         Returns a list of exam.question records.
         """
         self.ensure_one()
@@ -337,7 +340,7 @@ class ExamDefinition(models.Model):
 
                 target_job = dist.job_id or self.job_id
 
-                # --- Tier 1: Exact Match (Competency + Difficulty + Job) ---
+                # --- Tier 1: Exact Match (Competency + Difficulty + Job + Question Type) ---
                 t1_domain = list(base_domain)
                 if dist.competency_id:
                     t1_domain.append(("competency_id", "=", dist.competency_id.id))
@@ -347,7 +350,7 @@ class ExamDefinition(models.Model):
                     t1_domain.append(("job_id", "=", target_job.id))
                 available = self.env["exam.question"].search(t1_domain)
 
-                # --- Tier 2: Any Difficulty for this Competency & Job ---
+                # --- Tier 2: Any Difficulty for this Competency & Job & Question Type ---
                 if len(available) < dist.number_of_questions and dist.competency_id:
                     t2_domain = list(base_domain) + [("competency_id", "=", dist.competency_id.id)]
                     if target_job:
@@ -366,25 +369,30 @@ class ExamDefinition(models.Model):
                     t4_domain = list(base_domain)
                     available = self.env["exam.question"].search(t4_domain)
 
-                # --- Tier 5: Absolute Fallback to ANY Approved Question in Bank ---
-                if not available:
-                    available = self.env["exam.question"].search([("state", "=", "approved"), ("active", "=", True)])
-
-                if not available:
-                    raise UserError(_("No approved questions exist in the Question Bank. Please create and approve questions first."))
+                # Strict validation: DO NOT drop question_type filter under any circumstances!
+                if len(available) < dist.number_of_questions:
+                    q_type_str = dict(dist._fields['question_type'].selection).get(dist.question_type, dist.question_type) if dist.question_type else _("Any")
+                    job_str = target_job.name if target_job else _("General")
+                    raise UserError(_(
+                        "Insufficient approved questions in Question Bank for Question Type '%(qtype)s' (Job Position: %(job)s).\n"
+                        "Required: %(required)d question(s), but only %(found)d approved question(s) of this type exist in the bank.",
+                        qtype=q_type_str,
+                        job=job_str,
+                        required=dist.number_of_questions,
+                        found=len(available)
+                    ))
                 
-                # --- Anti-Repetition Filter: prioritize questions not yet used in previous versions ---
+                # --- Anti-Repetition Filter: prioritize questions not yet used in previous sessions ---
                 fresh_pool = [q for q in available if q.id not in exclude_set]
                 if len(fresh_pool) >= dist.number_of_questions:
                     sampled = random.sample(fresh_pool, dist.number_of_questions)
                 else:
-                    # Take all fresh questions and fill remaining from general pool
+                    # Take all fresh questions and fill remaining from available pool of SAME question_type
                     sampled = list(fresh_pool)
                     remaining_needed = dist.number_of_questions - len(sampled)
                     recycled_pool = [q for q in available if q not in sampled]
                     if recycled_pool:
                         sampled.extend(random.sample(recycled_pool, min(remaining_needed, len(recycled_pool))))
-                    # If still short, sample from available with replacement
                     while len(sampled) < dist.number_of_questions and available:
                         sampled.append(random.choice(list(available)))
 

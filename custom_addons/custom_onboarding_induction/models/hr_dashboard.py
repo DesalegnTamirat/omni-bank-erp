@@ -47,7 +47,6 @@ class HrOnboardingDashboard(models.TransientModel):
         relation="hr_dash_recent_induction_rel"
     )
 
-    @api.depends()
     def _compute_ob_stats(self):
         OB = self.env["hr.onboarding.plan"]
         for rec in self:
@@ -63,7 +62,6 @@ class HrOnboardingDashboard(models.TransientModel):
             rec.ob_escalated      = len(all_plans.filtered(lambda p: p.state == "escalated"))
             rec.ob_completion_rate= round((rec.ob_completed / total * 100) if total else 0.0, 1)
 
-    @api.depends()
     def _compute_ind_stats(self):
         IND = self.env["hr.induction.plan"]
         for rec in self:
@@ -75,7 +73,6 @@ class HrOnboardingDashboard(models.TransientModel):
             rec.ind_completed   = len(all_plans.filtered(lambda p: p.state == "completed"))
             rec.ind_completion_rate = round((rec.ind_completed / total * 100) if total else 0.0, 1)
 
-    @api.depends()
     def _compute_task_stats(self):
         TASK = self.env["hr.onboarding.task"]
         for rec in self:
@@ -88,7 +85,6 @@ class HrOnboardingDashboard(models.TransientModel):
             rec.task_overdue = len(all_tasks.filtered(lambda t: t.is_overdue))
             rec.task_completion_rate = round((done / total * 100) if total else 0.0, 1)
 
-    @api.depends()
     def _compute_lms_stats(self):
         LMS = self.env["hr.induction.lms.task"]
         for rec in self:
@@ -100,7 +96,6 @@ class HrOnboardingDashboard(models.TransientModel):
             rec.lms_overdue = len(all_tasks.filtered(lambda t: t.is_overdue))
             rec.lms_completion_rate = round((done / total * 100) if total else 0.0, 1)
 
-    @api.depends()
     def _compute_recent(self):
         for rec in self:
             rec.recent_onboarding_ids = self.env["hr.onboarding.plan"].search(

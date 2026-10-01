@@ -1,3 +1,4 @@
+import re
 import urllib.parse
 from datetime import datetime
 
@@ -48,215 +49,6 @@ import base64
 from odoo import http, fields, _
 from odoo.http import request, content_disposition
 
-ETHIOPIAN_FIELDS_OF_STUDY = [
-    'Accounting',
-    'Accounting & Finance',
-    'Agribusiness Management',
-    'Agricultural Economics',
-    'Agricultural Engineering',
-    'Agriculture / Agronomy',
-    'Animal Science / Animal Production',
-    'Applied Chemistry',
-    'Applied Geology',
-    'Applied Mathematics',
-    'Applied Physics',
-    'Architecture & Urban Planning',
-    'Automotive Technology / Engineering',
-    'Banking & Finance',
-    'Biochemistry',
-    'Biology / Biological Sciences',
-    'Biomedical Engineering',
-    'Biotechnology',
-    'Business Administration (BBA / MBA)',
-    'Business Education',
-    'Chemical Engineering',
-    'Chemistry',
-    'Civil Engineering',
-    'Computer Engineering',
-    'Computer Science',
-    'Construction Technology & Management',
-    'Cooperative Accounting / Management',
-    'Cotton & Textile Engineering',
-    'Crop Science / Protection',
-    'Data Science / Analytics',
-    'Dental Medicine / Dentistry',
-    'Development Economics',
-    'Disaster Risk Management',
-    'Economics',
-    'Educational Planning & Management',
-    'Electrical & Computer Engineering',
-    'Electromechanical Engineering',
-    'Environmental Engineering',
-    'Environmental Health',
-    'Environmental Science',
-    'Fashion Design & Garment Engineering',
-    'Finance / Financial Management',
-    'Food Engineering / Science & Technology',
-    'Forestry / Agroforestry',
-    'General Nursing',
-    'Geography & Environmental Studies',
-    'Geology / Earth Sciences',
-    'Geotechnical Engineering',
-    'Governance & Development Studies',
-    'Graphic Design & Multimedia',
-    'Hardware / Network Engineering',
-    'Healthcare / Health Service Management',
-    'History & Heritage Management',
-    'Horticulture',
-    'Hotel & Tourism Management',
-    'Human Resource Management (HRM)',
-    'Hydraulic & Water Resources Engineering',
-    'Industrial Chemistry',
-    'Industrial Engineering',
-    'Information Systems / MIS',
-    'Information Technology (IT)',
-    'Instrumentation Engineering',
-    'Internal Audit / Auditing',
-    'International Relations & Diplomacy',
-    'Journalism & Communication',
-    'Laboratory Technology / Medical Lab Science',
-    'Law (LLB / LLM)',
-    'Leadership & Organisational Management',
-    'Library & Information Science',
-    'Logistics & Supply Chain Management',
-    'Management',
-    'Management Information Systems (MIS)',
-    'Manufacturing Engineering',
-    'Marketing Management',
-    'Materials Science & Engineering',
-    'Mathematical Modeling',
-    'Mathematics',
-    'Mechanical Engineering',
-    'Medical Laboratory Technology',
-    'Medicine / MD / MBBS',
-    'Midwifery',
-    'Mining Engineering',
-    'Music & Performing Arts',
-    'Natural Resource Management',
-    'Neonatal Nursing',
-    'Nursing',
-    'Occupational Health & Safety',
-    'Ophthalmology / Optometry',
-    'Parasitology / Microbiology',
-    'Petroleum Engineering',
-    'Pharmacy / Pharmaceutical Sciences',
-    'Philosophy',
-    'Physical Education & Sports Science',
-    'Physics',
-    'Plant Sciences',
-    'Political Science & International Relations',
-    'Power & Control Engineering',
-    'Procurement & Asset Management',
-    'Procurement & Supply Chain Management',
-    'Public Administration',
-    'Public Health (MPH)',
-    'Radiography / Radiologic Technology',
-    'Real Estate & Land Administration',
-    'Record & Archives Management',
-    'Rural Development & Agricultural Extension',
-    'Software Engineering',
-    'Soil Science',
-    'Sociology & Social Work',
-    'Special Needs Education',
-    'Statistics',
-    'Structural Engineering',
-    'Supply Chain & Operations Management',
-    'Surveying & Geomatics Engineering',
-    'System & Network Administration',
-    'Tax & Customs Administration',
-    'Telecommunication Engineering',
-    'Textile & Apparel Engineering',
-    'Urban Planning & Design',
-    'Veterinary Medicine (DVM)',
-    'Veterinary Science',
-    'Water Supply & Environmental Engineering',
-    'Wildlife & Eco-Tourism',
-    'Wood Science & Technology',
-    'Zoology',
-    'Other'
-]
-
-ETHIOPIAN_INSTITUTIONS = [
-    'AASTU (Addis Ababa Science & Technology University)',
-    'Adama Science and Technology University (ASTU)',
-    'Addis Ababa University (AAU)',
-    'Admas University',
-    'Alpha University College',
-    'Ambo University',
-    'Arba Minch University',
-    'Arsi University',
-    'Assosa University',
-    'Atlas College',
-    'Axum University',
-    'Bahir Dar University',
-    'Beshale University College',
-    'Borana University',
-    'Bule Hora University',
-    'CPU College',
-    'Debre Berhan University',
-    'Debre Markos University',
-    'Debre Tabor University',
-    'Defense University',
-    'Dembi Dolo University',
-    'Densu University College',
-    'Dilla University',
-    'Dire Dawa University',
-    'Ethio-China TVET Institute',
-    'Ethiopian Aviation University (EAU)',
-    'Ethiopian Civil Service University (ECSU)',
-    'Ethiopian Police University',
-    'Gage College',
-    'Gambella University',
-    'Grace College',
-    'Harambee University',
-    'Haramaya University',
-    'Hawassa University',
-    'HiLCoE School of Computer Science & Technology',
-    'Hope Enterprise University College',
-    'Injibara University',
-    'Jigjiga University',
-    'Jinka University',
-    'Jimma University',
-    'Kebri Dehar University',
-    'Kotebe Education University (KEU)',
-    'Leadstar University College',
-    'Madda Walabu University',
-    'Mekelle University',
-    'Mettu University',
-    'Micro Business College',
-    'Microlink Information Technology College',
-    'National Aviation College',
-    'New Generation University College',
-    'Nile College',
-    'Oasis College',
-    'Oda Bultum University',
-    'Paradigm College',
-    'Paramount College',
-    'Princess Zenebework Nursing College',
-    'Queen\'s College',
-    'Raya University',
-    'Rift Valley College',
-    'Rift Valley University',
-    'Royal College',
-    'Salale University',
-    'Santex College',
-    'Semera University',
-    'St. Mary\'s University',
-    'Tropical College of Medicine',
-    'Unity University',
-    'Universal College',
-    'Universal Medical College',
-    'University of Gondar',
-    'Wachamo University',
-    'Werabe University',
-    'Wolaita Sodo University',
-    'Woldia University',
-    'Wollo University',
-    'Yanet College',
-    'Yardstick International College',
-    'Other'
-]
-
 
 class ATSPortalController(http.Controller):
 
@@ -267,38 +59,28 @@ class ATSPortalController(http.Controller):
             return True
         if not candidate:
             return False
-        # Profile is complete if candidate has Personal Info, Education, Experience, and Master CV Uploaded
-        return bool(candidate.cv_file and candidate.education_ids and candidate.experience_ids and candidate.phone)
+        # Profile is complete if candidate has Personal Info (First & Middle name, phone, gender), Education, Experience, and Master CV Uploaded
+        names = (candidate.name or '').split(' ')
+        first_name = names[0] if len(names) > 0 else ''
+        middle_name = names[1] if len(names) > 1 else ''
+        has_personal = bool(candidate.name and first_name and middle_name and candidate.phone and candidate.gender)
+        return bool(candidate.cv_file and candidate.education_ids and candidate.experience_ids and has_personal)
 
     def _get_candidate_profile(self):
-        """Get or create the candidate profile for the current logged-in user with phone auto-sync."""
+        """Get or create the candidate profile for the current logged-in user."""
         user = request.env.user
         if user._is_public():
             return False
         
-        user_phone = getattr(user, 'phone', '') or (user.partner_id and user.partner_id.phone) or (user.partner_id and getattr(user.partner_id, 'mobile', '')) or ''
-        
         profile = request.env['candidate.profile'].sudo().search([('partner_id', '=', user.partner_id.id)], limit=1)
-        if not profile:
-            profile = request.env['candidate.profile'].sudo().search([('user_id', '=', user.id)], limit=1)
         if not profile:
             profile = request.env['candidate.profile'].sudo().create({
                 'partner_id': user.partner_id.id,
                 'user_id': user.id,
                 'name': user.name or user.partner_id.name,
                 'email': user.email or user.login,
-                'phone': user_phone,
+                'phone': user.phone or user.partner_id.phone or '',
             })
-        
-        effective_phone = profile.phone or user_phone
-        if effective_phone:
-            if not profile.phone:
-                profile.sudo().write({'phone': effective_phone})
-            if user.partner_id and user.partner_id.phone != effective_phone:
-                user.partner_id.sudo().write({'phone': effective_phone, 'mobile': effective_phone})
-            if hasattr(user, 'phone') and getattr(user, 'phone', False) != effective_phone:
-                user.sudo().write({'phone': effective_phone})
-
         return profile
 
     def _is_recruitment_admin(self):
@@ -431,8 +213,6 @@ class ATSPortalController(http.Controller):
             domain.append(('job_location', 'ilike', location))
 
         candidate_profile = self._get_candidate_profile()
-        if candidate_profile and not self._is_profile_complete(candidate_profile):
-            return request.redirect('/my/candidate/profile?step=1&profile_required=1')
         vacancies = request.env['job.vacancy'].sudo().search(domain, order='create_date desc')
 
         applied_vacancies_map = {}
@@ -552,8 +332,6 @@ class ATSPortalController(http.Controller):
         candidate = self._get_candidate_profile()
         if not candidate:
             return request.redirect('/jobs/login')
-        if not self._is_profile_complete(candidate):
-            return request.redirect('/my/candidate/profile?step=1&profile_required=1')
 
         domain = [
             '|',
@@ -665,13 +443,19 @@ class ATSPortalController(http.Controller):
         stage_summary_parts = ['{}: {}'.format(k, v) for k, v in stage_counts.items()]
         stage_status_summary = ' | '.join(stage_summary_parts) if stage_summary_parts else 'No Applications'
 
-        # Calculate completeness
-        completeness = 20
-        if candidate.cv_file: completeness += 16
-        if candidate.education_ids: completeness += 16
-        if candidate.experience_ids: completeness += 16
-        if candidate.certification_ids: completeness += 16
-        if candidate.document_ids: completeness += 16
+        # Calculate completeness: 25% for each of the 4 core mandatory sections
+        completeness = 0
+        names = (candidate.name or '').split(' ')
+        first_name = names[0] if len(names) > 0 else ''
+        middle_name = names[1] if len(names) > 1 else ''
+        if candidate.name and first_name and middle_name and candidate.phone and candidate.gender:
+            completeness += 25
+        if candidate.education_ids:
+            completeness += 25
+        if candidate.experience_ids:
+            completeness += 25
+        if candidate.cv_file:
+            completeness += 25
 
         published_news_count = request.env['ats.news'].sudo().search_count([
             ('state', '=', 'published'),
@@ -846,8 +630,6 @@ class ATSPortalController(http.Controller):
         candidate = self._get_candidate_profile()
         if not candidate:
             return request.redirect('/jobs/login')
-        if not self._is_profile_complete(candidate):
-            return request.redirect('/my/candidate/profile?step=1&profile_required=1')
 
         domain = [('state', '=', 'published')]
         if search:
@@ -893,8 +675,6 @@ class ATSPortalController(http.Controller):
         candidate = self._get_candidate_profile()
         if not candidate:
             return request.redirect('/jobs/login')
-        if not self._is_profile_complete(candidate):
-            return request.redirect('/my/candidate/profile?step=1&profile_required=1')
 
         domain = [
             '|',
@@ -951,8 +731,6 @@ class ATSPortalController(http.Controller):
         candidate = self._get_candidate_profile()
         if not candidate:
             return request.redirect('/jobs/login')
-        if not self._is_profile_complete(candidate):
-            return request.redirect('/my/candidate/profile?step=1&profile_required=1')
 
         cand_email = candidate.email or request.env.user.email or ''
         user_partner_id = request.env.user.partner_id.id
@@ -982,10 +760,6 @@ class ATSPortalController(http.Controller):
             app = off.applicant_id or (off.ext_candidate_id.applicant_name if off.ext_candidate_id else False)
             # Remove / hide from candidate portal once Employee and Contract are created (hired)
             if app and (app.bunna_app_status == 'hired' or app.contract_created_new or (app.employee_id and app.contract_created_new)):
-                continue
-
-            # Remove from ATS candidate portal once the offer letter is accepted or rejected (declined)
-            if off.state in ('accepted', 'declined'):
                 continue
 
             days_left = None
@@ -1099,117 +873,6 @@ class ATSPortalController(http.Controller):
         return request.redirect('/my/candidate/offers')
 
     # ---------------------------------------------------------------
-    # Internal Employee Promotion & Transfer Response Routes
-    # ---------------------------------------------------------------
-    @http.route(['/my/promotion/respond/<int:cand_id>'], type='http', auth='user', website=True, methods=['GET'])
-    def internal_promotion_respond_page(self, cand_id, **kwargs):
-        """Displays the employee promotion response form."""
-        cand = request.env['new.internal.recruitment.selected.candidates'].sudo().browse(cand_id)
-        if not cand.exists():
-            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Candidate selection record not found.')})
-
-        user = request.env.user
-        cand_emp = cand.emp_name
-        is_owner = (cand_emp and cand_emp.user_id and cand_emp.user_id.id == user.id) or (cand_emp and cand_emp.id == getattr(user.employee_id, 'id', False))
-        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
-
-        if not (is_owner or is_hr):
-            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Unauthorized: This promotion offer is assigned to another employee.')})
-
-        job_name = cand.new_int_sel_cand.job_position.name if (cand.new_int_sel_cand and cand.new_int_sel_cand.job_position) else (cand.emp_position or _('Promoted Position'))
-        work_unit = cand.current_work_unit or ''
-
-        return request.render('custom_recruitment.internal_offer_response_page', {
-            'candidate_name': cand.emp_name.name if cand.emp_name else _('Employee'),
-            'job_title': job_name,
-            'work_unit': work_unit,
-            'acceptance_status': cand.acceptance_status or 'pending',
-            'submit_url': f'/my/promotion/respond/{cand.id}/submit',
-        })
-
-    @http.route(['/my/promotion/respond/<int:cand_id>/submit'], type='http', auth='user', website=True, methods=['POST'])
-    def internal_promotion_respond_submit(self, cand_id, decision='accept', reason='', **kwargs):
-        """Processes promotion acceptance/rejection from employee response portal."""
-        cand = request.env['new.internal.recruitment.selected.candidates'].sudo().browse(cand_id)
-        if not cand.exists():
-            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Candidate record not found.')})
-
-        user = request.env.user
-        cand_emp = cand.emp_name
-        is_owner = (cand_emp and cand_emp.user_id and cand_emp.user_id.id == user.id) or (cand_emp and cand_emp.id == getattr(user.employee_id, 'id', False))
-        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
-
-        if not (is_owner or is_hr):
-            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Unauthorized access.')})
-
-        if decision == 'accept':
-            cand.sudo().action_accept_promotion()
-            msg = _("Thank you! Your ACCEPTANCE of the promotion offer has been recorded.")
-        else:
-            if not reason or not reason.strip():
-                reason = _("Declined by employee via response portal.")
-            cand.sudo().confirm_decline_promotion(reason.strip())
-            msg = _("Your DECLINE of the promotion offer has been recorded.")
-
-        return request.render('custom_recruitment.internal_offer_response_page', {
-            'success': msg,
-        })
-
-    @http.route(['/my/transfer/respond/<int:req_id>'], type='http', auth='user', website=True, methods=['GET'])
-    def internal_transfer_respond_page(self, req_id, **kwargs):
-        """Displays the employee transfer response form."""
-        tr = request.env['employee.transfer.request'].sudo().browse(req_id)
-        if not tr.exists():
-            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Transfer request record not found.')})
-
-        user = request.env.user
-        tr_emp = tr.employee_id
-        is_owner = (tr_emp and tr_emp.user_id and tr_emp.user_id.id == user.id) or (tr_emp and tr_emp.id == getattr(user.employee_id, 'id', False))
-        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
-
-        if not (is_owner or is_hr):
-            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Unauthorized: This transfer offer is assigned to another employee.')})
-
-        job_name = tr.target_job_position_id.name if tr.target_job_position_id else (tr.current_job_position_id.name if tr.current_job_position_id else _('Lateral Transfer'))
-        work_unit = tr.requested_operating_unit_id.name if tr.requested_operating_unit_id else ''
-
-        return request.render('custom_recruitment.internal_offer_response_page', {
-            'candidate_name': tr.employee_id.name if tr.employee_id else _('Employee'),
-            'job_title': job_name,
-            'work_unit': work_unit,
-            'acceptance_status': tr.acceptance_status or 'pending',
-            'submit_url': f'/my/transfer/respond/{tr.id}/submit',
-        })
-
-    @http.route(['/my/transfer/respond/<int:req_id>/submit'], type='http', auth='user', website=True, methods=['POST'])
-    def internal_transfer_respond_submit(self, req_id, decision='accept', reason='', **kwargs):
-        """Processes transfer acceptance/rejection from employee response portal."""
-        tr = request.env['employee.transfer.request'].sudo().browse(req_id)
-        if not tr.exists():
-            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Transfer record not found.')})
-
-        user = request.env.user
-        tr_emp = tr.employee_id
-        is_owner = (tr_emp and tr_emp.user_id and tr_emp.user_id.id == user.id) or (tr_emp and tr_emp.id == getattr(user.employee_id, 'id', False))
-        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
-
-        if not (is_owner or is_hr):
-            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Unauthorized access.')})
-
-        if decision == 'accept':
-            tr.sudo().action_accept_transfer()
-            msg = _("Thank you! Your ACCEPTANCE of the transfer offer has been recorded.")
-        else:
-            if not reason or not reason.strip():
-                reason = _("Declined by employee via response portal.")
-            tr.sudo().confirm_decline_transfer(reason.strip())
-            msg = _("Your DECLINE of the transfer offer has been recorded.")
-
-        return request.render('custom_recruitment.internal_offer_response_page', {
-            'success': msg,
-        })
-
-    # ---------------------------------------------------------------
     # Master Electronic CV Profile Builder (7 Tabs)
     # ---------------------------------------------------------------
     @http.route('/my/candidate/profile', type='http', auth='user', website=True, methods=['GET', 'POST'])
@@ -1221,19 +884,55 @@ class ATSPortalController(http.Controller):
 
         step = int(kwargs.get('step', 1))
 
+        # Step prerequisite validation for GET: Prevent jumping to subsequent steps without completing mandatory sections
+        if request.httprequest.method == 'GET':
+            if step > 2:
+                names = (candidate.name or '').split(' ')
+                first_name = names[0] if len(names) > 0 else ''
+                middle_name = names[1] if len(names) > 1 else ''
+                if not candidate.name or not first_name or not middle_name or not candidate.phone or not candidate.gender:
+                    err = "Please complete your Personal Information (First Name, Father's Name, Gender, and Phone Number) before proceeding."
+                    return request.redirect('/my/candidate/profile?step=2&error=' + urllib.parse.quote(err))
+
+            if step > 3:
+                if not candidate.education_ids:
+                    err = "Please add at least one Educational Qualification entry before proceeding."
+                    return request.redirect('/my/candidate/profile?step=3&error=' + urllib.parse.quote(err))
+
+            if step > 4:
+                if not candidate.experience_ids:
+                    err = "Please add at least one Professional Experience entry before proceeding."
+                    return request.redirect('/my/candidate/profile?step=4&error=' + urllib.parse.quote(err))
+
         if request.httprequest.method == 'POST':
             if step == 2:
                 # Update Personal Information
                 first_name = kwargs.get('first_name', '').strip()
                 middle_name = kwargs.get('middle_name', '').strip()
                 last_name = kwargs.get('last_name', '').strip()
+                phone = kwargs.get('phone', '').strip()
+                phone_cleaned = re.sub(r'[\s\-\(\)]', '', phone)
+                gender = kwargs.get('gender')
+
+                missing = []
+                if not first_name: missing.append("First Name")
+                if not middle_name: missing.append("Father's Name (Middle Name)")
+                if not phone: missing.append("Phone Number")
+                if not gender: missing.append("Gender")
+                if missing:
+                    err = "Please fill in all required fields: " + ", ".join(missing)
+                    return request.redirect('/my/candidate/profile?step=2&error=' + urllib.parse.quote(err))
+
+                if not re.match(r'^(\+251|00251|251|0)(9|7)\d{8}$', phone_cleaned):
+                    err = "Invalid phone number format! Please enter a valid Ethiopian mobile number (e.g. 0911223344, 0711223344, or +251911223344)."
+                    return request.redirect('/my/candidate/profile?step=2&error=' + urllib.parse.quote(err))
+
                 full_name = f"{first_name} {middle_name} {last_name}".strip()
 
-                new_phone = kwargs.get('phone', candidate.phone)
                 candidate.sudo().write({
                     'name': full_name or candidate.name,
-                    'gender': kwargs.get('gender', candidate.gender),
-                    'phone': new_phone,
+                    'gender': gender or candidate.gender,
+                    'phone': phone or candidate.phone,
                     'national_id': kwargs.get('national_id', candidate.national_id),
                     'secondary_id_type': kwargs.get('secondary_id_type', candidate.secondary_id_type),
                     'secondary_id_number': kwargs.get('secondary_id_number', candidate.secondary_id_number),
@@ -1242,36 +941,39 @@ class ATSPortalController(http.Controller):
                     'city': kwargs.get('city', candidate.city),
                     'address': kwargs.get('address', candidate.address),
                 })
-
-                if new_phone and candidate.partner_id:
-                    candidate.partner_id.sudo().write({'phone': new_phone, 'mobile': new_phone})
-                if new_phone and candidate.user_id and hasattr(candidate.user_id, 'phone'):
-                    candidate.user_id.sudo().write({'phone': new_phone})
                 return request.redirect('/my/candidate/profile?step=3')
 
             elif step == 3:
                 # Handle single edit or multiple new education entries
                 edit_id = kwargs.get('edit_id')
                 if edit_id:
-                    # Single edit mode
                     edu_level = kwargs.get('education_level', 'bsc')
-                    field_study = kwargs.get('field_of_study')
-                    if field_study == 'Other':
-                        field_study = kwargs.get('other_field_of_study') or 'Other'
-                    inst = kwargs.get('institution')
-                    if inst == 'Other':
-                        inst = kwargs.get('other_institution') or 'Other'
+                    field_study = (kwargs.get('field_of_study') or '').strip()
+                    other_f = (kwargs.get('other_field_of_study') or '').strip()
+                    if field_study == 'Other' and other_f:
+                        field_study = other_f
+                    inst = (kwargs.get('institution') or '').strip()
+                    other_i = (kwargs.get('other_institution') or '').strip()
+                    if inst == 'Other' and other_i:
+                        inst = other_i
+
+                    missing = []
+                    if not field_study or field_study == 'Other': missing.append("Field of Study / Major")
+                    if not inst or inst == 'Other': missing.append("School / College / University")
+                    if missing:
+                        err = "Please fill in required fields: " + ", ".join(missing)
+                        return request.redirect('/my/candidate/profile?step=3&edit_edu_id=' + str(edit_id) + '&error=' + urllib.parse.quote(err))
 
                     has_cs = kwargs.get('has_cost_sharing') == '1'
                     cs_file = kwargs.get('cost_sharing_file')
                     cs_data, cs_filename, cs_err = _validate_uploaded_file(cs_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'], label='Cost Sharing Agreement / Document')
                     if cs_err:
-                        return request.redirect('/my/candidate/profile?step=3&upload_error=' + urllib.parse.quote(cs_err))
+                        return request.redirect('/my/candidate/profile?step=3&edit_edu_id=' + str(edit_id) + '&upload_error=' + urllib.parse.quote(cs_err))
 
                     edu_doc_file = kwargs.get('education_doc_file')
                     ed_data, ed_filename, ed_err = _validate_uploaded_file(edu_doc_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'], label='Degree / Diploma / Transcript Document')
                     if ed_err:
-                        return request.redirect('/my/candidate/profile?step=3&upload_error=' + urllib.parse.quote(ed_err))
+                        return request.redirect('/my/candidate/profile?step=3&edit_edu_id=' + str(edit_id) + '&upload_error=' + urllib.parse.quote(ed_err))
 
                     grad_year_input = kwargs.get('graduation_year')
                     grad_date = False
@@ -1299,6 +1001,7 @@ class ATSPortalController(http.Controller):
                         vals['education_doc_filename'] = ed_filename
 
                     request.env['candidate.education'].sudo().browse(int(edit_id)).write(vals)
+                    return request.redirect('/my/candidate/profile?step=3')
                 else:
                     # Multi-entry creation mode
                     fields_list = request.httprequest.form.getlist('field_of_study')
@@ -1313,9 +1016,27 @@ class ATSPortalController(http.Controller):
                     ed_files = request.httprequest.files.getlist('education_doc_file')
 
                     num_entries = max(len(fields_list), len(inst_list), 1)
+                    created_any = False
                     for i in range(num_entries):
                         f_study = fields_list[i].strip() if i < len(fields_list) else (kwargs.get('field_of_study', '').strip() if i == 0 else '')
                         inst = inst_list[i].strip() if i < len(inst_list) else (kwargs.get('institution', '').strip() if i == 0 else '')
+                        other_f = other_f_list[i].strip() if i < len(other_f_list) else (kwargs.get('other_field_of_study', '').strip() if i == 0 else '')
+                        other_i = other_i_list[i].strip() if i < len(other_i_list) else (kwargs.get('other_institution', '').strip() if i == 0 else '')
+
+                        if f_study == 'Other' and other_f:
+                            f_study = other_f
+                        if inst == 'Other' and other_i:
+                            inst = other_i
+
+                        if f_study or inst or not candidate.education_ids:
+                            missing = []
+                            if not f_study or f_study == 'Other': missing.append("Field of Study / Major")
+                            if not inst or inst == 'Other': missing.append("School / College / University")
+                            if missing:
+                                entry_label = f"Qualification #{i+1}: " if num_entries > 1 else ""
+                                err = entry_label + "Please fill in required fields: " + ", ".join(missing)
+                                return request.redirect('/my/candidate/profile?step=3&error=' + urllib.parse.quote(err))
+
                         if not f_study and not inst:
                             continue
 
@@ -1324,13 +1045,6 @@ class ATSPortalController(http.Controller):
                         g_val = grad_list[i].strip() if i < len(grad_list) else str(kwargs.get('graduation_year', '')).strip()
                         grad_date = f"{g_val}-01-01" if len(g_val) == 4 and g_val.isdigit() else (g_val or False)
                         cgpa_val = cgpa_list[i] if i < len(cgpa_list) else kwargs.get('cgpa', '0.0')
-                        other_f = other_f_list[i] if i < len(other_f_list) else kwargs.get('other_field_of_study', '')
-                        other_i = other_i_list[i] if i < len(other_i_list) else kwargs.get('other_institution', '')
-
-                        if f_study == 'Other' and other_f:
-                            f_study = other_f
-                        if inst == 'Other' and other_i:
-                            inst = other_i
 
                         cs_file = cs_files[i] if i < len(cs_files) else (kwargs.get('cost_sharing_file') if i == 0 else None)
                         cs_data, cs_filename, _ = _validate_uploaded_file(cs_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'])
@@ -1359,6 +1073,11 @@ class ATSPortalController(http.Controller):
                             vals['education_doc_filename'] = ed_filename
 
                         request.env['candidate.education'].sudo().create(vals)
+                        created_any = True
+
+                    if not candidate.education_ids and not created_any:
+                        err = "Please complete and add at least one Educational Qualification entry before proceeding."
+                        return request.redirect('/my/candidate/profile?step=3&error=' + urllib.parse.quote(err))
 
                 return request.redirect('/my/candidate/profile?step=4')
 
@@ -1366,22 +1085,33 @@ class ATSPortalController(http.Controller):
                 # Handle single edit or multiple new experience entries
                 edit_id = kwargs.get('edit_id')
                 if edit_id:
-                    pos = kwargs.get('position')
-                    org = kwargs.get('organization')
+                    pos = (kwargs.get('position') or '').strip()
+                    org = (kwargs.get('organization') or '').strip()
+                    s_date_raw = kwargs.get('start_date')
+                    s_date = _clean_date(s_date_raw)
                     is_curr = kwargs.get('is_current') == '1'
+                    e_date = False if is_curr else _clean_date(kwargs.get('end_date'))
+
+                    missing = []
+                    if not pos: missing.append("Job Title / Position")
+                    if not org: missing.append("Company / Organization")
+                    if not s_date: missing.append("Start Date")
+                    if missing:
+                        err = "Please fill in required experience fields: " + ", ".join(missing)
+                        return request.redirect('/my/candidate/profile?step=4&edit_exp_id=' + str(edit_id) + '&error=' + urllib.parse.quote(err))
 
                     exp_file = kwargs.get('exp_file')
                     exp_data, exp_filename, exp_err = _validate_uploaded_file(exp_file, max_mb=5, allowed_exts=['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'], label='Experience / Service Certificate')
                     if exp_err:
-                        return request.redirect('/my/candidate/profile?step=4&upload_error=' + urllib.parse.quote(exp_err))
+                        return request.redirect('/my/candidate/profile?step=4&edit_exp_id=' + str(edit_id) + '&upload_error=' + urllib.parse.quote(exp_err))
 
                     vals = {
                         'position': pos or '',
                         'organization': org or '',
                         'employment_type': kwargs.get('employment_type', 'full_time'),
                         'sector_type': kwargs.get('sector_type', 'banking'),
-                        'start_date': _clean_date(kwargs.get('start_date')),
-                        'end_date': False if is_curr else _clean_date(kwargs.get('end_date')),
+                        'start_date': s_date,
+                        'end_date': e_date,
                         'is_current': is_curr,
                         'responsibilities': kwargs.get('responsibilities', ''),
                     }
@@ -1390,6 +1120,7 @@ class ATSPortalController(http.Controller):
                         vals['exp_filename'] = exp_filename
 
                     request.env['candidate.experience'].sudo().browse(int(edit_id)).write(vals)
+                    return request.redirect('/my/candidate/profile?step=4')
                 else:
                     # Multi-entry creation mode
                     pos_list = request.httprequest.form.getlist('position')
@@ -1403,15 +1134,28 @@ class ATSPortalController(http.Controller):
                     exp_files = request.httprequest.files.getlist('exp_file')
 
                     num_entries = max(len(pos_list), len(org_list), 1)
+                    created_any = False
                     for i in range(num_entries):
                         pos = pos_list[i].strip() if i < len(pos_list) else (kwargs.get('position', '').strip() if i == 0 else '')
                         org = org_list[i].strip() if i < len(org_list) else (kwargs.get('organization', '').strip() if i == 0 else '')
+                        s_date_raw = start_list[i] if i < len(start_list) else kwargs.get('start_date')
+                        s_date = _clean_date(s_date_raw)
+
+                        if pos or org or s_date or not candidate.experience_ids:
+                            missing = []
+                            if not pos: missing.append("Job Title / Position")
+                            if not org: missing.append("Company / Organization")
+                            if not s_date: missing.append("Start Date")
+                            if missing:
+                                entry_label = f"Experience #{i+1}: " if num_entries > 1 else ""
+                                err = entry_label + "Please fill in required fields: " + ", ".join(missing)
+                                return request.redirect('/my/candidate/profile?step=4&error=' + urllib.parse.quote(err))
+
                         if not pos and not org:
                             continue
 
                         sec = sector_list[i] if i < len(sector_list) else kwargs.get('sector_type', 'banking')
                         emp_t = emp_type_list[i] if i < len(emp_type_list) else kwargs.get('employment_type', 'full_time')
-                        s_date = _clean_date(start_list[i]) if i < len(start_list) else _clean_date(kwargs.get('start_date'))
                         e_date_raw = end_list[i] if i < len(end_list) else kwargs.get('end_date')
                         is_c = (curr_list[i] == '1' if i < len(curr_list) else kwargs.get('is_current') == '1')
                         e_date = False if is_c else _clean_date(e_date_raw)
@@ -1436,6 +1180,11 @@ class ATSPortalController(http.Controller):
                             vals['exp_filename'] = exp_filename
 
                         request.env['candidate.experience'].sudo().create(vals)
+                        created_any = True
+
+                    if not candidate.experience_ids and not created_any:
+                        err = "Please complete and add at least one Work Experience entry before proceeding."
+                        return request.redirect('/my/candidate/profile?step=4&error=' + urllib.parse.quote(err))
 
                 return request.redirect('/my/candidate/profile?step=5')
 
@@ -1583,13 +1332,16 @@ class ATSPortalController(http.Controller):
         middle_name = names[1] if len(names) > 1 else ''
         last_name = ' '.join(names[2:]) if len(names) > 2 else ''
 
-        # Completeness calculation
-        completeness = 20
-        if candidate.cv_file: completeness += 16
-        if candidate.education_ids: completeness += 16
-        if candidate.experience_ids: completeness += 16
-        if candidate.certification_ids: completeness += 16
-        if candidate.document_ids: completeness += 16
+        # Completeness calculation: 25% for each of the 4 core mandatory sections
+        completeness = 0
+        if candidate.name and first_name and middle_name and candidate.phone and candidate.gender:
+            completeness += 25
+        if candidate.education_ids:
+            completeness += 25
+        if candidate.experience_ids:
+            completeness += 25
+        if candidate.cv_file:
+            completeness += 25
 
         values = {
             'candidate': candidate,
@@ -1597,14 +1349,13 @@ class ATSPortalController(http.Controller):
             'first_name': first_name,
             'middle_name': middle_name,
             'last_name': last_name,
+            'error': kwargs.get('error'),
+            'upload_error': kwargs.get('upload_error'),
             'completeness': min(100, completeness),
             'edit_edu': request.env['candidate.education'].sudo().browse(int(kwargs.get('edit_edu_id'))) if kwargs.get('edit_edu_id') else False,
             'edit_exp': request.env['candidate.experience'].sudo().browse(int(kwargs.get('edit_exp_id'))) if kwargs.get('edit_exp_id') else False,
             'edit_cert': request.env['candidate.certification'].sudo().browse(int(kwargs.get('edit_cert_id'))) if kwargs.get('edit_cert_id') else False,
             'edit_lang': request.env['candidate.language'].sudo().browse(int(kwargs.get('edit_lang_id'))) if kwargs.get('edit_lang_id') else False,
-            'error_msg': kwargs.get('error') or kwargs.get('error_msg') or False,
-            'ethiopian_fields_of_study': ETHIOPIAN_FIELDS_OF_STUDY,
-            'ethiopian_institutions': ETHIOPIAN_INSTITUTIONS,
         }
         return request.render('custom_recruitment.ats_candidate_profile_template', values)
 

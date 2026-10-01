@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import api, fields, models, tools, _
 from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 from .planing_categories import WORK_UNIT_TYPES
 
@@ -451,115 +454,13 @@ class PbmsPlanningConfig(models.Model):
 
     @api.model
     def get_category_review_info(cls, category, org_unit=None):
-        """Lookup responsible Operating Unit, Department, and Reviewer users for a category.
-        Follows a strict hierarchy to locate the configuration where this category is defined:
-        1. Specific Operating Unit override
-        2. Parent / Ancestor Operating Unit (e.g. parent District Office)
-        3. Work Unit Type default (e.g. branch)
-        4. Parent Work Unit Type default (e.g. district_office)
-        5. Global fallback to any config that defined this category
-        """
-        Config = cls.env["pbms.planning.config"]
-        prefix_map = {
-            "deposit": "deposit",
-            "customer_base": "customer_base",
-            "fx": "fx",
-            "digital_banking": "digital",
-            "general_expense": "expense",
-            "manpower": "manpower",
-            "fixed_asset": "fixed_asset",
-        }
-        prefix = prefix_map.get(category, category)
-
-        def _is_configured(cfg_rec):
-            if not cfg_rec:
-                return False
-            users = getattr(cfg_rec, f"{prefix}_reviewer_user_ids", False)
-            ou = getattr(cfg_rec, f"{prefix}_reviewer_ou_id", False)
-            dept = getattr(cfg_rec, f"{prefix}_reviewer_dept_id", False)
-            return bool(users or ou or dept)
-
-        cfg = False
-        if org_unit:
-            # 1. Direct operating unit config
-            c1 = Config.search([("config_type", "=", "operating_unit"), ("org_unit_id", "=", org_unit.id)], limit=1)
-            if _is_configured(c1):
-                cfg = c1
-
-            # 2. Check parent/ancestor operating units (e.g. parent district)
-            if not cfg:
-                curr_ou = org_unit
-                for _ in range(5):
-                    parent = getattr(curr_ou, "parent_unit", False) or getattr(curr_ou, "parent_id", False)
-                    if not parent:
-                        break
-                    c_parent = Config.search([("config_type", "=", "operating_unit"), ("org_unit_id", "=", parent.id)], limit=1)
-                    if _is_configured(c_parent):
-                        cfg = c_parent
-                        break
-                    curr_ou = parent
-
-            # 3. Work unit type config for this unit
-            if not cfg and org_unit.work_unit_type:
-                c_type = Config.search([("config_type", "=", "work_unit_type"), ("work_unit_type", "=", org_unit.work_unit_type)], limit=1)
-                if _is_configured(c_type):
-                    cfg = c_type
-
-            # 4. Parent work unit type config (e.g. district_office)
-            if not cfg:
-                parent = getattr(org_unit, "parent_unit", False) or getattr(org_unit, "parent_id", False)
-                if parent and parent.work_unit_type:
-                    c_ptype = Config.search([("config_type", "=", "work_unit_type"), ("work_unit_type", "=", parent.work_unit_type)], limit=1)
-                    if _is_configured(c_ptype):
-                        cfg = c_ptype
-
-        # 5. Global fallback to any config that defined this category
-        if not cfg:
-            all_cfgs = Config.search([], order="config_type desc, id asc")
-            for c_cand in all_cfgs:
-                if _is_configured(c_cand):
-                    cfg = c_cand
-                    break
-
-        if cfg:
-            users = getattr(cfg, f"{prefix}_reviewer_user_ids", cls.env["res.users"])
-            ou = getattr(cfg, f"{prefix}_reviewer_ou_id", False)
-            dept = getattr(cfg, f"{prefix}_reviewer_dept_id", False)
-            return {"users": users, "ou": ou, "dept": dept}
+        """Deprecated: Functional Reviewers are no longer configured or determined via Planning Configuration."""
         return {"users": cls.env["res.users"], "ou": False, "dept": False}
 
     @api.model
     def get_user_authorized_categories(cls, user):
-        """Check all Planning Configurations to determine which categories the user is designated to review."""
-        Config = cls.env["pbms.planning.config"]
-        configs = Config.search([])
-        cats = set()
-        user_unit_ids = set(user._pbms_operating_unit_ids())
-        user_dept_id = user.employee_id.department_id.id if (user.employee_id and user.employee_id.department_id) else False
-
-        prefix_map = [
-            ("deposit", "deposit"),
-            ("customer_base", "customer_base"),
-            ("fx", "fx"),
-            ("digital_banking", "digital"),
-            ("general_expense", "expense"),
-            ("manpower", "manpower"),
-            ("fixed_asset", "fixed_asset"),
-        ]
-
-        for cfg in configs:
-            for cat, prefix in prefix_map:
-                user_ids = getattr(cfg, f"{prefix}_reviewer_user_ids", cls.env["res.users"]).ids
-                ou_id = getattr(cfg, f"{prefix}_reviewer_ou_id", False)
-                dept_id = getattr(cfg, f"{prefix}_reviewer_dept_id", False)
-                if user.id in user_ids:
-                    cats.add(cat)
-                elif ou_id and ou_id.id in user_unit_ids:
-                    cats.add(cat)
-                elif dept_id and user_dept_id and dept_id.id == user_dept_id:
-                    cats.add(cat)
-
-        return list(cats)
+        """Deprecated: Functional Reviewers are no longer configured or determined via Planning Configuration."""
+        return []
 
 
     def action_save(self):
@@ -699,6 +600,18 @@ class PbmsPlanningConfig(models.Model):
             SET customer_base_measurement_type = 'integer'
             WHERE customer_base_measurement_type IS NULL OR customer_base_measurement_type = 'monetary';
         """)
+        # 5. Ensure branch work_unit_type defaults to all categories enabled
+        self.env.cr.execute("""
+            UPDATE pbms_planning_config
+            SET enable_deposit = TRUE,
+                enable_customer_base = TRUE,
+                enable_fx = TRUE,
+                enable_digital_banking = TRUE,
+                enable_expense = TRUE,
+                enable_manpower = TRUE,
+                enable_fixed_asset = TRUE
+            WHERE work_unit_type = 'branch' AND config_type = 'work_unit_type';
+        """)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -751,23 +664,11 @@ class PbmsPlanningConfig(models.Model):
         return created_records
 
     def _sync_reviewer_groups(self):
-        ho_group = self.env.ref("bunna_pbms.group_pbms_ho_reviewer", raise_if_not_found=False)
-        branch_group = self.env.ref("bunna_pbms.group_pbms_branch_user", raise_if_not_found=False)
-        if not ho_group:
-            return
-        all_rev_users = self.mapped("expense_reviewer_user_ids") | self.mapped("fixed_asset_reviewer_user_ids") | self.mapped("manpower_reviewer_user_ids")
-        for u in all_rev_users:
-            if not u.has_group("bunna_pbms.group_pbms_ho_reviewer"):
-                u.sudo().write({"group_ids": [(4, ho_group.id)]})
-            if branch_group and not u.has_group("bunna_pbms.group_pbms_branch_user"):
-                u.sudo().write({"group_ids": [(4, branch_group.id)]})
+        pass
 
     def write(self, vals):
         self.env.registry.clear_cache()
         res = super(PbmsPlanningConfig, self).write(vals)
-        reviewer_keys = {"expense_reviewer_user_ids", "fixed_asset_reviewer_user_ids", "manpower_reviewer_user_ids"}
-        if reviewer_keys & set(vals.keys()):
-            self._sync_reviewer_groups()
         if "budget_hiring_committee_user_ids" in vals or "ceo_user_id" in vals:
             self._sync_committee_and_ceo_roles()
         return res
@@ -803,10 +704,28 @@ class PbmsPlanningConfig(models.Model):
                 ("org_unit_id", "=", False),
             ], limit=1)
         if not config:
-            config = self.create({
+            vals = {
                 "config_type": "work_unit_type",
                 "work_unit_type": work_unit_type,
-            })
+            }
+            if work_unit_type in ("district_office", "head_office"):
+                vals.update({
+                    "enable_deposit": False,
+                    "enable_customer_base": False,
+                    "enable_fx": False,
+                    "enable_digital_banking": False,
+                })
+            elif work_unit_type == "branch":
+                vals.update({
+                    "enable_deposit": True,
+                    "enable_customer_base": True,
+                    "enable_fx": True,
+                    "enable_digital_banking": True,
+                    "enable_expense": True,
+                    "enable_manpower": True,
+                    "enable_fixed_asset": True,
+                })
+            config = self.create(vals)
         return config.id if config else False
 
     @api.model
@@ -837,6 +756,10 @@ class PbmsPlanningConfig(models.Model):
         ou_rec = self.env["operating.unit"].browse(ou_id) if isinstance(ou_id, int) else org_unit
         if not ou_rec or not ou_rec.exists():
             return True
+
+        # Head office and district office only plan resource categories (workforce, general expense, fixed asset)
+        if ou_rec.work_unit_type in ("district_office", "head_office") and category in ("deposit", "customer_base", "fx", "digital_banking"):
+            return False
 
         toggle_map = {
             "deposit": "enable_deposit",

@@ -22,17 +22,54 @@ class HrLeaveDashboard(models.TransientModel):
         if not employee:
             return defaults
 
-        balances = HrLeave._get_leave_balances(employee)
+        dash_data = HrLeave.get_dashboard_balances(employee.id)
         defaults.update({
             'employee_id': employee.id,
-            'accrued_leave_balance': balances.get('accrued', 0.0),
-            'scheduled_leave_balance': balances.get('scheduled', 0.0),
+            'accrued_leave_balance': dash_data.get('accrued', 0.0),
+            'scheduled_leave_balance': dash_data.get('scheduled', 0.0),
+            'daily_accrual_rate': dash_data.get('daily_rate', 0.0),
+            'annual_entitlement': dash_data.get('annual_entitlement', 0.0),
+            'max_carryover_cap': dash_data.get('max_cap', 0.0),
+            'remaining_to_cap': dash_data.get('remaining_to_cap', 0.0),
+            'cap_percentage': dash_data.get('cap_percentage', 0.0),
+            'accrual_status': dash_data.get('accrual_status', 'active'),
+            'accrual_status_label': dash_data.get('accrual_status_label', 'Actively Accruing'),
         })
         return defaults
+
+    @api.model
+    def get_dashboard_balances(self, employee_id=None):
+        return self.env['hr.leave'].get_dashboard_balances(employee_id=employee_id)
 
     employee_id = fields.Many2one('hr.employee', string='Employee', readonly=True)
     accrued_leave_balance = fields.Float(string='Accrued Leave Balance', digits=(16, 2), readonly=True)
     scheduled_leave_balance = fields.Float(string='Scheduled Leave Balance', digits=(16, 2), readonly=True)
+    daily_accrual_rate = fields.Float(string='Daily Accrual Rate', digits=(16, 4), readonly=True)
+    annual_entitlement = fields.Float(string='Annual Entitlement', digits=(16, 2), readonly=True)
+    max_carryover_cap = fields.Float(string='Maximum Carryover Cap', digits=(16, 2), readonly=True)
+    remaining_to_cap = fields.Float(string='Remaining Before Cap', digits=(16, 2), readonly=True)
+    cap_percentage = fields.Float(string='Cap Progress (%)', digits=(16, 1), readonly=True)
+    accrual_status = fields.Selection([
+        ('active', 'Actively Accruing'),
+        ('near_cap', 'Approaching Cap'),
+        ('capped', 'Accrual Paused (Cap Reached)'),
+    ], string='Accrual Status', readonly=True)
+    accrual_status_label = fields.Char(string='Accrual Status Label', readonly=True)
+
+    total_leave_balance = fields.Float(
+        string="Total Leave Balance",
+        compute="_compute_total_leave_balance",
+        store=True,  # set True if you want to search/sort/group on it
+    )
+
+    @api.depends('accrued_leave_balance', 'scheduled_leave_balance')
+    def _compute_total_leave_balance(self):
+
+
+
+
+        for rec in self:
+            rec.total_leave_balance = rec.accrued_leave_balance + rec.scheduled_leave_balance
 
     def action_open_my_requests(self):
         """Go to the existing My Time Off list/kanban (custom_saved=True only)."""

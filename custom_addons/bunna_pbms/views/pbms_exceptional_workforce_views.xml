@@ -23,7 +23,7 @@
                 <field name="can_view_sourcing_type"/>
                 <field name="color"/>
                 <field name="activity_state"/>
-                <progressbar field="state" colors='{"approved": "success", "ceo_review": "warning", "rejected": "danger", "returned": "muted", "people_solutions": "info", "cpco_review": "info"}'/>
+                <progressbar field="state" colors='{"approved": "forest", "ceo_review": "warning", "rejected": "danger", "returned": "muted", "people_solutions": "maroon", "cpco_review": "bronze"}'/>
                 <templates>
                     <t t-name="card">
                         <div class="card-body">
@@ -144,6 +144,14 @@
         <field name="arch" type="xml">
             <form string="Exceptional Workforce Request">
                 <header>
+                    <!-- Explicit Save Action Button -->
+                    <button name="action_save_request"
+                            string="Save"
+                            type="object"
+                            icon="fa-floppy-o"
+                            class="btn-primary o_pbms_save_btn d-none"
+                            invisible="state in ('approved', 'rejected')"/>
+
                     <!-- Export to Excel Action Button -->
                     <button name="action_export_excel"
                             string="Export to Excel"
@@ -151,13 +159,21 @@
                             icon="fa-file-excel-o"
                             class="btn btn-outline-secondary"/>
 
-                    <!-- District Reviewer Action: Submit to People Solutions -->
+                    <!-- District / Branch Action: Submit to People Solutions -->
                     <button name="action_submit"
                             string="Submit to People Solutions"
                             type="object"
                             class="oe_highlight"
-                            invisible="not can_district_submit"
-                            groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
+                            invisible="not can_district_submit or is_people_solutions_request"
+                            groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_branch_user,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_people_solutions"/>
+
+                    <!-- People Solutions Directorate Action: Submit Directly to CPCO Review -->
+                    <button name="action_submit"
+                            string="Submit to CPCO Review"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_district_submit or not is_people_solutions_request"
+                            groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_manager"/>
 
                     <!-- People Solutions Directorate Actions -->
                     <button name="action_people_solutions_escalate"
@@ -183,7 +199,7 @@
 
                     <!-- CPCO Actions -->
                     <button name="action_cpco_submit_memo"
-                            string="Submit Memo to CEO"
+                            string="Approve &amp; Submit Memo to CEO"
                             type="object"
                             class="oe_highlight"
                             invisible="not can_cpco_action"
@@ -205,25 +221,34 @@
 
                     <!-- CEO Decision Actions -->
                     <button name="action_ceo_approve"
-                            string="Approve Request"
+                            string="CEO Final Approve"
                             type="object"
+                            icon="fa-check-square"
                             class="btn-success"
-                            confirm="Are you sure you want to approve this Exceptional Workforce Request?"
+                            confirm="Are you sure you want to officially approve this Exceptional Workforce Request as CEO?"
                             invisible="not can_ceo_action"
-                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager"/>
+                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="%(bunna_pbms.action_pbms_exceptional_return_wizard)d"
+                            string="Return for Revision"
+                            type="action"
+                            class="btn-warning text-white"
+                            invisible="not can_ceo_action"
+                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
 
                     <button name="%(bunna_pbms.action_pbms_exceptional_reject_wizard)d"
                             string="Reject Request"
                             type="action"
                             class="btn-danger"
                             invisible="not can_ceo_action"
-                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager"/>
+                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
 
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,people_solutions,cpco_review,ceo_review,approved"/>
                 </header>
                 <sheet>
                     <!-- Client-side permission evaluation flags -->
+                    <field name="is_people_solutions_request" invisible="1"/>
                     <field name="eligible_job_ids" invisible="1"/>
                     <field name="can_district_edit" invisible="1"/>
                     <field name="can_district_submit" invisible="1"/>
@@ -238,8 +263,8 @@
                     <field name="can_edit" invisible="1"/>
 
                     <!-- Alert Banner for Returned Requests -->
-                    <div class="alert alert-warning mb-3" role="alert" invisible="state != 'returned'">
-                        <strong><i class="fa fa-exclamation-triangle"/> Returned for Revision: </strong>
+                    <div class="alert alert-warning mb-3" role="alert" invisible="not return_reason">
+                        <strong><i class="fa fa-exclamation-triangle"/> Feedback / Return Reason: </strong>
                         <field name="return_reason" readonly="1" class="d-inline ms-1"/>
                     </div>
 
@@ -297,7 +322,7 @@
                     </group>
 
                     <notebook>
-                        <page string="People Solutions Assessment" name="page_people_solutions" invisible="state == 'draft'">
+                        <page string="People Solutions Assessment" name="page_people_solutions" invisible="state == 'draft' and not is_people_solutions_request">
                             <group>
                                 <group>
                                     <field name="people_solutions_reviewer_id" readonly="1"/>

@@ -97,10 +97,17 @@
                         <!-- Paragraph 3: RELEASE CLAUSE (Rendered ONLY for Different Work Unit - Image 1) -->
                         <t t-if="o.promotion_type == 'diff_unit'">
                             <p style="margin-bottom: 14px;">
-                                By copy of this letter, <strong><span t-esc="o.get_current_work_unit_name() or '________________'"/></strong> 
-                                is advised to release <strong><span t-esc="o.emp_name.name if o.emp_name else '________________'"/></strong> 
-                                and forward the necessary information to <strong><span t-esc="o.get_target_work_unit_name() or '________________'"/></strong> 
-                                and <strong><span t-esc="o.get_signatory_title()"/></strong>.
+                                <t t-if="o.is_candidate_in_pomd()">
+                                    By copy of this letter, <strong><span t-esc="o.get_current_work_unit_name() or '________________'"/></strong> 
+                                    is advised to release <strong><span t-esc="o.emp_name.name if o.emp_name else '________________'"/></strong> 
+                                    and forward the necessary information to <strong><span t-esc="o.get_target_work_unit_name() or '________________'"/></strong>.
+                                </t>
+                                <t t-else="">
+                                    By copy of this letter, <strong><span t-esc="o.get_current_work_unit_name() or '________________'"/></strong> 
+                                    is advised to release <strong><span t-esc="o.emp_name.name if o.emp_name else '________________'"/></strong> 
+                                    and forward the necessary information to <strong><span t-esc="o.get_target_work_unit_name() or '________________'"/></strong> 
+                                    and <strong><span t-esc="o.get_signatory_title()"/></strong>.
+                                </t>
                             </p>
                         </t>
 
@@ -135,8 +142,9 @@
                     <div class="mt-4" style="font-size: 12.5px; line-height: 1.5;">
                         <div><strong>CC:</strong></div>
                         <ul style="list-style-type: disc; margin-left: 20px; padding-left: 0; margin-top: 4px;">
-                            <li>IT Security Management Directorate</li>
-                            <li>All respective work units</li>
+                            <t t-foreach="o.get_promotion_letter_cc_lines()" t-as="cc_line">
+                                <li><span t-esc="cc_line"/></li>
+                            </t>
                             <li><u><strong>Bunna Bank S.C</strong></u></li>
                         </ul>
                     </div>

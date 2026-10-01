@@ -362,27 +362,5 @@ class HrEmployeeCompetency(models.Model):
                 self._sync_coach_supervisor_group(coach_ids)
         return res
 
-    def _register_hook(self):
-        super()._register_hook()
-        try:
-            with self.env.cr.savepoint():
-                # 1. Enforce strict menu groups for reporting menus (purge supervisor/employee groups)
-                officer_group = self.env.ref('competency_management.group_competency_officer', raise_if_not_found=False)
-                if officer_group:
-                    reporting_menu_xmls = [
-                        'competency_management.menu_competency_reports_categ',
-                        'competency_management.menu_competency_report_wizard',
-                        'competency_management.menu_competency_tna_analytics_report',
-                        'competency_management.menu_competency_dashboard_snapshot',
-                    ]
-                    for m_xml in reporting_menu_xmls:
-                        menu = self.env.ref(m_xml, raise_if_not_found=False)
-                        if menu:
-                            menu.sudo().write({'group_ids': [(6, 0, [officer_group.id])]})
-
-                # 2. Sync all coaches to have group_competency_supervisor
-                self.sudo()._sync_all_coach_supervisor_groups()
-        except Exception:
-            pass
 
 

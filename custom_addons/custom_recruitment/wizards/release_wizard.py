@@ -59,12 +59,25 @@ def _resolve_operating_unit(env, cand, parent_rec):
     """
     Robustly resolves the destination operating unit record.
     """
-    # 1. From candidate preferred location
+    # 1. From candidate target work unit helper / preferred location
+    if hasattr(cand, 'get_target_work_unit_name'):
+        target_name = cand.get_target_work_unit_name()
+        if target_name:
+            ou = env['operating.unit'].search([('name', '=ilike', str(target_name).strip())], limit=1)
+            if ou:
+                return ou
+            ou = env['operating.unit'].search([('name', 'ilike', str(target_name).strip())], limit=1)
+            if ou:
+                return ou
+
     target_unit = getattr(cand, 'preferred_location', False)
     if target_unit:
         clean_name = _format_clean_text(target_unit)
         if clean_name:
             ou = env['operating.unit'].search([('name', '=ilike', str(clean_name).strip())], limit=1)
+            if ou:
+                return ou
+            ou = env['operating.unit'].search([('name', 'ilike', str(clean_name).strip())], limit=1)
             if ou:
                 return ou
 
@@ -75,25 +88,40 @@ def _resolve_operating_unit(env, cand, parent_rec):
             ou = env['operating.unit'].browse(w_id)
             if ou.exists():
                 return ou
+        elif hasattr(w_id, 'id') and w_id.id:
+            return w_id
 
-    # 3. From vacancy operating_unit_id
+    # 3. From vacancy operating_unit_id or hiring_details
+    vac = False
     if parent_rec:
         vac_id = getattr(parent_rec, 'vacancy_id', False)
-        vac = False
         if isinstance(vac_id, int) and vac_id > 0:
             vac = env['job.vacancy'].browse(vac_id)
-        elif hasattr(vac_id, 'operating_unit_id'):
+        elif hasattr(vac_id, 'operating_unit_id') and vac_id:
             vac = vac_id
         if not vac and getattr(parent_rec, 'vacancy_reference', False):
             vac = env['job.vacancy'].search([('reference', '=', parent_rec.vacancy_reference)], limit=1)
-        if vac and vac.exists() and vac.operating_unit_id:
+    if not vac and getattr(cand, 'vacancy_id', False):
+        c_vac_id = cand.vacancy_id
+        if isinstance(c_vac_id, int) and c_vac_id > 0:
+            vac = env['job.vacancy'].browse(c_vac_id)
+
+    if vac and vac.exists():
+        if vac.operating_unit_id:
             return vac.operating_unit_id
+        if hasattr(vac, 'hiring_details') and vac.hiring_details:
+            for hd in vac.hiring_details:
+                if hd.work_unit:
+                    return hd.work_unit
 
     # 4. From parent recruitment job_location string
     if parent_rec and getattr(parent_rec, 'job_location', False):
         loc_str = _format_clean_text(parent_rec.job_location)
         if loc_str:
             ou = env['operating.unit'].search([('name', '=ilike', str(loc_str).strip())], limit=1)
+            if ou:
+                return ou
+            ou = env['operating.unit'].search([('name', 'ilike', str(loc_str).strip())], limit=1)
             if ou:
                 return ou
 
@@ -105,10 +133,12 @@ def _resolve_grade_record(env, grade_val, parent_rec=None):
     Robustly resolves employee.grade record.
     """
     if grade_val:
-        if isinstance(grade_val, int):
+        if isinstance(grade_val, int) and grade_val > 0:
             rec = env['employee.grade'].browse(grade_val)
             if rec.exists():
                 return rec
+        elif hasattr(grade_val, '_name') and grade_val._name == 'employee.grade':
+            return grade_val
         g_str = _format_clean_text(grade_val)
         if g_str:
             g_str = str(g_str).strip()
@@ -137,6 +167,8 @@ def _resolve_grade_record(env, grade_val, parent_rec=None):
                 rec = env['employee.grade'].browse(g_id)
                 if rec.exists():
                     return rec
+            elif hasattr(g_id, 'id') and g_id.id:
+                return g_id
         vac_id = getattr(parent_rec, 'vacancy_id', False)
         vac = False
         if isinstance(vac_id, int) and vac_id > 0:
@@ -148,12 +180,15 @@ def _resolve_grade_record(env, grade_val, parent_rec=None):
         if vac and vac.exists():
             if hasattr(vac, 'grade') and vac.grade:
                 return vac.grade
-            if hasattr(vac, 'job_id') and vac.job_id and hasattr(vac.job_id, 'job_grade') and vac.job_id.job_grade:
-                return vac.job_id.job_grade
             if hasattr(vac, 'job_grade') and vac.job_grade:
                 return vac.job_grade
-        if hasattr(parent_rec, 'job_position') and parent_rec.job_position and hasattr(parent_rec.job_position, 'job_grade') and parent_rec.job_position.job_grade:
-            return parent_rec.job_position.job_grade
+            if hasattr(vac, 'job_id') and vac.job_id and hasattr(vac.job_id, 'job_grade') and vac.job_id.job_grade:
+                return vac.job_id.job_grade
+        if hasattr(parent_rec, 'job_position') and parent_rec.job_position:
+            if hasattr(parent_rec.job_position, 'job_grade') and parent_rec.job_position.job_grade:
+                return parent_rec.job_position.job_grade
+            if hasattr(parent_rec.job_position, 'grade') and parent_rec.job_position.grade:
+                return parent_rec.job_position.grade
 
     return False
 
@@ -189,7 +224,7 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
     )
     handover_status = fields.Selection([
         ('completed', 'Handover Completed'),
-        ('pending', 'Pending Handover')
+        ('pending', 'Pending Handover'),
     ], string="Handover Status", default='completed', required=True)
 
     release_remarks = fields.Text(
@@ -215,7 +250,7 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
                     vac_id = getattr(parent_rec, 'vacancy_id', False)
                     if isinstance(vac_id, int) and vac_id > 0:
                         vac = self.env['job.vacancy'].browse(vac_id)
-                    elif hasattr(vac_id, 'operating_unit_id'):
+                    elif hasattr(vac_id, 'operating_unit_id') and vac_id:
                         vac = vac_id
                     if not vac and getattr(parent_rec, 'vacancy_reference', False):
                         vac = self.env['job.vacancy'].search([('reference', '=', parent_rec.vacancy_reference)], limit=1)
@@ -226,31 +261,44 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
                         vac = self.env['job.vacancy'].browse(c_vac_id)
 
                 # 1. Current Position (Reference #1): Candidate's current job position
-                curr_pos = cand.emp_position or False
+                curr_pos = cand.get_current_position_name() if hasattr(cand, 'get_current_position_name') else False
+                if not curr_pos:
+                    curr_pos = cand.emp_position or False
                 if not curr_pos and emp:
                     curr_pos = (
-                        (emp.job_position.name if hasattr(emp, 'job_position') and emp.job_position else False) or
-                        (emp.job_id.name if hasattr(emp, 'job_id') and emp.job_id else False) or
+                        (emp.job_id.name if getattr(emp, 'job_id', False) and emp.job_id else False) or
+                        (emp.job_position.name if hasattr(emp, 'job_position') and emp.job_position and hasattr(emp.job_position, 'name') else False) or
                         (emp.job_name if hasattr(emp, 'job_name') and emp.job_name else False) or
-                        (getattr(emp, 'job_title', False) or False)
+                        (getattr(emp, 'job_title', False) or False) or
+                        (emp.contract_id.job_id.name if hasattr(emp, 'contract_id') and emp.contract_id and emp.contract_id.job_id else False) or
+                        (emp.version_id.job_id.name if hasattr(emp, 'version_id') and emp.version_id and emp.version_id.job_id else False)
                     )
-                if not curr_pos:
-                    curr_pos = (self.env['hr.job'].browse(cand.position_id).name if getattr(cand, 'position_id', False) else False)
+                if not curr_pos and getattr(cand, 'position_id', False):
+                    job = self.env['hr.job'].browse(cand.position_id)
+                    if job.exists():
+                        curr_pos = job.name
 
                 # 2. Current Work Unit (Reference #1): Candidate's current location / default operating unit
-                curr_unit = cand.current_work_unit or False
+                curr_unit = cand.get_current_work_unit_name() if hasattr(cand, 'get_current_work_unit_name') else False
+                if not curr_unit:
+                    curr_unit = cand.current_work_unit or False
                 if not curr_unit and emp:
                     curr_unit = (
                         (emp.default_operating_unit_id.name if getattr(emp, 'default_operating_unit_id', False) and emp.default_operating_unit_id else False) or
                         (emp.department_id.operating_unit_id.name if (getattr(emp, 'department_id', False) and emp.department_id and getattr(emp.department_id, 'operating_unit_id', False) and emp.department_id.operating_unit_id) else False) or
+                        (emp.department_id.name if getattr(emp, 'department_id', False) and emp.department_id else False) or
                         (emp.operating_unit_ids[0].name if getattr(emp, 'operating_unit_ids', False) and emp.operating_unit_ids else False) or
                         (getattr(emp, 'location', False) or False)
                     )
-                if not curr_unit:
-                    curr_unit = (self.env['operating.unit'].browse(cand.workunit_id).name if getattr(cand, 'workunit_id', False) else False)
+                if not curr_unit and getattr(cand, 'workunit_id', False):
+                    ou = self.env['operating.unit'].browse(cand.workunit_id)
+                    if ou.exists():
+                        curr_unit = ou.name
 
                 # 3. New Placement Work Unit (Reference #2): Candidate's target placement unit / vacancy hiring work unit
-                target_unit = cand.preferred_location or False
+                target_unit = cand.get_target_work_unit_name() if hasattr(cand, 'get_target_work_unit_name') else False
+                if not target_unit:
+                    target_unit = cand.preferred_location or False
                 if not target_unit and vac and vac.exists():
                     if hasattr(vac, 'hiring_details') and vac.hiring_details:
                         units = [hd.work_unit.name for hd in vac.hiring_details if hd.work_unit and hd.work_unit.name]
@@ -263,30 +311,40 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
 
                 if not target_unit:
                     dest_ou = _resolve_operating_unit(self.env, cand, parent_rec)
-                    target_unit = dest_ou.name if dest_ou else (parent_rec.job_location if parent_rec else False)
+                    target_unit = dest_ou.name if dest_ou else (parent_rec.job_location if parent_rec and parent_rec.job_location else False)
+
+                if not target_unit and parent_rec and getattr(parent_rec, 'workunit_id', False):
+                    ou = self.env['operating.unit'].browse(parent_rec.workunit_id)
+                    if ou.exists():
+                        target_unit = ou.name
 
                 # 4. New Job Position & Grade: vacancy of this position which was selected
                 new_job = False
-                if vac and vac.exists() and vac.job_position:
-                    new_job = vac.job_position
-                elif parent_rec and parent_rec.job_position:
+                if parent_rec and parent_rec.job_position:
                     new_job = parent_rec.job_position
+                elif vac and vac.exists() and vac.job_position:
+                    new_job = vac.job_position
 
-                new_grade_str = False
-                if vac and vac.exists():
-                    if getattr(vac, 'grade', False) and vac.grade and vac.grade.grade_name:
-                        new_grade_str = vac.grade.grade_name
-                    elif getattr(vac, 'job_grade', False) and vac.job_grade and vac.job_grade.grade_name:
-                        new_grade_str = vac.job_grade.grade_name
-                    elif new_job and getattr(new_job, 'grade', False) and new_job.grade and new_job.grade.grade_name:
-                        new_grade_str = new_job.grade.grade_name
-                    elif new_job and getattr(new_job, 'job_grade', False) and new_job.job_grade and new_job.job_grade.grade_name:
-                        new_grade_str = new_job.job_grade.grade_name
+                new_grade_str = cand.get_new_job_grade_name() if hasattr(cand, 'get_new_job_grade_name') else False
+                if not new_grade_str and vac and vac.exists():
+                    if getattr(vac, 'grade', False) and vac.grade:
+                        new_grade_str = getattr(vac.grade, 'grade_name', False) or getattr(vac.grade, 'name', False) or str(vac.grade)
+                    elif getattr(vac, 'job_grade', False) and vac.job_grade:
+                        new_grade_str = getattr(vac.job_grade, 'grade_name', False) or getattr(vac.job_grade, 'name', False) or str(vac.job_grade)
+
+                if not new_grade_str and new_job:
+                    if getattr(new_job, 'grade', False) and new_job.grade:
+                        new_grade_str = getattr(new_job.grade, 'grade_name', False) or getattr(new_job.grade, 'name', False)
+                    elif getattr(new_job, 'job_grade', False) and new_job.job_grade:
+                        new_grade_str = getattr(new_job.job_grade, 'grade_name', False) or getattr(new_job.job_grade, 'name', False)
 
                 if not new_grade_str and parent_rec:
                     grade_val = parent_rec.job_grade if parent_rec else False
                     grade_rec = _resolve_grade_record(self.env, grade_val, parent_rec=parent_rec)
                     new_grade_str = grade_rec.grade_name if grade_rec else (_format_clean_text(grade_val) or (new_job.job_grade.grade_name if new_job and hasattr(new_job, 'job_grade') and new_job.job_grade else False))
+
+                if not new_grade_str and getattr(cand, 'emp_grade', False):
+                    new_grade_str = cand.emp_grade
 
                 # 5. Coach / Manager
                 coach = cand.coach_id or (
@@ -356,6 +414,19 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
         # 4. Perform write with job_history_reason='promotion'
         if vals:
             emp.sudo().with_context(job_history_reason='promotion').write(vals)
+
+        # Update salary on hr.version / contract upon release
+        if cand.promoted_salary:
+            if hasattr(emp, 'version_id') and emp.version_id:
+                try:
+                    emp.version_id.sudo().write({'wage': cand.promoted_salary})
+                except Exception as e:
+                    _logger.warning("Could not update version_id wage on release: %s", e)
+            if hasattr(emp, 'contract_id') and emp.contract_id:
+                try:
+                    emp.contract_id.sudo().write({'wage': cand.promoted_salary})
+                except Exception as e:
+                    _logger.warning("Could not update contract wage on release: %s", e)
 
         # 5. History Logging Rule:
         # If Grade CHANGED -> Log ONLY under Job History (handled automatically by HrEmployeeJobHistory)

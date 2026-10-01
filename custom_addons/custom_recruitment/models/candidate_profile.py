@@ -9,6 +9,7 @@ and automatic profile-to-application synchronization engine for external vacanci
 """
 
 import logging
+import re
 _logger = logging.getLogger(__name__)
 
 from odoo import models, fields, api, _
@@ -187,6 +188,20 @@ class CandidateProfile(models.Model):
         domain="[('country_id', '=', country_id)]",
     )
 
+    @api.constrains('name', 'email', 'phone')
+    def _check_required_candidate_fields(self):
+        for rec in self:
+            missing = []
+            if not rec.name or not rec.name.strip():
+                missing.append(_("Full Name"))
+            if not rec.email or not rec.email.strip():
+                missing.append(_("Email Address"))
+            if not rec.phone or not rec.phone.strip():
+                missing.append(_("Mobile Phone Number"))
+            if missing:
+                raise ValidationError(_("Missing required information for Candidate Profile:\n• %s\n\nPlease fill all required fields.") % "\n• ".join(missing))
+
+
     # ---------------------------------------------------------------
     # Electronic CV Sub-tables (One2many)
     # ---------------------------------------------------------------
@@ -249,10 +264,32 @@ class CandidateProfile(models.Model):
         compute='_compute_profile_summaries',
         store=True,
     )
+    profile_completeness = fields.Integer(
+        string='Profile Completeness (%)',
+        compute='_compute_profile_completeness',
+        store=True,
+    )
     application_count = fields.Integer(
         string='Applications Count',
         compute='_compute_application_count',
     )
+
+    @api.depends('name', 'phone', 'gender', 'education_ids', 'experience_ids', 'cv_file')
+    def _compute_profile_completeness(self):
+        for rec in self:
+            score = 0
+            names = (rec.name or '').strip().split(' ')
+            first_name = names[0] if len(names) > 0 else ''
+            middle_name = names[1] if len(names) > 1 else ''
+            if rec.name and first_name and middle_name and rec.phone and rec.gender:
+                score += 25
+            if rec.education_ids:
+                score += 25
+            if rec.experience_ids:
+                score += 25
+            if rec.cv_file:
+                score += 25
+            rec.profile_completeness = min(100, score)
 
     @api.depends('experience_ids.duration_years', 'education_ids.qualification_name', 'education_ids.cgpa')
     def _compute_profile_summaries(self):
@@ -506,6 +543,17 @@ class CandidateProfile(models.Model):
         _logger.info("Master Candidate Profiles auto-synced %s unlinked applicant records.", count)
         return True
 
+    @api.constrains('phone')
+    def _check_phone_number(self):
+        for record in self:
+            if record.phone:
+                cleaned = re.sub(r'[\s\-\(\)]', '', str(record.phone).strip())
+                if not re.match(r'^(\+251|00251|251|0)(9|7)\d{8}$', cleaned):
+                    raise ValidationError(_(
+                        "Invalid Ethiopian phone number '%s'. "
+                        "Please enter a valid Ethiopian mobile phone number starting with 09, 07, or +251 (e.g. 0911223344, 0711223344, or +251911223344)."
+                    ) % record.phone)
+
 
 
 # -----------------------------------------------------------------------
@@ -595,6 +643,17 @@ class CandidateEducation(models.Model):
     )
     active = fields.Boolean(default=True)
 
+    @api.constrains('field_of_study', 'institution')
+    def _check_required_education_fields(self):
+        for rec in self:
+            missing = []
+            if not rec.field_of_study or not str(rec.field_of_study).strip():
+                missing.append(_("Field of Study / Major"))
+            if not rec.institution or not str(rec.institution).strip():
+                missing.append(_("School / College / University"))
+            if missing:
+                raise ValidationError(_("Missing required information for Education Entry:\n• %s\n\nPlease specify all required education details.") % "\n• ".join(missing))
+
     def unlink(self):
         for rec in self:
             rec.write({'active': False})
@@ -659,6 +718,19 @@ class CandidateExperience(models.Model):
                 rec.duration_years = max(0.0, round(days / 365.25, 2))
             else:
                 rec.duration_years = 0.0
+
+    @api.constrains('position', 'organization', 'start_date')
+    def _check_required_experience_fields(self):
+        for rec in self:
+            missing = []
+            if not rec.position or not str(rec.position).strip():
+                missing.append(_("Job Title / Position"))
+            if not rec.organization or not str(rec.organization).strip():
+                missing.append(_("Company / Organization"))
+            if not rec.start_date:
+                missing.append(_("Start Date"))
+            if missing:
+                raise ValidationError(_("Missing required information for Experience Entry:\n• %s\n\nPlease specify all required experience details.") % "\n• ".join(missing))
 
     def unlink(self):
         for rec in self:

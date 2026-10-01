@@ -464,3 +464,15 @@ body.o_gate_active {
     }
 }
 
+/* For regular un-checked-in employees: clean focus mode (no brand or submenus in top navbar) */
+body.o_gate_regular_user {
+    .o_main_navbar .o_menu_brand,
+    .o_main_navbar .o_menu_sections,
+    .o_main_navbar .o_navbar_breadcrumbs {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
+}
+
+

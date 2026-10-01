@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Deposit product types (BRD 8.1 Deposit Mobilization Plan) -->
+    <record id="deposit_type_savings" model="pbms.deposit.type">
+        <field name="name">Savings Deposit</field>
+        <field name="code">SAV</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="deposit_type_demand" model="pbms.deposit.type">
+        <field name="name">Demand Deposit</field>
+        <field name="code">DEM</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="deposit_type_time" model="pbms.deposit.type">
+        <field name="name">Time Deposit</field>
+        <field name="code">TIME</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="deposit_type_ifb" model="pbms.deposit.type">
+        <field name="name">IFB Deposit</field>
+        <field name="code">IFB</field>
+        <field name="sequence">40</field>
+        <field name="is_ifb">True</field>
+    </record>
+
+    <!-- Fixed asset categories (BRD 8.1 Fixed Asset Requirement Plan) -->
+    <record id="fa_category_computer" model="pbms.fixed.asset.category">
+        <field name="name">Computer and Accessories</field>
+        <field name="code">FA-COMP</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="fa_category_building" model="pbms.fixed.asset.category">
+        <field name="name">Buildings</field>
+        <field name="code">FA-BLDG</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="fa_category_furniture" model="pbms.fixed.asset.category">
+        <field name="name">Office Furniture and Fittings</field>
+        <field name="code">FA-FURN</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="fa_category_equipment" model="pbms.fixed.asset.category">
+        <field name="name">Office Equipment</field>
+        <field name="code">FA-EQUIP</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="fa_category_it" model="pbms.fixed.asset.category">
+        <field name="name">Digital and IT Equipment</field>
+        <field name="code">FA-IT</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="fa_category_renovation" model="pbms.fixed.asset.category">
+        <field name="name">Office Renovation</field>
+        <field name="code">FA-RENOV</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="fa_category_initiative" model="pbms.fixed.asset.category">
+        <field name="name">Initiatives</field>
+        <field name="code">FA-INIT</field>
+        <field name="sequence">70</field>
+    </record>
+    <!-- Digital banking channels (BRD 8.1 Digital Banking Plan) -->
+    <record id="digital_channel_mobile_activation" model="pbms.digital.channel">
+        <field name="name">Mobile Banking Activation</field>
+        <field name="code">DIG-MOB</field>
+        <field name="sequence">10</field>
+        <field name="unit_of_measure">count</field>
+    </record>
+    <record id="digital_channel_atm_activation" model="pbms.digital.channel">
+        <field name="name">ATM Card Activation</field>
+        <field name="code">DIG-ATM</field>
+        <field name="sequence">20</field>
+        <field name="unit_of_measure">count</field>
+    </record>
+    <record id="digital_channel_active_merchant" model="pbms.digital.channel">
+        <field name="name">Active Merchant</field>
+        <field name="code">DIG-MERCH-ACT</field>
+        <field name="sequence">30</field>
+        <field name="unit_of_measure">count</field>
+    </record>
+    <record id="digital_channel_quality_merchant" model="pbms.digital.channel">
+        <field name="name">Quality Merchant</field>
+        <field name="code">DIG-MERCH-QLY</field>
+        <field name="sequence">40</field>
+        <field name="unit_of_measure">count</field>
+    </record>
+    <record id="digital_channel_merchant_residual" model="pbms.digital.channel">
+        <field name="name">Merchant Residual Deposits</field>
+        <field name="code">DIG-MERCH-RES</field>
+        <field name="sequence">50</field>
+        <field name="unit_of_measure">amount</field>
+    </record>
+
+</odoo>

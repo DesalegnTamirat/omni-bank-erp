@@ -60,7 +60,7 @@ class CorporateScorecard(models.Model):
         max_height=128,
         store=True,
     )
-    employee_id = fields.Many2one('hr.employee', string='Employee', required=True)
+    employee_id = fields.Many2one('hr.employee', string='Employee', required=True, default=lambda self: self.env.user.employee_id)
     manager_id = fields.Many2one('hr.employee', string='Manager', readonly=True)
     job_id = fields.Many2one('hr.job', string='Job Position', related='employee_id.job_id', store=True, readonly=True)
     operating_unit_id = fields.Many2one('operating.unit', string='Operating Unit', readonly=True)

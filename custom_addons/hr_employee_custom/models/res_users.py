@@ -123,7 +123,7 @@ class Users(models.Model):
         """
         Validates whether the user has both:
         1. An active record in hr.employee (Master Data)
-        2. An active record in hr.version (Contract Data)
+        2. A valid record in hr.version (Contract Data)
         System Administrators (SUPERUSER_ID or base.group_system) are always valid.
         """
         self.ensure_one()
@@ -139,7 +139,7 @@ class Users(models.Model):
 
         has_contract = self.env['hr.version'].sudo().search_count([
             ('employee_id', '=', employee.id),
-            ('active', '=', True),
+            ('state', '!=', 'cancel'),
         ])
         return bool(has_contract)
 
@@ -160,7 +160,7 @@ class Users(models.Model):
 
         has_contract = self.env['hr.version'].sudo().search_count([
             ('employee_id', '=', employee.id),
-            ('active', '=', True),
+            ('state', '!=', 'cancel'),
         ])
         return {
             'is_valid': bool(has_contract),

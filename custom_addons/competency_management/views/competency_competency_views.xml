@@ -22,7 +22,7 @@
             <field name="arch" type="xml">
                 <form string="Rating Model">
                     <header>
-                        <button name="action_generate_lines" string="Generate / Reset Level Lines" type="object" class="oe_highlight"/>
+                        <button name="action_generate_lines" string="Generate / Reset Level Lines" type="object" class="oe_highlight" groups="competency_management.group_competency_officer"/>
                     </header>
                     <sheet>
                         <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
@@ -86,11 +86,11 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_submit" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_submit" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'" groups="competency_management.group_competency_officer"/>
                         <button name="action_approve" string="Approve Competency" type="object" class="oe_highlight" invisible="state != 'submitted'" groups="competency_management.group_competency_admin"/>
-                        <button name="action_create_new_version" string="Create New Version" type="object" class="btn-primary" invisible="state != 'approved'"/>
-                        <button name="action_retire" string="Retire / Inactivate" type="object" class="btn-warning" invisible="state != 'approved'"/>
-                        <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state not in ('submitted', 'retired')"/>
+                        <button name="action_create_new_version" string="Create New Version" type="object" class="btn-primary" invisible="state != 'approved'" groups="competency_management.group_competency_officer"/>
+                        <button name="action_retire" string="Retire / Inactivate" type="object" class="btn-warning" invisible="state != 'approved'" groups="competency_management.group_competency_officer"/>
+                        <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state not in ('submitted', 'retired')" groups="competency_management.group_competency_officer"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,retired"/>
                     </header>
                     <sheet>

@@ -113,8 +113,34 @@ class HrApplicantCustom(models.Model):
         help='Link to the applicant\'s master candidate profile / electronic CV.',
     )
     total_experience_years = fields.Float(
-        related='candidate_profile_id.total_experience_years',
         string="Total Exp (Years)",
+        compute="_compute_weighted_experience",
+        store=True,
+        readonly=True,
+        help="Weighted total experience calculated for this vacancy based on hiring workunit rules."
+    )
+    raw_banking_experience = fields.Float(
+        related='candidate_profile_id.banking_experience',
+        string="Banking Exp (Years)",
+        readonly=True,
+        store=True,
+    )
+    raw_non_banking_experience = fields.Float(
+        related='candidate_profile_id.non_banking_experience',
+        string="Raw Non-Banking Exp (Years)",
+        readonly=True,
+        store=True,
+    )
+    weighted_non_banking_experience = fields.Float(
+        string="Weighted Non-Banking Exp (Years)",
+        compute="_compute_weighted_experience",
+        store=True,
+        readonly=True,
+    )
+    is_hr_or_it_workunit = fields.Boolean(
+        string="HR/IT Workunit (Full Credit)",
+        compute="_compute_weighted_experience",
+        store=True,
         readonly=True,
     )
     highest_education = fields.Char(
@@ -159,6 +185,59 @@ class HrApplicantCustom(models.Model):
     is_interview_notified = fields.Boolean(
         string="Interview Notified", compute="_compute_assessment_schedules"
     )
+
+    @api.depends(
+        'candidate_profile_id.banking_experience',
+        'candidate_profile_id.non_banking_experience',
+        'candidate_profile_id.total_experience_years',
+        'application_type',
+        'app_reference',
+        'app_reference.operating_unit_id',
+        'department_id',
+        'job_id',
+        'job_id.department_id'
+    )
+    def _compute_weighted_experience(self):
+        for app in self:
+            cand = app.candidate_profile_id
+            raw_b = cand.banking_experience if cand else 0.0
+            raw_nb = cand.non_banking_experience if cand else 0.0
+            raw_tot = cand.total_experience_years if cand else (raw_b + raw_nb)
+
+            ou = False
+            dept = False
+            if app.app_reference:
+                ou = getattr(app.app_reference, 'operating_unit_id', False)
+                if hasattr(app.app_reference, 'department_id') and app.app_reference.department_id:
+                    dept = app.app_reference.department_id
+            if not dept:
+                dept = app.department_id or (app.job_id and app.job_id.department_id)
+
+            is_hr_it = False
+            if ou:
+                ou_name = (ou.name or '').lower()
+                ou_code = (getattr(ou, 'code', '') or '').lower()
+                if getattr(ou, 'full_non_banking_credit', False) or any(kw in ou_name or kw in ou_code for kw in ['hr', 'human resource', 'it', 'information technology', 'ict', 'software', 'digital']):
+                    is_hr_it = True
+
+            if not is_hr_it and dept:
+                dept_name = (dept.name or '').lower()
+                dept_code = (getattr(dept, 'code', '') or '').lower()
+                if getattr(dept, 'full_non_banking_credit', False) or any(kw in dept_name or kw in dept_code for kw in ['hr', 'human resource', 'it', 'information technology', 'ict', 'software', 'digital']):
+                    is_hr_it = True
+
+            app.is_hr_or_it_workunit = is_hr_it
+
+            # Apply 50% non-banking experience weighting rule ONLY for External vacancies
+            is_external = (app.application_type == 'External') or (app.app_reference and getattr(app.app_reference, 'sourcing_type', '') in ('external', 'both'))
+            if is_external:
+                weight = 1.0 if is_hr_it else 0.5
+                w_nb = round(raw_nb * weight, 2)
+                app.weighted_non_banking_experience = w_nb
+                app.total_experience_years = round(raw_b + w_nb, 2)
+            else:
+                app.weighted_non_banking_experience = round(raw_nb, 2)
+                app.total_experience_years = round(raw_tot, 2)
 
     def _compute_assessment_schedules(self):
         ExtSelCand = self.env['external.recruitment.selected.candidates'].sudo()

@@ -57,9 +57,16 @@
                         </group>
                     </group>
                     <group>
-                        <field name="qualification_ids"
+                        <field name="study_qualification_ids"
                                widget="many2many_tags"
-                               help="Select from education qualifications registered across candidates (external_applicant_education). Candidate must match at least one."/>
+                               options="{'no_create_edit': False}"
+                               placeholder="e.g. Computer Science, Accounting, Finance..."
+                               help="Select required fields of study / qualifications (candidate_education). Candidate must match at least one."/>
+                        <field name="institution_ids"
+                               widget="many2many_tags"
+                               options="{'no_create_edit': False}"
+                               placeholder="e.g. Addis Ababa University, Hawassa University..."
+                               help="Select required educational institutions / universities (candidate_education). Candidate must match at least one."/>
                     </group>
 
                     <separator string="Experience Requirements"/>
@@ -88,7 +95,17 @@
                     <group>
                         <field name="cert_ids"
                                widget="many2many_tags"
-                               help="Select from certifications registered across candidates. Candidate must hold ALL selected certifications."/>
+                               help="Select from certifications registered across candidates. Optional filter — leave empty to skip."/>
+                    </group>
+
+                    <separator string="Salary Criteria"/>
+                    <group>
+                        <group>
+                            <field name="max_expected_salary" string="Max Expected Salary (ETB)" help="Filter candidates with Expected Salary &lt;= this amount. Set 0 to skip."/>
+                        </group>
+                        <group>
+                            <field name="max_current_salary" string="Max Current Salary (ETB)" help="Filter candidates with Current Salary &lt;= this amount. Set 0 to skip."/>
+                        </group>
                     </group>
 
                     <separator string="Personal &amp; Demographics"/>

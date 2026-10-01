@@ -407,7 +407,7 @@
                                     <button name="action_submit" type="object" class="btn btn-sm btn-primary py-0 px-2" invisible="state != 'draft'" title="Submit Plan for Review">
                                         <i class="fa fa-paper-plane me-1"/>Submit
                                     </button>
-                                    <button name="action_reset_to_draft" type="object" class="btn btn-sm btn-outline-warning py-0 px-2" invisible="state not in ('submitted', 'returned', 'info_requested')" title="Reset Plan to Draft">
+                                    <button name="action_reset_to_draft" type="object" class="btn btn-sm btn-outline-warning py-0 px-2" invisible="state not in ('submitted', 'returned', 'info_requested', 'chief_review')" title="Reset Plan to Draft">
                                         <i class="fa fa-undo me-1"/>Reset
                                     </button>
 
@@ -447,7 +447,7 @@
                 <filter string="Pending Review" name="pending"
                         domain="[('state', 'in', ('submitted', 'district_approved', 'district_endorsed', 'chief_review', 'people_solutions_review', 'cpco_review', 'board_ceo_approval', 'committee_review', 'hr_fulfillment', 'ceo_approval', 'ho_reviewed', 'ho_endorse', 'cpco_endorse', 'info_requested'))]"/>
                 <filter string="Chief Review" name="filter_chief_review"
-                        domain="[('state', 'in', ('chief_review', 'district_approved', 'district_endorsed')), ('category', '=', 'manpower')]"/>
+                        domain="[('state', 'in', ('chief_review', 'district_approved', 'district_endorsed')), ('category', 'in', ('manpower', 'general_expense', 'fixed_asset'))]"/>
                 <filter string="Budget Committee Review" name="filter_committee_review"
                         domain="[('state', '=', 'committee_review')]"/>
                 <filter string="HR Sourcing" name="filter_hr_fulfillment"
@@ -788,7 +788,7 @@
                 <field name="base_type" string="Base Type" optional="show"/>
                 <field name="channel_id" string="Digital Channel" optional="show"/>
                 <field name="fx_source_type" string="FX Source" optional="show"/>
-                <field name="opening_balance" string="Opening Balance" optional="show" options="{'no_symbol': True}"/>
+                <field name="opening_balance" string="Current FY closing estimate" optional="show" options="{'no_symbol': True}"/>
                 <field name="m01" string="Jul" options="{'no_symbol': True}"/>
                 <field name="m02" string="Aug" options="{'no_symbol': True}"/>
                 <field name="m03" string="Sep" options="{'no_symbol': True}"/>
@@ -1096,12 +1096,17 @@
         <field name="arch" type="xml">
             <form duplicate="false">
                 <header>
+                    <!-- Explicit Save Action for draft inputs and workflow edits -->
+                    <button name="action_save_plan" type="object" string="Save" icon="fa-floppy-o"
+                            class="btn-primary o_pbms_save_btn d-none"
+                            invisible="state in ('approved', 'rejected') or (not can_edit_content and not can_chief_review and not can_people_solutions_review and not can_cpco_review and not can_committee_review and not can_ceo_approve and state not in ('draft', 'returned', 'info_requested'))"/>
+
                     <!-- Submitter / Branch actions -->
                     <button name="action_submit" type="object" string="Submit Plan" icon="fa-paper-plane"
                             invisible="state not in ('draft', 'returned', 'info_requested') or not is_cycle_open" class="btn-primary"/>
 
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" icon="fa-undo"
-                            invisible="state not in ('submitted', 'returned', 'info_requested')" class="btn-secondary"/>
+                            invisible="state not in ('submitted', 'returned', 'info_requested', 'chief_review', 'district_endorsed')" class="btn-secondary"/>
 
                     <button name="action_export_excel" type="object" string="Export to Excel" icon="fa-file-excel-o" class="btn btn-outline-secondary"/>
                     <button name="action_open_import_wizard" type="object" string="Import from Excel" icon="fa-upload" class="btn btn-outline-secondary"
@@ -1109,55 +1114,63 @@
 
                     <!-- District Reviewer Action Buttons (Visible ONLY while pending district review - disappear after endorse) -->
                     <button name="action_district_approve" type="object" string="District Approve" icon="fa-check-circle"
-                            invisible="category == 'manpower' or org_unit_type == 'district_office' or state not in ('submitted', 'info_requested')" class="btn-success"
+                            invisible="category == 'manpower' or is_district_unit or is_head_office_unit or state not in ('submitted', 'info_requested')" class="btn-success"
                             groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
 
                     <button name="action_district_approve" type="object" string="Endorse to Head Office" icon="fa-send"
-                            invisible="category == 'manpower' or org_unit_type != 'district_office' or state not in ('submitted', 'info_requested')" class="btn-primary"
-                            groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+                            invisible="category == 'manpower' or not is_district_unit or state not in ('submitted', 'district_approved', 'info_requested')" class="btn-primary"
+                            groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
 
                     <button name="%(bunna_pbms.action_pbms_target_cascade_district_wizard)d" type="action"
                             string="Cascade Targets to Branches" icon="fa-share-alt"
-                            invisible="category == 'manpower' or org_unit_type != 'district_office' or not has_cascaded_targets or is_targets_cascaded" class="btn-primary"
+                            invisible="category == 'manpower' or not is_district_unit or not has_cascaded_targets or is_targets_cascaded" class="btn-primary"
                             context="{'default_plan_id': id, 'default_cascade_level': 'district_to_branch'}"
                             groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
 
                     <button name="action_already_cascaded_notice" type="object"
                             string="Cascaded" icon="fa-check-circle"
-                            invisible="category == 'manpower' or org_unit_type != 'district_office' or not has_cascaded_targets or not is_targets_cascaded"
+                            invisible="category == 'manpower' or not is_district_unit or not has_cascaded_targets or not is_targets_cascaded"
                             class="btn-success"
                             title="Targets have already been cascaded to child branches to prevent double cascade."
                             groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
 
-                    <!-- Head Office Functional Reviewer Action: Final Approve for Mobilization Categories -->
+                    <!-- Head Office Functional Reviewer Action: Final Approve for Mobilization Categories and General Expense -->
                     <button name="action_ho_approve" type="object"
                             string="Final Approve" icon="fa-check-square-o"
-                            invisible="category not in ('deposit', 'customer_base', 'fx', 'digital_banking') or (org_unit_type in ('branch', 'sub_branch', 'service_center')) or state not in ('submitted', 'district_approved', 'district_endorsed', 'info_requested')" class="btn-success"
+                            invisible="category not in ('deposit', 'customer_base', 'fx', 'digital_banking', 'general_expense') or (category != 'general_expense' and is_branch_unit) or state not in ('submitted', 'district_approved', 'district_endorsed', 'info_requested', 'ho_reviewed')" class="btn-success"
                             groups="bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_manager"/>
 
-                    <!-- Head Office Functional Reviewer Action: Submit to Review Committee for General Expense and Fixed Asset -->
+                    <!-- Head Office Functional Reviewer Action: Submit to Budget Hiring Committee for Fixed Asset -->
                     <button name="action_submit_to_committee" type="object"
-                            string="Submit to Review Committee" icon="fa-users"
-                            invisible="category not in ('general_expense', 'fixed_asset') or state not in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed')" class="btn-primary"
+                            string="Submit to Budget Hiring Committee" icon="fa-users"
+                            invisible="category != 'fixed_asset' or state not in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed')" class="btn-primary"
                             groups="bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_manager"/>
 
-                    <!-- Review Committee Action: Final Approve for General Expense and Fixed Asset -->
+                    <!-- Review Committee Action: Final Approve for Fixed Asset -->
                     <button name="action_committee_approve_resource" type="object"
                             string="Committee Final Approve" icon="fa-check-circle"
-                            invisible="category not in ('general_expense', 'fixed_asset') or state != 'committee_review'"
+                            invisible="category != 'fixed_asset' or state != 'committee_review'"
                             class="btn-success"
                             groups="bunna_pbms.group_pbms_budget_hiring_committee,bunna_pbms.group_pbms_manager"/>
 
                     <!-- Manpower Category Specific Workflow Buttons -->
                     <button name="action_district_approve_workforce" type="object"
-                            string="Review &amp; Escalate to Chief" icon="fa-arrow-circle-right"
-                            invisible="category != 'manpower' or state not in ('submitted', 'info_requested') or org_unit_type == 'head_office'"
+                            string="Approve — Forward to Respective Chief" icon="fa-arrow-circle-right"
+                            invisible="category != 'manpower' or state not in ('submitted', 'info_requested') or is_district_unit or is_head_office_unit"
                             class="btn-primary"
                             groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
 
+                    <!-- Respective Chief Action: Endorse for General Expense & Fixed Asset -->
+                    <button name="action_chief_approve_escalate" type="object"
+                            string="Endorse" icon="fa-check-circle"
+                            invisible="not can_chief_review or category not in ('general_expense', 'fixed_asset')"
+                            class="btn-success"
+                            groups="bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_manager"/>
+
+                    <!-- Respective Chief Action: Chief Approve & Escalate for Workforce -->
                     <button name="action_chief_approve_escalate" type="object"
                             string="Chief Approve &amp; Escalate" icon="fa-check-circle"
-                            invisible="not can_chief_review"
+                            invisible="not can_chief_review or category in ('general_expense', 'fixed_asset')"
                             class="btn-success"
                             groups="bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_manager"/>
 
@@ -1192,7 +1205,7 @@
                             groups="bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_manager"/>
 
                     <button name="action_cpco_endorse_to_solutions" type="object"
-                            string="Endorse to People Solutions" icon="fa-check-circle"
+                            string="Endorse to People Operations &amp; Management" icon="fa-check-circle"
                             invisible="category != 'manpower' or state != 'cpco_endorse'"
                             class="btn-success"
                             groups="bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_manager"/>
@@ -1221,42 +1234,61 @@
                     <button name="%(bunna_pbms.action_pbms_review_comment_wizard)d" type="action"
                             string="Add Review Comment" icon="fa-commenting-o"
                             class="btn-secondary"
-                            invisible="not can_use_reviewer_actions"/>
+                            invisible="not can_use_reviewer_actions or (category == 'manpower' and state in ('ho_endorse', 'cpco_endorse', 'approved')) or (org_unit_type in ('branch', 'sub_branch', 'service_center', 'other') and state in ('district_approved', 'district_endorsed'))"/>
 
                     <button name="%(bunna_pbms.action_pbms_request_info_wizard)d" type="action"
                             string="Request Information" icon="fa-question-circle"
                             class="btn-info text-white"
-                            invisible="not can_use_reviewer_actions"/>
+                            invisible="not can_use_reviewer_actions or (category == 'manpower' and state in ('ho_endorse', 'cpco_endorse', 'approved')) or (org_unit_type in ('branch', 'sub_branch', 'service_center', 'other') and state in ('district_approved', 'district_endorsed'))"/>
 
                     <button name="%(bunna_pbms.action_pbms_return_revision_wizard)d" type="action"
                             string="Return for Revision" icon="fa-undo"
                             class="btn-warning text-white"
-                            invisible="not can_use_reviewer_actions"/>
+                            invisible="not can_use_reviewer_actions or (category == 'manpower' and state in ('ho_endorse', 'cpco_endorse', 'approved')) or (org_unit_type in ('branch', 'sub_branch', 'service_center', 'other') and state in ('district_approved', 'district_endorsed'))"/>
 
                     <button name="%(bunna_pbms.action_pbms_reject_wizard)d" type="action"
                             string="Reject Plan" icon="fa-ban"
                             class="btn-danger"
-                            invisible="not can_use_reviewer_actions"/>
+                            invisible="not can_use_reviewer_actions or (category == 'manpower' and state in ('ho_endorse', 'cpco_endorse', 'approved')) or (org_unit_type in ('branch', 'sub_branch', 'service_center', 'other') and state in ('district_approved', 'district_endorsed'))"/>
 
                     <!-- Statusbar for Mobilization Categories (Deposit, Customer Base, FX, Digital Banking) -->
                     <field name="state" widget="statusbar"
                            invisible="category not in ('deposit', 'customer_base', 'fx', 'digital_banking')"
-                           statusbar_visible="draft,submitted,district_approved,approved"/>
+                           statusbar_visible="draft,submitted,district_approved,district_endorsed,approved"/>
 
-                    <!-- Statusbar for Resource & Budget Categories (General Expense, Fixed Asset) -->
+                    <!-- Statusbar for General Expense Budget Category
+                         Branch: draft → submitted → district_approved → approved
+                         District: draft → district_endorsed → approved
+                         HO: draft → chief_review → submitted → approved -->
                     <field name="state" widget="statusbar"
-                           invisible="category not in ('general_expense', 'fixed_asset')"
-                           statusbar_visible="draft,submitted,district_approved,committee_review,approved"/>
+                           invisible="category != 'general_expense'"
+                           statusbar_visible="draft,submitted,district_approved,district_endorsed,approved"/>
 
-                    <!-- Statusbar specifically for Manpower Planning Category -->
+                    <!-- Statusbar for Fixed Asset Acquisition Category
+                         Branch: draft → submitted → district_approved → committee_review → approved
+                         District: draft → district_endorsed → committee_review → approved
+                         HO: draft → chief_review → submitted → committee_review → approved -->
+                    <field name="state" widget="statusbar"
+                           invisible="category != 'fixed_asset'"
+                           statusbar_visible="draft,submitted,district_approved,district_endorsed,committee_review,approved"/>
+
+                    <!-- Statusbar specifically for Manpower Planning Category
+                         Branch: draft → submitted → district_approved → chief_review → people_solutions_review → approved
+                         District: draft → chief_review → people_solutions_review → approved
+                         HO: draft → chief_review → people_solutions_review → approved -->
                     <field name="state" widget="statusbar"
                            invisible="category != 'manpower'"
-                           statusbar_visible="draft,submitted,chief_review,people_solutions_review,cpco_review,committee_review,ceo_approval,ho_endorse,cpco_endorse,approved"/>
+                           statusbar_visible="draft,submitted,district_approved,chief_review,people_solutions_review,cpco_review,committee_review,ceo_approval,approved"/>
                 </header>
                 <sheet>
                     <field name="is_cycle_open" invisible="1"/>
                     <field name="cycle_state" invisible="1"/>
                     <field name="is_targets_cascaded" invisible="1"/>
+                    <field name="is_district_unit" invisible="1"/>
+                    <field name="is_head_office_unit" invisible="1"/>
+                    <field name="is_branch_unit" invisible="1"/>
+                    <field name="org_unit_type" invisible="1"/>
+                    <field name="work_unit_type" invisible="1"/>
                     <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="is_cycle_open">
                         <i class="fa fa-exclamation-triangle fa-2x me-3 text-warning"/>
                         <div>
@@ -1270,12 +1302,12 @@
                     </div>
                     <div class="oe_button_box" name="button_box">
                         <button class="oe_stat_button" type="object" name="action_view_attached_branch_plans"
-                                icon="fa-building-o" invisible="org_unit_type != 'district_office'"
+                                icon="fa-building-o" invisible="not is_district_unit"
                                 groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_manager">
                             <field name="branch_plan_count" widget="statinfo" string="Branch Plans"/>
                         </button>
                         <button class="oe_stat_button" type="object" name="action_view_district_overview_plans"
-                                icon="fa-sitemap" invisible="org_unit_type not in ('head_office', 'district_office')"
+                                icon="fa-sitemap" invisible="not is_head_office_unit and not is_district_unit"
                                 groups="bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_ho_reviewer">
                             <field name="district_plan_count" widget="statinfo" string="District Plans"/>
                         </button>
@@ -1426,8 +1458,8 @@
                                     <field name="broad_category" string="Broad Category" readonly="1" optional="show"/>
                                     <field name="deposit_type_id" domain="[('id', 'in', parent.available_deposit_type_ids), ('id', 'not in', parent.used_deposit_type_ids)]"/>
                                     <field name="plan_category" optional="show"/>
-                                    <field name="opening_balance" widget="float" digits="[16, 2]" options="{'no_symbol': True}" optional="show" column_invisible="not parent.is_deposit_monetary"/>
-                                    <field name="opening_balance" widget="integer" optional="show" column_invisible="parent.is_deposit_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="float" digits="[16, 2]" options="{'no_symbol': True}" optional="show" column_invisible="not parent.is_deposit_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="integer" optional="show" column_invisible="parent.is_deposit_monetary"/>
                                     <field name="m01" widget="float" digits="[16, 2]" options="{'no_symbol': True}" string="Jul" column_invisible="not parent.is_deposit_monetary"/>
                                     <field name="m01" widget="integer" string="Jul" column_invisible="parent.is_deposit_monetary"/>
                                     <field name="m02" widget="float" digits="[16, 2]" options="{'no_symbol': True}" string="Aug" column_invisible="not parent.is_deposit_monetary"/>
@@ -1536,8 +1568,8 @@
                                     <field name="broad_category" string="Broad Category" readonly="1" optional="show"/>
                                     <field name="deposit_type_id" string="Product / Account Type" domain="[('id', 'in', parent.available_deposit_type_ids), ('id', 'not in', parent.used_customer_base_deposit_type_ids)]"/>
                                     <field name="base_type"/>
-                                    <field name="opening_balance" widget="float" digits="[16, 2]" options="{'no_symbol': True}" optional="show" column_invisible="not parent.is_customer_base_monetary"/>
-                                    <field name="opening_balance" widget="integer" optional="show" column_invisible="parent.is_customer_base_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="float" digits="[16, 2]" options="{'no_symbol': True}" optional="show" column_invisible="not parent.is_customer_base_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="integer" optional="show" column_invisible="parent.is_customer_base_monetary"/>
                                     <field name="m01" widget="float" digits="[16, 2]" options="{'no_symbol': True}" string="Jul" column_invisible="not parent.is_customer_base_monetary"/>
                                     <field name="m01" widget="integer" string="Jul" column_invisible="parent.is_customer_base_monetary"/>
                                     <field name="m02" widget="float" digits="[16, 2]" options="{'no_symbol': True}" string="Aug" column_invisible="not parent.is_customer_base_monetary"/>
@@ -1645,8 +1677,8 @@
                                     <field name="source_unit_id" string="Branch / Unit" readonly="1" optional="hide"/>
                                     <field name="fx_source_type" domain="[('id', 'in', parent.available_fx_source_type_ids), ('id', 'not in', parent.used_fx_source_type_ids)]"/>
                                     <field name="currency_id" string="Currency" optional="show" options="{'no_create': True}"/>
-                                    <field name="opening_balance" widget="float" digits="[16, 2]" options="{'currency_field': 'currency_id', 'no_symbol': True}" optional="show" column_invisible="not parent.is_fx_monetary"/>
-                                    <field name="opening_balance" widget="integer" optional="show" column_invisible="parent.is_fx_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="float" digits="[16, 2]" options="{'currency_field': 'currency_id', 'no_symbol': True}" optional="show" column_invisible="not parent.is_fx_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="integer" optional="show" column_invisible="parent.is_fx_monetary"/>
                                     <field name="m01" widget="float" digits="[16, 2]" options="{'currency_field': 'currency_id', 'no_symbol': True}" string="Jul" column_invisible="not parent.is_fx_monetary"/>
                                     <field name="m01" widget="integer" string="Jul" column_invisible="parent.is_fx_monetary"/>
                                     <field name="m02" widget="float" digits="[16, 2]" options="{'currency_field': 'currency_id', 'no_symbol': True}" string="Aug" column_invisible="not parent.is_fx_monetary"/>
@@ -1751,8 +1783,8 @@
                                     <field name="sol_id" string="Sol ID" readonly="1" optional="show"/>
                                     <field name="source_unit_id" string="Branch / Unit" readonly="1" optional="hide"/>
                                     <field name="channel_id" domain="[('id', 'in', parent.available_channel_ids), ('id', 'not in', parent.used_channel_ids)]"/>
-                                    <field name="opening_balance" widget="float" digits="[16, 2]" options="{'no_symbol': True}" optional="show" column_invisible="not parent.is_digital_banking_monetary"/>
-                                    <field name="opening_balance" widget="integer" optional="show" column_invisible="parent.is_digital_banking_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="float" digits="[16, 2]" options="{'no_symbol': True}" optional="show" column_invisible="not parent.is_digital_banking_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="integer" optional="show" column_invisible="parent.is_digital_banking_monetary"/>
                                     <field name="m01" widget="float" digits="[16, 2]" options="{'no_symbol': True}" string="Jul" column_invisible="not parent.is_digital_banking_monetary"/>
                                     <field name="m01" widget="integer" string="Jul" column_invisible="parent.is_digital_banking_monetary"/>
                                     <field name="m02" widget="float" digits="[16, 2]" options="{'no_symbol': True}" string="Aug" column_invisible="not parent.is_digital_banking_monetary"/>
@@ -1850,8 +1882,8 @@
                                     <field name="district_id" string="Districts Name" readonly="1" optional="show"/>
                                     <field name="broad_category" string="Broad Category" readonly="1" optional="show"/>
                                     <field name="expense_account_id" string="Description" domain="[('id', 'in', parent.available_expense_account_ids), ('id', 'not in', parent.used_expense_account_ids)]"/>
-                                    <field name="opening_balance" widget="float" digits="[16, 2]" options="{'no_symbol': True}" optional="show" column_invisible="not parent.is_expense_monetary"/>
-                                    <field name="opening_balance" widget="integer" optional="show" column_invisible="parent.is_expense_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="float" digits="[16, 2]" options="{'no_symbol': True}" optional="show" column_invisible="not parent.is_expense_monetary"/>
+                                    <field name="opening_balance" string="Current FY closing estimate" widget="integer" optional="show" column_invisible="parent.is_expense_monetary"/>
                                     <field name="m01" widget="float" digits="[16, 2]" options="{'no_symbol': True}" string="Jul" column_invisible="not parent.is_expense_monetary"/>
                                     <field name="m01" widget="integer" string="Jul" column_invisible="parent.is_expense_monetary"/>
                                     <field name="m02" widget="float" digits="[16, 2]" options="{'no_symbol': True}" string="Aug" column_invisible="not parent.is_expense_monetary"/>
@@ -1918,6 +1950,16 @@
                         <!-- MANPOWER PLANNING PAGE                   -->
                         <!-- ======================================== -->
                         <page string="WorkForce Planning" name="page_manpower" invisible="not enable_manpower">
+                            <div class="d-flex gap-2 mb-3" invisible="org_unit_type not in ('district_office', 'head_office')">
+                                <button name="action_view_branch_details" type="object" string="🔍 See Branch Details"
+                                        class="btn btn-outline-primary btn-sm" invisible="org_unit_type != 'district_office'"
+                                        groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_people_solutions"
+                                        context="{'target_category': 'manpower'}"/>
+                                <button name="action_view_district_details" type="object" string="🔍 See District Details"
+                                        class="btn btn-outline-primary btn-sm" invisible="org_unit_type not in ('head_office', 'district_office')"
+                                        groups="bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_people_solutions"
+                                        context="{'target_category': 'manpower'}"/>
+                            </div>
                             <notebook>
                                 <!-- ======================================== -->
                                 <!-- 1. MANPOWER REQUEST (CHILD TAB)          -->
@@ -2162,6 +2204,26 @@
                         </page>
 
                         <!-- ======================================== -->
+                        <!-- CPCO REVIEW & ATTACHMENTS PAGE           -->
+                        <!-- ======================================== -->
+                        <page string="CPCO Review &amp; Attachments" name="page_cpco_review" invisible="category != 'manpower'">
+                            <group>
+                                <group string="CPCO Review Details">
+                                    <field name="cpco_reviewer_id" readonly="1"/>
+                                    <field name="cpco_submission_date" readonly="1"/>
+                                    <field name="cpco_endorser_id" readonly="1" invisible="not cpco_endorser_id"/>
+                                    <field name="cpco_endorse_date" readonly="1" invisible="not cpco_endorse_date"/>
+                                </group>
+                                <group string="CPCO Review Remarks">
+                                    <field name="cpco_comment" readonly="not can_cpco_review and not can_cpco_endorse" placeholder="CPCO review notes, justification, or recommendations..."/>
+                                </group>
+                            </group>
+                            <group string="CPCO Attachments / Supporting Documents">
+                                <field name="cpco_attachment_ids" widget="many2many_binary" readonly="not can_cpco_review and not can_cpco_endorse"/>
+                            </group>
+                        </page>
+
+                        <!-- ======================================== -->
                         <!-- REVIEW HISTORY & AUDIT TRAIL PAGE       -->
                         <!-- ======================================== -->
                         <page string="Review History &amp; Audit Trail" name="page_audit_trail">
@@ -2182,7 +2244,7 @@
                         </page>
                     </notebook>
                 </sheet>
-                <chatter/>
+                <chatter reload_on_attachment="True"/>
             </form>
         </field>
     </record>

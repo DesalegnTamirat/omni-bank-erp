@@ -34,6 +34,11 @@
                             string="Approve"
                             class="btn-primary"
                             invisible="not show_approve_btn"/>
+                    <button name="action_refuse"
+                            type="object"
+                            string="Refuse"
+                            class="btn-secondary"
+                            invisible="not show_refuse_btn"/>
                     <button name="action_discard_custom"
                             type="object"
                             string="Discard"
@@ -48,7 +53,7 @@
                 </div>
                 <field name="leave_request_status"
                        widget="statusbar"
-                       statusbar_visible="fetch,draft,notify"/>
+                       statusbar_visible="draft,fetch,notify,approved"/>
                 <field name="custom_saved" invisible="1"/>
                 <field name="is_edit_mode" invisible="1"/>
                 <field name="fields_readonly" invisible="1"/>
@@ -57,6 +62,7 @@
                 <field name="show_edit_btn" invisible="1"/>
                 <field name="show_notify_btn" invisible="1"/>
                 <field name="show_approve_btn" invisible="1"/>
+                <field name="show_refuse_btn" invisible="1"/>
                 <field name="show_cancel_btn" invisible="1"/>
                 <field name="show_compute_btn" invisible="1"/>
                 <field name="is_hr_admin" invisible="1"/>
@@ -119,116 +125,181 @@
 
             <!-- Add custom Leave Request form inside sheet -->
             <xpath expr="//sheet" position="inside">
-                <div class="oe_title d-flex align-items-center justify-content-between flex-wrap">
-                    <h1>
-                        <span>Leave Request</span>
-                    </h1>
-                    <h4 class="mb-0" invisible="not custom_saved">
-                        <span class="badge text-bg-secondary" title="Reference No.">
-                            <field name="leave_reference" readonly="1" force_save="1"/>
-                        </span>
-                    </h4>
+                <div class="oe_title d-flex align-items-center justify-content-between flex-wrap pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <h1 class="my-0">
+                            <span style="color: #541718; font-weight: 700;">Leave Request</span>
+                        </h1>
+                        <div invisible="not custom_saved">
+                            <!-- Draft / Fetch status badge -->
+                            <span class="badge text-bg-secondary fs-6 px-3 py-2 rounded-pill shadow-sm"
+                                  title="Draft / Fetch"
+                                  invisible="leave_request_status not in ('draft', 'fetch')">
+                                <i class="fa fa-file-text-o me-1"/> <field name="leave_reference" readonly="1" force_save="1" class="d-inline"/>
+                            </span>
+                            <!-- Notify / Pending Approval badge (Amber Orange) -->
+                            <span class="badge text-white fs-6 px-3 py-2 rounded-pill shadow-sm"
+                                  title="To Approve (Notified)"
+                                  style="background-color: #c17540 !important;"
+                                  invisible="leave_request_status != 'notify'">
+                                <i class="fa fa-clock-o me-1"/> <field name="leave_reference" readonly="1" force_save="1" class="d-inline"/>
+                            </span>
+                            <!-- Approved badge (Green) -->
+                            <span class="badge text-white fs-6 px-3 py-2 rounded-pill shadow-sm"
+                                  title="Approved"
+                                  style="background-color: #28a745 !important;"
+                                  invisible="leave_request_status != 'approved'">
+                                <i class="fa fa-check-circle me-1"/> <field name="leave_reference" readonly="1" force_save="1" class="d-inline"/>
+                            </span>
+                            <!-- Refused badge (Red) -->
+                            <span class="badge text-white fs-6 px-3 py-2 rounded-pill shadow-sm"
+                                  title="Refused"
+                                  style="background-color: #dc3545 !important;"
+                                  invisible="leave_request_status != 'refused'">
+                                <i class="fa fa-times-circle me-1"/> <field name="leave_reference" readonly="1" force_save="1" class="d-inline"/>
+                            </span>
+                            <!-- Cancelled badge (Dark) -->
+                            <span class="badge text-bg-dark fs-6 px-3 py-2 rounded-pill shadow-sm"
+                                  title="Cancelled"
+                                  invisible="leave_request_status != 'cancel'">
+                                <i class="fa fa-ban me-1"/> <field name="leave_reference" readonly="1" force_save="1" class="d-inline"/>
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="row">
-                    <!-- Left Column: Requester Information & Balances -->
-                    <div class="col-md-6 col-12">
-                        <group string="Requester Information">
-                            <field name="employee_id"
-                                   string="Requester Name"
-                                   options="{'no_create': True, 'no_open': True}"
-                                   readonly="employee_id_readonly"
-                                   force_save="1"/>
-                            <field name="employee_id_readonly" invisible="1"/>
-                            <field name="job_position"
-                                   string="Job Position"
-                                   readonly="1"
-                                   force_save="1"/>
-                            <field name="job_grade"
-                                   string="Job Grade"
-                                   readonly="1"
-                                   force_save="1"/>
-                            <field name="job_category"
-                                   string="Job Category"
-                                   readonly="1"
-                                   force_save="1"/>
-                            <field name="operating_unit"
-                                   string="Operating Unit"
-                                   options="{'no_create': True, 'no_open': True}"
-                                   readonly="1"
-                                   force_save="1"/>
-                            <field name="accrued_leave_balance"
-                                   string="Accrued Leave Balance"
-                                   readonly="1"/>
-                            <field name="scheduled_leave_balance"
-                                   string="Scheduled Leave Balance"
-                                   readonly="1"/>
-                            <field name="fetch_status" invisible="1"/>
-                        </group>
+                <div class="row g-3">
+                    <!-- Left Column: Requester Information & Balances & Computed Leave -->
+                    <div class="col-lg-6 col-12">
+                        <!-- Requester Information Card -->
+                        <div class="card shadow-sm rounded-3 border-0 bg-light-subtle mb-3" style="border: 1px solid #e9ecef !important;">
+                            <div class="card-header bg-white py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                <h6 class="my-0 fw-bold d-flex align-items-center" style="color: #541718; font-size: 14px;">
+                                    <i class="fa fa-user-circle me-2" style="color: #c17540; font-size: 16px;"/> Requester Information
+                                </h6>
+                            </div>
+                            <div class="card-body p-3">
+                                <group class="m-0">
+                                    <field name="employee_id"
+                                           string="Requester Name"
+                                           options="{'no_create': True, 'no_open': True}"
+                                           readonly="employee_id_readonly"
+                                           force_save="1"/>
+                                    <field name="employee_id_readonly" invisible="1"/>
+                                    <field name="job_position"
+                                           string="Job Position"
+                                           readonly="1"
+                                           force_save="1"/>
+                                    <field name="job_grade"
+                                           string="Job Grade"
+                                           readonly="1"
+                                           force_save="1"/>
+                                    <field name="job_category"
+                                           string="Job Category"
+                                           readonly="1"
+                                           force_save="1"/>
+                                    <field name="operating_unit"
+                                           string="Operating Unit"
+                                           options="{'no_create': True, 'no_open': True}"
+                                           readonly="1"
+                                           force_save="1"/>
+                                    <field name="accrued_leave_balance"
+                                           string="Accrued Balance"
+                                           readonly="1"/>
+                                    <field name="scheduled_leave_balance"
+                                           string="Scheduled Balance"
+                                           readonly="1"/>
+                                    <field name="fetch_status" invisible="1"/>
+                                </group>
+                            </div>
+                        </div>
 
-                        <group string="Computed Leave Details" class="mt-4">
-                            <field name="computed_leave"
-                                   string="Computed Leave (Days)"
-                                   readonly="1"
-                                   force_save="1"/>
-                            <field name="date_from" invisible="1"/>
-                            <field name="date_to" invisible="1"/>
-                            <field name="request_date_from" invisible="1"/>
-                            <field name="request_date_to" invisible="1"/>
-                            <field name="state" invisible="1"/>
-                        </group>
+                        <!-- Computed Leave Details Card -->
+                        <div class="card shadow-sm rounded-3 border-0 bg-light-subtle mb-3" style="border: 1px solid #e9ecef !important;">
+                            <div class="card-header bg-white py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                <h6 class="my-0 fw-bold d-flex align-items-center" style="color: #541718; font-size: 14px;">
+                                    <i class="fa fa-calculator me-2" style="color: #c17540; font-size: 16px;"/> Computed Leave Details
+                                </h6>
+                            </div>
+                            <div class="card-body p-3">
+                                <group class="m-0">
+                                    <field name="computed_leave"
+                                           string="Computed Days"
+                                           readonly="1"
+                                           force_save="1"/>
+                                    <field name="date_from" invisible="1"/>
+                                    <field name="date_to" invisible="1"/>
+                                    <field name="request_date_from" invisible="1"/>
+                                    <field name="request_date_to" invisible="1"/>
+                                    <field name="state" invisible="1"/>
+                                </group>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Right Column: Leave Details -->
-                    <div class="col-md-6 col-12">
-                        <group string="Leave Details">
-                            <field name="holiday_status_id"
-                                   string="Leave Reason"
-                                   options="{'no_create': True, 'no_open': True}"
-                                   readonly="fields_readonly"/>
-                            <field name="support_document" invisible="1"/>
-                            <field name="attachment"
-                                   filename="attachment_name"
-                                   widget="binary"
-                                   string="Attachment"
-                                   readonly="fields_readonly"
-                                   invisible="not support_document"/>
-                            <field name="attachment_name" invisible="1"/>
-                            <field name="comments"
-                                   string="Comments"
-                                   placeholder=""
-                                   widget="text"
-                                   readonly="fields_readonly"/>
-                            <field name="leave_start_date"
-                                   string="Start Date"
-                                   readonly="fields_readonly"/>
-                            <field name="number_of_days"
-                                   string="Duration (Days)"
-                                   readonly="is_duration_readonly"
-                                   force_save="1"/>
-                            <field name="single_half_day_period"
-                                   string="Half Day Period"
-                                   widget="radio"
-                                   options="{'horizontal': true}"
-                                   invisible="not is_single_half_day"
-                                   readonly="fields_readonly"/>
-                            <field name="multi_half_day_period"
-                                   string="Select Half Day"
-                                   widget="radio"
-                                   options="{'horizontal': true}"
-                                   invisible="not is_multi_half_day"
-                                   readonly="fields_readonly"/>
-                            <field name="leave_end_date"
-                                   string="End Date"
-                                   readonly="fields_readonly"/>
-                            <field name="starting_half_day" invisible="1"/>
-                            <field name="ending_half_day" invisible="1"/>
-                            <field name="half_day" invisible="1"/>
-                            <field name="delegated_employee_id"
-                                   string="Delegated Employee"
-                                   options="{'no_create': True, 'no_open': True}"
-                                   readonly="fields_readonly"/>
-                        </group>
+                    <!-- Right Column: Leave Details Card -->
+                    <div class="col-lg-6 col-12">
+                        <div class="card shadow-sm rounded-3 border-0 bg-light-subtle mb-3" style="border: 1px solid #e9ecef !important;">
+                            <div class="card-header bg-white py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                <h6 class="my-0 fw-bold d-flex align-items-center" style="color: #541718; font-size: 14px;">
+                                    <i class="fa fa-calendar-check-o me-2" style="color: #c17540; font-size: 16px;"/> Leave Details
+                                </h6>
+                            </div>
+                            <div class="card-body p-3">
+                                <group class="m-0">
+                                    <field name="employee_gender" invisible="1"/>
+                                    <field name="is_hr_user" invisible="1"/>
+                                    <field name="holiday_status_domain" invisible="1"/>
+                                    <field name="holiday_status_id"
+                                           string="Leave Reason"
+                                           domain="holiday_status_domain"
+                                           options="{'no_create': True, 'no_open': True}"
+                                           readonly="fields_readonly"/>
+                                    <field name="support_document" invisible="1"/>
+                                    <field name="attachment"
+                                           filename="attachment_name"
+                                           widget="binary"
+                                           string="Attachment"
+                                           readonly="fields_readonly"
+                                           invisible="not support_document"/>
+                                    <field name="attachment_name" invisible="1"/>
+                                    <field name="comments"
+                                           string="Comments"
+                                           placeholder="Provide any additional comments..."
+                                           widget="text"
+                                           readonly="fields_readonly"/>
+                                    <field name="leave_start_date"
+                                           string="Start Date"
+                                           readonly="fields_readonly"/>
+                                    <field name="number_of_days"
+                                           string="Duration (Days)"
+                                           readonly="is_duration_readonly"
+                                           force_save="1"/>
+                                    <field name="single_half_day_period"
+                                           string="Half Day Period"
+                                           widget="radio"
+                                           options="{'horizontal': true}"
+                                           invisible="not is_single_half_day"
+                                           readonly="fields_readonly"/>
+                                    <field name="multi_half_day_period"
+                                           string="Select Half Day"
+                                           widget="radio"
+                                           options="{'horizontal': true}"
+                                           invisible="not is_multi_half_day"
+                                           readonly="fields_readonly"/>
+                                    <field name="leave_end_date"
+                                           string="End Date"
+                                           readonly="fields_readonly"/>
+                                    <field name="starting_half_day" invisible="1"/>
+                                    <field name="ending_half_day" invisible="1"/>
+                                    <field name="half_day" invisible="1"/>
+                                    <field name="delegated_employee_id"
+                                           string="Delegated Employee"
+                                           options="{'no_create': True, 'no_open': True}"
+                                           readonly="fields_readonly"/>
+                                </group>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </xpath>
@@ -265,11 +336,7 @@
 
     <!-- ============================================================
          Add Reference No. column to the main Time Off list view.
-         NOTE: the record id is still "hr_leave_view_tree" in Odoo 17-19
-         even though the <list> tag itself replaced <tree> inside the
-         arch (Odoo renamed the tag, not the view's xmlid). If your
-         install still errors on this, check Settings > Technical >
-         Views (search model "hr.leave") for the exact id.
+         Hide inline approval buttons so regular users cannot validate/refuse from "My Time Off".
          ============================================================ -->
     <record id="view_hr_leave_list_inherit_custom" model="ir.ui.view">
         <field name="name">hr.leave.list.inherit.custom</field>
@@ -277,12 +344,101 @@
         <field name="inherit_id" ref="hr_holidays.hr_leave_view_tree"/>
         <field name="priority">100</field>
         <field name="arch" type="xml">
-            <xpath expr="//list" position="attributes">
-                <attribute name="decoration-muted">not custom_saved</attribute>
-            </xpath>
             <field name="employee_id" position="before">
-                <field name="leave_reference" string="Reference No." optional="show"/>
+                <field name="leave_reference" string="Reference No." optional="show" widget="badge"
+                       decoration-muted="leave_request_status in ('draft', 'fetch', 'cancel')"
+                       decoration-warning="leave_request_status == 'notify'"
+                       decoration-success="leave_request_status == 'approved'"
+                       decoration-danger="leave_request_status == 'refused'"/>
+                <field name="leave_request_status" string="Status" optional="show" widget="badge"
+                       decoration-muted="leave_request_status in ('draft', 'fetch', 'cancel')"
+                       decoration-warning="leave_request_status == 'notify'"
+                       decoration-success="leave_request_status == 'approved'"
+                       decoration-danger="leave_request_status == 'refused'"/>
             </field>
+            <!-- Hide inline approve/refuse buttons in personal list view -->
+            <xpath expr="//button[@name='action_approve']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_refuse']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <!-- Hide standard state column to prevent duplicate Status badge -->
+            <xpath expr="//field[@name='state']" position="attributes">
+                <attribute name="column_invisible">True</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Dedicated list view for Employee "My Time Off" (clean, zero approval buttons) -->
+    <record id="view_hr_leave_tree_my_custom" model="ir.ui.view">
+        <field name="name">hr.leave.tree.my.custom</field>
+        <field name="model">hr.leave</field>
+        <field name="priority">10</field>
+        <field name="arch" type="xml">
+            <list string="My Time Off" sample="1"
+                  decoration-muted="leave_request_status in ('draft', 'fetch', 'cancel')"
+                  decoration-warning="leave_request_status == 'notify'"
+                  decoration-success="leave_request_status == 'approved'"
+                  decoration-danger="leave_request_status == 'refused'">
+                <field name="leave_reference" string="Reference No." widget="badge"
+                       decoration-muted="leave_request_status in ('draft', 'fetch', 'cancel')"
+                       decoration-warning="leave_request_status == 'notify'"
+                       decoration-success="leave_request_status == 'approved'"
+                       decoration-danger="leave_request_status == 'refused'"/>
+                <field name="holiday_status_id" string="Leave Reason"/>
+                <field name="leave_start_date" string="Start Date"/>
+                <field name="leave_end_date" string="End Date"/>
+                <field name="number_of_days" string="Duration" sum="Total Days"/>
+                <field name="leave_request_status" string="Status" widget="badge"
+                       decoration-muted="leave_request_status in ('draft', 'fetch', 'cancel')"
+                       decoration-warning="leave_request_status == 'notify'"
+                       decoration-success="leave_request_status == 'approved'"
+                       decoration-danger="leave_request_status == 'refused'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Dedicated list view for Manager / HR Time Off Management & Approvals -->
+    <record id="view_hr_leave_tree_management_custom" model="ir.ui.view">
+        <field name="name">hr.leave.tree.management.custom</field>
+        <field name="model">hr.leave</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <list string="Time Off Approvals" sample="1"
+                  decoration-muted="leave_request_status in ('draft', 'fetch', 'cancel')"
+                  decoration-warning="leave_request_status == 'notify'"
+                  decoration-success="leave_request_status == 'approved'"
+                  decoration-danger="leave_request_status == 'refused'">
+                <field name="leave_reference" string="Reference No." widget="badge"
+                       decoration-muted="leave_request_status in ('draft', 'fetch', 'cancel')"
+                       decoration-warning="leave_request_status == 'notify'"
+                       decoration-success="leave_request_status == 'approved'"
+                       decoration-danger="leave_request_status == 'refused'"/>
+                <field name="employee_id" widget="many2one_avatar_employee"/>
+                <field name="department_id" optional="show"/>
+                <field name="holiday_status_id" string="Leave Reason"/>
+                <field name="leave_start_date" string="Start Date"/>
+                <field name="leave_end_date" string="End Date"/>
+                <field name="number_of_days" string="Duration" sum="Total Days"/>
+                <field name="leave_request_status" string="Status" widget="badge"
+                       decoration-muted="leave_request_status in ('draft', 'fetch', 'cancel')"
+                       decoration-warning="leave_request_status == 'notify'"
+                       decoration-success="leave_request_status == 'approved'"
+                       decoration-danger="leave_request_status == 'refused'"/>
+                <field name="show_approve_btn" column_invisible="True"/>
+                <field name="show_refuse_btn" column_invisible="True"/>
+                <field name="state" column_invisible="True"/>
+                <field name="custom_saved" column_invisible="True"/>
+                <button name="action_approve" type="object" string="Validate" icon="fa-check"
+                        class="btn-link"
+                        invisible="not show_approve_btn"
+                        groups="hr_leave_request_custom.group_hr_holidays_manager_approver,hr_holidays.group_hr_holidays_user,hr_holidays.group_hr_holidays_manager"/>
+                <button name="action_refuse" type="object" string="Refuse" icon="fa-times"
+                        class="btn-link text-danger"
+                        invisible="not show_refuse_btn"
+                        groups="hr_leave_request_custom.group_hr_holidays_manager_approver,hr_holidays.group_hr_holidays_user,hr_holidays.group_hr_holidays_manager"/>
+            </list>
         </field>
     </record>
 
@@ -291,10 +447,77 @@
          ============================================================ -->
     <record id="hr_holidays.hr_leave_action_my" model="ir.actions.act_window">
         <field name="domain">[('user_id', '=', uid), ('custom_saved', '=', True)]</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_hr_leave_tree_my_custom')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_hr_leave_form_inherit_custom')}),
+            (0, 0, {'view_mode': 'calendar'}),
+            (0, 0, {'view_mode': 'kanban'}),
+            (0, 0, {'view_mode': 'activity'})]"/>
     </record>
 
     <record id="hr_holidays.hr_leave_action_action_approve_department" model="ir.actions.act_window">
         <field name="domain">[('employee_id.company_id', 'in', allowed_company_ids), ('custom_saved', '=', True)]</field>
+        <field name="context">{
+            'search_default_waiting_for_me': 1,
+            'hide_employee_name': 1,
+        }</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_hr_leave_tree_management_custom')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_hr_leave_form_inherit_custom')}),
+            (0, 0, {'view_mode': 'calendar'}),
+            (0, 0, {'view_mode': 'kanban'}),
+            (0, 0, {'view_mode': 'activity'})]"/>
+    </record>
+
+    <!-- ============================================================
+         Extend Time Off Search Filter for Coach / Manager Approvals
+         ============================================================ -->
+    <record id="view_hr_holidays_filter_inherit_custom" model="ir.ui.view">
+        <field name="name">hr.holidays.filter.inherit.custom</field>
+        <field name="model">hr.leave</field>
+        <field name="inherit_id" ref="hr_holidays.view_hr_holidays_filter"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='waiting_for_me']" position="attributes">
+                <attribute name="domain">[
+                    ('state', 'in', ['confirm', 'validate1']),
+                    ('employee_id.user_id', '!=', uid)
+                ]</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='waiting_for_me_manager']" position="attributes">
+                <attribute name="domain">[
+                    ('state', 'in', ['confirm', 'validate1']),
+                    ('employee_id.user_id', '!=', uid)
+                ]</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_hr_leave_search_manager_inherit_custom" model="ir.ui.view">
+        <field name="name">hr.leave.search.manager.inherit.custom</field>
+        <field name="model">hr.leave</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_view_search_manager"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='waiting_for_me']" position="attributes">
+                <attribute name="domain">[
+                    ('state', 'in', ['confirm', 'validate1']),
+                    ('employee_id.user_id', '!=', uid)
+                ]</attribute>
+                <attribute name="groups">hr_leave_request_custom.group_hr_holidays_manager_approver,hr_holidays.group_hr_holidays_responsible,hr_holidays.group_hr_holidays_user,hr_holidays.group_hr_holidays_manager</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='waiting_for_me_manager']" position="attributes">
+                <attribute name="domain">[
+                    ('state', 'in', ['confirm', 'validate1']),
+                    ('employee_id.user_id', '!=', uid)
+                ]</attribute>
+                <attribute name="groups">hr_leave_request_custom.group_hr_holidays_manager_approver,hr_holidays.group_hr_holidays_responsible,hr_holidays.group_hr_holidays_user,hr_holidays.group_hr_holidays_manager</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='approve']" position="before">
+                <filter string="Pending Approval" name="filter_pending_notify"
+                        domain="[('leave_request_status', '=', 'notify'), ('employee_id.user_id', '!=', uid)]"/>
+            </xpath>
+        </field>
     </record>
 
     <!-- ============================================================
@@ -338,8 +561,25 @@
         </field>
     </record>
 
+    <record id="view_hr_leave_form_dashboard_new_time_off_inherit_custom" model="ir.ui.view">
+        <field name="name">hr.leave.view.form.dashboard.new.time.off.inherit.custom</field>
+        <field name="model">hr.leave</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_view_form_dashboard_new_time_off"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='holiday_status_id']" position="before">
+                <field name="employee_gender" invisible="1"/>
+                <field name="is_hr_user" invisible="1"/>
+                <field name="holiday_status_domain" invisible="1"/>
+            </xpath>
+            <xpath expr="//field[@name='holiday_status_id']" position="attributes">
+                <attribute name="domain">holiday_status_domain</attribute>
+            </xpath>
+        </field>
+    </record>
+
     <!-- ============================================================
-         Safety-net cron
+         Crons
          ============================================================ -->
     <record id="ir_cron_cleanup_abandoned_leave_requests" model="ir.cron">
         <field name="name">Time Off: Clean up abandoned auto-saved leave requests</field>
@@ -348,6 +588,16 @@
         <field name="code">model._cron_cleanup_abandoned_leave_requests()</field>
         <field name="interval_number">30</field>
         <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="ir_cron_remind_pending_leave_approvals" model="ir.cron">
+        <field name="name">Time Off: Remind Approvers for Pending Leaves (3+ days)</field>
+        <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_remind_pending_leave_approvals()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
         <field name="active">True</field>
     </record>
 

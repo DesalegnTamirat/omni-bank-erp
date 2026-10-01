@@ -108,7 +108,7 @@
                     <button name="notify_interview" invisible="interview_scheduled == 'Yes'" string="Notify Interview" type="object" class="btn-secondary" icon="fa-calendar"/>
                     <button name="fetch_interview_score" string="Fetch Interview Score" type="object" class="btn-secondary" icon="fa-download" invisible="interview_scores_fetched == True"/>
                     <button name="action_compute_and_rank" string="Compute &amp; Rank Scores" type="object" class="btn-primary" icon="fa-calculator" confirm="This will compute weighted scores for all candidates using the vacancy weight matrix, then rank and set final status (Selected / Reserved / Disqualified). Continue?"/>
-                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o"/>
+                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o" invisible="not minute_signed"/>
                     <button name="action_open_digital_minute" string="Digital Selection Minute" type="object" class="btn-primary" icon="fa-pencil-square-o" help="Open or create the digital committee selection minute for digital signatures."/>
                     <button name="action_promote_selected_employees" string="Promote Selected Employees" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-rocket" invisible="not scores_computed"/>
                     <button name="action_print_all_promotion_letters" string="📄 Promotion Letters" type="object" class="btn-secondary" icon="fa-print" invisible="not employees_promoted"/>

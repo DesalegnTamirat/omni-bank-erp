@@ -870,6 +870,14 @@ class DisciplineCase(models.Model):
     suspension_ids = fields.One2many('discipline.suspension', 'case_id', string='Suspensions')
     appeal_ids = fields.One2many('discipline.appeal', 'case_id', string='Appeals')
     payroll_penalty_ids = fields.One2many('discipline.payroll.penalty', 'case_id', string='Payroll Penalties')
+    deduction_status = fields.Selection([
+        ('not_applicable', 'Not Applicable'),
+        ('appeal_pending', 'Pending Appeal Window Expiry'),
+        ('scheduled', 'Scheduled for Payroll'),
+        ('transferred', 'Transmitted to Payroll'),
+        ('cancelled', 'Cancelled on Appeal'),
+    ], string='Financial Deduction Status', default='not_applicable', tracking=True)
+    computed_deduction_month = fields.Char(string='Target Payroll Month (Computed)', readonly=True)
 
     # Flags & Decision Summary
     has_exonerated_investigation = fields.Boolean(
@@ -1344,7 +1352,8 @@ class DisciplineCase(models.Model):
                 'is_punishment_modified_by_committee', 'is_cash_shortage',
                 'statutory_deadline_date', 'is_deadline_exceeded', 'active_penalty_end_date',
                 'active_duration_days', 'legal_article_display', 'legal_clause_text',
-                'appeal_outcome_type', 'appeal_outcome_display', 'appeal_ids'
+                'appeal_outcome_type', 'appeal_outcome_display', 'appeal_ids',
+                'deduction_status', 'computed_deduction_month', 'payroll_month'
             }
             # Only enforce immutability on manually edited, non-computed user fields
             explicit_user_fields = {
@@ -1689,64 +1698,19 @@ class DisciplineCase(models.Model):
             if rec.punishment_type == 'demotion' or rec.decided_punishment_type == 'demotion':
                 rec.action_apply_demotion()
 
-            # Enqueue pending deduction records for downstream payroll processing
-            today_date = rec.final_decision_date or fields.Date.context_today(rec)
-            if rec.payroll_month:
-                try:
-                    from datetime import date
-                    deduction_date = date(today_date.year, int(rec.payroll_month), 1)
-                except Exception:
-                    deduction_date = today_date
-            else:
-                deduction_date = today_date
-
-            month_dict = dict(rec._fields['payroll_month'].selection) if 'payroll_month' in rec._fields else {}
-            month_display = month_dict.get(rec.payroll_month, str(rec.payroll_month or ''))
-
-            # 1. Percentage deduction for non-managerial employees
-            if not rec.is_managerial and rec.penalty_percentage > 0.0:
-                self.env['discipline.payroll.penalty'].create({
-                    'case_id': rec.id,
-                    'employee_id': rec.employee_id.id,
-                    'penalty_type': 'percentage',
-                    'penalty_percentage': rec.penalty_percentage,
-                    'effective_date': deduction_date,
-                    'state': 'pending',
-                    'notes': _('Automatic percentage penalty of %s%% from Case %s (Target Payroll Month: %s).') % (
-                        rec.penalty_percentage, rec.name, month_display
-                    )
-                })
-            # 2. Daily wage unit deduction for managerial staff
-            elif rec.is_managerial and rec.fine_days > 0.0:
-                self.env['discipline.payroll.penalty'].create({
-                    'case_id': rec.id,
-                    'employee_id': rec.employee_id.id,
-                    'penalty_type': 'managerial',
-                    'managerial_days': int(rec.fine_days),
-                    'effective_date': deduction_date,
-                    'state': 'pending',
-                    'notes': _('Automatic managerial penalty of %d day(s) from Case %s (Target Payroll Month: %s).') % (
-                        int(rec.fine_days), rec.name, month_display
-                    )
-                })
-
-            # Suspension without-pay deduction for active suspensions
-            active_swp = rec.suspension_ids.filtered(
-                lambda s: s.suspension_type == 'without_pay' and s.state in ['active', 'extended', 'completed']
+            # Appeal-Aware Deduction Lock: Financial penalties are held in abeyance during the 10-day appeal window
+            has_financial_penalty = (
+                (not rec.is_managerial and rec.penalty_percentage > 0.0) or
+                (rec.is_managerial and rec.fine_days > 0.0) or
+                bool(rec.suspension_ids.filtered(lambda s: s.suspension_type == 'without_pay' and s.state in ['active', 'extended', 'completed']))
             )
-            for susp in active_swp:
-                self.env['discipline.payroll.penalty'].create({
-                    'case_id': rec.id,
-                    'employee_id': rec.employee_id.id,
-                    'penalty_type': 'suspension_without_pay',
-                    'suspension_id': susp.id,
-                    'suspension_days': susp.working_days_count,
-                    'effective_date': deduction_date,
-                    'state': 'pending',
-                    'notes': _('Without-pay suspension deduction for %d days from Suspension %s (Target Payroll Month: %s).') % (
-                        susp.working_days_count, susp.name, month_display
-                    )
-                })
+            if has_financial_penalty:
+                rec.with_context(force_write=True).write({'deduction_status': 'appeal_pending'})
+                rec.message_post(body=_(
+                    'Financial deductions (salary fine / percentage deduction) are held in abeyance pending expiration of the 10-calendar-day statutory appeal window (Appeal Deadline: %s).'
+                ) % (rec.appeal_deadline or _('10 days from receipt')))
+            else:
+                rec.with_context(force_write=True).write({'deduction_status': 'not_applicable'})
 
             # Dismissal Handling & Separation Workflow
             if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
@@ -1755,10 +1719,270 @@ class DisciplineCase(models.Model):
             # Auto-attach the official warning letter PDF and notify employee
             rec._attach_warning_letter()
 
+    @api.model
+    def _compute_target_payroll_month(self, closure_date):
+        """
+        Computes target payroll month based on closure date and mid-month (15th) cutoff rule:
+        - Closure Day < 15: Current Month
+        - Closure Day >= 15: Next Month (handles Dec -> Jan year transition)
+        Returns tuple: (month_str '01'-'12', target_year int)
+        """
+        if not closure_date:
+            closure_date = fields.Date.today()
+        if closure_date.day < 15:
+            target_month = closure_date.month
+            target_year = closure_date.year
+        else:
+            if closure_date.month == 12:
+                target_month = 1
+                target_year = closure_date.year + 1
+            else:
+                target_month = closure_date.month + 1
+                target_year = closure_date.year
+        return str(target_month), target_year
+
+    def action_process_appeal_window_deductions(self):
+        """
+        Evaluates and generates scheduled payroll deductions for cases whose appeal window has passed or concluded.
+        Applies the mid-month cutoff rule (Day 15) to determine the target payroll month.
+        """
+        from datetime import date
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.state not in ('enforced', 'closed', 'appealed') or rec.deduction_status not in ('appeal_pending', 'scheduled'):
+                continue
+
+            # If an active appeal is in progress, deductions remain deferred
+            active_appeals = rec.appeal_ids.filtered(lambda a: a.state not in ('decided', 'revoked', 'closed', 'cancelled'))
+            if active_appeals:
+                continue
+
+            # Check if 10-day appeal window is still open
+            if rec.state == 'enforced' and rec.appeal_deadline and today <= rec.appeal_deadline and not rec.appeal_ids:
+                continue
+
+            has_financial_penalty = (
+                (not rec.is_managerial and rec.penalty_percentage > 0.0) or
+                (rec.is_managerial and rec.fine_days > 0.0) or
+                bool(rec.suspension_ids.filtered(lambda s: s.suspension_type == 'without_pay' and s.state in ['active', 'extended', 'completed']))
+            )
+            if not has_financial_penalty:
+                rec.deduction_status = 'not_applicable'
+                continue
+
+            # Determine closure date
+            if rec.appeal_ids:
+                decided_appeals = rec.appeal_ids.filtered(lambda a: a.state in ('decided', 'closed'))
+                latest_decision = decided_appeals.sorted('decision_date', reverse=True)
+                closure_date = latest_decision[0].decision_date if (latest_decision and latest_decision[0].decision_date) else (rec.appeal_deadline or today)
+            else:
+                closure_date = rec.appeal_deadline or today
+
+            target_month, target_year = self._compute_target_payroll_month(closure_date)
+            deduction_date = date(target_year, int(target_month), 1)
+
+            rec.payroll_month = target_month
+            rec.computed_deduction_month = target_month
+
+            existing_penalties = self.env['discipline.payroll.penalty'].search([('case_id', '=', rec.id)])
+            month_dict = dict(rec._fields['payroll_month'].selection) if 'payroll_month' in rec._fields else {}
+            month_display = month_dict.get(target_month, str(target_month))
+
+            if existing_penalties:
+                existing_penalties.filtered(lambda p: p.state == 'pending').write({
+                    'effective_date': deduction_date,
+                    'payroll_month': target_month,
+                })
+            else:
+                # 1. Percentage deduction for non-managerial staff
+                if not rec.is_managerial and rec.penalty_percentage > 0.0:
+                    self.env['discipline.payroll.penalty'].create({
+                        'case_id': rec.id,
+                        'employee_id': rec.employee_id.id,
+                        'penalty_type': 'percentage',
+                        'penalty_percentage': rec.penalty_percentage,
+                        'effective_date': deduction_date,
+                        'payroll_month': target_month,
+                        'state': 'pending',
+                        'notes': _('Scheduled percentage penalty of %s%% for Case %s (Target Payroll Month: %s - Post Appeal Window).') % (
+                            rec.penalty_percentage, rec.name, month_display
+                        )
+                    })
+                # 2. Daily wage unit deduction for managerial staff
+                elif rec.is_managerial and rec.fine_days > 0.0:
+                    self.env['discipline.payroll.penalty'].create({
+                        'case_id': rec.id,
+                        'employee_id': rec.employee_id.id,
+                        'penalty_type': 'managerial',
+                        'managerial_days': int(rec.fine_days),
+                        'effective_date': deduction_date,
+                        'payroll_month': target_month,
+                        'state': 'pending',
+                        'notes': _('Scheduled managerial penalty of %d day(s) for Case %s (Target Payroll Month: %s - Post Appeal Window).') % (
+                            int(rec.fine_days), rec.name, month_display
+                        )
+                    })
+
+                # 3. Unpaid suspension deductions
+                active_swp = rec.suspension_ids.filtered(
+                    lambda s: s.suspension_type == 'without_pay' and s.state in ['active', 'extended', 'completed']
+                )
+                for susp in active_swp:
+                    self.env['discipline.payroll.penalty'].create({
+                        'case_id': rec.id,
+                        'employee_id': rec.employee_id.id,
+                        'penalty_type': 'suspension_without_pay',
+                        'suspension_id': susp.id,
+                        'suspension_days': susp.working_days_count,
+                        'effective_date': deduction_date,
+                        'payroll_month': target_month,
+                        'state': 'pending',
+                        'notes': _('Scheduled without-pay suspension deduction for %d days for Case %s (Target Payroll Month: %s - Post Appeal Window).') % (
+                            susp.working_days_count, rec.name, month_display
+                        )
+                    })
+
+            rec.deduction_status = 'scheduled'
+            rec.message_post(
+                body=_('Appeal window closed on %s. In accordance with the mid-month cutoff rule (Day 15), disciplinary financial deduction is scheduled for <b>%s</b> payroll.') % (
+                    closure_date, month_display
+                )
+            )
+
+    _process_appeal_window_deductions = action_process_appeal_window_deductions
+
+    @api.model
+    def _cron_process_appeal_window_deductions(self):
+        """Ultra-lightweight off-peak daily cron: sweeps enforced cases whose appeal window has expired and schedules deductions."""
+        today = fields.Date.today()
+        cases = self.search([
+            ('state', 'in', ['enforced', 'closed']),
+            ('deduction_status', '=', 'appeal_pending'),
+            ('appeal_deadline', '<', today),
+        ])
+        if cases:
+            cases._process_appeal_window_deductions()
+
+    def action_coach_exonerate_attendance(self):
+        """Allows direct coach / manager to exonerate an auto-initiated attendance case upon reviewing valid justification."""
+        self.ensure_one()
+        if not self.is_system_generated:
+            raise UserError(_('Only system-generated attendance cases can be exonerated directly by the coach.'))
+        if self.state not in ('draft', 'initiated'):
+            raise UserError(_('Case cannot be exonerated in current state.'))
+        
+        self.write({
+            'state': 'closed',
+            'is_revoked': True,
+            'revocation_reason': _('Exonerated by Direct Coach / Manager upon review of attendance justification.'),
+            'revocation_date': fields.Date.context_today(self),
+            'revoked_by_id': self.env.user.id,
+            'deduction_status': 'cancelled',
+            'punishment_type': 'exonerate',
+            'penalty_percentage': 0.0,
+            'fine_days': 0.0,
+        })
+        self.message_post(body=_('Attendance disciplinary case exonerated and closed by Direct Coach (%s). Zero penalty applied.') % self.env.user.name)
+
     def action_print_warning_letter(self):
         """Direct action to print or download the official disciplinary warning / decision letter."""
         self.ensure_one()
         return self.env.ref('discipline_management.action_report_disciplinary_warning_letter').report_action(self)
+
+    @api.model
+    def get_official_bunna_logo_base64(self):
+        """Returns base64 string of the official Bunna Bank logo for reliable QWeb PDF rendering."""
+        import base64
+        import os
+
+        # First check local module static directory
+        logo_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+        )
+        if not os.path.exists(logo_path):
+            logo_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), '..', '..', 'custom_recruitment', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+            )
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        return ""
+
+    def get_salutation_label(self):
+        """Returns formal Ethiopian salutation based on gender (Ato / W/ro / W/t)."""
+        self.ensure_one()
+        gender = getattr(self.employee_id, 'gender', False)
+        if gender == 'male':
+            return 'Ato'
+        elif gender == 'female':
+            marital = getattr(self.employee_id, 'marital', False)
+            return 'W/t' if marital == 'single' else 'W/ro'
+        return 'Ato/W/ro'
+
+    def get_formatted_employee_name(self):
+        """Returns formatted full recipient employee name with salutation."""
+        self.ensure_one()
+        emp_name = self.employee_id.name or _('Employee')
+        salutation = self.get_salutation_label()
+        return f"{salutation} {emp_name}"
+
+    def get_salutation_title_and_first_name(self):
+        """Returns formal salutation and first name for letter opening."""
+        self.ensure_one()
+        emp_name = self.employee_id.name or _('Employee')
+        salutation = self.get_salutation_label()
+        first_name = emp_name.split()[0] if emp_name else _('Employee')
+        return f"{salutation} {first_name}"
+
+    def get_sanction_display_text(self):
+        """Returns clean human-readable sanction and financial penalty description."""
+        self.ensure_one()
+        sanction_name = dict(self._fields['punishment_type'].selection).get(
+            self.punishment_type, str(self.punishment_type or '')
+        )
+        penalty_details = []
+        if self.penalty_percentage > 0.0:
+            penalty_details.append(f"{self.penalty_percentage}% monthly basic salary deduction")
+        if self.fine_days > 0.0:
+            penalty_details.append(f"{int(self.fine_days)} day(s) salary fine")
+        
+        if penalty_details:
+            return f"{sanction_name} with {' and '.join(penalty_details)}"
+        return sanction_name
+
+    def get_signatory_name(self):
+        """Returns the formal signatory name based on action track."""
+        self.ensure_one()
+        if self.case_action_track == 'direct_enforce':
+            return (self.initiator_id.name or self.reported_by_id.name or self.approver_id.name or self.env.user.name)
+        return (self.approver_id.name or self.env.user.name)
+
+    def get_signatory_title(self):
+        """Returns formal signatory job / authority title."""
+        self.ensure_one()
+        if self.case_action_track == 'direct_enforce':
+            return _("Line Manager / Direct Coach")
+        if self.approver_id and hasattr(self.approver_id, 'has_group') and self.approver_id.has_group('discipline_management.group_discipline_ceo'):
+            return _("Chief Executive Officer")
+        return _("Chief People & Culture Officer / Authorized Executive")
+
+    def get_signatory_company(self):
+        return _("Bunna Bank S.C.")
+
+    def get_discipline_letter_cc_lines(self):
+        """Returns formatted CC distribution lines for the official letter."""
+        self.ensure_one()
+        lines = [
+            _("People Operations Management Directorate (POMD) - Personnel File"),
+        ]
+        if self.department_id:
+            lines.append(f"{self.department_id.name} / Respective Directorate")
+        else:
+            lines.append(_("Respective Directorate / Branch Management"))
+        lines.append(_("Internal Audit Directorate"))
+        if self.employee_id:
+            lines.append(f"{self.employee_id.name} (Subject Employee)")
+        return lines
 
     def _attach_warning_letter(self):
         """Generate and auto-attach the official warning letter PDF and send targeted notification to the employee."""

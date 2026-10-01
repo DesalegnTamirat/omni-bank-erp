@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="action_resl_guarantor_lookup" model="ir.actions.act_window">
+            <field name="name">Find Guarantor</field>
+            <field name="res_model">resl.guarantor.lookup</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <record id="view_resl_guarantor_lookup_form" model="ir.ui.view">
+            <field name="name">resl.guarantor.lookup.form</field>
+            <field name="model">resl.guarantor.lookup</field>
+            <field name="arch" type="xml">
+                <form string="Find Employee as Guarantor">
+                    <sheet>
+                        <group>
+                            <field name="loan_id" invisible="1"/>
+                            <field name="query" string="Search by Name or Job Title"
+                                placeholder="Type to search..."/>
+                            <button name="action_search" type="object"
+                                string="Search" class="oe_highlight"/>
+                        </group>
+                        <separator string="Search Results" colspan="2"/>
+                        <field name="line_ids" string="Matching Employees">
+                            <list decoration-success="is_eligible" decoration-danger="not is_eligible">
+                                <field name="name" string="Employee Name"/>
+                                <field name="job_title" string="Job Title"/>
+                                <field name="is_eligible" string="Eligible" widget="boolean" optional="show"/>
+                                <field name="eligibility_note" string="Eligibility / Reason"/>
+                                <button name="action_select" type="object"
+                                    string="Select as Guarantor" class="oe_highlight"/>
+                            </list>
+                        </field>
+                        <footer>
+                            <button name="action_clear" type="object"
+                                string="Clear" class="btn-default"/>
+                            <button string="Close" class="btn-secondary" special="cancel"/>
+                        </footer>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_resl_guarantor_lookup_line_tree" model="ir.ui.view">
+            <field name="name">resl.guarantor.lookup.line.list</field>
+            <field name="model">resl.guarantor.lookup.line</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="job_title"/>
+                    <button name="action_select" type="object" string="Select"/>
+                </list>
+            </field>
+        </record>
+
+    </data>
+</odoo>

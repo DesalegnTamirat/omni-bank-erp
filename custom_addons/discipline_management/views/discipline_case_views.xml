@@ -20,6 +20,12 @@
                     <filter string="Escalated by Prior Warning" name="filter_escalated" domain="[('is_escalated_by_active_warning', '=', True)]"/>
                     <filter string="Enforced Cases" name="filter_enforced" domain="[('state', '=', 'enforced')]"/>
                     <filter string="Revoked Cases" name="filter_revoked" domain="[('state', '=', 'revoked')]"/>
+                    <separator/>
+                    <filter string="System Attendance Cases" name="filter_attendance_cases" domain="[('is_system_generated', '=', True)]"/>
+                    <filter string="Pending Coach Attendance Review" name="filter_coach_attendance_review" domain="[('is_system_generated', '=', True), ('state', '=', 'initiated')]"/>
+                    <filter string="Deductions in Appeal Lock" name="filter_deduction_appeal_lock" domain="[('deduction_status', '=', 'appeal_pending')]"/>
+                    <filter string="Deductions Scheduled" name="filter_deduction_scheduled" domain="[('deduction_status', '=', 'scheduled')]"/>
+                    <separator/>
                     <filter string="Employee" name="group_employee" context="{'group_by':'employee_id'}"/>
                     <filter string="Regulatory Article" name="group_article" context="{'group_by':'article_id'}"/>
                     <filter string="Severity Level" name="group_severity" context="{'group_by':'severity_level'}"/>
@@ -46,6 +52,7 @@
                     <field name="sla_deadline"/>
                     <field name="is_sla_exceeded" widget="boolean"/>
                     <field name="penalty_percentage"/>
+                    <field name="deduction_status" widget="badge"/>
                     <field name="state" widget="badge"/>
                 </list>
             </field>
@@ -125,6 +132,14 @@
                         <button name="action_approve_and_enforce" string="Approve &amp; Enforce Decision" type="object" class="btn-success"
                                 invisible="state != 'pending_approval' or not is_cpco_user and not is_ceo_user and not is_hr_admin"/>
                         
+                        <!-- Direct Coach Action: Exonerate Auto-Initiated Attendance Case -->
+                        <button name="action_coach_exonerate_attendance" 
+                                string="Exonerate Attendance Case" 
+                                type="object" 
+                                class="btn-outline-danger"
+                                invisible="not is_system_generated or state not in ('draft', 'initiated') or not is_coach_or_manager and not is_hr_admin"
+                                help="Allows direct coach to record valid justification and exonerate an auto-initiated attendance case."/>
+
                         <!-- Print Official Warning Letter / Decision Notice -->
                         <button name="action_print_warning_letter" 
                                 string="Print Official Warning Letter" 
@@ -133,6 +148,14 @@
                                 icon="fa-print"
                                 invisible="state not in ('enforced', 'closed', 'appealed')"
                                 help="Download or print the official disciplinary warning letter / decision notice."/>
+
+                        <!-- Post-Appeal Deductions Processing (Mid-Month Rule) -->
+                        <button name="action_process_appeal_window_deductions"
+                                string="Schedule Deduction (Post-Appeal)"
+                                type="object"
+                                class="btn-outline-primary"
+                                invisible="state != 'enforced' or deduction_status != 'appeal_pending' or is_appeal_window_open or not is_hr_admin"
+                                help="Immediately schedules salary deduction using the mid-month cutoff rule once the appeal window is closed."/>
 
                         <!-- Delivery Receipt & Appeal -->
                         <button name="action_acknowledge_receipt" string="Acknowledge Delivery / Receipt" type="object" class="btn-info"
@@ -389,13 +412,27 @@
                                 </field>
                             </page>
                             <page string="Payroll Deductions" invisible="not is_payroll_deductible and not payroll_penalty_ids">
+                                <group>
+                                    <group string="Deduction Timing &amp; Policy Rules">
+                                        <field name="deduction_status" widget="badge"/>
+                                        <field name="payroll_month" string="Target Payroll Month"/>
+                                    </group>
+                                    <group string="Statutory Cutoff Policy">
+                                        <div class="text-muted" colspan="2">
+                                            <strong>Policy Rule (Mid-Month Cutoff):</strong> Financial deductions are deferred until the 10-day appeal window expires. 
+                                            If the appeal window closes before the 15th, deduction applies to the coming salary month. 
+                                            If on/after the 15th, deduction applies to the following month.
+                                        </div>
+                                    </group>
+                                </group>
                                 <field name="payroll_penalty_ids" readonly="1">
                                     <list string="Payroll Penalties">
                                         <field name="name"/>
                                         <field name="penalty_percentage"/>
                                         <field name="calculated_amount"/>
                                         <field name="effective_date"/>
-                                        <field name="state"/>
+                                        <field name="payroll_month"/>
+                                        <field name="state" widget="badge"/>
                                     </list>
                                 </field>
                             </page>

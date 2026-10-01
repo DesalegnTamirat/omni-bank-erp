@@ -18,6 +18,7 @@
             <xpath expr="//field[@name='responsible_ids']" position="attributes">
                 <attribute name="invisible">True</attribute>
             </xpath>
+            <!-- Keep leave_validation group hidden but expose just the approval field in our section below -->
             <xpath expr="//group[@name='leave_validation']" position="attributes">
                 <attribute name="invisible">True</attribute>
             </xpath>
@@ -43,9 +44,12 @@
                         <field name="max_allowed_days" placeholder="0.0 = no maximum limit"/>
                     </group>
                     <group>
+                        <field name="gender_rule" widget="radio"/>
+                        <field name="allowed_group"/>
                         <field name="include_public_holidays_in_duration"/>
                         <field name="support_document" string="Require Supporting Document" widget="boolean_toggle"/>
                         <field name="hide_on_dashboard"/>
+                        <field name="leave_validation_type" string="Approval"/>
                     </group>
                 </group>
             </xpath>

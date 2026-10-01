@@ -118,45 +118,77 @@ class ResUsers(models.Model):
         self.ensure_one()
         user = self.sudo()
 
-        if user.has_group("bunna_pbms.group_pbms_respective_chief"):
-            # 1. Resolve employee(s) for the chief user
-            emp = user.employee_id or (user.employee_ids and user.employee_ids[0])
-            if not emp:
-                emp = self.env["hr.employee"].sudo().search([("user_id", "=", user.id)], limit=1)
-            if not emp and user.default_operating_unit_id and user.default_operating_unit_id.manager_id:
-                emp = user.default_operating_unit_id.manager_id
-            if not emp:
-                for ou in (user.assigned_operating_unit_ids or user.operating_unit_ids):
-                    if ou.manager_id:
-                        emp = ou.manager_id
-                        break
+        emp = user.employee_id or (user.employee_ids and user.employee_ids[0])
+        if not emp:
+            emp = self.env["hr.employee"].sudo().search([("user_id", "=", user.id)], limit=1)
+        if not emp and user.default_operating_unit_id and user.default_operating_unit_id.manager_id:
+            emp = user.default_operating_unit_id.manager_id
+        if not emp:
+            for ou in (user.assigned_operating_unit_ids or user.operating_unit_ids):
+                if ou.manager_id:
+                    emp = ou.manager_id
+                    break
 
+        has_subordinates = bool(emp and self.env["hr.employee"].sudo().search([("parent_id", "=", emp.id)], limit=1))
+
+        if user.has_group("bunna_pbms.group_pbms_respective_chief") or user._pbms_is_respective_chief() or has_subordinates:
             if not emp:
                 return []
 
-            # 2. Find all subordinate employees in the management hierarchy (direct & indirect)
+            # 2. Find immediate direct subordinate employees in the management hierarchy
             subordinates = self.env["hr.employee"].sudo().search([
-                ("id", "child_of", emp.id),
-                ("id", "!=", emp.id),
+                ("parent_id", "=", emp.id),
             ])
             if not subordinates:
+                # Fallback: check operating units with parent_unit managed by this chief
+                ou_by_parent = self.env["operating.unit"].sudo().search([
+                    ("parent_unit.manager_id", "=", emp.id)
+                ])
+                if ou_by_parent:
+                    chief_emp_ids = (user.employee_id | user.employee_ids).ids
+                    if emp.id not in chief_emp_ids:
+                        chief_emp_ids.append(emp.id)
+                    own_managed_units = self.env["operating.unit"].sudo().search([
+                        ("manager_id", "in", chief_emp_ids)
+                    ])
+                    return list(set(ou_by_parent.ids) - set(own_managed_units.ids))
                 return []
 
             child_units = set()
-            # 3. Operating units where manager_id is one of the subordinates
+            # 3. Operating units where manager_id is one of the direct subordinates
             ou_by_mgr = self.env["operating.unit"].sudo().search([
                 ("manager_id", "in", subordinates.ids)
             ])
             child_units.update(ou_by_mgr.ids)
 
-            # 4. Operating units assigned to subordinate employees
+            # 4. Operating units assigned to direct subordinate employees or their user accounts
             for sub in subordinates:
-                if sub.operating_unit_id:
+                if hasattr(sub, "operating_unit_id") and sub.operating_unit_id:
                     child_units.add(sub.operating_unit_id.id)
-                if sub.default_operating_unit_id:
+                if hasattr(sub, "default_operating_unit_id") and sub.default_operating_unit_id:
                     child_units.add(sub.default_operating_unit_id.id)
-                if sub.operating_unit_ids:
+                if hasattr(sub, "operating_unit_ids") and sub.operating_unit_ids:
                     child_units.update(sub.operating_unit_ids.ids)
+                if sub.user_id:
+                    u = sub.user_id
+                    if hasattr(u, "default_operating_unit_id") and u.default_operating_unit_id:
+                        child_units.add(u.default_operating_unit_id.id)
+                    if hasattr(u, "operating_unit_ids") and u.operating_unit_ids:
+                        child_units.update(u.operating_unit_ids.ids)
+                    if hasattr(u, "assigned_operating_unit_ids") and u.assigned_operating_unit_ids:
+                        child_units.update(u.assigned_operating_unit_ids.ids)
+                if hasattr(sub, "department_id") and sub.department_id:
+                    dept = sub.department_id
+                    if hasattr(dept, "operating_unit_id") and dept.operating_unit_id:
+                        child_units.add(dept.operating_unit_id.id)
+                    if hasattr(dept, "operating_unit_ids") and dept.operating_unit_ids:
+                        child_units.update(dept.operating_unit_ids.ids)
+
+            # 5. Operating units where parent_unit manager is the chief
+            ou_by_parent = self.env["operating.unit"].sudo().search([
+                ("parent_unit.manager_id", "=", emp.id)
+            ])
+            child_units.update(ou_by_parent.ids)
 
             # Exclude units where the chief themselves is the manager
             chief_emp_ids = (user.employee_id | user.employee_ids).ids
@@ -318,38 +350,8 @@ class ResUsers(models.Model):
         if self._pbms_is_sppmd_admin() or self._pbms_is_sppmd_approver() or self.has_group("base.group_system") or self.id == 1:
             return all_cats
 
-        # If Head Office Reviewer: evaluate strictly from Planning Configuration or department mapping
+        # If Head Office Reviewer: authorized to review all categories at Head Office level
         if self.has_group("bunna_pbms.group_pbms_ho_reviewer"):
-            # 1. Check Planning Configuration
-            ConfigModel = self.env.get("pbms.planning.config")
-            if ConfigModel is not None:
-                cats = ConfigModel.get_user_authorized_categories(self)
-                if cats:
-                    return cats
-
-            # 2. Fallback Heuristic matching
-            cats = set()
-            dept_name = (self.employee_id.department_id.name or "").lower() if (self.employee_id and self.employee_id.department_id) else ""
-            emp_ous = self.employee_id.operating_unit_ids.mapped("name") if (self.employee_id and self.employee_id.operating_unit_ids) else []
-            emp_def_ou = [self.employee_id.default_operating_unit_id.name] if (self.employee_id and self.employee_id.default_operating_unit_id and self.employee_id.default_operating_unit_id.name) else []
-            user_ous = [ou.name for ou in self.operating_unit_ids if ou.name]
-            combined = f"{dept_name} {' '.join(emp_ous + emp_def_ou + user_ous)}".lower()
-
-            if self.has_group("hr.group_hr_user") or self.has_group("hr.group_hr_manager") or any(w in combined for w in ("hr", "human", "manpower", "recruitment", "people")):
-                cats.add("manpower")
-            if any(w in combined for w in ("retail", "operation", "deposit", "branch", "customer")):
-                cats.update(["deposit", "customer_base"])
-            if any(w in combined for w in ("fx", "foreign", "trade", "international", "treasury")):
-                cats.add("fx")
-            if any(w in combined for w in ("digital", "e-banking", "electronic", "card", "channel")):
-                cats.add("digital_banking")
-            if any(w in combined for w in ("finance", "account", "budget", "cost")):
-                cats.add("general_expense")
-            if any(w in combined for w in ("property", "procurement", "facility", "admin", "asset")):
-                cats.add("fixed_asset")
-
-            if cats:
-                return list(cats)
             return all_cats
 
         # Branch Users & District Reviewers see all categories for their assigned operating units
@@ -386,47 +388,66 @@ def send_pbms_inbox_notification(env, doc, recipients, subject, body):
                     u = p.user_ids[:1] if p.user_ids else False
                     pairs.append((p, u))
 
+    if not seen_partner_ids:
+        return
+
     doc_model = doc._name if doc and hasattr(doc, "_name") else False
     doc_res_id = doc.id if doc and hasattr(doc, "id") and len(doc) == 1 else False
+    author = env.user.partner_id if env.user and env.user.partner_id else env.ref("base.partner_root", raise_if_not_found=False)
+    author_id = author.id if author else list(seen_partner_ids)[0]
 
-    for partner, user in pairs:
-        if not partner or not partner.active:
-            continue
-        author = env.user.partner_id if env.user and env.user.partner_id else partner
-        msg = MailMessage.create({
-            "subject": subject,
-            "body": body,
-            "model": doc_model,
-            "res_id": doc_res_id,
-            "message_type": "user_notification",
-            "subtype_id": subtype_id,
-            "author_id": author.id,
-            "partner_ids": [(4, partner.id)],
-            "is_internal": True,
-        })
-        MailNotification.create({
-            "author_id": msg.author_id.id,
+    # Ultra-fast batch creation: single mail.message for all recipients
+    msg = MailMessage.create({
+        "subject": subject,
+        "body": body,
+        "model": doc_model,
+        "res_id": doc_res_id,
+        "message_type": "user_notification",
+        "subtype_id": subtype_id,
+        "author_id": author_id,
+        "partner_ids": [(6, 0, list(seen_partner_ids))],
+        "is_internal": True,
+    })
+
+    # Batch insert all mail.notification records in a single database operation
+    notif_vals = [
+        {
+            "author_id": author_id,
             "mail_message_id": msg.id,
             "notification_status": "sent",
             "notification_type": "inbox",
-            "res_partner_id": partner.id,
+            "res_partner_id": pid,
             "is_read": False,
-        })
+        }
+        for pid in seen_partner_ids
+    ]
+    MailNotification.create(notif_vals)
+
+    # Batch web bus notifications to online users
+    bus_notifications = []
+    for partner, user in pairs:
         if user and Store:
             try:
                 store = Store(bus_channel=user).add(
                     msg.with_user(user).with_context(allowed_company_ids=[]),
                     add_followers=False,
                 )
-                user._bus_send(
+                bus_notifications.append((
+                    user,
                     "mail.message/inbox",
                     {
                         "message_id": msg.id,
                         "store_data": store.get_result(),
                     },
-                )
+                ))
             except Exception as e:
-                _logger.debug("Bus send failed for user %s: %s", user.id, e)
+                _logger.debug("Bus store generation failed for user %s: %s", user.id, e)
+
+    if bus_notifications and "bus.bus" in env:
+        try:
+            env["bus.bus"]._sendmany(bus_notifications)
+        except Exception as e:
+            _logger.debug("Bus _sendmany failed: %s", e)
 
 
 class IrUiMenu(models.Model):

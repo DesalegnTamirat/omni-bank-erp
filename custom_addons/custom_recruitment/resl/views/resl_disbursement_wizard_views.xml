@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Form view ──────────────────────────────────────────────────────── -->
+    <record id="view_resl_disbursement_wizard_form" model="ir.ui.view">
+        <field name="name">resl.loan.disbursement.wizard.form</field>
+        <field name="model">resl.loan.disbursement.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Confirm Core Banking Disbursement">
+
+                <!-- Hidden bindings -->
+                <field name="loan_id" invisible="1"/>
+                <field name="currency_id" invisible="1"/>
+
+                <div class="o_form_view o_resl_disbursement_wizard">
+
+                    <!-- Info banner -->
+                    <div class="alert alert-info mb-3" role="alert">
+                        <i class="fa fa-info-circle me-2"/>
+                        Please provide the employee's Core Banking account number.
+                        The approved amount will be disbursed to that account.
+                    </div>
+
+                    <group>
+                        <group string="Loan Details">
+                            <field name="employee_name" string="Employee"/>
+                            <field name="approved_amount" string="Approved Loan Amount"
+                                   widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                        </group>
+                        <group string="Account Information">
+                            <field name="account_number"
+                                   string="Bank Account Number"
+                                   placeholder="e.g. 1000123456789"
+                                   maxlength="13"/>
+                        </group>
+                    </group>
+
+                    <!-- "Don't have an account" link — deliberately NOT wired to a
+                         required field, so it always opens the portal in a new
+                         tab even before the account number is filled in. -->
+                    <div class="mt-3">
+                        <button name="action_open_account_portal"
+                                type="object"
+                                string="I don't have an account — Open Bunna Bank Account Portal"
+                                class="btn btn-link p-0"
+                                icon="fa-external-link"/>
+                    </div>
+
+                </div>
+
+                <footer>
+                    <button name="action_confirm_disburse"
+                            type="object"
+                            string="Confirm Disbursement"
+                            class="btn-primary"
+                            icon="fa-money"
+                            data-hotkey="v"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"
+                            icon="fa-times"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Window action (opened programmatically from action_disburse_core_banking) ── -->
+    <record id="action_resl_disbursement_wizard" model="ir.actions.act_window">
+        <field name="name">Confirm Core Banking Disbursement</field>
+        <field name="res_model">resl.loan.disbursement.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="view_resl_disbursement_wizard_form"/>
+    </record>
+
+</odoo>

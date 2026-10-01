@@ -167,29 +167,33 @@ class ExamGenerationWizard(models.TransientModel):
                 "number_of_questions": cfg["count"],
                 "marks_per_question": cfg["marks"],
             }))
-        master_exam.write({"distribution_line_ids": dist_vals})
+        # 3. Sample Master Base Question Set (shared across all version papers)
+        master_questions = []
+        for label, cfg in pools.items():
+            pool = cfg["pool"]
+            count = cfg["count"]
+            if len(pool) >= count:
+                sampled = random.sample(pool, count)
+            else:
+                sampled = pool[:count]
+            master_questions.extend(sampled)
 
-        # 3. Generate N Version Papers (e.g. Version A, Version B...)
+        master_exam.write({
+            "distribution_line_ids": dist_vals,
+            "manual_question_ids": [(6, 0, [q.id for q in master_questions])],
+        })
+
+        # 4. Generate N Version Papers (e.g. Version A, Version B...) using exact same questions in randomized order
         version_labels = list(string.ascii_uppercase) + [f"V{i}" for i in range(27, 100)]
         created_versions = []
 
         for i in range(self.version_count):
             v_code = version_labels[i] if i < len(version_labels) else f"V{i+1}"
             
-            # Sample questions for this version
-            version_questions = []
-            for label, cfg in pools.items():
-                pool = cfg["pool"]
-                count = cfg["count"]
-                # If pool size >= count, sample random subset or shuffle
-                if len(pool) >= count:
-                    sampled = random.sample(pool, count)
-                else:
-                    sampled = pool[:count]
-                version_questions.extend(sampled)
-
-            # Shuffle questions within paper
-            random.shuffle(version_questions)
+            # Take exact master questions and shuffle order for this version paper
+            v_questions = list(master_questions)
+            version_rng = random.Random(f"wizard_v_{master_exam.id}_{v_code}_{i}")
+            version_rng.shuffle(v_questions)
 
             version_paper = self.env["exam.definition"].create({
                 "name": f"{self.name} - Version {v_code}",
@@ -198,7 +202,7 @@ class ExamGenerationWizard(models.TransientModel):
                 "duration_minutes": self.duration_minutes,
                 "passing_score_percentage": self.passing_score_percentage,
                 "selection_mode": "manual_select",
-                "manual_question_ids": [(6, 0, [q.id for q in version_questions])],
+                "manual_question_ids": [(6, 0, [q.id for q in v_questions])],
                 "is_version_paper": True,
                 "version_code": v_code,
                 "parent_exam_id": master_exam.id,

@@ -110,9 +110,8 @@
                             <p class="text-muted small mb-0"><i class="fa fa-map-marker me-1"/> <t t-esc="vacancy.operating_unit_id.name if vacancy.operating_unit_id else 'Addis Ababa'"/> | Released: <t t-esc="vacancy.release_date or 'N/A'"/></p>
                         </div>
                         <div class="mt-3 mt-sm-0">
-                            <t t-set="today" t-value="datetime.date.today()"/>
-                            <t t-if="vacancy.vacancy_status == 'closed' or (vacancy.last_date_to_apply and vacancy.last_date_to_apply &lt; today)">
-                                <span class="btn btn-danger disabled fw-bold" style="pointer-events: none; opacity: 0.7;"><i class="fa fa-lock me-1"/> Closed</span>
+                            <t t-if="vacancy.vacancy_status == 'closed'">
+                                <span class="btn btn-danger disabled fw-bold"><i class="fa fa-lock me-1"/> Closed</span>
                             </t>
                             <t t-elif="has_applied">
                                 <span class="btn btn-success disabled fw-bold" style="background-color: #2e7d32 !important; border-color: #2e7d32 !important;"><i class="fa fa-check-circle me-1"/> Applied</span>
@@ -210,7 +209,7 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small">Expected Salary (ETB)</label>
-                                <input type="number" step="100" name="expected_salary" class="form-control" placeholder="e.g. 25000"/>
+                                <input type="number" step="any" min="0" name="expected_salary" class="form-control" placeholder="e.g. 25000"/>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small">Notice Period (Days)</label>
@@ -338,7 +337,7 @@
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
                                     <span class="text-muted small fw-semibold text-uppercase">Profile Status</span>
-                                    <h2 class="fw-bold my-1" style="color: #1D2B32;"><t t-esc="completeness or 0"/>%</h2>
+                                    <h2 class="fw-bold my-1" style="color: #1D2B32;"><t t-esc="completeness"/>%</h2>
                                     <a href="/my/candidate/profile" class="text-decoration-none small fw-bold" style="color: #C17540;">Update Profile &amp; CV &#8594;</a>
                                 </div>
                                 <div class="rounded-circle p-3 d-flex align-items-center justify-content-center" style="background-color: rgba(29, 43, 50, 0.1); width: 50px; height: 50px;">
@@ -802,28 +801,15 @@
                     <!-- Right Step Builder Container -->
                     <div class="col-lg-9">
                         <div class="ats-profile-card p-4">
-                            <!-- Profile Incomplete Locked Notification Banner -->
+                            <!-- Profile Incomplete Helpful Reminder Banner -->
                             <t t-set="is_profile_complete" t-value="bool(candidate and candidate.cv_file and candidate.education_ids and candidate.experience_ids)"/>
-                            <t t-if="not is_profile_complete">
-                                <div class="alert alert-warning border-warning shadow-sm mb-4 d-flex align-items-center">
-                                    <i class="fa fa-lock fa-2x me-3" style="color: #C17540;"/>
+                            <t t-if="not is_profile_complete and (completeness or 0) &lt; 100">
+                                <div class="alert alert-light border shadow-sm mb-4 d-flex align-items-center" style="border-left: 4px solid #C17540 !important;">
+                                    <i class="fa fa-info-circle fa-2x me-3" style="color: #C17540;"/>
                                     <div>
-                                        <h6 class="fw-bold mb-1" style="color: #541718;">Master Profile Incomplete (Action Required)</h6>
-                                        <p class="small mb-0 text-dark">Please complete your <strong>Personal Info</strong>, <strong>Educational Qualifications</strong>, <strong>Professional Experience</strong>, and upload your <strong>Master CV Document</strong> to unlock Open Vacancies and Job Applications.</p>
+                                        <h6 class="fw-bold mb-1" style="color: #541718;">Profile Tip</h6>
+                                        <p class="small mb-0 text-dark">Complete your <strong>Personal Info</strong>, <strong>Educational Qualifications</strong>, <strong>Professional Experience</strong>, and upload your <strong>Master CV Document</strong> to strengthen your job applications.</p>
                                     </div>
-                                </div>
-                            </t>
-
-                            <t t-if="error_msg or request.params.get('error')">
-                                <div class="alert alert-danger alert-dismissible fade show mb-4 shadow-sm" role="alert">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fa fa-exclamation-triangle fa-2x me-3 text-danger"/>
-                                        <div>
-                                            <h6 class="fw-bold mb-1 text-danger">Application Requirement</h6>
-                                            <p class="small mb-0 text-dark"><t t-esc="error_msg or request.params.get('error')"/></p>
-                                        </div>
-                                    </div>
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
                             </t>
 
@@ -869,17 +855,36 @@
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="fw-semibold text-dark small"><i class="fa fa-tasks me-1" style="color: #C17540;"/> Master Profile Completeness</span>
                                 <span class="badge rounded-pill px-3 py-2 fw-bold text-white" style="background-color: #C17540; font-size: 0.85rem;">
-                                    <t t-out="completeness or 0"/>% Completed
+                                    <t t-out="completeness"/>% Completed
                                 </span>
                             </div>
                             <div class="ats-progress-bar-container position-relative mb-4" style="height: 18px; background-color: #e5e7eb; border-radius: 9px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
                                 <div class="ats-progress-bar-fill d-flex align-items-center justify-content-center text-white fw-bold" 
-                                     t-attf-style="width: #{completeness or 0}%; height: 100%; font-size: 0.75rem; background-image: linear-gradient(90deg, #541718 0%, #C17540 100%); transition: width 0.6s ease-in-out;">
-                                    <t t-if="(completeness or 0) &gt; 10">
-                                        <t t-out="completeness or 0"/>%
+                                     t-attf-style="width: #{completeness}%; height: 100%; font-size: 0.75rem; background-image: linear-gradient(90deg, #541718 0%, #C17540 100%); transition: width 0.6s ease-in-out;">
+                                    <t t-if="completeness &gt; 10">
+                                        <t t-out="completeness"/>%
                                     </t>
                                 </div>
                             </div>
+
+                            <!-- Backend Validation & Upload Error Alerts -->
+                            <t t-if="error">
+                                <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert" style="border-left: 5px solid #dc3545;">
+                                    <i class="fa fa-exclamation-triangle me-2" style="font-size: 1.1rem;"/>
+                                    <strong>Validation Notice:</strong> <t t-esc="error"/>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            </t>
+                            <t t-if="upload_error">
+                                <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert" style="border-left: 5px solid #dc3545;">
+                                    <i class="fa fa-exclamation-triangle me-2" style="font-size: 1.1rem;"/>
+                                    <strong>File Upload Error:</strong> <t t-esc="upload_error"/>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            </t>
+
+                            <!-- Dynamic Client-Side Validation Alert Container -->
+                            <div id="atsValidationAlertContainer"></div>
 
                             <!-- TAB 1: PROFILE SUMMARY (END-TO-END COMPLETE CATEGORIZED VIEW) -->
                             <t t-if="step == 1">
@@ -1307,7 +1312,8 @@
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-bold small">Phone Number <span class="text-danger">*</span></label>
-                                            <input type="text" name="phone" class="form-control" t-att-value="candidate.phone" required="required"/>
+                                            <input type="tel" name="phone" id="candidatePhoneInput" class="form-control" t-att-value="candidate.phone" placeholder="e.g. 0911223344 or +251911223344" required="required" pattern="^(\+251|00251|251|0)(9|7)[0-9]{8}$" title="Please enter a valid Ethiopian mobile phone number (e.g. 0911223344, 0711223344, or +251911223344)"/>
+                                            <small class="text-muted" style="font-size: 0.75rem;">Ethiopian format: <strong>09XXXXXXXX</strong>, <strong>07XXXXXXXX</strong>, or <strong>+2519XXXXXXXX</strong></small>
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label fw-bold small">National ID</label>
@@ -1484,43 +1490,21 @@
                                                                 <option value="summer" t-att-selected="edit_edu.program_type == 'summer' if edit_edu else False">Summer</option>
                                                             </select>
                                                         </div>
-                                                        <t t-set="fields_list" t-value="ethiopian_fields_of_study if ethiopian_fields_of_study else ['Accounting', 'Accounting &amp; Finance', 'Agribusiness Management', 'Agricultural Economics', 'Agricultural Engineering', 'Agriculture / Agronomy', 'Animal Science / Animal Production', 'Applied Chemistry', 'Applied Geology', 'Applied Mathematics', 'Applied Physics', 'Architecture &amp; Urban Planning', 'Automotive Technology / Engineering', 'Banking &amp; Finance', 'Biochemistry', 'Biology / Biological Sciences', 'Biomedical Engineering', 'Biotechnology', 'Business Administration (BBA / MBA)', 'Business Education', 'Chemical Engineering', 'Chemistry', 'Civil Engineering', 'Computer Engineering', 'Computer Science', 'Construction Technology &amp; Management', 'Cooperative Accounting / Management', 'Cotton &amp; Textile Engineering', 'Crop Science / Protection', 'Data Science / Analytics', 'Dental Medicine / Dentistry', 'Development Economics', 'Disaster Risk Management', 'Economics', 'Educational Planning &amp; Management', 'Electrical &amp; Computer Engineering', 'Electromechanical Engineering', 'Environmental Engineering', 'Environmental Health', 'Environmental Science', 'Fashion Design &amp; Garment Engineering', 'Finance / Financial Management', 'Food Engineering / Science &amp; Technology', 'Forestry / Agroforestry', 'General Nursing', 'Geography &amp; Environmental Studies', 'Geology / Earth Sciences', 'Geotechnical Engineering', 'Governance &amp; Development Studies', 'Graphic Design &amp; Multimedia', 'Hardware / Network Engineering', 'Healthcare / Health Service Management', 'History &amp; Heritage Management', 'Horticulture', 'Hotel &amp; Tourism Management', 'Human Resource Management (HRM)', 'Hydraulic &amp; Water Resources Engineering', 'Industrial Chemistry', 'Industrial Engineering', 'Information Systems / MIS', 'Information Technology (IT)', 'Instrumentation Engineering', 'Internal Audit / Auditing', 'International Relations &amp; Diplomacy', 'Journalism &amp; Communication', 'Laboratory Technology / Medical Lab Science', 'Law (LLB / LLM)', 'Leadership &amp; Organisational Management', 'Library &amp; Information Science', 'Logistics &amp; Supply Chain Management', 'Management', 'Management Information Systems (MIS)', 'Manufacturing Engineering', 'Marketing Management', 'Materials Science &amp; Engineering', 'Mathematical Modeling', 'Mathematics', 'Mechanical Engineering', 'Medical Laboratory Technology', 'Medicine / MD / MBBS', 'Midwifery', 'Mining Engineering', 'Music &amp; Performing Arts', 'Natural Resource Management', 'Neonatal Nursing', 'Nursing', 'Occupational Health &amp; Safety', 'Ophthalmology / Optometry', 'Parasitology / Microbiology', 'Petroleum Engineering', 'Pharmacy / Pharmaceutical Sciences', 'Philosophy', 'Physical Education &amp; Sports Science', 'Physics', 'Plant Sciences', 'Political Science &amp; International Relations', 'Power &amp; Control Engineering', 'Procurement &amp; Asset Management', 'Procurement &amp; Supply Chain Management', 'Public Administration', 'Public Health (MPH)', 'Radiography / Radiologic Technology', 'Real Estate &amp; Land Administration', 'Record &amp; Archives Management', 'Rural Development &amp; Agricultural Extension', 'Software Engineering', 'Soil Science', 'Sociology &amp; Social Work', 'Special Needs Education', 'Statistics', 'Structural Engineering', 'Supply Chain &amp; Operations Management', 'Surveying &amp; Geomatics Engineering', 'System &amp; Network Administration', 'Tax &amp; Customs Administration', 'Telecommunication Engineering', 'Textile &amp; Apparel Engineering', 'Urban Planning &amp; Design', 'Veterinary Medicine (DVM)', 'Veterinary Science', 'Water Supply &amp; Environmental Engineering', 'Wildlife &amp; Eco-Tourism', 'Wood Science &amp; Technology', 'Zoology', 'Other']"/>
-
-                                                        <t t-set="inst_list" t-value="ethiopian_institutions if ethiopian_institutions else ['AASTU (Addis Ababa Science &amp; Technology University)', 'Adama Science and Technology University (ASTU)', 'Addis Ababa University (AAU)', 'Admas University', 'Alpha University College', 'Ambo University', 'Arba Minch University', 'Arsi University', 'Assosa University', 'Atlas College', 'Axum University', 'Bahir Dar University', 'Beshale University College', 'Borana University', 'Bule Hora University', 'CPU College', 'Debre Berhan University', 'Debre Markos University', 'Debre Tabor University', 'Defense University', 'Dembi Dolo University', 'Densu University College', 'Dilla University', 'Dire Dawa University', 'Ethio-China TVET Institute', 'Ethiopian Aviation University (EAU)', 'Ethiopian Civil Service University (ECSU)', 'Ethiopian Police University', 'Gage College', 'Gambella University', 'Grace College', 'Harambee University', 'Haramaya University', 'Hawassa University', 'HiLCoE School of Computer Science &amp; Technology', 'Hope Enterprise University College', 'Injibara University', 'Jigjiga University', 'Jinka University', 'Jimma University', 'Kebri Dehar University', 'Kotebe Education University (KEU)', 'Leadstar University College', 'Madda Walabu University', 'Mekelle University', 'Mettu University', 'Micro Business College', 'Microlink Information Technology College', 'National Aviation College', 'New Generation University College', 'Nile College', 'Oasis College', 'Oda Bultum University', 'Paradigm College', 'Paramount College', 'Princess Zenebework Nursing College', &quot;Queen's College&quot;, 'Raya University', 'Rift Valley College', 'Rift Valley University', 'Royal College', 'Salale University', 'Santex College', 'Semera University', &quot;St. Mary's University&quot;, 'Tropical College of Medicine', 'Unity University', 'Universal College', 'Universal Medical College', 'University of Gondar', 'Wachamo University', 'Werabe University', 'Wolaita Sodo University', 'Woldia University', 'Wollo University', 'Yanet College', 'Yardstick International College', 'Other']"/>
-
-                                                        <datalist id="fieldsList">
-                                                            <t t-foreach="fields_list" t-as="fos_opt">
-                                                                <option t-att-value="fos_opt"/>
-                                                            </t>
-                                                        </datalist>
-
-                                                        <datalist id="instList">
-                                                            <t t-foreach="inst_list" t-as="inst_opt">
-                                                                <option t-att-value="inst_opt"/>
-                                                            </t>
-                                                        </datalist>
-
                                                         <div class="col-md-6">
                                                             <label class="form-label fw-bold small">Field of Study <span class="text-danger">*</span></label>
-                                                            <t t-set="saved_fos" t-value="edit_edu.field_of_study if edit_edu else ''"/>
-                                                            <t t-set="is_fos_in_list" t-value="saved_fos in fields_list if edit_edu else False"/>
-                                                            <t t-set="input_fos" t-value="saved_fos if is_fos_in_list else ('Other' if (edit_edu and saved_fos) else '')"/>
-                                                            <input list="fieldsList" name="field_of_study" class="form-control field-of-study-input" t-att-value="input_fos" placeholder="Type to search e.g. Computer Science" oninput="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.other-field-div'); if(this.value==='Other'){d.style.display='block';}else{d.style.display='none';}" onchange="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.other-field-div'); if(this.value==='Other'){d.style.display='block';}else{d.style.display='none';}"/>
+                                                            <input list="fieldsList" name="field_of_study" class="form-control" t-att-value="edit_edu.field_of_study if edit_edu else ''" placeholder="Type to search e.g. Computer Science" onchange="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.other-field-div'); if(this.value==='Other'){d.style.display='block';}else{d.style.display='none';}"/>
                                                         </div>
-                                                        <div class="col-md-6 other-field-div" t-att-style="'display: block;' if (edit_edu and (input_fos == 'Other' or edit_edu.other_field_of_study or not is_fos_in_list)) else 'display: none;'">
+                                                        <div class="col-md-6 other-field-div" style="display: none;">
                                                             <label class="form-label fw-bold small">Custom Field of Study</label>
-                                                            <input type="text" name="other_field_of_study" class="form-control" t-att-value="edit_edu.other_field_of_study or (saved_fos if not is_fos_in_list else '') if edit_edu else ''" placeholder="Specify Custom Field of Study"/>
+                                                            <input type="text" name="other_field_of_study" class="form-control" t-att-value="edit_edu.other_field_of_study if edit_edu else ''" placeholder="Specify Custom Field of Study"/>
                                                         </div>
                                                         <div class="col-md-6">
                                                             <label class="form-label fw-bold small">School / College / University <span class="text-danger">*</span></label>
-                                                            <t t-set="saved_inst" t-value="edit_edu.institution if edit_edu else ''"/>
-                                                            <t t-set="is_inst_in_list" t-value="saved_inst in inst_list if edit_edu else False"/>
-                                                            <t t-set="input_inst" t-value="saved_inst if is_inst_in_list else ('Other' if (edit_edu and saved_inst) else '')"/>
-                                                            <input list="instList" name="institution" class="form-control institution-input" t-att-value="input_inst" placeholder="Type to search e.g. Addis Ababa University" oninput="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.other-inst-div'); if(this.value==='Other'){d.style.display='block';}else{d.style.display='none';}" onchange="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.other-inst-div'); if(this.value==='Other'){d.style.display='block';}else{d.style.display='none';}"/>
+                                                            <input list="instList" name="institution" class="form-control" t-att-value="edit_edu.institution if edit_edu else ''" placeholder="Type to search e.g. Addis Ababa University" onchange="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.other-inst-div'); if(this.value==='Other'){d.style.display='block';}else{d.style.display='none';}"/>
                                                         </div>
-                                                        <div class="col-md-6 other-inst-div" t-att-style="'display: block;' if (edit_edu and (input_inst == 'Other' or edit_edu.other_institution or not is_inst_in_list)) else 'display: none;'">
+                                                        <div class="col-md-6 other-inst-div" style="display: none;">
                                                             <label class="form-label fw-bold small">Custom Institution</label>
-                                                            <input type="text" name="other_institution" class="form-control" t-att-value="edit_edu.other_institution or (saved_inst if not is_inst_in_list else '') if edit_edu else ''" placeholder="Specify Custom Institution"/>
+                                                            <input type="text" name="other_institution" class="form-control" t-att-value="edit_edu.other_institution if edit_edu else ''" placeholder="Specify Custom Institution"/>
                                                         </div>
                                                         <div class="col-md-4">
                                                              <label class="form-label fw-bold small">Year of Graduation</label>
@@ -1998,7 +1982,7 @@
                                                     </div>
                                                     <div class="row g-3">
                                                         <div class="col-md-6">
-                                                            <label class="form-label fw-bold small">Certification Title <span class="text-danger">*</span></label>
+                                                            <label class="form-label fw-bold small">Certification Title <span class="text-muted fw-normal">(Optional)</span></label>
                                                             <input type="text" name="cert_name" class="form-control" t-att-value="edit_cert.name if edit_cert else ''" placeholder="e.g. AWS Certified Solutions Architect"/>
                                                         </div>
                                                         <div class="col-md-6">
@@ -2324,30 +2308,213 @@
                                     </div>
                                 </form>
 
-                                <!-- Universal Client-side File Validation Script -->
-                                <script>
-                                    document.addEventListener('DOMContentLoaded', function() {
-                                        var fileInputs = document.querySelectorAll('.file-validate-input');
-                                        fileInputs.forEach(function(input) {
-                                            input.addEventListener('change', function() {
-                                                var file = this.files[0];
-                                                if (!file) return;
-                                                var maxMb = parseFloat(this.getAttribute('data-max-size') || '5');
-                                                var recMb = parseFloat(this.getAttribute('data-rec-size') || '2');
-                                                var typeName = this.getAttribute('data-type-name') || 'File';
-                                                var maxBytes = maxMb * 1024 * 1024;
-                                                var fileSizeMb = (file.size / (1024 * 1024)).toFixed(2);
-
-                                                if (file.size > maxBytes) {
-                                                    alert("⚠️ File Too Large!\n\nThe selected " + typeName + " (" + fileSizeMb + " MB) exceeds the maximum allowed limit of " + maxMb + " MB.\n\nPlease upload a smaller or compressed file (Recommended: &lt; " + recMb + " MB).");
-                                                    this.value = "";
-                                                }
-                                            });
-                                        });
-                                    });
-                                </script>
                             </t>
 
+                            <!-- Universal Client-side Validation &amp; Missing Field Indicators Script -->
+                            <script type="text/javascript">
+                            //<![CDATA[
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    // 1. File Size Validation
+                                    var fileInputs = document.querySelectorAll('.file-validate-input');
+                                    fileInputs.forEach(function(input) {
+                                        input.addEventListener('change', function() {
+                                            var file = this.files[0];
+                                            if (!file) return;
+                                            var maxMb = parseFloat(this.getAttribute('data-max-size') || '5');
+                                            var recMb = parseFloat(this.getAttribute('data-rec-size') || '2');
+                                            var typeName = this.getAttribute('data-type-name') || 'File';
+                                            var maxBytes = maxMb * 1024 * 1024;
+                                            var fileSizeMb = (file.size / (1024 * 1024)).toFixed(2);
+
+                                            if (file.size > maxBytes) {
+                                                alert("⚠️ File Too Large!\n\nThe selected " + typeName + " (" + fileSizeMb + " MB) exceeds the maximum allowed limit of " + maxMb + " MB.\n\nPlease upload a smaller or compressed file (Recommended: < " + recMb + " MB).");
+                                                this.value = "";
+                                            }
+                                        });
+                                    });
+
+                                    // 2. Save & Next Required Fields Validation and Visual Indicators
+                                    function getFieldLabel(el) {
+                                        if (el.getAttribute('data-field-name')) return el.getAttribute('data-field-name');
+                                        var container = el.closest('.col-md-6, .col-md-4, .col-md-3, .col-md-8, .col-md-12, .col-12, .mb-3, .form-group');
+                                        if (container) {
+                                            var label = container.querySelector('label');
+                                            if (label) {
+                                                var txt = label.innerText.replace('*', '').replace(/\s+/g, ' ').trim();
+                                                if (txt) return txt;
+                                            }
+                                        }
+                                        return el.placeholder || el.name || 'Required Field';
+                                    }
+
+                                    var forms = document.querySelectorAll('form');
+                                    forms.forEach(function(form) {
+                                        form.addEventListener('submit', function(e) {
+                                            var valid = true;
+                                            var firstInvalid = null;
+                                            var missingFieldNames = [];
+
+                                            // Clear previous invalid styles & feedback messages
+                                            form.querySelectorAll('.is-invalid').forEach(function(el) {
+                                                el.classList.remove('is-invalid');
+                                            });
+                                            form.querySelectorAll('.ats-inline-feedback').forEach(function(el) {
+                                                el.remove();
+                                            });
+                                            var alertBox = document.getElementById('atsValidationAlertContainer');
+                                            if (alertBox) alertBox.innerHTML = '';
+
+                                            function markFieldInvalid(el, fieldName) {
+                                                if (!el) return;
+                                                el.classList.add('is-invalid');
+                                                valid = false;
+                                                var labelName = fieldName || getFieldLabel(el);
+                                                if (!missingFieldNames.includes(labelName)) {
+                                                    missingFieldNames.push(labelName);
+                                                }
+                                                if (!firstInvalid) firstInvalid = el;
+
+                                                var existingFeedback = el.parentNode.querySelector('.ats-inline-feedback');
+                                                if (!existingFeedback) {
+                                                    var feedback = document.createElement('div');
+                                                    feedback.className = 'ats-inline-feedback text-danger small mt-1 fw-semibold';
+                                                    feedback.innerHTML = '<i class="fa fa-exclamation-circle me-1"></i> ' + labelName + ' is required.';
+                                                    if (el.nextSibling) {
+                                                        el.parentNode.insertBefore(feedback, el.nextSibling);
+                                                    } else {
+                                                        el.parentNode.appendChild(feedback);
+                                                    }
+                                                }
+                                            }
+
+                                            // Step 2: Personal Info Specific Validation
+                                            if (form.action && form.action.includes('step=2')) {
+                                                var fn = form.querySelector('[name="first_name"]');
+                                                if (fn && !fn.value.trim()) markFieldInvalid(fn, "First Name");
+                                                var mn = form.querySelector('[name="middle_name"]');
+                                                if (mn && !mn.value.trim()) markFieldInvalid(mn, "Father's Name (Middle Name)");
+                                                var phone = form.querySelector('[name="phone"]');
+                                                if (phone) {
+                                                    var pVal = phone.value.trim().replace(/[\s\-\(\)]/g, '');
+                                                    if (!pVal) {
+                                                        markFieldInvalid(phone, "Mobile Phone Number");
+                                                    } else if (!/^(\+251|00251|251|0)(9|7)\d{8}$/.test(pVal)) {
+                                                        markFieldInvalid(phone, "Ethiopian Phone Number (Must start with 09, 07, or +251 followed by 8 digits, e.g. 0911223344)");
+                                                    }
+                                                }
+                                                var gender = form.querySelector('[name="gender"]');
+                                                if (gender && !gender.value.trim()) markFieldInvalid(gender, "Gender");
+                                            }
+
+                                            // Step 3: Education Card Validation
+                                            if (form.id === 'eduMainForm' || (form.action && form.action.includes('step=3'))) {
+                                                var isEditEdu = !!form.querySelector('[name="edit_id"]');
+                                                var hasSavedEdu = document.querySelectorAll('.table tbody tr').length > 0;
+                                                var eduCards = form.querySelectorAll('.edu-entry-card');
+
+                                                eduCards.forEach(function(card, idx) {
+                                                    var fStudy = card.querySelector('[name="field_of_study"]');
+                                                    var inst = card.querySelector('[name="institution"]');
+                                                    var otherF = card.querySelector('[name="other_field_of_study"]');
+                                                    var otherI = card.querySelector('[name="other_institution"]');
+
+                                                    var fVal = fStudy ? fStudy.value.trim() : '';
+                                                    var iVal = inst ? inst.value.trim() : '';
+                                                    var otherFVal = otherF ? otherF.value.trim() : '';
+                                                    var otherIVal = otherI ? otherI.value.trim() : '';
+
+                                                    var cardStarted = fVal !== '' || iVal !== '' || isEditEdu || (!hasSavedEdu && idx === 0);
+
+                                                    if (cardStarted) {
+                                                        if (!fVal || (fVal === 'Other' && !otherFVal)) {
+                                                            markFieldInvalid(fVal === 'Other' ? otherF : fStudy, fVal === 'Other' ? "Custom Field of Study" : "Field of Study / Major");
+                                                        }
+                                                        if (!iVal || (iVal === 'Other' && !otherIVal)) {
+                                                            markFieldInvalid(iVal === 'Other' ? otherI : inst, iVal === 'Other' ? "Custom Institution" : "School / College / University");
+                                                        }
+                                                    }
+                                                });
+                                            }
+
+                                            // Step 4: Experience Card Validation
+                                            if (form.id === 'expMainForm' || (form.action && form.action.includes('step=4'))) {
+                                                var isEditExp = !!form.querySelector('[name="edit_id"]');
+                                                var hasSavedExp = document.querySelectorAll('.exp-saved-row').length > 0;
+                                                var expCards = form.querySelectorAll('.exp-entry-card');
+
+                                                expCards.forEach(function(card, idx) {
+                                                    var pos = card.querySelector('[name="position"]');
+                                                    var org = card.querySelector('[name="organization"]');
+                                                    var sDate = card.querySelector('[name="start_date"]');
+
+                                                    var pVal = pos ? pos.value.trim() : '';
+                                                    var oVal = org ? org.value.trim() : '';
+                                                    var sVal = sDate ? sDate.value.trim() : '';
+
+                                                    var cardStarted = pVal !== '' || oVal !== '' || sVal !== '' || isEditExp || (!hasSavedExp && idx === 0);
+
+                                                    if (cardStarted) {
+                                                        if (!pVal) markFieldInvalid(pos, "Job Title / Position");
+                                                        if (!oVal) markFieldInvalid(org, "Company / Organization");
+                                                        if (!sVal) markFieldInvalid(sDate, "Start Date");
+                                                    }
+                                                });
+                                            }
+
+                                            // Universal validation for all standard inputs with required attribute
+                                            var elements = form.querySelectorAll('input, select, textarea');
+                                            elements.forEach(function(el) {
+                                                if (el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return;
+                                                if (el.offsetParent === null && el.type !== 'file') return;
+
+                                                if (el.hasAttribute('required') && !el.value.trim()) {
+                                                    markFieldInvalid(el, getFieldLabel(el));
+                                                } else if (el.validity && !el.validity.valid) {
+                                                    markFieldInvalid(el, getFieldLabel(el));
+                                                }
+                                            });
+
+                                            if (!valid) {
+                                                e.preventDefault();
+                                                // Display prominent top banner with missing fields list
+                                                if (alertBox && missingFieldNames.length > 0) {
+                                                    var listHtml = missingFieldNames.map(function(name) {
+                                                        return '<li><strong>' + name + '</strong></li>';
+                                                    }).join('');
+                                                    alertBox.innerHTML = '<div class="alert alert-danger shadow-sm border-0 d-flex align-items-start mb-4" role="alert" style="border-left: 5px solid #dc3545 !important; background-color: #fff5f5;"><i class="fa fa-exclamation-triangle text-danger fs-4 me-3 mt-1"></i><div class="flex-grow-1"><h6 class="fw-bold text-danger mb-1">Missing Required Fields!</h6><p class="small text-dark mb-1">Please complete the following required information before continuing:</p><ul class="mb-0 small text-danger ps-3">' + listHtml + '</ul></div><button type="button" class="btn-close" onclick="this.closest(\'.alert\').remove();" aria-label="Close"></button></div>';
+                                                    alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                } else if (firstInvalid) {
+                                                    firstInvalid.focus();
+                                                    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                }
+                                                if (form.reportValidity) {
+                                                    form.reportValidity();
+                                                }
+                                            }
+                                        });
+
+                                        // Remove is-invalid and inline feedback on user input / change
+                                        function clearInvalid(el) {
+                                            if (el.classList.contains('is-invalid')) {
+                                                el.classList.remove('is-invalid');
+                                                var parent = el.parentNode;
+                                                if (parent) {
+                                                    var fb = parent.querySelector('.ats-inline-feedback');
+                                                    if (fb) fb.remove();
+                                                }
+                                            }
+                                        }
+
+                                        form.addEventListener('input', function(e) {
+                                            clearInvalid(e.target);
+                                        });
+                                        form.addEventListener('change', function(e) {
+                                            clearInvalid(e.target);
+                                        });
+                                    });
+                                });
+                            //]]>
+                            </script>
                         </div>
                     </div>
                 </div>

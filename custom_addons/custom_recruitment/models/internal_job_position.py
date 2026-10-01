@@ -43,46 +43,35 @@ class InternalJobPosition(models.Model):
     def apply(self):
         p_id = self.id
         today = date.today()
-        n = 0
-        x = 0
-        for val in self.employee_vacancy_ids:
-            if val:
-                x = x + 1
-                if val.location_preference > 0:
-                    n = n + 1
-        if x > 0:
-            if n > 0:
-                if self.last_date_to_apply and self.last_date_to_apply < today:
-                    raise ValidationError(_('You cannot apply after the Last Date to Apply.'))
-                else:
-                    # Auto-fill employee_id if missing from the available vacancy record
-                    for rec in self:
-                        if not rec.employee_id:
-                            emp = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
-                            if not emp:
-                                emp = self.env['hr.employee'].search([('create_uid', '=', self.env.uid)], limit=1)
-                            if emp:
-                                rec.write({
-                                    'employee_id': emp.id,
-                                    'employee_user_id': self.env.uid,
-                                    'employee_applicant': emp.name,
-                                })
+        if self.last_date_to_apply and self.last_date_to_apply < today:
+            raise ValidationError(_('You cannot apply after the Last Date to Apply.'))
 
-                    self.env.cr.execute('SELECT internal_application(%s)', (p_id,))
-                    self.env.invalidate_all()
-                    return {
-                        'type': 'ir.actions.client',
-                        'tag': 'display_notification',
-                        'params': {
-                            'title': _('Application Submitted'),
-                            'message': _('Your application has been successfully submitted.'),
-                            'type': 'success',
-                            'sticky': False,
-                            'next': {'type': 'ir.actions.client', 'tag': 'reload'},
-                        }
-                    }
-            else:
-                raise ValidationError(_('Please enter your preferences of work units.'))
+        # Auto-fill employee_id if missing from the available vacancy record
+        for rec in self:
+            if not rec.employee_id:
+                emp = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+                if not emp:
+                    emp = self.env['hr.employee'].search([('create_uid', '=', self.env.uid)], limit=1)
+                if emp:
+                    rec.write({
+                        'employee_id': emp.id,
+                        'employee_user_id': self.env.uid,
+                        'employee_applicant': emp.name,
+                    })
+
+        self.env.cr.execute('SELECT internal_application(%s)', (p_id,))
+        self.env.invalidate_all()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Application Submitted'),
+                'message': _('Your application has been successfully submitted.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def accept_promotion(self):
         p_id = self.employee_id
@@ -288,6 +277,5 @@ class InternalJobVacancy(models.Model):
     vacancy_id = fields.Many2one('employee.recruitment.available', string="Employee Vacancy")
     employee_applicant = fields.Char("Employee Applicant")
     operating_unit = fields.Char("Work Unit", readonly=True)
-    number_of_vacancies = fields.Integer("Number of Vacancies")
-    location_preference = fields.Integer(string="Location Preference", help='Provide Location Preference',
-                                         )
+    number_of_vacancies = fields.Integer("Number of Vacancies", readonly=True)
+    location_preference = fields.Integer(string="Location Preference", help='Provide Location Preference')

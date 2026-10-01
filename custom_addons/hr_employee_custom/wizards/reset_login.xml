@@ -36,6 +36,6 @@
 <!--           action="action_Preprocessig_salary_details_wizard"-->
 
 <!-- />-->
-    net salary payment wizard
-    <menuitem id="menu_Reset_login_wizard" name="Reset Employee Login Wizard" parent="hr_employee_custom.menu_hr_payroll_community_wizards_stub" action="action_reset_login_wizard"/>
+    
+    <menuitem id="menu_Reset_login_wizard" name="Reset Employee Login Wizard" parent="hr.menu_human_resources_configuration" action="action_reset_login_wizard"/>
 </odoo>

@@ -308,10 +308,16 @@ class PbmsTargetCascadeWizard(models.TransientModel):
         Line = self.env["pbms.plan.category.line"]
 
         if cascade_level == "ho_to_district":
-            recipient_units = self.env["operating.unit"].search([
+            ho_unit = plan.org_unit_id if plan else False
+            domain = [
                 ("work_unit_type", "=", "district_office"),
                 ("active", "=", True),
-            ])
+            ]
+            if ho_unit:
+                child_districts = self.env["operating.unit"].search(domain + [("parent_unit", "=", ho_unit.id)])
+                recipient_units = child_districts if child_districts else self.env["operating.unit"].search(domain)
+            else:
+                recipient_units = self.env["operating.unit"].search(domain)
         else:
             district_unit = plan.org_unit_id
             recipient_units = self.env["operating.unit"].search([
@@ -598,11 +604,13 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                     # Preserve the original proposed target as the baseline
                     orig_proposed = target_line.proposed_annual_total or target_line.annual_total or 0.0
 
-                    # ONLY update approved target fields on the existing row!
+                    # Update both active monthly targets and approved target fields on the existing row
                     update_vals = {
                         "is_cascaded": True,
+                        "annual_total": prod_alloc_total,
                         "approved_annual_total": prod_alloc_total,
                         "proposed_annual_total": orig_proposed,
+                        **m_vals,
                         **approved_m_vals,
                     }
                     if self.category == "deposit" and getattr(s_line, "opening_balance", False):

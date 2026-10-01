@@ -362,15 +362,10 @@ class RecruitmentCandidateScore(models.Model):
 
     @api.constrains("vacancy_employee_category", "job_level")
     def _check_job_level_required(self):
+        """Job Level is optional."""
         for rec in self:
-            if rec.vacancy_employee_category == "Non Managerial" and not rec.job_level:
-                raise ValidationError(_(
-                    "Job Level (Junior / Senior) is required for Non-Managerial vacancies."
-                ))
             if rec.vacancy_employee_category == "Managerial" and rec.job_level:
-                raise ValidationError(_(
-                    "Job Level does not apply to Managerial vacancies — clear it before saving."
-                ))
+                rec.job_level = False
 
     # ── : auto-populate weights from the matrix ─────────────────
     @api.onchange("recruitment_type", "vacancy_employee_category", "job_level")

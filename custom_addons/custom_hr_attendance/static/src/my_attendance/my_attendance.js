@@ -25,6 +25,7 @@ export class MyAttendance extends Component {
     setup() {
         this.notification = useService("notification");
         this.action = useService("action");
+        this.menu = useService("menu");
         this.formatFloatTime = registry.category("formatters").get("float_time");
 
         this.state = useState({
@@ -299,6 +300,9 @@ export class MyAttendance extends Component {
                 longitude,
             });
             this._fill(data);
+            if (this.menu) {
+                this.menu.reload();
+            }
             if (data && data.notification) {
                 this.notification.add(data.notification.message, {
                     title: data.notification.title,

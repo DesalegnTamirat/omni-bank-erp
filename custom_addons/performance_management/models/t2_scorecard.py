@@ -11,7 +11,7 @@ class T2Scorecard(models.Model):
     _rec_name = "employee_id"
     _order = "employee_id"
 
-    employee_id = fields.Many2one("hr.employee", string="Employee",)
+    employee_id = fields.Many2one("hr.employee", string="Employee", default=lambda self: self.env.user.employee_id)
     manager_id = fields.Many2one("hr.employee", string="Manager", readonly=True)
 
     planning_name = fields.Char(

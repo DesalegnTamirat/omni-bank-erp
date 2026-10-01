@@ -42,8 +42,8 @@
                         <page string="Vacancies">
                             <field name="employee_vacancy_ids">
                                 <list editable="bottom">
-                                    <field name="operating_unit" width="40%"/>
-                                    <field name="number_of_vacancies" width="30%"/>
+                                    <field name="operating_unit" width="40%" readonly="1"/>
+                                    <field name="number_of_vacancies" width="30%" readonly="1"/>
                                     <field name="location_preference" width="30%"/>
                                 </list>
                             </field>

@@ -61,26 +61,62 @@
 
         <!-- QWEB REPORT DOCUMENT TEMPLATES -->
 
+        <!-- Shared Bunna Bank Report Header (Repeats on Every Page) -->
+        <template id="competency_report_bunna_header">
+            <div class="header" style="font-family: Arial, sans-serif; font-size: 11px;">
+                <table style="width: 100%; border-bottom: 2px solid #541718; padding-bottom: 4px; margin-bottom: 8px;">
+                    <tr>
+                        <td style="width: 28%; text-align: left; vertical-align: middle;">
+                            <img t-att-src="'data:image/png;base64,%s' % doc.get_bunna_logo_base64()" style="max-height: 48px; width: auto;" alt="Bunna Bank S.C."/>
+                        </td>
+                        <td style="width: 44%; text-align: center; vertical-align: middle;">
+                            <div style="font-size: 15px; font-weight: 700; color: #541718; letter-spacing: 0.5px;">BUNNA BANK S.C.</div>
+                            <div style="font-size: 10px; font-weight: 600; color: #726732;">Bank of the Visionaries</div>
+                            <div style="font-size: 11px; font-weight: 600; color: #1d2b32; margin-top: 2px;">
+                                <t t-out="report_title"/>
+                            </div>
+                        </td>
+                        <td style="width: 28%; text-align: right; vertical-align: middle; font-size: 9px; color: #64748b;">
+                            <div><b>Cycle:</b> <t t-out="doc.cycle_id.name if 'cycle_id' in doc._fields and doc.cycle_id else ''"/></div>
+                            <div><b>Generated:</b> <t t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></div>
+                            <div><b>Page:</b> <span class="page"/> / <span class="topage"/></div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </template>
+
+        <!-- Shared Bunna Bank Report Footer (Repeats on Every Page) -->
+        <template id="competency_report_bunna_footer">
+            <div class="footer" style="border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; padding-top: 4px; font-family: Arial, sans-serif;">
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="text-align: left;">Bunna Bank S.C. - Human Resources Directorate | Confidential</td>
+                        <td style="text-align: right;">Page <span class="page"/> of <span class="topage"/></td>
+                    </tr>
+                </table>
+            </div>
+        </template>
+
         <!-- TIER 1: Individual Competency Profile & Gap Analysis Template -->
         <template id="report_competency_assessment_individual">
             <t t-call="web.html_container">
                 <t t-foreach="docs" t-as="doc">
-                    <t t-call="web.external_layout">
-                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                    <t t-call="web.basic_layout">
+                        <t t-set="report_title" t-value="'Individual Competency Profile &amp; Gap Analysis Report'"/>
+                        <t t-call="competency_management.competency_report_bunna_header"/>
+                        <t t-call="competency_management.competency_report_bunna_footer"/>
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 6px 10px;">
                             
-                            <!-- Cover Strip Header: #541718 Maroon & #726732 Accent -->
-                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                            <!-- Cover Strip Header: Reference & Identity Sub-strip -->
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 8px 14px; border-radius: 4px; margin-bottom: 14px; border-bottom: 3px solid #726732;">
                                 <table style="width: 100%; border: none;">
                                     <tr>
-                                        <td style="width: 65%; text-align: left; vertical-align: middle;">
-                                            <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
-                                            <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
-                                                Individual Competency Profile &amp; Gap Analysis Report
-                                            </div>
+                                        <td style="width: 60%; text-align: left; vertical-align: middle;">
+                                            <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">Competency Assessment Record</span>
                                         </td>
-                                        <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
-                                            <div><b>Report Ref:</b> <t t-out="doc.name"/></div>
-                                            <div><b>Generated:</b> <t t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></div>
+                                        <td style="width: 40%; text-align: right; vertical-align: middle; font-size: 10px; color: #cbd5e1;">
+                                            <b>Report Ref:</b> <t t-out="doc.name"/> | <b>Status:</b> <t t-out="dict(doc._fields['state'].selection).get(doc.state, doc.state)"/>
                                         </td>
                                     </tr>
                                 </table>
@@ -233,23 +269,22 @@
             <t t-call="web.html_container">
                 <t t-foreach="docs" t-as="doc">
                     <t t-set="tdata" t-value="doc.get_team_gap_data()"/>
-                    <t t-call="web.external_layout">
-                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                    <t t-call="web.basic_layout">
+                        <t t-set="report_title" t-value="'Team Competency Gap Report'"/>
+                        <t t-call="competency_management.competency_report_bunna_header"/>
+                        <t t-call="competency_management.competency_report_bunna_footer"/>
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 6px 10px;">
                             
-                            <!-- Cover Strip Header -->
-                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                            <!-- Cover Strip Header: Scope Bar -->
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 8px 14px; border-radius: 4px; margin-bottom: 14px; border-bottom: 3px solid #726732;">
                                 <table style="width: 100%; border: none;">
                                     <tr>
-                                        <td style="width: 65%; text-align: left; vertical-align: middle;">
-                                            <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
-                                            <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
-                                                Team Competency Gap Report
-                                            </div>
+                                        <td style="width: 50%; text-align: left; vertical-align: middle;">
+                                            <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">Supervisor: </span>
+                                            <span style="font-size: 13px; font-weight: 600; color: #fed7aa;"><t t-out="tdata['supervisor_name']"/></span>
                                         </td>
-                                        <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
-                                            <div><b>Supervisor:</b> <t t-out="tdata['supervisor_name']"/></div>
-                                            <div><b>Cycle:</b> <t t-out="doc.cycle_id.name"/></div>
-                                            <div><b>Generated:</b> <t t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></div>
+                                        <td style="width: 50%; text-align: right; vertical-align: middle; font-size: 10px; color: #cbd5e1;">
+                                            <b>Cycle:</b> <t t-out="doc.cycle_id.name"/> | <b>Focus:</b> <t t-out="dict(doc._fields['assessment_type_filter'].selection).get(doc.assessment_type_filter, 'All Ratings (360°)')"/>
                                         </td>
                                     </tr>
                                 </table>
@@ -329,23 +364,22 @@
             <t t-call="web.html_container">
                 <t t-foreach="docs" t-as="doc">
                     <t t-set="odata" t-value="doc.get_org_capability_data()"/>
-                    <t t-call="web.external_layout">
-                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                    <t t-call="web.basic_layout">
+                        <t t-set="report_title" t-value="'Organizational Capability &amp; TNA Report'"/>
+                        <t t-call="competency_management.competency_report_bunna_header"/>
+                        <t t-call="competency_management.competency_report_bunna_footer"/>
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 6px 10px;">
                             
-                            <!-- Cover Strip Header -->
-                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                            <!-- Cover Strip Header: Scope Bar -->
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 8px 14px; border-radius: 4px; margin-bottom: 14px; border-bottom: 3px solid #726732;">
                                 <table style="width: 100%; border: none;">
                                     <tr>
-                                        <td style="width: 65%; text-align: left; vertical-align: middle;">
-                                            <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
-                                            <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
-                                                Organizational Capability &amp; TNA Report
-                                            </div>
+                                        <td style="width: 50%; text-align: left; vertical-align: middle;">
+                                            <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">Campaign: </span>
+                                            <span style="font-size: 13px; font-weight: 600; color: #fed7aa;"><t t-out="doc.cycle_id.name"/></span>
                                         </td>
-                                        <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
-                                            <div><b>Cycle:</b> <t t-out="doc.cycle_id.name"/></div>
-                                            <div><b>Pillar Filter:</b> <t t-out="dict(doc._fields['pillar'].selection).get(doc.pillar)"/></div>
-                                            <div><b>Generated:</b> <t t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></div>
+                                        <td style="width: 50%; text-align: right; vertical-align: middle; font-size: 10px; color: #cbd5e1;">
+                                            <b>Focus:</b> <t t-out="dict(doc._fields['assessment_type_filter'].selection).get(doc.assessment_type_filter, 'All Ratings (360°)')"/> | <b>Pillar:</b> <t t-out="dict(doc._fields['pillar'].selection).get(doc.pillar, 'All')"/>
                                         </td>
                                     </tr>
                                 </table>
@@ -434,49 +468,123 @@
         <template id="report_competency_detailed_matrix">
             <t t-call="web.html_container">
                 <t t-foreach="docs" t-as="doc">
-                    <t t-call="web.external_layout">
-                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
-                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
-                                <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
-                                <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
-                                    Detailed Competency Performance &amp; 360 Multi-Rater Gap Matrix
-                                </div>
-                            </div>
-                            <t t-set="rows" t-value="doc._get_360_report_data_rows()"/>
-                            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
-                                <thead>
-                                    <tr style="background-color: #541718; color: #ffffff;">
-                                        <th style="padding: 5px; text-align: left;">Employee</th>
-                                        <th style="padding: 5px; text-align: left;">Job Position</th>
-                                        <th style="padding: 5px; text-align: left;">Competency</th>
-                                        <th style="padding: 5px; text-align: center;">Self</th>
-                                        <th style="padding: 5px; text-align: center;">Peer</th>
-                                        <th style="padding: 5px; text-align: center;">Subordinate</th>
-                                        <th style="padding: 5px; text-align: center;">Supervisor</th>
-                                        <th style="padding: 5px; text-align: center;">Weighted</th>
-                                        <th style="padding: 5px; text-align: center;">Required</th>
-                                        <th style="padding: 5px; text-align: center;">Gap</th>
-                                        <th style="padding: 5px; text-align: center;">Status</th>
+                    <t t-call="web.basic_layout">
+                        <t t-set="report_title" t-value="'Detailed Competency Performance &amp; Gap Matrix Report'"/>
+                        <t t-call="competency_management.competency_report_bunna_header"/>
+                        <t t-call="competency_management.competency_report_bunna_footer"/>
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 11px; color: #1d2b32; padding: 4px 8px;">
+
+                            <!-- Filter Scope Information Strip -->
+                            <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 6px 12px; margin-bottom: 14px; font-size: 10px; color: #334155;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 2px 4px;"><b>Assessment Cycle:</b> <t t-out="doc.cycle_id.name"/></td>
+                                        <td style="padding: 2px 4px;"><b>Assessment Type Filter:</b> <span style="font-weight: 700; color: #541718;"><t t-out="dict(doc._fields['assessment_type_filter'].selection).get(doc.assessment_type_filter, 'All Ratings (360°)')"/></span></td>
+                                        <td style="padding: 2px 4px;"><b>Competency Pillar:</b> <t t-out="dict(doc._fields['pillar'].selection).get(doc.pillar, 'All')"/></td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="rows" t-as="r">
-                                        <tr style="border-bottom: 1px solid #e2e8f0;">
-                                            <td style="padding: 4px;"><t t-out="r['emp_name']"/></td>
-                                            <td style="padding: 4px;"><t t-out="r['job_name']"/></td>
-                                            <td style="padding: 4px;"><t t-out="r['competency_name']"/></td>
-                                            <td style="padding: 4px; text-align: center;"><t t-out="r['self_rating']"/></td>
-                                            <td style="padding: 4px; text-align: center;"><t t-out="r['peer_avg']"/></td>
-                                            <td style="padding: 4px; text-align: center;"><t t-out="r['subordinate_avg']"/></td>
-                                            <td style="padding: 4px; text-align: center;"><t t-out="r['supervisor_avg']"/></td>
-                                            <td style="padding: 4px; text-align: center; font-weight: 700;"><t t-out="r['weighted_rating']"/></td>
-                                            <td style="padding: 4px; text-align: center;"><t t-out="r['required_level']"/></td>
-                                            <td style="padding: 4px; text-align: center;"><t t-out="r['weighted_gap']"/></td>
-                                            <td style="padding: 4px; text-align: center; font-weight: 600;"><t t-out="r['achievement_status']"/></td>
+                                    <tr t-if="doc.department_ids or doc.operating_unit_ids or doc.job_ids or doc.employee_ids">
+                                        <td colspan="3" style="padding: 2px 4px; border-top: 1px dashed #e2e8f0;">
+                                            <t t-if="doc.department_ids"><b>Departments:</b> <t t-out="', '.join(doc.department_ids.mapped('name'))"/> | </t>
+                                            <t t-if="doc.operating_unit_ids"><b>Workunits:</b> <t t-out="', '.join(doc.operating_unit_ids.mapped('name'))"/> | </t>
+                                            <t t-if="doc.job_ids"><b>Positions:</b> <t t-out="', '.join(doc.job_ids.mapped('name'))"/> | </t>
+                                            <t t-if="doc.employee_ids"><b>Employees:</b> <t t-out="', '.join(doc.employee_ids.mapped('name'))"/></t>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <t t-set="rows" t-value="doc._get_360_report_data_rows()"/>
+                            <t t-set="filter_type" t-value="doc.assessment_type_filter or 'all'"/>
+
+                            <!-- FULL 360 DEGREE COMPOSITE VIEW -->
+                            <t t-if="filter_type == 'all'">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
+                                    <thead>
+                                        <tr style="background-color: #541718; color: #ffffff;">
+                                            <th style="padding: 4px; text-align: left;">Employee</th>
+                                            <th style="padding: 4px; text-align: center;">Gender</th>
+                                            <th style="padding: 4px; text-align: left;">Department</th>
+                                            <th style="padding: 4px; text-align: left;">Job Position</th>
+                                            <th style="padding: 4px; text-align: left;">Competency</th>
+                                            <th style="padding: 4px; text-align: center;">Self</th>
+                                            <th style="padding: 4px; text-align: center;">Peer</th>
+                                            <th style="padding: 4px; text-align: center;">Sub</th>
+                                            <th style="padding: 4px; text-align: center;">Sup</th>
+                                            <th style="padding: 4px; text-align: center;">Weighted</th>
+                                            <th style="padding: 4px; text-align: center;">Required</th>
+                                            <th style="padding: 4px; text-align: center;">Gap</th>
+                                            <th style="padding: 4px; text-align: center;">Status</th>
                                         </tr>
-                                    </t>
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="rows" t-as="r">
+                                            <tr style="border-bottom: 1px solid #e2e8f0;">
+                                                <td style="padding: 4px; font-weight: 600;"><t t-out="r['emp_name']"/></td>
+                                                <td style="padding: 4px; text-align: center;"><t t-out="r['gender']"/></td>
+                                                <td style="padding: 4px;"><t t-out="r['department_name']"/></td>
+                                                <td style="padding: 4px;"><t t-out="r['job_name']"/></td>
+                                                <td style="padding: 4px;"><t t-out="r['competency_name']"/></td>
+                                                <td style="padding: 4px; text-align: center;"><t t-out="r['self_rating']"/></td>
+                                                <td style="padding: 4px; text-align: center;"><t t-out="r['peer_avg']"/></td>
+                                                <td style="padding: 4px; text-align: center;"><t t-out="r['subordinate_avg']"/></td>
+                                                <td style="padding: 4px; text-align: center;"><t t-out="r['supervisor_avg']"/></td>
+                                                <td style="padding: 4px; text-align: center; font-weight: 700;"><t t-out="r['weighted_rating']"/></td>
+                                                <td style="padding: 4px; text-align: center;"><t t-out="r['required_level']"/></td>
+                                                <td style="padding: 4px; text-align: center; font-weight: 600;"><t t-out="r['weighted_gap']"/></td>
+                                                <td style="padding: 4px; text-align: center; font-weight: 600;">
+                                                    <span t-attf-style="color: #{'#166534' if r['achievement_status'] == 'Fit / Qualified' else ('#991b1b' if r['achievement_status'] == 'Underqualified' else '#1d2b32')};">
+                                                        <t t-out="r['achievement_status']"/>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
+
+                            <!-- FOCUSED SINGLE ASSESSMENT TYPE VIEW (Self, Peer, Subordinate, Supervisor) -->
+                            <t t-else="">
+                                <t t-set="rating_headers" t-value="{'self': ('Self Rating', 'Self Gap'), 'peer': ('Peer Avg Rating', 'Peer Gap'), 'subordinate': ('Subordinate Avg Rating', 'Subordinate Gap'), 'supervisor': ('Supervisor Rating', 'Supervisor Gap')}"/>
+                                <t t-set="active_labels" t-value="rating_headers.get(filter_type, ('Current Rating', 'Gap'))"/>
+                                <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
+                                    <thead>
+                                        <tr style="background-color: #541718; color: #ffffff;">
+                                            <th style="padding: 5px; text-align: left;">Employee</th>
+                                            <th style="padding: 5px; text-align: center; width: 7%;">Gender</th>
+                                            <th style="padding: 5px; text-align: left;">Department</th>
+                                            <th style="padding: 5px; text-align: left;">Job Position</th>
+                                            <th style="padding: 5px; text-align: left;">Competency</th>
+                                            <th style="padding: 5px; text-align: center; width: 12%;"><t t-out="active_labels[0]"/></th>
+                                            <th style="padding: 5px; text-align: center; width: 12%;">Required Level</th>
+                                            <th style="padding: 5px; text-align: center; width: 12%;"><t t-out="active_labels[1]"/></th>
+                                            <th style="padding: 5px; text-align: center; width: 14%;">Qualification Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="rows" t-as="r">
+                                            <tr style="border-bottom: 1px solid #e2e8f0;">
+                                                <td style="padding: 4px; font-weight: 600;"><t t-out="r['emp_name']"/></td>
+                                                <td style="padding: 4px; text-align: center;"><t t-out="r['gender']"/></td>
+                                                <td style="padding: 4px;"><t t-out="r['department_name']"/></td>
+                                                <td style="padding: 4px;"><t t-out="r['job_name']"/></td>
+                                                <td style="padding: 4px;"><t t-out="r['competency_name']"/></td>
+                                                <td style="padding: 4px; text-align: center; font-weight: 700;"><t t-out="r['active_rating']"/></td>
+                                                <td style="padding: 4px; text-align: center;"><t t-out="r['required_level']"/></td>
+                                                <td style="padding: 4px; text-align: center; font-weight: 700;"><t t-out="r['active_gap']"/></td>
+                                                <td style="padding: 4px; text-align: center; font-weight: 600;">
+                                                    <span t-attf-style="color: #{'#166534' if r['achievement_status'] == 'Fit / Qualified' else ('#991b1b' if r['achievement_status'] == 'Underqualified' else '#1d2b32')};">
+                                                        <t t-out="r['achievement_status']"/>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
+
+                            <div t-if="not rows" style="padding: 20px; text-align: center; color: #64748b; font-style: italic;">
+                                No evaluated competency assessment records match the selected filter criteria.
+                            </div>
                         </div>
                     </t>
                 </t>
@@ -487,17 +595,14 @@
         <template id="report_competency_campaign_progress">
             <t t-call="web.html_container">
                 <t t-foreach="docs" t-as="doc">
-                    <t t-call="web.external_layout">
-                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
-                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
-                                <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
-                                <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
-                                    Assessment Campaign Completion &amp; Progress Tracking Report
-                                </div>
-                            </div>
-                            <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px;">
-                                <strong>Assessment Campaign:</strong> <t t-out="doc.cycle_id.name"/><br/>
-                                <strong>Deadline:</strong> <t t-out="doc.cycle_id.assessment_deadline"/>
+                    <t t-call="web.basic_layout">
+                        <t t-set="report_title" t-value="'Assessment Campaign Completion &amp; Progress Tracking Report'"/>
+                        <t t-call="competency_management.competency_report_bunna_header"/>
+                        <t t-call="competency_management.competency_report_bunna_footer"/>
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 6px 10px;">
+                            <div style="border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 12px; margin-bottom: 14px; background-color: #f8fafc; font-size: 11px;">
+                                <strong>Assessment Campaign:</strong> <t t-out="doc.cycle_id.name"/> | 
+                                <strong>Assessment Deadline:</strong> <t t-out="doc.cycle_id.assessment_deadline or 'Open'"/>
                             </div>
                             <t t-set="odata" t-value="doc.get_org_capability_data()"/>
                             <table style="width: 100%; border-collapse: collapse; font-size: 11px;">

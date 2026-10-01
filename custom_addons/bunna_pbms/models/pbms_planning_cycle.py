@@ -342,23 +342,42 @@ class PbmsPlanningCycle(models.Model):
             "bunna_pbms.group_pbms_cpco",
             "bunna_pbms.group_pbms_people_operations",
         )
+        group_ids = []
         for g_xmlid in group_xmlids:
-            g_users = self._get_users_with_group(g_xmlid)
-            if g_users:
-                users |= g_users
+            g = self.env.ref(g_xmlid, raise_if_not_found=False)
+            if g:
+                group_ids.append(g.id)
+        if group_ids:
+            try:
+                users |= self.env["res.users"].search([
+                    ("all_group_ids", "in", group_ids),
+                    ("active", "=", True),
+                ])
+            except Exception:
+                try:
+                    users |= self.env["res.users"].search([
+                        ("groups_id", "in", group_ids),
+                        ("active", "=", True),
+                    ])
+                except Exception:
+                    for g_xmlid in group_xmlids:
+                        users |= self._get_users_with_group(g_xmlid)
 
-        # 2. Operating Units: All Branches, Districts, and Head Offices
+        # 2. Operating Units: All Branches, Districts, Departments, and Head Offices
         if "operating.unit" in self.env:
             target_ous = self.env["operating.unit"].search([
                 ("active", "=", True),
-                ("work_unit_type", "in", ("branch", "district", "district_office", "head_office")),
             ])
-            for ou in target_ous:
-                if hasattr(ou, "user_ids") and ou.user_ids:
-                    users |= ou.user_ids.filtered(lambda u: u.active)
-                if hasattr(ou, "manager_id") and ou.manager_id and getattr(ou.manager_id, "user_id", False):
-                    if ou.manager_id.user_id.active:
-                        users |= ou.manager_id.user_id
+            if hasattr(target_ous, "user_ids"):
+                users |= target_ous.mapped("user_ids").filtered(lambda u: u.active)
+            if hasattr(target_ous, "manager_id"):
+                users |= target_ous.mapped("manager_id.user_id").filtered(lambda u: u.active)
+
+            # Department managers
+            if "hr.department" in self.env:
+                depts = self.env["hr.department"].search([("active", "=", True)])
+                if hasattr(depts, "manager_id"):
+                    users |= depts.mapped("manager_id.user_id").filtered(lambda u: u.active)
 
             if hasattr(self.env["res.users"], "assigned_operating_unit_ids"):
                 ou_assigned = self.env["res.users"].search([
@@ -445,9 +464,27 @@ class PbmsPlanningCycle(models.Model):
 
         _logger.info("Starting budget call for cycle %s (ID: %s)", self.name, self.id)
         self.write({'state': 'budget_call'})
+
+        deadline_lines = []
+        if self.branch_deadline:
+            deadline_lines.append(_("• <b>Branch Submission Deadline:</b> %s") % fields.Datetime.to_string(self.branch_deadline))
+        if self.district_deadline:
+            deadline_lines.append(_("• <b>District Endorsement Deadline:</b> %s") % fields.Datetime.to_string(self.district_deadline))
+        if self.head_office_deadline:
+            deadline_lines.append(_("• <b>Head Office Review Deadline:</b> %s") % fields.Datetime.to_string(self.head_office_deadline))
+        if self.board_deadline:
+            deadline_lines.append(_("• <b>Board Approval Deadline:</b> %s") % fields.Datetime.to_string(self.board_deadline))
+        deadlines_text = "<br/>".join(deadline_lines) if deadline_lines else _("Submission deadlines will be announced shortly.")
+
+        budget_call_msg = _(
+            "The annual Budget Call for <b>%s</b> has officially started.<br/>"
+            "All relevant Line Managers and Work Unit Heads are required to prepare and submit their plan and budget requests within the specified deadlines:<br/>"
+            "%s"
+        ) % (self.name, deadlines_text)
+
         self._notify_cycle_status_change(
             _("Budget Call Issued"),
-            _("The annual Budget Call has been officially issued. Units may begin reviewing baseline data."),
+            budget_call_msg,
         )
 
         return {
@@ -481,14 +518,6 @@ class PbmsPlanningCycle(models.Model):
                 _("Budget Year Opened for Unit Input"),
                 _("Planning cycle '%s' is now open for plan and budget input.<br/>%s") % (cycle.name, deadline_info),
             )
-
-            # In-app inbox notifications for all planning users across branches, districts, and head offices
-            target_users = cycle._get_all_planning_users()
-            summary = _("Plan Submission Window Open: %s") % cycle.name
-            note = _(
-                "Planning cycle <b>%s</b> is now open for plan and budget input.<br/>%s"
-            ) % (cycle.name, deadline_info)
-            cycle._send_inbox_notification(target_users, summary, note)
 
     def action_start_consolidation(self):
         self.write({"state": "consolidation"})

@@ -2,6 +2,7 @@
     'name': 'Performance Management',
     'version': '1.0',
     'summary': 'Custom module to measure employee and work unit performance.',
+    'post_init_hook': 'post_init_hook',
     'description': """
 Custom module to measure employee and work unit performance.
 

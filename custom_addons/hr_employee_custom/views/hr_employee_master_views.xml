@@ -416,6 +416,7 @@
                             <field name="competencies_id">
                                 <list editable="bottom">
                                     <field name="competencies" options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
+                                    <field name="required_level"/>
                                     <field name="requirement"/>
                                     <field name="response"/>
                                 </list>
@@ -1078,16 +1079,7 @@
             </field>
         </record>
 
-        <record id="hr_employee_view_search_contract_v2" model="ir.ui.view">
-            <field name="name">hr.employee.view.search.contract</field>
-            <field name="model">hr.employee</field>
-            <field name="inherit_id" ref="hr.view_employee_filter"/>
-            <field name="arch" type="xml">
-                <xpath expr="//filter[@name='message_needaction']" position="after">
-                    <separator/>
-                </xpath>
-            </field>
-        </record>
+        <!-- Removed hr_employee_view_search_contract_v2 to prevent contract_warning filter errors -->
 
         <!-- Form View for hr_experience_info_job (Recruitment Experience Criteria) -->
         <record id="view_hr_experience_info_job_form" model="ir.ui.view">

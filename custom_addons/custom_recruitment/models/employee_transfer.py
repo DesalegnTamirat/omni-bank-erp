@@ -37,6 +37,48 @@ class EmployeeTransferRequest(models.Model):
         return True
 
     _order = "request_date desc"
+    def _auto_init(self):
+        res = super()._auto_init()
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    UPDATE employee_transfer_request 
+                    SET state = CASE 
+                            WHEN state ILIKE 'draft' THEN 'draft'
+                            WHEN state ILIKE 'submitted' THEN 'submitted'
+                            WHEN state ILIKE '%under%' THEN 'under_review'
+                            WHEN state ILIKE 'approved' THEN 'approved'
+                            WHEN state ILIKE 'transferred' THEN 'transferred'
+                            WHEN state ILIKE 'rejected' THEN 'rejected'
+                            WHEN state ILIKE 'withdrawn' THEN 'withdrawn'
+                            WHEN state ILIKE 'refused' THEN 'refused'
+                            ELSE 'draft'
+                        END,
+                        acceptance_status = CASE 
+                            WHEN acceptance_status ILIKE 'accepted' THEN 'accepted'
+                            WHEN acceptance_status ILIKE 'rejected' OR acceptance_status ILIKE 'refused' OR acceptance_status ILIKE 'declined' THEN 'rejected'
+                            ELSE 'pending'
+                        END,
+                        eligibility_status = CASE 
+                            WHEN eligibility_status ILIKE 'ineligible' THEN 'ineligible'
+                            ELSE 'eligible'
+                        END,
+                        current_job_category = CASE 
+                            WHEN current_job_category ILIKE '%non%' THEN 'Non Managerial'
+                            WHEN current_job_category ILIKE '%manag%' THEN 'Managerial'
+                            ELSE 'Non Managerial'
+                        END,
+                        disciplinary_status = CASE 
+                            WHEN disciplinary_status ILIKE '%last%' THEN 'last_written_warning'
+                            WHEN disciplinary_status ILIKE '%second%' THEN 'second_warning'
+                            WHEN disciplinary_status ILIKE '%first%' THEN 'first_warning'
+                            ELSE 'none'
+                        END;
+                """)
+        except Exception as e:
+            pass
+        return res
+
 
     name = fields.Char(string="Reference", copy=False, readonly=True, default=lambda self: _("New"))
 

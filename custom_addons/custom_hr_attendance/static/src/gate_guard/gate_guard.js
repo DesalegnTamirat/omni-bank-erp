@@ -3,53 +3,105 @@
 import { patch } from "@web/core/utils/patch";
 import { actionService } from "@web/webclient/actions/action_service";
 import { menuService } from "@web/webclient/menus/menu_service";
+import { NavBar } from "@web/webclient/navbar/navbar";
+import { browser } from "@web/core/browser/browser";
 import { session } from "@web/session";
 import { _t } from "@web/core/l10n/translation";
 
 /**
  * Checks whether an action request is exempt from the ERP Access Gate check.
- * Allowed exempt actions: Check In / Check Out dashboard & Discuss.
+ * Allowed exempt actions: Check In / Check Out dashboard & Attendance management/settings.
  */
-function isActionExempt(actionRequest) {
+function isActionExempt(actionRequest, env) {
     if (!actionRequest) return false;
     let tag = "";
     let xmlId = "";
+    let resModel = "";
+    let actionId = null;
+
     if (typeof actionRequest === "string") {
         xmlId = actionRequest;
         tag = actionRequest;
     } else if (typeof actionRequest === "number") {
-        // Numeric action ID (e.g., action-187 for Employees) is NOT exempt
-        return false;
+        actionId = actionRequest;
     } else if (typeof actionRequest === "object") {
         tag = actionRequest.tag || actionRequest.type || "";
         xmlId = actionRequest.xml_id || actionRequest.xmlid || "";
+        resModel = actionRequest.res_model || "";
+        actionId = actionRequest.id || null;
     }
 
-    return (
+    // Always exempt: Check In / Check Out attendance dashboard
+    if (
         xmlId === "custom_hr_attendance.my_attendance_action" ||
         xmlId === "custom_hr_attendance.action_my_attendance" ||
         tag === "custom_hr_attendance.my_attendance_action" ||
         tag === "action_my_attendance" ||
-        xmlId === "mail.action_discuss" ||
-        tag === "mail.action_discuss" ||
-        tag === "mail"
-    );
+        xmlId === "attendances" ||
+        tag === "attendances"
+    ) {
+        return true;
+    }
+
+    // Attendance management actions & settings (allows admins/managers to manage attendance & toggle gate during emergency)
+    const isAttendance =
+        String(xmlId).startsWith("custom_hr_attendance.") ||
+        String(xmlId).startsWith("hr_attendance.") ||
+        String(resModel).startsWith("hr.attendance") ||
+        String(resModel).startsWith("job.shift") ||
+        String(resModel).startsWith("job.position") ||
+        String(resModel).startsWith("location.based") ||
+        String(resModel).startsWith("attendance.") ||
+        String(resModel).startsWith("my.shift") ||
+        String(resModel).startsWith("over.time") ||
+        String(resModel).startsWith("overtime.") ||
+        resModel === "res.config.settings" ||
+        tag === "res.config.settings";
+
+    if (isAttendance) {
+        return true;
+    }
+
+    // If it's a numeric action ID, check if it belongs to an exempt menu in menuService
+    if (actionId && env && env.services && env.services.menu) {
+        const allMenus = env.services.menu.getAll() || [];
+        const matchedMenu = allMenus.find((m) => m.actionID === actionId);
+        if (matchedMenu) {
+            const mXmlId = String(matchedMenu.xmlid || matchedMenu.xml_id || "");
+            const mName = String(matchedMenu.name || "");
+            if (
+                mXmlId.startsWith("custom_hr_attendance.") ||
+                mXmlId.startsWith("hr_attendance.") ||
+                mName.includes("Attendance") ||
+                mName.includes("Check In")
+            ) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 /**
  * Toggles a class on document.body so CSS can hide the top-left App Switcher (:::) icon
- * when an employee is NOT checked in.
+ * when an employee or administrator is NOT checked in.
  */
 function updateGateBodyClass() {
     const isGateActive = Boolean(
         session.enable_checkin_gate &&
-        !session.is_system_admin &&
         !session.attendance_checked_in
     );
     if (isGateActive) {
         document.body?.classList.add("o_gate_active");
+        if (!session.is_attendance_admin) {
+            document.body?.classList.add("o_gate_regular_user");
+        } else {
+            document.body?.classList.remove("o_gate_regular_user");
+        }
     } else {
         document.body?.classList.remove("o_gate_active");
+        document.body?.classList.remove("o_gate_regular_user");
     }
 }
 
@@ -97,7 +149,7 @@ if (document.body) {
 window.addEventListener(
     "click",
     (event) => {
-        if (session.enable_checkin_gate && !session.is_system_admin && !session.attendance_checked_in) {
+        if (session.enable_checkin_gate && !session.attendance_checked_in) {
             const toggleBtn = event.target.closest(
                 ".o_home_menu_toggle, .o_navbar_apps_menu, .o_menu_toggle, .o_app_switcher_toggle, [title='Apps'], [title='Home Menu']"
             );
@@ -117,6 +169,12 @@ window.addEventListener(
                         }
                     );
                 }
+                if (env && env.services && env.services.action) {
+                    env.services.action.doAction(
+                        { type: "ir.actions.client", tag: "custom_hr_attendance.my_attendance_action" },
+                        { clearBreadcrumbs: true }
+                    );
+                }
                 return false;
             }
         }
@@ -125,7 +183,35 @@ window.addEventListener(
 );
 
 /**
- * Patch actionService to block unauthorized action execution
+ * If an attendance gate validation error dialog is displayed, intercept clicking Close
+ * and immediately mount the Check In / Check Out client action smoothly (no reload).
+ */
+window.addEventListener(
+    "click",
+    (event) => {
+        if (session.enable_checkin_gate && !session.attendance_checked_in) {
+            const btn = event.target.closest(
+                ".modal-footer .btn, .o_dialog .btn, .modal-header .btn-close, .modal-backdrop"
+            );
+            if (btn) {
+                const dialog = document.querySelector(".o_dialog, .modal");
+                if (dialog && dialog.textContent.includes("You must check in before accessing the system")) {
+                    const env = window.odoo?.env || (window.owl && window.owl.Component ? window.owl.Component.env : null);
+                    if (env && env.services && env.services.action) {
+                        env.services.action.doAction(
+                            { type: "ir.actions.client", tag: "custom_hr_attendance.my_attendance_action" },
+                            { clearBreadcrumbs: true }
+                        );
+                    }
+                }
+            }
+        }
+    },
+    true
+);
+
+/**
+ * Patch actionService to block unauthorized action execution and redirect to check-in
  */
 patch(actionService, {
     start(env) {
@@ -134,8 +220,8 @@ patch(actionService, {
 
         result.doAction = async function (actionRequest, options) {
             handleStateUpdates();
-            if (session.enable_checkin_gate && !session.is_system_admin && !session.attendance_checked_in) {
-                if (!isActionExempt(actionRequest)) {
+            if (session.enable_checkin_gate && !session.attendance_checked_in) {
+                if (!isActionExempt(actionRequest, env)) {
                     const notification = env.services.notification;
                     if (notification) {
                         notification.add(
@@ -158,29 +244,93 @@ patch(actionService, {
             return originalDoAction.apply(this, arguments);
         };
 
+        // When user is un-checked-in, automatically switch to Check In / Check Out client action on startup
+        if (session.enable_checkin_gate && !session.attendance_checked_in) {
+            Promise.resolve().then(() => {
+                result.doAction(
+                    { type: "ir.actions.client", tag: "custom_hr_attendance.my_attendance_action" },
+                    { clearBreadcrumbs: true }
+                );
+            });
+        }
+
         return result;
     },
 });
 
 /**
- * Patch menuService to block unapproved menu clicks and filter menu tree
+ * Patch NavBar.prototype to directly govern currentApp and currentAppSections.
+ * For un-checked-in regular employees: returns undefined for currentApp and [] for currentAppSections,
+ * guaranteeing clean focus mode (Option 1) on both initial login and refresh.
+ * For un-checked-in attendance administrators: immediately surfaces the Attendances root app and
+ * attendance configuration/management submenus (Option 2) without needing a page refresh.
+ */
+patch(NavBar.prototype, {
+    get currentApp() {
+        if (session.enable_checkin_gate && !session.attendance_checked_in) {
+            if (!session.is_attendance_admin) {
+                // Non-admins: NO brand at all, pure clean screen (Option 1)
+                return undefined;
+            }
+            // Attendance Administrator: ensure Attendances root menu is active immediately on first login
+            const app = super.currentApp;
+            if (app) return app;
+            const allMenus = this.menuService?.getAll() || [];
+            return (
+                allMenus.find(
+                    (m) =>
+                        m.xmlid === "hr_attendance.menu_hr_attendance_root" ||
+                        (m.name === "Attendances" && !m.parentID)
+                ) || undefined
+            );
+        }
+        return super.currentApp;
+    },
+
+    get currentAppSections() {
+        if (session.enable_checkin_gate && !session.attendance_checked_in) {
+            if (!session.is_attendance_admin) {
+                // Non-admins: NO submenus at all (Option 1)
+                return [];
+            }
+            // Attendance Administrators: keep attendance management & configuration menus visible (Option 2)
+            const sections = super.currentAppSections || [];
+            return sections.filter((child) => {
+                const xid = String(child.xmlid || child.xml_id || "");
+                const name = String(child.name || "");
+                return (
+                    xid.startsWith("custom_hr_attendance.") ||
+                    xid.startsWith("hr_attendance.") ||
+                    name.includes("Attendance") ||
+                    name.includes("Check In")
+                );
+            });
+        }
+        return super.currentAppSections;
+    },
+});
+
+/**
+ * Patch menuService to block unapproved menu clicks and prevent stale session storage
  */
 patch(menuService, {
-    start(env) {
-        const result = super.start(...arguments);
+    async start(env) {
+        const result = await super.start(...arguments);
         const originalSelectMenu = result.selectMenu;
 
         result.selectMenu = async function (menu) {
             handleStateUpdates();
-            if (session.enable_checkin_gate && !session.is_system_admin && !session.attendance_checked_in) {
-                const menuObj = typeof menu === "object" ? menu : result.getMenu(menu);
-                const xmlId = menuObj ? (menuObj.xmlid || menuObj.xml_id || "") : "";
+            if (session.enable_checkin_gate && !session.attendance_checked_in) {
+                const menuObj = typeof menu === "number" ? result.getMenu(menu) : menu;
+                const xmlId = String(menuObj ? (menuObj.xmlid || menuObj.xml_id || "") : "");
+                const name = String(menuObj ? (menuObj.name || "") : "");
                 const actionID = menuObj ? (menuObj.actionID || menuObj.action_id || "") : "";
 
                 const isExempt =
-                    xmlId === "custom_hr_attendance.menu_check_in_out" ||
-                    xmlId === "mail.menu_root_discuss" ||
-                    xmlId === "mail.box_inbox" ||
+                    xmlId.startsWith("custom_hr_attendance.") ||
+                    xmlId.startsWith("hr_attendance.") ||
+                    name.includes("Attendance") ||
+                    name.includes("Check In") ||
                     actionID === "custom_hr_attendance.action_my_attendance" ||
                     actionID === "custom_hr_attendance.my_attendance_action";
 
@@ -196,25 +346,60 @@ patch(menuService, {
                             }
                         );
                     }
-                    return; // Completely stop menu selection
+                    return env.services.action.doAction(
+                        { type: "ir.actions.client", tag: "custom_hr_attendance.my_attendance_action" },
+                        { clearBreadcrumbs: true }
+                    );
                 }
             }
             return originalSelectMenu.apply(this, arguments);
         };
 
-        // Filter menu tree for non-checked-in employees
+        // For non-admins: clear any stale sessionStorage menu_id so it doesn't resurrect attendance menus on refresh
+        if (session.enable_checkin_gate && !session.attendance_checked_in) {
+            if (!session.is_attendance_admin) {
+                try {
+                    browser.sessionStorage.removeItem("menu_id");
+                } catch (e) {}
+            } else {
+                // For Attendance Administrator: activate the Attendances menu immediately on first login so menus render without refresh
+                const allMenus = result.getAll() || [];
+                const attendanceApp = allMenus.find(
+                    (m) =>
+                        m.xmlid === "hr_attendance.menu_hr_attendance_root" ||
+                        (m.name === "Attendances" && !m.parentID)
+                );
+                if (attendanceApp) {
+                    result.setCurrentMenu(attendanceApp);
+                }
+            }
+        }
+
+        // Filter menu tree for non-checked-in users
         const originalGetMenuAsTree = result.getMenuAsTree;
         result.getMenuAsTree = function (menuId) {
             const tree = originalGetMenuAsTree.apply(this, arguments);
-            if (session.enable_checkin_gate && !session.is_system_admin && !session.attendance_checked_in) {
-                if (tree && tree.childrenTree) {
-                    tree.childrenTree = tree.childrenTree.filter((child) => {
-                        return (
-                            child.xmlid === "custom_hr_attendance.menu_check_in_out" ||
-                            child.id === "custom_hr_attendance.menu_check_in_out" ||
-                            child.name === "Check In / Check Out"
-                        );
-                    });
+            if (session.enable_checkin_gate && !session.attendance_checked_in) {
+                if (!session.is_attendance_admin) {
+                    // Regular employees: hide all top submenus completely until checked in (Option 1)
+                    if (tree && Array.isArray(tree.childrenTree)) {
+                        return { ...tree, childrenTree: [] };
+                    }
+                } else {
+                    // Attendance Administrators: keep attendance management & configuration menus visible (Option 2)
+                    if (tree && Array.isArray(tree.childrenTree)) {
+                        const filtered = tree.childrenTree.filter((child) => {
+                            const xid = String(child.xmlid || child.xml_id || "");
+                            const name = String(child.name || "");
+                            return (
+                                xid.startsWith("custom_hr_attendance.") ||
+                                xid.startsWith("hr_attendance.") ||
+                                name.includes("Attendance") ||
+                                name.includes("Check In")
+                            );
+                        });
+                        return { ...tree, childrenTree: filtered };
+                    }
                 }
             }
             return tree;

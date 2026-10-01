@@ -261,21 +261,37 @@ class PbmsExcelImportWizard(models.TransientModel):
             },
         }
 
-    def _get_float(self, val):
-        if val is None or val == "":
+    def _get_float(self, val, field_name="Amount"):
+        if val is None or val == "" or str(val).strip() == "":
             return 0.0
+        val_str = str(val).replace(",", "").strip()
         try:
-            return float(str(val).replace(",", "").strip())
-        except Exception:
-            return 0.0
+            return float(val_str)
+        except (ValueError, TypeError):
+            raise UserError(_("Invalid numeric input '%s' for '%s'. Numbers cannot contain text or character values.") % (val, field_name))
 
-    def _get_int(self, val):
-        if val is None or val == "":
+    def _get_int(self, val, field_name="Quantity"):
+        if val is None or val == "" or str(val).strip() == "":
             return 0
+        val_str = str(val).replace(",", "").strip()
         try:
-            return int(float(str(val).replace(",", "").strip()))
-        except Exception:
-            return 0
+            f = float(val_str)
+            if f != int(f):
+                raise UserError(_("Expected a whole number (integer) for '%s', but got '%s'.") % (field_name, val))
+            return int(f)
+        except (ValueError, TypeError):
+            raise UserError(_("Invalid numeric input '%s' for '%s'. Whole numbers cannot contain text or character values.") % (val, field_name))
+
+    def _get_text(self, val, field_name="Text", required=False):
+        if val is None or str(val).strip() == "":
+            if required:
+                raise UserError(_("Field '%s' is required and cannot be empty.") % field_name)
+            return ""
+        s = str(val).strip()
+        cleaned = s.replace(".", "").replace(",", "").replace("-", "").replace("+", "").replace(" ", "")
+        if cleaned and cleaned.isdigit():
+            raise UserError(_("Field '%s' cannot be purely numbers ('%s'). Please provide a valid text description.") % (field_name, s))
+        return s
 
     def _import_deposit_row(self, row, plan):
         code = str(row[0] or "").strip()
@@ -286,8 +302,8 @@ class PbmsExcelImportWizard(models.TransientModel):
         if not deposit_type:
             raise UserError(_("Unknown deposit product code or name: '%s'") % (code or name))
 
-        ob = self._get_float(row[2]) if len(row) > 2 else 0.0
-        months = [self._get_float(row[i]) if len(row) > i else 0.0 for i in range(3, 15)]
+        ob = self._get_float(row[2], _("Opening Balance")) if len(row) > 2 else 0.0
+        months = [self._get_float(row[i], f"Month {i-2}") if len(row) > i else 0.0 for i in range(3, 15)]
 
         vals = {
             "plan_id": plan.id,
@@ -309,8 +325,8 @@ class PbmsExcelImportWizard(models.TransientModel):
         if not deposit_type:
             raise UserError(_("Unknown customer segment code or name: '%s'") % (code or name))
 
-        ob = self._get_float(row[2]) if len(row) > 2 else 0.0
-        months = [self._get_float(row[i]) if len(row) > i else 0.0 for i in range(3, 15)]
+        ob = self._get_float(row[2], _("Opening Balance")) if len(row) > 2 else 0.0
+        months = [self._get_float(row[i], f"Month {i-2}") if len(row) > i else 0.0 for i in range(3, 15)]
 
         vals = {
             "plan_id": plan.id,
@@ -332,7 +348,7 @@ class PbmsExcelImportWizard(models.TransientModel):
         if not fx_type:
             raise UserError(_("Unknown FX source code or name: '%s'") % (code or name))
 
-        months = [self._get_float(row[i]) if len(row) > i else 0.0 for i in range(2, 14)]
+        months = [self._get_float(row[i], f"Month {i-1}") if len(row) > i else 0.0 for i in range(2, 14)]
 
         vals = {
             "plan_id": plan.id,
@@ -353,7 +369,7 @@ class PbmsExcelImportWizard(models.TransientModel):
         if not ch:
             raise UserError(_("Unknown digital channel code or name: '%s'") % (code or name))
 
-        months = [self._get_float(row[i]) if len(row) > i else 0.0 for i in range(2, 14)]
+        months = [self._get_float(row[i], f"Month {i-1}") if len(row) > i else 0.0 for i in range(2, 14)]
 
         vals = {
             "plan_id": plan.id,
@@ -374,7 +390,7 @@ class PbmsExcelImportWizard(models.TransientModel):
         if not acc:
             raise UserError(_("Unknown expense account code or name: '%s'") % (code or name))
 
-        months = [self._get_float(row[i]) if len(row) > i else 0.0 for i in range(2, 14)]
+        months = [self._get_float(row[i], f"Month {i-1}") if len(row) > i else 0.0 for i in range(2, 14)]
 
         vals = {
             "plan_id": plan.id,
@@ -387,9 +403,9 @@ class PbmsExcelImportWizard(models.TransientModel):
         return 1
 
     def _import_manpower_row(self, row, plan):
-        pos_type_name = str(row[0] or "").strip()
-        job_title = str(row[1] or "").strip()
-        baseline = self._get_int(row[2]) if len(row) > 2 else 0
+        pos_type_name = self._get_text(row[0], _("Position Type"), required=True)
+        job_title = self._get_text(row[1], _("Job Title"), required=True)
+        baseline = self._get_int(row[2], _("Baseline")) if len(row) > 2 else 0
 
         pos_type = self.env["pbms.position.type"].search([
             "|", ("code", "=ilike", pos_type_name), ("name", "=ilike", pos_type_name)
@@ -408,9 +424,9 @@ class PbmsExcelImportWizard(models.TransientModel):
             if not job:
                 raise UserError(_("Job Position '%s' was not found in HR Job Positions. Please make sure the job title exists or select 'New Position'.") % job_title)
 
-        months = [self._get_int(row[i]) if len(row) > i else 0 for i in range(3, 15)]
-        monthly_comp = self._get_float(row[15]) if len(row) > 15 else 0.0
-        reason = str(row[16] or "") if len(row) > 16 else ""
+        months = [self._get_int(row[i], f"Month {i-2}") if len(row) > i else 0 for i in range(3, 15)]
+        monthly_comp = self._get_float(row[15], _("Monthly Compensation")) if len(row) > 15 else 0.0
+        reason = self._get_text(row[16], _("Reason")) if len(row) > 16 else ""
 
         vals = {
             "plan_id": plan.id,
@@ -428,15 +444,15 @@ class PbmsExcelImportWizard(models.TransientModel):
         return 1
 
     def _import_fixed_asset_row(self, row, plan):
-        cat_name = str(row[0] or "").strip()
-        desc = str(row[1] or "").strip() if len(row) > 1 else ""
-        qty = self._get_int(row[2]) if len(row) > 2 else 0
-        unit_cost = self._get_float(row[3]) if len(row) > 3 else 0.0
-        q1 = self._get_int(row[4]) if len(row) > 4 else 0
-        q2 = self._get_int(row[5]) if len(row) > 5 else 0
-        q3 = self._get_int(row[6]) if len(row) > 6 else 0
-        q4 = self._get_int(row[7]) if len(row) > 7 else 0
-        purpose_str = str(row[8] or "").strip() if len(row) > 8 else ""
+        cat_name = self._get_text(row[0], _("Asset Category"), required=True)
+        desc = self._get_text(row[1], _("Item Description")) if len(row) > 1 else ""
+        qty = self._get_int(row[2], _("Quantity")) if len(row) > 2 else 0
+        unit_cost = self._get_float(row[3], _("Estimated Unit Price")) if len(row) > 3 else 0.0
+        q1 = self._get_int(row[4], _("Q1 Quantity")) if len(row) > 4 else 0
+        q2 = self._get_int(row[5], _("Q2 Quantity")) if len(row) > 5 else 0
+        q3 = self._get_int(row[6], _("Q3 Quantity")) if len(row) > 6 else 0
+        q4 = self._get_int(row[7], _("Q4 Quantity")) if len(row) > 7 else 0
+        purpose_str = self._get_text(row[8], _("Purpose")) if len(row) > 8 else ""
         job = False
         if purpose_str:
             job = self.env["hr.job"].search([("name", "=ilike", purpose_str)], limit=1)

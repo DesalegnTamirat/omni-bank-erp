@@ -164,16 +164,29 @@ class ExamSession(models.Model):
 
         fetched_candidates = []
 
-        # Sourcing & Movement Type check
+        # Determine vacancy sourcing mode: 'internal', 'external', or 'both'
         sourcing_type = getattr(target_vac, 'sourcing_type', '') or ''
         recruitment_type = getattr(target_vac, 'recruitment_type', '') or ''
         movement_type = getattr(target_vac, 'internal_movement_type', '') or ''
-        
-        is_internal = (sourcing_type == 'internal' or recruitment_type == 'Internal' or movement_type in ('internal', 'promotion', 'lateral'))
-        is_external = (sourcing_type == 'external' or recruitment_type == 'External' or movement_type == 'external')
+        ref_upper = (target_vac.reference or '').upper() if target_vac else ''
 
-        # 1. Fetch Internal Candidates notified for written exam
-        if is_internal or not is_external:
+        if sourcing_type == 'internal':
+            vac_mode = 'internal'
+        elif sourcing_type == 'external':
+            vac_mode = 'external'
+        elif sourcing_type == 'both':
+            vac_mode = 'both'
+        else:
+            # Fallback if sourcing_type is not explicitly defined
+            if recruitment_type == 'Internal' or movement_type in ('internal', 'promotion', 'transfer', 'lateral') or 'INT' in ref_upper or 'TRA' in ref_upper:
+                vac_mode = 'internal'
+            elif recruitment_type == 'External' or movement_type == 'external' or 'EXT' in ref_upper:
+                vac_mode = 'external'
+            else:
+                vac_mode = 'both'
+
+        # 1. Fetch Internal Candidates selected/notified for written exam
+        if vac_mode in ('internal', 'both'):
             int_sel_domain = []
             if target_vac:
                 int_sel_domain = ['|', ('vacancy_id', '=', target_vac.id), ('vacancy_reference', '=', target_vac.reference)]
@@ -183,17 +196,38 @@ class ExamSession(models.Model):
             int_selections = self.env['new.internal.recruitment.selected'].search(int_sel_domain)
             for sel in int_selections:
                 for cand in sel.new_int_rec_sel:
-                    # Filter candidates notified for written exam
-                    notified = (cand.exam_notified == 'Yes' or cand.select_flag or sel.exam_scheduled == 'Yes')
-                    if cand.emp_name and notified:
+                    # Filter candidates strictly selected for written exam
+                    is_selected = (
+                        (cand.exam_notified == 'Yes' or cand.select_flag) and
+                        getattr(cand, 'selection_type', '') != 'rejected' and
+                        getattr(cand, 'active', True)
+                    )
+                    if cand.emp_name and is_selected:
                         fetched_candidates.append({
                             'candidate_type': 'internal',
                             'employee_id': cand.emp_name.id,
                             'applicant_id': False,
+                            'candidate_name': cand.emp_name.name,
                         })
 
-        # 2. Fetch External Candidates notified for written exam
-        if (is_external or not is_internal) and not fetched_candidates:
+            # Also check direct job.vacancy lines if present
+            if target_vac and hasattr(target_vac, 'new_int_rec_sel') and target_vac.new_int_rec_sel:
+                for cand in target_vac.new_int_rec_sel:
+                    is_selected = (
+                        (cand.exam_notified == 'Yes' or cand.select_flag) and
+                        getattr(cand, 'selection_type', '') != 'rejected' and
+                        getattr(cand, 'active', True)
+                    )
+                    if cand.emp_name and is_selected:
+                        fetched_candidates.append({
+                            'candidate_type': 'internal',
+                            'employee_id': cand.emp_name.id,
+                            'applicant_id': False,
+                            'candidate_name': cand.emp_name.name,
+                        })
+
+        # 2. Fetch External Candidates selected/notified for written exam
+        if vac_mode in ('external', 'both'):
             ext_sel_domain = []
             if target_vac:
                 ext_sel_domain = ['|', ('vacancy_id', '=', target_vac.id), ('vacancy_reference', '=', target_vac.reference)]
@@ -203,16 +237,20 @@ class ExamSession(models.Model):
             ext_selections = self.env['external.recruitment.selected'].search(ext_sel_domain)
             for sel in ext_selections:
                 for cand in sel.ext_rec_sel:
-                    # Filter candidates notified for written exam
-                    notified = (cand.select_flag or sel.exam_scheduled == 'Yes' or getattr(cand, 'selection_type', '') == 'selected')
-                    if cand.applicant_name and notified:
+                    is_selected = (
+                        (cand.select_flag or cand.exam_notified == 'Yes' or getattr(cand, 'selection_type', '') == 'selected') and
+                        getattr(cand, 'selection_type', '') != 'rejected' and
+                        getattr(cand, 'active', True)
+                    )
+                    if cand.applicant_name and is_selected:
                         fetched_candidates.append({
                             'candidate_type': 'external',
                             'employee_id': False,
                             'applicant_id': cand.applicant_name.id,
+                            'candidate_name': cand.applicant_name.partner_name or cand.applicant_name.name,
                         })
 
-        # Fallback to hr.applicant pool if no selection record exists
+        # 3. Fallback to hr.applicant pool if no selection record exists yet
         if not fetched_candidates and (target_vac or target_job):
             app_domain = [('active', '=', True)]
             if target_vac and hasattr(self.env['hr.applicant'], 'job_vacancy_id'):
@@ -222,23 +260,43 @@ class ExamSession(models.Model):
             
             applicants = self.env['hr.applicant'].search(app_domain)
             for app in applicants:
-                fetched_candidates.append({
-                    'candidate_type': 'external',
-                    'employee_id': False,
-                    'applicant_id': app.id,
-                })
+                emp = getattr(app, 'employee_id', False) or (app.partner_id.user_ids.employee_id[:1] if getattr(app.partner_id, 'user_ids', False) else False)
+                if vac_mode == 'internal':
+                    cand_type = 'internal'
+                elif vac_mode == 'external':
+                    cand_type = 'external'
+                else:
+                    cand_type = 'internal' if emp else 'external'
+                
+                is_selected = (
+                    getattr(app, 'select_flag', True) or
+                    getattr(app, 'exam_notified', False) == 'Yes' or
+                    getattr(app, 'bunna_app_status', '') in ('selected', 'exam_notified', 'shortlisted')
+                )
+                if is_selected:
+                    fetched_candidates.append({
+                        'candidate_type': cand_type,
+                        'employee_id': emp.id if emp else False,
+                        'applicant_id': app.id,
+                        'candidate_name': emp.name if emp else (app.partner_name or app.name),
+                    })
 
         if not fetched_candidates:
-            raise UserError(_("No candidates notified for written exam were found for this Vacancy / Job Position."))
+            raise UserError(_("No candidates notified/selected for written exam were found for this Vacancy / Job Position."))
 
         # Get available exam versions (Version A, B, C, D) or master exam
         versions = self.exam_id.child_version_ids.filtered(lambda v: v.state in ('confirmed', 'draft')) if self.exam_id else False
         if not versions and self.exam_id:
             versions = self.exam_id
 
-        # Existing candidate attempts to avoid duplicates
+        # Deduplication tracking sets (avoid duplicate attempts by emp_id, app_id, or candidate_name)
         existing_emp_ids = set(self.attempt_ids.mapped('employee_id.id'))
         existing_app_ids = set(self.attempt_ids.mapped('applicant_id.id'))
+        existing_names = set(self.attempt_ids.mapped('candidate_name'))
+
+        seen_batch_emp = set()
+        seen_batch_app = set()
+        seen_batch_names = set()
 
         created_count = 0
         version_list = list(versions) if versions else []
@@ -247,10 +305,13 @@ class ExamSession(models.Model):
         for idx, cand_info in enumerate(fetched_candidates):
             emp_id = cand_info['employee_id']
             app_id = cand_info['applicant_id']
+            c_name = (cand_info.get('candidate_name') or '').strip().lower()
 
-            if emp_id and emp_id in existing_emp_ids:
+            if emp_id and (emp_id in existing_emp_ids or emp_id in seen_batch_emp):
                 continue
-            if app_id and app_id in existing_app_ids:
+            if app_id and (app_id in existing_app_ids or app_id in seen_batch_app):
+                continue
+            if c_name and (c_name in existing_names or c_name in seen_batch_names):
                 continue
 
             # Assign Version Round-Robin if versions exist
@@ -264,8 +325,17 @@ class ExamSession(models.Model):
                 'version_exam_id': assigned_version.id if (assigned_version and assigned_version.is_version_paper) else False,
             }
             self.env['exam.candidate.attempt'].create(attempt_vals)
-            if emp_id: existing_emp_ids.add(emp_id)
-            if app_id: existing_app_ids.add(app_id)
+
+            if emp_id:
+                existing_emp_ids.add(emp_id)
+                seen_batch_emp.add(emp_id)
+            if app_id:
+                existing_app_ids.add(app_id)
+                seen_batch_app.add(app_id)
+            if c_name:
+                existing_names.add(c_name)
+                seen_batch_names.add(c_name)
+
             created_count += 1
 
         v_summary = ', '.join(v.version_code or v.name for v in version_list) if version_list else _("Master Exam")
@@ -797,9 +867,16 @@ class ExamCandidateAttempt(models.Model):
         if not manual_answers:
             return
 
-        # Find target grader from job's work unit / department manager
+        # Find target grader: candidate's work unit manager first, then job's department manager
         grader = False
-        if self.job_id and self.job_id.department_id and self.job_id.department_id.manager_id:
+        emp = self.employee_id
+        if not emp and self.applicant_id:
+            emp = getattr(self.applicant_id, 'emp_id', False) or getattr(self.applicant_id, 'employee_id', False)
+
+        if emp and emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.user_id:
+            grader = emp.department_id.manager_id.user_id
+
+        if not grader and self.job_id and self.job_id.department_id and self.job_id.department_id.manager_id:
             grader = self.job_id.department_id.manager_id.user_id
         if not grader:
             grader = self.env.user

@@ -167,11 +167,11 @@
         <!-- RESULT PUBLICATIONS ISOLATION (FR-EXM-071)           -->
         <!-- ==================================================== -->
 
-        <!-- Employee: Can ONLY see their own published result line -->
+        <!-- Employee / Candidate: Can ONLY see their own published result line -->
         <record id="rule_assessment_result_publication_line_user_own" model="ir.rule">
             <field name="name">Assessment Result Publication Line: Employee - Own Results Only</field>
             <field name="model_id" ref="model_assessment_result_publication_line"/>
-            <field name="domain_force">['|', '|', '|', ('user_id', '=', user.id), ('employee_id.user_id', '=', user.id), ('candidate_email', '=ilike', user.login), ('candidate_code', 'in', [user.employee_id.identification_id or '___none___', user.employee_id.barcode or '___none___', user.login or '___none___'])]</field>
+            <field name="domain_force">['|', '|', '|', '|', ('user_id', '=', user.id), ('employee_id.user_id', '=', user.id), ('candidate_email', '=ilike', user.login), ('candidate_code', 'in', [user.employee_id.identification_id or '___none___', user.employee_id.barcode or '___none___', user.login or '___none___', user.name or '___none___']), ('candidate_name_private', '=ilike', user.name)]</field>
             <field name="groups" eval="[(4, ref('base.group_user'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -194,11 +194,11 @@
             ]"/>
         </record>
 
-        <!-- Employee: Can view published result batches -->
+        <!-- Employee / Candidate: Can view published result batches containing their own record line -->
         <record id="rule_assessment_result_publication_user" model="ir.rule">
             <field name="name">Assessment Result Publication: Employee - Published Batches Only</field>
             <field name="model_id" ref="model_assessment_result_publication"/>
-            <field name="domain_force">[('state', '=', 'published')]</field>
+            <field name="domain_force">['&amp;', ('state', '=', 'published'), '|', '|', '|', '|', ('line_ids.user_id', '=', user.id), ('line_ids.employee_id.user_id', '=', user.id), ('line_ids.candidate_email', '=ilike', user.login), ('line_ids.candidate_code', 'in', [user.employee_id.identification_id or '___none___', user.employee_id.barcode or '___none___', user.login or '___none___', user.name or '___none___']), ('line_ids.candidate_name_private', '=ilike', user.name)]</field>
             <field name="groups" eval="[(4, ref('base.group_user'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>

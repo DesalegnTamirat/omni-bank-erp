@@ -2,6 +2,7 @@
 import io
 import csv
 import base64
+import os
 import xlsxwriter
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, AccessError
@@ -72,6 +73,25 @@ class CompetencyReportWizard(models.TransientModel):
         'competency.assessment.cycle', string='Assessment Campaign / Cycle', required=True,
         default=lambda self: self.env['competency.assessment.cycle'].search([('state', '=', 'open')], limit=1)
         or self.env['competency.assessment.cycle'].search([], order='id desc', limit=1))
+
+    comparison_cycle_id = fields.Many2one(
+        'competency.assessment.cycle', string='Comparison Cycle (Previous)',
+        help='Select the earlier / previous cycle to compare ratings and gap progression against the selected cycle.'
+    )
+
+    assessment_type_filter = fields.Selection([
+        ('all', 'All Ratings (Composite 360°)'),
+        ('self', 'Self-Assessment Only'),
+        ('peer', 'Peer Evaluation Only'),
+        ('subordinate', 'Subordinate Evaluation Only'),
+        ('supervisor', 'Supervisor Rating Only'),
+    ], string='Assessment Type Filter', default='all', required=True,
+       help='Filter reporting data strictly by one assessment rating type, calculating the gap directly between required proficiency and that single rating.')
+
+    include_self_gap = fields.Boolean(string='Include Self Rating Gap', default=False)
+    include_peer_gap = fields.Boolean(string='Include Peer Rating Gap', default=False)
+    include_subordinate_gap = fields.Boolean(string='Include Subordinate Rating Gap', default=False)
+    include_supervisor_gap = fields.Boolean(string='Include Supervisor Rating Gap', default=False)
 
     # User Permission Flags for Role-Based UI Scoping
     is_dept_readonly = fields.Boolean(compute='_compute_user_permissions')
@@ -355,9 +375,10 @@ class CompetencyReportWizard(models.TransientModel):
             domain_comp = [('state', '=', 'approved')]
         return {'domain': {'competency_ids': domain_comp}}
 
-    def _build_line_domain(self):
+    def _build_line_domain(self, cycle=None):
         """Construct domain based on wizard selections and enforce server-side boundary isolation."""
-        domain = [('cycle_id', '=', self.cycle_id.id), ('is_primary_reporting_line', '=', True)]
+        target_cycle = cycle or self.cycle_id
+        domain = [('cycle_id', '=', target_cycle.id), ('is_primary_reporting_line', '=', True)]
 
         user = self.env.user.sudo()
         emp = user.employee_id
@@ -416,6 +437,15 @@ class CompetencyReportWizard(models.TransientModel):
                 domain.append(('assessment_id.cycle_id.state', '=', 'closed'))
             else:
                 domain.append(('assessment_id.state', '=', self.stage_filter))
+
+        if self.assessment_type_filter == 'self':
+            domain.append(('self_rating', '>', 0))
+        elif self.assessment_type_filter == 'peer':
+            domain.append(('peer_avg', '>', 0))
+        elif self.assessment_type_filter == 'subordinate':
+            domain.append(('subordinate_avg', '>', 0))
+        elif self.assessment_type_filter == 'supervisor':
+            domain.append(('supervisor_avg', '>', 0))
         return domain
 
     def action_generate_report(self):
@@ -454,6 +484,7 @@ class CompetencyReportWizard(models.TransientModel):
                 'domain': domain,
                 'context': {
                     'search_default_filter_primary_reporting': 1,
+                    'assessment_type_filter': self.assessment_type_filter or 'all',
                     'create': False,
                     'edit': False,
                     'delete': False,
@@ -556,79 +587,103 @@ class CompetencyReportWizard(models.TransientModel):
         lines = self.env['competency.assessment.line'].sudo().search(line_domain)
 
         rows = []
-        # Group lines by (employee_id, competency_id)
-        grouped = {}
+        rating_filter = self.assessment_type_filter or 'all'
+
         for l in lines:
-            key = (l.employee_id.id, l.competency_id.id)
-            grouped.setdefault(key, []).append(l)
+            emp = l.employee_id
+            comp = l.competency_id
 
-        for (emp_id, comp_id), comp_lines in grouped.items():
-            emp = self.env['hr.employee'].sudo().browse(emp_id)
-            comp = self.env['competency.competency'].sudo().browse(comp_id)
+            self_val = float(l.self_rating) if l.self_rating and l.self_rating > 0 else None
+            peer_avg = float(l.peer_avg) if l.peer_avg and l.peer_avg > 0 else None
+            sub_avg = float(l.subordinate_avg) if l.subordinate_avg and l.subordinate_avg > 0 else None
+            sup_avg = float(l.supervisor_avg) if l.supervisor_avg and l.supervisor_avg > 0 else None
+            final_rating = float(l.weighted_current_level) if l.weighted_current_level else 0.0
 
-            self_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'self' and l.current_level]
-            peer_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'peer' and l.current_level]
-            sub_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'subordinate' and l.current_level]
-            sup_lines = [l for l in comp_lines if l.assessment_id.assessment_type in ('supervisor', 'team') and l.current_level]
-            team_lines = []
+            req_str = l.required_level or '2'
+            req_val = int(req_str) if str(req_str).isdigit() else 2
 
-            self_val = int(self_lines[0].current_level) if self_lines else None
-            peer_avg = round(sum(int(l.current_level) for l in peer_lines) / len(peer_lines), 2) if peer_lines else None
-            sub_avg = round(sum(int(l.current_level) for l in sub_lines) / len(sub_lines), 2) if sub_lines else None
-            sup_avg = int(sup_lines[0].current_level) if (len(sup_lines) == 1 and str(sup_lines[0].current_level).isdigit()) else (round(sum(int(l.current_level) for l in sup_lines) / len(sup_lines), 2) if sup_lines else None)
-            team_avg = None
+            self_gap = float(l.self_gap) if l.self_gap is not None else None
+            peer_gap = float(l.peer_gap) if l.peer_gap is not None else None
+            sub_gap = float(l.subordinate_gap) if l.subordinate_gap is not None else None
+            sup_gap = float(l.supervisor_gap) if l.supervisor_gap is not None else None
+            weighted_gap = float(l.gap) if l.gap is not None else round(req_val - final_rating, 2)
 
-            # Calculate Weighted Final Rating
-            weighted_num = 0.0
-            weighted_den = 0.0
-            if self_val is not None:
-                weighted_num += self_val * w_self
-                weighted_den += w_self
-            if peer_avg is not None:
-                weighted_num += peer_avg * w_peer
-                weighted_den += w_peer
-            if sub_avg is not None:
-                weighted_num += sub_avg * w_sub
-                weighted_den += w_sub
-            if sup_avg is not None:
-                weighted_num += sup_avg * w_sup
-                weighted_den += w_sup
-
-            final_rating = round(weighted_num / weighted_den, 2) if weighted_den > 0 else (self_val or 0.0)
-
-            # Authoritative Role-Mapping required level lookup (Item 10)
-            emp_job = getattr(emp, 'job_position', False) or emp.job_id
-            role_map = self.env['competency.role.mapping'].sudo().search([
-                ('job_position_id', '=', emp_job.id if emp_job else 0),
-                ('state', '=', 'approved')
-            ], limit=1)
-            req_val = None
-            if role_map:
-                map_line = role_map.line_ids.filtered(lambda l: l.competency_id.id == comp.id)
-                if map_line and map_line[0].required_proficiency:
-                    try:
-                        req_val = int(map_line[0].required_proficiency)
-                    except (ValueError, TypeError):
-                        req_val = None
-            if req_val is None:
-                req_str = comp_lines[0].required_level or '1'
-                req_val = int(req_str) if str(req_str).isdigit() else 1
-            gap_val = round(req_val - final_rating, 2)
-
-            if gap_val > 0:
-                status_str = 'Underqualified'
-            elif gap_val < 0:
-                status_str = 'Overqualified'
+            if rating_filter == 'self':
+                if self_val is None or self_val <= 0:
+                    continue
+                active_rating = self_val
+                active_gap = self_gap
+                gap_for_status = self_gap
+            elif rating_filter == 'peer':
+                if peer_avg is None or peer_avg <= 0:
+                    continue
+                active_rating = peer_avg
+                active_gap = peer_gap
+                gap_for_status = peer_gap
+            elif rating_filter == 'subordinate':
+                if sub_avg is None or sub_avg <= 0:
+                    continue
+                active_rating = sub_avg
+                active_gap = sub_gap
+                gap_for_status = sub_gap
+            elif rating_filter == 'supervisor':
+                if sup_avg is None or sup_avg <= 0:
+                    continue
+                active_rating = sup_avg
+                active_gap = sup_gap
+                gap_for_status = sup_gap
             else:
-                status_str = 'Fit / Qualified'
+                active_rating = final_rating
+                active_gap = weighted_gap
+                gap_for_status = weighted_gap
+
+            if gap_for_status is not None:
+                if gap_for_status > 0:
+                    status_str = 'Underqualified'
+                elif gap_for_status < 0:
+                    status_str = 'Overqualified'
+                else:
+                    status_str = 'Fit / Qualified'
+            else:
+                status_str = 'Not Evaluated'
+
+            # Strictly enforce wizard level & status filters
+            if self.achievement_status != 'all':
+                if self.achievement_status == 'below' and status_str != 'Underqualified':
+                    continue
+                elif self.achievement_status == 'meets' and status_str != 'Fit / Qualified':
+                    continue
+                elif self.achievement_status == 'exceeds' and status_str != 'Overqualified':
+                    continue
+
+            if self.current_level != 'all':
+                try:
+                    c_int = int(self.current_level)
+                    if active_rating is None or round(active_rating) != c_int:
+                        continue
+                except (ValueError, TypeError):
+                    pass
+
+            if self.required_level != 'all':
+                try:
+                    r_int = int(self.required_level)
+                    if req_val != r_int:
+                        continue
+                except (ValueError, TypeError):
+                    pass
 
             ou_obj = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
             grade_obj = getattr(emp, 'grade_id', False)
+            emp_job = l.job_id or getattr(emp, 'job_position', False) or emp.job_id
+            gender_lbl = 'N/A'
+            if hasattr(emp, 'gender') and emp.gender:
+                gender_lbl = dict(emp._fields['gender'].selection).get(emp.gender, emp.gender.capitalize())
 
             rows.append({
                 'cycle_name': self.cycle_id.name,
                 'emp_id_code': emp.id,
                 'emp_name': emp.name,
+                'gender': gender_lbl,
                 'operating_unit_name': ou_obj.name if ou_obj else 'N/A',
                 'department_name': emp.department_id.name if emp.department_id else 'N/A',
                 'job_name': emp_job.name if emp_job else 'N/A',
@@ -640,10 +695,15 @@ class CompetencyReportWizard(models.TransientModel):
                 'peer_avg': peer_avg if peer_avg is not None else 'N/A',
                 'subordinate_avg': sub_avg if sub_avg is not None else 'N/A',
                 'supervisor_avg': sup_avg if sup_avg is not None else 'N/A',
-                'team_avg': team_avg if team_avg is not None else 'N/A',
-                'weighted_rating': final_rating,
+                'self_gap': self_gap if self_gap is not None else 'N/A',
+                'peer_gap': peer_gap if peer_gap is not None else 'N/A',
+                'subordinate_gap': sub_gap if sub_gap is not None else 'N/A',
+                'supervisor_gap': sup_gap if sup_gap is not None else 'N/A',
+                'weighted_rating': round(final_rating, 2),
                 'required_level': f"Level {req_val}",
-                'weighted_gap': gap_val,
+                'weighted_gap': weighted_gap,
+                'active_rating': active_rating if active_rating is not None else 'N/A',
+                'active_gap': active_gap if active_gap is not None else 'N/A',
                 'achievement_status': status_str,
             })
         return rows
@@ -652,23 +712,62 @@ class CompetencyReportWizard(models.TransientModel):
         """Action: Export report dataset as CSV file matching selected report_type."""
         self.ensure_one()
         output = io.StringIO()
+
+        # Bunna Bank Corporate Metadata Banner
+        cycle_name = self.cycle_id.name if self.cycle_id else 'All Cycles'
+        focus_label = dict(self._fields['assessment_type_filter'].selection).get(self.assessment_type_filter, 'All 360° Ratings')
+        now_str = fields.Datetime.now().strftime('%Y-%m-%d %H:%M')
+        output.write('# ==============================================================================\n')
+        output.write('# BUNNA BANK S.C. - COMPETENCY MANAGEMENT & CAPABILITY ASSESSMENT REPORT\n')
+        output.write(f'# Campaign: {cycle_name}   |   Assessment Focus: {focus_label}\n')
+        output.write(f'# Generated: {now_str}\n')
+        output.write('# Note: Graphic images (Logos) cannot be embedded in raw plaintext CSV format.\n')
+        output.write('# For official branded reports with the Bunna Bank logo, use PDF or Excel (.xlsx).\n')
+        output.write('# ==============================================================================\n')
+
         writer = csv.writer(output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
         if self.report_type == 'detailed_matrix':
             rows = self._get_360_report_data_rows()
-            writer.writerow([
-                'Cycle', 'Employee ID', 'Employee Name', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
-                'Competency Name', 'Pillar', 'Functional Domain',
-                'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg', 'Team Avg',
-                'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
-            ])
-            for r in rows:
-                writer.writerow([
-                    r['cycle_name'], r['emp_id_code'], r['emp_name'], r['operating_unit_name'], r['department_name'], r['job_name'], r['grade_name'],
-                    r['competency_name'], r['pillar_name'], r['domain_name'],
-                    r['self_rating'], r['peer_avg'], r['subordinate_avg'], r['supervisor_avg'], r['team_avg'],
-                    r['weighted_rating'], r['required_level'], r['weighted_gap'], r['achievement_status']
-                ])
+            rating_filter = self.assessment_type_filter or 'all'
+            if rating_filter != 'all':
+                label_map = {
+                    'self': ('Self Rating', 'Self Rating Gap'),
+                    'peer': ('Peer Avg Rating', 'Peer Rating Gap'),
+                    'subordinate': ('Subordinate Avg Rating', 'Subordinate Rating Gap'),
+                    'supervisor': ('Supervisor Rating', 'Supervisor Rating Gap'),
+                }
+                r_lbl, g_lbl = label_map.get(rating_filter, ('Current Rating', 'Gap'))
+                headers = [
+                    'Cycle', 'Employee ID', 'Employee Name', 'Gender', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
+                    'Competency Name', 'Pillar', 'Functional Domain',
+                    r_lbl, 'Required Level', g_lbl, 'Qualification Status'
+                ]
+                writer.writerow(headers)
+                for r in rows:
+                    writer.writerow([
+                        r['cycle_name'], r['emp_id_code'], r['emp_name'], r['gender'], r['operating_unit_name'], r['department_name'], r['job_name'], r['grade_name'],
+                        r['competency_name'], r['pillar_name'], r['domain_name'],
+                        r['active_rating'], r['required_level'], r['active_gap'], r['achievement_status']
+                    ])
+            else:
+                headers = [
+                    'Cycle', 'Employee ID', 'Employee Name', 'Gender', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
+                    'Competency Name', 'Pillar', 'Functional Domain',
+                    'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg',
+                    'Self Gap', 'Peer Gap', 'Subordinate Gap', 'Supervisor Gap',
+                    'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
+                ]
+                writer.writerow(headers)
+                for r in rows:
+                    row_vals = [
+                        r['cycle_name'], r['emp_id_code'], r['emp_name'], r['gender'], r['operating_unit_name'], r['department_name'], r['job_name'], r['grade_name'],
+                        r['competency_name'], r['pillar_name'], r['domain_name'],
+                        r['self_rating'], r['peer_avg'], r['subordinate_avg'], r['supervisor_avg'],
+                        r['self_gap'], r['peer_gap'], r['subordinate_gap'], r['supervisor_gap'],
+                        r['weighted_rating'], r['required_level'], r['weighted_gap'], r['achievement_status']
+                    ]
+                    writer.writerow(row_vals)
 
         elif self.report_type == 'dept_role_gap':
             rows = self._get_360_report_data_rows()
@@ -685,7 +784,7 @@ class CompetencyReportWizard(models.TransientModel):
                 meets = sum(1 for x in items if x['achievement_status'] == 'Fit / Qualified')
                 below = sum(1 for x in items if x['achievement_status'] == 'Underqualified')
                 exceeds = sum(1 for x in items if x['achievement_status'] == 'Overqualified')
-                gaps = [x['weighted_gap'] for x in items if isinstance(x['weighted_gap'], (int, float))]
+                gaps = [x['active_gap'] for x in items if isinstance(x['active_gap'], (int, float))]
                 avg_gap = round(sum(gaps) / len(gaps), 2) if gaps else 0.0
                 writer.writerow([
                     self.cycle_id.name, dept, job, len(items),
@@ -766,6 +865,271 @@ class CompetencyReportWizard(models.TransientModel):
             'target': 'self',
         }
 
+    def _aggregate_cycle_lines(self, lines, cycle):
+        """Aggregate evaluation lines for a specific cycle into structured per-competency records."""
+        config = self.env['competency.matrix.config'].sudo().get_active_config()
+        config_data = config.read(['weight_self', 'weight_peer', 'weight_subordinate', 'weight_supervisor']) if config else []
+        if config_data:
+            c_dict = config_data[0]
+            w_self = float(c_dict.get('weight_self') or 2.0)
+            w_peer = float(c_dict.get('weight_peer') or 1.0)
+            w_sub = float(c_dict.get('weight_subordinate') or 1.0)
+            w_sup = float(c_dict.get('weight_supervisor') or 3.0)
+        else:
+            w_self, w_peer, w_sub, w_sup = 2.0, 1.0, 1.0, 3.0
+
+        grouped = {}
+        for l in lines:
+            key = (l.employee_id.id, l.competency_id.id)
+            grouped.setdefault(key, []).append(l)
+
+        res = {}
+        for (emp_id, comp_id), comp_lines in grouped.items():
+            emp = self.env['hr.employee'].sudo().browse(emp_id)
+            comp = self.env['competency.competency'].sudo().browse(comp_id)
+
+            self_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'self' and l.current_level]
+            peer_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'peer' and l.current_level]
+            sub_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'subordinate' and l.current_level]
+            sup_lines = [l for l in comp_lines if l.assessment_id.assessment_type in ('supervisor', 'team') and l.current_level]
+
+            self_val = int(self_lines[0].current_level) if self_lines else None
+            peer_avg = round(sum(int(l.current_level) for l in peer_lines) / len(peer_lines), 2) if peer_lines else None
+            sub_avg = round(sum(int(l.current_level) for l in sub_lines) / len(sub_lines), 2) if sub_lines else None
+            sup_avg = int(sup_lines[0].current_level) if (len(sup_lines) == 1 and str(sup_lines[0].current_level).isdigit()) else (round(sum(int(l.current_level) for l in sup_lines) / len(sup_lines), 2) if sup_lines else None)
+
+            weighted_num = 0.0
+            weighted_den = 0.0
+            if self_val is not None:
+                weighted_num += self_val * w_self
+                weighted_den += w_self
+            if peer_avg is not None:
+                weighted_num += peer_avg * w_peer
+                weighted_den += w_peer
+            if sub_avg is not None:
+                weighted_num += sub_avg * w_sub
+                weighted_den += w_sub
+            if sup_avg is not None:
+                weighted_num += sup_avg * w_sup
+                weighted_den += w_sup
+
+            final_rating = round(weighted_num / weighted_den, 2) if weighted_den > 0 else (self_val or 0.0)
+
+            emp_job = getattr(emp, 'job_position', False) or emp.job_id
+            role_map = self.env['competency.role.mapping'].sudo().search([
+                ('job_position_id', '=', emp_job.id if emp_job else 0),
+                ('state', '=', 'approved')
+            ], limit=1)
+            req_val = None
+            if role_map:
+                map_line = role_map.line_ids.filtered(lambda l: l.competency_id.id == comp.id)
+                if map_line and map_line[0].required_proficiency:
+                    try:
+                        req_val = int(map_line[0].required_proficiency)
+                    except (ValueError, TypeError):
+                        req_val = None
+            if req_val is None:
+                req_str = comp_lines[0].required_level or '1'
+                req_val = int(req_str) if str(req_str).isdigit() else 1
+
+            self_gap = round(req_val - self_val, 2) if self_val is not None else None
+            peer_gap = round(req_val - peer_avg, 2) if peer_avg is not None else None
+            sub_gap = round(req_val - sub_avg, 2) if sub_avg is not None else None
+            sup_gap = round(req_val - sup_avg, 2) if sup_avg is not None else None
+            weighted_gap = round(req_val - final_rating, 2)
+
+            ou_obj = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+            grade_obj = getattr(emp, 'grade_id', False)
+
+            res[(emp_id, comp_id)] = {
+                'emp_id': emp.id,
+                'emp_name': emp.name,
+                'emp_id_code': getattr(emp, 'identification_id', '') or getattr(emp, 'barcode', '') or str(emp.id),
+                'dept_name': emp.department_id.name if emp.department_id else 'N/A',
+                'ou_name': ou_obj.name if ou_obj else 'N/A',
+                'job_name': emp_job.name if emp_job else 'N/A',
+                'grade_name': (getattr(grade_obj, 'grade_name', False) or getattr(grade_obj, 'name', False) or 'N/A') if grade_obj else 'N/A',
+                'comp_name': comp.name,
+                'pillar_name': dict(comp._fields['pillar'].selection).get(comp.pillar, comp.pillar),
+                'domain_name': comp.functional_domain or 'General',
+                'req_val': req_val,
+                'self_val': self_val,
+                'self_gap': self_gap,
+                'peer_avg': peer_avg,
+                'peer_gap': peer_gap,
+                'sub_avg': sub_avg,
+                'sub_gap': sub_gap,
+                'sup_avg': sup_avg,
+                'sup_gap': sup_gap,
+                'weighted_rating': final_rating,
+                'weighted_gap': weighted_gap,
+            }
+        return res
+
+    @api.model
+    def get_bunna_logo_base64(self):
+        """Returns base64 string of official Bunna Bank logo for QWeb PDF reports."""
+        logo_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+        )
+        if not os.path.exists(logo_path):
+            alt_path = '/mnt/extra-addons/custom_recruitment/static/src/img/bunna_bank_official_logo.png'
+            if os.path.exists(alt_path):
+                logo_path = alt_path
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        return ""
+
+    def _setup_worksheet_header(self, worksheet, workbook, title):
+        """Inserts Bunna Bank logo and corporate branding header onto an xlsx worksheet."""
+        logo_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+        )
+        if not os.path.exists(logo_path):
+            alt_path = '/mnt/extra-addons/custom_recruitment/static/src/img/bunna_bank_official_logo.png'
+            if os.path.exists(alt_path):
+                logo_path = alt_path
+
+        if os.path.exists(logo_path):
+            worksheet.insert_image('A1', logo_path, {'x_scale': 0.28, 'y_scale': 0.28, 'x_offset': 8, 'y_offset': 6})
+
+        title_fmt = workbook.add_format({
+            'bold': True, 'font_name': 'Arial', 'font_size': 13,
+            'font_color': '#541718', 'valign': 'vcenter'
+        })
+        sub_fmt = workbook.add_format({
+            'bold': True, 'font_name': 'Arial', 'font_size': 10,
+            'font_color': '#726732', 'valign': 'vcenter'
+        })
+        meta_fmt = workbook.add_format({
+            'italic': True, 'font_name': 'Arial', 'font_size': 9,
+            'font_color': '#475569', 'valign': 'vcenter'
+        })
+
+        worksheet.set_row(0, 20)
+        worksheet.set_row(1, 18)
+        worksheet.set_row(2, 16)
+        worksheet.set_row(3, 10)
+
+        worksheet.write('D1', 'BUNNA BANK S.C.', title_fmt)
+        worksheet.write('D2', title or 'Competency Capability & Gap Report', sub_fmt)
+
+        cycle_name = self.cycle_id.name if self.cycle_id else 'All Cycles'
+        focus_label = dict(self._fields['assessment_type_filter'].selection).get(self.assessment_type_filter, 'All 360° Ratings')
+        now_str = fields.Datetime.now().strftime('%Y-%m-%d %H:%M')
+        meta_text = f"Campaign: {cycle_name}   |   Focus: {focus_label}   |   Exported: {now_str}"
+        worksheet.write('D3', meta_text, meta_fmt)
+
+        worksheet.set_header('&L&G&C&12&"Arial,Bold"BUNNA BANK S.C.&R&D')
+        worksheet.set_footer('&LConfidential - Internal Banking Assessment&RPage &P of &N')
+        worksheet.repeat_rows(4)
+
+        return 4
+
+    def _export_two_cycle_comparison_xlsx(self, workbook, header_format, cell_format, num_format):
+        if not self.comparison_cycle_id:
+            raise UserError(_("Please select a Comparison Cycle (Previous) to generate the Two-Cycle Comparison Report."))
+
+        worksheet = workbook.add_worksheet('Two-Cycle Comparison')
+        start_row = self._setup_worksheet_header(worksheet, workbook, 'Two-Cycle Competency Progression & Gap Improvement')
+        worksheet.freeze_panes(start_row + 2, 4)
+
+        group_header_format = workbook.add_format({
+            'bold': True, 'bg_color': '#2C3E50', 'font_color': '#FFFFFF',
+            'border': 1, 'align': 'center', 'valign': 'vcenter'
+        })
+        delta_pos_format = workbook.add_format({
+            'border': 1, 'valign': 'vcenter', 'num_format': '+0.00;-0.00;0.00',
+            'bg_color': '#D4EDDA', 'font_color': '#155724', 'bold': True
+        })
+        delta_neg_format = workbook.add_format({
+            'border': 1, 'valign': 'vcenter', 'num_format': '+0.00;-0.00;0.00',
+            'bg_color': '#F8D7DA', 'font_color': '#721C24', 'bold': True
+        })
+        delta_neutral_format = workbook.add_format({
+            'border': 1, 'valign': 'vcenter', 'num_format': '+0.00;-0.00;0.00'
+        })
+
+        curr_lines = self.env['competency.assessment.line'].sudo().search(self._build_line_domain(cycle=self.cycle_id))
+        prev_lines = self.env['competency.assessment.line'].sudo().search(self._build_line_domain(cycle=self.comparison_cycle_id))
+
+        curr_data = self._aggregate_cycle_lines(curr_lines, self.cycle_id)
+        prev_data = self._aggregate_cycle_lines(prev_lines, self.comparison_cycle_id)
+
+        all_keys = sorted(set(curr_data.keys()) | set(prev_data.keys()))
+
+        worksheet.merge_range(start_row, 0, start_row, 5, "Employee Information", group_header_format)
+        worksheet.merge_range(start_row, 6, start_row, 8, "Competency Master", group_header_format)
+        worksheet.merge_range(start_row, 9, start_row, 15, f"Previous Cycle ({self.comparison_cycle_id.name})", group_header_format)
+        worksheet.merge_range(start_row, 16, start_row, 22, f"Current Cycle ({self.cycle_id.name})", header_format)
+        worksheet.merge_range(start_row, 23, start_row, 27, "Growth & Delta Analysis (Δ)", group_header_format)
+
+        headers = [
+            'Emp ID', 'Employee Name', 'Department', 'Operating Unit', 'Job Position', 'Grade',
+            'Competency', 'Pillar', 'Domain',
+            'Prev Req Level', 'Prev Self Rating', 'Prev Self Gap', 'Prev Peer Avg', 'Prev Sup Rating', 'Prev Weighted Level', 'Prev Weighted Gap',
+            'Curr Req Level', 'Curr Self Rating', 'Curr Self Gap', 'Curr Peer Avg', 'Curr Sup Rating', 'Curr Weighted Level', 'Curr Weighted Gap',
+            'Self Rating Δ', 'Peer Rating Δ', 'Supervisor Rating Δ', 'Weighted Level Δ', 'Gap Improvement (Δ)'
+        ]
+        for col_num, h in enumerate(headers):
+            worksheet.write(start_row + 1, col_num, h, header_format)
+            worksheet.set_column(col_num, col_num, 16)
+
+        row_num = start_row + 2
+        for key in all_keys:
+            c = curr_data.get(key, {})
+            p = prev_data.get(key, {})
+            base = c or p
+
+            worksheet.write(row_num, 0, base.get('emp_id', ''), cell_format)
+            worksheet.write(row_num, 1, base.get('emp_name', ''), cell_format)
+            worksheet.write(row_num, 2, base.get('dept_name', ''), cell_format)
+            worksheet.write(row_num, 3, base.get('ou_name', ''), cell_format)
+            worksheet.write(row_num, 4, base.get('job_name', ''), cell_format)
+            worksheet.write(row_num, 5, base.get('grade_name', ''), cell_format)
+            worksheet.write(row_num, 6, base.get('comp_name', ''), cell_format)
+            worksheet.write(row_num, 7, base.get('pillar_name', ''), cell_format)
+            worksheet.write(row_num, 8, base.get('domain_name', ''), cell_format)
+
+            # Prev Cycle
+            worksheet.write(row_num, 9, p.get('req_val', 'N/A'), cell_format)
+            worksheet.write(row_num, 10, p.get('self_val', 'N/A'), num_format if isinstance(p.get('self_val'), (int, float)) else cell_format)
+            worksheet.write(row_num, 11, p.get('self_gap', 'N/A'), num_format if isinstance(p.get('self_gap'), (int, float)) else cell_format)
+            worksheet.write(row_num, 12, p.get('peer_avg', 'N/A'), num_format if isinstance(p.get('peer_avg'), (int, float)) else cell_format)
+            worksheet.write(row_num, 13, p.get('sup_avg', 'N/A'), num_format if isinstance(p.get('sup_avg'), (int, float)) else cell_format)
+            worksheet.write(row_num, 14, p.get('weighted_rating', 'N/A'), num_format if isinstance(p.get('weighted_rating'), (int, float)) else cell_format)
+            worksheet.write(row_num, 15, p.get('weighted_gap', 'N/A'), num_format if isinstance(p.get('weighted_gap'), (int, float)) else cell_format)
+
+            # Curr Cycle
+            worksheet.write(row_num, 16, c.get('req_val', 'N/A'), cell_format)
+            worksheet.write(row_num, 17, c.get('self_val', 'N/A'), num_format if isinstance(c.get('self_val'), (int, float)) else cell_format)
+            worksheet.write(row_num, 18, c.get('self_gap', 'N/A'), num_format if isinstance(c.get('self_gap'), (int, float)) else cell_format)
+            worksheet.write(row_num, 19, c.get('peer_avg', 'N/A'), num_format if isinstance(c.get('peer_avg'), (int, float)) else cell_format)
+            worksheet.write(row_num, 20, c.get('sup_avg', 'N/A'), num_format if isinstance(c.get('sup_avg'), (int, float)) else cell_format)
+            worksheet.write(row_num, 21, c.get('weighted_rating', 'N/A'), num_format if isinstance(c.get('weighted_rating'), (int, float)) else cell_format)
+            worksheet.write(row_num, 22, c.get('weighted_gap', 'N/A'), num_format if isinstance(c.get('weighted_gap'), (int, float)) else cell_format)
+
+            # Deltas
+            self_d = (c['self_val'] - p['self_val']) if (isinstance(c.get('self_val'), (int, float)) and isinstance(p.get('self_val'), (int, float))) else 'N/A'
+            peer_d = (c['peer_avg'] - p['peer_avg']) if (isinstance(c.get('peer_avg'), (int, float)) and isinstance(p.get('peer_avg'), (int, float))) else 'N/A'
+            sup_d = (c['sup_avg'] - p['sup_avg']) if (isinstance(c.get('sup_avg'), (int, float)) and isinstance(p.get('sup_avg'), (int, float))) else 'N/A'
+            w_d = (c['weighted_rating'] - p['weighted_rating']) if (isinstance(c.get('weighted_rating'), (int, float)) and isinstance(p.get('weighted_rating'), (int, float))) else 'N/A'
+            gap_impr = (p['weighted_gap'] - c['weighted_gap']) if (isinstance(p.get('weighted_gap'), (int, float)) and isinstance(c.get('weighted_gap'), (int, float))) else 'N/A'
+
+            worksheet.write(row_num, 23, self_d, num_format if isinstance(self_d, (int, float)) else cell_format)
+            worksheet.write(row_num, 24, peer_d, num_format if isinstance(peer_d, (int, float)) else cell_format)
+            worksheet.write(row_num, 25, sup_d, num_format if isinstance(sup_d, (int, float)) else cell_format)
+            worksheet.write(row_num, 26, w_d, num_format if isinstance(w_d, (int, float)) else cell_format)
+
+            if isinstance(gap_impr, (int, float)):
+                fmt = delta_pos_format if gap_impr > 0 else (delta_neg_format if gap_impr < 0 else delta_neutral_format)
+                worksheet.write(row_num, 27, gap_impr, fmt)
+            else:
+                worksheet.write(row_num, 27, 'N/A', cell_format)
+
+            row_num += 1
+
     def action_export_xlsx(self):
         """Action: Export report dataset as Excel (.xlsx) file matching selected report_type."""
         self.ensure_one()
@@ -785,40 +1149,81 @@ class CompetencyReportWizard(models.TransientModel):
 
         if self.report_type == 'detailed_matrix':
             worksheet = workbook.add_worksheet('Detailed Matrix')
+            start_row = self._setup_worksheet_header(worksheet, workbook, 'Detailed Competency Performance & Gap Matrix Report')
             rows = self._get_360_report_data_rows()
-            headers = [
-                'Cycle', 'Employee ID', 'Employee Name', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
-                'Competency Name', 'Pillar', 'Functional Domain',
-                'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg', 'Team Avg',
-                'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
-            ]
-            for col_num, header in enumerate(headers):
-                worksheet.write(0, col_num, header, header_format)
-                worksheet.set_column(col_num, col_num, 18)
+            rating_filter = self.assessment_type_filter or 'all'
 
-            for row_num, r in enumerate(rows, start=1):
-                worksheet.write(row_num, 0, r['cycle_name'], cell_format)
-                worksheet.write(row_num, 1, r['emp_id_code'], cell_format)
-                worksheet.write(row_num, 2, r['emp_name'], cell_format)
-                worksheet.write(row_num, 3, r['operating_unit_name'], cell_format)
-                worksheet.write(row_num, 4, r['department_name'], cell_format)
-                worksheet.write(row_num, 5, r['job_name'], cell_format)
-                worksheet.write(row_num, 6, r['grade_name'], cell_format)
-                worksheet.write(row_num, 7, r['competency_name'], cell_format)
-                worksheet.write(row_num, 8, r['pillar_name'], cell_format)
-                worksheet.write(row_num, 9, r['domain_name'], cell_format)
-                worksheet.write(row_num, 10, r['self_rating'], num_format if isinstance(r['self_rating'], (int, float)) else cell_format)
-                worksheet.write(row_num, 11, r['peer_avg'], num_format if isinstance(r['peer_avg'], (int, float)) else cell_format)
-                worksheet.write(row_num, 12, r['subordinate_avg'], num_format if isinstance(r['subordinate_avg'], (int, float)) else cell_format)
-                worksheet.write(row_num, 13, r['supervisor_avg'], num_format if isinstance(r['supervisor_avg'], (int, float)) else cell_format)
-                worksheet.write(row_num, 14, r['team_avg'], num_format if isinstance(r['team_avg'], (int, float)) else cell_format)
-                worksheet.write(row_num, 15, r['weighted_rating'], num_format)
-                worksheet.write(row_num, 16, r['required_level'], cell_format)
-                worksheet.write(row_num, 17, r['weighted_gap'], num_format)
-                worksheet.write(row_num, 18, r['achievement_status'], cell_format)
+            if rating_filter != 'all':
+                label_map = {
+                    'self': ('Self Rating', 'Self Rating Gap'),
+                    'peer': ('Peer Avg Rating', 'Peer Rating Gap'),
+                    'subordinate': ('Subordinate Avg Rating', 'Subordinate Rating Gap'),
+                    'supervisor': ('Supervisor Rating', 'Supervisor Rating Gap'),
+                }
+                r_lbl, g_lbl = label_map.get(rating_filter, ('Current Rating', 'Gap'))
+                headers = [
+                    'Cycle', 'Employee ID', 'Employee Name', 'Gender', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
+                    'Competency Name', 'Pillar', 'Functional Domain',
+                    r_lbl, 'Required Level', g_lbl, 'Qualification Status'
+                ]
+                for col_num, header in enumerate(headers):
+                    worksheet.write(start_row, col_num, header, header_format)
+                    worksheet.set_column(col_num, col_num, 18)
+
+                for row_num, r in enumerate(rows, start=start_row + 1):
+                    worksheet.write(row_num, 0, r['cycle_name'], cell_format)
+                    worksheet.write(row_num, 1, r['emp_id_code'], cell_format)
+                    worksheet.write(row_num, 2, r['emp_name'], cell_format)
+                    worksheet.write(row_num, 3, r['gender'], cell_format)
+                    worksheet.write(row_num, 4, r['operating_unit_name'], cell_format)
+                    worksheet.write(row_num, 5, r['department_name'], cell_format)
+                    worksheet.write(row_num, 6, r['job_name'], cell_format)
+                    worksheet.write(row_num, 7, r['grade_name'], cell_format)
+                    worksheet.write(row_num, 8, r['competency_name'], cell_format)
+                    worksheet.write(row_num, 9, r['pillar_name'], cell_format)
+                    worksheet.write(row_num, 10, r['domain_name'], cell_format)
+                    worksheet.write(row_num, 11, r['active_rating'], num_format if isinstance(r['active_rating'], (int, float)) else cell_format)
+                    worksheet.write(row_num, 12, r['required_level'], cell_format)
+                    worksheet.write(row_num, 13, r['active_gap'], num_format if isinstance(r['active_gap'], (int, float)) else cell_format)
+                    worksheet.write(row_num, 14, r['achievement_status'], cell_format)
+            else:
+                headers = [
+                    'Cycle', 'Employee ID', 'Employee Name', 'Gender', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
+                    'Competency Name', 'Pillar', 'Functional Domain',
+                    'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg',
+                    'Self Gap', 'Peer Gap', 'Subordinate Gap', 'Supervisor Gap',
+                    'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
+                ]
+
+                for col_num, header in enumerate(headers):
+                    worksheet.write(start_row, col_num, header, header_format)
+                    worksheet.set_column(col_num, col_num, 18)
+
+                for row_num, r in enumerate(rows, start=start_row + 1):
+                    col_idx = 0
+                    for val in [r['cycle_name'], r['emp_id_code'], r['emp_name'], r['gender'], r['operating_unit_name'], r['department_name'], r['job_name'], r['grade_name'], r['competency_name'], r['pillar_name'], r['domain_name']]:
+                        worksheet.write(row_num, col_idx, val, cell_format)
+                        col_idx += 1
+                    for rating_val in [r['self_rating'], r['peer_avg'], r['subordinate_avg'], r['supervisor_avg']]:
+                        worksheet.write(row_num, col_idx, rating_val, num_format if isinstance(rating_val, (int, float)) else cell_format)
+                        col_idx += 1
+                    for gap_val in [r['self_gap'], r['peer_gap'], r['subordinate_gap'], r['supervisor_gap']]:
+                        worksheet.write(row_num, col_idx, gap_val, num_format if isinstance(gap_val, (int, float)) else cell_format)
+                        col_idx += 1
+                    worksheet.write(row_num, col_idx, r['weighted_rating'], num_format)
+                    col_idx += 1
+                    worksheet.write(row_num, col_idx, r['required_level'], cell_format)
+                    col_idx += 1
+                    worksheet.write(row_num, col_idx, r['weighted_gap'], num_format)
+                    col_idx += 1
+                    worksheet.write(row_num, col_idx, r['achievement_status'], cell_format)
+
+        elif self.report_type == 'two_cycle_comparison':
+            self._export_two_cycle_comparison_xlsx(workbook, header_format, cell_format, num_format)
 
         elif self.report_type == 'dept_role_gap':
             worksheet = workbook.add_worksheet('Dept & Role Gap')
+            start_row = self._setup_worksheet_header(worksheet, workbook, 'Department & Role Competency Gap Summary Report')
             rows = self._get_360_report_data_rows()
             grouped = {}
             for r in rows:
@@ -830,14 +1235,14 @@ class CompetencyReportWizard(models.TransientModel):
                 'Fit / Qualified Count', 'Underqualified Count', 'Overqualified Count', 'Average Gap'
             ]
             for col_num, header in enumerate(headers):
-                worksheet.write(0, col_num, header, header_format)
+                worksheet.write(start_row, col_num, header, header_format)
                 worksheet.set_column(col_num, col_num, 20)
 
-            for row_num, ((dept, job), items) in enumerate(sorted(grouped.items()), start=1):
+            for row_num, ((dept, job), items) in enumerate(sorted(grouped.items()), start=start_row + 1):
                 meets = sum(1 for x in items if x['achievement_status'] == 'Fit / Qualified')
                 below = sum(1 for x in items if x['achievement_status'] == 'Underqualified')
                 exceeds = sum(1 for x in items if x['achievement_status'] == 'Overqualified')
-                gaps = [x['weighted_gap'] for x in items if isinstance(x['weighted_gap'], (int, float))]
+                gaps = [x['active_gap'] for x in items if isinstance(x['active_gap'], (int, float))]
                 avg_gap = round(sum(gaps) / len(gaps), 2) if gaps else 0.0
                 worksheet.write(row_num, 0, self.cycle_id.name, cell_format)
                 worksheet.write(row_num, 1, dept, cell_format)
@@ -850,6 +1255,7 @@ class CompetencyReportWizard(models.TransientModel):
 
         elif self.report_type == 'individual':
             worksheet = workbook.add_worksheet('Employee Profiles')
+            start_row = self._setup_worksheet_header(worksheet, workbook, 'Employee Competency Assessment Profile Roster')
             asm_domain = [('cycle_id', '=', self.cycle_id.id)]
             if self.department_ids:
                 asm_domain.append(('department_id', 'in', self.department_ids.ids))
@@ -868,10 +1274,10 @@ class CompetencyReportWizard(models.TransientModel):
                 'Job Position', 'Total Competencies', 'Gap Count', 'Average Gap', 'Overall Score', 'Status'
             ]
             for col_num, header in enumerate(headers):
-                worksheet.write(0, col_num, header, header_format)
+                worksheet.write(start_row, col_num, header, header_format)
                 worksheet.set_column(col_num, col_num, 18)
 
-            for row_num, a in enumerate(asms, start=1):
+            for row_num, a in enumerate(asms, start=start_row + 1):
                 emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.employee_id, 'operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
                 ou_name = emp_ou.name if emp_ou else 'N/A'
                 tot_comps = len(a.line_ids)
@@ -892,6 +1298,7 @@ class CompetencyReportWizard(models.TransientModel):
 
         elif self.report_type == 'campaign_progress':
             worksheet = workbook.add_worksheet('Campaign Progress')
+            start_row = self._setup_worksheet_header(worksheet, workbook, 'Assessment Campaign Progress Tracking Report')
             asm_domain = [('cycle_id', '=', self.cycle_id.id)]
             if self.department_ids:
                 asm_domain.append(('department_id', 'in', self.department_ids.ids))
@@ -906,10 +1313,10 @@ class CompetencyReportWizard(models.TransientModel):
                 'Supervisor Review', 'HR Verified', 'Approved', 'Locked', 'Completion Rate %'
             ]
             for col_num, header in enumerate(headers):
-                worksheet.write(0, col_num, header, header_format)
+                worksheet.write(start_row, col_num, header, header_format)
                 worksheet.set_column(col_num, col_num, 18)
 
-            for row_num, (d_name, items) in enumerate(sorted(dept_map.items()), start=1):
+            for row_num, (d_name, items) in enumerate(sorted(dept_map.items()), start=start_row + 1):
                 draft_cnt = sum(1 for x in items if x.state == 'draft')
                 sub_cnt = sum(1 for x in items if x.state == 'submitted')
                 sup_cnt = sum(1 for x in items if x.state == 'supervisor_review')
@@ -948,14 +1355,22 @@ class CompetencyReportWizard(models.TransientModel):
         """Action: Print QWeb PDF report."""
         self.ensure_one()
         if self.report_type == 'individual':
-            emp = self.employee_ids[:1] or self.env.user.employee_id
-            asm = self.env['competency.assessment'].search([
-                ('employee_id', '=', emp.id if emp else 0),
-                ('cycle_id', '=', self.cycle_id.id)
-            ], limit=1)
-            if not asm:
-                raise UserError(_("No assessment found for employee %s in cycle %s.") % (emp.name if emp else 'N/A', self.cycle_id.name))
-            return self.env.ref('competency_management.action_report_competency_assessment_individual').report_action(asm)
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.employee_ids:
+                asm_domain.append(('employee_id', 'in', self.employee_ids.ids))
+            elif self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            elif self.operating_unit_ids:
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+            else:
+                emp = self.env.user.employee_id
+                if emp:
+                    asm_domain.append(('employee_id', '=', emp.id))
+
+            asms = self.env['competency.assessment'].sudo().search(asm_domain, limit=30)
+            if not asms:
+                raise UserError(_("No assessment found matching the selected filters for cycle %s.") % self.cycle_id.name)
+            return self.env.ref('competency_management.action_report_competency_assessment_individual').report_action(asms)
         elif self.report_type == 'dept_role_gap':
             return self.env.ref('competency_management.action_report_competency_team_gap').report_action(self)
         elif self.report_type == 'detailed_matrix':
@@ -964,6 +1379,58 @@ class CompetencyReportWizard(models.TransientModel):
             return self.env.ref('competency_management.action_report_competency_campaign_progress').report_action(self)
         else:
             return self.env.ref('competency_management.action_report_competency_org_capability').report_action(self)
+
+    def get_team_gap_data(self):
+        """Computes aggregate analytics data for Tier 2 Supervisor QWeb report."""
+        self.ensure_one()
+        rows = self._get_360_report_data_rows()
+
+        emp_groups = {}
+        for r in rows:
+            emp_groups.setdefault(r['emp_name'], []).append(r)
+
+        total_members = len(emp_groups)
+        assessed_members = sum(1 for e, items in emp_groups.items() if any(x['active_rating'] not in ('N/A', None, 0, 0.0) for x in items))
+        completion_rate = round((assessed_members / total_members * 100), 1) if total_members else 0.0
+
+        below_count = sum(1 for r in rows if r['achievement_status'] == 'Underqualified')
+        numeric_gaps = [r['active_gap'] for r in rows if isinstance(r.get('active_gap'), (int, float))]
+        avg_gap = round(sum(numeric_gaps) / len(numeric_gaps), 2) if numeric_gaps else 0.0
+
+        member_roster = []
+        for emp_name, items in sorted(emp_groups.items()):
+            job = items[0]['job_name'] if items else 'N/A'
+            under = sum(1 for x in items if x['achievement_status'] == 'Underqualified')
+            has_rating = any(x['active_rating'] not in ('N/A', None, 0, 0.0) for x in items)
+
+            if under > 0:
+                overall = 'Needs Intervention'
+            elif has_rating:
+                overall = 'Fit / Qualified'
+            else:
+                overall = 'Pending'
+
+            top_gap_items = [x['competency_name'] for x in items if x['achievement_status'] == 'Underqualified']
+            top_gaps_str = ', '.join(top_gap_items[:3]) if top_gap_items else 'None (Fully Qualified)'
+
+            member_roster.append({
+                'name': emp_name,
+                'job': job,
+                'status': 'Assessed' if has_rating else 'Pending',
+                'overall_status': overall,
+                'top_gaps': top_gaps_str,
+            })
+
+        user_emp = self.env.user.employee_id
+        return {
+            'supervisor_name': user_emp.name if user_emp else self.env.user.name,
+            'total_members': total_members,
+            'assessed_members': assessed_members,
+            'completion_rate': completion_rate,
+            'below_count': below_count,
+            'avg_gap': avg_gap,
+            'member_roster': member_roster,
+        }
 
     def get_org_capability_data(self):
         """Computes aggregate analytics data for Tier 3 Admin QWeb report."""
@@ -1040,7 +1507,6 @@ class CompetencyRaterBreakdownWizard(models.TransientModel):
     peer_avg = fields.Float(string='Peer Avg', readonly=True)
     subordinate_avg = fields.Float(string='Subordinate Avg', readonly=True)
     supervisor_avg = fields.Float(string='Supervisor Avg', readonly=True)
-    team_avg = fields.Float(string='Team Avg', readonly=True)
     weighted_current_level = fields.Float(string='Weighted Current Level', readonly=True)
 
     # Detailed rater line breakdown

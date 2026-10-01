@@ -405,93 +405,66 @@ class RecruitmentSelectionMinute(models.Model):
                 )
             self.ranking_line_ids = ranking_cmds
 
-            # 2. Attempt to detect committee roles from vacancy delegation team or responsible
-            if not (self.chairperson_id and self.panel_member_id and self.secretary_id):
+            # 2. Populate signatures ONLY from explicitly configured Approval Committee members
+            sig_cmds = [(5, 0, 0)]
+            added_user_ids = set()
+
+            int_sel = self.env["new.internal.recruitment.selected"].search([
+                '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
+            ], limit=1)
+
+            if int_sel and int_sel.recr_selected_team_id:
+                for member in int_sel.recr_selected_team_id:
+                    user = member.employee_name or getattr(member, 'alternate_committee_member', False)
+                    if user and user.id not in added_user_ids:
+                        added_user_ids.add(user.id)
+                        role_label = dict(member._fields['role'].selection).get(member.role, 'Committee Member') if member.role else 'Committee Member'
+                        is_mand = False if member.role == 'observer' else True
+                        sig_cmds.append((0, 0, {
+                            'user_id': user.id,
+                            'role': role_label,
+                            'role_label': role_label,
+                            'is_mandatory': is_mand,
+                            'state': 'pending',
+                        }))
+
+            if len(sig_cmds) == 1:
+                ext_sel = self.env["external.recruitment.selected"].search([
+                    '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
+                ], limit=1)
+                if ext_sel:
+                    ext_team = getattr(ext_sel, 'recr_exter_selected_team_id', False) or getattr(ext_sel, 'recr_selected_team_id', False)
+                    if ext_team:
+                        for member in ext_team:
+                            user = member.employee_name or getattr(member, 'alternate_committee_member', False)
+                            if user and user.id not in added_user_ids:
+                                added_user_ids.add(user.id)
+                                role_label = dict(member._fields['role'].selection).get(member.role, 'Committee Member') if member.role else 'Committee Member'
+                                is_mand = False if member.role == 'observer' else True
+                                sig_cmds.append((0, 0, {
+                                    'user_id': user.id,
+                                    'role': role_label,
+                                    'role_label': role_label,
+                                    'is_mandatory': is_mand,
+                                    'state': 'pending',
+                                }))
+
+            if len(sig_cmds) == 1 and self.vacancy_id.vac_del_team_id:
                 for del_member in self.vacancy_id.vac_del_team_id:
-                    u = del_member.employee_name or getattr(del_member, 'alternate_committee_member', False)
-                    role_code = del_member.role or ''
-                    if not self.chairperson_id and role_code in ('chairperson', 'chair_person'):
-                        self.chairperson_id = u
-                    elif not self.panel_member_id and role_code in ('panel_member', 'member', 'approver'):
-                        self.panel_member_id = u
-                    elif not self.secretary_id and role_code in ('secretary', 'member_secretary'):
-                        self.secretary_id = u
-                    elif not self.observer_id and role_code == 'observer':
-                        self.observer_id = u
+                    user = del_member.employee_name or getattr(del_member, 'alternate_committee_member', False)
+                    if user and user.id not in added_user_ids:
+                        added_user_ids.add(user.id)
+                        role_label = dict(del_member._fields['role'].selection).get(del_member.role, 'Committee Member') if del_member.role else 'Committee Member'
+                        is_mand = False if del_member.role == 'observer' else True
+                        sig_cmds.append((0, 0, {
+                            'user_id': user.id,
+                            'role': role_label,
+                            'role_label': role_label,
+                            'is_mandatory': is_mand,
+                            'state': 'pending',
+                        }))
 
-                if not self.secretary_id and self.vacancy_id.responsible and self.vacancy_id.responsible.user_id:
-                    self.secretary_id = self.vacancy_id.responsible.user_id
-
-            # 3. Load Panel Members / Committee Signature Slots
-            if self.chairperson_id or self.panel_member_id or self.secretary_id:
-                self._onchange_hierarchy_roles()
-            else:
-                sig_cmds = [(5, 0, 0)]
-                added_user_ids = set()
-
-                # Panel members from vacancy (memb_panel_vac)
-                for pm in self.vacancy_id.memb_panel_vac:
-                    u_id = pm.user_id.id if pm.user_id else (pm.employee_id.user_id.id if pm.employee_id and pm.employee_id.user_id else False)
-                    if not u_id and pm.panel_member_name:
-                        emp = self.env['hr.employee'].search([('name', '=ilike', pm.panel_member_name)], limit=1)
-                        u_id = emp.user_id.id if emp and emp.user_id else False
-
-                    if u_id and u_id not in added_user_ids:
-                        added_user_ids.add(u_id)
-                        role_desc = pm.role or pm.panel_type or "Panel Member"
-                        sig_cmds.append(
-                            (
-                                0,
-                                0,
-                                {
-                                    "user_id": u_id,
-                                    "role": role_desc,
-                                    "role_label": role_desc,
-                                    "is_mandatory": True,
-                                    "state": "pending",
-                                },
-                            )
-                        )
-
-                # Vacancy Delegation team
-                for del_member in self.vacancy_id.vac_del_team_id:
-                    u_id = del_member.employee_name.id if del_member.employee_name else False
-                    if u_id and u_id not in added_user_ids:
-                        added_user_ids.add(u_id)
-                        role_desc = del_member.role or "Delegated Committee Member"
-                        sig_cmds.append(
-                            (
-                                0,
-                                0,
-                                {
-                                    "user_id": u_id,
-                                    "role": role_desc,
-                                    "role_label": role_desc,
-                                    "is_mandatory": False if del_member.role == 'observer' else True,
-                                    "state": "pending",
-                                },
-                            )
-                        )
-
-                # Vacancy Responsible employee
-                if self.vacancy_id.responsible and self.vacancy_id.responsible.user_id:
-                    resp_u_id = self.vacancy_id.responsible.user_id.id
-                    if resp_u_id not in added_user_ids:
-                        added_user_ids.add(resp_u_id)
-                        sig_cmds.append(
-                            (
-                                0,
-                                0,
-                                {
-                                    "user_id": resp_u_id,
-                                    "role": "Recruitment Responsible / HR",
-                                    "role_label": "Recruitment Responsible / HR",
-                                    "is_mandatory": True,
-                                    "state": "pending",
-                                },
-                            )
-                        )
-
+            if len(sig_cmds) > 1:
                 self.committee_signature_ids = sig_cmds
 
     def action_load_candidates_from_vacancy(self):
@@ -691,112 +664,35 @@ class RecruitmentSelectionMinute(models.Model):
                 self.env["recruitment.committee.signature"].create(lines_to_create)
 
     def action_load_panel_members_from_vacancy(self):
-        """Auto-populate committee signature slots from assigned process panel members or vacancy panel members."""
+        """Auto-populate committee signature slots strictly from explicitly assigned Approval Committee members."""
         self.ensure_one()
         if not self.vacancy_id:
             return
 
-        # 1. Attempt to auto-detect chairperson, panel_member, secretary, observer if not set
-        if not (self.chairperson_id and self.panel_member_id and self.secretary_id):
-            int_sel = self.env["new.internal.recruitment.selected"].search([
-                '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
-            ], limit=1)
-            ext_sel = self.env["external.recruitment.selected"].search([
-                '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
-            ], limit=1)
-            teams_to_scan = []
-            if int_sel and int_sel.recr_selected_team_id:
-                teams_to_scan.append(int_sel.recr_selected_team_id)
-            if ext_sel:
-                ext_team = getattr(ext_sel, 'recr_exter_selected_team_id', False) or getattr(ext_sel, 'recr_selected_team_id', False)
-                if ext_team:
-                    teams_to_scan.append(ext_team)
-            if self.vacancy_id.vac_del_team_id:
-                teams_to_scan.append(self.vacancy_id.vac_del_team_id)
-
-            found_chair = self.chairperson_id
-            found_panel = self.panel_member_id
-            found_sec = self.secretary_id
-            found_obs = self.observer_id
-
-            for team in teams_to_scan:
-                for member in team:
-                    u = member.employee_name or getattr(member, 'alternate_committee_member', False)
-                    role_code = member.role or ''
-                    if not found_chair and role_code in ('chairperson', 'chair_person'):
-                        found_chair = u
-                    elif not found_panel and role_code in ('panel_member', 'member', 'approver'):
-                        found_panel = u
-                    elif not found_sec and role_code in ('secretary', 'member_secretary'):
-                        found_sec = u
-                    elif not found_obs and role_code == 'observer':
-                        found_obs = u
-
-            if not found_sec and self.vacancy_id.responsible and self.vacancy_id.responsible.user_id:
-                found_sec = self.vacancy_id.responsible.user_id
-
-            vals_to_update = {}
-            if found_chair and not self.chairperson_id:
-                vals_to_update['chairperson_id'] = found_chair.id
-            if found_panel and not self.panel_member_id:
-                vals_to_update['panel_member_id'] = found_panel.id
-            if found_sec and not self.secretary_id:
-                vals_to_update['secretary_id'] = found_sec.id
-            if found_obs and not self.observer_id:
-                vals_to_update['observer_id'] = found_obs.id
-            if vals_to_update:
-                self.write(vals_to_update)
-
-        # 2. If hierarchy committee roles are present, generate structured hierarchy signatures
-        if self.chairperson_id or self.panel_member_id or self.secretary_id:
-            self.action_generate_signature_lines()
-            return
-
-        if self.id:
-            self.committee_signature_ids.unlink()
-
         sig_lines = []
         added_user_ids = set()
 
-        # 1. Search Internal Process Record Panel & Committee Members
+        # 1. Search Internal Process Record Committee Members (recr_selected_team_id)
         int_sel = self.env["new.internal.recruitment.selected"].search([
             '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
         ], limit=1)
 
-        if int_sel:
-            if int_sel.recr_selected_team_id:
-                for member in int_sel.recr_selected_team_id:
-                    user = member.employee_name or member.alternate_committee_member
-                    if user and user.id not in added_user_ids:
-                        added_user_ids.add(user.id)
-                        role_label = dict(member._fields['role'].selection).get(member.role, 'Committee Member') if member.role else 'Committee Member'
-                        is_mand = False if member.role == 'observer' else True
-                        sig_lines.append((0, 0, {
-                            'user_id': user.id,
-                            'role': role_label,
-                            'role_label': role_label,
-                            'is_mandatory': is_mand,
-                            'state': 'pending',
-                        }))
+        if int_sel and int_sel.recr_selected_team_id:
+            for member in int_sel.recr_selected_team_id:
+                user = member.employee_name or getattr(member, 'alternate_committee_member', False)
+                if user and user.id not in added_user_ids:
+                    added_user_ids.add(user.id)
+                    role_label = dict(member._fields['role'].selection).get(member.role, 'Committee Member') if member.role else 'Committee Member'
+                    is_mand = False if member.role == 'observer' else True
+                    sig_lines.append((0, 0, {
+                        'user_id': user.id,
+                        'role': role_label,
+                        'role_label': role_label,
+                        'is_mandatory': is_mand,
+                        'state': 'pending',
+                    }))
 
-            if int_sel.new_int_rec_panel:
-                for panel in int_sel.new_int_rec_panel:
-                    emp = panel.delegate_employee_id if (panel.delegation_state == 'approved' and panel.delegate_employee_id) else panel.emp_name
-                    user = emp.user_id if (emp and getattr(emp, 'user_id', False)) else False
-                    if not user and emp:
-                        user = self.env['res.users'].search([('employee_id', '=', emp.id)], limit=1)
-                    if user and user.id not in added_user_ids:
-                        added_user_ids.add(user.id)
-                        r_name = panel.selection_criteria or 'Panel Member'
-                        sig_lines.append((0, 0, {
-                            'user_id': user.id,
-                            'role': r_name,
-                            'role_label': r_name,
-                            'is_mandatory': True,
-                            'state': 'pending',
-                        }))
-
-        # 2. Search External Process Record Panel & Committee Members
+        # 2. Search External Process Record Committee Members (recr_exter_selected_team_id / recr_selected_team_id)
         if not sig_lines:
             ext_sel = self.env["external.recruitment.selected"].search([
                 '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
@@ -805,7 +701,7 @@ class RecruitmentSelectionMinute(models.Model):
                 ext_team = getattr(ext_sel, 'recr_exter_selected_team_id', False) or getattr(ext_sel, 'recr_selected_team_id', False)
                 if ext_team:
                     for member in ext_team:
-                        user = member.employee_name or member.alternate_committee_member
+                        user = member.employee_name or getattr(member, 'alternate_committee_member', False)
                         if user and user.id not in added_user_ids:
                             added_user_ids.add(user.id)
                             role_label = dict(member._fields['role'].selection).get(member.role, 'Committee Member') if member.role else 'Committee Member'
@@ -818,73 +714,69 @@ class RecruitmentSelectionMinute(models.Model):
                                 'state': 'pending',
                             }))
 
-                if ext_sel.ext_rec_panel:
-                    for panel in ext_sel.ext_rec_panel:
-                        emp = panel.delegate_employee_id if (panel.delegation_state == 'approved' and panel.delegate_employee_id) else panel.emp_name
-                        user = emp.user_id if (emp and getattr(emp, 'user_id', False)) else False
-                        if not user and emp:
-                            user = self.env['res.users'].search([('employee_id', '=', emp.id)], limit=1)
-                        if user and user.id not in added_user_ids:
-                            added_user_ids.add(user.id)
-                            r_name = panel.selection_criteria or 'Panel Member'
-                            sig_lines.append((0, 0, {
-                                'user_id': user.id,
-                                'role': r_name,
-                                'role_label': r_name,
-                                'is_mandatory': True,
-                                'state': 'pending',
-                            }))
-
-        # 3. Search Vacancy Panel & Delegation Members
-        if not sig_lines and self.vacancy_id:
+        # 3. Search Vacancy Approval / Delegation Team (vac_del_team_id)
+        if not sig_lines and self.vacancy_id and self.vacancy_id.vac_del_team_id:
             for del_member in self.vacancy_id.vac_del_team_id:
-                u_id = del_member.employee_name.id if del_member.employee_name else False
-                if u_id and u_id not in added_user_ids:
-                    added_user_ids.add(u_id)
+                user = del_member.employee_name or getattr(del_member, 'alternate_committee_member', False)
+                if user and user.id not in added_user_ids:
+                    added_user_ids.add(user.id)
                     role_label = dict(del_member._fields['role'].selection).get(del_member.role, 'Committee Member') if del_member.role else 'Committee Member'
                     is_mand = False if del_member.role == 'observer' else True
                     sig_lines.append((0, 0, {
-                        "user_id": u_id,
-                        "role": role_label,
-                        "role_label": role_label,
-                        "is_mandatory": is_mand,
-                        "state": "pending",
+                        'user_id': user.id,
+                        'role': role_label,
+                        'role_label': role_label,
+                        'is_mandatory': is_mand,
+                        'state': 'pending',
                     }))
 
-            for pm in self.vacancy_id.memb_panel_vac:
-                u_id = pm.user_id.id if pm.user_id else (pm.employee_id.user_id.id if pm.employee_id and pm.employee_id.user_id else False)
-                if not u_id and pm.panel_member_name:
-                    emp = self.env['hr.employee'].search([('name', '=ilike', pm.panel_member_name)], limit=1)
-                    u_id = emp.user_id.id if emp and emp.user_id else False
+        # 4. If hierarchy committee roles are manually set directly on the minute:
+        if not sig_lines and (self.chairperson_id or self.panel_member_id or self.secretary_id):
+            labels = self._get_hierarchy_role_labels()
+            if self.chairperson_id and self.chairperson_id.id not in added_user_ids:
+                added_user_ids.add(self.chairperson_id.id)
+                sig_lines.append((0, 0, {
+                    'user_id': self.chairperson_id.id,
+                    'role': 'Chairperson',
+                    'role_label': labels['chairperson'],
+                    'is_mandatory': True,
+                    'state': 'pending',
+                }))
+            if self.panel_member_id and self.panel_member_id.id not in added_user_ids:
+                added_user_ids.add(self.panel_member_id.id)
+                sig_lines.append((0, 0, {
+                    'user_id': self.panel_member_id.id,
+                    'role': 'Panel Member',
+                    'role_label': labels['panel_member'],
+                    'is_mandatory': True,
+                    'state': 'pending',
+                }))
+            if self.secretary_id and self.secretary_id.id not in added_user_ids:
+                added_user_ids.add(self.secretary_id.id)
+                sig_lines.append((0, 0, {
+                    'user_id': self.secretary_id.id,
+                    'role': 'Panel Member & Secretary',
+                    'role_label': labels['secretary'],
+                    'is_mandatory': True,
+                    'state': 'pending',
+                }))
+            if self.observer_id and self.observer_id.id not in added_user_ids:
+                added_user_ids.add(self.observer_id.id)
+                sig_lines.append((0, 0, {
+                    'user_id': self.observer_id.id,
+                    'role': 'Observer',
+                    'role_label': labels['observer'],
+                    'is_mandatory': False,
+                    'state': 'pending',
+                }))
 
-                if u_id and u_id not in added_user_ids:
-                    added_user_ids.add(u_id)
-                    role_desc = pm.role or pm.panel_type or "Panel Member"
-                    sig_lines.append((0, 0, {
-                        "user_id": u_id,
-                        "role": role_desc,
-                        "role_label": role_desc,
-                        "is_mandatory": True,
-                        "state": "pending",
-                    }))
-
-            if self.vacancy_id.responsible and self.vacancy_id.responsible.user_id:
-                resp_u_id = self.vacancy_id.responsible.user_id.id
-                if resp_u_id not in added_user_ids:
-                    added_user_ids.add(resp_u_id)
-                    sig_lines.append((0, 0, {
-                        "user_id": resp_u_id,
-                        "role": "Recruitment Responsible / HR",
-                        "role_label": "Recruitment Responsible / HR",
-                        "is_mandatory": True,
-                        "state": "pending",
-                    }))
-
+        if self.id:
+            self.committee_signature_ids.unlink()
         if sig_lines:
             self.write({"committee_signature_ids": sig_lines})
 
     def action_load_from_vacancy(self):
-        """Reload candidates and panel members from the selected vacancy."""
+        """Reload candidates and committee members from the selected vacancy."""
         for rec in self:
             if rec.vacancy_id:
                 rec.action_load_candidates_from_vacancy()
@@ -906,10 +798,13 @@ class RecruitmentSelectionMinute(models.Model):
 
             # Ensure all assigned committee members have group_recruitment_approval_committee so the menu appears under Employees
             if committee_group:
-                current_uids = getattr(committee_group, 'user_ids', committee_group.users).ids
+                current_uids = committee_group.user_ids.ids if hasattr(committee_group, 'user_ids') else []
                 users_to_add = rec.committee_signature_ids.mapped('user_id').filtered(lambda u: u.id not in current_uids)
                 if users_to_add:
-                    committee_group.sudo().write({'user_ids': [(4, u.id) for u in users_to_add]})
+                    try:
+                        committee_group.sudo().write({'user_ids': [(4, u.id) for u in users_to_add]})
+                    except Exception as e:
+                        _logger.warning("Could not auto-assign group_recruitment_approval_committee to users: %s", e)
 
             notified_partners = []
             for sig in rec.committee_signature_ids:
@@ -977,15 +872,11 @@ class RecruitmentSelectionMinute(models.Model):
                 _("Cannot submit minute without candidate rankings.")
             )
 
-        # Validate required committee roles if assigned via approval hierarchy
-        if self.chairperson_id or self.panel_member_id or self.secretary_id:
-            if not (self.chairperson_id and self.panel_member_id and self.secretary_id):
-                raise UserError(_(
-                    "Please assign all mandatory committee roles (Chairperson, Panel Member, and Secretary) "
-                    "before submitting for digital signatures."
-                ))
-            if not self.committee_signature_ids:
+        if not self.committee_signature_ids:
+            if self.chairperson_id or self.panel_member_id or self.secretary_id:
                 self.action_generate_signature_lines()
+            else:
+                self.action_load_panel_members_from_vacancy()
 
         if not self.committee_signature_ids:
             raise ValidationError(

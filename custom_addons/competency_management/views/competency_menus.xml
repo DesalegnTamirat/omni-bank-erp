@@ -33,6 +33,12 @@
             action="action_competency_role_mapping"
             sequence="40"
             groups="competency_management.group_competency_employee" />
+        <menuitem id="menu_competency_role_mapping_import"
+            name="Import Role Mappings (Excel)"
+            parent="menu_competency_framework_categ"
+            action="action_competency_role_mapping_import_wizard"
+            sequence="45"
+            groups="competency_management.group_competency_officer" />
 
         <!-- 2. Assessments Category -->
         <menuitem id="menu_competency_assessments_categ"
@@ -83,6 +89,13 @@
             parent="menu_competency_reports_categ"
             action="action_competency_report_wizard"
             sequence="1"
+            groups="competency_management.group_competency_officer" />
+
+        <menuitem id="menu_competency_multi_cycle_report_wizard"
+            name="Multi-Cycle Gap &amp; Trend Analysis"
+            parent="menu_competency_reports_categ"
+            action="action_competency_multi_cycle_report_wizard"
+            sequence="3"
             groups="competency_management.group_competency_officer" />
 
         <menuitem id="menu_competency_tna_analytics_report"

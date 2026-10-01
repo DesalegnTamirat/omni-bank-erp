@@ -70,3 +70,13 @@ class JobVacancyCompetency(models.Model):
     def unlink(self):
         self.write({'active': False})
         return True
+
+
+class HrCompetenciesInfoJob(models.Model):
+    """Extension of hr_competencies_info_job in custom_recruitment:
+    Links job position competencies tab directly to competency.competency from Competency Management module.
+    """
+    _inherit = 'hr_competencies_info_job'
+
+    competencies = fields.Many2one('competency.competency', string="Competency", ondelete='set null')
+

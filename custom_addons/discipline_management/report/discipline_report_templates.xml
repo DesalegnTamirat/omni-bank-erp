@@ -2,204 +2,198 @@
 <odoo>
     <data>
 
+        <!-- Main Report Template Document: Recruitment Letter Format -->
         <template id="report_disciplinary_warning_letter_template">
             <t t-call="web.html_container">
-                <t t-foreach="docs" t-as="doc">
-                    <t t-call="web.external_layout">
-                        <div class="page" style="font-family: 'Helvetica', 'Arial', sans-serif; font-size: 13px; line-height: 1.6; color: #212529;">
-                            
-                            <!-- Header / Title -->
-                            <div class="row text-center mb-4" style="border-bottom: 2px solid #800000; padding-bottom: 12px;">
-                                <div class="col-12">
-                                    <h2 style="color: #800000; font-weight: bold; margin-bottom: 3px;">BUNNA BANK S.C.</h2>
-                                    <h5 style="color: #495057; font-weight: 600; margin-bottom: 5px;">PEOPLE OPERATIONS &amp; CULTURE / HUMAN RESOURCES</h5>
-                                    <h4 style="color: #800000; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; margin-top: 10px;">
-                                        <t t-if="doc.case_action_track == 'direct_enforce'">
-                                            OFFICIAL DISCIPLINARY WARNING NOTICE (COACH / LINE MANAGER DIRECT ACTION)
-                                        </t>
-                                        <t t-else="">
-                                            OFFICIAL EXECUTIVE DISCIPLINARY DECISION &amp; SANCTION NOTICE
-                                        </t>
-                                    </h4>
-                                </div>
-                            </div>
+                <t t-foreach="docs" t-as="o">
+                    <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Times New Roman', Times, serif; color: #111111; font-size: 13.5px; line-height: 1.6; padding: 15px 35px; position: relative;">
 
-                            <!-- Meta / Reference Row -->
-                            <div class="row mb-3" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px 12px;">
-                                <div class="col-6">
-                                    <strong>Case Reference:</strong> <span t-field="doc.name"/><br/>
-                                    <strong>Issuance Date:</strong> <span t-field="doc.final_decision_date" t-options='{"widget": "date"}'/><br/>
-                                    <strong>Action Pathway:</strong> 
-                                    <span t-if="doc.case_action_track == 'direct_enforce'" class="badge bg-secondary">Coach / Line Manager Direct Action</span>
-                                    <span t-else="" class="badge bg-primary">Formal Disciplinary Committee Escalation</span>
-                                </div>
-                                <div class="col-6 text-end">
-                                    <strong>Staff Category:</strong> <span t-field="doc.staff_category_display"/><br/>
-                                    <strong>Severity Classification:</strong> <span t-field="doc.severity_level_id.name" t-if="doc.severity_level_id"/><span t-else="" t-field="doc.severity_level"/><br/>
-                                    <strong>Statutory Status:</strong> 
-                                    <t t-if="doc.is_sla_exceeded">
-                                        <span class="badge bg-danger">SLA Breached</span>
+                        <!-- Official Header: Full Bunna Logo + Brown Accent Bar -->
+                        <table style="width: 100%; margin-bottom: 22px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 32%; vertical-align: middle;">
+                                    <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 95px; max-width: 180px; height: auto;" alt="Bunna Bank S.C."/>
+                                </td>
+                                <td style="width: 68%; vertical-align: middle; padding-left: 15px;">
+                                    <div style="background-color: #9C7D73; height: 26px; width: 100%; border-radius: 2px;"></div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Date & Reference Numbers -->
+                        <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 55%;"></td>
+                                <td style="width: 45%; font-size: 13.5px; line-height: 1.6; text-align: left; padding-left: 20px;">
+                                    <div>
+                                        <strong>Date: </strong>
+                                        <span t-esc="o.final_decision_date.strftime('%B %d, %Y') if o.final_decision_date else (context_timestamp(datetime.datetime.now()).strftime('%B %d, %Y'))"/>
+                                    </div>
+                                    <div>
+                                        <strong>Ref. No: </strong>
+                                        <span t-esc="o.name or ''"/>
+                                    </div>
+                                    <div>
+                                        <strong>ID No: </strong>
+                                        <span t-esc="o.employee_id.identification_id or o.employee_id.barcode or ''"/>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Recipient Block -->
+                        <div class="mb-3" style="font-size: 14px; line-height: 1.4;">
+                            <div>
+                                <strong><span t-esc="o.get_salutation_label()"/> </strong>
+                                <span style="text-decoration: underline; font-weight: bold;" t-esc="o.employee_id.name if o.employee_id else '____________________'"/>
+                            </div>
+                            <div t-if="o.job_id">
+                                <strong><span t-esc="o.job_id.name"/></strong>
+                            </div>
+                            <div t-if="o.department_id">
+                                <strong><span t-esc="o.department_id.name"/></strong>
+                            </div>
+                            <div><strong>Bunna Bank S.C.</strong></div>
+                            <div><u><strong><span t-esc="o.work_location_id.name if o.work_location_id else 'Addis Ababa'"/></strong></u></div>
+                        </div>
+
+                        <!-- Salutation -->
+                        <div class="mb-3" style="font-size: 14px;">
+                            Dear <span t-esc="o.get_salutation_title_and_first_name()"/>,
+                        </div>
+
+                        <!-- Subject -->
+                        <div class="text-center my-3">
+                            <span style="font-size: 15px; font-weight: bold;">
+                                <t t-if="o.case_action_track == 'direct_enforce'">
+                                    Subject: – <u>Official Disciplinary Warning Notice</u>
+                                </t>
+                                <t t-else="">
+                                    Subject: – <u>Official Disciplinary Sanction &amp; Decision Notice</u>
+                                </t>
+                            </span>
+                        </div>
+
+                        <!-- Body Content -->
+                        <div style="text-align: justify; font-size: 13.5px; line-height: 1.65;">
+                            
+                            <!-- Paragraph 1: Misconduct & Legal Finding -->
+                            <p style="margin-bottom: 14px;">
+                                This is to formally notify you that following the review of the disciplinary incident which occurred on 
+                                <strong><span t-esc="o.incident_date.strftime('%B %d, %Y') if o.incident_date else 'the incident date'"/></strong> 
+                                regarding 
+                                <strong>
+                                    <t t-if="o.legal_article_display">
+                                        <span t-esc="o.legal_article_display"/>
+                                    </t>
+                                    <t t-elif="o.offense_id">
+                                        <span t-esc="o.offense_id.name"/>
                                     </t>
                                     <t t-else="">
-                                        <span class="badge bg-success">Enforced / Active</span>
+                                        applicable bank regulations
                                     </t>
-                                </div>
+                                </strong>, 
+                                the Bank has formally established the following facts of misconduct:
+                            </p>
+
+                            <!-- Statement of Facts Indented Block -->
+                            <div style="background-color: #f9f9f9; border-left: 3px solid #9C7D73; padding: 8px 12px; margin-bottom: 14px; font-style: italic;">
+                                <span t-esc="o.description or 'Misconduct details recorded on file.'"/>
                             </div>
 
-                            <!-- Section 1: Employee Particulars -->
-                            <div style="border: 1px solid #dee2e6; border-radius: 4px; padding: 12px; margin-bottom: 18px;">
-                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #dee2e6; padding-bottom: 4px; margin-bottom: 8px; text-transform: uppercase;">
-                                    1. Subject Employee Particulars
-                                </h6>
-                                <div class="row">
-                                    <div class="col-6">
-                                        <strong>Full Name:</strong> <span t-field="doc.employee_id.name"/><br/>
-                                        <strong>Employee ID / Reg No:</strong> <span t-field="doc.employee_id.identification_id"/><br/>
-                                        <strong>Job Position:</strong> <span t-field="doc.job_id.name"/>
-                                    </div>
-                                    <div class="col-6">
-                                        <strong>Department / Branch:</strong> <span t-field="doc.department_id.name"/><br/>
-                                        <strong>Reporting Manager / Coach:</strong> <span t-field="doc.reported_by_id.name"/><br/>
-                                        <strong>Company / Work Unit:</strong> <span t-field="doc.company_id.name"/>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Section 2: Summary of Allegations & Legal Basis -->
-                            <div class="mb-4">
-                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #dee2e6; padding-bottom: 4px; margin-bottom: 8px; text-transform: uppercase;">
-                                    2. Misconduct Facts &amp; Statutory Legal Citation
-                                </h6>
-                                <p style="margin-bottom: 4px;"><strong>Incident Date:</strong> <span t-field="doc.incident_date" t-options='{"widget": "date"}'/></p>
-                                <p style="margin-bottom: 4px;">
-                                    <strong>Governing Legal Article:</strong> 
-                                    <span t-field="doc.legal_article_display" t-if="doc.legal_article_display"/>
-                                    <span t-else="" t-field="doc.offense_id.name"/>
-                                </p>
-                                <t t-if="doc.legal_clause_text">
-                                    <div style="background: #fdfdfe; border-left: 3px solid #6c757d; padding: 6px 10px; font-size: 12px; font-style: italic; margin-bottom: 8px;">
-                                        <strong>Statutory Provision:</strong> <span t-field="doc.legal_clause_text"/>
-                                    </div>
+                            <!-- Paragraph 2: Sanction & Payroll Month -->
+                            <p style="margin-bottom: 14px;">
+                                In accordance with the Governing Disciplinary Policy and Regulations of Bunna Bank S.C., 
+                                <t t-if="o.case_action_track == 'direct_enforce'">
+                                    your reporting coach / line management has enforced a 
                                 </t>
-                                <div style="background: #fff; border-left: 3px solid #800000; padding: 10px; margin-top: 6px; text-align: justify;">
-                                    <strong>Statement of Facts / Misconduct Details:</strong><br/>
-                                    <span t-field="doc.description"/>
-                                </div>
-                            </div>
-
-                            <!-- Section 3: Disciplinary Sanction & Decision -->
-                            <div class="mb-4">
-                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #dee2e6; padding-bottom: 4px; margin-bottom: 8px; text-transform: uppercase;">
-                                    3. Prescribed Disciplinary Sanction &amp; Penalties
-                                </h6>
-                                <table class="table table-bordered table-sm" style="margin-top: 8px; font-size: 12px;">
-                                    <thead style="background-color: #f1f3f5;">
-                                        <tr>
-                                            <th>Prescribed Measure</th>
-                                            <th>Salary Deduction / Fine Days</th>
-                                            <th>Effective Month</th>
-                                            <th>Issuing Authority</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>
-                                                <strong style="color: #800000;"><span t-field="doc.punishment_type"/></strong>
-                                            </td>
-                                            <td>
-                                                <t t-if="doc.fine_days &gt; 0">
-                                                    <strong><span t-field="doc.fine_days"/> Day(s)</strong> Wage Fine (Managerial)
-                                                </t>
-                                                <t t-elif="doc.penalty_percentage &gt; 0">
-                                                    <strong><span t-field="doc.penalty_percentage"/>%</strong> Salary Deduction (Non-Managerial)
-                                                </t>
-                                                <t t-else="">
-                                                    Recorded Warning (0.0% Financial Penalty)
-                                                </t>
-                                            </td>
-                                            <td>
-                                                <span t-field="doc.payroll_month"/>
-                                            </td>
-                                            <td>
-                                                <t t-if="doc.case_action_track == 'direct_enforce'">
-                                                    <span t-esc="doc.initiator_id.name or doc.reported_by_id.name or doc.approver_id.name"/> (Line Manager / Coach)
-                                                </t>
-                                                <t t-else="">
-                                                    <span t-field="doc.approver_id.name"/> (Disciplinary Committee / Executive Approver)
-                                                </t>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                                <t t-if="doc.auto_applied_rule_summary">
-                                    <p style="font-size: 11px; color: #495057; font-style: italic; margin-top: 4px;">
-                                        <strong>Rule Application Note:</strong> <span t-field="doc.auto_applied_rule_summary"/>
-                                    </p>
+                                <t t-else="">
+                                    the Disciplinary Authority has resolved to enforce a 
                                 </t>
-                            </div>
+                                <strong><span t-esc="o.get_sanction_display_text()"/></strong> against you
+                                <t t-if="o.payroll_month">
+                                    effective for the payroll period of <strong><span t-esc="o.payroll_month"/></strong>
+                                </t>.
+                            </p>
 
-                            <!-- Section 4: Notice of Appeal Rights -->
-                            <div class="mb-4" style="background-color: #fff8e1; border: 1px solid #ffe082; padding: 10px 14px; border-radius: 4px;">
-                                <h6 style="color: #b78103; font-weight: bold; margin-bottom: 4px; text-transform: uppercase;">
-                                    4. Statutory Notice of Appeal Rights (10 Calendar Days)
-                                </h6>
-                                <p style="color: #5c4300; margin-bottom: 0; font-size: 12px; text-align: justify;">
-                                    In accordance with Bank Disciplinary Policy, you have the right to lodge a formal appeal against this disciplinary decision within 
-                                    <strong>ten (10) calendar days</strong> from the receipt date of this notice (Statutory Appeal Deadline: <strong><span t-field="doc.appeal_deadline"/></strong>). 
-                                    Appeals submitted after the statutory 10-day window shall not be admissible.
-                                </p>
-                            </div>
+                            <!-- Paragraph 3: Corrective Obligation & Caution on Repeated Breaches -->
+                            <p style="margin-bottom: 14px;">
+                                Please be reminded that this notice constitutes an official disciplinary record placed in your personnel file. 
+                                Management expects you to strictly abide by the Bank's Code of Conduct, policies, and operational procedures in all future assignments. 
+                                You are expressly cautioned that any recurrent breach or repetition of similar disciplinary infractions shall attract escalated punitive measures, up to and including termination of contract / separation under Article 33 of the Disciplinary Regulation.
+                            </p>
 
-                            <!-- Section 5: Signatures Block -->
-                            <div class="row mt-5" style="page-break-inside: avoid; margin-top: 35px;">
-                                <div class="col-6 text-center">
-                                    <p style="margin-bottom: 40px;">
-                                        <t t-if="doc.case_action_track == 'direct_enforce'">
-                                            <strong>Issued By Line Manager / Coach:</strong>
-                                        </t>
-                                        <t t-else="">
-                                            <strong>Issued By Authorized Approver:</strong>
-                                        </t>
-                                    </p>
-                                    <p style="margin-bottom: 0;">___________________________________</p>
-                                    <p style="margin-top: 2px;">
-                                        <strong>
-                                            <t t-if="doc.case_action_track == 'direct_enforce'">
-                                                <span t-esc="doc.initiator_id.name or doc.reported_by_id.name or doc.approver_id.name"/>
-                                            </t>
-                                            <t t-else="">
-                                                <span t-field="doc.approver_id.name"/>
-                                            </t>
-                                        </strong><br/>
-                                        <span style="font-size: 11px; color: #6c757d;">
-                                            <t t-if="doc.case_action_track == 'direct_enforce'">Line Manager / Direct Coach</t>
-                                            <t t-else="">Disciplinary Authority (CEO / CPCO)</t>
-                                        </span>
-                                    </p>
-                                </div>
-                                <div class="col-6 text-center">
-                                    <p style="margin-bottom: 40px;"><strong>Employee Acknowledgment &amp; Receipt:</strong></p>
-                                    <p style="margin-bottom: 0;">___________________________________</p>
-                                    <p style="margin-top: 2px;">
-                                        <strong><span t-field="doc.employee_id.name"/></strong><br/>
-                                        <span style="font-size: 11px; color: #6c757d;">Signature &amp; Date of Receipt</span>
-                                    </p>
-                                </div>
-                            </div>
+                            <!-- Paragraph 4: Statutory 10-Calendar-Day Appeal Notice -->
+                            <p style="margin-bottom: 20px;">
+                                Pursuant to the Bank's Disciplinary Policy, you have the right to lodge a formal written appeal against this decision within 
+                                <strong>ten (10) calendar days</strong> from the receipt date of this notice 
+                                <t t-if="o.appeal_deadline">
+                                    (Statutory Appeal Deadline: <strong><span t-esc="o.appeal_deadline.strftime('%B %d, %Y')"/></strong>)
+                                </t>. 
+                                Any appeal submitted after the expiration of the statutory 10-day period shall not be entertained.
+                            </p>
 
-                            <!-- CC Footer -->
-                            <div class="row mt-4" style="border-top: 1px solid #dee2e6; padding-top: 8px; font-size: 11px; color: #6c757d;">
-                                <div class="col-12">
-                                    <strong>CC:</strong>
-                                    1. People Operations Management Directorate (POMD) - Personnel File |
-                                    2. Respective Directorate / Branch Management |
-                                    3. Internal Audit Directorate |
-                                    4. Subject Employee
-                                </div>
-                            </div>
-
+                            <p class="mt-3">
+                                Sincerely yours,
+                            </p>
                         </div>
-                    </t>
+
+                        <!-- Sign-off Block with Authorized Signatory -->
+                        <div class="mt-2 mb-4" style="font-size: 13.5px; line-height: 1.5;">
+                            <div style="height: 40px;"></div>
+                            <div><strong><span t-esc="o.get_signatory_name()"/></strong></div>
+                            <div><strong><span t-esc="o.get_signatory_title()"/></strong></div>
+                            <div><strong><span t-esc="o.get_signatory_company()"/></strong></div>
+                        </div>
+
+                        <!-- Employee Acknowledgment & Receipt Line -->
+                        <div class="mt-3 pt-2" style="border-top: 1px dashed #aaaaaa; font-size: 12px; line-height: 1.4;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="width: 65%;">
+                                        <strong>Employee Acknowledgment &amp; Receipt:</strong> ___________________________________
+                                    </td>
+                                    <td style="width: 35%; text-align: right;">
+                                        <strong>Date of Receipt:</strong> ____________________
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- CC Block -->
+                        <div class="mt-3" style="font-size: 12px; line-height: 1.5;">
+                            <div><strong>CC: -</strong></div>
+                            <ul style="list-style-type: disc; margin-left: 20px; padding-left: 0; margin-top: 4px;">
+                                <t t-foreach="o.get_discipline_letter_cc_lines()" t-as="cc_line">
+                                    <li><span t-esc="cc_line"/></li>
+                                </t>
+                                <li><u><strong>Bunna Bank S.C</strong></u></li>
+                            </ul>
+                        </div>
+
+                        <!-- Official Footer: Standard Bunna Bank Letterhead Footer -->
+                        <div class="footer" style="border-top: 1px solid #7d8285; padding-top: 8px; margin-top: 25px; font-size: 10px; color: #555555;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: center; vertical-align: middle;">
+                                <tr>
+                                    <td style="width: 5%;"><div style="background-color: #8C948D; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                                    <td style="width: 32%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>Tel</strong> +251 111 580 861 | 62</div>
+                                        <div><strong>Fax</strong> +251 111 580 832 | 76</div>
+                                    </td>
+                                    <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>Email</strong> info@bunnabanksc.com</div>
+                                        <div><strong>Website</strong> www.bunnabanksc.com</div>
+                                    </td>
+                                    <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>P.O.Box</strong> 1743 code 1110</div>
+                                        <div>Addis Ababa | Ethiopia</div>
+                                    </td>
+                                    <td style="width: 5%;"><div style="background-color: #8C948D; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                                </tr>
+                            </table>
+                        </div>
+
+                    </div>
                 </t>
             </t>
         </template>

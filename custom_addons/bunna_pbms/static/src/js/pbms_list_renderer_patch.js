@@ -6,6 +6,8 @@ import { registry } from "@web/core/registry";
 import { currencies } from "@web/core/currency";
 import { patch } from "@web/core/utils/patch";
 import { formatFloat } from "@web/core/utils/numbers";
+import { FormStatusIndicator } from "@web/views/form/form_status_indicator/form_status_indicator";
+import { useEffect } from "@odoo/owl";
 
 // Clear "Br" / ETB symbol in currencies cache so frontend monetary formatters do not prepend Br
 for (const id in currencies) {
@@ -190,5 +192,36 @@ patch(ListRenderer.prototype, {
                 .trim();
         }
         return val;
+    },
+});
+
+/**
+ * Patch FormStatusIndicator so that the custom header Save button(s)
+ * appear when editing or creating a record, and disappear when saved or clean.
+ */
+patch(FormStatusIndicator.prototype, {
+    setup() {
+        super.setup(...arguments);
+        useEffect(
+            () => {
+                const isEditingOrCreate = Boolean(
+                    this.props.model?.root?.isNew || this.displayButtons
+                );
+                const formEl =
+                    this.saveButton?.el?.closest(".o_form_view_container, .o_form_view, .o_content, .o_action_manager") ||
+                    document.querySelector(".o_form_view_container, .o_form_view");
+                if (formEl) {
+                    formEl.classList.toggle("o_form_is_editing", isEditingOrCreate);
+                    formEl.classList.toggle("o_form_is_saved", !isEditingOrCreate);
+                    const saveBtns = formEl.querySelectorAll(
+                        'button[name="action_save_plan"], button[name="action_save_request"], .o_pbms_save_btn'
+                    );
+                    for (const btn of saveBtns) {
+                        btn.classList.toggle("d-none", !isEditingOrCreate);
+                    }
+                }
+            },
+            () => [this.props.model?.root?.isNew, this.displayButtons, this.indicatorMode, this.state.fieldIsDirty]
+        );
     },
 });

@@ -78,40 +78,16 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
         ou_tuple = tuple(matched_ou_ids)
         discovered_pairs = set()
 
-        # 1. From hr_employee (active employees)
-        try:
-            self.env.cr.execute("""
-                SELECT DISTINCT
-                    COALESCE(e.default_operating_unit_id, e.operating_unit_id) AS ou_id,
-                    COALESCE(e.job_position, e.job_id) AS job_id
-                FROM hr_employee e
-                WHERE e.active = true
-                  AND (e.default_operating_unit_id IN %s OR e.operating_unit_id IN %s)
-                  AND (e.job_position IS NOT NULL OR e.job_id IS NOT NULL)
-            """, (ou_tuple, ou_tuple))
-            for r in self.env.cr.fetchall():
-                if r[0] in matched_ou_ids and r[1]:
-                    discovered_pairs.add((r[0], r[1]))
-        except Exception:
-            pass
-
-        # 2. From hr_version if table exists
-        try:
-            self.env.cr.execute("""
-                SELECT DISTINCT
-                    v.operating_unit_id AS ou_id,
-                    v.job_id AS job_id
-                FROM hr_version v
-                WHERE v.active = true
-                  AND v.operating_unit_id IN %s
-                  AND v.operating_unit_id IS NOT NULL
-                  AND v.job_id IS NOT NULL
-            """, (ou_tuple,))
-            for r in self.env.cr.fetchall():
-                if r[0] in matched_ou_ids and r[1]:
-                    discovered_pairs.add((r[0], r[1]))
-        except Exception:
-            pass
+        # 1. From hr.employee (active employees)
+        emp_domain = [
+            ("active", "=", True),
+            ("default_operating_unit_id", "in", matched_ou_ids),
+            ("job_id", "!=", False),
+        ]
+        employees = self.env["hr.employee"].sudo().search(emp_domain)
+        for e in employees:
+            if e.default_operating_unit_id and e.job_id:
+                discovered_pairs.add((e.default_operating_unit_id.id, e.job_id.id))
 
         # 3. From pbms.plan.category.line (manpower plan lines)
         PlanLine = self.env.get("pbms.plan.category.line")
@@ -252,60 +228,26 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
                         val = getattr(pl, "approved_annual_total", 0.0) or (pl.quantity or 0.0)
                     approved_plan_map[k] = approved_plan_map.get(k, 0.0) + (val or 0.0)
 
-        # 5. Fetch Active Employees from hr_employee and hr_version
-        ou_tuple = tuple(matched_ou_ids)
+        # 5. Fetch Active Employees from hr.employee using ORM
         active_emp_map = {}
+        emp_domain = [
+            ("active", "=", True),
+            ("default_operating_unit_id", "in", matched_ou_ids),
+            ("job_id", "!=", False),
+        ]
+        employees = self.env["hr.employee"].sudo().search(emp_domain)
+        for e in employees:
+            if e.default_operating_unit_id and e.job_id:
+                k = (e.default_operating_unit_id.id, e.job_id.id)
+                active_emp_map[k] = active_emp_map.get(k, 0) + 1
 
-        try:
-            self.env.cr.execute("""
-                SELECT 
-                    COALESCE(e.default_operating_unit_id, e.operating_unit_id) AS ou_id,
-                    COALESCE(e.job_position, e.job_id) AS job_id,
-                    COUNT(DISTINCT e.id) AS active_cnt
-                FROM hr_employee e
-                WHERE e.active = true
-                  AND (e.default_operating_unit_id IN %s OR e.operating_unit_id IN %s)
-                  AND (e.job_position IS NOT NULL OR e.job_id IS NOT NULL)
-                GROUP BY 1, 2
-            """, (ou_tuple, ou_tuple))
-            for r in self.env.cr.fetchall():
-                if r[0] and r[1]:
-                    active_emp_map[(r[0], r[1])] = active_emp_map.get((r[0], r[1]), 0) + r[2]
-        except Exception:
-            pass
-
-        try:
-            self.env.cr.execute("""
-                SELECT 
-                    v.operating_unit_id AS ou_id,
-                    v.job_id AS job_id,
-                    COUNT(DISTINCT v.id) AS active_cnt
-                FROM hr_version v
-                WHERE v.active = true
-                  AND v.operating_unit_id IN %s
-                  AND v.operating_unit_id IS NOT NULL
-                  AND v.job_id IS NOT NULL
-                GROUP BY 1, 2
-            """, (ou_tuple,))
-            for r in self.env.cr.fetchall():
-                if r[0] and r[1] and (r[0], r[1]) not in active_emp_map:
-                    active_emp_map[(r[0], r[1])] = r[2]
-        except Exception:
-            pass
-
-        # Direct scope total active employee count from active_emp_map or hr_employee
         scope_total_active = sum(active_emp_map.values())
         if scope_total_active == 0:
-            try:
-                self.env.cr.execute("""
-                    SELECT COUNT(DISTINCT e.id)
-                    FROM hr_employee e
-                    WHERE e.active = true
-                      AND (e.default_operating_unit_id IN %s OR e.operating_unit_id IN %s)
-                """, (ou_tuple, ou_tuple))
-                scope_total_active = self.env.cr.fetchone()[0] or 0
-            except Exception:
-                scope_total_active = 0
+            all_emps = self.env["hr.employee"].sudo().search([
+                ("active", "=", True),
+                ("default_operating_unit_id", "in", matched_ou_ids),
+            ])
+            scope_total_active = len(all_emps)
 
         # 6. Process establishment lines and compute aggregated metrics
         table_rows = []

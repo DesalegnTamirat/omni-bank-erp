@@ -1,0 +1,53 @@
+.o_resignation_dashboard {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+.o_resignation_header {
+    border-bottom: 2px solid #e9ecef;
+}
+.o_stat_card {
+    transition: all 0.2s ease-in-out;
+}
+.o_stat_card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+}
+.white-card {
+    background: #fff;
+    border-radius: 0.75rem;
+}
+.icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.icon-light-purple {
+    background-color: #f3e8ff;
+    color: #9333ea;
+}
+.icon-light-blue {
+    background-color: #e0f2fe;
+    color: #0284c7;
+}
+.icon-light-orange {
+    background-color: #ffedd5;
+    color: #ea580c;
+}
+.icon-light-red {
+    background-color: #fee2e2;
+    color: #dc2626;
+}
+.icon-light-green {
+    background-color: #dcfce7;
+    color: #16a34a;
+}
+.trend-indicator {
+    padding-top: 0.5rem;
+    border-top: 1px solid #f3f4f6;
+    margin-top: 0.5rem;
+}
+.o_stat_card { cursor: pointer; }

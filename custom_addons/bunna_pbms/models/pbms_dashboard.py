@@ -65,7 +65,7 @@ class PbmsDashboard(models.AbstractModel):
         cycles = self.get_cycles()
         active_cycle_id = cycle_id
         if not active_cycle_id and cycles:
-            open_cycle = next((c for c in cycles if c.get("state") == "open"), None)
+            open_cycle = next((c for c in cycles if c.get("state") in ("budget_call", "open")), None)
             active_cycle_id = open_cycle["id"] if open_cycle else cycles[0]["id"]
 
         submission = self.get_submission_status(active_cycle_id) if active_cycle_id else []

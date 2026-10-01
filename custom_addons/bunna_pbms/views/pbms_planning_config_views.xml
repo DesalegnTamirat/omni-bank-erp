@@ -175,56 +175,6 @@
                             </group>
                         </page>
 
-                        <page string="Functional Reviewers &amp; Department Routing" name="page_functional_routing">
-                            <p class="text-muted">
-                                Configure the responsible Head Office Operating Unit, Department, and Designated Reviewer users for each planning category.
-                            </p>
-                            <group string="Core &amp; Mobilization Categories">
-                                <group string="Deposit Mobilization">
-                                    <field name="deposit_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="deposit_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="deposit_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                                <group string="Customer Base">
-                                    <field name="customer_base_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="customer_base_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="customer_base_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                            </group>
-                            <group string="International &amp; Digital Channels">
-                                <group string="FX Mobilization">
-                                    <field name="fx_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="fx_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="fx_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                                <group string="Digital Banking Channels">
-                                    <field name="digital_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="digital_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="digital_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                            </group>
-                            <group string="Resources &amp; Operating Expenses">
-                                <group string="Workforce Requirement">
-                                    <field name="manpower_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="manpower_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="manpower_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                    <field name="budget_hiring_committee_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                    <field name="ceo_user_id" options="{'no_create': True}"/>
-                                </group>
-                                <group string="General Expense Budget">
-                                    <field name="expense_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="expense_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="expense_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                            </group>
-                            <group string="Fixed Assets &amp; Facilities">
-                                <group string="Fixed Asset Requirement">
-                                    <field name="fixed_asset_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="fixed_asset_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="fixed_asset_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                            </group>
-                        </page>
                     </notebook>
                 </sheet>
             </form>
@@ -258,7 +208,7 @@
         <field name="search_view_id" ref="view_pbms_planning_config_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Configure eligible planning categories and category reviewers per Work Unit Type or specific Operating Unit.
+                Configure eligible planning categories and dropdown options per Work Unit Type or specific Operating Unit.
             </p>
             <p>
                 Configure defaults for Work Unit Types (Branch, District Office, Head Office, ...)

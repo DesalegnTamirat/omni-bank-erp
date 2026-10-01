@@ -429,6 +429,48 @@ class Job(models.Model):
     # hr_policy_id = fields.One2many("hr.job.policies", "hr_job_id", string="Hr Policies")
     user_id = fields.Many2one('res.users', "Responsible", tracking=True, default=lambda self: self.env.uid)
 
+    def _sync_competencies_from_competency_module(self):
+        """Auto-sync competencies from approved competency.role.mapping or competency.competency if competencies_id is empty."""
+        level_map = {'1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert'}
+        for job in self:
+            if not job.competencies_id and 'competency.role.mapping' in self.env:
+                mapping = self.env['competency.role.mapping'].search([
+                    ('job_position_id', '=', job.id),
+                    ('state', '=', 'approved')
+                ], limit=1)
+                if not mapping:
+                    mapping = self.env['competency.role.mapping'].search([
+                        ('job_position_id', '=', job.id)
+                    ], limit=1)
+
+                comp_cmds = []
+                seen_comp_ids = set()
+                if mapping and mapping.line_ids:
+                    for line in mapping.line_ids:
+                        if line.competency_id and line.competency_id.id not in seen_comp_ids:
+                            seen_comp_ids.add(line.competency_id.id)
+                            req_lvl = level_map.get(str(line.required_proficiency), 'intermediate')
+                            comp_cmds.append((0, 0, {
+                                'competencies': line.competency_id.id,
+                                'required_level': req_lvl,
+                            }))
+
+                if not comp_cmds and 'competency.competency' in self.env:
+                    comps = self.env['competency.competency'].search([
+                        ('applicable_job_ids', 'in', [job.id]),
+                        ('status', '=', 'active')
+                    ])
+                    for comp in comps:
+                        if comp.id not in seen_comp_ids:
+                            seen_comp_ids.add(comp.id)
+                            comp_cmds.append((0, 0, {
+                                'competencies': comp.id,
+                                'required_level': 'intermediate',
+                            }))
+
+                if comp_cmds:
+                    job.write({'competencies_id': comp_cmds})
+
     @api.constrains('competencies_id')
     def _check_unique_competencies(self):
         for job in self:
@@ -629,28 +671,53 @@ class competencies_multi_record_job(models.Model):
 
     def _auto_init(self):
         res = super()._auto_init()
-        self.env.cr.execute("""
-            SELECT 1 FROM information_schema.columns 
-            WHERE table_name = 'hr_competencies_info_job' AND column_name = 'competencies'
-        """)
-        if self.env.cr.fetchone():
-            self.env.cr.execute("""
-                SELECT 1 FROM information_schema.tables 
-                WHERE table_name = 'competency_competency'
-            """)
-            if self.env.cr.fetchone():
+        try:
+            with self.env.cr.savepoint():
+                # Drop legacy foreign key constraint pointing to recruitment_competency if present
                 self.env.cr.execute("""
-                    UPDATE hr_competencies_info_job 
-                    SET competencies = NULL 
-                    WHERE competencies IS NOT NULL 
-                      AND competencies NOT IN (SELECT id FROM competency_competency)
+                    DO $$ 
+                    DECLARE 
+                        r RECORD;
+                    BEGIN 
+                        FOR r IN (
+                            SELECT tc.constraint_name 
+                            FROM information_schema.table_constraints tc
+                            JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+                            JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name
+                            WHERE tc.constraint_type = 'FOREIGN KEY' 
+                              AND tc.table_name = 'hr_competencies_info_job' 
+                              AND kcu.column_name = 'competencies'
+                              AND ccu.table_name = 'recruitment_competency'
+                        ) LOOP
+                            EXECUTE 'ALTER TABLE hr_competencies_info_job DROP CONSTRAINT ' || quote_ident(r.constraint_name);
+                        END LOOP;
+                    END $$;
                 """)
+                self.env.cr.execute("""
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'competency_competency'
+                """)
+                if self.env.cr.fetchone():
+                    self.env.cr.execute("""
+                        UPDATE hr_competencies_info_job 
+                        SET competencies = NULL 
+                        WHERE competencies IS NOT NULL 
+                          AND competencies NOT IN (SELECT id FROM competency_competency)
+                    """)
+        except Exception as e:
+            pass
         return res
 
     job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
     applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
     employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     competencies = fields.Many2one('recruitment.competency', string="Competency", ondelete='set null')
+    required_level = fields.Selection([
+        ('basic', 'Basic'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced'),
+        ('expert', 'Expert'),
+    ], string='Required Level', default='intermediate')
     requirement = fields.Char(string="Requirement")
     response = fields.Char(string="Response")
     smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')

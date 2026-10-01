@@ -468,20 +468,48 @@ class HrEmployee(models.Model):
                 if exp_cmds:
                     employee.experiance_id = exp_cmds
 
-            # 3. Competencies from Job Position
+            # 3. Competencies from Job Position (combining direct job competencies & Competency Management Module matrix)
             if job:
                 existing_comp_ids = set(employee.competencies_id.mapped('competencies.id'))
                 comp_cmds = []
+
+                # 3a. Direct competencies on job position (hr_competencies_info_job)
                 for c in job.competencies_id:
                     if c.competencies and (force or c.competencies.id not in existing_comp_ids):
                         if c.competencies.id in existing_comp_ids and force:
                             continue
+                        existing_comp_ids.add(c.competencies.id)
                         comp_cmds.append((0, 0, {
                             'competencies': c.competencies.id,
-                            'requirement': c.requirement,
+                            'required_level': getattr(c, 'required_level', 'intermediate') or 'intermediate',
+                            'requirement': c.requirement or (c.required_level.capitalize() if getattr(c, 'required_level', False) else 'Intermediate'),
                             'response': c.response,
                             'smart_search': c.smart_search or 'yes',
                         }))
+
+                # 3b. Competencies from Competency Management Module (competency.role.mapping)
+                if hasattr(job, 'get_required_competencies'):
+                    try:
+                        req_comps = job.get_required_competencies()
+                        level_map = {'1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert'}
+                        for comp_data in req_comps:
+                            comp_id = comp_data.get('competency_id')
+                            if comp_id and (force or comp_id not in existing_comp_ids):
+                                if comp_id in existing_comp_ids and force:
+                                    continue
+                                existing_comp_ids.add(comp_id)
+                                prof_lvl = str(comp_data.get('required_proficiency', '2'))
+                                req_lvl_key = level_map.get(prof_lvl, 'intermediate')
+                                req_lvl_name = comp_data.get('required_level_name') or req_lvl_key.capitalize()
+                                comp_cmds.append((0, 0, {
+                                    'competencies': comp_id,
+                                    'required_level': req_lvl_key,
+                                    'requirement': req_lvl_name,
+                                    'smart_search': 'yes',
+                                }))
+                    except Exception:
+                        pass
+
                 if comp_cmds:
                     employee.competencies_id = comp_cmds
 

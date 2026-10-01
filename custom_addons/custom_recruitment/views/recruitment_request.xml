@@ -136,7 +136,6 @@
                             <field name="employee_category" readonly="state != 'draft'" widget="radio"/>
                             <field name="job_level"
                                    invisible="employee_category != 'Non Managerial'"
-                                   required="employee_category == 'Non Managerial' and sourcing_type in ('external', 'both')"
                                    readonly="state != 'draft'"/>
                             <field name="employment_type" readonly="state != 'draft'"/>
                             <field name="required_headcount" readonly="state != 'draft'"/>

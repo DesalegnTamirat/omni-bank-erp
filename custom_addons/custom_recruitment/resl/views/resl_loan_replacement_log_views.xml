@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_resl_loan_replacement_log_tree" model="ir.ui.view">
+            <field name="name">resl.loan.replacement.log.list</field>
+            <field name="model">resl.loan.replacement.log</field>
+            <field name="arch" type="xml">
+                <list string="Replacement Logs" create="false" delete="false">
+                    <field name="create_date"/>
+                    <field name="loan_id"/>
+                    <field name="old_guarantor_id"/>
+                    <field name="new_guarantor_id"/>
+                    <field name="action_by"/>
+                    <field name="is_hr_action"/>
+                    <field name="reason" column_invisible="1"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_resl_loan_replacement_log_form" model="ir.ui.view">
+            <field name="name">resl.loan.replacement.log.form</field>
+            <field name="model">resl.loan.replacement.log</field>
+            <field name="arch" type="xml">
+                <form string="Replacement Log" create="false" delete="false">
+                    <sheet>
+                        <group>
+                            <field name="loan_id" readonly="1"/>
+                            <field name="create_date" readonly="1"/>
+                            <field name="action_by" readonly="1"/>
+                            <field name="is_hr_action" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="old_guarantor_id" readonly="1"/>
+                            <field name="new_guarantor_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="reason" readonly="1" widget="text"/>
+                        </group>
+                    </sheet>
+                    <footer>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_resl_loan_replacement_log_search" model="ir.ui.view">
+            <field name="name">resl.loan.replacement.log.search</field>
+            <field name="model">resl.loan.replacement.log</field>
+            <field name="arch" type="xml">
+                <search string="Search Replacement Logs">
+                    <field name="loan_id"/>
+                    <field name="old_guarantor_id"/>
+                    <field name="new_guarantor_id"/>
+                    <field name="action_by"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_resl_loan_replacement_log_kanban" model="ir.ui.view">
+            <field name="name">resl.loan.replacement.log.kanban</field>
+            <field name="model">resl.loan.replacement.log</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="is_hr_action" >
+                    <field name="loan_id"/>
+                    <field name="old_guarantor_id"/>
+                    <field name="new_guarantor_id"/>
+                    <field name="action_by"/>
+                    <field name="create_date"/>
+                    <field name="reason"/>
+                    <field name="is_hr_action"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong><field name="loan_id"/></strong>
+                                <t t-if="record.is_hr_action.raw_value">
+                                    <span class="badge text-bg-info">HR</span>
+                                </t>
+                                <t t-else="">
+                                    <span class="badge text-bg-secondary">Employee</span>
+                                </t>
+                            </div>
+                            <div><strong>Old:</strong> <field name="old_guarantor_id"/></div>
+                            <div><strong>New:</strong> <field name="new_guarantor_id"/></div>
+                            <div class="mt-1 text-muted small">
+                                <field name="action_by"/> | <field name="create_date"/>
+                            </div>
+                            <div class="mt-2" t-if="record.reason.raw_value">
+                                <small><i>"<field name="reason"/>"</i></small>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <record id="action_resl_loan_replacement_logs" model="ir.actions.act_window">
+            <field name="name">Guarantor Replacement Logs</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="search_view_id" ref="view_resl_loan_replacement_log_search"/>
+            <field name="res_model">resl.loan.replacement.log</field>
+        </record>
+
+    </data>
+</odoo>

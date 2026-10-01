@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- Team Competency Gap Dashboard - Pivot View (FR-GAP-006) -->
+        <!-- Team Competency Gap Dashboard - Pivot View -->
         <record id="view_competency_team_gap_pivot" model="ir.ui.view">
             <field name="name">competency.assessment.line.team.gap.pivot</field>
             <field name="model">competency.assessment.line</field>
@@ -14,7 +14,7 @@
             </field>
         </record>
 
-        <!-- Team Competency Gap Dashboard - Graph View (FR-GAP-006) -->
+        <!-- Team Competency Gap Dashboard - Graph View -->
         <record id="view_competency_team_gap_graph" model="ir.ui.view">
             <field name="name">competency.assessment.line.team.gap.graph</field>
             <field name="model">competency.assessment.line</field>
@@ -26,7 +26,7 @@
             </field>
         </record>
 
-        <!-- Team Competency Gap Dashboard - Search View (FR-GAP-006) -->
+        <!-- Team Competency Gap Dashboard - Search View -->
         <record id="view_competency_assessment_line_search" model="ir.ui.view">
             <field name="name">competency.assessment.line.search</field>
             <field name="model">competency.assessment.line</field>

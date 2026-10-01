@@ -11,7 +11,6 @@ JOB_VACANCY_TYPE_CODE_MAP = {
     'internal': 'INT',
     'promotion': 'INT',
     'lateral': 'LAT',
-    'transfer': 'LAT',
     'external': 'EXT',
 }
 
@@ -19,8 +18,11 @@ LOCKED_ALLOWED_FIELDS = {
     'vacancy_status', 'status', 'state', 'reference', 'message_ids',
     'message_follower_ids', 'activity_ids', 'website_published',
     'eligible_employee_ids', 'new_int_rec_sel', 'new_int_rec_panel',
-    'recr_selected_team_id', 'pms_weight', 'written_weight', 'interview_weight', 'has_written_exam', 'transfer_eval_mode',
-    'app_date_weight', 'experience_weight', 'location_weight', 'recommendation_weight',
+    'recr_selected_team_id', 'pms_weight', 'written_weight', 'interview_weight',
+    'has_written_exam', 'approved_plan_count', 'plan_fulfillment_promotion',
+    'plan_fulfillment_lateral', 'position_qualifications', 'position_experiences',
+    'transfer_eval_mode', 'supervisor_rec_requested', 'app_date_weight',
+    'experience_weight', 'location_weight', 'recommendation_weight',
     'written_exam_date', 'exam_location', 'interview_date', 'interview_location',
     'recruitment_step', 'shortlist_done', 'candidate_notified', 'exam_notified',
     'interview_notified', 'committee_notified', 'minute_signed', 'employees_promoted',
@@ -104,7 +106,7 @@ class JobVacancy(models.Model):
     internal_movement_type = fields.Selection(
         [
             ('promotion', 'Promotion'),
-            ('transfer', 'Transfer'),
+            ('lateral', 'Lateral Transfer'),
             ('external', 'External Only'),
         ],
         string='Movement Type', default='promotion',
@@ -144,22 +146,6 @@ class JobVacancy(models.Model):
         [('Managerial', 'Managerial'), ('Non Managerial', 'Non Managerial')],
         string='Job Category', default='Non Managerial')
 
-    has_written_exam = fields.Boolean(
-        string="Requires Written Exam",
-        default=True,
-        compute="_compute_has_written_exam",
-        store=True,
-        readonly=False,
-        help="If enabled, candidates undergo a written exam before interview notification. If disabled, written exam steps are skipped."
-    )
-
-    transfer_eval_mode = fields.Selection([
-        ('standard', 'Full Assessment (PMS + Exam + Interview)'),
-        ('interview_only', 'Interview & PMS Only (No Written Exam)'),
-        ('transfer_matrix_only', 'Pure Transfer Matrix (No Exam & No Interview)'),
-    ], string="Transfer Evaluation Mode", default='standard', tracking=True,
-       help="Determines assessment requirements for Transfer and Lateral vacancies.")
-
     # ── NEW: Job Level now lives on the vacancy itself, not on each
     # candidate score. Only relevant / visible when employee_category is
     # 'Non Managerial' — Managerial vacancies have no sub-level.
@@ -170,155 +156,6 @@ class JobVacancy(models.Model):
              "Job Level shown on every Candidate Score linked to this "
              "vacancy — no longer chosen per-candidate."
     )
-
-    @api.depends('employee_category', 'internal_movement_type', 'transfer_eval_mode')
-    def _compute_has_written_exam(self):
-        for rec in self:
-            if rec.employee_category == 'Managerial':
-                rec.has_written_exam = False
-            elif rec.transfer_eval_mode in ('interview_only', 'transfer_matrix_only'):
-                rec.has_written_exam = False
-            elif not rec.has_written_exam and not rec.id:
-                rec.has_written_exam = True
-
-    @api.onchange('employee_category', 'sourcing_type', 'job_level', 'internal_movement_type', 'transfer_eval_mode')
-    def _onchange_category_or_sourcing_sync_weights(self):
-        """When profile category/sourcing/transfer mode changes, fetch defaults from DB profile."""
-        self._sync_weights_from_assessment_profile(force_reset=True)
-
-    @api.onchange('has_written_exam')
-    def _onchange_has_written_exam_adjust_weights(self):
-        """When exam toggle changes, recalculate weights based on current weights or profile."""
-        self._sync_weights_from_assessment_profile(force_reset=False)
-
-    def _sync_weights_from_assessment_profile(self, force_reset=False):
-        for rec in self:
-            is_transfer = rec.sourcing_type in ('internal', 'both') and rec.internal_movement_type in ('transfer', 'lateral')
-            
-            if is_transfer and rec.transfer_eval_mode == 'transfer_matrix_only':
-                cand_type = "transfer"
-            else:
-                cand_type = "internal" if rec.sourcing_type in ('internal', 'both') else "external"
-            
-            existing_pms = rec.pms_weight
-            existing_int = rec.interview_weight
-            existing_exam = rec.written_weight
-
-            if is_transfer and rec.transfer_eval_mode == 'transfer_matrix_only':
-                pms_w = existing_pms if (existing_pms and not force_reset and existing_pms != 100.0) else 30.0
-                exam_w = 0.0
-                int_w = 0.0
-                if force_reset or not rec.app_date_weight: rec.app_date_weight = 20.0
-                if force_reset or not rec.experience_weight: rec.experience_weight = 20.0
-                if force_reset or not rec.location_weight: rec.location_weight = 20.0
-                if force_reset or not rec.recommendation_weight: rec.recommendation_weight = 10.0
-            elif is_transfer and rec.transfer_eval_mode == 'interview_only':
-                pms_w = existing_pms if (existing_pms and not force_reset) else 50.0
-                exam_w = 0.0
-                int_w = existing_int if (existing_int and not force_reset) else 50.0
-            else:
-                pms_w = existing_pms if (existing_pms and not force_reset) else (40.0 if cand_type == "internal" else 0.0)
-                exam_w = existing_exam if (existing_exam and not force_reset) else (30.0 if cand_type == "internal" else 60.0)
-                int_w = existing_int if (existing_int and not force_reset) else (30.0 if cand_type == "internal" else 40.0)
-
-            if force_reset and "assessment.weight.profile" in self.env:
-                role_lvl = "managerial" if rec.employee_category == 'Managerial' else ("junior" if rec.job_level == 'junior' else "non_managerial")
-                profile = self.env["assessment.weight.profile"].sudo().get_profile_for_candidate(cand_type, role_lvl)
-                if profile and profile.line_ids:
-                    pms_w, exam_w, int_w = 0.0, 0.0, 0.0
-                    for line in profile.line_ids:
-                        if line.component == "pms":
-                            pms_w = line.weight_percentage
-                        elif line.component == "exam":
-                            exam_w = line.weight_percentage
-                        elif line.component == "interview":
-                            int_w = line.weight_percentage
-                        elif line.component == "app_date":
-                            rec.app_date_weight = line.weight_percentage
-                        elif line.component == "experience":
-                            rec.experience_weight = line.weight_percentage
-                        elif line.component == "service_location":
-                            rec.location_weight = line.weight_percentage
-                        elif line.component == "recommendation":
-                            rec.recommendation_weight = line.weight_percentage
-
-            if is_transfer and rec.transfer_eval_mode == 'transfer_matrix_only':
-                exam_w = 0.0
-                int_w = 0.0
-                if not rec.app_date_weight: rec.app_date_weight = 20.0
-                if not rec.experience_weight: rec.experience_weight = 20.0
-                if not rec.location_weight: rec.location_weight = 20.0
-                if not rec.recommendation_weight: rec.recommendation_weight = 10.0
-                if pms_w == 100.0 or not pms_w: pms_w = 30.0
-
-            elif not rec.has_written_exam:
-                exam_w = 0.0
-                rec.written_exam_date = False
-                rec.exam_location = False
-                rec.exam_scheduled = 'No'
-                if rec.transfer_eval_mode != 'interview_only':
-                    total_rem = pms_w + int_w
-                    if total_rem > 0:
-                        pms_w = round((pms_w / total_rem) * 100.0, 2)
-                        int_w = round(100.0 - pms_w, 2)
-                    else:
-                        if cand_type == "internal":
-                            pms_w, int_w = 60.0, 40.0
-                        else:
-                            pms_w, int_w = 0.0, 100.0
-
-            rec.pms_weight = pms_w
-            rec.written_weight = exam_w
-            rec.interview_weight = int_w
-
-    def _sync_to_assessment_weight_profile(self):
-        """
-        Reverse-sync evaluation weights from job.vacancy to assessment.weight.profile
-        so changes in Recruitment module immediately update Assessment System Management profiles.
-        """
-        if "assessment.weight.profile" not in self.env or self.env.context.get('skip_profile_sync'):
-            return
-
-        for rec in self:
-            cand_type = "internal" if rec.sourcing_type in ('internal', 'both') else "external"
-            role_lvl = "managerial" if rec.employee_category == 'Managerial' else ("junior" if rec.job_level == 'junior' else "non_managerial")
-            
-            Profile = self.env["assessment.weight.profile"].sudo()
-            profile = Profile.get_profile_for_candidate(cand_type, role_lvl)
-            if not profile:
-                profile = Profile.with_context(skip_profile_sync=True).create({
-                    "candidate_type": cand_type,
-                    "role_level": role_lvl,
-                    "name": f"{cand_type.capitalize()} Applicant - {role_lvl.replace('_', ' ').title()} Weight Profile",
-                })
-
-            pms_val = round(rec.pms_weight or 0.0, 2)
-            exam_val = round(rec.written_weight if rec.has_written_exam else 0.0, 2)
-            int_val = round(rec.interview_weight or 0.0, 2)
-
-            lines = profile.line_ids
-            pms_line = lines.filtered(lambda l: l.component == 'pms')
-            exam_line = lines.filtered(lambda l: l.component == 'exam')
-            int_line = lines.filtered(lambda l: l.component == 'interview')
-
-            line_commands = []
-            if pms_line:
-                line_commands.append((1, pms_line.id, {'weight_percentage': pms_val}))
-            elif pms_val > 0:
-                line_commands.append((0, 0, {'component': 'pms', 'weight_percentage': pms_val, 'minimum_pass_score': 50.0}))
-
-            if exam_line:
-                line_commands.append((1, exam_line.id, {'weight_percentage': exam_val}))
-            elif rec.has_written_exam or exam_val > 0:
-                line_commands.append((0, 0, {'component': 'exam', 'weight_percentage': exam_val, 'minimum_pass_score': 50.0}))
-
-            if int_line:
-                line_commands.append((1, int_line.id, {'weight_percentage': int_val}))
-            elif int_val > 0:
-                line_commands.append((0, 0, {'component': 'interview', 'weight_percentage': int_val, 'minimum_pass_score': 50.0}))
-
-            if line_commands:
-                profile.with_context(skip_profile_sync=True).sudo().write({'line_ids': line_commands})
 
     recruitment_request_id = fields.Many2one(
         "recruitment.request", string="Recruitment Reference",
@@ -369,78 +206,6 @@ class JobVacancy(models.Model):
     )
 
     no_of_vacancies = fields.Integer(string="Number of Vacancies")
-    request_type = fields.Selection(
-        [("planned", "Planned"), ("unplanned", "Unplanned")],
-        string="Request Type",
-        compute="_compute_request_type",
-        store=True,
-        readonly=False,
-        default="planned",
-        help="Planned requests validate against approved manpower plan. Unplanned requests bypass approved plan validation."
-    )
-
-    @api.depends('recruitment_request_id', 'recruitment_request_id.request_type')
-    def _compute_request_type(self):
-        for rec in self:
-            if rec.recruitment_request_id and rec.recruitment_request_id.request_type:
-                rec.request_type = rec.recruitment_request_id.request_type
-            elif not rec.request_type:
-                rec.request_type = 'planned'
-    approved_plan_count = fields.Integer(
-        string='Approved Plan Headcount',
-        compute='_compute_approved_plan_count',
-        help="Approved manpower plan count for this position and work unit.",
-    )
-    plan_fulfillment_promotion = fields.Integer(
-        string='Approved Promotion Plan',
-        compute='_compute_approved_plan_count',
-        help="Approved manpower plan count earmarked for promotion.",
-    )
-    plan_fulfillment_lateral = fields.Integer(
-        string='Approved Lateral/Transfer Plan',
-        compute='_compute_approved_plan_count',
-        help="Approved manpower plan count earmarked for lateral transfer.",
-    )
-    plan_fulfillment_external = fields.Integer(
-        string='Approved External Plan',
-        compute='_compute_approved_plan_count',
-        help="Approved manpower plan count earmarked for external vacancy.",
-    )
-
-    @api.depends('job_position', 'operating_unit_id')
-    def _compute_approved_plan_count(self):
-        if 'operating.unit.job.position' not in self.env:
-            for rec in self:
-                rec.approved_plan_count = 0
-                rec.plan_fulfillment_promotion = 0
-                rec.plan_fulfillment_lateral = 0
-                rec.plan_fulfillment_external = 0
-            return
-        OUJobPosition = self.env['operating.unit.job.position']
-        for rec in self:
-            if rec.job_position and rec.operating_unit_id:
-                ou_id = rec.operating_unit_id._origin.id or rec.operating_unit_id.id
-                job_id = rec.job_position._origin.id or rec.job_position.id
-                ou_job = OUJobPosition.search([
-                    ('operating_unit_id', '=', ou_id),
-                    ('job_position_id', '=', job_id),
-                ], limit=1)
-                if ou_job:
-                    rec.approved_plan_count = ou_job.approved_plan_count or 0
-                    rec.plan_fulfillment_promotion = ou_job.plan_fulfillment_promotion or 0
-                    rec.plan_fulfillment_lateral = ou_job.plan_fulfillment_lateral or 0
-                    rec.plan_fulfillment_external = ou_job.plan_fulfillment_external or 0
-                else:
-                    rec.approved_plan_count = 0
-                    rec.plan_fulfillment_promotion = 0
-                    rec.plan_fulfillment_lateral = 0
-                    rec.plan_fulfillment_external = 0
-            else:
-                rec.approved_plan_count = 0
-                rec.plan_fulfillment_promotion = 0
-                rec.plan_fulfillment_lateral = 0
-                rec.plan_fulfillment_external = 0
-
     operating_unit_id = fields.Many2one("operating.unit", string="Place Of Assignment", required=True, readonly=True)
     type_of_employment = fields.Selection(
         [('Permanent', 'Permanent'), ('Contractual', 'Contractual'), ("internship", "Internship")],
@@ -603,12 +368,10 @@ class JobVacancy(models.Model):
 
         # 1. From job.competencies_id (hr_competencies_info_job) or competencies_ids
         comp_rel = getattr(job, 'competencies_id', False) or getattr(job, 'competencies_ids', False)
-        seen_comp_ids = set()
         if comp_rel:
             for comp_line in comp_rel:
                 comp_obj = getattr(comp_line, 'competencies', False) or getattr(comp_line, 'competency_id', False)
-                if comp_obj and comp_obj.id not in seen_comp_ids:
-                    seen_comp_ids.add(comp_obj.id)
+                if comp_obj:
                     lines.append((0, 0, {
                         'competency_id': comp_obj.id,
                         'required_level': getattr(comp_line, 'required_level', 'intermediate') or 'intermediate',
@@ -628,13 +391,11 @@ class JobVacancy(models.Model):
             level_map = {'1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert'}
             if mapping and mapping.line_ids:
                 for line in mapping.line_ids:
-                    if line.competency_id and line.competency_id.id not in seen_comp_ids:
-                        seen_comp_ids.add(line.competency_id.id)
-                        req_lvl = level_map.get(str(line.required_proficiency), 'intermediate')
-                        lines.append((0, 0, {
-                            'competency_id': line.competency_id.id,
-                            'required_level': req_lvl,
-                        }))
+                    req_lvl = level_map.get(str(line.required_proficiency), 'intermediate')
+                    lines.append((0, 0, {
+                        'competency_id': line.competency_id.id,
+                        'required_level': req_lvl,
+                    }))
 
         # 3. From competency.competency directly
         if not lines:
@@ -647,12 +408,10 @@ class JobVacancy(models.Model):
                     ('status', '=', 'active')
                 ], limit=4)
             for comp in comps:
-                if comp.id not in seen_comp_ids:
-                    seen_comp_ids.add(comp.id)
-                    lines.append((0, 0, {
-                        'competency_id': comp.id,
-                        'required_level': 'intermediate',
-                    }))
+                lines.append((0, 0, {
+                    'competency_id': comp.id,
+                    'required_level': 'intermediate',
+                }))
         return lines
 
     @api.onchange('operating_unit_id', 'responsible', 'no_of_vacancies')
@@ -751,22 +510,76 @@ class JobVacancy(models.Model):
     )
 
     # Direct Evaluation weights & schedule fields stored directly on job.vacancy
+    has_written_exam = fields.Boolean(string="Has Written Exam", default=True)
     pms_weight = fields.Float(string="PMS Weight (%)", default=0.0)
     written_weight = fields.Float(string="Written Exam Weight (%)", default=0.0)
     interview_weight = fields.Float(string="Interview Weight (%)", default=0.0)
-    app_date_weight = fields.Float(string="Application Date Weight (%)", default=20.0)
-    experience_weight = fields.Float(string="Total Experience Weight (%)", default=20.0)
-    location_weight = fields.Float(string="Location Service Weight (%)", default=20.0)
-    recommendation_weight = fields.Float(string="Supervisor Recommendation Weight (%)", default=10.0)
+    transfer_eval_mode = fields.Selection([
+        ('standard', 'Standard (Exam + Interview)'),
+        ('interview_only', 'Interview Only'),
+        ('transfer_matrix_only', 'Transfer Matrix Only'),
+    ], string='Transfer Evaluation Mode', default='standard')
+    supervisor_rec_requested = fields.Boolean(string="Supervisor Recommendation Requested", default=False)
+    app_date_weight = fields.Float(string="Application Date Weight (%)", default=0.0)
+    experience_weight = fields.Float(string="Experience Weight (%)", default=0.0)
+    location_weight = fields.Float(string="Location Weight (%)", default=0.0)
+    recommendation_weight = fields.Float(string="Recommendation Weight (%)", default=0.0)
+    approved_plan_count = fields.Integer(string="Approved Plan Count", compute="_compute_plan_fulfillment", store=False)
+    plan_fulfillment_promotion = fields.Integer(string="Approved Promotion Plan", compute="_compute_plan_fulfillment", store=False)
+    plan_fulfillment_lateral = fields.Integer(string="Approved Transfer Plan", compute="_compute_plan_fulfillment", store=False)
+    position_qualifications = fields.Text(string="Required Qualifications", compute="_compute_position_requirements", store=False)
+    position_experiences = fields.Text(string="Required Experiences", compute="_compute_position_requirements", store=False)
+
+    @api.depends('job_position')
+    def _compute_position_requirements(self):
+        for rec in self:
+            qual_lines = []
+            exp_lines = []
+            if rec.job_position:
+                job = rec.job_position
+                if getattr(job, 'qualification_id', False) and job.qualification_id:
+                    for q in job.qualification_id:
+                        q_name = q.qualification.name if getattr(q, 'qualification', False) and hasattr(q.qualification, 'name') else str(getattr(q, 'qualification', '') or '')
+                        lvl = getattr(q, 'required_level', '') or ''
+                        if q_name:
+                            qual_lines.append(f"• {q_name}" + (f" ({lvl})" if lvl else ""))
+                if getattr(job, 'experience_id', False) and job.experience_id:
+                    for exp in job.experience_id:
+                        e_name = exp.experience.name if getattr(exp, 'experience', False) and hasattr(exp.experience, 'name') else str(getattr(exp, 'experience', '') or '')
+                        e_yrs = getattr(exp, 'years_of_experience', '') or ''
+                        if e_name:
+                            exp_lines.append(f"• {e_name}" + (f" ({e_yrs} yrs)" if e_yrs else ""))
+            rec.position_qualifications = "\n".join(qual_lines) if qual_lines else ""
+            rec.position_experiences = "\n".join(exp_lines) if exp_lines else ""
+
+    @api.depends('recruitment_request_id', 'no_of_vacancies')
+    def _compute_plan_fulfillment(self):
+        for rec in self:
+            rec.approved_plan_count = rec.no_of_vacancies or 0
+            rec.plan_fulfillment_promotion = rec.no_of_vacancies or 0
+            rec.plan_fulfillment_lateral = 0
     written_exam_date = fields.Datetime(string="Written Exam Date")
     exam_location = fields.Text(string="Exam Location")
     exam_scheduled = fields.Selection([('Yes', 'Yes'), ('No', 'No')], string="Exam Scheduled", default='No')
     interview_date = fields.Datetime(string="Interview Date")
     interview_location = fields.Text(string="Interview Location")
     interview_scheduled = fields.Selection([('Yes', 'Yes'), ('No', 'No')], string="Interview Scheduled", default='No')
+
+    @api.onchange('written_exam_date')
+    def _onchange_written_exam_date_auto_schedule(self):
+        if self.written_exam_date:
+            self.exam_scheduled = 'Yes'
+        else:
+            self.exam_scheduled = 'No'
+
+    @api.onchange('interview_date')
+    def _onchange_interview_date_auto_schedule(self):
+        if self.interview_date:
+            self.interview_scheduled = 'Yes'
+        else:
+            self.interview_scheduled = 'No'
     panel_notified = fields.Boolean(string="Panel Notified", default=False)
     selection_notified = fields.Boolean(string="Selection Notified", default=False)
-    supervisor_rec_requested = fields.Boolean(string="Supervisor Recommendation Requested", default=False, copy=False)
     show_reschedule_button = fields.Boolean(compute="_compute_show_reschedule_button_unified")
     total_candidates_count = fields.Integer(compute="_compute_candidate_counts", string="Applicants")
     selected_candidates_count = fields.Integer(compute="_compute_candidate_counts", string="Selected")
@@ -830,28 +643,13 @@ class JobVacancy(models.Model):
             else:
                 rec.show_reschedule_button = False
 
-    @api.depends('shortlist_done', 'candidate_notified', 'exam_notified',
-                 'exam_scores_fetched', 'panel_notified', 'interview_notified', 'interview_scores_fetched',
+    @api.depends('shortlist_done', 'candidate_notified', 'exam_notified', 'panel_notified',
+                 'interview_notified', 'exam_scores_fetched', 'interview_scores_fetched',
                  'scores_computed', 'committee_notified', 'minute_signed',
-                 'selection_notified', 'supervisor_rec_requested', 'employees_promoted', 'eligible_employee_ids', 'ext_rec_sel', 'sourcing_type', 'has_written_exam', 'transfer_eval_mode')
+                 'selection_notified', 'employees_promoted', 'eligible_employee_ids', 'ext_rec_sel', 'sourcing_type')
     def _compute_recruitment_step(self):
         for rec in self:
             is_internal = rec.sourcing_type in ('internal', 'both') or 'INT' in (rec.reference or '').upper() or 'LAT' in (rec.reference or '').upper()
-            if rec.transfer_eval_mode == 'transfer_matrix_only':
-                if rec.employees_promoted:
-                    rec.recruitment_step = 'done'
-                elif rec.selection_notified:
-                    rec.recruitment_step = 'promote'
-                elif rec.minute_signed or rec.committee_notified:
-                    rec.recruitment_step = 'notify_selection'
-                elif rec.scores_computed:
-                    rec.recruitment_step = 'notify_committee'
-                elif rec.supervisor_rec_requested or rec.candidate_notified or rec.shortlist_done or (is_internal and rec.eligible_employee_ids and len(rec.eligible_employee_ids) > 0):
-                    rec.recruitment_step = 'compute_rank'
-                else:
-                    rec.recruitment_step = 'shortlist'
-                continue
-
             if rec.employees_promoted:
                 rec.recruitment_step = 'done'
             elif rec.selection_notified:
@@ -866,24 +664,18 @@ class JobVacancy(models.Model):
                 rec.recruitment_step = 'fetch_interview'
             elif rec.panel_notified:
                 rec.recruitment_step = 'notify_interview'
-            elif rec.has_written_exam and rec.exam_scores_fetched:
+            elif rec.exam_scores_fetched:
                 rec.recruitment_step = 'notify_panel'
-            elif rec.has_written_exam and rec.exam_notified:
+            elif rec.exam_notified:
                 rec.recruitment_step = 'fetch_exam'
             elif is_internal and rec.candidate_notified:
-                if rec.has_written_exam:
-                    rec.recruitment_step = 'notify_exam'
-                else:
-                    rec.recruitment_step = 'notify_panel'
+                rec.recruitment_step = 'notify_exam'
             elif rec.shortlist_done or (is_internal and rec.eligible_employee_ids and len(rec.eligible_employee_ids) > 0) or (not is_internal and rec.ext_rec_sel and len(rec.ext_rec_sel) > 0):
                 if is_internal:
                     rec.recruitment_step = 'notify_cand'
                 else:
                     # External applicants applied directly via portal, bypass invitation notification
-                    if rec.has_written_exam:
-                        rec.recruitment_step = 'notify_exam'
-                    else:
-                        rec.recruitment_step = 'notify_panel'
+                    rec.recruitment_step = 'notify_exam'
             else:
                 rec.recruitment_step = 'shortlist'
 
@@ -899,7 +691,6 @@ class JobVacancy(models.Model):
             rec.ext_selected_recruitment_id = ext_rec
 
     def _inverse_recruitment_step(self):
-        # Intentionally blank inverse method to allow user-editable computed recruitment_step field
         pass
 
     @api.depends('reference')
@@ -963,6 +754,14 @@ class JobVacancy(models.Model):
                         sel_rec.exam_candidate_summary = rec.exam_candidate_summary
                     elif sel_rec.exam_candidate_summary and not rec.exam_candidate_summary:
                         rec.exam_candidate_summary = sel_rec.exam_candidate_summary
+                    if rec.exam_scheduled and rec.exam_scheduled == 'Yes' and sel_rec.exam_scheduled != 'Yes':
+                        sel_rec.exam_scheduled = 'Yes'
+                    elif sel_rec.exam_scheduled and sel_rec.exam_scheduled == 'Yes' and rec.exam_scheduled != 'Yes':
+                        rec.exam_scheduled = 'Yes'
+                    if rec.interview_scheduled and rec.interview_scheduled == 'Yes' and sel_rec.interview_scheduled != 'Yes':
+                        sel_rec.interview_scheduled = 'Yes'
+                    elif sel_rec.interview_scheduled and sel_rec.interview_scheduled == 'Yes' and rec.interview_scheduled != 'Yes':
+                        rec.interview_scheduled = 'Yes'
             else:
                 ext_sel = ExtSelected.search([
                     '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
@@ -1006,6 +805,14 @@ class JobVacancy(models.Model):
                         ext_sel.exam_candidate_summary = rec.exam_candidate_summary
                     elif ext_sel.exam_candidate_summary and not rec.exam_candidate_summary:
                         rec.exam_candidate_summary = ext_sel.exam_candidate_summary
+                    if rec.exam_scheduled and rec.exam_scheduled == 'Yes' and ext_sel.exam_scheduled != 'Yes':
+                        ext_sel.exam_scheduled = 'Yes'
+                    elif ext_sel.exam_scheduled and ext_sel.exam_scheduled == 'Yes' and rec.exam_scheduled != 'Yes':
+                        rec.exam_scheduled = 'Yes'
+                    if rec.interview_scheduled and rec.interview_scheduled == 'Yes' and ext_sel.interview_scheduled != 'Yes':
+                        ext_sel.interview_scheduled = 'Yes'
+                    elif ext_sel.interview_scheduled and ext_sel.interview_scheduled == 'Yes' and rec.interview_scheduled != 'Yes':
+                        rec.interview_scheduled = 'Yes'
 
     def _get_selected_recruitment_record(self):
         self.ensure_one()
@@ -1061,35 +868,11 @@ class JobVacancy(models.Model):
     def action_notify_interview_panel(self):
         self.ensure_one()
         self._sync_selected_recruitment_records()
-        sel = self._get_selected_recruitment_record()
-
-        has_panel = False
-        if sel:
-            if hasattr(sel, 'new_int_rec_panel') and sel.new_int_rec_panel:
-                has_panel = any(line.emp_name for line in sel.new_int_rec_panel)
-            elif hasattr(sel, 'ext_rec_panel') and sel.ext_rec_panel:
-                has_panel = any(line.emp_name for line in sel.ext_rec_panel)
-
-        if not has_panel and hasattr(self, 'panl_memb_vac') and self.panl_memb_vac:
-            has_panel = any(getattr(line, 'employee_id', False) or getattr(line, 'panel_member_name', False) for line in self.panl_memb_vac)
-
-        if not has_panel:
-            raise UserError(_("No panel members have been added for this vacancy. Please add interview panel members before notifying the panel."))
-
         self.panel_notified = True
         self.recruitment_step = 'notify_interview'
-
-        dt = self.interview_date or (self.selected_recruitment_id.interview_date if self.selected_recruitment_id else False)
-        loc = self.interview_location or (self.selected_recruitment_id.interview_location if self.selected_recruitment_id else False) or 'Head Office'
-
+        sel = self._get_selected_recruitment_record()
         if sel:
-            if not dt and sel.interview_date:
-                dt = sel.interview_date
-            if dt and sel.interview_date != dt:
-                sel.sudo().write({'interview_date': dt})
-            if loc and sel.interview_location != loc:
-                sel.sudo().write({'interview_location': loc})
-            return sel.notify_interview_panel()
+            return sel.action_notify_panel_members()
 
     def action_open_reschedule_wizard(self):
         self.ensure_one()
@@ -1127,6 +910,42 @@ class JobVacancy(models.Model):
             res = sel.fetch_interview_score()
             self.env.invalidate_all()
             return res
+
+    def action_request_supervisor_recommendation(self):
+        """Request supervisor recommendation for eligible transfer candidates."""
+        self.ensure_one()
+        self.supervisor_rec_requested = True
+        self.message_post(body=_("Supervisor recommendation requested for eligible transfer candidates."))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Supervisor Recommendation Requested'),
+                'message': _('Supervisor recommendations have been requested successfully.'),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
+    def action_generate_minute(self):
+        """Generates selection minute report."""
+        self.ensure_one()
+        sel = self._get_selected_recruitment_record()
+        if sel and hasattr(sel, 'action_generate_minute'):
+            return sel.action_generate_minute()
+        if self.sourcing_type == 'external':
+            selected = self.env['external.recruitment.selected'].search([
+                '|', ('vacancy_id', '=', self.id), ('vacancy_reference', '=', self.reference)
+            ], limit=1)
+            if selected and hasattr(selected, 'action_generate_minute'):
+                return selected.action_generate_minute()
+        else:
+            selected = self.env['new.internal.recruitment.selected'].search([
+                '|', ('vacancy_id', '=', self.id), ('vacancy_reference', '=', self.reference)
+            ], limit=1)
+            if selected and hasattr(selected, 'action_generate_minute'):
+                return selected.action_generate_minute()
+        return True
 
     def action_compute_and_rank(self):
         self.ensure_one()
@@ -1417,268 +1236,6 @@ class JobVacancy(models.Model):
                     "The following mandatory fields are missing for vacancy record: %s"
                 ) % ", ".join(missing))
 
-    @api.constrains('no_of_vacancies', 'job_position', 'operating_unit_id', 'internal_movement_type', 'sourcing_type', 'hiring_details', 'recruitment_request_id', 'request_type')
-    def _check_no_of_vacancies_vs_approved_plan(self):
-        if 'operating.unit.job.position' not in self.env:
-            return
-        OUJobPosition = self.env['operating.unit.job.position']
-        for rec in self:
-            # Skip approved plan validation for unplanned requests!
-            is_unplanned = (rec.recruitment_request_id and rec.recruitment_request_id.request_type == 'unplanned') or getattr(rec, 'request_type', '') == 'unplanned' or self.env.context.get('default_request_type') == 'unplanned' or self.env.context.get('unplanned')
-            if is_unplanned:
-                continue
-            if not rec.job_position or not rec.operating_unit_id:
-                continue
-            ou_id = rec.operating_unit_id._origin.id or rec.operating_unit_id.id
-            job_id = rec.job_position._origin.id or rec.job_position.id
-            ou_job = OUJobPosition.search([
-                ('operating_unit_id', '=', ou_id),
-                ('job_position_id', '=', job_id),
-            ], limit=1)
-            if not ou_job:
-                continue
-
-            plan_count = ou_job.approved_plan_count or 0
-            prom_plan = ou_job.plan_fulfillment_promotion or 0
-            lat_plan = ou_job.plan_fulfillment_lateral or 0
-            ext_plan = ou_job.plan_fulfillment_external or 0
-            has_breakdown = (prom_plan > 0 or lat_plan > 0 or ext_plan > 0)
-
-            # Movement type and sourcing validation against PBMS fulfillment plan
-            m_type = rec.internal_movement_type or ('external' if rec.sourcing_type == 'external' else 'promotion')
-
-            if has_breakdown:
-                if m_type == 'promotion':
-                    if prom_plan <= 0:
-                        breakdown_desc = []
-                        if lat_plan > 0:
-                            breakdown_desc.append(_("Transfer (%s)") % lat_plan)
-                        if ext_plan > 0:
-                            breakdown_desc.append(_("External (%s)") % ext_plan)
-                        earmarked_str = ", ".join(breakdown_desc) or _("other sourcing channels")
-                        raise ValidationError(_(
-                            "Cannot create a Promotion vacancy for '%(job)s' at '%(unit)s'. "
-                            "There is no approved plan for Promotion (Approved Promotion Plan: 0). "
-                            "The approved plan is earmarked for %(earmarked)s."
-                        ) % {
-                            'job': rec.job_position.name,
-                            'unit': rec.operating_unit_id.name,
-                            'earmarked': earmarked_str,
-                        })
-                    if rec.no_of_vacancies and rec.no_of_vacancies > prom_plan:
-                        raise ValidationError(_(
-                            "The number of opening vacancies (%(openings)s) cannot exceed the "
-                            "approved Promotion plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
-                        ) % {
-                            'openings': rec.no_of_vacancies,
-                            'plan': prom_plan,
-                            'job': rec.job_position.name,
-                            'unit': rec.operating_unit_id.name,
-                        })
-                elif m_type in ('lateral', 'transfer'):
-                    if lat_plan <= 0:
-                        breakdown_desc = []
-                        if prom_plan > 0:
-                            breakdown_desc.append(_("Promotion (%s)") % prom_plan)
-                        if ext_plan > 0:
-                            breakdown_desc.append(_("External (%s)") % ext_plan)
-                        earmarked_str = ", ".join(breakdown_desc) or _("other sourcing channels")
-                        raise ValidationError(_(
-                            "Cannot create a Transfer/Lateral vacancy for '%(job)s' at '%(unit)s'. "
-                            "There is no approved plan for Transfer/Lateral (Approved Lateral/Transfer Plan: 0). "
-                            "The approved plan is earmarked for %(earmarked)s."
-                        ) % {
-                            'job': rec.job_position.name,
-                            'unit': rec.operating_unit_id.name,
-                            'earmarked': earmarked_str,
-                        })
-                    if rec.no_of_vacancies and rec.no_of_vacancies > lat_plan:
-                        raise ValidationError(_(
-                            "The number of opening vacancies (%(openings)s) cannot exceed the "
-                            "approved Transfer/Lateral plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
-                        ) % {
-                            'openings': rec.no_of_vacancies,
-                            'plan': lat_plan,
-                            'job': rec.job_position.name,
-                            'unit': rec.operating_unit_id.name,
-                        })
-                elif m_type == 'external' or rec.sourcing_type == 'external':
-                    if ext_plan <= 0:
-                        breakdown_desc = []
-                        if prom_plan > 0:
-                            breakdown_desc.append(_("Promotion (%s)") % prom_plan)
-                        if lat_plan > 0:
-                            breakdown_desc.append(_("Transfer (%s)") % lat_plan)
-                        earmarked_str = ", ".join(breakdown_desc) or _("internal sourcing channels")
-                        raise ValidationError(_(
-                            "Cannot create an External vacancy for '%(job)s' at '%(unit)s'. "
-                            "There is no approved plan for External Vacancy (Approved External Plan: 0). "
-                            "The approved plan is earmarked for %(earmarked)s."
-                        ) % {
-                            'job': rec.job_position.name,
-                            'unit': rec.operating_unit_id.name,
-                            'earmarked': earmarked_str,
-                        })
-                    if rec.no_of_vacancies and rec.no_of_vacancies > ext_plan:
-                        raise ValidationError(_(
-                            "The number of opening vacancies (%(openings)s) cannot exceed the "
-                            "approved External plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
-                        ) % {
-                            'openings': rec.no_of_vacancies,
-                            'plan': ext_plan,
-                            'job': rec.job_position.name,
-                            'unit': rec.operating_unit_id.name,
-                        })
-
-            if rec.no_of_vacancies and rec.no_of_vacancies > plan_count:
-                raise ValidationError(_(
-                    "The number of opening vacancies (%(openings)s) cannot exceed the "
-                    "approved plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
-                ) % {
-                    'openings': rec.no_of_vacancies,
-                    'plan': plan_count,
-                    'job': rec.job_position.name,
-                    'unit': rec.operating_unit_id.name,
-                })
-
-            if rec.hiring_details:
-                total_hiring_openings = sum(
-                    h.number_of_openings for h in rec.hiring_details
-                    if (h.work_unit._origin.id or h.work_unit.id) == ou_id
-                )
-                cap = plan_count
-                if has_breakdown:
-                    if m_type == 'promotion':
-                        cap = prom_plan
-                    elif m_type in ('lateral', 'transfer'):
-                        cap = lat_plan
-                    elif m_type == 'external' or rec.sourcing_type == 'external':
-                        cap = ext_plan
-                if total_hiring_openings > cap:
-                    raise ValidationError(_(
-                        "The total openings in hiring details (%(openings)s) cannot exceed the "
-                        "approved plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
-                    ) % {
-                        'openings': total_hiring_openings,
-                        'plan': cap,
-                        'job': rec.job_position.name,
-                        'unit': rec.operating_unit_id.name,
-                    })
-
-    @api.onchange('no_of_vacancies', 'job_position', 'operating_unit_id', 'internal_movement_type', 'sourcing_type', 'recruitment_request_id', 'request_type')
-    def _onchange_check_no_of_vacancies_plan(self):
-        if 'operating.unit.job.position' not in self.env:
-            return
-        OUJobPosition = self.env['operating.unit.job.position']
-        for rec in self:
-            # Skip approved plan warning for unplanned requests!
-            is_unplanned = (rec.recruitment_request_id and rec.recruitment_request_id.request_type == 'unplanned') or getattr(rec, 'request_type', '') == 'unplanned' or self.env.context.get('default_request_type') == 'unplanned' or self.env.context.get('unplanned')
-            if is_unplanned:
-                continue
-            if rec.job_position and rec.operating_unit_id:
-                ou_id = rec.operating_unit_id._origin.id or rec.operating_unit_id.id
-                job_id = rec.job_position._origin.id or rec.job_position.id
-                ou_job = OUJobPosition.search([
-                    ('operating_unit_id', '=', ou_id),
-                    ('job_position_id', '=', job_id),
-                ], limit=1)
-                if not ou_job:
-                    continue
-
-                plan_count = ou_job.approved_plan_count or 0
-                prom_plan = ou_job.plan_fulfillment_promotion or 0
-                lat_plan = ou_job.plan_fulfillment_lateral or 0
-                ext_plan = ou_job.plan_fulfillment_external or 0
-                has_breakdown = (prom_plan > 0 or lat_plan > 0 or ext_plan > 0)
-                m_type = rec.internal_movement_type or ('external' if rec.sourcing_type == 'external' else 'promotion')
-
-                # If movement type has not been explicitly switched yet, auto-select the available one
-                if has_breakdown and not self.env.context.get('default_internal_movement_type'):
-                    if lat_plan > 0 and prom_plan <= 0 and m_type == 'promotion':
-                        rec.internal_movement_type = 'lateral'
-                        m_type = 'lateral'
-                    elif prom_plan > 0 and lat_plan <= 0 and m_type in ('lateral', 'transfer'):
-                        rec.internal_movement_type = 'promotion'
-                        m_type = 'promotion'
-
-                if has_breakdown:
-                    if m_type == 'promotion' and prom_plan <= 0:
-                        breakdown_desc = []
-                        if lat_plan > 0:
-                            breakdown_desc.append(_("Transfer (%s)") % lat_plan)
-                        if ext_plan > 0:
-                            breakdown_desc.append(_("External (%s)") % ext_plan)
-                        earmarked_str = ", ".join(breakdown_desc) or _("other sourcing channels")
-                        return {
-                            'warning': {
-                                'title': _('No Approved Promotion Plan'),
-                                'message': _(
-                                    "The approved plan for Promotion is 0 for '%s' at '%s'. "
-                                    "The approved plan is earmarked for %s."
-                                ) % (rec.job_position.name, rec.operating_unit_id.name, earmarked_str)
-                            }
-                        }
-                    elif m_type in ('lateral', 'transfer') and lat_plan <= 0:
-                        breakdown_desc = []
-                        if prom_plan > 0:
-                            breakdown_desc.append(_("Promotion (%s)") % prom_plan)
-                        if ext_plan > 0:
-                            breakdown_desc.append(_("External (%s)") % ext_plan)
-                        earmarked_str = ", ".join(breakdown_desc) or _("other sourcing channels")
-                        return {
-                            'warning': {
-                                'title': _('No Approved Transfer/Lateral Plan'),
-                                'message': _(
-                                    "The approved plan for Transfer/Lateral is 0 for '%s' at '%s'. "
-                                    "The approved plan is earmarked for %s."
-                                ) % (rec.job_position.name, rec.operating_unit_id.name, earmarked_str)
-                            }
-                        }
-                    elif (m_type == 'external' or rec.sourcing_type == 'external') and ext_plan <= 0:
-                        breakdown_desc = []
-                        if prom_plan > 0:
-                            breakdown_desc.append(_("Promotion (%s)") % prom_plan)
-                        if lat_plan > 0:
-                            breakdown_desc.append(_("Transfer (%s)") % lat_plan)
-                        earmarked_str = ", ".join(breakdown_desc) or _("internal sourcing channels")
-                        return {
-                            'warning': {
-                                'title': _('No Approved External Plan'),
-                                'message': _(
-                                    "The approved plan for External Vacancy is 0 for '%s' at '%s'. "
-                                    "The approved plan is earmarked for %s."
-                                ) % (rec.job_position.name, rec.operating_unit_id.name, earmarked_str)
-                            }
-                        }
-
-                    # Check exceeding movement type allocation
-                    cap = prom_plan if m_type == 'promotion' else (lat_plan if m_type in ('lateral', 'transfer') else ext_plan)
-                    if rec.no_of_vacancies and rec.no_of_vacancies > cap:
-                        return {
-                            'warning': {
-                                'title': _('Approved Plan Limit Exceeded'),
-                                'message': _(
-                                    "The entered vacancies (%s) exceeds the approved %s plan count (%s) for %s at %s."
-                                ) % (rec.no_of_vacancies, m_type.capitalize(), cap, rec.job_position.name, rec.operating_unit_id.name)
-                            }
-                        }
-
-                if rec.no_of_vacancies and rec.no_of_vacancies > plan_count:
-                    return {
-                        'warning': {
-                            'title': _('Approved Plan Limit Exceeded'),
-                            'message': _(
-                                "The entered vacancies (%s) exceeds the approved "
-                                "plan count (%s) for %s at %s."
-                            ) % (
-                                rec.no_of_vacancies,
-                                plan_count,
-                                rec.job_position.name,
-                                rec.operating_unit_id.name,
-                            )
-                        }
-                    }
-
     def _is_locked(self):
         """A vacancy is locked once it leaves Draft — matches the vacancy_status
         statusbar (draft, evaluate, published, closed)."""
@@ -1694,16 +1251,12 @@ class JobVacancy(models.Model):
             if 'exam_candidate_summary' in vals and isinstance(vals.get('exam_candidate_summary'), str):
                 cleaned = re.sub(r'<[^>]+>', '', vals['exam_candidate_summary']).strip()
                 vals['exam_candidate_summary'] = cleaned if cleaned else False
-        records = super().create(vals_list)
-        if not self.env.context.get('skip_profile_sync'):
-            records._sync_to_assessment_weight_profile()
-        return records
+        return super().create(vals_list)
 
     def write(self, vals):
         """Protect core vacancy fields once Evaluated or Published, and lock completely once Closed.
         All selection, scoring, scheduling, panel members, committee, and promotion fields remain
         fully operational throughout the recruitment lifecycle."""
-        self._check_parent_lock()
         if 'exam_candidate_summary' in vals and isinstance(vals.get('exam_candidate_summary'), str):
             import re
             cleaned = re.sub(r'<[^>]+>', '', vals['exam_candidate_summary']).strip()
@@ -1730,16 +1283,6 @@ class JobVacancy(models.Model):
         if vals.get('vacancy_status') == 'published':
             for rec in self:
                 rec._sync_published_vacancy_records()
-
-        sync_keys = {'written_exam_date', 'exam_location', 'exam_scheduled', 'interview_date', 'interview_location', 'interview_scheduled', 'pms_weight', 'written_weight', 'interview_weight'}
-        if sync_keys.intersection(vals.keys()):
-            for rec in self:
-                rec._sync_schedule_to_selection_models()
-
-        weight_keys = {'pms_weight', 'written_weight', 'interview_weight', 'has_written_exam', 'sourcing_type', 'employee_category', 'job_level'}
-        if weight_keys.intersection(vals.keys()) and not self.env.context.get('skip_profile_sync'):
-            self._sync_to_assessment_weight_profile()
-
         return res
 
     def _sync_published_vacancy_records(self):
@@ -1962,19 +1505,11 @@ class JobVacancy(models.Model):
                     WHERE internal_recruitment_id = %s;
                 """, (self.id, int_rec.id))
 
-            # 4. Filter / populate candidates for Transfer / Lateral movement
-            if self.internal_movement_type in ('transfer', 'lateral'):
-                self._filter_and_populate_transfer_candidates(int_rec)
-
             self.env.invalidate_all()
             self._sync_selected_recruitment_records()
             self.shortlist_done = True
-            if self.transfer_eval_mode == 'transfer_matrix_only':
-                self.recruitment_step = 'compute_rank'
-            else:
-                self.recruitment_step = 'notify_cand'
-
-            count = len(self.eligible_employee_ids.filtered(lambda r: r.select_flag))
+            self.recruitment_step = 'notify_cand'
+            count = len(self.eligible_employee_ids)
 
             return {
                 'type': 'ir.actions.client',
@@ -2029,123 +1564,6 @@ class JobVacancy(models.Model):
                 }
             }
 
-    def _filter_and_populate_transfer_candidates(self, int_rec=None):
-        """
-        For Transfer/Lateral vacancies, fetch and shortlist all active employees who have:
-        1. Same Job Position or Job Grade
-        2. DIFFERENT location (Operating Unit) from the vacancy's Place of Assignment.
-        """
-        self.ensure_one()
-        vac_position = self.job_position
-        vac_grade = self.job_grade or (self.job_position.grade if self.job_position else False)
-        vac_ou = self.operating_unit_id
-
-        all_employees = self.env['hr.employee'].search([('active', '=', True)])
-        transfer_eligible_employees = self.env['hr.employee']
-
-        for emp in all_employees:
-            emp_pos = getattr(emp, 'job_id', False) or getattr(emp, 'job_position', False)
-            pos_match = bool(emp_pos and vac_position and emp_pos.id == vac_position.id)
-
-            emp_grade = getattr(emp, 'job_grade', False) or getattr(emp, 'grade', False) or (emp_pos.grade if emp_pos and hasattr(emp_pos, 'grade') else False)
-            grade_match = bool(emp_grade and vac_grade and emp_grade.id == vac_grade.id)
-
-            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False)
-            diff_location = bool(not emp_ou or not vac_ou or emp_ou.id != vac_ou.id)
-
-            if (pos_match or grade_match) and diff_location:
-                transfer_eligible_employees |= emp
-
-        EligibleLine = self.env['internal.recruitment.eligible.employees']
-        existing_emp_ids = set(self.eligible_employee_ids.mapped('emp_name').ids)
-
-        for emp in transfer_eligible_employees:
-            contract_pms = emp.contract_id.pms_score if hasattr(emp, 'contract_id') and emp.contract_id else 0.0
-            emp_pos_name = emp.job_id.name if emp.job_id else (emp.job_position.name if hasattr(emp, 'job_position') and emp.job_position else '')
-            emp_grade_name = emp.job_grade.grade_name if hasattr(emp, 'job_grade') and emp.job_grade else (emp.job_id.grade.grade_name if emp.job_id and emp.job_id.grade else '')
-            emp_unit_name = emp.default_operating_unit_id.name if hasattr(emp, 'default_operating_unit_id') and emp.default_operating_unit_id else ''
-
-            if emp.id not in existing_emp_ids:
-                vals = {
-                    'vacancy_id': self.id,
-                    'internal_recruitment_id': int_rec.id if int_rec else False,
-                    'emp_name': emp.id,
-                    'select_flag': True,
-                    'emp_position': emp_pos_name,
-                    'emp_grade': emp_grade_name,
-                    'current_work_unit': emp_unit_name,
-                    'pms_score': contract_pms,
-                }
-                EligibleLine.create(vals)
-            else:
-                lines = self.eligible_employee_ids.filtered(lambda r: r.emp_name.id == emp.id)
-                lines.write({'select_flag': True})
-
-        same_loc_lines = self.eligible_employee_ids.filtered(
-            lambda r: r.emp_name.default_operating_unit_id and vac_ou and r.emp_name.default_operating_unit_id.id == vac_ou.id
-        )
-        if same_loc_lines:
-            same_loc_lines.write({'select_flag': False})
-
-    def action_request_supervisor_recommendation(self):
-        """Send supervisor recommendation request activities & emails to coaches/managers of shortlisted candidates."""
-        self.ensure_one()
-        if not self.new_int_rec_sel:
-            raise UserError(_("No candidate lines found on this vacancy to request supervisor recommendation for."))
-
-        HrTask = self.env['mail.activity']
-        ActivityType = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-        count = 0
-
-        for line in self.new_int_rec_sel:
-            emp = line.emp_name
-            if not emp:
-                continue
-            coach = getattr(emp, 'coach_id', False) or getattr(emp, 'parent_id', False) or (emp.department_id.manager_id if emp.department_id else False)
-            if coach and coach.user_id and 'transfer.assessment.record' in self.env:
-                TransferAssess = self.env['transfer.assessment.record'].sudo()
-                existing = TransferAssess.search([
-                    ('employee_id', '=', emp.id),
-                    '|',
-                    ('vacancy_id', '=', self.id),
-                    ('target_job_id', '=', self.job_position.id if self.job_position else False)
-                ], limit=1)
-                if not existing:
-                    existing = TransferAssess.create({
-                        'vacancy_id': self.id,
-                        'employee_id': emp.id,
-                        'target_job_id': self.job_position.id if self.job_position else False,
-                        'target_branch_id': self.operating_unit_id.name if self.operating_unit_id else '',
-                        'assessment_mode': 'criteria_only',
-                        'pms_score': line.pms_score or (emp.contract_id.pms_score if hasattr(emp, 'contract_id') and emp.contract_id else 85.0),
-                    })
-                
-                if ActivityType:
-                    HrTask.sudo().create({
-                        'activity_type_id': ActivityType.id,
-                        'note': _("Action Required: Please submit the Supervisor Recommendation Score (0-100%%) for employee <b>%s</b> for vacancy <b>%s</b>.") % (emp.name, self.reference),
-                        'res_id': existing.id,
-                        'res_model_id': self.env['ir.model']._get('transfer.assessment.record').id,
-                        'user_id': coach.user_id.id,
-                        'summary': _("Submit Supervisor Recommendation Score for Transfer"),
-                    })
-                count += 1
-
-        self.supervisor_rec_requested = True
-        self.recruitment_step = 'compute_rank'
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Supervisor Recommendations Requested'),
-                'message': _('Successfully sent recommendation requests to %s candidate supervisors.') % count,
-                'type': 'success',
-                'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
-            }
-        }
-
-
     def action_notify_candidates(self):
         """Notify shortlisted candidates directly from the Job Vacancy form."""
         self.ensure_one()
@@ -2183,12 +1601,7 @@ class JobVacancy(models.Model):
             # Trigger notify
             int_rec.notify()
             self.candidate_notified = True
-            if not self.has_written_exam:
-                self.exam_notified = True
-                self.exam_scores_fetched = True
-                self.recruitment_step = 'notify_panel'
-            else:
-                self.recruitment_step = 'notify_exam'
+            self.recruitment_step = 'notify_exam'
 
             return {
                 'type': 'ir.actions.client',
@@ -2209,12 +1622,7 @@ class JobVacancy(models.Model):
             if ext_rec:
                 ext_rec.notify()
             self.candidate_notified = True
-            if not self.has_written_exam:
-                self.exam_notified = True
-                self.exam_scores_fetched = True
-                self.recruitment_step = 'notify_panel'
-            else:
-                self.recruitment_step = 'notify_exam'
+            self.recruitment_step = 'notify_exam'
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -2620,7 +2028,7 @@ class JobVacancy(models.Model):
     def _compute_hierarchy_type_recruitment(self):
         """Determine the approval hierarchy category based on Grade and Operating Unit."""
         self.ensure_one()
-        grade = getattr(self, 'job_grade', False) or getattr(self, 'job_grade_id', False) or (getattr(self.job_position, 'grade', False) if self.job_position else False)
+        grade = self.job_grade_id or (self.job_position.job_grade_id if self.job_position else False)
         op_unit = self.operating_unit_id
         category = self.employee_category if hasattr(self, 'employee_category') else False
 
@@ -2648,6 +2056,10 @@ class JobVacancy(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if 'written_exam_date' in vals and 'exam_scheduled' not in vals:
+                vals['exam_scheduled'] = 'Yes' if vals.get('written_exam_date') else 'No'
+            if 'interview_date' in vals and 'interview_scheduled' not in vals:
+                vals['interview_scheduled'] = 'Yes' if vals.get('interview_date') else 'No'
             ou_id = vals.get('operating_unit_id')
             if ou_id and not vals.get('hiring_details'):
                 resp_id = vals.get('responsible') or (self.env.user.employee_id.id if self.env.user.employee_id else False)
@@ -2723,44 +2135,19 @@ class PanelMembers(models.Model):
         string='Eligible Panel Employees'
     )
 
-    def _get_allowed_operating_unit_ids(self):
-        """
-        Returns a list of operating unit IDs allowed for panel members:
-        - Hiring Work Unit (vacancy.operating_unit_id)
-        - Vacancy Creator / Responsible Officer Work Unit (vacancy.responsible or create_uid.employee_id)
-        """
-        allowed_ous = set()
-        vac = self.panl_memb_vac
-
-        # 1. Hiring OU
-        if vac and vac.operating_unit_id:
-            allowed_ous.add(vac.operating_unit_id.id)
-        elif self.env.context.get('parent_operating_unit_id'):
-            p_ou = self.env.context.get('parent_operating_unit_id')
-            ou_id = p_ou if isinstance(p_ou, int) else getattr(p_ou, 'id', False)
-            if ou_id:
-                allowed_ous.add(ou_id)
-
-        # 2. Responsible / Creator OU
-        if vac and vac.responsible and vac.responsible.default_operating_unit_id:
-            allowed_ous.add(vac.responsible.default_operating_unit_id.id)
-        elif vac and vac.create_uid and vac.create_uid.employee_id and vac.create_uid.employee_id.default_operating_unit_id:
-            allowed_ous.add(vac.create_uid.employee_id.default_operating_unit_id.id)
-        elif self.env.context.get('parent_responsible_id'):
-            r_id = self.env.context.get('parent_responsible_id')
-            emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
-            if emp and getattr(emp, 'default_operating_unit_id', False):
-                allowed_ous.add(emp.default_operating_unit_id.id)
-
-        return list(allowed_ous)
-
-    @api.depends('panl_memb_vac', 'panl_memb_vac.operating_unit_id', 'panl_memb_vac.responsible', 'panl_memb_vac.responsible.default_operating_unit_id')
+    @api.depends('panl_memb_vac', 'panl_memb_vac.operating_unit_id')
     def _compute_eligible_employee_ids(self):
         for rec in self:
-            allowed_ous = rec._get_allowed_operating_unit_ids()
-            if allowed_ous:
+            hiring_ou = False
+            if rec.panl_memb_vac and rec.panl_memb_vac.operating_unit_id:
+                hiring_ou = rec.panl_memb_vac.operating_unit_id.id
+            elif self.env.context.get('parent_operating_unit_id'):
+                p_ou = self.env.context.get('parent_operating_unit_id')
+                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+
+            if hiring_ou:
                 rec.eligible_employee_ids = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', 'in', allowed_ous),
+                    ('default_operating_unit_id', '=', hiring_ou),
                     ('active', '=', True)
                 ])
             else:
@@ -2768,10 +2155,16 @@ class PanelMembers(models.Model):
 
     @api.onchange('panl_memb_vac', 'role', 'panel_type')
     def _onchange_panl_memb_vac_domain(self):
-        """Filter panel members to Hiring Work Unit AND Vacancy Creator/Responsible Officer Work Unit."""
-        allowed_ous = self._get_allowed_operating_unit_ids()
-        if allowed_ous:
-            domain = [('default_operating_unit_id', 'in', allowed_ous), ('active', '=', True)]
+        """Filter panel members strictly to the Vacancy's Hiring Work Unit."""
+        hiring_ou = False
+        if self.panl_memb_vac and self.panl_memb_vac.operating_unit_id:
+            hiring_ou = self.panl_memb_vac.operating_unit_id.id
+        elif self.env.context.get('parent_operating_unit_id'):
+            p_ou = self.env.context.get('parent_operating_unit_id')
+            hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+
+        if hiring_ou:
+            domain = [('default_operating_unit_id', '=', hiring_ou), ('active', '=', True)]
             self.eligible_employee_ids = self.env['hr.employee'].search(domain)
             if self.employee_id and self.employee_id.id not in self.eligible_employee_ids.ids:
                 self.employee_id = False
@@ -2849,12 +2242,6 @@ class PanelMembers(models.Model):
             with self.env.cr.savepoint():
                 self.env.cr.execute("""
                     ALTER TABLE job_vacancy 
-                    ADD COLUMN IF NOT EXISTS has_written_exam BOOLEAN DEFAULT TRUE,
-                    ADD COLUMN IF NOT EXISTS transfer_eval_mode VARCHAR DEFAULT 'standard',
-                    ADD COLUMN IF NOT EXISTS app_date_weight NUMERIC DEFAULT 20.0,
-                    ADD COLUMN IF NOT EXISTS experience_weight NUMERIC DEFAULT 20.0,
-                    ADD COLUMN IF NOT EXISTS location_weight NUMERIC DEFAULT 20.0,
-                    ADD COLUMN IF NOT EXISTS recommendation_weight NUMERIC DEFAULT 10.0,
                     ADD COLUMN IF NOT EXISTS written_exam_date TIMESTAMP WITHOUT TIME ZONE,
                     ADD COLUMN IF NOT EXISTS exam_location TEXT,
                     ADD COLUMN IF NOT EXISTS exam_scheduled VARCHAR,
@@ -2914,6 +2301,18 @@ class PanelMembers(models.Model):
 
         return res
 
+    def write(self, vals):
+        self._check_parent_lock()
+        if 'written_exam_date' in vals and 'exam_scheduled' not in vals:
+            vals['exam_scheduled'] = 'Yes' if vals.get('written_exam_date') else 'No'
+        if 'interview_date' in vals and 'interview_scheduled' not in vals:
+            vals['interview_scheduled'] = 'Yes' if vals.get('interview_date') else 'No'
+        res = super().write(vals)
+        sync_keys = {'written_exam_date', 'exam_location', 'exam_scheduled', 'interview_date', 'interview_location', 'interview_scheduled', 'pms_weight', 'written_weight', 'interview_weight'}
+        if sync_keys.intersection(vals.keys()):
+            for rec in self:
+                rec._sync_schedule_to_selection_models()
+        return res
 
     def _sync_schedule_to_selection_models(self):
         for rec in self:
@@ -2924,10 +2323,14 @@ class PanelMembers(models.Model):
                 vals_to_sync['written_exam_date'] = rec.written_exam_date
             if rec.exam_location:
                 vals_to_sync['exam_location'] = rec.exam_location
+            if rec.exam_scheduled:
+                vals_to_sync['exam_scheduled'] = rec.exam_scheduled
             if rec.interview_date:
                 vals_to_sync['interview_date'] = rec.interview_date
             if rec.interview_location:
                 vals_to_sync['interview_location'] = rec.interview_location
+            if rec.interview_scheduled:
+                vals_to_sync['interview_scheduled'] = rec.interview_scheduled
 
             if vals_to_sync:
                 if rec.selected_recruitment_id:
@@ -3109,30 +2512,18 @@ class VacancyDelegation(models.Model):
         role_val = role or self.role or 'panel_member'
         vac = self.vac_del_id
 
-        # 1. Panel Member: Employees from Hiring Work Unit OR Responsible/Creator Work Unit
+        # 1. Panel Member: Strictly from Vacancy's Hiring Work Unit
         if role_val == 'panel_member':
-            allowed_ous = set()
-            if vac and getattr(vac, 'operating_unit_id', False):
-                allowed_ous.add(vac.operating_unit_id.id)
+            hiring_ou = False
+            if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
+                hiring_ou = vac.operating_unit_id.id
             elif self.env.context.get('parent_operating_unit_id'):
                 p_ou = self.env.context.get('parent_operating_unit_id')
-                ou_id = p_ou if isinstance(p_ou, int) else getattr(p_ou, 'id', False)
-                if ou_id:
-                    allowed_ous.add(ou_id)
+                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
 
-            if vac and getattr(vac, 'responsible', False) and vac.responsible.default_operating_unit_id:
-                allowed_ous.add(vac.responsible.default_operating_unit_id.id)
-            elif vac and getattr(vac, 'create_uid', False) and vac.create_uid.employee_id and vac.create_uid.employee_id.default_operating_unit_id:
-                allowed_ous.add(vac.create_uid.employee_id.default_operating_unit_id.id)
-            elif self.env.context.get('parent_responsible_id'):
-                r_id = self.env.context.get('parent_responsible_id')
-                emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
-                if emp and getattr(emp, 'default_operating_unit_id', False):
-                    allowed_ous.add(emp.default_operating_unit_id.id)
-
-            if allowed_ous:
+            if hiring_ou:
                 employees = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', 'in', list(allowed_ous)),
+                    ('default_operating_unit_id', '=', hiring_ou),
                     ('active', '=', True),
                     ('user_id', '!=', False)
                 ])

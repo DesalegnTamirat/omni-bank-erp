@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
 from . import archive_mixin
-from . import upgrade_mail_patch
-from . import hr_employee_no_track
 from . import acting_position_rule
 
 from . import employee_acting_service_request
@@ -73,6 +71,5 @@ from . import res_users
 from . import res_config_settings
 from . import ir_http
 from . import ir_ui_menu
-from . import discuss_channel_custom
 from . import employee_profile_photo
 from . import employee_profile

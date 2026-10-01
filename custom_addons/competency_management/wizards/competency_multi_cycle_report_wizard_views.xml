@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_competency_multi_cycle_report_wizard_form" model="ir.ui.view">
+            <field name="name">competency.multi.cycle.report.wizard.form</field>
+            <field name="model">competency.multi.cycle.report.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Multi-Cycle Capability Gap &amp; Trend Analysis">
+                    <sheet>
+                        <div style="background-color: #f0fdf4; color: #166534; padding: 14px 18px; border-radius: 6px; margin-bottom: 18px; border: 1px solid #bbf7d0;">
+                            <div style="font-size: 13.5px; font-weight: 500;">
+                                📈 <strong>Multi-Cycle Trend &amp; Gap Evolution Analytics:</strong> Compare ratings, gaps, and qualification growth across two or more assessment cycles. Track whether competency gaps are narrowing, capability is improving, or regressions have occurred over time.
+                            </div>
+                        </div>
+
+                        <group col="2">
+                            <group string="Campaign &amp; Rating Basis">
+                                <field name="cycle_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select 2 or more cycles to compare..."/>
+                                <field name="assessment_type_filter" widget="selection"/>
+                            </group>
+                            <group string="Demographic &amp; Category Filters">
+                                <field name="gender_filter" widget="selection"/>
+                                <field name="pillar" widget="selection"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Organizational Scoping" name="org_scoping">
+                                <group>
+                                    <field name="department_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Departments"/>
+                                    <field name="operating_unit_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Workunits / Branches"/>
+                                    <field name="job_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Job Roles / Positions"/>
+                                    <field name="grade_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Job Grades"/>
+                                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Employees"/>
+                                    <field name="competency_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Competencies"/>
+                                </group>
+                            </page>
+                        </notebook>
+
+                    </sheet>
+                    <footer>
+                        <button name="action_export_xlsx" string="Generate Multi-Cycle Excel Report" type="object" class="btn-primary" style="background-color: #541718; border-color: #541718; color: #FFFFFF; font-weight: 600; padding: 6px 18px;" groups="competency_management.group_competency_officer"/>
+                        <button name="action_view_filtered_lines" string="🔍 View Comparison Lines" type="object" class="btn-secondary" style="font-weight: 600;" groups="competency_management.group_competency_officer"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_competency_multi_cycle_report_wizard" model="ir.actions.act_window">
+            <field name="name">Multi-Cycle Capability Gap &amp; Trend Report</field>
+            <field name="res_model">competency.multi.cycle.report.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="group_ids" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
+        </record>
+
+    </data>
+</odoo>

@@ -49,6 +49,13 @@
                   groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
                   sequence="4"/>
 
+        <menuitem id="menu_discipline_attendance_scan"
+                  name="Scan Attendance Violations"
+                  parent="menu_discipline_operations_root"
+                  action="action_discipline_attendance_scan_wizard"
+                  groups="discipline_management.group_discipline_user"
+                  sequence="5"/>
+
         <!-- 3. Hearings & Investigations Group -->
         <menuitem id="menu_discipline_hearings_root"
                   name="Hearings &amp; Investigations"

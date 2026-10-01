@@ -77,7 +77,7 @@
                     <button name="compute_weighted_score" invisible="scores_computed == True" string="Compute &amp; Rank Scores" type="object" class="btn-primary" icon="fa-calculator"/>
 
                     <!-- Step 4: Minute & Approval Phase -->
-                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o"/>
+                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o" invisible="not minute_signed"/>
                     <button name="action_open_digital_minute" string="Digital Selection Minute" type="object" class="btn-primary" icon="fa-pencil-square-o" help="Open or create the digital committee selection minute for digital signatures."/>
 
                     <!-- Step 5: Final Selection Notification -->

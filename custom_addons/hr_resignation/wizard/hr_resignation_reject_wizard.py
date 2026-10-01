@@ -22,10 +22,14 @@ class HrResignationRejectWizard(models.TransientModel):
 
         if self.reject_by == 'return':
             rec.state = 'returned'
+            if rec.current_version_id and hasattr(rec.current_version_id, 'has_approved_resignation'):
+                rec.current_version_id.has_approved_resignation = False
             subject = _('Resignation Returned: %s') % rec.name
             body = _('Dear %s,\n\nYour resignation request (%s) has been returned by HR for the following reason:\n\n%s') % (rec.employee_id.sudo().name, rec.name, self.rejection_reason)
         elif self.reject_by == 'revoke':
             rec.state = 'revoked'
+            if rec.current_version_id and hasattr(rec.current_version_id, 'has_approved_resignation'):
+                rec.current_version_id.has_approved_resignation = False
             subject = _('Resignation Revoked: %s') % rec.name
             body = _('Dear %s,\n\nYour resignation request (%s) has been revoked by HR.\n\nReason: %s') % (rec.employee_id.sudo().name, rec.name, self.rejection_reason)
         else:

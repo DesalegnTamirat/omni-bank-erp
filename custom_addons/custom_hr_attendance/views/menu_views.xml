@@ -1,8 +1,14 @@
 <odoo>
 
+        <!-- Move standard attendance action path so /odoo/attendances exclusively opens Check In / Check Out -->
+        <record id="hr_attendance.hr_attendance_action" model="ir.actions.act_window">
+                <field name="path">attendances-list</field>
+        </record>
+
         <record id="action_my_attendance" model="ir.actions.client">
                 <field name="name">Check In / Check Out</field>
                 <field name="tag">custom_hr_attendance.my_attendance_action</field>
+                <field name="path">attendances</field>
         </record>
 
         <!-- Patch root app-icon so clicking "Attendances" in the home-screen
@@ -23,9 +29,9 @@
         <!-- ====================================================
          1. Check In / Check Out (Deactivated duplicate sub-menu, app root opens dashboard)
          ==================================================== -->
-        <!-- <record id="menu_check_in_out" model="ir.ui.menu">
-        <field name="active" eval="False"/>
-    </record> -->
+        <record id="menu_check_in_out" model="ir.ui.menu">
+                <field name="active" eval="False" />
+        </record>
 
         <!-- ====================================================
          2. Kiosk Mode (Deactivated per company specification)

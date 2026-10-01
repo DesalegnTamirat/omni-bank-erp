@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!--
+            RESL Record Rules
+            ─────────────────
+            Employee group: see own loans + loans where they are a guarantor.
+            Manager/HR group: see all loans (no domain restriction).
+        -->
+
+        <!-- Employees see their own loan records -->
+        <record id="rule_resl_loan_employee_own" model="ir.rule">
+            <field name="name">RESL Loan: Employee sees own loans</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_employee'))]"/>
+            <field name="domain_force">[
+                '|',
+                ('employee_id.user_id', '=', user.id),
+                ('guarantor_line_ids.guarantor_id.user_id', '=', user.id)
+            ]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Managers see all loans (global rule) -->
+        <record id="rule_resl_loan_manager_all" model="ir.rule">
+            <field name="name">RESL Loan: Manager sees all</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_manager'))]"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Employees see guarantee lines they are involved in -->
+        <record id="rule_resl_loan_guarantee_employee_own" model="ir.rule">
+            <field name="name">RESL Guarantee: Employee sees own lines</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_employee'))]"/>
+            <field name="domain_force">[
+                '|',
+                ('loan_id.employee_id.user_id', '=', user.id),
+                ('guarantor_id.user_id', '=', user.id)
+            ]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Managers see all guarantee lines -->
+        <record id="rule_resl_loan_guarantee_manager_all" model="ir.rule">
+            <field name="name">RESL Guarantee: Manager sees all</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_manager'))]"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

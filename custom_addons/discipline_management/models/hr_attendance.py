@@ -37,85 +37,99 @@ class HrAttendance(models.Model):
                     "Please resolve the disciplinary case before recording attendance."
                 ) % att.employee_id.name)
 
-    def _check_attendance_discipline_threshold(self):
-        """Per-record threshold check for attendance violations."""
-        for att in self:
-            rolling_days = 30
-            date_from = fields.Date.context_today(self) - timedelta(days=rolling_days)
-            recent_count = self.search_count([
-                ('employee_id', '=', att.employee_id.id),
-                ('check_in', '>=', date_from),
-            ])
-            if recent_count >= 3:
-                self._cron_escalate_attendance_violations()
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        # Pure attendance record creation (no synchronous discipline case triggers on hot path)
-        return super().create(vals_list)
-
     @api.model
-    def _cron_escalate_attendance_violations(self):
-        """Cron action: Monitor repeated lateness, forced check-outs, and consecutive absences, auto-generating disciplinary cases."""
+    def scan_and_initiate_attendance_cases(self, employee_ids=None, date_from=None, date_to=None):
+        """
+        High-performance targeted scanner: identifies repeated lateness & forced checkout violations
+        and creates auto-initiated disciplinary cases for Direct Manager / Coach review and manual enforcement.
+        Can be executed on-demand by managers or on off-peak schedule.
+        """
         ICP = self.env['ir.config_parameter'].sudo()
         late_threshold = int(ICP.get_param('discipline.attendance_lateness_threshold', 3))
         force_threshold = int(ICP.get_param('discipline.attendance_force_checkout_threshold', 3))
         rolling_days = int(ICP.get_param('discipline.attendance_rolling_days', 30))
-        absence_warning_days = int(ICP.get_param('discipline.absence_warning_consecutive_days', 3))
-        absence_dismissal_days = int(ICP.get_param('discipline.absence_dismissal_consecutive_days', 5))
-        date_from = fields.Date.context_today(self) - timedelta(days=rolling_days)
+
+        if not date_to:
+            date_to = fields.Date.context_today(self)
+        if not date_from:
+            date_from = date_to - timedelta(days=rolling_days)
 
         Category = self.env['discipline.offense.category']
         cat = Category.search([('name', '=ilike', 'Attendance')], limit=1)
         if not cat:
-            cat = Category.create({'name': 'Attendance', 'code': 'ATT_CAT'})
+            cat = Category.create({'name': 'Attendance Violations', 'code': 'ATT_CAT'})
 
         Offense = self.env['discipline.offense']
         Severity = self.env['discipline.severity.level']
         
         sev_minor = Severity.search([('code', '=', 'level_5')], limit=1) or Severity.search([], limit=1)
-        sev_warning = Severity.search([('code', '=', 'level_2')], limit=1) or sev_minor
-        sev_dismissal = Severity.search([('code', '=', 'level_1')], limit=1) or sev_minor
 
-        recent_attendances = self.search([('check_in', '>=', date_from)])
-        employees = recent_attendances.mapped('employee_id')
-        for emp in employees:
-            emp_atts = recent_attendances.filtered(lambda a: a.employee_id == emp)
-            late_count = len(emp_atts.filtered(lambda a: getattr(a, 'check_in_status', '') == 'Late' or getattr(a, 'is_late', False)))
-            force_count = len(emp_atts.filtered(lambda a: getattr(a, 'is_force_checkout', False) or getattr(a, 'is_forced_checkout', False)))
+        domain = [
+            ('check_in', '>=', date_from),
+            ('check_in', '<=', date_to + timedelta(days=1)),
+        ]
+        if employee_ids:
+            domain.append(('employee_id', 'in', employee_ids.ids if hasattr(employee_ids, 'ids') else employee_ids))
+
+        # Query only violations directly from database to minimize memory footprint
+        late_domain = domain + ['|', ('is_late', '=', True), ('check_in_status', '=', 'Late')] if 'check_in_status' in self._fields else domain + [('is_late', '=', True)]
+        
+        created_cases = self.env['discipline.case']
+
+        # Query aggregated violation counts by employee
+        for emp, late_count in self._read_group(late_domain, ['employee_id'], ['__count']):
+            if not emp or late_count < late_threshold:
+                continue
+            if not emp.active:
+                continue
+
             supervisor_user = (emp.coach_id.user_id or emp.parent_id.user_id) if (emp.coach_id or emp.parent_id) else False
 
-            # Check Lateness / Force Checkout threshold
-            if late_count >= late_threshold or force_count >= force_threshold:
-                offense_name = 'Repeated Lateness Violation' if late_count >= late_threshold else 'Repeated Forced Check-Out Violation'
-                offense = Offense.search([('name', '=ilike', offense_name)], limit=1)
-                if not offense:
-                    offense = Offense.create({
-                        'name': offense_name,
-                        'category_id': cat.id,
-                        'severity_level_id': sev_minor.id if sev_minor else False,
-                    })
+            offense_name = _('Repeated Lateness / Attendance Punctuality Violation')
+            offense = Offense.search([('name', '=ilike', offense_name)], limit=1)
+            if not offense:
+                offense = Offense.create({
+                    'name': offense_name,
+                    'category_id': cat.id,
+                    'severity_level_id': sev_minor.id if sev_minor else False,
+                })
 
-                existing = self.env['discipline.case'].search([
-                    ('employee_id', '=', emp.id),
-                    ('state', 'in', ['draft', 'initiated']),
-                ], limit=1)
+            # Check if active draft/initiated case already exists in the same period
+            existing = self.env['discipline.case'].search([
+                ('employee_id', '=', emp.id),
+                ('offense_id', '=', offense.id),
+                ('state', 'in', ['draft', 'initiated']),
+                ('incident_date', '>=', date_from),
+            ], limit=1)
 
-                if not existing:
-                    case = self.env['discipline.case'].create({
-                        'employee_id': emp.id,
-                        'offense_id': offense.id,
-                        'severity_level_id': offense.severity_level_id.id if offense.severity_level_id else sev_minor.id,
-                        'incident_date': fields.Date.context_today(self),
-                        'is_system_generated': True,
-                        'case_action_track': 'direct_enforce',
-                        'reviewer_id': supervisor_user.id if supervisor_user else False,
-                        'description': _(
-                            'Automated Attendance Escalation: Employee %s accumulated %d lateness and %d forced checkout violations in the past %d days. '
-                            'Review and direct enforcement by Coach/Supervisor required.'
-                        ) % (emp.name, late_count, force_count, rolling_days),
-                    })
-                    if supervisor_user:
-                        case.message_post(body=_(
-                            'Automated attendance breach detected. Assigned to Supervisor (%s) for direct review and enforcement.'
-                        ) % supervisor_user.name)
+            if not existing:
+                case = self.env['discipline.case'].create({
+                    'employee_id': emp.id,
+                    'offense_id': offense.id,
+                    'severity_level_id': offense.severity_level_id.id if offense.severity_level_id else sev_minor.id,
+                    'incident_date': date_to,
+                    'is_system_generated': True,
+                    'case_action_track': 'direct_enforce',
+                    'reviewer_id': supervisor_user.id if supervisor_user else False,
+                    'description': _(
+                        'Automated Attendance Escalation:\n'
+                        '- Employee: %s (ID: %s)\n'
+                        '- Violation Period: %s to %s\n'
+                        '- Total Lateness Occurrences: %d (Threshold: %d)\n\n'
+                        'Direct Coach / Manager Action Required: Review attendance logs and manually enforce disciplinary decision or exonerate if valid justification is established.'
+                    ) % (emp.name, emp.identification_id or 'N/A', date_from, date_to, late_count, late_threshold),
+                })
+                # Set directly to initiated for coach review
+                case.state = 'initiated'
+                if supervisor_user:
+                    case.message_post(body=_(
+                        'Automated attendance breach detected (%d late check-ins). Assigned to Direct Coach (%s) for manual review and enforcement.'
+                    ) % (late_count, supervisor_user.name))
+                created_cases |= case
+
+        return created_cases
+
+    @api.model
+    def _cron_escalate_attendance_violations(self):
+        """Monthly/off-peak closeout cron: triggers attendance scanning with zero continuous overhead."""
+        return self.scan_and_initiate_attendance_cases()

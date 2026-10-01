@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Attendance Scan Wizard Form -->
+        <record id="view_discipline_attendance_scan_wizard_form" model="ir.ui.view">
+            <field name="name">discipline.attendance.scan.wizard.form</field>
+            <field name="model">discipline.attendance.scan.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Scan Attendance Violations">
+                    <p class="text-muted">
+                        This tool analyzes attendance punch records for repeated tardiness and missing checkouts within the specified date range. 
+                        For any employee exceeding the policy threshold, it automatically drafts and initiates a disciplinary case assigned directly to their Coach / Line Manager for manual review and enforcement.
+                    </p>
+                    <group>
+                        <group string="Filter Criteria">
+                            <field name="department_id" options="{'no_create': True}"/>
+                            <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                        </group>
+                        <group string="Scan Period">
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                    </group>
+                    <footer>
+                        <button name="action_scan_and_initiate" string="Scan &amp; Initiate Cases" type="object" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- Action to open wizard -->
+        <record id="action_discipline_attendance_scan_wizard" model="ir.actions.act_window">
+            <field name="name">Scan Attendance Violations</field>
+            <field name="res_model">discipline.attendance.scan.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

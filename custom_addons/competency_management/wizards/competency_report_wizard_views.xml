@@ -28,6 +28,7 @@
                                 <field name="report_type" widget="radio"/>
                                 <field name="export_format" widget="radio"/>
                                 <field name="cycle_id" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="assessment_type_filter" widget="selection" invisible="report_type not in ('detailed_matrix', 'individual')"/>
                             </group>
 
                             <group string="Evaluation &amp; Status Filters">
@@ -54,8 +55,8 @@
 
                     </sheet>
                     <footer>
-                        <button name="action_generate_report" string="Generate Report" type="object" class="btn-primary" style="background-color: #541718; border-color: #541718; color: #FFFFFF; font-weight: 600; padding: 6px 18px;"/>
-                        <button name="action_apply_filter" string="🔍 View Filtered Tree" type="object" class="btn-secondary" style="font-weight: 600;"/>
+                        <button name="action_generate_report" string="Generate Report" type="object" class="btn-primary" style="background-color: #541718; border-color: #541718; color: #FFFFFF; font-weight: 600; padding: 6px 18px;" groups="competency_management.group_competency_officer"/>
+                        <button name="action_apply_filter" string="🔍 View Filtered Tree" type="object" class="btn-secondary" style="font-weight: 600;" groups="competency_management.group_competency_officer"/>
                         <button string="Close" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>
@@ -69,6 +70,7 @@
             <field name="view_mode">form</field>
             <field name="context">{'competency_employee_select': True}</field>
             <field name="target">new</field>
+            <field name="group_ids" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
         </record>
 
         <!-- Form View for 360 Rater Breakdown Popup Modal -->
@@ -101,7 +103,6 @@
                             </group>
                             <group>
                                 <field name="supervisor_avg" readonly="1"/>
-                                <field name="team_avg" readonly="1"/>
                                 <field name="weighted_current_level" style="font-weight: bold; color: #541718;" readonly="1"/>
                             </group>
                         </group>

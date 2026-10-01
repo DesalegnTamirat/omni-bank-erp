@@ -142,7 +142,8 @@ class TalentRoster(models.Model):
                 cand.applicant_email or _("External Candidate")
             )
             
-            vacancy_id = cand.external_recruitment_id.vacancy_id.id if cand.external_recruitment_id and cand.external_recruitment_id.vacancy_id else False
+            v_raw = cand.external_recruitment_id.vacancy_id if cand.external_recruitment_id else False
+            vacancy_id = v_raw if isinstance(v_raw, int) else (v_raw.id if v_raw else False)
 
             qual_val = cand.educational_qualification
             if qual_val and hasattr(cand._fields['educational_qualification'], 'selection'):

@@ -206,7 +206,7 @@
                     <group readonly="state != 'draft'">
                         <group>
                             <field name="resignation_type_id" string="Separation Type"
-                                   options="{'no_open': True}"
+                                   options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"
                                    readonly="state != 'draft'"
                                    domain="[('is_company_terminated', '=', initiated_by == 'company')]"
                                    style="max-width: 350px;"/>

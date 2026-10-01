@@ -192,6 +192,17 @@ class DisciplinePayrollPenalty(models.Model):
     @api.model
     def get_pending_penalties(self, employee_id, date_from=None, date_to=None):
         """Public API returning list of pending penalty records for an employee during payroll execution."""
+        # Just-in-time check: evaluate expired appeal window cases for this employee
+        today = fields.Date.today()
+        pending_cases = self.env['discipline.case'].search([
+            ('employee_id', '=', employee_id),
+            ('state', 'in', ['enforced', 'closed']),
+            ('deduction_status', '=', 'appeal_pending'),
+            ('appeal_deadline', '<', today),
+        ])
+        if pending_cases:
+            pending_cases._process_appeal_window_deductions()
+
         domain = [
             ('employee_id', '=', employee_id),
             ('state', 'in', ['pending', 'transferred']),

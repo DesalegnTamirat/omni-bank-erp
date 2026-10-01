@@ -52,6 +52,7 @@ Key Features:
         'views/discipline_dashboard_views.xml',
         'views/discipline_config_settings_views.xml',
         'wizards/discipline_revocation_wizard_views.xml',
+        'wizards/discipline_attendance_scan_wizard_views.xml',
         'report/discipline_report_templates.xml',
         'report/discipline_reports.xml',
         'views/discipline_menus.xml',

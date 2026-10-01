@@ -78,6 +78,14 @@
                             invisible="vacancy_status != 'published' or recruitment_step != 'compute_rank'"
                             confirm="This will compute weighted scores for all candidates using the vacancy weight matrix, then rank and set final status (Selected / Reserved / Disqualified). Continue?"/>
 
+                    <!-- 8b. Generate Selection Minute (Visible ONLY after Approval Committee Minute is approved/signed) -->
+                    <button name="action_generate_minute"
+                            string="Generate Minute"
+                            type="object"
+                            class="btn-secondary"
+                            icon="fa-file-text-o"
+                            invisible="vacancy_status != 'published' or not minute_signed"/>
+
                     <!-- 9. Notify Approval Committee -->
                     <button name="action_notify_approval_committee"
                             string="Notify Approval Committee"
@@ -164,12 +172,6 @@
                         <button class="oe_stat_button" icon="fa-times-circle" style="color: #dc3545;">
                             <field name="disqualified_candidates_count" string="Disqualified" widget="statinfo"/>
                         </button>
-                        <button name="action_open_digital_minute" type="object" class="oe_stat_button" icon="fa-pencil-square-o" invisible="not committee_notified">
-                            <div class="o_stat_info">
-                                <span class="o_stat_text">Digital</span>
-                                <span class="o_stat_text">Minute</span>
-                            </div>
-                        </button>
                     </div>
 
                     <!-- Title -->
@@ -198,7 +200,6 @@
                             <field name="employee_category" string="Job Category" readonly="vacancy_status != 'draft'"/>
                             <field name="has_written_exam" widget="boolean_toggle" readonly="vacancy_status != 'draft'"/>
                             <field name="job_level" invisible="employee_category != 'Non Managerial'"
-                                   required="employee_category == 'Non Managerial' and sourcing_type in ('external', 'both')"
                                    readonly="vacancy_status != 'draft'"/>
 
                             <field name="sourcing_type" string="Sourcing Type" readonly="vacancy_status != 'draft'"/>
@@ -261,12 +262,12 @@
                     <group string="External Applicant Requirements"
                            invisible="sourcing_type not in ['external', 'both']">
                         <group string="Academic Requirements">
-                            <field name="minimum_education" readonly="vacancy_status != 'draft'"/>
+                            <field name="position_qualifications" readonly="1" string="Required Qualification(s)"/>
                             <field name="minimum_cgpa" readonly="vacancy_status != 'draft'"/>
                         </group>
                         <group string="Experience Requirements">
+                            <field name="position_experiences" readonly="1" string="Required Experience(s)"/>
                             <field name="minimum_experience_years" readonly="vacancy_status != 'draft'"/>
-                            <field name="banking_experience_required" readonly="vacancy_status != 'draft'"/>
                             <field name="ex_bunna_preferred" readonly="vacancy_status != 'draft'"/>
                         </group>
                     </group>
@@ -293,16 +294,17 @@
                             </field>
                         </page>
                         <page string="Vacancy Approval Members" name="approval_members">
-                            <field name="vac_del_team_id" readonly="vacancy_status != 'draft'">
+                            <field name="vac_del_team_id" readonly="vacancy_status != 'draft'" context="{'parent_responsible_id': responsible}">
                                 <list editable="bottom">
                                     <field name="role" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="employee_name" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]" readonly="parent.vacancy_status != 'draft'"/>
                                     <field name="operating_unit"/>
                                     <field name="status" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="alternate_committee_member"
+                                    <field name="alternate_committee_member" domain="[('id', 'in', eligible_user_ids)]"
                                            readonly="parent.vacancy_status != 'draft'"/>
                                     <field name="alter_operating_unit"/>
                                     <field name="approve"/>
+                                    <field name="eligible_user_ids" column_invisible="1"/>
                                 </list>
                             </field>
                         </page>

@@ -60,11 +60,53 @@ class ExamGradingTask(models.Model):
                 vals["name"] = self.env["ir.sequence"].next_by_code("exam.grading.task") or _("GRADE/%06d") % self.search_count([])
         return super().create(vals_list)
 
-    @api.depends("question_id.department_id", "question_id.operating_unit_id", "job_id.department_id", "attempt_id.employee_id.operating_unit_id")
+    @api.depends(
+        "question_id.department_id",
+        "question_id.operating_unit_id",
+        "job_id.department_id",
+        "attempt_id.employee_id.operating_unit_id",
+        "attempt_id.employee_id.department_id.operating_unit_id",
+        "attempt_id.applicant_id",
+        "attempt_id.candidate_type",
+        "attempt_id.session_id.vacancy_id.sourcing_type",
+        "attempt_id.session_id.vacancy_id.reference"
+    )
     def _compute_department_id(self):
         for rec in self:
             rec.department_id = rec.question_id.department_id or (rec.job_id.department_id if rec.job_id else False)
-            rec.operating_unit_id = rec.question_id.operating_unit_id or (rec.attempt_id.employee_id.operating_unit_id if rec.attempt_id and rec.attempt_id.employee_id else False) or (getattr(rec.job_id.department_id, "operating_unit_id", False) if rec.job_id and rec.job_id.department_id else False)
+
+            # Determine candidate's default operating unit (work unit)
+            cand_ou = False
+            if rec.attempt_id:
+                emp = rec.attempt_id.employee_id
+                if not emp and rec.attempt_id.applicant_id:
+                    emp = getattr(rec.attempt_id.applicant_id, 'emp_id', False) or getattr(rec.attempt_id.applicant_id, 'employee_id', False)
+                
+                if emp:
+                    cand_ou = emp.operating_unit_id or (emp.department_id.operating_unit_id if emp.department_id else False)
+                elif rec.attempt_id.applicant_id:
+                    cand_ou = getattr(rec.attempt_id.applicant_id, 'operating_unit_id', False) or (getattr(rec.attempt_id.applicant_id.department_id, 'operating_unit_id', False) if getattr(rec.attempt_id.applicant_id, 'department_id', False) else False)
+
+            # Determine if candidate or vacancy is internal
+            target_vac = rec.attempt_id.session_id.vacancy_id if (rec.attempt_id and rec.attempt_id.session_id) else False
+            sourcing_type = getattr(target_vac, 'sourcing_type', '') or ''
+            ref_upper = (getattr(target_vac, 'reference', '') or '').upper()
+
+            is_internal_vacancy = (
+                sourcing_type == 'internal' or
+                'INT' in ref_upper or 'TRA' in ref_upper or 'LAT' in ref_upper
+            )
+            is_internal_cand = (rec.attempt_id.candidate_type == 'internal' if rec.attempt_id else False) or is_internal_vacancy
+
+            # For internal vacancies / candidates, submitted work unit MUST be the candidate's default operating unit
+            if (is_internal_cand or is_internal_vacancy) and cand_ou:
+                rec.operating_unit_id = cand_ou
+            else:
+                rec.operating_unit_id = (
+                    cand_ou or
+                    rec.question_id.operating_unit_id or
+                    (getattr(rec.job_id.department_id, "operating_unit_id", False) if rec.job_id and rec.job_id.department_id else False)
+                )
 
     @api.depends("create_date")
     def _compute_sla_deadline(self):

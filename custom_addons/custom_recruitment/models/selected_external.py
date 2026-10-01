@@ -79,6 +79,36 @@ class ExternalRecruitmentSelected(models.Model):
     vacancy_id = fields.Integer(string="Vacancy ID")
     vacancy_announced_on = fields.Date(string="Vacancy Announced On")
 
+    @api.onchange('written_exam_date')
+    def _onchange_written_exam_date_auto_schedule(self):
+        if self.written_exam_date:
+            self.exam_scheduled = 'Yes'
+        else:
+            self.exam_scheduled = 'No'
+
+    @api.onchange('interview_date')
+    def _onchange_interview_date_auto_schedule(self):
+        if self.interview_date:
+            self.interview_scheduled = 'Yes'
+        else:
+            self.interview_scheduled = 'No'
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if 'written_exam_date' in vals and 'exam_scheduled' not in vals:
+                vals['exam_scheduled'] = 'Yes' if vals.get('written_exam_date') else 'No'
+            if 'interview_date' in vals and 'interview_scheduled' not in vals:
+                vals['interview_scheduled'] = 'Yes' if vals.get('interview_date') else 'No'
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if 'written_exam_date' in vals and 'exam_scheduled' not in vals:
+            vals['exam_scheduled'] = 'Yes' if vals.get('written_exam_date') else 'No'
+        if 'interview_date' in vals and 'interview_scheduled' not in vals:
+            vals['interview_scheduled'] = 'Yes' if vals.get('interview_date') else 'No'
+        return super().write(vals)
+
     has_delegation_requests = fields.Boolean(
         compute='_compute_has_delegation_requests',
         string="Has Delegation Requests"
@@ -117,6 +147,9 @@ class ExternalRecruitmentSelected(models.Model):
         string="Exam & Selected Candidates Summary",
         help="Summary regarding exams (written & interview) and selected candidates for the Approval Committee review."
     )
+    committee_notified = fields.Boolean(string="Committee Notified", default=False)
+    minute_signed = fields.Boolean(string="Minute Signed", default=False)
+    employees_promoted = fields.Boolean(string="Employees Promoted", default=False)
 
     def _auto_init(self):
         res = super()._auto_init()
@@ -410,6 +443,8 @@ class ExternalRecruitmentSelected(models.Model):
         except Exception as e:
             _logger.warning("Stored procedure populate_external_exam_evaluation_sheet failed: %s", e)
         self.exam_scheduled = 'Yes'
+        if vac and vac.exists():
+            vac.sudo().write({'exam_scheduled': 'Yes'})
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -487,20 +522,8 @@ class ExternalRecruitmentSelected(models.Model):
         }
 
     def notify_interview_panel(self):
-        vac = False
-        if self.vacancy_id:
-            vac = self.env['job.vacancy'].browse(self.vacancy_id)
-        elif self.vacancy_reference:
-            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
-
-        has_exam = True
-        if vac and hasattr(vac, 'has_written_exam'):
-            has_exam = vac.has_written_exam
-
-        if has_exam and not self.exam_scores_fetched:
+        if not self.exam_scores_fetched:
             raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before notifying the interview panel."))
-        if not self.ext_rec_panel or not any(line.emp_name for line in self.ext_rec_panel):
-            raise UserError(_('No panel members have been added. Please add at least one panel member before notifying the interview panel.'))
         if not self.interview_date:
             raise UserError(_('Please specify the Interview Date before notifying the panel.'))
         pos_title = self._get_position_title()
@@ -573,20 +596,15 @@ class ExternalRecruitmentSelected(models.Model):
         }
 
     def notify_interview(self):
+        if not self.exam_scores_fetched:
+            raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before sending interview invitations to candidates."))
+        if not self.panel_notified:
+            raise UserError(_("Sequence Error: You must notify the Interview Panel ('Notify Interview Panel') before sending interview invitations to candidates."))
         vac = False
         if self.vacancy_id:
             vac = self.env['job.vacancy'].browse(self.vacancy_id)
         elif self.vacancy_reference:
             vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
-
-        has_exam = True
-        if vac and hasattr(vac, 'has_written_exam'):
-            has_exam = vac.has_written_exam
-
-        if has_exam and not self.exam_scores_fetched:
-            raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before sending interview invitations to candidates."))
-        if not self.panel_notified:
-            raise UserError(_("Sequence Error: You must notify the Interview Panel ('Notify Interview Panel') before sending interview invitations to candidates."))
 
         # Pull interview schedule from linked vacancy if missing on this record
         if not self.interview_date and vac and vac.exists():
@@ -671,6 +689,13 @@ class ExternalRecruitmentSelected(models.Model):
         except Exception as e:
             _logger.warning("Stored procedure populate_external_interview_evaluation_sheet failed: %s", e)
         self.interview_scheduled = 'Yes'
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+        if vac and vac.exists():
+            vac.sudo().write({'interview_scheduled': 'Yes'})
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -800,26 +825,14 @@ class ExternalRecruitmentSelected(models.Model):
     def _get_external_weights(self):
         """
         Fetches Written Exam and Interview weight percentages directly from the 
-        Vacancy form, auto-populated from Assessment module Weight Profiles (assessment.weight.profile).
+        Assessment module Weight Profiles (assessment.weight.profile).
         """
         self.ensure_one()
-        vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
-        if not vac and self.vacancy_reference:
-            vac = self.env["job.vacancy"].search([('reference', '=', self.vacancy_reference)], limit=1)
-
-        if vac and (vac.written_weight or vac.interview_weight):
-            exam_w = vac.written_weight if getattr(vac, 'has_written_exam', True) else 0.0
-            int_w = vac.interview_weight
-            total = exam_w + int_w
-            if total > 0 and abs(total - 100.0) > 0.01:
-                int_w = 100.0
-                exam_w = 0.0
-            return (exam_w, int_w)
-
         exam_w, int_w = (60.0, 40.0)
 
         if "assessment.weight.profile" in self.env:
-            role_lvl = "managerial" if (vac and vac.employee_category == 'Managerial') else "non_managerial"
+            role_lvl = "non_managerial"
+            vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
             if vac and getattr(vac, "interview_type", False):
                 role_lvl = vac.interview_type
 
@@ -831,9 +844,6 @@ class ExternalRecruitmentSelected(models.Model):
                         exam_w = line.weight_percentage
                     elif line.component == "interview":
                         int_w = line.weight_percentage
-
-        if vac and hasattr(vac, 'has_written_exam') and not vac.has_written_exam:
-            exam_w, int_w = 0.0, 100.0
 
         return (exam_w, int_w)
 
@@ -859,16 +869,6 @@ class ExternalRecruitmentSelected(models.Model):
             exam_weight_pct = exam_w / 100.0
             interview_weight_pct = int_w / 100.0
 
-            vac = False
-            if rec.vacancy_id:
-                vac = self.env['job.vacancy'].browse(rec.vacancy_id)
-            elif rec.vacancy_reference:
-                vac = self.env['job.vacancy'].search([('reference', '=', rec.vacancy_reference)], limit=1)
-
-            has_exam = True
-            if vac and hasattr(vac, 'has_written_exam'):
-                has_exam = vac.has_written_exam
-
             for app in rec.ext_rec_sel:
                 exam = app.written_exam_score or 0.0
                 interview = app.interview_score or 0.0
@@ -877,7 +877,7 @@ class ExternalRecruitmentSelected(models.Model):
                 # 50% Disqualification Gate (FR-REC rules)
                 disqualified = False
                 reasons = []
-                if has_exam and exam < 50.0:
+                if exam < 50.0:
                     disqualified = True
                     reasons.append(_("Written Exam score %.1f%% < 50%%") % exam)
                 if interview < 50.0:
@@ -1337,13 +1337,49 @@ class InternalRecruitmentPanel(models.Model):
         string='Eligible Panel Employees'
     )
 
-    def _get_allowed_operating_unit_ids(self):
-        """
-        Returns allowed operating unit IDs for panel members:
-        - Hiring Work Unit
-        - Vacancy Creator / Responsible Officer Work Unit
-        """
-        allowed_ous = set()
+    @api.depends('ext_panel', 'ext_panel.vacancy_id', 'ext_panel.workunit_id')
+    def _compute_eligible_employee_ids(self):
+        for rec in self:
+            sel = rec.ext_panel
+            vac = False
+            if sel:
+                vac_id = getattr(sel, 'vacancy_id', False)
+                if isinstance(vac_id, int) and vac_id > 0:
+                    vac = self.env['job.vacancy'].browse(vac_id)
+                elif hasattr(vac_id, 'operating_unit_id') and vac_id:
+                    vac = vac_id
+                if not vac and getattr(sel, 'vacancy_reference', False):
+                    vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
+
+            hiring_ou = False
+            if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
+                hiring_ou = vac.operating_unit_id.id
+            elif sel and getattr(sel, 'workunit_id', False):
+                w_id = sel.workunit_id
+                hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
+            elif sel and getattr(sel, 'job_location', False):
+                ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
+                if ou:
+                    hiring_ou = ou.id
+
+            elif self.env.context.get('parent_operating_unit_id'):
+                p_ou = self.env.context.get('parent_operating_unit_id')
+                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+            elif self.env.context.get('parent_workunit_id'):
+                p_wu = self.env.context.get('parent_workunit_id')
+                hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+
+            if hiring_ou:
+                rec.eligible_employee_ids = self.env['hr.employee'].search([
+                    ('default_operating_unit_id', '=', hiring_ou),
+                    ('active', '=', True)
+                ])
+            else:
+                rec.eligible_employee_ids = self.env['hr.employee'].search([('active', '=', True)])
+
+    @api.onchange('ext_panel', 'selection_criteria')
+    def _onchange_ext_panel_domain(self):
+        """Filter panel members strictly to the Hiring Work Unit."""
         sel = self.ext_panel
         vac = False
         if sel:
@@ -1355,60 +1391,25 @@ class InternalRecruitmentPanel(models.Model):
             if not vac and getattr(sel, 'vacancy_reference', False):
                 vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
 
-        # 1. Hiring OU
-        if vac and getattr(vac, 'operating_unit_id', False):
-            allowed_ous.add(vac.operating_unit_id.id)
+        hiring_ou = False
+        if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
+            hiring_ou = vac.operating_unit_id.id
         elif sel and getattr(sel, 'workunit_id', False):
             w_id = sel.workunit_id
-            ou_id = w_id.id if hasattr(w_id, 'id') else w_id
-            if ou_id:
-                allowed_ous.add(ou_id)
+            hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
         elif sel and getattr(sel, 'job_location', False):
             ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
             if ou:
-                allowed_ous.add(ou.id)
+                hiring_ou = ou.id
         elif self.env.context.get('parent_operating_unit_id'):
             p_ou = self.env.context.get('parent_operating_unit_id')
-            ou_id = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
-            if ou_id:
-                allowed_ous.add(ou_id)
+            hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
         elif self.env.context.get('parent_workunit_id'):
             p_wu = self.env.context.get('parent_workunit_id')
-            ou_id = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
-            if ou_id:
-                allowed_ous.add(ou_id)
+            hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
 
-        # 2. Responsible Officer / Vacancy Creator OU
-        if vac and getattr(vac, 'responsible', False) and vac.responsible.default_operating_unit_id:
-            allowed_ous.add(vac.responsible.default_operating_unit_id.id)
-        elif vac and getattr(vac, 'create_uid', False) and vac.create_uid.employee_id and vac.create_uid.employee_id.default_operating_unit_id:
-            allowed_ous.add(vac.create_uid.employee_id.default_operating_unit_id.id)
-        elif self.env.context.get('parent_responsible_id'):
-            r_id = self.env.context.get('parent_responsible_id')
-            emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
-            if emp and getattr(emp, 'default_operating_unit_id', False):
-                allowed_ous.add(emp.default_operating_unit_id.id)
-
-        return list(allowed_ous)
-
-    @api.depends('ext_panel', 'ext_panel.vacancy_id', 'ext_panel.workunit_id')
-    def _compute_eligible_employee_ids(self):
-        for rec in self:
-            allowed_ous = rec._get_allowed_operating_unit_ids()
-            if allowed_ous:
-                rec.eligible_employee_ids = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', 'in', allowed_ous),
-                    ('active', '=', True)
-                ])
-            else:
-                rec.eligible_employee_ids = self.env['hr.employee'].search([('active', '=', True)])
-
-    @api.onchange('ext_panel', 'selection_criteria')
-    def _onchange_ext_panel_domain(self):
-        """Filter panel members to Hiring Work Unit AND Vacancy Creator/Responsible Officer Work Unit."""
-        allowed_ous = self._get_allowed_operating_unit_ids()
-        if allowed_ous:
-            domain = [('default_operating_unit_id', 'in', allowed_ous), ('active', '=', True)]
+        if hiring_ou:
+            domain = [('default_operating_unit_id', '=', hiring_ou), ('active', '=', True)]
             self.eligible_employee_ids = self.env['hr.employee'].search(domain)
             if self.emp_name and self.emp_name.id not in self.eligible_employee_ids.ids:
                 self.emp_name = False

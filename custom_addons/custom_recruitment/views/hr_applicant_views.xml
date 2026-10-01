@@ -67,6 +67,13 @@
                             <field name="prmt_emp" invisible="1"/>
                             <field name="functions" invisible="1"/>
                         </group>
+                        <group string="Experience Breakdown">
+                            <field name="raw_banking_experience"/>
+                            <field name="raw_non_banking_experience"/>
+                            <field name="is_hr_or_it_workunit"/>
+                            <field name="weighted_non_banking_experience"/>
+                            <field name="total_experience_years" string="Calculated Total Exp (Years)"/>
+                        </group>
                         <group string="Target Location">
                             <field name="preferred_location" readonly="app_reference != False"/>
                             <field name="vacancy_reference" readonly="app_reference != False"/>

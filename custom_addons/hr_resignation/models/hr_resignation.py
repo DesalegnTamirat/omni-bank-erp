@@ -476,11 +476,15 @@ class HrResignation(models.Model):
                 contract.notice_period if (contract and contract.notice_period) else default_np
             )
 
-    @api.depends('application_date', 'notice_period')
+    @api.depends('application_date', 'notice_period', 'notice_period_accepted')
     def _compute_expected_last_day(self):
         from datetime import timedelta
         for rec in self:
-            if rec.application_date and rec.notice_period:
+            if not rec.application_date:
+                rec.expected_last_day = False
+            elif rec.notice_period_accepted == 'no':
+                rec.expected_last_day = rec.application_date
+            elif rec.notice_period:
                 # Subtract 1 day so that the application date is counted as day 1
                 rec.expected_last_day = rec.application_date + timedelta(days=rec.notice_period - 1)
             else:
@@ -838,6 +842,10 @@ class HrResignation(models.Model):
                             "Please evaluate or adjust their probation status first."
                         ))
             rec.state = 'approved'
+            
+            # Update the flag on the contract
+            if rec.current_version_id and hasattr(rec.current_version_id, 'has_approved_resignation'):
+                rec.current_version_id.has_approved_resignation = True
 
             # Assign exit interview
             if not rec.exit_interview_id:

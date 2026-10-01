@@ -705,6 +705,7 @@ class DisciplineAppeal(models.Model):
 
             if rec.decision_outcome == 'upheld':
                 case.sudo().with_context(force_write=True).write({'state': 'enforced'})
+                case.sudo()._process_appeal_window_deductions()
                 case.sudo().message_post(body=_('Appeal %s decided: Original decision UPHELD.') % rec.name)
 
             elif rec.decision_outcome == 'overturned':
@@ -734,6 +735,7 @@ class DisciplineAppeal(models.Model):
                     'punishment_type': 'exonerate',
                     'active_duration_days': 0,
                     'active_penalty_end_date': False,
+                    'deduction_status': 'cancelled',
                     'state': 'closed'
                 })
                 case.sudo().message_post(body=_('Appeal %s decided: Decision OVERTURNED. Employee exonerated and records restored.') % rec.name)
@@ -762,6 +764,7 @@ class DisciplineAppeal(models.Model):
                         'punishment_type': 'exonerate',
                         'active_duration_days': 0,
                         'active_penalty_end_date': False,
+                        'deduction_status': 'cancelled',
                         'state': 'closed'
                     })
                     case.sudo().message_post(body=_('Appeal %s decided: Penalty REDUCED to ZERO (Exonerated). Employee records restored.') % rec.name)
@@ -783,15 +786,7 @@ class DisciplineAppeal(models.Model):
                         'state': 'enforced'
                     }
                     case.sudo().with_context(force_write=True).write(new_vals)
-                    
-                    # Update pending payroll penalties
-                    if hasattr(case, 'payroll_penalty_ids') and case.payroll_penalty_ids:
-                        pending_penalties = case.payroll_penalty_ids.sudo().filtered(lambda p: p.state == 'pending')
-                        if pending_penalties:
-                            pending_penalties.write({
-                                'penalty_percentage': rec.revised_penalty_percentage,
-                                'managerial_days': int(rec.revised_fine_days) if rec.revised_fine_days > 0 else 0
-                            })
+                    case.sudo()._process_appeal_window_deductions()
                     
                     case.sudo().message_post(body=_('Appeal %s decided: Penalty REDUCED (Pct: %s%%, Days: %s).') % (
                         rec.name, rec.revised_penalty_percentage, rec.revised_fine_days

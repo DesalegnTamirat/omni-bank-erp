@@ -50,12 +50,19 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
     # ── Academic ────────────────────────────────────────────────────────────────
     minimum_cgpa = fields.Float(string='Minimum CGPA',
                                 help='Candidates with CGPA >= this value pass. Set 0 to skip.')
-    qualification_ids = fields.Many2many(
-        'external.applicant.education',
-        'ext_shortlist_wizard_education_rel',
-        'wizard_id', 'education_id',
+    study_qualification_ids = fields.Many2many(
+        'recruitment.field.of.study',
+        'ext_shortlist_wizard_field_study_rel',
+        'wizard_id', 'field_study_id',
         string='Required Study Qualifications',
-        help='Select required education qualifications from registered candidate education records.'
+        help='Select required fields of study / qualifications (from candidate_education). Candidate matches if their study qualification matches any selected.'
+    )
+    institution_ids = fields.Many2many(
+        'recruitment.institution',
+        'ext_shortlist_wizard_institution_rel',
+        'wizard_id', 'institution_id',
+        string='University / Institution',
+        help='Select required universities or institutions (from candidate_education). Candidate matches if their educational institution matches any selected.'
     )
 
     # ── Experience ──────────────────────────────────────────────────────────────
@@ -84,8 +91,20 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
         'recruitment.certification',
         'ext_shortlist_wizard_cert_rel',
         'wizard_id', 'cert_id',
-        string='Required Certifications',
-        help='Select required certifications from the configured recruitment certification list.'
+        string='Required Certifications (Optional)',
+        help='Select required certifications (from candidate_certification). Optional filter — leave empty to skip.'
+    )
+
+    # ── Salary & Compensation Filter ────────────────────────────────────────────
+    max_expected_salary = fields.Float(
+        string='Maximum Expected Salary (ETB)',
+        digits=(16, 2),
+        help='Filter candidates with Expected Salary <= this amount. Accepts any numeric value. Set 0 to skip.'
+    )
+    max_current_salary = fields.Float(
+        string='Maximum Current Salary (ETB)',
+        digits=(16, 2),
+        help='Filter candidates with Current Salary <= this amount. Accepts any numeric value. Set 0 to skip.'
     )
 
     # ── Personal & Demographics ─────────────────────────────────────────────────
@@ -142,10 +161,87 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
         ('french', 'French'),
     ], string='Required Language', default='')
 
+    # ── Auto-Sync Master Data on Wizard Load ────────────────────────────────────
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        self._sync_master_data()
+        return res
+
+    @api.model
+    def _sync_master_data(self):
+        cr = self.env.cr
+        # Sync Field of Study from candidate_education and external_applicant_education
+        try:
+            cr.execute("""
+                SELECT DISTINCT trim(field_of_study) 
+                FROM candidate_education 
+                WHERE field_of_study IS NOT NULL AND trim(field_of_study) != ''
+                UNION
+                SELECT DISTINCT trim(qualification_name) 
+                FROM candidate_education 
+                WHERE qualification_name IS NOT NULL AND trim(qualification_name) != ''
+                UNION
+                SELECT DISTINCT trim(other_field_of_study) 
+                FROM candidate_education 
+                WHERE other_field_of_study IS NOT NULL AND trim(other_field_of_study) != ''
+                UNION
+                SELECT DISTINCT trim(field_of_study) 
+                FROM external_applicant_education 
+                WHERE field_of_study IS NOT NULL AND trim(field_of_study) != ''
+            """)
+            studies = [r[0] for r in cr.fetchall() if r[0]]
+            for name in studies:
+                if name and not self.env['recruitment.field.of.study'].search([('name', '=ilike', name.strip())], limit=1):
+                    self.env['recruitment.field.of.study'].create({'name': name.strip()})
+        except Exception:
+            pass
+
+        # Sync Institutions from candidate_education and external_applicant_education
+        try:
+            cr.execute("""
+                SELECT DISTINCT trim(institution) 
+                FROM candidate_education 
+                WHERE institution IS NOT NULL AND trim(institution) != ''
+                UNION
+                SELECT DISTINCT trim(other_institution) 
+                FROM candidate_education 
+                WHERE other_institution IS NOT NULL AND trim(other_institution) != ''
+                UNION
+                SELECT DISTINCT trim(institution_name) 
+                FROM external_applicant_education 
+                WHERE institution_name IS NOT NULL AND trim(institution_name) != ''
+            """)
+            insts = [r[0] for r in cr.fetchall() if r[0]]
+            for name in insts:
+                if name and not self.env['recruitment.institution'].search([('name', '=ilike', name.strip())], limit=1):
+                    self.env['recruitment.institution'].create({'name': name.strip()})
+        except Exception:
+            pass
+
+        # Sync Certifications from candidate_certification and external_applicant_certification
+        try:
+            cr.execute("""
+                SELECT DISTINCT trim(name) 
+                FROM candidate_certification 
+                WHERE name IS NOT NULL AND trim(name) != ''
+                UNION
+                SELECT DISTINCT trim(name) 
+                FROM external_applicant_certification 
+                WHERE name IS NOT NULL AND trim(name) != ''
+            """)
+            certs = [r[0] for r in cr.fetchall() if r[0]]
+            for name in certs:
+                if name and not self.env['recruitment.certification'].search([('name', '=ilike', name.strip())], limit=1):
+                    self.env['recruitment.certification'].create({'name': name.strip()})
+        except Exception:
+            pass
+
     # ── Matching Logic ──────────────────────────────────────────────────────────
 
     def action_submit_criteria(self):
-        self.ensure_one
+        self.ensure_one()
         recruitment = self.recruitment_id
 
         candidates = recruitment.eligible_emp_external
@@ -154,67 +250,104 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
 
         matched_candidates = []
         for candidate in candidates:
+            prof = candidate.applicant_name.candidate_profile_id if candidate.applicant_name and hasattr(candidate.applicant_name, 'candidate_profile_id') else False
 
             # 1. CGPA check (only if minimum_cgpa > 0)
             if self.minimum_cgpa > 0:
-                cand_cgpas = [candidate.highest_cgpa] if candidate.highest_cgpa else []
+                cand_cgpas = []
+                if candidate.highest_cgpa:
+                    cand_cgpas.append(candidate.highest_cgpa)
                 for edu in candidate.education_ids:
                     if edu.cgpa:
                         cand_cgpas.append(edu.cgpa)
+                if prof:
+                    for edu in prof.education_ids:
+                        if edu.cgpa:
+                            cand_cgpas.append(edu.cgpa)
                 max_cgpa = max(cand_cgpas) if cand_cgpas else 0.0
                 if max_cgpa > 0 and max_cgpa < self.minimum_cgpa:
                     continue
 
             # 2. Relevant experience check (only if minimum_experience_years > 0)
             if self.minimum_experience_years > 0:
-                exp = candidate.relevant_experience or candidate.total_experience or 0.0
+                exp = candidate.relevant_experience or candidate.total_experience or (prof.total_experience if prof else 0.0) or 0.0
                 if exp > 0 and exp < self.minimum_experience_years:
                     continue
 
             # 3. Banking experience check (only if minimum_banking_experience > 0)
             if self.minimum_banking_experience > 0:
-                b_exp = candidate.banking_experience or 0.0
+                b_exp = candidate.banking_experience or (prof.banking_experience if prof else 0.0) or 0.0
                 if b_exp > 0 and b_exp < self.minimum_banking_experience:
                     continue
 
             # 4. Supervisory experience check
             if self.minimum_supervisory_experience > 0:
-                sup_exp = candidate.supervisory_experience or 0.0
+                sup_exp = candidate.supervisory_experience or (prof.supervisory_experience if prof else 0.0) or 0.0
                 if sup_exp < self.minimum_supervisory_experience:
                     continue
 
-            # 5. Study qualifications check
-            if self.qualification_ids:
-                req_quals = []
-                for q in self.qualification_ids:
-                    if q.field_of_study:
-                        req_quals.append(q.field_of_study.strip.lower)
-                    if q.level:
-                        req_quals.append(str(q.level).strip.lower)
-
+            # 5. Study qualifications / Field of Study check (from candidate_education)
+            if self.study_qualification_ids:
+                req_quals = [q.name.strip().lower() for q in self.study_qualification_ids if q.name]
                 cand_strings = []
                 if candidate.field_of_study:
-                    cand_strings.append(candidate.field_of_study.strip.lower)
+                    cand_strings.append(candidate.field_of_study.strip().lower())
                 if candidate.educational_qualification:
-                    cand_strings.append(str(candidate.educational_qualification).strip.lower)
+                    cand_strings.append(str(candidate.educational_qualification).strip().lower())
                 for edu in candidate.education_ids:
                     if edu.field_of_study:
-                        cand_strings.append(edu.field_of_study.strip.lower)
+                        cand_strings.append(edu.field_of_study.strip().lower())
                     if edu.level:
-                        cand_strings.append(str(edu.level).strip.lower)
+                        cand_strings.append(str(edu.level).strip().lower())
+                if prof:
+                    for edu in prof.education_ids:
+                        if edu.field_of_study:
+                            cand_strings.append(edu.field_of_study.strip().lower())
+                        if edu.other_field_of_study:
+                            cand_strings.append(edu.other_field_of_study.strip().lower())
+                        if edu.qualification_name:
+                            cand_strings.append(edu.qualification_name.strip().lower())
+                        if edu.education_level:
+                            cand_strings.append(str(edu.education_level).strip().lower())
 
                 match_qual = False
                 for req in req_quals:
-                    if any(req in s or s in req for s in cand_strings):
+                    if any(req in s or s in req for s in cand_strings if s):
                         match_qual = True
                         break
                 if not match_qual:
                     continue
 
+            # 5b. University / Institution check (from candidate_education)
+            if self.institution_ids:
+                req_insts = [i.name.strip().lower() for i in self.institution_ids if i.name]
+                cand_insts = []
+                if candidate.institution_name:
+                    cand_insts.append(candidate.institution_name.strip().lower())
+                for edu in candidate.education_ids:
+                    if edu.institution_name:
+                        cand_insts.append(edu.institution_name.strip().lower())
+                if prof:
+                    for edu in prof.education_ids:
+                        if edu.institution:
+                            cand_insts.append(edu.institution.strip().lower())
+                        if edu.other_institution:
+                            cand_insts.append(edu.other_institution.strip().lower())
+
+                match_inst = False
+                for req in req_insts:
+                    if any(req in ci or ci in req for ci in cand_insts if ci):
+                        match_inst = True
+                        break
+                if not match_inst:
+                    continue
+
             # 6. Skills check
             if self.skill_ids:
-                req_skills = [s.name.strip.lower for s in self.skill_ids if s.name]
-                cand_skills = [s.skill_name.strip.lower for s in candidate.skill_ids if s.skill_name]
+                req_skills = [s.name.strip().lower() for s in self.skill_ids if s.name]
+                cand_skills = [s.skill_name.strip().lower() for s in candidate.skill_ids if s.skill_name]
+                if prof:
+                    cand_skills.extend([s.name.strip().lower() for s in prof.skill_ids if s.name])
                 match_skill = any(
                     any(req in cs or cs in req for cs in cand_skills)
                     for req in req_skills
@@ -222,15 +355,28 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
                 if not match_skill:
                     continue
 
-            # 7. Certifications check
+            # 7. Certifications check (Optional — only filtered if cert_ids selected)
             if self.cert_ids:
-                req_certs = [c.name.strip.lower for c in self.cert_ids if c.name]
-                cand_certs = [c.name.strip.lower for c in candidate.certification_ids if c.name]
+                req_certs = [c.name.strip().lower() for c in self.cert_ids if c.name]
+                cand_certs = [c.name.strip().lower() for c in candidate.certification_ids if c.name]
+                if prof:
+                    cand_certs.extend([c.name.strip().lower() for c in prof.certification_ids if c.name])
                 match_cert = any(
                     any(req in cc or cc in req for cc in cand_certs)
                     for req in req_certs
                 )
                 if not match_cert:
+                    continue
+
+            # 7b. Salary checks (Expected & Current Salary - accepts any number)
+            if self.max_expected_salary > 0:
+                cand_exp_sal = candidate.expected_salary or (candidate.applicant_name.expected_salary if candidate.applicant_name else 0.0) or 0.0
+                if cand_exp_sal > 0 and cand_exp_sal > self.max_expected_salary:
+                    continue
+
+            if self.max_current_salary > 0:
+                cand_cur_sal = candidate.current_salary or (candidate.applicant_name.current_salary if candidate.applicant_name and hasattr(candidate.applicant_name, 'current_salary') else 0.0) or (prof.current_salary if prof else 0.0) or 0.0
+                if cand_cur_sal > 0 and cand_cur_sal > self.max_current_salary:
                     continue
 
             # 8. Gender check
@@ -256,24 +402,29 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
 
             # 12. Max Age check
             if self.max_age > 0:
-                age = 0
-                if candidate.applicant_age:
-                    try:
-                        age = int(candidate.applicant_age)
-                    except (ValueError, TypeError):
-                        pass
-                elif candidate.date_of_birth:
-                    today = datetime.now.date
-                    age = today.year - candidate.date_of_birth.year - (
-                        (today.month, today.day) < (candidate.date_of_birth.month, candidate.date_of_birth.day)
-                    )
+                age = candidate.age or 0
+                if not age:
+                    if candidate.applicant_age:
+                        try:
+                            age = int(candidate.applicant_age)
+                        except (ValueError, TypeError):
+                            pass
+                    elif candidate.date_of_birth:
+                        today = fields.Date.today()
+                        age = today.year - candidate.date_of_birth.year - (
+                            (today.month, today.day) < (candidate.date_of_birth.month, candidate.date_of_birth.day)
+                        )
+                    elif prof and prof.age:
+                        age = prof.age
                 if age > 0 and age > self.max_age:
                     continue
 
             # 13. Required Language check
             if self.required_language:
-                cand_langs = [l.language for l in candidate.language_ids if l.language]
-                if self.required_language not in cand_langs:
+                cand_langs = [l.language.lower() for l in candidate.language_ids if l.language]
+                if prof:
+                    cand_langs.extend([l.name.lower() for l in prof.language_ids if l.name])
+                if self.required_language not in cand_langs and not any(self.required_language in cl for cl in cand_langs):
                     continue
 
             matched_candidates.append(candidate)
