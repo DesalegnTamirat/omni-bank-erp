@@ -66,9 +66,9 @@
                 <form string="Disciplinary Case">
                     <header>
                         <button name="action_initiate" string="Initiate Case" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                        <!-- Coach / Line Manager / Director Direct Enforcement (Levels 2-5) -->
+                        <!-- Coach / Line Manager / Director Direct Enforcement (Configurable Limit) -->
                         <button name="action_approve_and_enforce" string="Enforce Decision" type="object" class="btn-success"
-                                invisible="state not in ('draft', 'initiated') or case_action_track != 'direct_enforce' or severity_level == 'level_1' or not is_coach_or_manager"/>
+                                invisible="state not in ('draft', 'initiated') or case_action_track != 'direct_enforce' or not is_coach_enforce_allowed or not is_coach_or_manager"/>
                         
                         <!-- Formal Escalation -> Chief Flow -->
                         <button name="action_submit_to_chief" string="Forward to Respective Chief" type="object" class="btn-primary"
@@ -198,6 +198,7 @@
                         <field name="can_lodge_second_appeal_on_behalf" invisible="1"/>
                         <field name="can_lodge_third_appeal_on_behalf" invisible="1"/>
                         <field name="is_coach_or_manager" invisible="1"/>
+                        <field name="is_coach_enforce_allowed" invisible="1"/>
                         <field name="is_hr_admin" invisible="1"/>
                         <field name="is_current_user_employee" invisible="1"/>
                         <field name="is_auditor_user" invisible="1"/>

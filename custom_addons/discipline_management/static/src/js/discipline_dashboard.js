@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
-import { Component, useState, onMounted, onWillUnmount } from "@odoo/owl";
+import { Component, useState, onMounted } from "@odoo/owl";
 
 class DisciplineDashboard extends Component {
     static template = "discipline_management.DisciplineDashboard";
@@ -34,20 +34,8 @@ class DisciplineDashboard extends Component {
             top_departments: [],
         });
 
-        this._refreshInterval = null;
-
         onMounted(async () => {
             await this._loadDashboardData();
-            // Auto-refresh every 5 minutes
-            this._refreshInterval = setInterval(async () => {
-                await this._loadDashboardData();
-            }, 5 * 60 * 1000);
-        });
-
-        onWillUnmount(() => {
-            if (this._refreshInterval) {
-                clearInterval(this._refreshInterval);
-            }
         });
     }
 
@@ -241,6 +229,16 @@ class DisciplineDashboard extends Component {
             res_model: "discipline.case",
             views: [[false, "form"]],
             target: "current",
+        });
+    }
+
+    openAttendanceScanWizard() {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: "Scan Attendance Violations",
+            res_model: "discipline.attendance.scan.wizard",
+            views: [[false, "form"]],
+            target: "new",
         });
     }
 

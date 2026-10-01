@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- Root Menu (Landing Page & Main Action) -->
+        <!-- Root Menu (Landing Page & Main Action directly loads Dashboard) -->
         <menuitem id="menu_discipline_root"
                   name="Discipline"
                   action="action_discipline_dashboard"
@@ -10,14 +10,7 @@
                   groups="discipline_management.group_discipline_user"
                   sequence="75"/>
 
-        <!-- 1. Dashboard -->
-        <menuitem id="menu_discipline_dashboard"
-                  name="Dashboard"
-                  parent="menu_discipline_root"
-                  action="action_discipline_dashboard"
-                  sequence="5"/>
-
-        <!-- 2. Operations / Cases Group -->
+        <!-- 1. Operations / Cases Group -->
         <menuitem id="menu_discipline_operations_root"
                   name="Discipline Operations"
                   parent="menu_discipline_root"

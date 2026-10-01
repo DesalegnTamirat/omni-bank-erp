@@ -26,12 +26,6 @@
         ])]" />
         </record>
 
-        <!-- ====================================================
-         1. Check In / Check Out (Deactivated duplicate sub-menu, app root opens dashboard)
-         ==================================================== -->
-        <record id="menu_check_in_out" model="ir.ui.menu">
-                <field name="active" eval="False" />
-        </record>
 
         <!-- ====================================================
          2. Kiosk Mode (Deactivated per company specification)

@@ -38,14 +38,15 @@ class HrAttendance(models.Model):
                 ) % att.employee_id.name)
 
     @api.model
-    def scan_and_initiate_attendance_cases(self, employee_ids=None, date_from=None, date_to=None):
+    def scan_and_initiate_attendance_cases(self, employee_ids=None, date_from=None, date_to=None, late_threshold=None, skip_existing_active_cases=True):
         """
         High-performance targeted scanner: identifies repeated lateness & forced checkout violations
         and creates auto-initiated disciplinary cases for Direct Manager / Coach review and manual enforcement.
         Can be executed on-demand by managers or on off-peak schedule.
         """
         ICP = self.env['ir.config_parameter'].sudo()
-        late_threshold = int(ICP.get_param('discipline.attendance_lateness_threshold', 3))
+        if late_threshold is None:
+            late_threshold = int(ICP.get_param('discipline.attendance_lateness_threshold', 3))
         force_threshold = int(ICP.get_param('discipline.attendance_force_checkout_threshold', 3))
         rolling_days = int(ICP.get_param('discipline.attendance_rolling_days', 30))
 
@@ -95,14 +96,15 @@ class HrAttendance(models.Model):
                 })
 
             # Check if active draft/initiated case already exists in the same period
-            existing = self.env['discipline.case'].search([
-                ('employee_id', '=', emp.id),
-                ('offense_id', '=', offense.id),
-                ('state', 'in', ['draft', 'initiated']),
-                ('incident_date', '>=', date_from),
-            ], limit=1)
-
-            if not existing:
+            if skip_existing_active_cases:
+                existing = self.env['discipline.case'].search([
+                    ('employee_id', '=', emp.id),
+                    ('offense_id', '=', offense.id),
+                    ('state', 'in', ['draft', 'initiated', 'pending_approval', 'enforced']),
+                    ('incident_date', '>=', date_from),
+                ], limit=1)
+                if existing:
+                    continue
                 case = self.env['discipline.case'].create({
                     'employee_id': emp.id,
                     'offense_id': offense.id,

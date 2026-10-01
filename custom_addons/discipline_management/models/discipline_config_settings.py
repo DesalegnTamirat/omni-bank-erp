@@ -26,6 +26,16 @@ class ResConfigSettings(models.TransientModel):
         help='Maximum allowed duration in working days for precautionary suspension.'
     )
 
+    discipline_coach_max_punishment = fields.Selection([
+        ('verbal_warning', 'Verbal Warning Only (Level 5 Minor)'),
+        ('first_warning_penalty', 'Up to 1st Written Warning (Level 4 Low)'),
+        ('second_warning_penalty', 'Up to 2nd Written Warning (Level 3 Medium)'),
+        ('final_warning_penalty', 'Up to Final Written Warning (Level 2 High)'),
+    ], string='Direct Coach Max Punishment Authority',
+       default='final_warning_penalty',
+       config_parameter='discipline.coach_max_punishment',
+       help='Maximum disciplinary sanction a Direct Coach / Line Manager is authorized to directly enforce without escalating to the Disciplinary Committee.')
+
     absence_warning_consecutive_days = fields.Integer(
         string='Consecutive Absence for Final Warning (Days)',
         default=3,

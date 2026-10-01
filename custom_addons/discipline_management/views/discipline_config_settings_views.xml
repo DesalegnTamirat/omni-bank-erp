@@ -34,6 +34,14 @@
                                     </div>
                                 </div>
                             </setting>
+                            <setting id="discipline_coach_authority_setting" string="Coach Enforcement Authority Limit" help="Maximum disciplinary sanction a Direct Coach or Line Manager can directly initiate and enforce without committee referral.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_coach_max_punishment" class="col-lg-4 o_light_label"/>
+                                        <field name="discipline_coach_max_punishment" class="col-lg-4"/>
+                                    </div>
+                                </div>
+                            </setting>
                         </block>
 
                         <block title="Attendance &amp; Absence Escalation Rules" id="discipline_attendance_rules">

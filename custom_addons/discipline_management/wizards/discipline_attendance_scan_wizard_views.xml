@@ -8,22 +8,52 @@
             <field name="model">discipline.attendance.scan.wizard</field>
             <field name="arch" type="xml">
                 <form string="Scan Attendance Violations">
-                    <p class="text-muted">
-                        This tool analyzes attendance punch records for repeated tardiness and missing checkouts within the specified date range. 
-                        For any employee exceeding the policy threshold, it automatically drafts and initiates a disciplinary case assigned directly to their Coach / Line Manager for manual review and enforcement.
+                    <field name="is_hr_admin" invisible="1"/>
+                    <field name="is_supervisor" invisible="1"/>
+
+                    <!-- Mandate Status Banner -->
+                    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                        <i class="fa fa-shield me-2 fs-4 text-primary"/>
+                        <div>
+                            <strong>Mandate &amp; Scope:</strong>
+                            <field name="mandate_notice" readonly="1" class="d-inline ms-1"/>
+                        </div>
+                    </div>
+
+                    <p class="text-muted small">
+                        This scanner evaluates punch records for chronic tardiness and unexcused attendance issues.
+                        When an employee exceeds the configured violation threshold, a disciplinary case is auto-initiated and assigned directly to their <strong>Direct Coach / Line Manager</strong> for evidence review and manual enforcement.
                     </p>
+
                     <group>
-                        <group string="Filter Criteria">
-                            <field name="department_id" options="{'no_create': True}"/>
-                            <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                        <group string="1. Target Scope &amp; Mandate">
+                            <field name="scan_scope" widget="radio"/>
+                            <field name="department_id" 
+                                   options="{'no_create': True}"
+                                   invisible="scan_scope != 'department'"
+                                   required="scan_scope == 'department'"/>
+                            <field name="employee_ids" 
+                                   widget="many2many_tags" 
+                                   options="{'no_create': True}"
+                                   invisible="scan_scope != 'specific_employees'"
+                                   required="scan_scope == 'specific_employees'"/>
                         </group>
-                        <group string="Scan Period">
-                            <field name="date_from"/>
-                            <field name="date_to"/>
+
+                        <group string="2. Evaluation Period &amp; Threshold">
+                            <field name="period_preset"/>
+                            <field name="date_from" readonly="period_preset != 'custom'"/>
+                            <field name="date_to" readonly="period_preset != 'custom'"/>
+                            <field name="late_threshold"/>
+                            <field name="skip_existing_active_cases"/>
                         </group>
                     </group>
+
                     <footer>
-                        <button name="action_scan_and_initiate" string="Scan &amp; Initiate Cases" type="object" class="btn-primary"/>
+                        <button name="action_scan_and_initiate" 
+                                string="Scan &amp; Initiate Disciplinary Cases" 
+                                type="object" 
+                                class="btn-primary"
+                                icon="fa-bolt"/>
                         <button string="Cancel" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>

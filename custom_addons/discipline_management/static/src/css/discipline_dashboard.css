@@ -214,6 +214,16 @@
     transform: translateY(-1px);
 }
 
+.disc-btn-scan {
+    background: rgba(66, 87, 39, 0.5);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.disc-btn-scan:hover {
+    background: rgba(66, 87, 39, 0.8);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
 /* ---- Alert Banner ---- */
 .disc-alert-banner {
     background: linear-gradient(135deg, #541718, #991b1b);

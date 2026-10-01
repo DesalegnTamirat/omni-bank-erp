@@ -382,6 +382,27 @@ class DisciplineCase(models.Model):
                 rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
                 rec.fine_days = rec.decided_fine_days if rec.decided_fine_days > 0 else days
 
+    @api.model
+    def _get_coach_max_authority(self):
+        """
+        Returns tuple: (max_punishment_key, max_rank_int, allowed_severity_codes_list)
+        Punishment Ranks:
+        1: verbal_warning (Level 5)
+        2: first_warning_penalty (Level 4)
+        3: second_warning_penalty (Level 3)
+        4: final_warning_penalty (Level 2)
+        """
+        punish_to_rank = {
+            'verbal_warning': (1, ['level_5']),
+            'first_warning_penalty': (2, ['level_5', 'level_4']),
+            'second_warning_penalty': (3, ['level_5', 'level_4', 'level_3']),
+            'final_warning_penalty': (4, ['level_5', 'level_4', 'level_3', 'level_2']),
+        }
+        ICP = self.env['ir.config_parameter'].sudo()
+        cfg_punish = ICP.get_param('discipline.coach_max_punishment', 'final_warning_penalty')
+        rank, allowed_levels = punish_to_rank.get(cfg_punish, (4, ['level_5', 'level_4', 'level_3', 'level_2']))
+        return cfg_punish, rank, allowed_levels
+
     @api.onchange('employee_id', 'case_action_track')
     def _onchange_employee_id_filter_regulations(self):
         if self.employee_id:
@@ -401,8 +422,8 @@ class DisciplineCase(models.Model):
 
             offense_domain = [('staff_category', 'in', [cat, 'all'])]
             if self.case_action_track == 'direct_enforce':
-                # Direct managers cannot initiate or enforce Level 1 Dismissal
-                offense_domain.append(('severity_level', '!=', 'level_1'))
+                _, _, allowed_levels = self._get_coach_max_authority()
+                offense_domain.append(('severity_level', 'in', allowed_levels))
 
             return {
                 'domain': {
@@ -750,6 +771,37 @@ class DisciplineCase(models.Model):
                 self.env.user.has_group('discipline_management.group_discipline_admin')
             )
 
+    is_coach_enforce_allowed = fields.Boolean(
+        string='Is Coach Enforcement Allowed',
+        compute='_compute_is_coach_enforce_allowed'
+    )
+
+    @api.depends('case_action_track', 'severity_level_id', 'punishment_type', 'decided_punishment_type')
+    def _compute_is_coach_enforce_allowed(self):
+        _, max_rank, allowed_levels = self._get_coach_max_authority()
+        punish_ranks = {
+            'verbal_warning': 1,
+            'first_warning_penalty': 2,
+            'second_warning_penalty': 3,
+            'final_warning_penalty': 4,
+            'demotion': 5,
+            'dismissal': 6,
+        }
+        sev_ranks = {
+            'level_5': 1,
+            'level_4': 2,
+            'level_3': 3,
+            'level_2': 4,
+            'level_1': 6,
+        }
+        for rec in self:
+            if rec.case_action_track != 'direct_enforce':
+                rec.is_coach_enforce_allowed = False
+                continue
+            case_punish_rank = punish_ranks.get(rec.punishment_type or rec.decided_punishment_type, 1)
+            case_sev_rank = sev_ranks.get(rec.severity_level or (rec.severity_level_id and rec.severity_level_id.code), 1)
+            rec.is_coach_enforce_allowed = (case_punish_rank <= max_rank) and (case_sev_rank <= max_rank)
+
     allowed_severity_level_ids = fields.Many2many(
         'discipline.severity.level',
         compute='_compute_allowed_severity_level_ids',
@@ -790,14 +842,22 @@ class DisciplineCase(models.Model):
             else:
                 rec.subordinate_employee_ids = self.env['hr.employee']
 
-    @api.depends('offense_id', 'offense_id.line_ids')
+    @api.depends('offense_id', 'offense_id.line_ids', 'case_action_track')
     def _compute_allowed_severity_level_ids(self):
         all_levels = self.env['discipline.severity.level'].search([])
+        _, _, allowed_levels_codes = self._get_coach_max_authority()
         for rec in self:
-            if rec.offense_id and rec.offense_id.line_ids:
-                rec.allowed_severity_level_ids = rec.offense_id.line_ids.mapped('severity_level_id')
+            if rec.case_action_track == 'direct_enforce':
+                levels = all_levels.filtered(lambda l: l.code in allowed_levels_codes)
+                if rec.offense_id and rec.offense_id.line_ids:
+                    rec.allowed_severity_level_ids = rec.offense_id.line_ids.mapped('severity_level_id').filtered(lambda l: l.code in allowed_levels_codes)
+                else:
+                    rec.allowed_severity_level_ids = levels
             else:
-                rec.allowed_severity_level_ids = all_levels
+                if rec.offense_id and rec.offense_id.line_ids:
+                    rec.allowed_severity_level_ids = rec.offense_id.line_ids.mapped('severity_level_id')
+                else:
+                    rec.allowed_severity_level_ids = all_levels
 
     @api.depends('employee_id', 'employee_id.is_managerial')
     def _compute_staff_category_display(self):
@@ -1656,14 +1716,39 @@ class DisciplineCase(models.Model):
             if rec.case_action_track == 'direct_enforce':
                 if not rec.severity_level_id:
                     raise UserError(_('Severity Level is required for Coach Direct Enforcement.'))
-                if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
+                cfg_punish, max_rank, allowed_levels = self._get_coach_max_authority()
+                
+                punish_ranks = {
+                    'verbal_warning': 1,
+                    'first_warning_penalty': 2,
+                    'second_warning_penalty': 3,
+                    'final_warning_penalty': 4,
+                    'demotion': 5,
+                    'dismissal': 6,
+                }
+                sev_ranks = {
+                    'level_5': 1,
+                    'level_4': 2,
+                    'level_3': 3,
+                    'level_2': 4,
+                    'level_1': 6,
+                }
+                case_punish_rank = punish_ranks.get(rec.punishment_type or rec.decided_punishment_type, 1)
+                case_sev_rank = sev_ranks.get(rec.severity_level or (rec.severity_level_id and rec.severity_level_id.code), 1)
+
+                is_exceeded = (case_punish_rank > max_rank) or (case_sev_rank > max_rank)
+                if is_exceeded:
                     if (not current_user.has_group('discipline_management.group_discipline_admin') and 
                         not current_user.has_group('discipline_management.group_discipline_ceo') and 
                         not current_user.has_group('discipline_management.group_discipline_cpco')):
+                        
+                        cfg_display = dict(self.env['res.config.settings']._fields['discipline_coach_max_punishment'].selection).get(cfg_punish, cfg_punish) if 'discipline_coach_max_punishment' in self.env['res.config.settings']._fields else cfg_punish
                         raise UserError(_(
-                            'Dismissal Authority Restriction: Level 1 Dismissal cannot be directly enforced by a Coach or Line Manager. '
-                            'Please escalate through the Chief / Executive Committee route.'
-                        ))
+                            'Coach Direct Enforcement Authority Limit Exceeded:\n\n'
+                            'Per Bank Disciplinary Governance Configuration, Direct Coaches / Line Managers are authorized to directly enforce sanctions up to: %s.\n\n'
+                            'This disciplinary case involves: %s (%s), which exceeds your direct enforcement authority.\n'
+                            'Please route/escalate this case to the Respective Chief / Executive Disciplinary Committee.'
+                        ) % (cfg_display, rec.severity_level_id.name or rec.severity_level, rec.punishment_type or rec.decided_punishment_type))
             else:
                 if not rec.severity_level_id and not rec.decided_punishment_type and not rec.punishment_type:
                     raise UserError(_('Severity Level and Final Decided Punishment must be assigned before enforcing this case.'))
