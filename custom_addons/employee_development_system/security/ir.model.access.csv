@@ -295,3 +295,7 @@ access_eds_competency_gap_import_adm,eds.competency.gap.import admin,model_eds_c
 access_eds_pms_gap_import_off,eds.pms.gap.import officer,model_eds_pms_gap_import,employee_development_system.group_eds_officer,1,1,1,1
 access_eds_pms_gap_import_mgr,eds.pms.gap.import manager,model_eds_pms_gap_import,employee_development_system.group_eds_manager,1,1,1,1
 access_eds_pms_gap_import_adm,eds.pms.gap.import admin,model_eds_pms_gap_import,employee_development_system.group_eds_admin,1,1,1,1
+access_eds_tna_exclude_wizard_mgr,eds.tna.exclude.wizard line manager,model_eds_tna_exclude_wizard,employee_development_system.group_eds_line_manager,1,1,1,1
+access_eds_tna_exclude_wizard_off,eds.tna.exclude.wizard officer,model_eds_tna_exclude_wizard,employee_development_system.group_eds_officer,1,1,1,1
+access_eds_tna_exclude_wizard_mgt,eds.tna.exclude.wizard manager,model_eds_tna_exclude_wizard,employee_development_system.group_eds_manager,1,1,1,1
+access_eds_tna_exclude_wizard_adm,eds.tna.exclude.wizard admin,model_eds_tna_exclude_wizard,employee_development_system.group_eds_admin,1,1,1,1

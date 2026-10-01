@@ -22,7 +22,7 @@
             <form string="Individual Development Plan (IDP)">
                 <header>
                     <button name="action_submit" string="Submit for Review" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_approve" string="Approve IDP" type="object" class="oe_highlight" invisible="state != 'submitted'" groups="employee_development_system.group_eds_line_manager"/>
+                    <button name="action_approve" string="Approve IDP" type="object" class="oe_highlight" invisible="state != 'submitted'" groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_start" string="Set In Progress" type="object" invisible="state != 'approved'"/>
                     <button name="action_complete" string="Mark Completed" type="object" class="oe_highlight" invisible="state != 'in_progress'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,in_progress,completed"/>

@@ -87,16 +87,16 @@
                     <header>
                         <button name="action_activate" string="Activate Course"
                                 type="object" class="oe_highlight" invisible="status != 'draft'"
-                                groups="employee_development_system.group_eds_officer"/>
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_generate_learning_objectives" string="Auto-Compile Learning Outcomes"
                                 type="object" class="btn-secondary" icon="fa-magic" invisible="status == 'retired'"
-                                groups="employee_development_system.group_eds_officer"/>
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_suspend" string="Suspend"
                                 type="object" invisible="status not in ('draft','active')"
-                                groups="employee_development_system.group_eds_officer"/>
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_retire" string="Retire"
                                 type="object" invisible="status not in ('draft','active','suspended')"
-                                groups="employee_development_system.group_eds_officer"/>
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="status" widget="statusbar"
                                statusbar_visible="draft,active,suspended,retired"/>
                     </header>
@@ -107,17 +107,17 @@
                             </button>
                             <button name="%(employee_development_system.action_eds_curriculum)d"
                                     type="action" class="oe_stat_button" icon="fa-book"
-                                    groups="employee_development_system.group_eds_officer">
+                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="curriculum_count" widget="statinfo" string="Curriculums"/>
                             </button>
                             <button name="%(employee_development_system.action_eds_course_development_request)d"
                                     type="action" class="oe_stat_button" icon="fa-gears"
-                                    groups="employee_development_system.group_eds_officer">
+                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="development_request_count" widget="statinfo" string="Dev Requests"/>
                             </button>
                             <button name="action_view_materials" type="object"
                                     class="oe_stat_button" icon="fa-folder-open"
-                                    groups="employee_development_system.group_eds_officer">
+                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="material_count" widget="statinfo" string="Materials"/>
                                 <span class="o_stat_text">Approval gate ()</span>
                             </button>
@@ -152,10 +152,10 @@
                             <button name="action_submit_sourcing" string="Submit for Director PPDD Review"
                                     type="object" class="oe_highlight"
                                     invisible="sourcing_state != 'draft'"
-                                    groups="employee_development_system.group_eds_officer"/>
+                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                             <button name="action_record_sourcing_decision" string="Record Director Decision"
                                     type="object" invisible="sourcing_state != 'director_review'"
-                                    groups="employee_development_system.group_eds_manager"/>
+                                    groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         </group>
                         <group string="Course Definition / Summary">
                             <field name="description" placeholder="Provide general definition, target competencies and objectives..."/>
@@ -282,14 +282,18 @@
                 <form>
                     <header>
                         <button name="action_start_development" string="Start Development"
-                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_submit" string="Submit for Approval"
-                                type="object" class="oe_highlight" invisible="state != 'in_development'"/>
+                                type="object" class="oe_highlight" invisible="state != 'in_development'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_approve" string="Approve"
-                                type="object" class="oe_highlight" invisible="state != 'submitted'"/>
+                                type="object" class="oe_highlight" invisible="state != 'submitted'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_convert_to_course" string="Convert to Course"
                                 type="object" class="oe_highlight"
-                                invisible="state not in ('approved','done')"/>
+                                invisible="state not in ('approved','done')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,in_development,submitted,approved,done"/>
                     </header>

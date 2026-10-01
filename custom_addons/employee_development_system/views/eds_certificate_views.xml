@@ -76,8 +76,10 @@
         <field name="arch" type="xml">
             <form string="Completion Certificate">
                 <header>
-                    <button name="action_issue" string="Issue Certificate" type="object" class="oe_highlight" invisible="state != 'pending'"/>
-                    <button name="action_void" string="Void Certificate" type="object" invisible="state == 'void'"/>
+                    <button name="action_issue" string="Issue Certificate" type="object" class="oe_highlight" invisible="state != 'pending'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_void" string="Void Certificate" type="object" invisible="state == 'void'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="pending,issued,void"/>
                 </header>
                 <sheet>

@@ -89,7 +89,7 @@
                         <button name="action_submit" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'" groups="competency_management.group_competency_officer"/>
                         <button name="action_approve" string="Approve Competency" type="object" class="oe_highlight" invisible="state != 'submitted'" groups="competency_management.group_competency_admin"/>
                         <button name="action_create_new_version" string="Create New Version" type="object" class="btn-primary" invisible="state != 'approved'" groups="competency_management.group_competency_officer"/>
-                        <button name="action_retire" string="Retire / Inactivate" type="object" class="btn-warning" invisible="state != 'approved'" groups="competency_management.group_competency_officer"/>
+                        <button name="action_retire" string="Retire / Inactivate" type="object" class="btn-warning" invisible="state != 'approved'" confirm="Are you sure you want to retire this competency? It will no longer be available for future assessments." groups="competency_management.group_competency_officer"/>
                         <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state not in ('submitted', 'retired')" groups="competency_management.group_competency_officer"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,retired"/>
                     </header>

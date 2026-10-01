@@ -40,6 +40,7 @@
                                 groups="competency_management.group_competency_admin"/>
                         <button name="action_close" string="Close Cycle"
                                 type="object" invisible="state not in ('open','in_review')"
+                                confirm="Are you sure you want to close this assessment cycle? All submitted assessments will be locked and final snapshots generated."
                                 groups="competency_management.group_competency_admin"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,open,in_review,closed"/>
                     </header>

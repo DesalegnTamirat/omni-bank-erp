@@ -25,10 +25,10 @@
         <field name="arch" type="xml">
             <form string="Certification Sponsorship &amp; Bond">
                 <header>
-                    <button name="action_verify_eligibility" string="Verify 12-Month Eligibility" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_approve" string="Approve Sponsorship" type="object" class="oe_highlight" invisible="state != 'eligibility_check'"/>
-                    <button name="action_activate_bond" string="Activate Bond Agreement" type="object" class="oe_highlight" invisible="state != 'approved'"/>
-                    <button name="action_mark_breached" string="Mark Bond Breached" type="object" class="btn-danger" invisible="state != 'active'"/>
+                    <button name="action_verify_eligibility" string="Verify 12-Month Eligibility" type="object" class="oe_highlight" invisible="state != 'draft'" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_approve" string="Approve Sponsorship" type="object" class="oe_highlight" invisible="state != 'eligibility_check'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_activate_bond" string="Activate Bond Agreement" type="object" class="oe_highlight" invisible="state != 'approved'" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_mark_breached" string="Mark Bond Breached" type="object" class="btn-danger" invisible="state != 'active'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,eligibility_check,approved,active,completed"/>
                 </header>
                 <sheet>
@@ -112,10 +112,10 @@
             <form string="Staff Education Assistance Request">
                 <header>
                     <button name="action_submit" string="Submit Request" type="object" class="oe_highlight" invisible="approval_state != 'draft'"/>
-                    <button name="action_dept_approve" string="Dept Head Approve" type="object" class="oe_highlight" invisible="approval_state != 'submitted'"/>
-                    <button name="action_ppdd_validate" string="PPDD Validate" type="object" class="oe_highlight" invisible="approval_state != 'dept_approved'"/>
-                    <button name="action_cpco_approve" string="CPCO Approve" type="object" class="oe_highlight" invisible="approval_state != 'ppdd_validated'"/>
-                    <button name="action_disburse" string="Disburse Reimbursement" type="object" class="oe_highlight" invisible="approval_state != 'cpco_approved' or reimbursement_state == 'disbursed'"/>
+                    <button name="action_dept_approve" string="Dept Head Approve" type="object" class="oe_highlight" invisible="approval_state != 'submitted'" groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_ppdd_validate" string="PPDD Validate" type="object" class="oe_highlight" invisible="approval_state != 'dept_approved'" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_cpco_approve" string="CPCO Approve" type="object" class="oe_highlight" invisible="approval_state != 'ppdd_validated'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_disburse" string="Disburse Reimbursement" type="object" class="oe_highlight" invisible="approval_state != 'cpco_approved' or reimbursement_state == 'disbursed'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="approval_state" widget="statusbar" statusbar_visible="draft,submitted,dept_approved,ppdd_validated,cpco_approved"/>
                 </header>
                 <sheet>

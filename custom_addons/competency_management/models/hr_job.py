@@ -9,14 +9,32 @@ class HrJobCompetency(models.Model):
     competency_role_mapping_ids = fields.One2many(
         'competency.role.mapping', 'job_position_id', string='Competency Role Mappings',
         help="Competencies explicitly assigned to this job position.")
+    competency_mapping_ids = fields.One2many(
+        'competency.role.mapping', 'job_position_id', string='Competency Role Mappings (Alias)',
+        help="Alias for competency_role_mapping_ids.")
+    competency_mapping_count = fields.Integer(
+        string='Competency Mapping Count', compute='_compute_competency_mapping_count',
+        help="Total number of competency role mappings for this job position.")
     required_competency_count = fields.Integer(
         string='Required Competencies Count', compute='_compute_required_competency_count',
         help="Total count of competencies assigned to this job position or grade.")
 
     @api.depends('competency_role_mapping_ids')
+    def _compute_competency_mapping_count(self):
+        for job in self:
+            job.competency_mapping_count = len(job.competency_role_mapping_ids)
+
+    @api.depends('competency_role_mapping_ids')
     def _compute_required_competency_count(self):
         for job in self:
             job.required_competency_count = len(job.competency_role_mapping_ids)
+
+    def action_view_competency_mappings(self):
+        self.ensure_one()
+        action = self.env['ir.actions.actions']._for_xml_id('competency_management.action_competency_role_mapping')
+        action['domain'] = [('job_position_id', '=', self.id)]
+        action['context'] = {'default_job_position_id': self.id}
+        return action
 
     def get_required_competencies(self, grade_id=None):
         """API helper method for Career Path, Recruitment, and external modules.

@@ -20,9 +20,12 @@
         <field name="arch" type="xml">
             <form string="Evaluation Instrument">
                 <header>
-                    <button name="action_publish" string="Publish Instrument" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_create_new_version" string="Create New Version" type="object" invisible="state != 'published'"/>
-                    <button name="action_archive" string="Archive" type="object" invisible="state == 'archived'"/>
+                    <button name="action_publish" string="Publish Instrument" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_create_new_version" string="Create New Version" type="object" invisible="state != 'published'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_archive" string="Archive" type="object" invisible="state == 'archived'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,published,archived"/>
                 </header>
                 <sheet>
@@ -158,7 +161,8 @@
         <field name="arch" type="xml">
             <form string="Level 2 Learning Evaluation">
                 <header>
-                    <button name="action_evaluate" string="Complete Evaluation" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_evaluate" string="Complete Evaluation" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
                 </header>
                 <sheet>
@@ -212,7 +216,8 @@
         <field name="arch" type="xml">
             <form string="Level 3 Behavioral Assessment">
                 <header>
-                    <button name="action_submit_level3" string="Submit Manager Assessment" type="object" class="oe_highlight" invisible="status == 'completed'"/>
+                    <button name="action_submit_level3" string="Submit Manager Assessment" type="object" class="oe_highlight" invisible="status == 'completed'"
+                            groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="status" widget="statusbar" statusbar_visible="pending,in_progress,completed,overdue"/>
                 </header>
                 <sheet>
@@ -279,7 +284,8 @@
         <field name="arch" type="xml">
             <form string="Level 4 Business Impact &amp; ROI Assessment">
                 <header>
-                    <button name="action_evaluate" string="Publish Impact Assessment" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_evaluate" string="Publish Impact Assessment" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
                 </header>
                 <sheet>

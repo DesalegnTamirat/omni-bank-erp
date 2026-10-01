@@ -28,24 +28,33 @@
                 <form>
                     <header>
                         <button name="action_start_collection" string="Start Collection"
-                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_open_pull_competency_gaps" string="Pull Closed Competency Gaps"
-                                type="object" class="btn-primary" invisible="state not in ('draft', 'collecting')"/>
+                                type="object" class="btn-primary" invisible="state not in ('draft', 'collecting')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_open_pull_pms_gaps" string="Pull PMS Appraisal Gaps"
-                                type="object" class="btn-secondary" invisible="state not in ('draft', 'collecting')"/>
+                                type="object" class="btn-secondary" invisible="state not in ('draft', 'collecting')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_finish_collection" string="Finish Collection"
-                                type="object" class="oe_highlight" invisible="state != 'collecting'"/>
+                                type="object" class="oe_highlight" invisible="state != 'collecting'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_submit_for_approval" string="Submit for Approval"
-                                type="object" class="oe_highlight" invisible="state != 'consolidating'"/>
+                                type="object" class="oe_highlight" invisible="state != 'consolidating'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="%(employee_development_system.action_eds_tna_consolidation_wizard)d"
                                 string="Consolidate Needs" type="action" class="oe_highlight"
-                                invisible="state not in ('collecting','consolidating','under_approval')"/>
+                                invisible="state not in ('collecting','consolidating','under_approval')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_approve" string="Approve TNA"
-                                type="object" class="oe_highlight" invisible="state != 'under_approval'"/>
+                                type="object" class="oe_highlight" invisible="state != 'under_approval'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_lock" string="Lock Approved TNA"
-                                type="object" invisible="state != 'approved'"/>
+                                type="object" invisible="state != 'approved'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_unlock" string="Unlock (Change Request)"
-                                type="object" invisible="state != 'locked'"/>
+                                type="object" invisible="state != 'locked'"
+                                groups="employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                 statusbar_visible="draft,collecting,consolidating,under_approval,approved,locked"/>
                     </header>
@@ -164,21 +173,26 @@
                                 type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_validate" string="Validate"
                                 type="object" class="oe_highlight" invisible="state not in ('submitted','validated')"
-                                groups="employee_development_system.group_eds_line_manager"/>
+                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_exclude" string="Exclude (Duplicate / Invalid)"
                                 type="object" invisible="state not in ('submitted','validated')"
-                                groups="employee_development_system.group_eds_line_manager"/>
+                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_reopen_draft" string="Reopen as Draft"
                                 type="object" invisible="state not in ('submitted','excluded')"
-                                groups="employee_development_system.group_eds_line_manager"/>
+                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_create_development_request" string="Create Development Request"
                                 type="object" class="oe_highlight"
                                 invisible="state not in ('approved','converted')"
-                                groups="employee_development_system.group_eds_officer"/>
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,submitted,validated,approved,converted,excluded"/>
                     </header>
                     <sheet>
+                        <div class="alert alert-warning mb-3" role="alert" invisible="state != 'excluded'">
+                            <h5 class="alert-heading mb-1"><i class="fa fa-ban me-1"/> Excluded Training Need</h5>
+                            <div><strong>Category: </strong><field name="exclusion_type" readonly="1" class="fw-bold"/></div>
+                            <div><strong>Reason: </strong><field name="excluded_reason" readonly="1"/></div>
+                        </div>
                         <group>
                             <group string="Course Selection &amp; Urgency">
                                 <field name="is_custom_course" widget="boolean_toggle" readonly="state != 'draft'"/>
@@ -217,33 +231,24 @@
                             </group>
                             <group string="Business Justification &amp; Impact">
                                 <field name="justification" placeholder="Explain the business need, competency gap, or regulatory requirement..." readonly="state != 'draft'"/>
-                                <field name="excluded_reason" invisible="state != 'excluded'" readonly="1"/>
+                                <field name="exclusion_type" invisible="state != 'excluded' and not exclusion_type" readonly="state == 'excluded'"/>
+                                <field name="excluded_reason" invisible="state != 'excluded' and not excluded_reason" readonly="state == 'excluded'"/>
                                 <field name="converted_course_ref" invisible="state != 'converted'" readonly="1"/>
                             </group>
                         </group>
                         <notebook>
-                            <page string="HR Planning &amp; Consolidation Review" groups="employee_development_system.group_eds_officer">
+                            <page string="L&amp;D Consolidation &amp; Priority Analysis" groups="employee_development_system.group_eds_officer">
                                 <group>
-                                    <group string="Target Schedule &amp; Budget">
-                                        <field name="hr_target_quarter"/>
-                                        <field name="hr_target_delivery_date"/>
-                                        <field name="estimated_cost"/>
-                                    </group>
-                                    <group string="Target Assigned Employees">
-                                        <field name="hr_assigned_participant_ids" widget="many2many_tags"
-                                               placeholder="Select employees nominated to attend..."/>
-                                    </group>
-                                </group>
-                            </page>
-                            <page string="L&amp;D Priority Scoring Analysis" groups="employee_development_system.group_eds_officer">
-                                <group>
-                                    <group string="Consolidation Status">
+                                    <group string="Consolidation Status &amp; Scheduling">
                                         <field name="priority_score" readonly="1"/>
                                         <field name="consolidation_id" readonly="1"/>
                                         <field name="is_duplicate" readonly="1"/>
                                         <field name="duplicate_of_id" readonly="1" invisible="not is_duplicate"/>
-                                        <field name="exclusion_type"/>
+                                        <field name="exclusion_type" readonly="state == 'excluded'"/>
+                                        <field name="hr_target_quarter" readonly="state in ('converted', 'excluded')"/>
+                                        <field name="hr_target_delivery_date" readonly="state in ('converted', 'excluded')"/>
                                     </group>
+
                                     <group string="Priority Scoring Breakdown">
                                         <field name="score_strategic_alignment"/>
                                         <field name="score_tom_impact"/>
@@ -293,6 +298,9 @@
                     <filter string="Excluded" name="excluded" domain="[('state','=','excluded')]"/>
                     <separator/>
                     <filter string="Competency Gaps" name="filter_competency" domain="[('source','=','competency_gap')]"/>
+                    <filter string="Duplicates" name="filter_duplicates" domain="[('is_duplicate','=',True)]"/>
+                    <filter string="Non-Training Items" name="filter_non_training" domain="[('exclusion_type','!=',False), ('exclusion_type','!=','duplicate')]"/>
+                    <filter string="Screened &amp; Excluded" name="filter_flagged_excluded" domain="['|', '|', ('is_duplicate','=',True), ('exclusion_type','!=',False), ('state','=','excluded')]"/>
                     <group name="group_by">
                         <filter string="Department" name="group_department" context="{'group_by':'department_id'}"/>
                         <filter string="Work Unit" name="group_work_unit" context="{'group_by':'work_unit_id'}"/>
@@ -300,6 +308,7 @@
                         <filter string="Employee" name="group_employee" context="{'group_by':'employee_id'}"/>
                         <filter string="TNA Cycle" name="group_cycle" context="{'group_by':'cycle_id'}"/>
                         <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                        <filter string="Screening Category" name="group_exclusion" context="{'group_by':'exclusion_type'}"/>
                         <filter string="Delivery Mode" name="group_delivery" context="{'group_by':'delivery_mode'}"/>
                         <filter string="Source" name="group_source" context="{'group_by':'source'}"/>
                     </group>

@@ -27,17 +27,23 @@
                 <form>
                     <header>
                         <button name="action_submit_quality_review" string="Submit to Quality Review"
-                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_quality_approve" string="L&amp;D Quality Approve"
-                                type="object" class="oe_highlight" invisible="state != 'quality_review'"/>
+                                type="object" class="oe_highlight" invisible="state != 'quality_review'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_director_validate" string="Director PPDD Validate"
-                                type="object" class="oe_highlight" invisible="state != 'director_validation'"/>
+                                type="object" class="oe_highlight" invisible="state != 'director_validation'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_cpco_approve" string="CPCO Approve"
-                                type="object" class="oe_highlight" invisible="state != 'cpco_approval'"/>
+                                type="object" class="oe_highlight" invisible="state != 'cpco_approval'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_request_revision" string="Request Revision"
-                                type="object" invisible="state != 'approved'"/>
+                                type="object" invisible="state != 'approved'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_resubmit_revision" string="Resubmit After Revision"
-                                type="object" class="oe_highlight" invisible="state != 'revision'"/>
+                                type="object" class="oe_highlight" invisible="state != 'revision'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,quality_review,director_validation,cpco_approval,approved,revision"/>
                     </header>

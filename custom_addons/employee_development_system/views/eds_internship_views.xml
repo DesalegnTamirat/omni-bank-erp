@@ -26,12 +26,18 @@
         <field name="arch" type="xml">
             <form string="Internship Application &amp; Placement">
                 <header>
-                    <button name="action_notify_units" string="Notify Work Units" type="object" class="oe_highlight" invisible="status != 'received'"/>
-                    <button name="action_accept" string="Accept Application" type="object" class="oe_highlight" invisible="status != 'notified'"/>
-                    <button name="action_place" string="Place Intern" type="object" class="oe_highlight" invisible="status != 'accepted'"/>
-                    <button name="action_start" string="Start Internship" type="object" class="oe_highlight" invisible="status != 'placed'"/>
-                    <button name="action_complete" string="Complete Internship" type="object" class="oe_highlight" invisible="status != 'ongoing'"/>
-                    <button name="action_reject" string="Reject" type="object" invisible="status in ['completed', 'rejected']"/>
+                    <button name="action_notify_units" string="Notify Work Units" type="object" class="oe_highlight" invisible="status != 'received'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_accept" string="Accept Application" type="object" class="oe_highlight" invisible="status != 'notified'"
+                            groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_place" string="Place Intern" type="object" class="oe_highlight" invisible="status != 'accepted'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_start" string="Start Internship" type="object" class="oe_highlight" invisible="status != 'placed'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_complete" string="Complete Internship" type="object" class="oe_highlight" invisible="status != 'ongoing'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_reject" string="Reject" type="object" invisible="status in ['completed', 'rejected']"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="status" widget="statusbar" statusbar_visible="received,notified,accepted,placed,ongoing,completed"/>
                 </header>
                 <sheet>

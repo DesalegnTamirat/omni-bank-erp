@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_tna_exclude_wizard_form" model="ir.ui.view">
+        <field name="name">eds.tna.exclude.wizard.form</field>
+        <field name="model">eds.tna.exclude.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Exclude Training Need">
+                <div class="alert alert-warning mb-3" role="alert">
+                    Please provide the reason and classification for excluding this training need. Excluded items are removed from consolidation and the annual training plan.
+                </div>
+                <group>
+                    <group>
+                        <field name="entry_id"/>
+                        <field name="employee_id"/>
+                    </group>
+                    <group>
+                        <field name="proposed_program"/>
+                        <field name="exclusion_type" widget="radio"/>
+                    </group>
+                </group>
+                <group string="Justification">
+                    <field name="excluded_reason" nolabel="1" required="1"/>
+                </group>
+                <footer>
+                    <button name="action_confirm_exclusion" string="Confirm Exclusion" type="object" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_tna_exclude_wizard" model="ir.actions.act_window">
+        <field name="name">Exclude Training Need</field>
+        <field name="res_model">eds.tna.exclude.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -60,15 +60,20 @@
                         <button name="action_submit" string="Submit for Approval" type="object"
                                 class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_line_manager_approve" string="Approve as Line Manager"
-                                type="object" invisible="state != 'submitted'"/>
+                                type="object" invisible="state != 'submitted'"
+                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_lnd_approve" string="Approve as L&amp;D" type="object"
-                                class="oe_highlight" invisible="state not in ('submitted','line_manager_approved')"/>
+                                class="oe_highlight" invisible="state not in ('submitted','line_manager_approved')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_approve_budget_hr" string="Approve Budget/HR" type="object"
-                                class="oe_highlight" invisible="state != 'lnd_approved' or not budget_hr_required"/>
+                                class="oe_highlight" invisible="state != 'lnd_approved' or not budget_hr_required"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_final_approve" string="Final Approve" type="object"
-                                class="oe_highlight" invisible="state != 'lnd_approved'"/>
+                                class="oe_highlight" invisible="state != 'lnd_approved'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_reject" string="Reject" type="object"
-                                invisible="state not in ('submitted','line_manager_approved','lnd_approved')"/>
+                                invisible="state not in ('submitted','line_manager_approved','lnd_approved')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_withdraw" string="Withdraw" type="object"
                                 invisible="state not in ('draft','submitted','line_manager_approved','lnd_approved','approved')"/>
                         <button name="action_employee_accept" string="Accept Nomination" type="object"

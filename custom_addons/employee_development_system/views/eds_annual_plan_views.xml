@@ -49,32 +49,39 @@
                     <header>
                         <button name="action_generate_calendar" string="Generate Calendar"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"
                                 confirm="Generate the draft calendar from the approved TNA and curricula? ()"/>
                         <button name="action_submit_director" string="Submit to Director PPDD"
-                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_director_approve" string="Director PPDD Approve"
-                                type="object" invisible="state != 'director_review'"/>
+                                type="object" class="oe_highlight" invisible="state != 'director_review'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_cpco_approve" string="CPCO Endorse"
-                                type="object" invisible="state != 'cpco_endorsement'"/>
+                                type="object" class="oe_highlight" invisible="state != 'cpco_endorsement'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_publish" string="SMC Approve &amp; Publish"
-                                type="object" class="oe_highlight" invisible="state != 'smc_approval'"/>
+                                type="object" class="oe_highlight" invisible="state != 'smc_approval'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_amend" string="Amend Plan" type="object"
-                                invisible="state != 'published'"/>
+                                invisible="state != 'published'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_re_publish" string="Re-Publish" type="object"
-                                class="oe_highlight" invisible="state != 'amended'"/>
+                                class="oe_highlight" invisible="state != 'amended'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
                         <div class="oe_button_box">
                             <button class="oe_stat_button" type="object"
-                                    name="action_view_sessions" icon="fa-calendar-check-o">
+                                     name="action_view_sessions" icon="fa-calendar-check-o">
                                 <div class="o_stat_info">
                                     <field name="line_count" widget="statinfo" string="Programs"/>
                                     <span class="o_stat_text">Sessions of this plan</span>
                                 </div>
                             </button>
                             <button class="oe_stat_button" type="object"
-                                    name="action_view_sessions" icon="fa-bar-chart">
+                                     name="action_view_sessions" icon="fa-bar-chart">
                                 <div class="o_stat_info">
                                     <field name="execution_rate" widget="statinfo" string="Execution"/>
                                     <span class="o_stat_text">Delivered <field name="delivered_count"/> of <field name="line_count"/></span>
@@ -111,7 +118,8 @@
                                     <list editable="bottom">
                                         <field name="course_id" options="{'no_create': True}"/>
                                         <field name="program_name"/>
-                                        <field name="scheduled_month"/>
+                                        <field name="scheduled_date" widget="date" string="Scheduled Month"/>
+                                        <field name="scheduled_month" optional="hide"/>
                                         <field name="delivery_method"/>
                                         <field name="target_employee_segment"/>
                                         <field name="budget_allocated" sum="Budget"/>

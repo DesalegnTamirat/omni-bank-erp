@@ -107,6 +107,7 @@
                                 groups="competency_management.group_competency_officer"/>
                         <button name="action_archive" string="Archive Mapping"
                                 type="object" invisible="state == 'archived'"
+                                confirm="Are you sure you want to archive this role-competency mapping?"
                                 groups="competency_management.group_competency_officer"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,under_approval,approved,archived"/>
                     </header>

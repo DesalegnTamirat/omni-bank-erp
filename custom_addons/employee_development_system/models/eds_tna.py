@@ -504,11 +504,13 @@ class EdsTnaEntry(models.Model):
              'from multiple sources ().')
     duplicate_of_id = fields.Many2one('eds.tna.entry', string='Duplicate Of', ondelete='set null')
     exclusion_type = fields.Selection([
-        ('process', 'Process Issue'),
-        ('system', 'System Issue'),
-        ('structural', 'Structural Issue'),
-    ], string='Non-Training Item Type', tracking=True,
-        help='Flagged as a non-training item (process/system/structural) for review & exclusion ().')
+        ('duplicate', 'Duplicate Need'),
+        ('process', 'Process Issue (Non-Training)'),
+        ('system', 'System / Technical Issue (Non-Training)'),
+        ('structural', 'Structural Issue (Non-Training)'),
+        ('other', 'Other Out of Scope'),
+    ], string='Non-Training / Exclusion Type', tracking=True,
+        help='Flagged as a non-training item (process/system/structural) or duplicate for review & exclusion.')
 
     # Priority scoring criteria () - each scored 0-100, weighted by eds.tna.priority.rule
     score_strategic_alignment = fields.Float(string='Strategic Alignment Score', default=50.0)
@@ -783,15 +785,52 @@ class EdsTnaEntry(models.Model):
 
     def action_exclude(self):
         """Flag duplicate/invalid/non-training items for exclusion ()."""
+        if len(self) == 1 and not self.excluded_reason:
+            return {
+                'name': _('Exclude Training Need'),
+                'type': 'ir.actions.act_window',
+                'res_model': 'eds.tna.exclude.wizard',
+                'view_mode': 'form',
+                'target': 'new',
+                'context': {
+                    'default_entry_id': self.id,
+                    'default_exclusion_type': self.exclusion_type or 'duplicate',
+                    'default_excluded_reason': self.excluded_reason or '',
+                },
+            }
         for rec in self:
             if not rec.excluded_reason:
-                raise UserError(_('An exclusion reason is required ().'))
+                raise UserError(_('An exclusion reason is required.'))
             rec.state = 'excluded'
             rec.message_post(body=_('Training need %s excluded: %s') % (rec.name, rec.excluded_reason))
 
     def action_reopen_draft(self):
         for rec in self:
             rec.state = 'draft'
+
+    def action_restore_from_exclusion(self):
+        """Restore an excluded need back to submitted / validated active status."""
+        for rec in self:
+            if rec.state == 'excluded':
+                target_state = 'validated' if rec.validated_by else 'submitted'
+                rec.write({
+                    'state': target_state,
+                    'excluded_reason': False,
+                    'exclusion_type': False,
+                    'is_duplicate': False,
+                    'duplicate_of_id': False,
+                })
+                rec.message_post(body=_('Training need %s restored from exclusion to %s.') % (rec.name, target_state))
+
+    def action_clear_screening_flags(self):
+        """Clear duplicate and non-training flags to keep the need active as training."""
+        for rec in self:
+            rec.write({
+                'is_duplicate': False,
+                'exclusion_type': False,
+                'duplicate_of_id': False,
+            })
+            rec.message_post(body=_('Screening flags cleared for training need %s. Kept active.') % rec.name)
 
     def action_create_development_request(self):
         """kick off course development for an approved need - opens a pre-filled

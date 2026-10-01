@@ -6,3 +6,4 @@ from . import eds_assessment_import
 from . import eds_level1_import
 from . import eds_gap_import
 from . import eds_pms_gap_import
+from . import eds_tna_exclude_wizard

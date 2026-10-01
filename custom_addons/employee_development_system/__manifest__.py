@@ -65,6 +65,7 @@ Complete implementation of all 15 weighted delivery tasks:
         'wizards/eds_level1_import_views.xml',
         'wizards/eds_gap_import_views.xml',
         'wizards/eds_pms_gap_import_views.xml',
+        'wizards/eds_tna_exclude_wizard_views.xml',
         'views/eds_delivery_views.xml',
         'views/eds_tna_views.xml',
         'views/eds_evaluation_views.xml',

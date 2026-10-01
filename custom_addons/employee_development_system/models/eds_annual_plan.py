@@ -102,6 +102,21 @@ class EdsAnnualPlan(models.Model):
                 rec.calendar_sla_deadline and rec.calendar_sla_deadline < today
                 and rec.state == 'draft')
 
+    @api.constrains('fiscal_year', 'state')
+    def _check_fiscal_year_unique(self):
+        for rec in self:
+            if rec.fiscal_year and rec.state in ('director_review', 'cpco_endorsement', 'smc_approval', 'published', 'amended'):
+                duplicates = self.search([
+                    ('fiscal_year', '=', rec.fiscal_year),
+                    ('id', '!=', rec.id),
+                    ('state', 'in', ('director_review', 'cpco_endorsement', 'smc_approval', 'published', 'amended')),
+                ])
+                if duplicates:
+                    raise ValidationError(_(
+                        'An approved or active Annual L&D Plan (%s) already exists for Fiscal Year %s. '
+                        'Only one official annual plan can be processed per fiscal year.'
+                    ) % (duplicates[0].name, rec.fiscal_year))
+
     @api.model
     def _get_int_param(self, key, default):
         try:
@@ -335,12 +350,15 @@ class EdsAnnualPlanLine(models.Model):
     course_id = fields.Many2one('eds.course', string='Training Program',
                                 domain=[('status', 'in', ('draft', 'active'))])
     program_name = fields.Char(string='Program Name',
-                               help='Used when the program is not in the course catalog '
-                                    '(e.g. unscheduled-request addenda, /076).')
+                                help='Used when the program is not in the course catalog '
+                                     '(e.g. unscheduled-request addenda, /076).')
+    scheduled_date = fields.Date(
+        string='Scheduled Month',
+        help='Target month / planned start date for the program execution.')
     scheduled_month = fields.Char(
-        string='Scheduled Month (YYYY-MM)',
-        help='Month the program is planned for, e.g. 2026-09. Free text keeps planning '
-             'flexible ().')
+        string='Scheduled Month (YYYY-MM)', compute='_compute_scheduled_month',
+        store=True, readonly=False,
+        help='Month the program is planned for, e.g. 2026-10.')
     delivery_method = fields.Selection([
         ('internal', 'Internal Delivery'),
         ('local_external', 'Local External Provider'),
@@ -362,12 +380,34 @@ class EdsAnnualPlanLine(models.Model):
     session_count = fields.Integer(string='Sessions', compute='_compute_session_count')
     planned_vs_actual = fields.Float(
         string='Planned vs Actual (%)', compute='_compute_planned_vs_actual', store=True,
-        help='Percentage of this program\u2019s sessions that have actually been delivered '
+        help='Percentage of this program’s sessions that have actually been delivered '
              '().')
     is_addendum = fields.Boolean(
         string='Addendum', default=False,
         help='Added through an approved unscheduled training request (/076).')
     notes = fields.Text(string='Notes')
+
+    @api.depends('scheduled_date')
+    def _compute_scheduled_month(self):
+        for rec in self:
+            if rec.scheduled_date:
+                rec.scheduled_month = rec.scheduled_date.strftime('%Y-%m')
+            elif not rec.scheduled_month:
+                rec.scheduled_month = False
+
+    @api.onchange('scheduled_month')
+    def _onchange_scheduled_month(self):
+        if self.scheduled_month and not self.scheduled_date:
+            try:
+                y, m = (int(x) for x in self.scheduled_month.split('-'))
+                self.scheduled_date = date(y, m, 1)
+            except Exception:
+                pass
+
+    @api.onchange('scheduled_date')
+    def _onchange_scheduled_date(self):
+        if self.scheduled_date:
+            self.scheduled_month = self.scheduled_date.strftime('%Y-%m')
 
     @api.depends('session_ids')
     def _compute_session_count(self):
@@ -392,8 +432,8 @@ class EdsAnnualPlanLine(models.Model):
         self.ensure_one()
         if self.session_ids:
             return self.session_ids[0]
-        start = date.today()
-        if self.scheduled_month:
+        start = self.scheduled_date or date.today()
+        if not self.scheduled_date and self.scheduled_month:
             try:
                 y, m = (int(x) for x in self.scheduled_month.split('-'))
                 start = date(y, m, 1)

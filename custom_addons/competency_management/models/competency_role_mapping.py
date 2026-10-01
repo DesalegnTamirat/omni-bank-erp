@@ -169,7 +169,7 @@ class CompetencyRoleMapping(models.Model):
             self.line_ids = self.line_ids + new_virtual_lines
 
     def action_populate_from_clusters(self):
-        """Rule 5: Populate competency lines from selected clusters taking the UNION (deduplicating)."""
+        """Synchronize competency lines from selected clusters, taking the union and deduplicating."""
         for rec in self:
             if not rec.cluster_ids:
                 raise UserError(_("Please select at least one cluster first."))
@@ -223,8 +223,13 @@ class CompetencyRoleMapping(models.Model):
             prior_approved = self.search([
                 ('job_position_id', '=', rec.job_position_id.id),
                 ('state', '=', 'approved'),
-                ('id', '!=', rec.id)
+                ('id', '!=', rec.id),
+                ('is_operating_unit_specific', '=', rec.is_operating_unit_specific),
             ])
+            if rec.is_operating_unit_specific and rec.operating_unit_ids:
+                prior_approved = prior_approved.filtered(
+                    lambda p: bool(set(p.operating_unit_ids.ids) & set(rec.operating_unit_ids.ids))
+                )
             if prior_approved:
                 prior_approved.with_context(force_write=True).write({'state': 'archived'})
                 for p in prior_approved:
@@ -271,17 +276,13 @@ class CompetencyRoleMapping(models.Model):
         return super().write(vals)
 
     def action_create_new_version(self):
-        """Copy approved mapping into a new draft version after archiving the prior version."""
+        """Create a new draft version copied from an approved mapping. The prior version remains active until the new version is approved."""
         self.ensure_one()
         if self.state != 'approved':
             raise ValidationError(_('Only approved mappings can be versioned.'))
-            
+
         new_version_str = self._bump_version(self.version)
         change_desc = self.env.context.get('change_description') or _("New version created from %s.") % self.version
-        
-        # Archive current approved mapping to satisfy single-active constraint
-        self.with_context(force_write=True).write({'state': 'archived'})
-        self.message_post(body=_("Mapping version %s archived to allow creation of new version %s.") % (self.version, new_version_str))
 
         new_mapping = self.copy(default={
             'version': new_version_str,
@@ -291,6 +292,7 @@ class CompetencyRoleMapping(models.Model):
             'change_description': change_desc,
             'line_ids': [(0, 0, line.copy_data()[0]) for line in self.line_ids],
         })
+        self.message_post(body=_("New draft version %s initiated from this mapping.") % new_version_str)
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'competency.role.mapping',
@@ -355,7 +357,7 @@ class CompetencyRoleMappingLine(models.Model):
     mapping_id = fields.Many2one(
         'competency.role.mapping', string='Role Mapping', required=True, ondelete='cascade')
     competency_id = fields.Many2one(
-        'competency.competency', string='Competency', required=True, ondelete='cascade',
+        'competency.competency', string='Competency', required=True, ondelete='restrict',
         domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
     pillar = fields.Selection(related='competency_id.pillar', string='Pillar', store=True, readonly=True)
     competency_definition = fields.Text(related='competency_id.definition', string='Competency Definition', store=True, readonly=True)
@@ -383,13 +385,20 @@ class CompetencyRoleMappingLine(models.Model):
     @api.depends('competency_id')
     def _compute_level_indicators(self):
         matrix_config = self.env['competency.matrix.config'].sudo().get_active_config()
+        comp_ids = self.mapped('competency_id').ids
+        levels_by_comp = {}
+        if comp_ids:
+            all_levels = self.env['competency.proficiency.level'].search([
+                ('competency_id', 'in', comp_ids)
+            ])
+            for lvl in all_levels:
+                levels_by_comp.setdefault(lvl.competency_id.id, []).append(lvl)
+
         for rec in self:
             if rec.competency_id:
-                levels = self.env['competency.proficiency.level'].search([
-                    ('competency_id', '=', rec.competency_id.id)
-                ])
+                levels = levels_by_comp.get(rec.competency_id.id, [])
                 l_map = {l.level: l.behavioral_indicators for l in levels if l.behavioral_indicators}
-                
+
                 rec.indicator_level_1 = l_map.get('1') or (getattr(matrix_config, 'tech_indicator_level_1') if rec.competency_id.pillar == 'technical' else 'Level 1 (Basic) behavioral indicators.')
                 rec.indicator_level_2 = l_map.get('2') or (getattr(matrix_config, 'tech_indicator_level_2') if rec.competency_id.pillar == 'technical' else 'Level 2 (Intermediate) behavioral indicators.')
                 rec.indicator_level_3 = l_map.get('3') or (getattr(matrix_config, 'tech_indicator_level_3') if rec.competency_id.pillar == 'technical' else 'Level 3 (Advanced) behavioral indicators.')
@@ -442,39 +451,50 @@ class CompetencyRoleMappingLine(models.Model):
     @api.depends('competency_id', 'mapping_id.job_position_id', 'mapping_id.grade_id')
     def _compute_matrix_proficiency(self):
         """Multi-tiered Matrix Level Calculation: 1. Job Position Matrix -> 2. Job Grade Matrix -> 3. Standard Baseline."""
+        config = self.env['competency.matrix.config'].get_active_config()
+        job_ids = list({l.mapping_id.job_position_id.id for l in self if l.mapping_id and l.mapping_id.job_position_id})
+        grade_ids = list({l.mapping_id.grade_id.id for l in self if l.mapping_id and l.mapping_id.grade_id})
+
+        job_matrix_map = {}
+        if job_ids and config:
+            for jm in self.env['competency.job.matrix'].search([
+                ('config_id', '=', config.id),
+                ('job_id', 'in', job_ids)
+            ]):
+                job_matrix_map[jm.job_id.id] = jm
+
+        grade_matrix_map = {}
+        if grade_ids and config:
+            for gm in self.env['competency.grade.matrix'].search([
+                ('config_id', '=', config.id),
+                ('grade_id', 'in', grade_ids)
+            ]):
+                grade_matrix_map[gm.grade_id.id] = gm
+
         for line in self:
             if not line.competency_id:
                 line.is_matrix_configured = False
                 line.default_proficiency = False
                 continue
-            
+
             grade = line.mapping_id.grade_id if line.mapping_id else False
             job = line.mapping_id.job_position_id if line.mapping_id else False
-            config = self.env['competency.matrix.config'].get_active_config()
             matrix_lvl = False
-            
+
             # 1. First priority: Check Job Position Matrix
-            if job:
-                j_line = self.env['competency.job.matrix'].search([
-                    ('config_id', '=', config.id),
-                    ('job_id', '=', job.id)
-                ], limit=1)
-                if j_line:
-                    matrix_lvl = j_line.required_core_level if line.competency_id.pillar == 'core' else (
-                        j_line.required_leadership_level if line.competency_id.pillar == 'leadership' and j_line.required_leadership_level != '0' else j_line.required_technical_level
-                    )
-            
+            if job and job.id in job_matrix_map:
+                j_line = job_matrix_map[job.id]
+                matrix_lvl = j_line.required_core_level if line.competency_id.pillar == 'core' else (
+                    j_line.required_leadership_level if line.competency_id.pillar == 'leadership' and j_line.required_leadership_level != '0' else j_line.required_technical_level
+                )
+
             # 2. Second priority: If not set in Job Position Matrix, check Job Grade Matrix
-            if (not matrix_lvl or matrix_lvl not in ('1', '2', '3', '4')) and grade:
-                g_line = self.env['competency.grade.matrix'].search([
-                    ('config_id', '=', config.id),
-                    ('grade_id', '=', grade.id)
-                ], limit=1)
-                if g_line:
-                    matrix_lvl = g_line.required_core_level if line.competency_id.pillar == 'core' else (
-                        g_line.required_leadership_level if line.competency_id.pillar == 'leadership' and g_line.required_leadership_level != '0' else g_line.required_technical_level
-                    )
-            
+            if (not matrix_lvl or matrix_lvl not in ('1', '2', '3', '4')) and grade and grade.id in grade_matrix_map:
+                g_line = grade_matrix_map[grade.id]
+                matrix_lvl = g_line.required_core_level if line.competency_id.pillar == 'core' else (
+                    g_line.required_leadership_level if line.competency_id.pillar == 'leadership' and g_line.required_leadership_level != '0' else g_line.required_technical_level
+                )
+
             # 3. Third priority: Baseline Fallback if not configured in either matrix
             if not matrix_lvl or matrix_lvl not in ('1', '2', '3', '4'):
                 matrix_lvl = '3' if line.competency_id.pillar == 'technical' else '2'
@@ -501,7 +521,7 @@ class CompetencyRoleMappingLine(models.Model):
             self.required_proficiency = self.default_proficiency
 
     def action_reset_to_default_proficiency(self):
-        """Rule 2: Button to fall back to the default proficiency configured in the matrix."""
+        """Reset required proficiency level to the matrix configuration default."""
         for line in self:
             if line.default_proficiency:
                 line.write({
@@ -511,44 +531,23 @@ class CompetencyRoleMappingLine(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        lines = super().create(vals_list)
-        for line in lines:
-            if line.mapping_id and line.mapping_id.state != 'draft' and not self.env.context.get('force_write') and not self.env.su:
-                raise ValidationError(_('Cannot add lines to a role-competency mapping (%s) that is not in Draft state. Please create a new version.') % line.mapping_id.mapping_name)
-        return lines
+        if not self.env.context.get('force_write') and not self.env.su:
+            mapping_ids = {v.get('mapping_id') for v in vals_list if v.get('mapping_id')}
+            if mapping_ids:
+                non_draft = self.env['competency.role.mapping'].browse(mapping_ids).filtered(lambda m: m.state != 'draft')
+                if non_draft:
+                    raise ValidationError(_('Cannot add lines to a role-competency mapping (%s) that is not in Draft state. Please create a new version.') % non_draft[0].mapping_name)
+        return super().create(vals_list)
 
     def write(self, vals):
-        res = super().write(vals)
-        for line in self:
-            if line.mapping_id and line.mapping_id.state != 'draft' and not self.env.context.get('force_write') and not self.env.su:
-                raise ValidationError(_('Cannot modify lines on a role-competency mapping (%s) that is not in Draft state. Please create a new version.') % line.mapping_id.mapping_name)
-        return res
+        if not self.env.context.get('force_write') and not self.env.su:
+            for line in self:
+                if line.mapping_id and line.mapping_id.state != 'draft':
+                    raise ValidationError(_('Cannot modify lines on a role-competency mapping (%s) that is not in Draft state. Please create a new version.') % line.mapping_id.mapping_name)
+        return super().write(vals)
 
     @api.ondelete(at_uninstall=False)
     def _prevent_unlink_on_approved(self):
         for line in self:
             if line.mapping_id and line.mapping_id.state != 'draft' and not self.env.context.get('force_write') and not self.env.su:
                 raise ValidationError(_('Cannot delete lines from a role-competency mapping (%s) that is not in Draft state. Please create a new version.') % line.mapping_id.mapping_name)
-
-
-class HrJob(models.Model):
-    _inherit = 'hr.job'
-
-    competency_mapping_ids = fields.One2many('competency.role.mapping', 'job_position_id', string='Competency Mappings')
-    competency_mapping_count = fields.Integer(string='Competency Mapping Count', compute='_compute_competency_mapping_count')
-
-    @api.depends('competency_mapping_ids')
-    def _compute_competency_mapping_count(self):
-        for job in self:
-            job.competency_mapping_count = len(job.competency_mapping_ids)
-
-    def action_view_competency_mappings(self):
-        self.ensure_one()
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('Role-Competency Mapping for %s') % self.display_name,
-            'res_model': 'competency.role.mapping',
-            'view_mode': 'list,form',
-            'domain': [('job_position_id', '=', self.id)],
-            'context': {'default_job_position_id': self.id},
-        }

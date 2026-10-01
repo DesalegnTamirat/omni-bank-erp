@@ -335,6 +335,7 @@ class CompetencyRoleMappingImportWizard(models.TransientModel):
 
         errors = []
         valid_rows = []
+        seen_job_comp = {}
 
         total_rows_read = 0
         for row_idx, row in enumerate(sheet.iter_rows(min_row=header_row_idx + 1, values_only=True), start=header_row_idx + 1):
@@ -412,6 +413,24 @@ class CompetencyRoleMappingImportWizard(models.TransientModel):
             if not lvl_digit or lvl_digit not in ('1', '2', '3', '4'):
                 errors.append({'row': row_idx, 'field': 'Required Level', 'message': _("Invalid Required Level '%s'. Must be 1, 2, 3, or 4.") % raw_lvl})
                 continue
+
+            # Check for duplicate competency within the same job and operating unit in this file
+            dedup_key = (job.id, ou.id if ou else False, comp.id)
+            if dedup_key in seen_job_comp:
+                first_row = seen_job_comp[dedup_key]
+                ou_str = f" and Operating Unit '{ou.name}'" if ou else ""
+                errors.append({
+                    'row': row_idx,
+                    'field': 'Competency',
+                    'message': _("Duplicate entry for Competency '%(comp)s' under Job Position '%(job)s'%(ou)s (first defined on row %(first_row)s).") % {
+                        'comp': comp.name,
+                        'job': job.name,
+                        'ou': ou_str,
+                        'first_row': first_row,
+                    }
+                })
+                continue
+            seen_job_comp[dedup_key] = row_idx
 
             # 5. Resolve Weight
             parsed_weight = 1.0

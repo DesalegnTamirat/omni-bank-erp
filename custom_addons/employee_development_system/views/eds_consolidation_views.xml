@@ -78,30 +78,48 @@
                     <header>
                         <button name="action_consolidate" string="Consolidate Needs"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"
                                 confirm="Re-gather needs for this consolidation? Existing flags will be refreshed."/>
                         <button name="action_compute_priority" string="Recompute Priority"
-                                type="object" invisible="state in ('approved','locked')"/>
+                                type="object" invisible="state in ('approved','locked')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_submit_ppdd" string="Submit to PPDD Validation"
-                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_validate_ppdd" string="Validate (PPDD)"
-                                type="object" class="oe_highlight" invisible="state != 'ppdd_validation'"/>
+                                type="object" class="oe_highlight" invisible="state != 'ppdd_validation'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_director_review" string="Director PPDD Review"
-                                type="object" class="oe_highlight" invisible="state != 'director_review'"/>
+                                type="object" class="oe_highlight" invisible="state != 'director_review'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_cpco_endorsement" string="CPCO Endorsement"
-                                type="object" class="oe_highlight" invisible="state != 'cpco_endorsement'"/>
+                                type="object" class="oe_highlight" invisible="state != 'cpco_endorsement'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_smc_approve" string="SMC Final Approval"
-                                type="object" class="oe_highlight" invisible="state != 'smc_approval'"/>
+                                type="object" class="oe_highlight" invisible="state != 'smc_approval'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_generate_courses_from_tna" string="Generate Course Proposals"
                                 type="object" class="btn-success" invisible="state not in ('approved', 'locked')"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"
                                 confirm="Synthesize approved TNA needs into Course Catalog proposals?"/>
                         <button name="action_lock" string="Lock Register"
-                                type="object" invisible="state != 'approved'"/>
+                                type="object" invisible="state != 'approved'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_unlock" string="Unlock (Change Request)"
-                                type="object" invisible="state != 'locked'"/>
+                                type="object" invisible="state != 'locked'"
+                                groups="employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,ppdd_validation,director_review,cpco_endorsement,smc_approval,approved,locked"/>
                     </header>
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_all_entries" type="object" class="oe_stat_button" icon="fa-list-ol">
+                                <field name="entry_count" string="All Needs" widget="statinfo"/>
+                            </button>
+                            <button name="action_view_flagged_entries" type="object" class="oe_stat_button" icon="fa-filter">
+                                <field name="flagged_count" string="Flagged / Excluded" widget="statinfo"/>
+                            </button>
+                        </div>
                         <group>
                             <group string="Consolidation">
                                 <field name="name" readonly="1"/>
@@ -144,39 +162,40 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Duplicates &amp; Non-Training">
-                                <group string="Duplicate Needs ()">
-                                    <field name="duplicate_entry_ids" readonly="state == 'locked'">
-                                        <list>
-                                            <field name="name"/>
-                                            <field name="employee_id"/>
-                                            <field name="competency_id"/>
-                                            <field name="delivery_mode"/>
-                                            <field name="source"/>
-                                            <field name="duplicate_of_id"/>
-                                        </list>
-                                    </field>
-                                </group>
-                                <group string="Non-Training Items (Process/System/Structural)">
-                                    <field name="non_training_entry_ids" readonly="state == 'locked'">
-                                        <list>
-                                            <field name="name"/>
-                                            <field name="employee_id"/>
-                                            <field name="proposed_program"/>
-                                            <field name="exclusion_type"/>
-                                            <field name="state" widget="badge"/>
-                                        </list>
-                                    </field>
-                                </group>
-                                <group string="Excluded Needs">
-                                    <field name="excluded_entry_ids" readonly="1">
-                                        <list>
-                                            <field name="name"/>
-                                            <field name="employee_id"/>
-                                            <field name="excluded_reason"/>
-                                        </list>
-                                    </field>
-                                </group>
+                            <page string="Duplicates &amp; Non-Training Review">
+                                <div class="alert alert-info mb-3" role="alert">
+                                    <i class="fa fa-info-circle me-1"/> <strong>Consolidated Screening &amp; Exclusion:</strong>
+                                    All flagged duplicates, operational/process non-training items, and excluded requests are brought together into this single unified review list.
+                                    Review each item once: exclude non-viable items with a justification, clear screening flags to retain legitimate training needs, or restore previously excluded items before final SMC approval.
+                                </div>
+                                <field name="flagged_entry_ids" readonly="1">
+                                    <list create="0" delete="0">
+                                        <field name="name"/>
+                                        <field name="employee_id"/>
+                                        <field name="proposed_program"/>
+                                        <field name="competency_id"/>
+                                        <field name="exclusion_type" widget="badge"
+                                               decoration-warning="exclusion_type == 'duplicate'"
+                                               decoration-info="exclusion_type in ('process', 'system', 'structural')"
+                                               decoration-secondary="exclusion_type == 'other'"/>
+                                        <field name="duplicate_of_id" optional="show"/>
+                                        <field name="excluded_reason"/>
+                                        <field name="is_duplicate" column_invisible="True"/>
+                                        <field name="state" widget="badge"
+                                               decoration-danger="state == 'excluded'"
+                                               decoration-success="state in ('validated', 'approved')"
+                                               decoration-info="state == 'submitted'"/>
+                                        <button name="action_exclude" string="Exclude" type="object" icon="fa-ban"
+                                                class="btn-sm btn-outline-danger" invisible="state == 'excluded'"
+                                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                        <button name="action_clear_screening_flags" string="Clear Flag" type="object" icon="fa-check"
+                                                class="btn-sm btn-outline-primary" invisible="state == 'excluded' or (not is_duplicate and not exclusion_type)"
+                                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                        <button name="action_restore_from_exclusion" string="Restore / Reopen" type="object" icon="fa-undo"
+                                                class="btn-sm btn-outline-success" invisible="state != 'excluded'"
+                                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                    </list>
+                                </field>
                             </page>
                             <page string="Approval History">
                                 <field name="approval_history_ids" readonly="1">

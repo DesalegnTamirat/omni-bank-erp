@@ -132,6 +132,7 @@ class EdsTnaConsolidation(models.Model):
     duplicate_count = fields.Integer(string='Duplicates', compute='_compute_counts')
     non_training_count = fields.Integer(string='Non-Training Items', compute='_compute_counts')
     excluded_count = fields.Integer(string='Excluded', compute='_compute_counts')
+    flagged_count = fields.Integer(string='Flagged & Excluded', compute='_compute_counts')
     # Review sub-tabs (): computed subsets of entry_ids for the form pages
     duplicate_entry_ids = fields.One2many(
         'eds.tna.entry', 'consolidation_id', string='Duplicate Needs',
@@ -141,6 +142,9 @@ class EdsTnaConsolidation(models.Model):
         compute='_compute_review_subsets')
     excluded_entry_ids = fields.One2many(
         'eds.tna.entry', 'consolidation_id', string='Excluded Needs',
+        compute='_compute_review_subsets')
+    flagged_entry_ids = fields.One2many(
+        'eds.tna.entry', 'consolidation_id', string='Screened & Excluded Items',
         compute='_compute_review_subsets')
     priority_score = fields.Float(
         string='Weighted Priority Score', compute='_compute_priority_score', store=True)
@@ -173,20 +177,22 @@ class EdsTnaConsolidation(models.Model):
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    @api.depends('entry_ids')
+    @api.depends('entry_ids', 'entry_ids.is_duplicate', 'entry_ids.exclusion_type', 'entry_ids.state')
     def _compute_counts(self):
         for rec in self:
             rec.entry_count = len(rec.entry_ids)
             rec.duplicate_count = len(rec.entry_ids.filtered('is_duplicate'))
-            rec.non_training_count = len(rec.entry_ids.filtered('exclusion_type'))
+            rec.non_training_count = len(rec.entry_ids.filtered(lambda e: e.exclusion_type and e.exclusion_type != 'duplicate'))
             rec.excluded_count = len(rec.entry_ids.filtered(lambda e: e.state == 'excluded'))
+            rec.flagged_count = len(rec.entry_ids.filtered(lambda e: e.is_duplicate or e.exclusion_type or e.state == 'excluded'))
 
-    @api.depends('entry_ids')
+    @api.depends('entry_ids', 'entry_ids.is_duplicate', 'entry_ids.exclusion_type', 'entry_ids.state')
     def _compute_review_subsets(self):
         for rec in self:
             rec.duplicate_entry_ids = rec.entry_ids.filtered('is_duplicate')
             rec.non_training_entry_ids = rec.entry_ids.filtered('exclusion_type')
             rec.excluded_entry_ids = rec.entry_ids.filtered(lambda e: e.state == 'excluded')
+            rec.flagged_entry_ids = rec.entry_ids.filtered(lambda e: e.is_duplicate or e.exclusion_type or e.state == 'excluded')
 
     @api.depends('entry_ids.priority_score')
     def _compute_priority_score(self):
@@ -265,6 +271,7 @@ class EdsTnaConsolidation(models.Model):
             if key in seen:
                 entry.write({
                     'is_duplicate': True,
+                    'exclusion_type': 'duplicate',
                     'duplicate_of_id': seen[key].id,
                 })
             else:
@@ -476,4 +483,34 @@ class EdsTnaConsolidation(models.Model):
                 'type': 'success',
                 'sticky': False,
             }
+        }
+
+    def action_view_all_entries(self):
+        """Open all needs consolidated into this record."""
+        self.ensure_one()
+        return {
+            'name': _('Consolidated Training Needs - %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.tna.entry',
+            'view_mode': 'list,form',
+            'domain': [('consolidation_id', '=', self.id)],
+            'context': {'default_consolidation_id': self.id},
+        }
+
+    def action_view_flagged_entries(self):
+        """Open screened, flagged, and excluded needs for review."""
+        self.ensure_one()
+        return {
+            'name': _('Screened & Excluded Needs - %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.tna.entry',
+            'view_mode': 'list,form',
+            'domain': [
+                ('consolidation_id', '=', self.id),
+                '|', '|',
+                ('is_duplicate', '=', True),
+                ('exclusion_type', '!=', False),
+                ('state', '=', 'excluded'),
+            ],
+            'context': {'default_consolidation_id': self.id},
         }

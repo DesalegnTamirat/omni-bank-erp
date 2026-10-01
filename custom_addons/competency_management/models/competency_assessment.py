@@ -714,10 +714,10 @@ class CompetencyAssessmentCycle(models.Model):
                     peer_assessor_workload[d_u_id] = peer_assessor_workload.get(d_u_id, 0) + 1
                     total_sampled_raters += 1
 
-        # B. Non-Director Peer Bucketing according to bank matrix:
-        # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
-        # Rule 2: Managerial (HO & District): 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
-        # Rule 3: Branch Managers (BMs): 1. Same Coach, 2. Same Job Grade, 3. Same Job Position (BM)
+        # Peer grouping criteria based on organizational role hierarchy:
+        # Non-managerial: same coach, same job grade, same work unit, and same job position
+        # Managerial: same coach, same job grade, and same work unit
+        # Branch Managers: same coach, same job grade, and same job position
         peer_buckets = {}
         for e_id, e_data in emp_cache.items():
             if e_data['is_director'] or not e_data['user_id']:
@@ -732,16 +732,16 @@ class CompetencyAssessmentCycle(models.Model):
             j_id = e_data['job_id'] or 0
 
             if e_data['is_bm']:
-                # Rule 3: Branch Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Job Position
+                # Branch Managers: same coach, same job grade, same job position
                 b_key = ('BM', c_id, g_id, 'BM_ROLE')
             elif e_data.get('is_district_mgr'):
-                # Rule 2b: District Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
+                # District Managers: same coach, same job grade, same work unit
                 b_key = ('DISTRICT_MGR', c_id, g_id, ou_id)
             elif e_data['is_manager']:
-                # Rule 2a: Head Office Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
+                # Head Office Managers: same coach, same job grade, same work unit
                 b_key = ('HO_MGR', c_id, g_id, ou_id)
             else:
-                # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
+                # Non-Managerial: same coach, same job grade, same work unit, same job position
                 b_key = ('NON_MGR', c_id, g_id, ou_id, j_id)
 
             peer_buckets.setdefault(b_key, []).append(e_id)
@@ -821,10 +821,16 @@ class CompetencyAssessmentCycle(models.Model):
 
 
     def action_start_review(self):
+        for rec in self:
+            if rec.state != 'open':
+                raise UserError(_("Only open assessment cycles can transition to review state."))
         self.with_context(force_write=True).write({'state': 'in_review'})
         return True
 
     def action_close(self):
+        for rec in self:
+            if rec.state not in ('open', 'in_review'):
+                raise UserError(_("Only open or in-review assessment cycles can be closed."))
         self.with_context(force_write=True).write({'state': 'closed'})
         for rec in self:
             rec.message_post(body=_('Assessment cycle %s closed.') % rec.name)
@@ -1304,7 +1310,7 @@ class CompetencyAssessment(models.Model):
 
     @api.onchange('assessment_type')
     def _onchange_assessment_type_set_employee_domain(self):
-        """Rule 2: Restrict employee selection domain strictly based on chosen assessment type and auto-assign valid default."""
+        """Filter employee selection domain strictly based on chosen assessment type and auto-assign valid default."""
         user = self.env.user
         emp = user.employee_id
 
@@ -2041,7 +2047,7 @@ class CompetencyAssessment(models.Model):
         1. Top Header Clock Icon (mail.activity)
         2. Top Header Notifications Tray / Inbox (mail.notification with inbox type)
         """
-        if not target_user:
+        if not target_user or not target_user.active:
             return
         rec_to_notify = (target_rec or self).sudo()
 
@@ -2427,16 +2433,12 @@ class CompetencyAssessmentLine(models.Model):
     gender = fields.Selection(related='assessment_id.employee_id.gender', string='Gender', store=True, readonly=True, index=True)
     department_id = fields.Many2one(related='assessment_id.department_id', string='Department', store=True, readonly=True, index=True)
     operating_unit_id = fields.Many2one(related='assessment_id.employee_id.default_operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
-    job_id = fields.Many2one('hr.job', string='Job Position', compute='_compute_job_and_grade_id', store=True, readonly=True, index=True)
-    grade_id = fields.Many2one('employee.grade', string='Job Grade', compute='_compute_job_and_grade_id', store=True, readonly=True, index=True)
-
-    @api.depends('assessment_id.job_id', 'assessment_id.grade_id', 'assessment_id.employee_id')
-    def _compute_job_and_grade_id(self):
-        asm_model = self.env['competency.assessment']
-        for line in self:
-            emp = line.assessment_id.employee_id if line.assessment_id else False
-            line.job_id = (line.assessment_id.job_id if line.assessment_id and line.assessment_id.job_id else asm_model._get_employee_job(emp)) if emp else False
-            line.grade_id = (line.assessment_id.grade_id if line.assessment_id and line.assessment_id.grade_id else asm_model._resolve_employee_grade(emp)) if emp else False
+    job_id = fields.Many2one(
+        related='assessment_id.job_id', string='Job Position',
+        store=True, readonly=True, index=True)
+    grade_id = fields.Many2one(
+        related='assessment_id.grade_id', string='Job Grade',
+        store=True, readonly=True, index=True)
 
     state = fields.Selection(related='assessment_id.state', string='Assessment Status', store=True, readonly=True, index=True)
     is_deadline_passed = fields.Boolean(related='assessment_id.is_deadline_passed', string='Deadline Passed', readonly=True)
@@ -2509,11 +2511,19 @@ class CompetencyAssessmentLine(models.Model):
             matrix_config = self.env['competency.matrix.config'].get_active_config()
         except Exception:
             matrix_config = None
+
+        comp_ids = self.mapped('competency_id').ids
+        levels_by_comp = {}
+        if comp_ids:
+            all_levels = self.env['competency.proficiency.level'].search([
+                ('competency_id', 'in', comp_ids)
+            ])
+            for lvl in all_levels:
+                levels_by_comp.setdefault(lvl.competency_id.id, []).append(lvl)
+
         for rec in self:
             if rec.competency_id:
-                levels = self.env['competency.proficiency.level'].search([
-                    ('competency_id', '=', rec.competency_id.id)
-                ])
+                levels = levels_by_comp.get(rec.competency_id.id, [])
                 l_map = {l.level: l.behavioral_indicators for l in levels if l.behavioral_indicators}
 
                 l1 = l_map.get('1') or (getattr(matrix_config, 'tech_indicator_level_1', None) if (matrix_config and rec.competency_id.pillar == 'technical') else None) or 'Level 1 (Basic) behavioral indicators.'

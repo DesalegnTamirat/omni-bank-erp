@@ -123,15 +123,20 @@
                 <form string="Training Material">
                     <header>
                         <button name="action_submit_quality_review" string="Submit for Quality Review"
-                                type="object" class="oe_highlight" invisible="quality_state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="quality_state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_approve_quality" string="Approve Quality"
-                                type="object" invisible="quality_state != 'in_review'"/>
+                                type="object" invisible="quality_state != 'in_review'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_submit_director_approval" string="Submit to Director PPDD"
-                                type="object" invisible="quality_state != 'quality_approved' or approval_state == 'director_approved'"/>
+                                type="object" invisible="quality_state != 'quality_approved' or approval_state == 'director_approved'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_director_approve" string="Director PPDD Approve"
-                                type="object" class="oe_highlight" invisible="approval_state != 'submitted'"/>
+                                type="object" class="oe_highlight" invisible="approval_state != 'submitted'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_reject" string="Reject" type="object"
-                                invisible="quality_state in ('rejected',) or approval_state in ('rejected','director_approved')"/>
+                                invisible="quality_state in ('rejected',) or approval_state in ('rejected','director_approved')"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     </header>
                     <sheet>
                         <group>

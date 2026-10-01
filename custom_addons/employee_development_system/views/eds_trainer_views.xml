@@ -50,11 +50,14 @@
                 <form string="Trainer Profile">
                     <header>
                         <button name="action_activate" string="Activate" type="object"
-                                class="oe_highlight" invisible="state != 'inactive'"/>
+                                class="oe_highlight" invisible="state != 'inactive'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_deactivate" string="Deactivate" type="object"
-                                invisible="state != 'active'"/>
+                                invisible="state != 'active'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_mark_reviewed" string="Mark Reviewed" type="object"
-                                invisible="state != 'active'"/>
+                                invisible="state != 'active'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
@@ -178,7 +181,8 @@
                 <form string="External Training Provider">
                     <header>
                         <button name="action_toggle_qualified" string="Toggle Pre-Qualification"
-                                type="object" class="oe_highlight"/>
+                                type="object" class="oe_highlight"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     </header>
                     <sheet>
                         <group>

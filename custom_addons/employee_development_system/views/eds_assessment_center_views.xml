@@ -22,9 +22,12 @@
         <field name="arch" type="xml">
             <form string="Assessment Center Batch">
                 <header>
-                    <button name="action_schedule" string="Confirm Schedule" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_start" string="Start Sessions" type="object" class="oe_highlight" invisible="state != 'scheduled'"/>
-                    <button name="action_finalize" string="Finalize Evaluations" type="object" class="oe_highlight" invisible="state != 'ongoing'"/>
+                    <button name="action_schedule" string="Confirm Schedule" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_start" string="Start Sessions" type="object" class="oe_highlight" invisible="state != 'scheduled'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_finalize" string="Finalize Evaluations" type="object" class="oe_highlight" invisible="state != 'ongoing'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,ongoing,evaluated"/>
                 </header>
                 <sheet>

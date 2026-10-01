@@ -48,6 +48,7 @@ class EdsCompetencyGapImport(models.TransientModel):
 
         domain = [
             ('cycle_id', '=', self.competency_cycle_id.id),
+            ('is_primary_reporting_line', '=', True),
             ('gap', '>=', self.min_gap),
             ('active', '=', True),
             ('tna_measure', '=', 'below'),

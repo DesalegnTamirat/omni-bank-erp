@@ -53,13 +53,17 @@
                         <button name="action_submit" string="Submit for Approval" type="object"
                                 class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_lnd_approve" string="L&amp;D Approve" type="object"
-                                class="oe_highlight" invisible="state != 'submitted'"/>
+                                class="oe_highlight" invisible="state != 'submitted'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_director_approve" string="Director PPDD Approve"
-                                type="object" class="oe_highlight" invisible="state != 'lnd_approved'"/>
+                                type="object" class="oe_highlight" invisible="state != 'lnd_approved'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_approve" string="Final Approval" type="object"
-                                class="oe_highlight" invisible="state != 'director_approved'"/>
+                                class="oe_highlight" invisible="state != 'director_approved'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_reject" string="Reject" type="object"
-                                invisible="state not in ('submitted','lnd_approved','director_approved')"/>
+                                invisible="state not in ('submitted','lnd_approved','director_approved')"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>

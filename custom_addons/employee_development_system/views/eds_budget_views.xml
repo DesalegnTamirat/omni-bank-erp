@@ -25,8 +25,10 @@
         <field name="arch" type="xml">
             <form string="L&amp;D Budget Management">
                 <header>
-                    <button name="action_approve" string="Approve Budget" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_lock" string="Lock Budget" type="object" invisible="state != 'approved'"/>
+                    <button name="action_approve" string="Approve Budget" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_lock" string="Lock Budget" type="object" invisible="state != 'approved'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,approved,locked"/>
                 </header>
                 <sheet>
@@ -96,11 +98,16 @@
         <field name="arch" type="xml">
             <form string="Strategic Learning Partnership &amp; MoU">
                 <header>
-                    <button name="action_screen" string="Screen (70% Gate)" type="object" class="oe_highlight" invisible="state != 'received'"/>
-                    <button name="action_ppdd_endorse" string="PPDD Endorse" type="object" class="oe_highlight" invisible="state != 'screened'"/>
-                    <button name="action_cpco_review" string="CPCO Review" type="object" class="oe_highlight" invisible="state != 'ppdd_endorsement'"/>
-                    <button name="action_ceo_approve" string="CEO Approve" type="object" class="oe_highlight" invisible="state != 'cpco_review'"/>
-                    <button name="action_sign_mou" string="Activate MoU" type="object" class="oe_highlight" invisible="state != 'ceo_approval'"/>
+                    <button name="action_screen" string="Screen (70% Gate)" type="object" class="oe_highlight" invisible="state != 'received'"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_ppdd_endorse" string="PPDD Endorse" type="object" class="oe_highlight" invisible="state != 'screened'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_cpco_review" string="CPCO Review" type="object" class="oe_highlight" invisible="state != 'ppdd_endorsement'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_ceo_approve" string="CEO Approve" type="object" class="oe_highlight" invisible="state != 'cpco_review'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_sign_mou" string="Activate MoU" type="object" class="oe_highlight" invisible="state != 'ceo_approval'"
+                            groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="received,screened,ppdd_endorsement,cpco_review,ceo_approval,active"/>
                 </header>
                 <sheet>

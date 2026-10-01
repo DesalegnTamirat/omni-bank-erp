@@ -121,9 +121,11 @@
                 <form string="Venue Booking">
                     <header>
                         <button name="action_confirm" string="Confirm" type="object"
-                                class="oe_highlight" invisible="state != 'requested'"/>
+                                class="oe_highlight" invisible="state != 'requested'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_cancel" string="Cancel Booking" type="object"
-                                invisible="state == 'cancelled'"/>
+                                invisible="state == 'cancelled'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
@@ -176,11 +178,14 @@
                 <form string="Training Batch">
                     <header>
                         <button name="action_plan" string="Plan" type="object"
-                                class="oe_highlight" invisible="state != 'draft'"/>
+                                class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_activate" string="Activate" type="object"
-                                class="oe_highlight" invisible="state != 'planned'"/>
+                                class="oe_highlight" invisible="state != 'planned'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_close" string="Close" type="object"
-                                invisible="state == 'closed'"/>
+                                invisible="state == 'closed'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
@@ -276,21 +281,29 @@
                 <form string="Training Session">
                     <header>
                         <button name="action_nominate" string="Nominate for Session" type="object"
-                                class="oe_highlight" invisible="status not in ('scheduled','ongoing','rescheduled')"/>
+                                class="oe_highlight" invisible="status not in ('scheduled','ongoing','rescheduled')"
+                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_confirm" string="Confirm Schedule" type="object"
-                                class="oe_highlight" invisible="status != 'draft'"/>
+                                class="oe_highlight" invisible="status != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_start" string="Start Session" type="object"
-                                class="oe_highlight" invisible="status != 'scheduled'"/>
+                                class="oe_highlight" invisible="status != 'scheduled'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_complete" string="Complete Session" type="object"
-                                class="oe_highlight" invisible="status != 'ongoing'"/>
+                                class="oe_highlight" invisible="status != 'ongoing'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_reschedule" string="Reschedule" type="object"
-                                invisible="status not in ('scheduled','ongoing')"/>
+                                invisible="status not in ('scheduled','ongoing')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_confirm_reschedule" string="Confirm Reschedule"
-                                type="object" class="oe_highlight" invisible="status != 'rescheduled'"/>
+                                type="object" class="oe_highlight" invisible="status != 'rescheduled'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_print_all_certificates" string="Print All Certificates" type="object"
-                                class="btn-primary" icon="fa-print" invisible="status != 'completed'"/>
+                                class="btn-primary" icon="fa-print" invisible="status != 'completed'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_cancel" string="Cancel Session" type="object"
-                                invisible="status in ('cancelled','completed')"/>
+                                invisible="status in ('cancelled','completed')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="status" widget="statusbar"/>
                     </header>
                     <sheet>

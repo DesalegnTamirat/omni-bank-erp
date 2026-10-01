@@ -23,9 +23,12 @@
         <field name="arch" type="xml">
             <form string="Workplace Learning Assignment">
                 <header>
-                    <button name="action_activate" string="Activate Assignment" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_complete" string="Mark Completed" type="object" class="oe_highlight" invisible="state != 'active'"/>
-                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('completed', 'cancelled')"/>
+                    <button name="action_activate" string="Activate Assignment" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_complete" string="Mark Completed" type="object" class="oe_highlight" invisible="state != 'active'"
+                            groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('completed', 'cancelled')"
+                            groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active,completed"/>
                 </header>
                 <sheet>

@@ -68,12 +68,14 @@
                 <form string="Venue Requirement Specification">
                     <header>
                         <button name="action_submit" string="Submit for Approval" type="object"
-                                class="oe_highlight" invisible="state != 'draft'"/>
+                                class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_director_approve" string="Director PPDD Approve"
                                 type="object" class="oe_highlight" invisible="state != 'submitted'"
-                                groups="employee_development_system.group_eds_manager"/>
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_return_draft" string="Return to Draft" type="object"
-                                invisible="state != 'submitted'"/>
+                                invisible="state != 'submitted'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,submitted,director_approved,rfp_initiated"/>
                     </header>
@@ -139,11 +141,14 @@
                 <form string="Vendor Proposal">
                     <header>
                         <button name="action_open_technical" string="Open Technical Envelope"
-                                type="object" class="oe_highlight" invisible="state != 'registered'"/>
+                                type="object" class="oe_highlight" invisible="state != 'registered'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_open_financial" string="Open Financial Envelope"
-                                type="object" class="oe_highlight" invisible="state != 'technical_opened'"/>
+                                type="object" class="oe_highlight" invisible="state != 'technical_opened'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_mark_evaluated" string="Mark Evaluated" type="object"
-                                class="oe_highlight" invisible="state != 'financial_opened'"/>
+                                class="oe_highlight" invisible="state != 'financial_opened'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="registered,technical_opened,financial_opened,evaluated"/>
                     </header>
@@ -210,12 +215,14 @@
                 <form string="Vendor Evaluation">
                     <header>
                         <button name="action_apply_template" string="Apply Criteria Template"
-                                type="object" invisible="state != 'draft'"/>
+                                type="object" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_submit" string="Submit for Approval" type="object"
-                                class="oe_highlight" invisible="state != 'draft'"/>
+                                class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_approve" string="Approve" type="object"
                                 class="oe_highlight" invisible="state != 'submitted'"
-                                groups="employee_development_system.group_eds_manager"/>
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,submitted,approved"/>
                     </header>
@@ -301,15 +308,20 @@
                 <form string="Request for Proposal">
                     <header>
                         <button name="action_issue" string="Issue RFP" type="object"
-                                class="oe_highlight" invisible="state != 'draft'"/>
+                                class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_receive_proposals" string="Start Receiving Proposals"
-                                type="object" class="oe_highlight" invisible="state != 'issued'"/>
+                                type="object" class="oe_highlight" invisible="state != 'issued'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_close_receiving" string="Close Receiving &amp; Evaluate"
-                                type="object" class="oe_highlight" invisible="state != 'receiving'"/>
+                                type="object" class="oe_highlight" invisible="state != 'receiving'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_back_to_receiving" string="Return to Receiving"
-                                type="object" invisible="state != 'evaluation'"/>
+                                type="object" invisible="state != 'evaluation'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_award" string="Award &amp; Create Contract" type="object"
-                                class="oe_highlight" invisible="state != 'evaluation'"/>
+                                class="oe_highlight" invisible="state != 'evaluation'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,issued,receiving,evaluation,awarded"/>
                     </header>
@@ -410,19 +422,23 @@
                 <form string="Training Contract">
                     <header>
                         <button name="action_send_legal" string="Send to Legal Review" type="object"
-                                class="oe_highlight" invisible="state != 'draft'"/>
+                                class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_legal_approve" string="Legal Approve" type="object"
                                 class="oe_highlight" invisible="state != 'legal_review'"
-                                groups="employee_development_system.group_eds_manager"/>
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_request_revision" string="Return with Legal Comments"
                                 type="object" invisible="state != 'legal_review'"
-                                groups="employee_development_system.group_eds_manager"/>
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_resubmit" string="Resubmit to Legal" type="object"
-                                invisible="state != 'revision'"/>
+                                invisible="state != 'revision'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_record_signature" string="Record Signature" type="object"
-                                class="oe_highlight" invisible="state != 'approved'"/>
+                                class="oe_highlight" invisible="state != 'approved'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_activate" string="Activate Contract" type="object"
-                                invisible="state != 'signed'"/>
+                                invisible="state != 'signed'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,legal_review,revision,approved,signed,active"/>
                     </header>

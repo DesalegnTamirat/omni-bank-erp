@@ -46,11 +46,12 @@ class ResUsers(models.Model):
         """
         self.ensure_one()
 
-        # 1. Admin / HR Officer: Full bank-wide visibility
+        # 1. Admin / HR Officer: Bank-wide access is handled via [(1, '=', 1)] record rules.
+        # Returning an empty recordset avoids unnecessarily querying all jobs in the database.
         if (self._is_admin() or 
             self.has_group('competency_management.group_competency_officer') or 
             self.has_group('competency_management.group_competency_admin')):
-            return self.env['hr.job'].sudo().search([])
+            return self.env['hr.job']
 
         emp = self.employee_id
         if not emp:
