@@ -48,18 +48,18 @@
                         </group>
                         <group string="Provident Fund &amp; Severance Thresholds">
                             <field name="pays_provident_fund" widget="boolean_toggle"/>
-                            <field name="pf_min_service_years" invisible="pays_provident_fund == False"/>
+                            <field name="pf_min_service_years" invisible="not pays_provident_fund"/>
                             
-                            <hr colspan="2" class="mt8 mb8" invisible="pays_provident_fund == False and pays_severance == False"/>
+                            <hr colspan="2" class="mt8 mb8" invisible="not pays_provident_fund and not pays_severance"/>
                             
                             <field name="pays_severance" widget="boolean_toggle"/>
-                            <field name="severance_rule_ids" nolabel="1" colspan="2" invisible="pays_severance == False">
+                            <field name="severance_rule_ids" nolabel="1" colspan="2" invisible="not pays_severance">
                                 <list editable="bottom">
                                     <field name="employee_category"/>
                                     <field name="min_service_years"/>
-                                    <field name="first_year_days" column_invisible="True"/>
-                                    <field name="subsequent_year_days" column_invisible="True"/>
-                                    <field name="max_severance_months" column_invisible="True"/>
+                                    <field name="first_year_days" column_invisible="1"/>
+                                    <field name="subsequent_year_days" column_invisible="1"/>
+                                    <field name="max_severance_months" column_invisible="1"/>
                                 </list>
                             </field>
                         </group>
@@ -83,8 +83,7 @@
         <field name="name">hr.separation.type.list</field>
         <field name="model">hr.separation.type</field>
         <field name="arch" type="xml">
-            <list string="Separation Types"
-                  decoration-muted="not active">
+            <list string="Separation Types">
                 <field name="sequence" widget="handle"/>
                 <field name="name" string="Separation Type"/>
             </list>

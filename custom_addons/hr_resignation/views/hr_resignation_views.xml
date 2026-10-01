@@ -20,25 +20,22 @@
         <field name="name">hr.resignation.view.list</field>
         <field name="model">hr.resignation</field>
         <field name="arch" type="xml">
-            <list string="Resignation Requests"
-                  decoration-danger="state in ('manager_rejected','hr_rejected')"
-                  decoration-success="state == 'completed'"
-                  decoration-muted="state == 'draft'">
+            <list string="Resignation Requests">
                 <field name="name"/>
                 <field name="employee_id"/>
-                <field name="initiated_by" widget="badge"
-                       decoration-info="initiated_by == 'employee'"
-                       decoration-danger="initiated_by == 'company'"/>
+                <field name="initiated_by"/>
                 <field name="resignation_type_id" string="Separation Type"/>
                 <field name="application_date"/>
                 <field name="expected_last_day"/>
                 <field name="release_date"/>
                 <field name="clearance_progress"/>
-                <field name="state" widget="badge"
-                       decoration-info="state in ('draft','submitted')"
-                       decoration-warning="state in ('manager_reviewed','approved','last_day_recorded','exit_interviewed')"
-                       decoration-success="state in ('cleared','settled','completed')"
-                       decoration-danger="state in ('manager_rejected','hr_rejected')"/>
+                <field name="state" 
+                       widget="badge" 
+                       decoration-muted="state == 'draft'"
+                       decoration-info="state in ('submitted', 'release_date_set', 'handover_completed', 'clearance_in_progress')"
+                       decoration-success="state in ('approved', 'cleared', 'settled', 'completed')"
+                       decoration-warning="state == 'returned'"
+                       decoration-danger="state == 'revoked'" />
             </list>
         </field>
     </record>
@@ -90,7 +87,7 @@
                     <button string="Regenerate Clearance Lines" type="object"
                             name="action_regenerate_clearance_lines"
                             class="btn-secondary" groups="hr_resignation.group_resignation_hr_manager"
-                            invisible="state not in ('approved', 'release_date_set', 'clearance_in_progress') or clearance_count != 0"
+                            invisible="state not in ('release_date_set', 'clearance_in_progress') or clearance_count != 0"
                             confirm="This will delete existing clearance lines and recreate them from the current template. Continue?"/>
 
                     <field name="settlement_id" invisible="1"/>
@@ -111,20 +108,20 @@
                 </header>
                 <sheet>
                     <field name="is_allowed_to_see_warnings" invisible="1"/>
-                    <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert" invisible="warning_disciplinary_count == 0 or is_allowed_to_see_warnings == False">
+                    <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert" invisible="warning_disciplinary_count == 0 or not is_allowed_to_see_warnings">
                         <div>
-                            <i class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_disciplinary_count" class="fw-bold"/> active disciplinary case(s). Please review before POMD approval.
+                            <i title="Icon" class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_disciplinary_count" class="fw-bold"/> active disciplinary case(s). Please review before POMD approval.
                         </div>
                         <button type="object" name="action_open_disciplinary_cases" class="btn btn-sm btn-danger" string="View Cases"/>
                     </div>
-                    <div class="alert alert-danger" role="alert" invisible="warning_investigation_count == 0 or is_allowed_to_see_warnings == False">
-                        <i class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_investigation_count" class="fw-bold"/> ongoing investigation(s). Must be finalized before POMD approval.
+                    <div class="alert alert-danger" role="alert" invisible="warning_investigation_count == 0 or not is_allowed_to_see_warnings">
+                        <i title="Icon" class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_investigation_count" class="fw-bold"/> ongoing investigation(s). Must be finalized before POMD approval.
                     </div>
-                    <div class="alert alert-warning" role="alert" invisible="warning_commitment_count == 0 or is_allowed_to_see_warnings == False">
-                        <i class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_commitment_count" class="fw-bold"/> active training/education commitment(s) to settle.
+                    <div class="alert alert-warning" role="alert" invisible="warning_commitment_count == 0 or not is_allowed_to_see_warnings">
+                        <i title="Icon" class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_commitment_count" class="fw-bold"/> active training/education commitment(s) to settle.
                     </div>
-                    <div class="alert alert-warning" role="alert" invisible="not warning_probation_status or is_allowed_to_see_warnings == False">
-                        <i class="fa fa-exclamation-triangle me-2"></i> Employee is currently on probation.
+                    <div class="alert alert-warning" role="alert" invisible="not warning_probation_status or not is_allowed_to_see_warnings">
+                        <i title="Icon" class="fa fa-exclamation-triangle me-2"></i> Employee is currently on probation.
                     </div>
                     <field name="is_current_manager" invisible="1"/>
                     <field name="exit_interview_waived" invisible="1"/>
@@ -211,7 +208,7 @@
                             <field name="resignation_type_id" string="Separation Type"
                                    options="{'no_open': True}"
                                    readonly="state != 'draft'"
-                                   domain="[('is_company_terminated', '=', False)] if initiated_by == 'employee' else [('is_company_terminated', '=', True)]"
+                                   domain="[('is_company_terminated', '=', initiated_by == 'company')]"
                                    style="max-width: 350px;"/>
                         </group>
                     </group>
@@ -228,9 +225,7 @@
                     <div class="o_horizontal_separator mt-4 mb-1">
                         <span class="fw-bold text-uppercase">Payment Request Declaration</span>
                     </div>
-                    <p class="text-muted mb-3" style="font-size:0.88em;">
-                        Select all separation payments you are requesting. At least one must be selected.
-                    </p>
+                    
 
                     <div class="row mb-3 px-1">
                         <div class="col-6">
@@ -289,7 +284,7 @@
                             </div>
                             <div class="text-success fw-semibold mt-2" style="font-size:0.88em;"
                                  invisible="not debt_settlement_authorized">
-                                <i class="fa fa-check-circle me-1"/>
+                                <i title="Icon" class="fa fa-check-circle me-1"/>
                                 Authorization confirmed.
                             </div>
                         </div>
@@ -306,7 +301,7 @@
                             <!-- Info banner shown to manager for handover -->
                             <div class="alert alert-info mb-3" role="alert"
                                  invisible="not can_edit_handover or state == 'clearance_in_progress'">
-                                <i class="fa fa-info-circle me-2"/>
+                                <i class="fa fa-info-circle me-2" title="Info"/>
                                 <strong>Action required:</strong>
                                 Fill in the handover details below — who takes over,
                                 by when, and what needs to be handed over.
@@ -316,7 +311,7 @@
                             <!-- Read-only banner once past manager step -->
                             <div class="alert alert-success mb-3" role="alert"
                                  invisible="state in ('approved', 'release_date_set')">
-                                <i class="fa fa-check-circle me-2"/>
+                                <i title="Icon" class="fa fa-check-circle me-2"/>
                                 Handover notes recorded by supervisor.
                             </div>
 
@@ -336,7 +331,7 @@
 
                         <!-- CLEARANCE TAB -->
                         <page string="Separation check list" name="clearance_in_progress"
-                              invisible="state not in ('approved','clearance_in_progress','last_day_recorded','exit_interviewed','cleared','settled','completed')">
+                              invisible="state not in ('release_date_set','clearance_in_progress','last_day_recorded','exit_interviewed','cleared','settled','completed')">
 
                             <!-- Progress header bar -->
                             <div class="row mb-3 align-items-center">
@@ -374,7 +369,7 @@
                             <div class="alert alert-danger" role="alert"
                                  invisible="clearance_rejected_count == 0">
                                 <strong>
-                                    <i class="fa fa-exclamation-circle me-1"/>
+                                    <i class="fa fa-exclamation-circle me-1" title="Warning"/>
                                     <field name="clearance_rejected_count"
                                            readonly="1" class="d-inline"/> mandatory line(s) rejected.
                                 </strong>
@@ -386,10 +381,7 @@
                             <!-- Clearance lines list -->
                             <field name="clearance_line_ids" nolabel="1">
                                 <list class="o_hr_clearance_list"
-                                      create="false" delete="false"
-                                      decoration-danger="state == 'rejected'"
-                                      decoration-success="state == 'cleared'"
-                                      decoration-warning="state == 'pending'">
+                                      create="false" delete="false">
                                     <field name="sequence" widget="handle"/>
                                     <field name="work_unit_id" readonly="1" string="Operating Unit"/>
                                     <field name="responsible_user" readonly="1" string="Responsible User"/>
@@ -397,21 +389,18 @@
                                            string="Mandatory" widget="boolean"/>
                                     <field name="items_progress"
                                            string="Checklist Progress"/>
-                                    <field name="state" widget="badge" string="Status"
-                                           decoration-warning="state == 'pending'"
-                                           decoration-danger="state == 'rejected'"
-                                           decoration-success="state == 'cleared'"/>
+                                    <field name="state" 
+                                           widget="badge" 
+                                           decoration-muted="state == 'waiting'"
+                                           decoration-info="state == 'pending'"
+                                           decoration-success="state == 'cleared'"
+                                           decoration-danger="state == 'rejected'" />
 
                                     <field name="cleared_by" readonly="1"
                                            optional="hide"/>
                                     <field name="cleared_date" readonly="1"
                                            optional="hide"/>
                                     <field name="can_approve" column_invisible="1"/>
-                                    <!-- Action buttons -->
-                                    <button string="Mark as Cleared"
-                                            type="object" name="action_clear"
-                                            class="btn-sm btn-success"
-                                            invisible="state != 'pending' or not can_approve"/>
                                 </list>
                             </field>
                         </page>
@@ -435,11 +424,11 @@
                                 </group>
                             </group>
                             <div invisible="not exit_interview_id" class="alert alert-success mt-2" role="alert">
-                                <i class="fa fa-check-circle me-2"/>
+                                <i title="Icon" class="fa fa-check-circle me-2"/>
                                 Exit interview completed. Click the button above to view the full questionnaire and answers.
                             </div>
                             <div invisible="exit_interview_id" class="alert alert-info" role="alert">
-                                <i class="fa fa-info-circle me-2"/>
+                                <i class="fa fa-info-circle me-2" title="Info"/>
                                 Exit interview not yet completed. Click "Open Exit Interview" above to start.
                             </div>
                         </page>
@@ -454,32 +443,32 @@
                                 <p>All clearance tasks are complete. You may now initiate the final settlement calculations.</p>
                                 <button string="Process Final Settlement" type="object" name="action_process_settlement"
                                         class="btn-primary mt-2" icon="fa-calculator"
-                                        groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager"/>
+                                        groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_auditor,hr_resignation.group_resignation_hr_manager"/>
                             </div>
                             
                             <!-- After Settlement is Created -->
                             <div class="mt-4" invisible="not settlement_id">
-                                <div class="alert alert-success text-center" role="alert" invisible="settlement_state in ('confirmed', 'paid')">
+                                <div class="alert alert-success text-center" role="alert" invisible="settlement_state == 'paid'">
                                     <h3>Settlement is in Progress</h3>
                                     <p>The settlement record has been created and is currently being processed.</p>
                                     <button string="Open Settlement Details ➔" type="object" name="action_process_settlement"
                                             class="btn-success mt-2" icon="fa-external-link"
-                                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+                                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_auditor,hr_resignation.group_resignation_hr_manager,base.group_system"/>
                                 </div>
-                                <div class="alert alert-info text-center" role="alert" invisible="settlement_state not in ('confirmed', 'paid')">
+                                <div class="alert alert-info text-center" role="alert" invisible="settlement_state != 'paid'">
                                     <h3>Settlement Completed</h3>
-                                    <p>The final settlement has been formally approved and finalized.</p>
+                                    <p>The final settlement has been formally approved and paid.</p>
                                     <button string="View Settlement Details ➔" type="object" name="action_process_settlement"
                                             class="btn-info mt-2" icon="fa-external-link"
-                                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+                                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_auditor,hr_resignation.group_resignation_hr_manager,base.group_system"/>
                                 </div>
                                 
                                 <group>
                                     <group>
-                                        <field name="settlement_state" string="Current Status" readonly="1" widget="badge" decoration-info="settlement_state == 'draft'" decoration-warning="settlement_state == 'waiting_approval'" decoration-success="settlement_state in ('confirmed','paid')"/>
+                                        <field name="settlement_state" string="Current Status" readonly="1" widget="badge" decoration-info="settlement_state == 'draft'" decoration-warning="settlement_state in ('waiting_audit', 'waiting_payment')" decoration-success="settlement_state == 'paid'"/>
                                     </group>
                                     <group>
-                                        <field name="settlement_net" string="Net Payout Amount" readonly="1" class="fw-bold" invisible="settlement_state not in ('confirmed','paid')"/>
+                                        <field name="settlement_net" string="Net Payout Amount" readonly="1" class="fw-bold" invisible="settlement_state != 'paid'"/>
                                     </group>
                                 </group>
                             </div>

@@ -1,23 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-    Clearance Configuration Seed Data
-    ───────────────────────────────────
-    Provides:
-      1. hr.separation.type          — separation type records replacing the
-                                       old hardcoded Selection field values
-      2. hr.clearance.category       — functional groupings for work units
 
-    These records carry noupdate="1" so manual admin edits survive upgrades.
--->
-<odoo>
-<data noupdate="1">
+<odoo noupdate="1">
 
-    <!-- ════════════════════════════════════════════════════════════════
-         SEPARATION TYPES
-         These replace the old hard-coded Selection field on hr.resignation.
-         The `code` field is the stable technical key used in Python logic.
-         Do NOT change the `code` once in use.
-    ════════════════════════════════════════════════════════════════ -->
 
     <record id="sep_type_voluntary" model="hr.separation.type">
         <field name="name">Voluntary Resignation</field>
@@ -66,6 +50,4 @@
         <field name="is_company_terminated">False</field>
         <field name="description">Fixed-term contract expires and is not renewed.</field>
     </record>
-</data>
 </odoo>
-

@@ -1,118 +1,221 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
+import { Component, useState, onWillStart } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { loadJS } from "@web/core/assets";
-const { Component, onWillStart, onMounted, onPatched, useState } = owl;
-
-const COLORS = ['#2F5D50', '#B98A3D', '#6B8F71', '#A85341', '#4C5B55', '#D4A843', '#5A8C6E', '#C0614E'];
 
 export class ExitInterviewDashboard extends Component {
     setup() {
-        this.orm = useService("orm");
-        this.actionService = useService("action");
+        this.orm    = useService("orm");
+        this.action = useService("action");
+
         this.state = useState({
-            dataLoaded: false,
-            data: {
-                meta: { total: 0, avg_rating: '-', avg_rating_raw: 0, this_month: 0, dept_count: 0 },
-                charts: [],
-                likerts: [],
-                themes: []
-            }
+            view: "dash",          // "dash" | "list" | "rep"
+            loading: true,
+            // filter selections
+            f_ou:       "all",
+            f_pos:      "all",
+            f_sep:      "all",
+            // filter options
+            operating_units: [],
+            positions:  [],
+            sep_types:  [],
+            // analytics data
+            kpis:       {},
+            bars:       [],
+            keeps:      [],
+            donuts:     [],
+            cg:         "#e5e7eb 0% 100%",
+            likerts:    [],
+            yes_no:     [],
+            themes:     [],
+            quotes:     [],
+            interviews: [],
+            // report view
+            cur_interview: null,
         });
-        this._chartInstances = {};
 
         onWillStart(async () => {
-            await loadJS("/web/static/lib/Chart/Chart.js");
-            try {
-                const result = await this.orm.call("hr.exit.interview", "get_dashboard_data", []);
-                this.state.data = result;
-            } catch (e) {
-                console.error("Dashboard data load error:", e);
+            await this._loadFilters();
+            await this._loadData();
+        });
+    }
+
+    // ── data loading ────────────────────────────────────────────────────────
+
+    async _loadFilters() {
+        try {
+            const opts = await this.orm.call(
+                "hr.exit.interview.dashboard", "get_filter_options", []);
+            this.state.operating_units = opts.operating_units || [];
+            this.state.positions   = opts.positions   || [];
+            this.state.sep_types   = opts.separation_types || [];
+        } catch (e) {
+            console.error("Failed to load filter options:", e);
+        }
+    }
+
+
+        async openReportTab() {
+            this.state.view = 'rep';
+            if (!this.state.cur_interview && this.state.interviews && this.state.interviews.length > 0) {
+                const first_id = this.state.interviews[0].id;
+                this.state.loading = true;
+                this.state.cur_interview = await this.orm.call("hr.exit.interview.dashboard", "get_employee_report", [first_id]);
+                this.state.loading = false;
             }
-            this.state.dataLoaded = true;
-        });
+        }
 
-        onMounted(() => this._renderCharts());
-        onPatched(() => this._renderCharts());
+        async onChangeReportEmployee(ev) {
+
+        const id = parseInt(ev.target.value);
+        if (id) {
+            this.state.loading = true;
+            this.state.cur_interview = await this.orm.call("hr.exit.interview.dashboard", "get_employee_report", [id]);
+            this.state.loading = false;
+        } else {
+            this.state.cur_interview = null;
+        }
+    }
+    
+    async onPrintReport() {
+        if (!this.state.cur_interview) return;
+        const id = parseInt(document.querySelector('.eid_sel_emp').value);
+        if(id) {
+            this.action.doAction('hr_resignation.action_report_exit_interview', { additionalContext: { active_ids: [id], active_model: 'hr.exit.interview' } });
+        }
+    }
+    async _loadData() {
+        this.state.loading = true;
+        try {
+            const filters = {
+                operating_unit: this.state.f_ou,
+                position:       this.state.f_pos,
+                sep_type:       this.state.f_sep,
+            };
+            const data = await this.orm.call(
+                "hr.exit.interview.dashboard", "get_analytics_data", [], { filters });
+
+            this.state.kpis       = data.kpis       || {};
+            this.state.bars       = data.bars        || [];
+            this.state.keeps      = data.keeps       || [];
+            this.state.donuts     = data.donuts      || [];
+            this.state.cg         = data.cg          || "#e5e7eb 0% 100%";
+            this.state.likerts    = data.likerts     || [];
+            this.state.yes_no     = data.yes_no      || [];
+            this.state.themes     = data.themes      || [];
+            this.state.quotes     = data.quotes      || [];
+            this.state.interviews = data.interviews  || [];
+        } catch (e) {
+            console.error("Failed to load analytics data:", e);
+        }
+        this.state.loading = false;
     }
 
-    openRecords(domain, title) {
-        this.actionService.doAction({
-            type: 'ir.actions.act_window',
-            name: title,
-            res_model: 'hr.exit.interview',
-            view_mode: 'list,form',
-            views: [[false, 'list'], [false, 'form']],
-            domain: domain,
-            target: 'current',
-        });
+    // ── filter handlers ─────────────────────────────────────────────────────
+
+    onFilterChange(field, ev) {
+        this.state[field] = ev.target.value;
+        this._loadData();
     }
 
-    _renderCharts() {
-        if (!this.state.dataLoaded || !this.state.data.charts) return;
+    // ── navigation ───────────────────────────────────────────────────────────
+
+    showDash() { this.state.view = "dash"; }
+    showList() { this.state.view = "list"; }
+
+    // Click row → open the exit interview form
+    openInterview(interview) {
+        if (interview.id) {
+            this.action.doAction({
+                type:      "ir.actions.act_window",
+                name:      "Exit Interview",
+                res_model: "hr.exit.interview",
+                res_id:    interview.id,
+                view_mode: "form",
+                views:     [[false, "form"]],
+                target:    "current",
+            });
+        }
+    }
+
+    // Click resignation → open the resignation form
+    openResignation(interview) {
+        if (interview.resignation_id) {
+            this.action.doAction({
+                type:      "ir.actions.act_window",
+                name:      "Resignation",
+                res_model: "hr.resignation",
+                res_id:    interview.resignation_id,
+                view_mode: "form",
+                views:     [[false, "form"]],
+                target:    "current",
+            });
+        }
+    }
+
+    printPDF(iv) {
+        this.action.doAction('hr_resignation.action_report_exit_interview', { additionalContext: { active_ids: [iv.id], active_model: 'hr.exit.interview' } });
+    }
+
+    openListView(type, answer=null) {
+        let domain = [['state', '=', 'completed']];
+        if (type === 'regrettable') {
+            domain.push(['resignation_id.performance_rating', 'in', ['high', 'excellent']]);
+        }
+        if (type === 'answer' && answer) {
+            domain.push(['line_ids.answer', 'ilike', answer]);
+        }
         
-        Chart.defaults.font.family = '"Inter", -apple-system, "Segoe UI", sans-serif';
-        Chart.defaults.font.size = 12;
-        Chart.defaults.color = '#4C5B55';
+        if (this.state.f_ou && this.state.f_ou !== 'all') {
+            domain.push(['employee_id.department_id.operating_unit_id.name', '=', this.state.f_ou]);
+        }
+        if (this.state.f_pos && this.state.f_pos !== 'all') {
+            domain.push(['employee_id.job_id.name', '=', this.state.f_pos]);
+        }
+        if (this.state.f_sep && this.state.f_sep !== 'all') {
+            domain.push(['resignation_id.resignation_type_id.name', '=', this.state.f_sep]);
+        }
 
-        this.state.data.charts.forEach(chartData => {
-            const canvasId = 'eid_chart_' + chartData.id;
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) return;
-
-            if (this._chartInstances[canvasId]) {
-                this._chartInstances[canvasId].destroy();
-            }
-
-            let config;
-            if (chartData.type === 'doughnut') {
-                config = {
-                    type: 'doughnut',
-                    data: {
-                        labels: chartData.labels,
-                        datasets: [{
-                            data: chartData.data,
-                            backgroundColor: COLORS.slice(0, chartData.data.length),
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        maintainAspectRatio: false,
-                        cutout: '62%',
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: { boxWidth: 10, padding: 12, usePointStyle: true, pointStyle: 'circle' }
-                            }
-                        }
-                    }
-                };
-            } else {
-                config = {
-                    type: 'bar',
-                    data: {
-                        labels: chartData.labels,
-                        datasets: [{
-                            data: chartData.data,
-                            backgroundColor: '#2F5D50',
-                            borderRadius: 4,
-                            barThickness: 20
-                        }]
-                    },
-                    options: {
-                        maintainAspectRatio: false,
-                        indexAxis: 'y', // Always horizontal for readability like mock
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { color: '#EFEBE0' }, ticks: { precision: 0 } },
-                            y: { grid: { display: false } }
-                        }
-                    }
-                };
-            }
-            this._chartInstances[canvasId] = new Chart(canvas, config);
+        this.action.doAction({
+            name: "Interviews",
+            type: "ir.actions.act_window",
+            res_model: "hr.exit.interview",
+            views: [[false, "list"], [false, "form"]],
+            domain: domain,
+            target: "current",
         });
+    }
+
+    onBarClick(ev) {
+        const answer = ev.currentTarget.dataset.answer;
+        if (answer) {
+            this.openListView('answer', answer);
+        }
+    }
+
+    onKpiClickAll() {
+        this.openListView('all');
+    }
+
+    onKpiClickRecommend() {
+        this.openListView('recommend');
+    }
+
+    onKpiClickRegrettable() {
+        this.openListView('regrettable');
+    }
+
+    onFilterChangeOU(ev) {
+        this.onFilterChange('f_ou', ev);
+    }
+
+    onFilterChangePos(ev) {
+        this.onFilterChange('f_pos', ev);
+    }
+
+    onFilterChangeSep(ev) {
+        this.onFilterChange('f_sep', ev);
     }
 }
 

@@ -5,16 +5,23 @@
             <field name="name">discipline.committee.meeting.list</field>
             <field name="model">discipline.committee.meeting</field>
             <field name="arch" type="xml">
-                <list>
+                <list decoration-info="state == 'draft'"
+                      decoration-warning="state in ('in_progress', 'director_review', 'voting')"
+                      decoration-success="state == 'completed'">
                     <field name="name"/>
                     <field name="case_id"/>
                     <field name="employee_id"/>
+                    <field name="offense_id"/>
                     <field name="meeting_date"/>
-                    <field name="meeting_end_time"/>
-                    <field name="committee_chair_id"/>
-                    <field name="is_quorum_met" widget="boolean"/>
-                    <field name="final_recommendation"/>
-                    <field name="state"/>
+                    <field name="location"/>
+                    <field name="present_members_count" string="Present / Quorum"/>
+                    <field name="is_quorum_met" widget="boolean" optional="show"/>
+                    <field name="recommended_penalty_type" optional="show"/>
+                    <field name="state" widget="badge"
+                           decoration-info="state == 'draft'"
+                           decoration-warning="state in ('in_progress', 'director_review', 'voting')"
+                           decoration-primary="state == 'minutes_recorded'"
+                           decoration-success="state == 'completed'"/>
                 </list>
             </field>
         </record>
@@ -25,83 +32,195 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
+                        <!-- Stage 1: Schedule & Notify -->
                         <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight"
                                 invisible="state != 'draft'"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
-                        <!-- Sequential sign-off flow -->
+                        
+                        <!-- Stage 2: Quick Roll-Call Helper -->
+                        <button name="action_mark_all_present" string="Mark All Panel Present" type="object" class="btn-secondary"
+                                invisible="state not in ('in_progress', 'draft')"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
+
+                        <!-- Stage 3: Request Director Sign-off -->
                         <button name="action_request_director_review" string="Request Director Sign-off" type="object" class="btn-info"
                                 invisible="state != 'in_progress'"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
-                                help="Submit agenda to Department Director for sign-off before voting."/>
+                                help="Submit hearing minutes to Department Director for formal sign-off before voting."/>
+                        
+                        <!-- Stage 4: Director Approval -->
                         <button name="action_director_signoff" string="Director: Approve &amp; Open Voting" type="object" class="btn-warning"
                                 invisible="state != 'director_review' or not can_director_signoff"
-                                help="Director confirms review and opens voting for committee members."/>
-                        <button name="action_record_minutes_and_votes" string="Record Minutes &amp; Votes" type="object" class="btn-info"
-                                invisible="state not in ('voting', 'in_progress')"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
-                        <button name="action_finalize_meeting" string="Finalize &amp; Validate Quorum" type="object" class="btn-success"
-                                invisible="state != 'minutes_recorded'"
+                                help="Respective Director confirms review of deliberations and opens voting."/>
+                        
+                        <!-- Stage 5: Finalize Meeting & Push Verdict -->
+                        <button name="action_finalize_meeting" string="Finalize Meeting &amp; Conclude Verdict" type="object" class="btn-success"
+                                invisible="state not in ('voting', 'minutes_recorded')"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,director_review,voting,minutes_recorded,completed"/>
+
+                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,director_review,voting,completed"/>
                     </header>
                     <sheet>
                         <field name="can_director_signoff" invisible="1"/>
-                        <widget name="web_ribbon" title="Quorum Met" bg_color="text-bg-success" invisible="not is_quorum_met"/>
+                        <field name="total_expected_members" invisible="1"/>
+                        <field name="present_members_count" invisible="1"/>
+                        <field name="required_quorum_percentage" invisible="1"/>
+                        <field name="director_signed_off" invisible="1"/>
+                        <field name="is_quorum_met" invisible="1"/>
+
+                        <widget name="web_ribbon" title="Quorum Met" bg_color="text-bg-success" invisible="state == 'draft' or not is_quorum_met"/>
+                        <widget name="web_ribbon" title="Finalized" bg_color="text-bg-primary" invisible="state != 'completed'"/>
+
                         <div class="oe_title">
+                            <label for="name" string="Meeting Reference"/>
                             <h1>
                                 <field name="name" readonly="1"/>
                             </h1>
                         </div>
-                        
-                            <group string="Meeting Schedule &amp; Case">
-                                <field name="case_id"/>
-                                <field name="employee_id"/>
-                                <field name="meeting_date"/>
-                                <field name="meeting_end_time"/>
-                                <field name="location"/>
-                                <field name="meeting_link"/>
+
+                        <!-- Top Card 1: Case & Misconduct Brief -->
+                        <group string="Case &amp; Allegation Summary">
+                            <group>
+                                <field name="case_id" readonly="state != 'draft'"/>
+                                <field name="employee_id" readonly="1"/>
+                                <field name="job_id" readonly="1"/>
+                                <field name="department_id" readonly="1"/>
+                                <field name="staff_category" readonly="1"/>
                             </group>
-                        <group>
-                            <group string="Designated Committee Roles">
-                                <field name="committee_chair_id"/>
-                                <field name="respective_director_id"/>
-                                <field name="legal_director_id"/>
-                                <field name="pomd_secretary_id"/>
-                                <field name="member_ids" widget="many2many_tags"/>
-                            </group>
-                            <group string="Quorum &amp; Sequential Sign-off">
-                                <field name="total_expected_members"/>
-                                <field name="present_members_count"/>
-                                <field name="required_quorum_percentage"/>
-                                <field name="is_quorum_met" widget="boolean"/>
-                                <field name="director_signed_off" widget="boolean"/>
-                                <field name="director_signoff_by_id" readonly="1"/>
-                                <field name="director_signoff_date" readonly="1"/>
+                            <group>
+                                <field name="offense_id" readonly="1"/>
+                                <field name="offense_category_id" readonly="1"/>
+                                <field name="severity_level" readonly="1"/>
+                                <field name="incident_date" readonly="1"/>
+                                <field name="investigation_id" readonly="1" invisible="not investigation_id"/>
+                                <field name="financial_loss_amount" readonly="1" invisible="financial_loss_amount == 0"/>
                             </group>
                         </group>
+
+                        <!-- Top Card 2: Hearing Schedule & Venue -->
+                        <group string="Hearing Logistics &amp; Schedule">
+                            <group>
+                                <field name="meeting_date" readonly="state in ('director_review', 'voting', 'completed')"/>
+                                <field name="meeting_end_time" readonly="state in ('director_review', 'voting', 'completed')"/>
+                                <field name="location" readonly="state in ('director_review', 'voting', 'completed')"/>
+                            </group>
+                            <group>
+                                <field name="meeting_link" readonly="state in ('director_review', 'voting', 'completed')" placeholder="https://teams.microsoft.com/..."/>
+                                <field name="committee_chair_id" readonly="state in ('director_review', 'voting', 'completed')"/>
+                                <field name="pomd_secretary_id" readonly="state in ('director_review', 'voting', 'completed')"/>
+                            </group>
+                        </group>
+
                         <notebook>
-                            <page string="Agenda &amp; Minutes">
+                            <!-- Tab 1: Panel & Roll-Call Attendance -->
+                            <page string="Panel &amp; Roll-Call Attendance">
                                 <group>
-                                    <field name="agenda" placeholder="Meeting agenda topics..."/>
-                                    <field name="meeting_minutes" placeholder="Record official meeting minutes, discussion points, and evidence review..."/>
-                                    <field name="final_recommendation"/>
-                                </group>
-                            </page>
-                            <page string="Committee Member Votes">
-                                <group>
-                                    <group>
-                                        <field name="in_favor_count"/>
-                                        <field name="against_count"/>
-                                        <field name="abstain_count"/>
+                                    <group string="Quorum Status">
+                                        <field name="required_quorum_percentage" readonly="1"/>
+                                        <field name="present_members_count" string="Members Present" readonly="1"/>
+                                        <field name="total_expected_members" string="Total Panel Size" readonly="1"/>
+                                    </group>
+                                    <group string="Key Statutory Members">
+                                        <field name="respective_director_id" readonly="state in ('director_review', 'voting', 'completed')"/>
+                                        <field name="legal_director_id" readonly="state in ('director_review', 'voting', 'completed')"/>
+                                        <field name="labour_union_rep_id" readonly="state in ('director_review', 'voting', 'completed')"/>
                                     </group>
                                 </group>
-                                <field name="vote_ids">
-                                    <list editable="bottom">
-                                        <field name="member_id"/>
-                                        <field name="vote"/>
-                                        <field name="comments"/>
-                                    </list>
-                                </field>
+                                <group string="Roll-Call Attendance Matrix">
+                                    <field name="attendance_ids" nolabel="1" readonly="state in ('director_review', 'voting', 'completed')">
+                                        <list editable="bottom">
+                                            <field name="role"/>
+                                            <field name="user_id"/>
+                                            <field name="is_present" widget="boolean_toggle"/>
+                                            <field name="attendance_status"/>
+                                            <field name="remarks"/>
+                                        </list>
+                                    </field>
+                                </group>
+                            </page>
+
+                            <!-- Tab 2: Deliberations, Minutes & Defense -->
+                            <page string="Deliberations &amp; Minutes">
+                                <group string="Meeting Agenda">
+                                    <field name="agenda" widget="html" nolabel="1" readonly="state in ('director_review', 'voting', 'completed')"
+                                           placeholder="Enter hearing agenda, points of order, and procedural steps..."/>
+                                </group>
+                                <group string="Summary of Employee Defense &amp; Evidence">
+                                    <field name="employee_defense_summary" widget="html" nolabel="1" readonly="state in ('director_review', 'voting', 'completed')"
+                                           placeholder="Record employee statements, justifications, mitigating circumstances, and witness testimonies..."/>
+                                </group>
+                                <group string="Official Committee Deliberations &amp; Findings">
+                                    <field name="meeting_minutes" widget="html" nolabel="1" readonly="state in ('director_review', 'voting', 'completed')"
+                                           placeholder="Record full committee deliberations, facts weighed, policy interpretations, and majority consensus..."/>
+                                </group>
+                                <group string="Official Supporting Documents &amp; Attachments">
+                                    <group>
+                                        <field name="signed_minutes_file" filename="signed_minutes_filename" readonly="state == 'completed'"/>
+                                        <field name="signed_minutes_filename" invisible="1"/>
+                                        <field name="attendance_sheet_file" filename="attendance_sheet_filename" readonly="state == 'completed'"/>
+                                        <field name="attendance_sheet_filename" invisible="1"/>
+                                    </group>
+                                    <group>
+                                        <field name="employee_statement_file" filename="employee_statement_filename" readonly="state == 'completed'"/>
+                                        <field name="employee_statement_filename" invisible="1"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <!-- Tab 3: Director Sign-off & Member Voting -->
+                            <page string="Director Sign-off &amp; Voting">
+                                <group string="Immediate Director Review &amp; Sign-off">
+                                    <group>
+                                        <field name="respective_director_id" string="Designated Directorate Director" readonly="1"/>
+                                        <field name="director_signed_off" string="Director Sign-off Status" readonly="1"/>
+                                    </group>
+                                    <group>
+                                        <field name="director_signoff_by_id" readonly="1"/>
+                                        <field name="director_signoff_date" readonly="1"/>
+                                    </group>
+                                </group>
+                                <group string="Director Sign-off Remarks" invisible="not director_signed_off">
+                                    <field name="director_signoff_remarks" readonly="state == 'completed'" nolabel="1"
+                                           placeholder="Director endorsement remarks prior to member voting..."/>
+                                </group>
+
+                                <group string="Member Voting Summary">
+                                    <group>
+                                        <field name="in_favor_count" string="Votes In Favor" readonly="1"/>
+                                        <field name="against_count" string="Votes Against" readonly="1"/>
+                                        <field name="abstain_count" string="Abstentions" readonly="1"/>
+                                    </group>
+                                </group>
+                                <group string="Individual Panel Member Votes">
+                                    <field name="vote_ids" nolabel="1" readonly="state == 'completed'">
+                                        <list editable="bottom">
+                                            <field name="member_id"/>
+                                            <field name="vote"/>
+                                            <field name="comments"/>
+                                        </list>
+                                    </field>
+                                </group>
+                            </page>
+
+                            <!-- Tab 4: Verdict & Recommended Sanction -->
+                            <page string="Committee Verdict &amp; Sanctions">
+                                <group string="Final Prescribed Measure">
+                                    <group>
+                                        <field name="recommended_penalty_type" widget="radio" readonly="state == 'completed'"/>
+                                        <field name="recommended_warning_validity_days" readonly="state == 'completed'"
+                                               invisible="recommended_penalty_type not in ('verbal_warning', 'first_warning_penalty', 'second_warning_penalty', 'final_warning_penalty')"/>
+                                    </group>
+                                    <group>
+                                        <field name="recommended_penalty_percentage" readonly="state == 'completed'"
+                                               invisible="staff_category == 'managerial'"/>
+                                        <field name="recommended_fine_days" readonly="state == 'completed'"
+                                               invisible="staff_category == 'non_managerial'"/>
+                                    </group>
+                                </group>
+                                <group string="Deliberation Verdict Rationale &amp; Policy Justification">
+                                    <field name="recommendation_rationale" widget="html" nolabel="1" readonly="state == 'completed'"
+                                           placeholder="State the legal and policy basis for the prescribed sanction, aggravating or mitigating considerations..."/>
+                                </group>
                             </page>
                         </notebook>
                     </sheet>

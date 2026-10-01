@@ -151,6 +151,164 @@ class HrEmployee(models.Model):
             current = current.coach_id or current.parent_id
         return chain
 
+    def is_supervisor_of(self, target_employee):
+        """Return True if self is in the supervisory chain of target_employee."""
+        if not target_employee:
+            return False
+        return self in target_employee.get_supervisor_chain()
+
+    @api.model
+    def get_cpco_user(self):
+        """
+        Unified CPCO Resolution Engine:
+        1. Explicit UI Setting in Discipline & Governance Settings (discipline.cpco_user_id)
+        2. Security Group Membership (group_discipline_cpco)
+        3. Job Position / Employee matching CPCO / Chief People
+        4. Fallback to System Administrator
+        """
+        ICP = self.env['ir.config_parameter'].sudo()
+        cpco_user_id_param = ICP.get_param('discipline.cpco_user_id')
+        if cpco_user_id_param:
+            try:
+                cpco_user = self.env['res.users'].browse(int(cpco_user_id_param)).exists()
+                if cpco_user:
+                    return cpco_user
+            except (ValueError, TypeError):
+                pass
+
+        # 2. Check Security Group
+        cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+        if cpco_group:
+            cpco_users = cpco_group.all_user_ids or cpco_group.user_ids
+            if cpco_users:
+                return cpco_users[0]
+
+        # 3. Check Job Title
+        cpco_emp = self.search([
+            '|', ('job_id.name', 'ilike', 'Chief People'),
+            ('job_id.name', 'ilike', 'CPCO')
+        ], limit=1)
+        if cpco_emp and cpco_emp.user_id:
+            return cpco_emp.user_id
+
+        # 4. Fallback Admin
+        return self.env.ref('base.user_admin', raise_if_not_found=False) or self.env.user
+
+    @api.model
+    def get_secretary_user(self):
+        """Resolve Disciplinary Committee Secretary (POMD Director)."""
+        ICP = self.env['ir.config_parameter'].sudo()
+        sec_id_param = ICP.get_param('discipline.secretary_user_id')
+        if sec_id_param:
+            try:
+                sec_user = self.env['res.users'].browse(int(sec_id_param)).exists()
+                if sec_user:
+                    return sec_user
+            except (ValueError, TypeError):
+                pass
+
+        pomd_emp = self.search([
+            '|', ('job_id.name', 'ilike', 'People Operations Management Director'),
+            ('job_id.name', 'ilike', 'People Operation')
+        ], limit=1)
+        if pomd_emp and pomd_emp.user_id:
+            return pomd_emp.user_id
+
+        pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
+        if pomd_group:
+            pomd_users = pomd_group.all_user_ids or pomd_group.user_ids
+            if pomd_users:
+                return pomd_users[0]
+
+        return self.env.ref('base.user_admin', raise_if_not_found=False) or self.env.user
+
+    @api.model
+    def get_legal_user(self):
+        """Resolve Legal Directorate Representative."""
+        ICP = self.env['ir.config_parameter'].sudo()
+        legal_id_param = ICP.get_param('discipline.legal_user_id')
+        if legal_id_param:
+            try:
+                legal_user = self.env['res.users'].browse(int(legal_id_param)).exists()
+                if legal_user:
+                    return legal_user
+            except (ValueError, TypeError):
+                pass
+
+        legal_emp = self.search([
+            '|', ('job_id.name', 'ilike', 'Legal Director'),
+            ('job_id.name', 'ilike', 'Legal Services Director')
+        ], limit=1)
+        if not legal_emp:
+            legal_emp = self.search([('job_id.name', 'ilike', 'Legal')], limit=1)
+        if legal_emp and legal_emp.user_id:
+            return legal_emp.user_id
+
+        legal_group = self.env.ref('discipline_management.group_discipline_legal', raise_if_not_found=False)
+        if legal_group:
+            legal_users = legal_group.all_user_ids or legal_group.user_ids
+            if legal_users:
+                return legal_users[0]
+
+        return False
+
+    @api.model
+    def get_union_user(self):
+        """Resolve Labour Union Representative for Disciplinary Committee meetings."""
+        ICP = self.env['ir.config_parameter'].sudo()
+        union_id_param = ICP.get_param('discipline.union_user_id')
+        if union_id_param:
+            try:
+                union_user = self.env['res.users'].browse(int(union_id_param)).exists()
+                if union_user:
+                    return union_user
+            except (ValueError, TypeError):
+                pass
+        return False
+
+    @api.model
+    def get_audit_director_user(self):
+        """Resolve Internal Audit Directorate Director."""
+        ICP = self.env['ir.config_parameter'].sudo()
+        audit_id_param = ICP.get_param('discipline.audit_user_id')
+        if audit_id_param:
+            try:
+                audit_user = self.env['res.users'].browse(int(audit_id_param)).exists()
+                if audit_user:
+                    return audit_user
+            except (ValueError, TypeError):
+                pass
+
+        audit_emp = self.search([
+            '|', ('job_id.name', 'ilike', 'Internal Audit Director'),
+            ('job_id.name', 'ilike', 'Audit Director')
+        ], limit=1)
+        if audit_emp and audit_emp.user_id:
+            return audit_emp.user_id
+
+        audit_group = self.env.ref('discipline_management.group_discipline_auditor', raise_if_not_found=False)
+        if audit_group:
+            audit_users = audit_group.all_user_ids or audit_group.user_ids
+            if audit_users:
+                return audit_users[0]
+
+        return False
+
+    @api.model
+    def get_ceo_user(self):
+        """Resolve Chief Executive Officer (CEO)."""
+        ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+        if ceo_group:
+            ceo_users = ceo_group.all_user_ids or ceo_group.user_ids
+            if ceo_users:
+                return ceo_users[0]
+
+        ceo_emp = self.search([('executive_level', '=', 'ceo')], limit=1)
+        if ceo_emp and ceo_emp.user_id:
+            return ceo_emp.user_id
+
+        return False
+
     @api.depends('job_id', 'job_id.name')
     def _compute_is_managerial(self):
         for emp in self:
@@ -182,3 +340,4 @@ class HrJob(models.Model):
         default=False,
         help='Check if this job position belongs to Managerial Staff'
     )
+

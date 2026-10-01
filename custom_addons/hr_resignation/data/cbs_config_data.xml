@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="cbs_api_url" model="ir.config_parameter">
+            <field name="key">cbs.api.url</field>
+            <field name="value">http://10.1.11.242:7001</field>
+        </record>
+        <record id="cbs_api_username" model="ir.config_parameter">
+            <field name="key">cbs.api.username</field>
+            <field name="value">ENTER_USERNAME_HERE</field>
+        </record>
+        <record id="cbs_api_password" model="ir.config_parameter">
+            <field name="key">cbs.api.password</field>
+            <field name="value">ENTER_PASSWORD_HERE</field>
+        </record>
+    </data>
+</odoo>

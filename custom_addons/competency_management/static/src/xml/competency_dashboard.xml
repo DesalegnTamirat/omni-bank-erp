@@ -17,7 +17,6 @@
                     <!-- Cycle Selector Dropdown -->
                     <select class="form-select form-select-sm" style="width: 150px; max-width: 160px; height: 32px; background: #ffffff; color: #1d2b32; font-size: 12px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 8px; text-overflow: ellipsis;"
                             t-on-change="onCycleChange">
-                        <option value="">All Cycles</option>
                         <t t-foreach="state.data.all_cycles" t-as="cyc" t-key="cyc.id">
                             <option t-att-value="cyc.id" t-att-selected="state.cycleId == cyc.id">
                                 <t t-out="cyc.name"/>
@@ -80,23 +79,23 @@
             </div>
 
             <!-- ── Sub-Header Row with Role Badge (No Persona Switcher Pills) ── -->
-            <div style="padding: 20px 28px 12px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1d2b32;">
+            <div style="padding: 10px 28px 8px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <h2 style="margin: 0; font-size: 19px; font-weight: 700; color: #1d2b32;">
                     Bunna Bank Talent Capability &amp; Competency Management
                 </h2>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <t t-if="state.persona === 'executive'">
-                        <span class="badge" style="background-color: #541718; color: #ffffff; font-size: 12px; padding: 6px 14px; font-weight: 600; border-radius: 6px;">
+                        <span class="badge" style="background-color: #541718; color: #ffffff; font-size: 12px; padding: 5px 12px; font-weight: 600; border-radius: 6px;">
                             🏛️ Executive Overview
                         </span>
                     </t>
                     <t t-elif="state.persona === 'manager'">
-                        <span class="badge" style="background-color: #c17540; color: #ffffff; font-size: 12px; padding: 6px 14px; font-weight: 600; border-radius: 6px;">
+                        <span class="badge" style="background-color: #c17540; color: #ffffff; font-size: 12px; padding: 5px 12px; font-weight: 600; border-radius: 6px;">
                             👥 Manager / Team Overview
                         </span>
                     </t>
                     <t t-else="">
-                        <span class="badge" style="background-color: #726732; color: #ffffff; font-size: 12px; padding: 6px 14px; font-weight: 600; border-radius: 6px;">
+                        <span class="badge" style="background-color: #726732; color: #ffffff; font-size: 12px; padding: 5px 12px; font-weight: 600; border-radius: 6px;">
                             👤 Employee Self-Service
                         </span>
                     </t>
@@ -105,105 +104,96 @@
 
             <!-- Error Banner -->
             <t t-if="state.error">
-                <div style="margin: 30px 28px; background-color: #fff2f0; border: 1px solid #ffccc7; border-left: 5px solid #ff4d4f; border-radius: 8px; padding: 20px 24px; text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 8px;">⚠️</div>
-                    <h5 style="color: #cf1322; font-weight: 700; margin-bottom: 6px;">Failed to load dashboard data</h5>
-                    <p style="color: #595959; font-size: 13px; margin-bottom: 14px;">An error occurred while communicating with the server. Please verify network connection or retry.</p>
+                <div style="margin: 20px 28px; background-color: #fff2f0; border: 1px solid #ffccc7; border-left: 5px solid #ff4d4f; border-radius: 8px; padding: 14px 18px; text-align: center;">
+                    <div style="font-size: 20px; margin-bottom: 6px;">⚠️</div>
+                    <h5 style="color: #cf1322; font-weight: 700; margin-bottom: 4px;">Failed to load dashboard data</h5>
+                    <p style="color: #595959; font-size: 12px; margin-bottom: 10px;">An error occurred while communicating with the server. Please verify network connection or retry.</p>
                     <button class="btn btn-sm btn-danger" t-on-click="loadData" style="font-weight: 600;">🔄 Retry Loading</button>
                 </div>
             </t>
 
             <!-- Loading Spinner -->
             <t t-elif="state.loading">
-                <div style="text-align: center; padding: 60px;">
+                <div style="text-align: center; padding: 40px;">
                     <div class="spinner-border" role="status" style="color: #541718 !important;"></div>
-                    <div style="margin-top: 12px; font-weight: 600; color: #1d2b32;">Loading Analytics Dashboard...</div>
+                    <div style="margin-top: 10px; font-weight: 600; color: #1d2b32;">Loading Analytics Dashboard...</div>
                 </div>
             </t>
 
             <t t-else="">
                 <div style="padding: 0 28px;">
 
-                    <!-- Empty Data State Banner -->
-                    <t t-if="state.data &amp;&amp; state.data.stats &amp;&amp; !state.data.stats.has_data">
-                        <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #726732; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; text-align: center;">
-                            <div style="font-size: 24px; margin-bottom: 6px;">📊</div>
-                            <h6 style="color: #1d2b32; font-weight: 700; margin-bottom: 4px;">No Assessment Data Available Yet for this Selection</h6>
-                            <p style="color: #64748b; font-size: 12px; margin-bottom: 0;">There are currently no completed assessment ratings recorded for the selected assessment cycle or department scope.</p>
-                        </div>
-                    </t>
-
-                    <!-- ── Data Quality Governance Banner ── -->
-                    <t t-if="state.persona === 'executive' &amp;&amp; !state.alertDismissed &amp;&amp; (state.data.stats.unmapped_cnt &gt; 0 || state.data.stats.missing_sups_cnt &gt; 0)">
-                        <div style="background-color: #fffbe6; border: 1px solid #ffe58f; border-left: 5px solid #c17540; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 12px;">
-                                <span style="font-size: 18px;">⚠️</span>
-                                <div>
-                                    <strong style="color: #1d2b32; font-size: 13px;">Data Quality Alert:</strong>
-                                    <span style="color: #726732; font-size: 13px; margin-left: 6px;">
+                    <!-- ── Combined Sleek Compact Governance & Notice Bar ── -->
+                    <t t-if="(!state.alertDismissed &amp;&amp; state.persona === 'executive' &amp;&amp; (state.data.stats.unmapped_cnt &gt; 0 || state.data.stats.missing_sups_cnt &gt; 0)) || (state.data &amp;&amp; state.data.stats &amp;&amp; !state.data.stats.has_data)">
+                        <div style="background-color: #fffbe6; border: 1px solid #ffe58f; border-left: 4px solid #c17540; border-radius: 6px; padding: 6px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                <t t-if="state.persona === 'executive' &amp;&amp; (state.data.stats.unmapped_cnt &gt; 0 || state.data.stats.missing_sups_cnt &gt; 0)">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span>⚠️</span>
+                                        <strong style="color: #1d2b32;">Data Quality:</strong>
                                         <t t-if="state.data.stats.unmapped_cnt &gt; 0">
                                             <a href="#" t-on-click.prevent="openUnmappedPositions" style="color: #541718; font-weight: 700; text-decoration: underline; cursor: pointer;">
-                                                <t t-out="state.data.stats.unmapped_cnt"/> unmapped job position<t t-out="state.data.stats.unmapped_cnt &gt; 1 ? 's' : ''"/>
+                                                <t t-out="state.data.stats.unmapped_cnt"/> unmapped position<t t-out="state.data.stats.unmapped_cnt &gt; 1 ? 's' : ''"/>
                                             </a>
                                         </t>
-                                        <t t-else="">
-                                            <span>0 unmapped job positions</span>
-                                        </t>
-                                        <span style="margin: 0 6px;">|</span>
+                                        <span style="color: #94a3b8;">|</span>
                                         <t t-if="state.data.stats.missing_sups_cnt &gt; 0">
                                             <a href="#" t-on-click.prevent="openMissingSupervisors" style="color: #541718; font-weight: 700; text-decoration: underline; cursor: pointer;">
-                                                <t t-out="state.data.stats.missing_sups_cnt"/> employee<t t-out="state.data.stats.missing_sups_cnt &gt; 1 ? 's' : ''"/> missing assigned supervisor
+                                                <t t-out="state.data.stats.missing_sups_cnt"/> missing supervisor<t t-out="state.data.stats.missing_sups_cnt &gt; 1 ? 's' : ''"/>
                                             </a>
                                         </t>
-                                        <t t-else="">
-                                            <span>0 employees missing assigned supervisor</span>
-                                        </t>
-                                    </span>
-                                </div>
+                                    </div>
+                                </t>
+                                <t t-if="state.data &amp;&amp; state.data.stats &amp;&amp; !state.data.stats.has_data">
+                                    <div style="display: flex; align-items: center; gap: 6px; color: #64748b;">
+                                        <span style="color: #94a3b8;">•</span>
+                                        <span>📊 <em>No completed ratings recorded yet for this selection.</em></span>
+                                    </div>
+                                </t>
                             </div>
-                            <button class="btn-close" t-on-click="dismissAlert" aria-label="Close"></button>
+                            <button class="btn-close" style="font-size: 10px;" t-on-click="dismissAlert" aria-label="Close"></button>
                         </div>
                     </t>
 
                     <!-- ── Active Assessment Campaign Status Banner ── -->
                     <t t-if="state.data.active_cycle_info &amp;&amp; state.data.active_cycle_info.has_active">
-                        <div style="background: linear-gradient(135deg, #ffffff 0%, #fdf8f5 100%); border: 1px solid #e2e8f0; border-left: 6px solid #541718; border-radius: 10px; padding: 16px 22px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                            <div style="display: flex; align-items: center; gap: 14px;">
-                                <div style="background-color: rgba(84, 23, 24, 0.1); color: #541718; font-size: 22px; width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <div style="background: linear-gradient(135deg, #ffffff 0%, #fdf8f5 100%); border: 1px solid #e2e8f0; border-left: 5px solid #541718; border-radius: 8px; padding: 10px 18px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="background-color: rgba(84, 23, 24, 0.1); color: #541718; font-size: 18px; width: 36px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
                                     📅
                                 </div>
                                 <div>
                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span t-attf-class="badge #{state.data.active_cycle_info.is_deadline_passed ? 'bg-danger' : (state.data.active_cycle_info.state == 'open' ? 'bg-success' : 'bg-warning')}" style="font-size: 11px; padding: 4px 8px; font-weight: 600;">
+                                        <span t-attf-class="badge #{state.data.active_cycle_info.is_deadline_passed ? 'bg-danger' : (state.data.active_cycle_info.state == 'open' ? 'bg-success' : 'bg-warning')}" style="font-size: 10px; padding: 3px 6px; font-weight: 600;">
                                             <t t-out="state.data.active_cycle_info.state_label"/>
                                         </span>
-                                        <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1d2b32;">
+                                        <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #1d2b32;">
                                             <t t-out="state.data.active_cycle_info.name"/>
                                         </h4>
                                     </div>
-                                    <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+                                    <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
                                         <span>Evaluation Range: <strong style="color: #1d2b32;"><t t-out="state.data.active_cycle_info.period_start"/> – <t t-out="state.data.active_cycle_info.period_end"/></strong></span>
                                     </div>
                                 </div>
                             </div>
-                            <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 16px; text-align: right;">
-                                <div style="font-size: 11px; font-weight: 700; color: #c17540; text-transform: uppercase; letter-spacing: 0.5px;">Submission Deadline</div>
-                                <div style="font-size: 15px; font-weight: 800; color: #541718;"><t t-out="state.data.active_cycle_info.deadline"/></div>
+                            <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 14px; text-align: right;">
+                                <div style="font-size: 10px; font-weight: 700; color: #c17540; text-transform: uppercase; letter-spacing: 0.5px;">Submission Deadline</div>
+                                <div style="font-size: 14px; font-weight: 800; color: #541718;"><t t-out="state.data.active_cycle_info.deadline"/></div>
                             </div>
                         </div>
                     </t>
                     <t t-else="">
-                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid #94a3b8; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-                            <span style="font-size: 18px;">ℹ️</span>
-                            <span style="font-size: 13px; font-weight: 600; color: #64748b;">
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #94a3b8; border-radius: 6px; padding: 8px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 16px;">ℹ️</span>
+                            <span style="font-size: 12px; font-weight: 600; color: #64748b;">
                                 No active assessment campaign is currently open.
                             </span>
                         </div>
                     </t>
 
                     <!-- ── 5 KPI Cards Row ── -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-                        <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-top: 4px solid #541718;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                        <div style="background: #ffffff; border-radius: 8px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-top: 3px solid #541718;">
                             <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
                                 <t t-if="state.persona === 'executive'">Bank Avg Gap</t>
                                 <t t-elif="state.persona === 'manager'">Team Avg Gap</t>
@@ -221,17 +211,17 @@
                                 <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.total_assessments"/></div>
                             </div>
                         </t>
-                        <div style="background: #fdf2f2; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(84,23,24,0.08); border: 1px solid #f87171; border-top: 4px solid #541718; cursor: pointer;" t-on-click="openTnaBelow">
-                            <div style="font-size: 12px; color: #541718; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Underqualified</div>
-                            <div style="font-size: 26px; font-weight: 900; color: #541718;"><t t-out="state.data.stats.below_cnt"/></div>
+                        <div style="background: #fdf2f2; border-radius: 8px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(84,23,24,0.06); border: 1px solid #f87171; border-top: 3px solid #541718; cursor: pointer;" t-on-click="openTnaBelow">
+                            <div style="font-size: 11px; color: #541718; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Underqualified</div>
+                            <div style="font-size: 24px; font-weight: 900; color: #541718;"><t t-out="state.data.stats.below_cnt"/></div>
                         </div>
-                        <div style="background: #f0fdf4; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(22,163,74,0.08); border: 1px solid #86efac; border-top: 4px solid #16a34a; cursor: pointer;" t-on-click="openTnaMeets">
-                            <div style="font-size: 12px; color: #15803d; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Fit / Qualified</div>
-                            <div style="font-size: 26px; font-weight: 900; color: #16a34a;"><t t-out="state.data.stats.meets_cnt"/></div>
+                        <div style="background: #f0fdf4; border-radius: 8px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(22,163,74,0.06); border: 1px solid #86efac; border-top: 3px solid #16a34a; cursor: pointer;" t-on-click="openTnaMeets">
+                            <div style="font-size: 11px; color: #15803d; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Fit / Qualified</div>
+                            <div style="font-size: 24px; font-weight: 900; color: #16a34a;"><t t-out="state.data.stats.meets_cnt"/></div>
                         </div>
-                        <div style="background: #fffbe6; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(193,117,64,0.08); border: 1px solid #fde68a; border-top: 4px solid #c17540; cursor: pointer;" t-on-click="openTnaExceeds">
-                            <div style="font-size: 12px; color: #c17540; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Overqualified</div>
-                            <div style="font-size: 26px; font-weight: 900; color: #c17540;"><t t-out="state.data.stats.exceeds_cnt"/></div>
+                        <div style="background: #fffbe6; border-radius: 8px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(193,117,64,0.06); border: 1px solid #fde68a; border-top: 3px solid #c17540; cursor: pointer;" t-on-click="openTnaExceeds">
+                            <div style="font-size: 11px; color: #c17540; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Overqualified</div>
+                            <div style="font-size: 24px; font-weight: 900; color: #c17540;"><t t-out="state.data.stats.exceeds_cnt"/></div>
                         </div>
                     </div>
 
@@ -260,16 +250,51 @@
 
                         <!-- Chart 3: Radar Chart (Spider/Radar) — personal, per-employee data only -->
                         <div style="background: #ffffff; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                                 <span style="font-size: 15px; font-weight: 700; color: #1d2b32;">My competency radar</span>
+                                <t t-if="state.radarHasData">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" 
+                                                t-attf-class="btn btn-xs #{state.radarPillarFilter === 'all' ? 'btn-primary' : 'btn-outline-secondary'}"
+                                                style="font-size: 11px; padding: 2px 8px; cursor: pointer;"
+                                                t-on-click="() => this.setRadarPillarFilter('all')">
+                                            All <span style="font-size: 10px; opacity: 0.85;">(<t t-esc="state.radarPillarCounts ? state.radarPillarCounts.all : 0"/>)</span>
+                                        </button>
+                                        <button type="button" 
+                                                t-attf-class="btn btn-xs #{state.radarPillarFilter === 'core' ? 'btn-primary' : 'btn-outline-secondary'}"
+                                                style="font-size: 11px; padding: 2px 8px; cursor: pointer;"
+                                                t-on-click="() => this.setRadarPillarFilter('core')">
+                                            Core <span style="font-size: 10px; opacity: 0.85;">(<t t-esc="state.radarPillarCounts.core"/>)</span>
+                                        </button>
+                                        <button type="button" 
+                                                t-attf-class="btn btn-xs #{state.radarPillarFilter === 'leadership' ? 'btn-primary' : 'btn-outline-secondary'}"
+                                                style="font-size: 11px; padding: 2px 8px; cursor: pointer;"
+                                                t-on-click="() => this.setRadarPillarFilter('leadership')">
+                                            Leadership <span style="font-size: 10px; opacity: 0.85;">(<t t-esc="state.radarPillarCounts.leadership"/>)</span>
+                                        </button>
+                                        <button type="button" 
+                                                t-attf-class="btn btn-xs #{state.radarPillarFilter === 'technical' ? 'btn-primary' : 'btn-outline-secondary'}"
+                                                style="font-size: 11px; padding: 2px 8px; cursor: pointer;"
+                                                t-on-click="() => this.setRadarPillarFilter('technical')">
+                                            Technical <span style="font-size: 10px; opacity: 0.85;">(<t t-esc="state.radarPillarCounts.technical"/>)</span>
+                                        </button>
+                                    </div>
+                                </t>
                             </div>
-                            <div style="height: 250px; position: relative;">
-                                <canvas id="competencyRadarChart" style="width: 100%; height: 230px; display: block;"
-                                        t-att-style="!state.radarHasData ? 'display:none;' : 'width: 100%; height: 230px; display: block;'"></canvas>
+                            <div style="height: 260px; position: relative;">
+                                <canvas id="competencyRadarChart" style="width: 100%; height: 250px; display: block;"
+                                        t-att-style="(!state.radarHasData || state.radarFilteredCount === 0) ? 'display:none;' : 'width: 100%; height: 250px; display: block;'"></canvas>
                                 <t t-if="!state.radarHasData">
                                     <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; text-align: center; gap: 6px;">
                                         <span style="font-size: 22px;">🕸️</span>
                                         <span style="font-size: 12px; font-weight: 600;">No personal assessment on record yet for this selection.</span>
+                                    </div>
+                                </t>
+                                <t t-elif="state.radarFilteredCount === 0">
+                                    <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; text-align: center; gap: 6px;">
+                                        <span style="font-size: 24px;">📋</span>
+                                        <span style="font-size: 13px; font-weight: 600; color: #64748b;">No competencies in this pillar for your role.</span>
+                                        <span style="font-size: 11px; color: #94a3b8;">Click 'All' or another pillar tab to view competencies.</span>
                                     </div>
                                 </t>
                             </div>

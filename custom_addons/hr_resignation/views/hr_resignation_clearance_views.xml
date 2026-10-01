@@ -25,7 +25,7 @@
                     <!-- Waiting banner -->
                     <div class="alert alert-warning mb-3" role="alert"
                          invisible="state != 'waiting'">
-                        <i class="fa fa-clock-o me-2"/>
+                        <i class="fa fa-clock-o me-2" title="Waiting"/>
                         <strong>Waiting for previous group to complete.</strong>
                         You will be notified automatically once all mandatory clearances
                         in the preceding group are approved.
@@ -75,22 +75,15 @@
                     <notebook invisible="not item_ids">
                         <page string="Checklist Items" name="items">
                             <field name="item_ids" nolabel="1">
-                                <list create="false" delete="false"
-                                      decoration-success="is_done"
-                                      decoration-muted="not is_mandatory and not is_done">
+                                <list create="false" delete="false">
                                     <field name="sequence" widget="handle"/>
                                     <field name="name" string="Task / Requirement" readonly="1"/>
                                     <field name="is_mandatory" string="Mandatory"
                                            readonly="1" widget="boolean"/>
                                     <field name="can_clear" column_invisible="1"/>
                                     <field name="is_done" column_invisible="1"/>
-                                    <button string="Clear" type="object" name="action_mark_done"
-                                            class="btn-sm btn-success"
-                                            confirm="Are you sure you want to mark this task as cleared? This action will be logged."
-                                            invisible="is_done"/>
-                                    <button string="Cleared ✓" type="object" name="action_unmark_done"
-                                            class="btn-sm btn-outline-success"
-                                            invisible="not is_done"/>
+                                      <button name="action_toggle_cleared" string="Clear" type="object" class="btn-success btn-sm" invisible="is_done == True" />
+                                      <button name="action_dummy_cleared" string="Cleared" type="object" class="btn-success btn-sm" invisible="is_done == False" />
                                 </list>
                                 <form string="Checklist Item">
                                     <sheet>
@@ -132,19 +125,14 @@
         <field name="name">hr.resignation.clearance.list</field>
         <field name="model">hr.resignation.clearance</field>
         <field name="arch" type="xml">
-            <list string="Clearance Lines"
-                  create="false"
-                  decoration-success="state == 'cleared'"
-                  decoration-warning="state == 'pending'">
+            <list string="Clearance Lines" create="false" delete="false">
                 <field name="employee_id"/>
                 <field name="resignation_type_id" optional="hide"/>
                 <field name="work_unit_id"/>
                 <field name="responsible_user" widget="many2one_avatar_user"/>
                 <field name="is_mandatory" widget="boolean" optional="show"/>
                 <field name="items_progress" string="Checklist" optional="show"/>
-                <field name="state" widget="badge"
-                       decoration-warning="state == 'pending'"
-                       decoration-success="state == 'cleared'"/>
+                <field name="state"/>
                 <field name="notification_sent" string="Notified"
                        widget="boolean" optional="hide"/>
                 <field name="cleared_by" optional="hide"/>
@@ -213,20 +201,13 @@
         <field name="model">hr.resignation.clearance</field>
         <field name="arch" type="xml">
             <list string="My Clearance Tasks"
-                  create="false"
-                  decoration-warning="state == 'pending'">
+                  create="false">
                 <field name="employee_id"/>
                 <field name="work_unit_id" string="Operating Unit"/>
                 <field name="is_mandatory" string="Mand." widget="boolean"/>
                 <field name="items_progress" string="Checklist" optional="show"/>
-                <field name="state" widget="badge"
-                       decoration-warning="state == 'pending'"
-                       decoration-success="state == 'cleared'"/>
-                <field name="can_approve" invisible="1"/>
-                <button string="Mark as Cleared"
-                        type="object" name="action_clear"
-                        class="btn-sm btn-success"
-                        invisible="state != 'pending' or not can_approve"/>
+                <field name="state"/>
+                <field name="can_approve" column_invisible="1"/>
             </list>
         </field>
     </record>

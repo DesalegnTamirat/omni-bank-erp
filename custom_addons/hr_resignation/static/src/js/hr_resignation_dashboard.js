@@ -164,7 +164,11 @@ export class HrResignationDashboard extends Component {
             target: "current",
         });
     }
-}
 
+    onKpiClick(ev) {
+        const domain = ev.currentTarget.dataset.domain;
+        this.openResignations(domain);
+    }
+}
 HrResignationDashboard.template = "hr_resignation.Dashboard";
 registry.category("actions").add("hr_resignation_dashboard_action", HrResignationDashboard);

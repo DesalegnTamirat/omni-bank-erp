@@ -53,6 +53,21 @@ class HrResignationSettlement(models.Model):
 
     resignation_id = fields.Many2one('hr.resignation', ondelete='cascade')
     employee_id    = fields.Many2one('hr.employee', required=True)
+    related_release_date = fields.Date(related='resignation_id.release_date')
+    def _default_settlement_date(self):
+        resignation_id = self.env.context.get('default_resignation_id')
+        if resignation_id:
+            resignation = self.env['hr.resignation'].browse(resignation_id)
+            if resignation.release_date:
+                return resignation.release_date
+        return fields.Date.context_today(self)
+
+    settlement_date = fields.Date(
+        string='Settlement Date',
+        default=_default_settlement_date,
+        help="Date used for final calculations. Defaults to the official Release Date."
+    )
+    date_change_justification = fields.Text(string='Date Change Justification')
 
     # Tracks whether the POMD Officer has explicitly clicked "Process Settlement"
     # Only when this is True does "Submit for Approval" become visible
@@ -148,8 +163,8 @@ class HrResignationSettlement(models.Model):
 
     state = fields.Selection([
         ('draft', 'Draft'), 
-        ('waiting_approval', 'Waiting Approval'),
-        ('confirmed', 'Approved'), 
+        ('waiting_audit', 'Waiting Audit'),
+        ('waiting_payment', 'Waiting Payment'),
         ('paid', 'Paid')
     ], default='draft', tracking=True)
     notes = fields.Text(string='HR Notes')
@@ -159,6 +174,8 @@ class HrResignationSettlement(models.Model):
     # Tracking Fields
     processed_by_id = fields.Many2one('res.users', string='Processed By', readonly=True, tracking=True)
     processed_date = fields.Datetime(string='Date Processed', readonly=True)
+    audited_by_id = fields.Many2one('res.users', string='Audited By', readonly=True, tracking=True)
+    audited_date = fields.Datetime(string='Date Audited', readonly=True)
     confirmed_by_id = fields.Many2one('res.users', string='Confirmed By', readonly=True, tracking=True)
     confirmed_date = fields.Datetime(string='Date Confirmed', readonly=True)
     paid_by_id = fields.Many2one('res.users', string='Paid By', readonly=True, tracking=True)
@@ -183,7 +200,7 @@ class HrResignationSettlement(models.Model):
     # COMPUTES
     # ==================================================================
 
-    @api.depends('resignation_id.release_date', 'resignation_id.joined_date', 'employee_id.start_date')
+    @api.depends('settlement_date', 'resignation_id.joined_date', 'employee_id.start_date')
     def _compute_service_years(self):
         for rec in self:
             emp = rec.employee_id.sudo()
@@ -203,7 +220,7 @@ class HrResignationSettlement(models.Model):
                 else:
                     start = emp.create_date.date()
                     
-            end   = rec.resignation_id.release_date or fields.Date.today()
+            end   = rec.settlement_date or fields.Date.today()
             if start and end and end >= start:
                 d = relativedelta(end, start)
                 rec.service_years        = d.years + d.months / 12.0
@@ -371,11 +388,11 @@ class HrResignationSettlement(models.Model):
             
             rec.income_tax_leave = total_tax
 
-    @api.depends('resignation_id.release_date')
+    @api.depends('settlement_date')
     def _compute_worked_days_default(self):
         """Auto-fill worked days from release date day. POMD can override the stored value."""
         for rec in self:
-            release_date = rec.resignation_id.release_date
+            release_date = rec.settlement_date
             if release_date:
                 rec.worked_days_final_month = release_date.day
             else:
@@ -639,62 +656,31 @@ class HrResignationSettlement(models.Model):
             rec.paid_date = False
 
     def action_confirm_settlement(self):
-        """HR Officer (POMD) submits for approval → waiting_approval.
-           HR Manager can bypass directly to confirmed."""
-        is_hr_manager = (
-            self.env.user.has_group('hr_resignation.group_resignation_hr_manager')
-            or self.env.user.has_group('base.group_system')
-        )
-        is_hr_officer = (
-            self.env.user.has_group('hr.group_hr_user')
-            or self.env.user.has_group('hr_resignation.group_pomd_officer')
-        )
-
-        if not is_hr_manager and not is_hr_officer:
-            raise UserError(_(
-                'Only an HR Officer or HR Manager can process a settlement.'
-            ))
-
+        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
+            raise UserError(_('Only a POMD Officer or HR Manager can confirm the settlement amount.'))
         for rec in self:
-            if rec.state != 'draft':
-                raise UserError(_('Only draft settlements can be submitted.'))
+            if rec.settlement_date and rec.resignation_id.release_date and rec.settlement_date != rec.resignation_id.release_date and not rec.date_change_justification:
+                raise UserError(_('The Settlement Date differs from the official Release Date. You must provide a Date Change Justification.'))
             if rec.outstanding_debt_deduction > 0 and not rec.settlement_authorized:
                 raise UserError(_('Cannot submit: Outstanding debts must be settled first.'))
 
-            # Everyone (including managers) must submit it properly for a clean audit trail
-            rec.state = 'waiting_approval'
-            rec.processed_by_id = self.env.user.id
-            rec.processed_date = fields.Datetime.now()
-            
-            # Send notification to HR Manager
-            manager_group = self.env.ref('hr_resignation.group_resignation_hr_manager')
-            managers = manager_group.user_ids.filtered(lambda u: u.active)
-            for manager in managers:
-                rec.message_post(
-                    body=f"The settlement for {rec.employee_id.name} has been processed and submitted for your approval.",
-                    message_type='notification',
-                    partner_ids=[manager.partner_id.id]
-                )
+            rec.state = 'waiting_audit'
 
-    def action_approve_settlement(self):
-        """Only HR Manager can approve a settlement that is waiting for approval."""
-        if not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') \
-                and not self.env.user.has_group('base.group_system'):
-            raise UserError(_('Only an HR Manager can approve the settlement.'))
+    def action_audit_confirm(self):
         for rec in self:
-            if rec.state != 'waiting_approval':
-                raise UserError(_('Settlement must be in Waiting Approval state to approve.'))
-            rec.state = 'confirmed'
-            rec.confirmed_by_id = self.env.user.id
-            rec.confirmed_date = fields.Datetime.now()
+            rec.state = 'waiting_payment'  
+            rec.audited_by_id = self.env.user.id
+            rec.audited_date = fields.Datetime.now()
             
-            # Notify the officer who processed it
-            if rec.processed_by_id:
-                rec.message_post(
-                    body=f"The settlement for {rec.employee_id.name} has been CONFIRMED by the HR Manager.",
-                    message_type='notification',
-                    partner_ids=[rec.processed_by_id.partner_id.id]
-                )
+            # Send notification to HR Manager group for payment execution
+            manager_group = self.env.ref('hr_resignation.group_resignation_hr_manager', raise_if_not_found=False)
+            managers = manager_group.user_ids.filtered(lambda u: u.active) if manager_group else []
+            partners = [m.partner_id.id for m in managers if m.partner_id]
+            rec.message_post(
+                body=f"The settlement for {rec.employee_id.name} has been AUDITED and submitted for your payment execution.",
+                message_type='notification',
+                partner_ids=partners
+            )
 
     def action_open_return_wizard(self):
         """Open the wizard to capture the return reason."""
@@ -709,9 +695,9 @@ class HrResignationSettlement(models.Model):
         }
 
     def action_return_to_draft(self, reason):
-        """HR Manager sends settlement back to draft with a reason."""
+        """Auditor or HR Manager sends settlement back to draft with a reason."""
         for rec in self:
-            if rec.state != 'waiting_approval':
+            if rec.state not in ('waiting_audit', 'waiting_payment'):
                 continue
             
             pomd_partner = rec.processed_by_id.partner_id.id if rec.processed_by_id else False
@@ -720,6 +706,8 @@ class HrResignationSettlement(models.Model):
             rec.is_processed = False
             rec.processed_by_id = False
             rec.processed_date = False
+            rec.audited_by_id = False
+            rec.audited_date = False
             
             # Post reason and notify POMD officer
             msg = f"<b>Settlement Returned for Revision</b><br/><b>Reason:</b> {reason}"
@@ -727,21 +715,23 @@ class HrResignationSettlement(models.Model):
             rec.message_post(body=msg, message_type='comment', partner_ids=partners)
 
     def action_mark_paid(self):
-        """Only POMD/HR Officer can mark a confirmed settlement as paid. (Segregation of Duties)"""
-        is_officer = (
-            self.env.user.has_group('hr_resignation.group_pomd_officer')
+        """HR Manager / Authorized Officer checks all details and executes settlement payment."""
+        is_authorized = (
+            self.env.user.has_group('hr_resignation.group_resignation_hr_manager')
+            or self.env.user.has_group('hr_resignation.group_pomd_officer')
+            or self.env.user.has_group('base.group_system')
         )
-        if not is_officer:
-            raise UserError(_(
-                'Segregation of Duties: Only an HR/POMD Officer can execute the final payment, not the Approver.'
-            ))
+        if not is_authorized:
+            raise UserError(_('Only an HR Manager or POMD Officer can execute the payment.'))
+
         for rec in self:
-            if rec.state != 'confirmed':
-                raise UserError(_('Only confirmed settlements can be marked as paid.'))
+            if rec.state != 'waiting_payment':
+                raise UserError(_('Only settlements in Waiting Payment state can be paid.'))
+
             rec.state = 'paid'
             rec.paid_by_id = self.env.user.id
             rec.paid_date = fields.Datetime.now()
-            if rec.resignation_id and rec.resignation_id.state == 'cleared':
+            if rec.resignation_id and rec.resignation_id.state in ('cleared', 'clearance_in_progress'):
                 rec.resignation_id.state = 'settled'
 
     def write(self, vals):

@@ -7,11 +7,11 @@ from datetime import timedelta
 class DisciplineSuspension(models.Model):
     _name = 'discipline.suspension'
     _description = 'Employee Disciplinary Suspension'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'start_date desc, id desc'
 
     name = fields.Char(string='Suspension Ref', required=True, copy=False, readonly=True, default=lambda self: _('New'))
-    case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, ondelete='cascade', tracking=True)
+    case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, readonly=True, ondelete='cascade', tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', related='case_id.employee_id', store=True, readonly=True)
     department_id = fields.Many2one('hr.department', string='Department', related='employee_id.department_id', store=True, readonly=True)
 
@@ -30,7 +30,7 @@ class DisciplineSuspension(models.Model):
         ('directorate', 'Respective Directorate'),
         ('audit', 'Audit Directorate'),
         ('pomd', 'People Operations Management Directorate (POMD)'),
-    ], string='Initiating Unit', default='directorate', required=True, tracking=True)
+    ], string='Initiating Unit', default='directorate', required=True, readonly=True, tracking=True)
 
     is_rmcd_or_iad = fields.Boolean(string='Is RMCD or IAD Staff', compute='_compute_is_rmcd_or_iad', store=True)
     
@@ -118,6 +118,38 @@ class DisciplineSuspension(models.Model):
                 vals['name'] = self.env['ir.sequence'].next_by_code('discipline.suspension') or _('New')
         return super().create(vals_list)
 
+    def write(self, vals):
+        protected_fields = {'suspension_type', 'start_date', 'end_date', 'reason', 'case_id', 'initiating_unit'}
+        if not self.env.su and any(f in vals for f in protected_fields):
+            for rec in self:
+                if rec.state in ['active', 'extended', 'completed', 'converted_dismissal', 'revoked']:
+                    if not (self.env.user.has_group('discipline_management.group_discipline_admin') or self.env.user.has_group('base.group_system')):
+                        raise UserError(_('Cannot modify suspension parameters (suspension type, dates, reason) while the suspension is active or completed.'))
+        return super().write(vals)
+
+    can_user_approve_suspension = fields.Boolean(
+        string='Can User Approve Suspension',
+        compute='_compute_can_user_approve_suspension'
+    )
+
+    def _compute_can_user_approve_suspension(self):
+        user = self.env.user
+        EmpModel = self.env['hr.employee'].sudo()
+        cpco_user = EmpModel.get_cpco_user()
+        sec_user = EmpModel.get_secretary_user()
+        is_admin = user.has_group('discipline_management.group_discipline_admin') or user.has_group('base.group_system')
+        for rec in self:
+            can_approve = False
+            if is_admin:
+                can_approve = True
+            elif rec.suspending_authority == 'cpco':
+                can_approve = bool((cpco_user and user.id == cpco_user.id) or user.has_group('discipline_management.group_discipline_cpco'))
+            elif rec.suspending_authority == 'pomd':
+                can_approve = bool((sec_user and user.id == sec_user.id) or user.has_group('discipline_management.group_discipline_pomd'))
+            elif rec.suspending_authority == 'bod':
+                can_approve = bool(user.has_group('discipline_management.group_discipline_ceo') or is_admin)
+            rec.can_user_approve_suspension = can_approve
+
     # Workflow Actions
     def action_submit_for_approval(self):
         for rec in self:
@@ -133,15 +165,16 @@ class DisciplineSuspension(models.Model):
         for rec in self:
             current_user = self.env.user
             # Authority validation
-            if rec.suspending_authority == 'bod':
-                if not rec.bod_resolution_number:
-                    raise UserError(_('BOD Resolution Reference must be recorded prior to activating suspension for RMCD/IAD staff.'))
-            elif rec.suspending_authority == 'cpco':
-                if not (current_user.has_group('discipline_management.group_discipline_cpco') or current_user.has_group('discipline_management.group_discipline_admin')):
+            if rec.suspending_authority == 'bod' and not rec.bod_resolution_number:
+                raise UserError(_('BOD Resolution Reference must be recorded prior to activating suspension for RMCD/IAD staff.'))
+            
+            if not rec.can_user_approve_suspension:
+                if rec.suspending_authority == 'cpco':
                     raise UserError(_('Authority Restriction: Suspensions for managerial employees require Chief People & Culture Officer (CPCO) approval.'))
-            elif rec.suspending_authority == 'pomd':
-                if not (current_user.has_group('discipline_management.group_discipline_pomd') or current_user.has_group('discipline_management.group_discipline_admin') or current_user.has_group('discipline_management.group_discipline_manager')):
+                elif rec.suspending_authority == 'pomd':
                     raise UserError(_('Authority Restriction: Non-managerial suspensions must be approved by People Operations Directorate (POMD).'))
+                else:
+                    raise UserError(_('Authority Restriction: You do not have authorization to approve this suspension.'))
 
             rec.write({'state': 'active'})
             rec.employee_id.sudo().is_suspended = True

@@ -228,6 +228,15 @@ class HrResignation(models.Model):
             if active_resignation:
                 raise ValidationError(_("This employee already has an active resignation request. You cannot create another one until the current request is finished or rejected."))
 
+    @api.onchange('initiated_by')
+    def _onchange_initiated_by(self):
+        if self.resignation_type_id:
+            is_company = self.resignation_type_id.is_company_terminated
+            if self.initiated_by == 'company' and not is_company:
+                self.resignation_type_id = False
+            elif self.initiated_by == 'employee' and is_company:
+                self.resignation_type_id = False
+
     # ── Dates ─────────────────────────────────────────────────────────
     application_date = fields.Date(
         default=fields.Date.context_today, readonly=True,
@@ -351,8 +360,8 @@ class HrResignation(models.Model):
 
     # ── Related fields from settlement (inline display on form) ──────
     settlement_service_years = fields.Float(related='settlement_id.service_years', readonly=True)
-    settlement_pf_eligible = fields.Selection([('yes', 'Yes'), ('no', 'No')], related='settlement_id.pf_eligible', readonly=True)
-    settlement_severance_eligible = fields.Selection([('yes', 'Yes'), ('no', 'No')], related='settlement_id.severance_eligible', readonly=True)
+    settlement_pf_eligible = fields.Selection(related='settlement_id.pf_eligible', readonly=True)
+    settlement_severance_eligible = fields.Selection(related='settlement_id.severance_eligible', readonly=True)
     settlement_pf_amount = fields.Float(related='settlement_id.pf_amount', readonly=False)
     settlement_severance_amount = fields.Float(related='settlement_id.severance_amount', readonly=False)
     settlement_accrued_leave_pay = fields.Float(related='settlement_id.accrued_leave_pay', readonly=False)
@@ -658,18 +667,10 @@ class HrResignation(models.Model):
                 raise UserError(_('You must specify if you accept the Notice Period before submitting your resignation.'))
             rec.name = self.env['ir.sequence'].next_by_code('hr.resignation') or _('New')
             # Validate Payment Request Declaration
-            has_payment_request = (
-                    rec.payment_request_unpaid_salary
-                    or rec.payment_request_severance
-                    or rec.payment_request_pf
-                    or rec.payment_request_other
-            )
-            if not has_payment_request:
+            if not (rec.payment_request_leave_pay and rec.payment_request_unpaid_salary and rec.payment_request_severance and rec.payment_request_pf):
                 raise UserError(_(
-                    'Payment Request Declaration is required.\n\n'
-                    'Please select at least one payment type you are '
-                    'requesting (Remaining Salary, Severance Pay, PF, or '
-                    'Other Benefits) in the "Payment Request Declaration" section.'))
+                    'Payment Request Declaration is incomplete.\n\n'
+                    'You must select Accrued leave pay, Remaining salary, Severance pay, and PF.'))
             if rec.payment_request_other and not rec.payment_request_other_detail:
                 raise UserError(_(
                     'Please specify the other payable benefits you are '
@@ -688,6 +689,30 @@ class HrResignation(models.Model):
             rec.state = 'submitted'
 
             # Notify Manager, HR Officers, HR Manager
+            # If the employee has an RSSA balance, notify their RSSA Guarantors
+            if rec.rssa > 0.0 and 'resl.loan' in self.env:
+                active_loans = self.env['resl.loan'].search([
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('state', 'in', ['approved', 'disbursed'])
+                ])
+                guarantors = active_loans.mapped('guarantor_line_ids').filtered(lambda g: g.state == 'approved')
+                
+                guarantor_partners = []
+                for g in guarantors:
+                    if g.guarantor_id:
+                        if hasattr(g.guarantor_id, 'user_id') and g.guarantor_id.user_id:
+                            guarantor_partners.append(g.guarantor_id.user_id.partner_id.id)
+                        elif hasattr(g.guarantor_id, 'partner_id'):
+                            guarantor_partners.append(g.guarantor_id.partner_id.id)
+                
+                if guarantor_partners:
+                    rec._send_notification(
+                        partner_ids=list(set(guarantor_partners)),
+                        subject=_('Resignation of RSSA Loanee: %s') % rec.employee_id.name,
+                        body=_('The employee %s has submitted a resignation request. As an active RSSA Guarantor for '
+                               'this employee, please be aware of this resignation.') % rec.employee_id.name
+                    )
+
             manager = rec.coach_id.sudo()
             if manager and manager.user_id:
                 rec._send_notification(
@@ -812,9 +837,7 @@ class HrResignation(models.Model):
                             "Cannot approve separation. The employee is still on probation. "
                             "Please evaluate or adjust their probation status first."
                         ))
-
             rec.state = 'approved'
-            rec._create_clearance_lines()
 
             # Assign exit interview
             if not rec.exit_interview_id:
@@ -926,6 +949,9 @@ class HrResignation(models.Model):
                           % (rec.employee_id.sudo().name, rec.release_date)
                 )
 
+            # Create clearance lines
+            rec._create_clearance_lines()
+
             # Notify clearance units
             for line in rec.clearance_line_ids:
                 if line.responsible_user and line.responsible_user.partner_id:
@@ -974,8 +1000,8 @@ class HrResignation(models.Model):
         return self._show_success_message(_('Exit interview marked as completed.'))
 
     def action_waive_exit_interview(self):
-        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
-            raise UserError(_('Only a POMD Officer or HR Manager can waive the exit interview.'))
+        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_auditor') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
+            raise UserError(_('Only a POMD Officer, Auditor, or HR Manager can waive the exit interview.'))
         for rec in self:
             if rec.state not in ('approved', 'release_date_set', 'clearance_in_progress'):
                 raise UserError(_('Please wait for HR Approval first before waiving exit interview.'))
@@ -986,8 +1012,8 @@ class HrResignation(models.Model):
 
     def action_complete_clearance(self):
 
-        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
-            raise UserError(_('Only a POMD Officer or HR Manager can complete clearance.'))
+        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_auditor') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
+            raise UserError(_('Only a POMD Officer, Auditor, or HR Manager can complete clearance.'))
         for rec in self:
             if not rec.exit_interview_waived and (not rec.exit_interview_id or rec.exit_interview_id.state != 'completed'):
                 raise UserError(_('The Exit Interview has to be processed first, unless waived by authorized HR or POMD personnel.'))
@@ -1005,13 +1031,14 @@ class HrResignation(models.Model):
             return self.action_process_settlement()
 
     def action_process_settlement(self):
-        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
-            raise UserError(_('Only a POMD Officer or HR Manager can process settlement.'))
+        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_auditor') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
+            raise UserError(_('Only a POMD Officer, Auditor, or HR Manager can process settlement.'))
         self.ensure_one()
         if not self.settlement_id:
             settlement = self.env['hr.resignation.settlement'].create({
                 'resignation_id': self.id,
                 'employee_id': self.employee_id.id,
+                'settlement_date': self.release_date,
             })
             self.settlement_id = settlement
         return {
@@ -1038,8 +1065,8 @@ class HrResignation(models.Model):
                 rec.settlement_id.action_mark_paid()
 
     def action_confirm_settled(self):
-        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
-            raise UserError(_('Only a POMD Officer or HR Manager can confirm settlement.'))
+        if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_auditor') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
+            raise UserError(_('Only a POMD Officer, Auditor, or HR Manager can confirm settlement.'))
         for rec in self:
             if rec.state != 'cleared':
                 raise UserError(_('Clearance must be completed before settlement.'))

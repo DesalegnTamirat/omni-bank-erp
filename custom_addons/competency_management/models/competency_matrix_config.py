@@ -96,6 +96,27 @@ class CompetencyMatrixConfig(models.Model):
     job_matrix_line_ids = fields.One2many(
         'competency.job.matrix', 'config_id', string='Job Position Proficiency Matrix'
     )
+    grade_matrix_count = fields.Integer(string='Job Grade Guidelines Count', compute='_compute_matrix_counts')
+    job_matrix_count = fields.Integer(string='Job Position Guidelines Count', compute='_compute_matrix_counts')
+
+    def _compute_matrix_counts(self):
+        for rec in self:
+            rec.grade_matrix_count = len(rec.grade_matrix_line_ids)
+            rec.job_matrix_count = len(rec.job_matrix_line_ids)
+
+    def action_view_job_matrix(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('competency_management.action_competency_job_matrix')
+        action['domain'] = [('config_id', '=', self.id)]
+        action['context'] = {'default_config_id': self.id}
+        return action
+
+    def action_view_grade_matrix(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('competency_management.action_competency_grade_matrix')
+        action['domain'] = [('config_id', '=', self.id)]
+        action['context'] = {'default_config_id': self.id}
+        return action
 
     @api.model_create_multi
     def create(self, vals_list):

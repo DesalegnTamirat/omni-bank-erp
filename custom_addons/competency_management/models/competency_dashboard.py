@@ -6,7 +6,7 @@ from odoo.exceptions import UserError
 
 
 class CompetencyDashboard(models.TransientModel):
-    """Executive & Employee Self-Service Competency Dashboard (FR-RPT-002, FR-RPT-010)."""
+    """Executive & Employee Self-Service Competency Dashboard."""
     _name = 'competency.dashboard'
     _description = 'Executive & Employee Competency Dashboard'
 
@@ -449,7 +449,7 @@ class CompetencyDashboard(models.TransientModel):
 
     @api.model
     def get_dashboard_data(self, cycle_id=None, department_id=None, operating_unit_id=None, persona=None):
-        """RPC API endpoint supplying structured JSON metrics and Chart.js datasets to OWL frontend (FR-RPT-002, FR-RPT-010)."""
+        """RPC API endpoint supplying structured JSON metrics and Chart.js datasets to the OWL frontend."""
         user = self.env.user.sudo()
         emp = user.employee_id
         is_admin = bool(
@@ -608,7 +608,6 @@ class CompetencyDashboard(models.TransientModel):
         subordinate_emp_ids = []
         if emp and is_supervisor:
             subordinate_emp_ids = self.env['hr.employee'].sudo().search([
-                '|', ('id', 'child_of', emp.id),
                 '|', ('parent_id', '=', emp.id),
                 ('coach_id', '=', emp.id)
             ]).ids
@@ -706,53 +705,142 @@ class CompetencyDashboard(models.TransientModel):
             unmapped_cnt = max(0, total_jobs - len(mapped_job_ids))
             missing_sups_cnt = self.env['hr.employee'].search_count([('active', '=', True), ('parent_id', '=', False)])
 
-        # Personal Metrics (Employee)
+        # Personal Metrics (Logged in Employee)
         my_asm = False
-        if emp and cycle:
-            my_asm = self.env['competency.assessment'].search([
-                ('employee_id', '=', emp.id),
-                ('cycle_id', '=', cycle.id)
-            ], limit=1)
+        if emp:
+            if cycle:
+                # 1. Prioritize self-assessment for this cycle so the employee's full competency profile is loaded
+                my_asm = self.env['competency.assessment'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('cycle_id', '=', cycle.id),
+                    ('assessment_type', '=', 'self')
+                ], limit=1)
+                # 2. If no self-assessment, pick the assessment with the most lines for this cycle
+                if not my_asm:
+                    asms = self.env['competency.assessment'].sudo().search([
+                        ('employee_id', '=', emp.id),
+                        ('cycle_id', '=', cycle.id)
+                    ])
+                    if asms:
+                        my_asm = max(asms, key=lambda a: len(a.line_ids))
+            if not my_asm:
+                my_asm = self.env['competency.assessment'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('assessment_type', '=', 'self')
+                ], order='id desc', limit=1)
+            if not my_asm:
+                asms = self.env['competency.assessment'].sudo().search([
+                    ('employee_id', '=', emp.id)
+                ])
+                if asms:
+                    my_asm = max(asms, key=lambda a: len(a.line_ids))
 
-        # Radar chart labels and values
+        # First Source of Truth: The Employee's Job Position Competency Role Mapping
+        # As assigned competencies originate from the role mapping (not individual assessments which can be configured for partial pillars)
         radar_labels = []
         radar_assessed = []
         radar_required = []
-        if my_asm and my_asm.line_ids:
-            for l in my_asm.line_ids[:8]:
-                radar_labels.append(l.competency_id.name)
-                c_val = int(l.current_level) if l.current_level and str(l.current_level).isdigit() else (int(round(l.weighted_current_level)) if l.weighted_current_level else 0)
-                r_val = int(l.required_level) if l.required_level and str(l.required_level).isdigit() else 0
-                radar_assessed.append(c_val)
-                radar_required.append(r_val)
-        elif lines:
-            grouped_comp = {}
-            for l in lines[:50]:
-                cid = l.competency_id
-                c_val = int(l.current_level) if l.current_level and str(l.current_level).isdigit() else (int(round(l.weighted_current_level)) if l.weighted_current_level else None)
-                r_val = int(l.required_level) if l.required_level and str(l.required_level).isdigit() else 1
-                if cid not in grouped_comp:
-                    grouped_comp[cid] = {'assessed': [], 'required': []}
-                if c_val is not None:
-                    grouped_comp[cid]['assessed'].append(c_val)
-                grouped_comp[cid]['required'].append(r_val)
+        radar_pillars = []
 
-            for comp, vals in list(grouped_comp.items())[:6]:
-                radar_labels.append(comp.name)
-                avg_ass = round(sum(vals['assessed']) / len(vals['assessed']), 1) if vals['assessed'] else 0.0
-                avg_req = round(sum(vals['required']) / len(vals['required']), 1) if vals['required'] else 0.0
-                radar_assessed.append(avg_ass)
-                radar_required.append(avg_req)
+        mapping = False
+        if emp:
+            job_pos = getattr(emp, 'job_position', False) or emp.job_id
+            if job_pos:
+                emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+                # Priority 1: Specific Operating Unit Mapping
+                if emp_ou:
+                    mapping = self.env['competency.role.mapping'].sudo().search([
+                        ('job_position_id', '=', job_pos.id),
+                        ('state', '=', 'approved'),
+                        ('is_operating_unit_specific', '=', True),
+                        ('operating_unit_ids', 'in', [emp_ou.id])
+                    ], order='id desc', limit=1)
+                # Priority 2: Global / All Operating Units Mapping
+                if not mapping:
+                    mapping = self.env['competency.role.mapping'].sudo().search([
+                        ('job_position_id', '=', job_pos.id),
+                        ('state', '=', 'approved'),
+                        ('is_operating_unit_specific', '=', False)
+                    ], order='id desc', limit=1)
+                # Priority 3: General Fallback (any approved)
+                if not mapping:
+                    mapping = self.env['competency.role.mapping'].sudo().search([
+                        ('job_position_id', '=', job_pos.id),
+                        ('state', '=', 'approved')
+                    ], order='id desc', limit=1)
+                # Priority 4: Draft/Any mapping
+                if not mapping:
+                    mapping = self.env['competency.role.mapping'].sudo().search([
+                        ('job_position_id', '=', job_pos.id)
+                    ], order='id desc', limit=1)
+
+        # Pre-fetch assessed levels for this employee in the active cycle
+        assessed_levels_by_comp_id = {}
+        if emp:
+            # 1. Primary reporting lines have the official weighted / final scores
+            if cycle:
+                p_lines = self.env['competency.assessment.line'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('cycle_id', '=', cycle.id),
+                    ('is_primary_reporting_line', '=', True)
+                ])
+                for pl in p_lines:
+                    if pl.competency_id:
+                        c_val = int(round(pl.weighted_current_level)) if pl.weighted_current_level else (int(pl.current_level) if pl.current_level and str(pl.current_level).isdigit() else 0)
+                        if c_val > 0:
+                            assessed_levels_by_comp_id[pl.competency_id.id] = c_val
+
+            # 2. Check all assessment lines for this employee in this cycle (self, supervisor, etc.)
+            cycle_domain = [('employee_id', '=', emp.id)]
+            if cycle:
+                cycle_domain.append(('cycle_id', '=', cycle.id))
+            asm_lines = self.env['competency.assessment.line'].sudo().search(cycle_domain)
+            for al in asm_lines:
+                if al.competency_id and al.competency_id.id not in assessed_levels_by_comp_id:
+                    c_val = int(round(al.weighted_current_level)) if al.weighted_current_level else (int(al.current_level) if al.current_level and str(al.current_level).isdigit() else 0)
+                    if c_val > 0:
+                        assessed_levels_by_comp_id[al.competency_id.id] = c_val
+
+        # Primary source: Populate from Role Mapping
+        if mapping and mapping.line_ids:
+            for mline in mapping.line_ids:
+                if mline.competency_id and mline.competency_id.name not in radar_labels:
+                    radar_labels.append(mline.competency_id.name)
+                    m_req = getattr(mline, 'required_proficiency', False) or getattr(mline, 'required_level', False)
+                    req = int(m_req) if m_req and str(m_req).isdigit() else 1
+                    radar_required.append(req)
+                    radar_assessed.append(assessed_levels_by_comp_id.get(mline.competency_id.id, 0))
+                    radar_pillars.append(mline.competency_id.pillar or 'core')
+
+        # Fallback / augmentation: include any additional competencies present in the employee's assessment
+        if my_asm and my_asm.line_ids:
+            for l in my_asm.line_ids:
+                if l.competency_id and l.competency_id.name not in radar_labels:
+                    radar_labels.append(l.competency_id.name)
+                    c_val = assessed_levels_by_comp_id.get(
+                        l.competency_id.id,
+                        int(l.current_level) if l.current_level and str(l.current_level).isdigit() else (int(round(l.weighted_current_level)) if l.weighted_current_level else 0)
+                    )
+                    r_val = int(l.required_level) if l.required_level and str(l.required_level).isdigit() else 1
+                    radar_assessed.append(c_val)
+                    radar_required.append(r_val)
+                    radar_pillars.append(l.competency_id.pillar or 'core')
 
         # Multi-cycle trend history for Employee
         trend_cycles = self.env['competency.assessment.cycle'].sudo().search([], order='id asc', limit=5)
         trend_labels = [c.name for c in trend_cycles]
         trend_values = []
         for c in trend_cycles:
-            casm = self.env['competency.assessment'].search([
+            casm = self.env['competency.assessment'].sudo().search([
                 ('employee_id', '=', emp.id if emp else 0),
-                ('cycle_id', '=', c.id)
+                ('cycle_id', '=', c.id),
+                ('assessment_type', '=', 'self')
             ], limit=1)
+            if not casm:
+                casm = self.env['competency.assessment'].sudo().search([
+                    ('employee_id', '=', emp.id if emp else 0),
+                    ('cycle_id', '=', c.id)
+                ], limit=1)
             trend_values.append(casm.average_gap if casm else 0.0)
 
         # Team metrics for Supervisor / Manager
@@ -800,7 +888,7 @@ class CompetencyDashboard(models.TransientModel):
                         'top_gaps': ", ".join([l.competency_id.name for l in top_gaps]) if (is_sub_fully_assessed and top_gaps) else ('Fit / Qualified' if is_sub_fully_assessed else ('Awaiting Evaluation' if all_sub_asms else 'Not Assigned'))
                     })
 
-        # Department Heatmap Data Matrix (Fix 5: Single-pass in-memory grouping)
+        # Department Heatmap Data Matrix (single-pass in-memory grouping)
         heatmap_rows = []
         if persona != 'employee' and has_real_data and lines:
             dept_lines_map = {}
@@ -915,6 +1003,7 @@ class CompetencyDashboard(models.TransientModel):
                     'labels': radar_labels,
                     'assessed': radar_assessed,
                     'required': radar_required,
+                    'pillars': radar_pillars,
                 },
                 'employee_trend': {
                     'labels': trend_labels,

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form View -->
+    <record id="view_hr_cash_indemnity_form" model="ir.ui.view">
+        <field name="name">hr.cash.indemnity.form</field>
+        <field name="model">hr.cash.indemnity</field>
+        <field name="arch" type="xml">
+            <form string="Cash Indemnity">
+                <header>
+                    <button name="action_fetch_from_cbs"
+                            type="object"
+                            string="Fetch from CBS API"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Employee Info">
+                            <field name="employee_id"/>
+                            <field name="cbs_user_id"/>
+                        </group>
+                        <group string="Date Range">
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="working_days"/>
+                        </group>
+                        <group string="Result">
+                            <field name="amount" widget="monetary"/>
+                            <field name="currency_id" groups="base.group_no_one"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Raw CBS Response">
+                            <field name="raw_response" widget="text" readonly="1" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- List View -->
+    <record id="view_hr_cash_indemnity_list" model="ir.ui.view">
+        <field name="name">hr.cash.indemnity.list</field>
+        <field name="model">hr.cash.indemnity</field>
+        <field name="arch" type="xml">
+            <list string="Cash Indemnities">
+                <field name="employee_id"/>
+                <field name="cbs_user_id"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="amount" widget="monetary"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'fetched'"
+                       decoration-info="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_hr_cash_indemnity" model="ir.actions.act_window">
+        <field name="name">CBS Cash Indemnities</field>
+        <field name="res_model">hr.cash.indemnity</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Menu -->
+    <!-- Assumes menu_hr_resignation_root already exists (from your other
+         installed module, as in your original code). If it doesn't exist,
+         either change "parent" to a menu that does, or delete the parent
+         attribute to make this a top-level menu. -->
+    <!-- 
+    <menuitem id="menu_hr_cash_indemnity"
+              name="CBS Cash Indemnity"
+              parent="menu_hr_resignation_root"
+              action="action_hr_cash_indemnity"
+              sequence="50"/>
+    -->
+
+</odoo>

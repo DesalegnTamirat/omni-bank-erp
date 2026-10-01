@@ -116,9 +116,6 @@ class HrAttendance(models.Model):
                         ) % (emp.name, late_count, force_count, rolling_days),
                     })
                     if supervisor_user:
-                        case.activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('Disciplinary Action Required: Attendance Violation (%s)') % emp.name,
-                            note=_('Employee %s has breached the attendance threshold. Please review the case and enforce disciplinary action.') % emp.name,
-                            user_id=supervisor_user.id
-                        )
+                        case.message_post(body=_(
+                            'Automated attendance breach detected. Assigned to Supervisor (%s) for direct review and enforcement.'
+                        ) % supervisor_user.name)

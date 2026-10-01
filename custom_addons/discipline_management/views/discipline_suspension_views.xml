@@ -27,8 +27,7 @@
                     <header>
                         <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_activate_suspension" string="Activate Suspension" type="object" class="btn-warning"
-                                invisible="state not in ('draft', 'pending_approval', 'referred_bod')"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
+                                invisible="state not in ('draft', 'pending_approval', 'referred_bod') or not can_user_approve_suspension"/>
                         <button name="action_reinstate_employee" string="Reinstate Employee" type="object" class="btn-success"
                                 invisible="state not in ('active', 'extended')"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
@@ -41,37 +40,38 @@
                         <field name="state" widget="statusbar" statusbar_visible="draft,pending_approval,active,completed,converted_dismissal"/>
                     </header>
                     <sheet>
+                        <field name="can_user_approve_suspension" invisible="1"/>
                         <group>
                             <group string="Suspension Details &amp; Governance">
                                 <field name="name"/>
-                                <field name="case_id"/>
+                                <field name="case_id" readonly="1"/>
                                 <field name="employee_id"/>
                                 <field name="department_id"/>
-                                <field name="initiating_unit"/>
+                                <field name="initiating_unit" readonly="1"/>
                                 <field name="is_rmcd_or_iad" invisible="1"/>
                                 <field name="suspending_authority"/>
                             </group>
                             <group string="Type &amp; Duration Rules">
-                                <field name="suspension_type"/>
-                                <field name="start_date"/>
-                                <field name="end_date"/>
+                                <field name="suspension_type" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
+                                <field name="start_date" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
+                                <field name="end_date" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
                                 <field name="working_days_count"/>
                                 <field name="days_remaining"/>
                             </group>
                         </group>
                         <group string="Board of Directors (BOD) Referral" invisible="not is_rmcd_or_iad">
                             <group>
-                                <field name="bod_resolution_number" required="is_rmcd_or_iad and state == 'referred_bod'"/>
-                                <field name="bod_meeting_date"/>
+                                <field name="bod_resolution_number" required="is_rmcd_or_iad and state == 'referred_bod'" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
+                                <field name="bod_meeting_date" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
                             </group>
                             <group>
-                                <field name="bod_resolution_file" filename="bod_resolution_filename"/>
+                                <field name="bod_resolution_file" filename="bod_resolution_filename" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
                                 <field name="bod_resolution_filename" invisible="1"/>
                             </group>
                         </group>
                         <notebook>
                             <page string="Reason &amp; Conditions">
-                                <field name="reason" placeholder="Detailed reason for suspension pending investigation..."/>
+                                <field name="reason" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')" placeholder="Detailed reason for suspension pending investigation..."/>
                             </page>
                         </notebook>
                     </sheet>

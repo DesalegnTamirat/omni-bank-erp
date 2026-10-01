@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 
 class CompetencySkillsTest(models.Model):
-    """Formal Skills Test / Examination record feeding into competency assessment (FR-ASM-003)."""
+    """Formal skills test/examination record that feeds verified proficiency into a competency assessment."""
     _name = 'competency.skills.test'
     _description = 'Competency Skills Test / Examination'
     _order = 'test_date desc, id desc'

@@ -34,6 +34,17 @@ class HrResignationClearanceLineItem(models.Model):
     done_date    = fields.Datetime(readonly=True)
     note         = fields.Text(string='Guidance Note')
 
+    def action_dummy_cleared(self):
+        from odoo.exceptions import UserError
+        raise UserError("This task is already cleared and cannot be undone.")
+
+    def action_toggle_cleared(self):
+        from odoo.exceptions import UserError
+        for rec in self:
+            if not rec.can_clear:
+                raise UserError("You are not authorized to clear this task. Only the assigned responsible user or system administrator can clear this task.")
+            rec.is_done = not rec.is_done
+
     def write(self, vals):
         if 'is_done' in vals:
             for rec in self:
@@ -447,3 +458,4 @@ class HrResignationClearance(models.Model):
                         'user_id': hr_user.id,
                         'date_deadline': fields.Date.today(),
                     })
+

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- ==================== 1. ASSIGNEE RULES ==================== -->
+        <!-- Task: Assignee can view and edit their own assigned tasks or tasks where they are team member -->
+        <record id="rule_pm_task_assignee" model="ir.rule">
+            <field name="name">Assignee: Own Tasks Only</field>
+            <field name="model_id" ref="model_pm_task"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_user'))]"/>
+            <field name="domain_force">['|', '|', ('user_ids', 'in', [user.id]), ('create_uid', '=', user.id), ('project_id.member_ids', 'in', [user.id])]</field>
+        </record>
+
+        <!-- Progress Log: Assignee can manage own progress logs only -->
+        <record id="rule_pm_progress_log_assignee" model="ir.rule">
+            <field name="name">Assignee: Own Progress Logs Only</field>
+            <field name="model_id" ref="model_pm_task_progress_log"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_user'))]"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+        </record>
+
+        <!-- Project: Assignee can view projects they are assigned to -->
+        <record id="rule_pm_project_assignee_read" model="ir.rule">
+            <field name="name">Assignee: View Assigned Projects</field>
+            <field name="model_id" ref="model_pm_project"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_user'))]"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+            <field name="domain_force">['|', '|', ('member_ids', 'in', [user.id]), ('manager_id', '=', user.id), ('coordinator_id', '=', user.id)]</field>
+        </record>
+
+        <!-- ==================== 2. PROJECT MANAGER RULES ==================== -->
+        <!-- Project: Project Manager accesses their own projects fully -->
+        <record id="rule_pm_project_manager_own" model="ir.rule">
+            <field name="name">Project Manager: Own Projects</field>
+            <field name="model_id" ref="model_pm_project"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_project_manager'))]"/>
+            <field name="domain_force">['|', '|', '|', ('manager_id', '=', user.id), ('coordinator_id', '=', user.id), ('member_ids', 'in', [user.id]), ('create_uid', '=', user.id)]</field>
+        </record>
+
+        <!-- Tasks: Project Manager accesses tasks in their own projects -->
+        <record id="rule_pm_task_pm_own" model="ir.rule">
+            <field name="name">Project Manager: Own Project Tasks</field>
+            <field name="model_id" ref="model_pm_task"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_project_manager'))]"/>
+            <field name="domain_force">['|', '|', '|', ('project_id.manager_id', '=', user.id), ('project_id.coordinator_id', '=', user.id), ('user_ids', 'in', [user.id]), ('create_uid', '=', user.id)]</field>
+        </record>
+
+        <!-- Deliverables: Project Manager manages deliverables for their projects -->
+        <record id="rule_pm_deliverable_pm_own" model="ir.rule">
+            <field name="name">Project Manager: Own Project Deliverables</field>
+            <field name="model_id" ref="model_pm_deliverable"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_project_manager'))]"/>
+            <field name="domain_force">['|', '|', ('project_id.manager_id', '=', user.id), ('project_id.coordinator_id', '=', user.id), ('create_uid', '=', user.id)]</field>
+        </record>
+
+        <!-- Milestones: Project Manager manages milestones for their projects -->
+        <record id="rule_pm_milestone_pm_own" model="ir.rule">
+            <field name="name">Project Manager: Own Project Milestones</field>
+            <field name="model_id" ref="model_pm_milestone"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_project_manager'))]"/>
+            <field name="domain_force">['|', '|', ('project_id.manager_id', '=', user.id), ('project_id.coordinator_id', '=', user.id), ('create_uid', '=', user.id)]</field>
+        </record>
+
+        <!-- ==================== 3. PROGRAM MANAGER RULES (ALL ACCESS) ==================== -->
+        <record id="rule_pm_project_program_manager_all" model="ir.rule">
+            <field name="name">Program Manager: All Projects</field>
+            <field name="model_id" ref="model_pm_project"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_pm_task_program_manager_all" model="ir.rule">
+            <field name="name">Program Manager: All Tasks</field>
+            <field name="model_id" ref="model_pm_task"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_pm_deliverable_program_manager_all" model="ir.rule">
+            <field name="name">Program Manager: All Deliverables</field>
+            <field name="model_id" ref="model_pm_deliverable"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_pm_milestone_program_manager_all" model="ir.rule">
+            <field name="name">Program Manager: All Milestones</field>
+            <field name="model_id" ref="model_pm_milestone"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_pm_progress_log_program_manager_all" model="ir.rule">
+            <field name="name">Program Manager: All Progress Logs</field>
+            <field name="model_id" ref="model_pm_task_progress_log"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <!-- ==================== 4. AUDIT RULES (READ ONLY ALL) ==================== -->
+        <record id="rule_pm_project_audit_all" model="ir.rule">
+            <field name="name">Audit: Read All Projects</field>
+            <field name="model_id" ref="model_pm_project"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_audit'))]"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_pm_task_audit_all" model="ir.rule">
+            <field name="name">Audit: Read All Tasks</field>
+            <field name="model_id" ref="model_pm_task"/>
+            <field name="groups" eval="[(4, ref('project_management.group_pm_audit'))]"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+    </data>
+</odoo>

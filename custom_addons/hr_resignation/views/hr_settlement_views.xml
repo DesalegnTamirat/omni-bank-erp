@@ -20,19 +20,23 @@
                             class="btn-secondary" invisible="state != 'draft' or not is_processed"
                             groups="hr_resignation.group_pomd_officer,base.group_system"/>
 
-                    <!-- Step 2: Only appears AFTER Process Settlement has been clicked -->
-                    <button string="Submit for Approval" type="object" name="action_confirm_settlement"
+                    <!-- Step 2: POMD Officer submits to Auditor -->
+                    <button string="Submit for Audit" type="object" name="action_confirm_settlement"
                             class="oe_highlight" invisible="state != 'draft' or not is_processed"
                             groups="hr_resignation.group_pomd_officer,base.group_system"/>
-                    <button string="Approve" type="object" name="action_approve_settlement"
-                            class="oe_highlight" invisible="state != 'waiting_approval'"
-                            groups="hr_resignation.group_resignation_hr_manager"/>
-                    <button string="Refuse" type="object" name="action_open_return_wizard"
-                            class="btn-secondary" invisible="state != 'waiting_approval'"
-                            groups="hr_resignation.group_resignation_hr_manager"/>
+
+                    <!-- Step 3: Auditor checks lines and submits for payment -->
+                    <button string="Confirm &amp; Send for Payment" type="object" name="action_audit_confirm"
+                            class="oe_highlight" invisible="state != 'waiting_audit'"
+                            groups="hr_resignation.group_resignation_auditor,base.group_system"/>
+                    <button string="Return for Revision" type="object" name="action_open_return_wizard"
+                            class="btn-secondary" invisible="state != 'waiting_audit'"
+                            groups="hr_resignation.group_resignation_auditor,base.group_system"/>
+
+                    <!-- Step 4: HR Manager checks & pays directly -->
                     <button string="Pay" type="object" name="action_mark_paid"
-                            class="oe_highlight" invisible="state != 'confirmed'"
-                            groups="hr_resignation.group_pomd_officer"/>
+                            class="oe_highlight" invisible="state != 'waiting_payment'"
+                            groups="hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
                     <!-- Reset to Draft: allows regenerating lines -->
                     <button string="Reset to Draft" type="object" name="action_set_draft"
@@ -45,10 +49,9 @@
                             class="btn-secondary" invisible="state != 'draft' or not is_processed"
                             groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
-                    <field name="state" widget="statusbar" statusbar_visible="draft,waiting_approval,confirmed,paid"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,waiting_audit,waiting_payment,paid"/>
                 </header>
                 <sheet>
-                    <widget name="web_ribbon" title="APPROVED" bg_color="text-bg-success" invisible="state != 'confirmed'"/>
                     <widget name="web_ribbon" title="PAID" bg_color="text-bg-success" invisible="state != 'paid'"/>
 
                     <div class="oe_title">
@@ -63,6 +66,12 @@
                     
                     <group>
                         <group string="SERVICE CONTEXT">
+                            <field name="related_release_date" invisible="1"/>
+                            <field name="settlement_date" string="Release Date" readonly="state != 'draft'" required="1"/>
+                            <field name="date_change_justification" 
+                                   invisible="settlement_date == False or settlement_date == related_release_date" 
+                                   required="settlement_date != False and settlement_date != related_release_date" 
+                                   readonly="state != 'draft'"/>
                             <field name="service_years" readonly="1"/>
                             <field name="employment_type" readonly="1"/>
                             <field name="settlement_authorized" readonly="1" widget="boolean_toggle"/>
@@ -111,9 +120,6 @@
                             <!-- Lines only visible AFTER Process Settlement is clicked -->
                             <field name="line_ids" nolabel="1" readonly="state != 'draft'" invisible="not is_processed">
                                 <list editable="bottom">
-                                    <control>
-                                        <create name="add_line_control" string="Add a line"/>
-                                    </control>
                                     <field name="name" string="Description"/>
                                     <field name="line_type" string="Type"/>
                                     <field name="is_taxable" string="Taxable?" widget="boolean"/>

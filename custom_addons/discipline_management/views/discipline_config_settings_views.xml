@@ -8,7 +8,7 @@
             <field name="inherit_id" ref="base.res_config_settings_view_form"/>
             <field name="arch" type="xml">
                 <xpath expr="//form" position="inside">
-                    <app data-string="Discipline" string="Discipline &amp; Governance" name="discipline_management" groups="discipline_management.group_discipline_admin">
+                    <app data-string="Discipline" string="Discipline" name="discipline_management" groups="discipline_management.group_discipline_admin">
                         <block title="Disciplinary Governance &amp; SLA Settings" id="discipline_governance_settings">
                             <setting id="discipline_sla_setting" string="Disciplinary SLA Resolution Target" help="Default resolution SLA in working days.">
                                 <div class="content-group">
@@ -74,6 +74,49 @@
                                     <div class="row mt16">
                                         <label for="attendance_rolling_days" class="col-lg-5 o_light_label"/>
                                         <field name="attendance_rolling_days" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                        </block>
+
+                        <block title="Disciplinary Committee Master Roles &amp; Union Configuration" id="discipline_committee_master_roles">
+                            <setting id="discipline_cpco_setting" string="Disciplinary Committee Chair (CPCO)" help="Designated CPCO user for Committee Chairmanship and Managerial Suspension approval.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_cpco_user_id" class="col-lg-5 o_light_label"/>
+                                        <field name="discipline_cpco_user_id" class="col-lg-7"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="discipline_secretary_setting" string="Committee Secretary (POMD Director)" help="Designated People Operations Director for Committee Secretary and minute taking.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_secretary_user_id" class="col-lg-5 o_light_label"/>
+                                        <field name="discipline_secretary_user_id" class="col-lg-7"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="discipline_legal_setting" string="Legal Directorate Member" help="Designated Legal Directorate representative on the Disciplinary Committee.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_legal_user_id" class="col-lg-5 o_light_label"/>
+                                        <field name="discipline_legal_user_id" class="col-lg-7"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="discipline_union_setting" string="Labour Union Representative" help="Designated Labour Union representative included in all Disciplinary Committee meetings.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_union_user_id" class="col-lg-5 o_light_label"/>
+                                        <field name="discipline_union_user_id" class="col-lg-7"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="discipline_audit_setting" string="Internal Audit Directorate Director" help="Designated Audit Director for bank-wide audit investigations and reporting.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_audit_user_id" class="col-lg-5 o_light_label"/>
+                                        <field name="discipline_audit_user_id" class="col-lg-7"/>
                                     </div>
                                 </div>
                             </setting>

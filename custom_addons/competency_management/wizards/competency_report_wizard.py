@@ -4,12 +4,31 @@ import csv
 import base64
 import xlsxwriter
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, AccessError
 
 class CompetencyReportWizard(models.TransientModel):
-    """Ad-hoc Cascading Report Filtering & Multi-Format Export Wizard (PDF, Excel, CSV) (FR-RPT-007, FR-RPT-009)."""
+    """Multi-format export wizard (PDF, Excel, CSV) with cascading department/pillar filters."""
     _name = 'competency.report.wizard'
     _description = 'Competency Cascading Report & Export Wizard'
+
+    @api.model
+    def default_get(self, fields_list):
+        user = self.env.user
+        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR / People Solution Officers and Competency Administrators can access reporting."))
+        return super().default_get(fields_list)
+
+    def web_read(self, specification):
+        user = self.env.user
+        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR / People Solution Officers and Competency Administrators can access reporting."))
+        return super(CompetencyReportWizard, self.sudo()).web_read(specification)
+
+    def read(self, fields=None, load='_classic_read'):
+        user = self.env.user
+        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR / People Solution Officers and Competency Administrators can access reporting."))
+        return super(CompetencyReportWizard, self.sudo()).read(fields=fields, load=load)
 
     @api.model
     def _get_user_scope_ou_ids(self, user):
@@ -69,12 +88,9 @@ class CompetencyReportWizard(models.TransientModel):
     # Evaluation & Status Filters
     stage_filter = fields.Selection([
         ('all', 'All Stages'),
-        ('draft', 'Draft'),
+        ('draft', 'Draft (In Progress)'),
         ('submitted', 'Submitted'),
-        ('supervisor_review', 'Supervisor Review'),
-        ('hr_verified', 'HR Verified'),
-        ('approved', 'Approved'),
-        ('locked', 'Locked'),
+        ('closed', 'Cycle Closed'),
     ], string='Assessment Stage', default='all', required=True)
 
     pillar = fields.Selection([
@@ -396,12 +412,18 @@ class CompetencyReportWizard(models.TransientModel):
         if self.achievement_status != 'all':
             domain.append(('achievement_status', '=', self.achievement_status))
         if self.stage_filter != 'all':
-            domain.append(('assessment_id.state', '=', self.stage_filter))
+            if self.stage_filter == 'closed':
+                domain.append(('assessment_id.cycle_id.state', '=', 'closed'))
+            else:
+                domain.append(('assessment_id.state', '=', self.stage_filter))
         return domain
 
     def action_generate_report(self):
         """Primary action: Generate Report based on Export Format & Report Type selections."""
         self.ensure_one()
+        user = self.env.user
+        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR / People Solution Officers and Competency Administrators can generate competency reports."))
         if self.export_format == 'pdf':
             return self.action_print_pdf()
         elif self.export_format == 'csv':
@@ -412,6 +434,9 @@ class CompetencyReportWizard(models.TransientModel):
     def action_apply_filter(self):
         """Action: Open filtered list/pivot view tailored to selected report_type."""
         self.ensure_one()
+        user = self.env.user
+        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR / People Solution Officers and Competency Administrators can access reporting views."))
 
         if self.report_type == 'detailed_matrix':
             domain = self._build_line_domain()

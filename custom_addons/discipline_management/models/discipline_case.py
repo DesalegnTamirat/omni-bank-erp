@@ -7,7 +7,7 @@ from datetime import timedelta
 class DisciplineCase(models.Model):
     _name = 'discipline.case'
     _description = 'Disciplinary Case Record'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'incident_date desc, id desc'
 
     name = fields.Char(string='Case Reference', required=True, copy=False, readonly=True, default=lambda self: _('New'))
@@ -177,7 +177,8 @@ class DisciplineCase(models.Model):
         'decided_penalty_percentage',
         'decided_fine_days',
         'cash_shortage_amount',
-        'is_statutory_mitigation_applied'
+        'is_statutory_mitigation_applied',
+        'appeal_outcome_type'
     )
     def _compute_punishment_details(self):
         rank_order = {
@@ -289,21 +290,33 @@ class DisciplineCase(models.Model):
                     if match_line:
                         line = match_line[0]
                         punish = line.punishment_type
-                        pct = line.managerial_penalty_pct if is_managerial else (line.non_managerial_penalty_pct or line.penalty_percentage)
-                        days = line.managerial_fine_days if is_managerial else (line.non_managerial_fine_days or line.fine_days)
+                        if is_managerial:
+                            pct = line.managerial_penalty_pct or 0.0
+                            days = line.managerial_fine_days if line.managerial_fine_days else (line.fine_days or (3.0 if punish == 'final_warning_penalty' else (2.0 if punish == 'second_warning_penalty' else (1.0 if punish == 'first_warning_penalty' else 0.0))))
+                        else:
+                            pct = line.non_managerial_penalty_pct if line.non_managerial_penalty_pct else (line.penalty_percentage or (20.0 if punish == 'final_warning_penalty' else (10.0 if punish == 'second_warning_penalty' else (5.0 if punish == 'first_warning_penalty' else 0.0))))
+                            days = 0.0
                         rule_notes.append(_('Applied Repetition Escalation Ladder (Tier %s / %s)') % (occurrence, line.occurrence_label or ''))
                 elif off.penalty_mode == 'article_override':
                     punish = off.custom_punishment_type or getattr(off, 'punishment_type', False) or (lvl and lvl.default_punishment_type)
-                    pct = off.custom_penalty_percentage or getattr(off, 'penalty_percentage', 0.0)
-                    days = off.custom_fine_days or getattr(off, 'fine_days', 0.0)
+                    if is_managerial:
+                        pct = off.custom_penalty_percentage or 0.0
+                        days = off.custom_fine_days or getattr(off, 'fine_days', 0.0) or (3.0 if punish == 'final_warning_penalty' else (2.0 if punish == 'second_warning_penalty' else (1.0 if punish == 'first_warning_penalty' else 0.0)))
+                    else:
+                        pct = off.custom_penalty_percentage or getattr(off, 'penalty_percentage', 0.0) or (20.0 if punish == 'final_warning_penalty' else (10.0 if punish == 'second_warning_penalty' else (5.0 if punish == 'first_warning_penalty' else 0.0)))
+                        days = 0.0
                     if not punish and days > 0:
                         punish = 'fine'
                     rule_notes.append(_('Applied Custom Article Penalty Override (%s, %s days fine, %s%% deduction)') % (punish, days, pct))
 
             if not punish and lvl:
                 punish = lvl.default_punishment_type
-                pct = (getattr(lvl, 'default_managerial_penalty_pct', 0.0) if is_managerial else getattr(lvl, 'default_non_managerial_penalty_pct', 0.0)) or getattr(lvl, 'default_penalty_percentage', 0.0)
-                days = (getattr(lvl, 'default_managerial_fine_days', 0.0) if is_managerial else getattr(lvl, 'default_non_managerial_fine_days', 0.0)) or getattr(lvl, 'default_fine_days', 0.0)
+                if is_managerial:
+                    pct = getattr(lvl, 'default_managerial_penalty_pct', 0.0)
+                    days = getattr(lvl, 'default_managerial_fine_days', 0.0) or getattr(lvl, 'default_fine_days', 0.0) or (3.0 if lvl.code == 'level_2' else (2.0 if lvl.code == 'level_3' else (1.0 if lvl.code == 'level_4' else 0.0)))
+                else:
+                    pct = getattr(lvl, 'default_non_managerial_penalty_pct', 0.0) or getattr(lvl, 'default_penalty_percentage', 0.0) or (20.0 if lvl.code == 'level_2' else (10.0 if lvl.code == 'level_3' else (5.0 if lvl.code == 'level_4' else 0.0)))
+                    days = 0.0
                 rule_notes.append(_('Applied Severity Level Standard Baseline (%s)') % lvl.name)
 
             # Check Article 33.1.4 1-grade escalation if active prior warning exists and not already dismissal
@@ -332,12 +345,21 @@ class DisciplineCase(models.Model):
                         pct = 0.0
                         days = 0.0
                     elif punish == 'first_warning_penalty':
-                        pct = min(pct, 5.0)
-                        days = min(days, 1.0)
+                        pct = 5.0 if not is_managerial else 0.0
+                        days = 1.0 if is_managerial else 0.0
                     elif punish == 'second_warning_penalty':
-                        pct = min(pct, 10.0)
-                        days = min(days, 2.0)
+                        pct = 10.0 if not is_managerial else 0.0
+                        days = 2.0 if is_managerial else 0.0
+                    elif punish == 'final_warning_penalty':
+                        pct = 20.0 if not is_managerial else 0.0
+                        days = 3.0 if is_managerial else 0.0
                     rule_notes.append(_('Mitigated by 1 Rank pursuant to CBA Art. 33.13 (Good faith / clean record / performance factor).'))
+
+            # Final enforcement of staff category segregation
+            if not is_managerial:
+                days = 0.0
+            else:
+                pct = 0.0
 
             rec.is_escalated_by_active_warning = is_escalated
             rec.auto_applied_rule_summary = ' | '.join(rule_notes) if rule_notes else False
@@ -346,9 +368,19 @@ class DisciplineCase(models.Model):
             rec.original_penalty_percentage = pct
             rec.original_fine_days = days
 
-            rec.punishment_type = rec.decided_punishment_type or punish
-            rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
-            rec.fine_days = rec.decided_fine_days if rec.decided_fine_days > 0 else days
+            if rec.appeal_outcome_type == 'exonerated' or (rec.state in ('enforced', 'closed', 'appealed') and rec.punishment_type == 'exonerate'):
+                rec.punishment_type = 'exonerate'
+                rec.penalty_percentage = 0.0
+                rec.fine_days = 0.0
+            elif rec.appeal_outcome_type == 'reduced' and rec.latest_appeal_id and rec.latest_appeal_id.state == 'decided':
+                last_app = rec.latest_appeal_id
+                rec.punishment_type = last_app.revised_punishment_type or punish
+                rec.penalty_percentage = last_app.revised_penalty_percentage
+                rec.fine_days = last_app.revised_fine_days
+            else:
+                rec.punishment_type = rec.decided_punishment_type or punish
+                rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
+                rec.fine_days = rec.decided_fine_days if rec.decided_fine_days > 0 else days
 
     @api.onchange('employee_id', 'case_action_track')
     def _onchange_employee_id_filter_regulations(self):
@@ -501,7 +533,73 @@ class DisciplineCase(models.Model):
         ('audit', 'Internal Audit / Compliance'),
     ], string='Case Initiator Source', default=_default_initiator_type, store=True, readonly=False, tracking=True)
 
-    chief_id = fields.Many2one('res.users', string='Respective Chief Officer', tracking=True)
+    chief_id = fields.Many2one(
+        'res.users',
+        string='Respective Chief Officer',
+        compute='_compute_chief_id',
+        store=True,
+        readonly=False,
+        tracking=True
+    )
+
+    def _find_respective_chief_user(self):
+        """Locate the respective Chief Officer by traversing the supervisor/coach hierarchy chain."""
+        self.ensure_one()
+        # 1. Start from Initiator / Reporter employee if available, or subject employee
+        start_emp = (self.reported_by_id and self.reported_by_id.employee_id) or (self.create_uid and self.create_uid.employee_id) or self.employee_id
+        
+        curr = start_emp
+        visited = set()
+        while curr and curr.id not in visited:
+            visited.add(curr.id)
+            mgr = curr.coach_id or curr.parent_id or (curr.department_id and curr.department_id.manager_id)
+            if not mgr or mgr.id == curr.id:
+                break
+            
+            job_name = (mgr.job_id.name or '').lower() if mgr.job_id else ''
+            exec_lvl = getattr(mgr, 'executive_level', False)
+            if exec_lvl in ('chief', 'ceo') or any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+                if mgr.user_id:
+                    return mgr.user_id
+            curr = mgr
+
+        # 2. If not found via reporter, try subject employee hierarchy
+        if self.employee_id and self.employee_id != start_emp:
+            curr = self.employee_id
+            visited = set()
+            while curr and curr.id not in visited:
+                visited.add(curr.id)
+                mgr = curr.coach_id or curr.parent_id or (curr.department_id and curr.department_id.manager_id)
+                if not mgr or mgr.id == curr.id:
+                    break
+                job_name = (mgr.job_id.name or '').lower() if mgr.job_id else ''
+                exec_lvl = getattr(mgr, 'executive_level', False)
+                if exec_lvl in ('chief', 'ceo') or any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+                    if mgr.user_id:
+                        return mgr.user_id
+                curr = mgr
+
+        # 3. Fallback: Search for an employee with executive_level='chief' or CPCO
+        chief_emp = self.env['hr.employee'].sudo().search([
+            ('executive_level', '=', 'chief'),
+            ('user_id', '!=', False)
+        ], limit=1)
+        if chief_emp and chief_emp.user_id:
+            return chief_emp.user_id
+        
+        cpco_user = self.env['hr.employee'].get_cpco_user()
+        if cpco_user:
+            return cpco_user
+            
+        return False
+
+    @api.depends('employee_id', 'reported_by_id', 'case_action_track')
+    def _compute_chief_id(self):
+        for rec in self:
+            if not rec.chief_id or rec.case_action_track == 'committee_escalation':
+                chief_u = rec._find_respective_chief_user()
+                if chief_u:
+                    rec.chief_id = chief_u
     escalation_target = fields.Selection([
         ('audit', 'Audit Directorate'),
         ('ceo', 'Chief Executive Officer (CEO)'),
@@ -509,13 +607,95 @@ class DisciplineCase(models.Model):
     ceo_assignment_notes = fields.Text(string='CEO Assignment Remarks', tracking=True)
     delivery_receipt_date = fields.Date(string='Decision Letter Delivery / Receipt Date', tracking=True)
 
+    appeal_ids = fields.One2many(
+        'discipline.appeal', 'case_id', string='Appeals'
+    )
+    appeal_count = fields.Integer(
+        string='Appeal Count', compute='_compute_appeal_stats'
+    )
+    has_active_appeal = fields.Boolean(
+        string='Has Active Appeal', compute='_compute_appeal_stats'
+    )
+    latest_appeal_id = fields.Many2one(
+        'discipline.appeal', string='Latest Appeal', compute='_compute_appeal_stats'
+    )
+    appeal_outcome_type = fields.Selection([
+        ('none', 'No Appeal'),
+        ('pending', 'Appeal in Progress'),
+        ('exonerated', 'Exonerated on Appeal'),
+        ('reduced', 'Penalty Reduced on Appeal'),
+        ('upheld', 'Original Decision Upheld'),
+    ], string='Appeal Outcome Status', compute='_compute_appeal_outcome', store=True)
+    appeal_outcome_display = fields.Text(
+        string='Appeal Decision Summary', compute='_compute_appeal_outcome', store=True
+    )
+
+    @api.depends('appeal_ids', 'appeal_ids.state', 'appeal_ids.submission_date')
+    def _compute_appeal_stats(self):
+        for rec in self:
+            appeals = rec.appeal_ids.sorted(lambda a: (a.submission_date or fields.Date.today(), a.id or 0), reverse=True)
+            rec.appeal_count = len(appeals)
+            rec.latest_appeal_id = appeals[0] if appeals else False
+            rec.has_active_appeal = any(a.state in ('submitted', 'under_review') for a in appeals)
+
+    @api.depends('appeal_ids', 'appeal_ids.state', 'appeal_ids.decision_outcome', 'appeal_ids.revised_punishment_type', 'appeal_ids.revised_penalty_percentage', 'appeal_ids.revised_fine_days', 'appeal_ids.review_date')
+    def _compute_appeal_outcome(self):
+        for rec in self:
+            appeals = rec.appeal_ids.sorted(lambda a: (a.submission_date or fields.Date.today(), a.id or 0), reverse=True)
+            if not appeals:
+                rec.appeal_outcome_type = 'none'
+                rec.appeal_outcome_display = False
+                continue
+
+            has_pending = any(a.state in ('submitted', 'under_review') for a in appeals)
+            decided_appeals = appeals.filtered(lambda a: a.state == 'decided')
+            if decided_appeals:
+                last_decision = decided_appeals[0]
+                outcome = last_decision.decision_outcome
+                rev_punish = last_decision.revised_punishment_type
+                reviewer = last_decision.reviewer_id.name or 'Executive Reviewer'
+                d_date = last_decision.review_date or last_decision.submission_date or fields.Date.today()
+
+                if outcome == 'overturned' or rev_punish == 'exonerate' or (last_decision.revised_fine_days == 0.0 and last_decision.revised_penalty_percentage == 0.0 and rev_punish in ('exonerate', False)):
+                    rec.appeal_outcome_type = 'exonerated'
+                    rec.appeal_outcome_display = _(
+                        "Fully Exonerated on Appeal by %s on %s. All penalties, records, and active warning durations have been completely voided."
+                    ) % (reviewer, d_date)
+                elif outcome == 'penalty_reduced':
+                    rec.appeal_outcome_type = 'reduced'
+                    punish_label = dict(last_decision._fields['revised_punishment_type'].selection).get(rev_punish, rev_punish) if rev_punish else 'Reduced Sanction'
+                    rec.appeal_outcome_display = _(
+                        "Disciplinary Penalty Reduced on Appeal by %s on %s. Revised Measure: %s (Salary Fine: %s Days, Deduction: %s%%)."
+                    ) % (reviewer, d_date, punish_label, last_decision.revised_fine_days, last_decision.revised_penalty_percentage)
+                elif outcome == 'upheld':
+                    rec.appeal_outcome_type = 'upheld'
+                    rec.appeal_outcome_display = _(
+                        "Original Disciplinary Decision Upheld on Appeal by %s on %s."
+                    ) % (reviewer, d_date)
+                else:
+                    rec.appeal_outcome_type = 'pending' if has_pending else 'none'
+                    rec.appeal_outcome_display = False
+            elif has_pending:
+                rec.appeal_outcome_type = 'pending'
+                rec.appeal_outcome_display = _("An appeal has been submitted and is currently under review.")
+            else:
+                rec.appeal_outcome_type = 'none'
+                rec.appeal_outcome_display = False
+
     active_duration_days = fields.Integer(string='Penalty Active Duration (Days)', compute='_compute_active_duration_days', store=True, readonly=True)
     active_penalty_end_date = fields.Date(string='Penalty Active Expiration Date', compute='_compute_active_penalty_end_date', store=True, tracking=True)
 
-    @api.depends('punishment_type', 'decided_punishment_type', 'severity_level_id', 'severity_level_id.active_duration_days', 'offense_id', 'offense_id.custom_warning_validity_months')
+    @api.depends('punishment_type', 'decided_punishment_type', 'severity_level_id', 'severity_level_id.active_duration_days', 'offense_id', 'offense_id.custom_warning_validity_months', 'appeal_outcome_type', 'state')
     def _compute_active_duration_days(self):
         for rec in self:
+            if rec.appeal_outcome_type == 'exonerated' or rec.punishment_type == 'exonerate' or rec.decided_punishment_type == 'exonerate':
+                rec.active_duration_days = 0
+                continue
             punish = rec.decided_punishment_type or rec.punishment_type or (rec.severity_level_id and rec.severity_level_id.default_punishment_type)
+            if hasattr(punish, 'default_punishment_type'):
+                punish = punish.default_punishment_type or False
+            elif not isinstance(punish, str):
+                punish = str(punish) if punish else False
             if rec.offense_id and rec.offense_id.custom_warning_validity_months and rec.offense_id.custom_warning_validity_months > 0 and rec.offense_id.penalty_mode == 'article_override' and not rec.is_cash_shortage:
                 rec.active_duration_days = rec.offense_id.custom_warning_validity_months * 30
             elif punish == 'verbal_warning':
@@ -531,10 +711,12 @@ class DisciplineCase(models.Model):
             else:
                 rec.active_duration_days = 90
 
-    @api.depends('final_decision_date', 'active_duration_days', 'state')
+    @api.depends('final_decision_date', 'active_duration_days', 'state', 'appeal_outcome_type')
     def _compute_active_penalty_end_date(self):
         for rec in self:
-            if rec.final_decision_date and rec.state == 'enforced':
+            if rec.appeal_outcome_type == 'exonerated' or rec.active_duration_days == 0:
+                rec.active_penalty_end_date = False
+            elif rec.final_decision_date and rec.state == 'enforced':
                 rec.active_penalty_end_date = rec.final_decision_date + timedelta(days=rec.active_duration_days or 365)
             else:
                 rec.active_penalty_end_date = False
@@ -583,18 +765,30 @@ class DisciplineCase(models.Model):
 
     @api.depends('reported_by_id', 'create_uid')
     def _compute_subordinate_employee_ids(self):
+        user = self.env.user
+        emp = user.sudo().employee_id
+        is_admin_or_officer = (
+            user.has_group('discipline_management.group_discipline_admin') or
+            user.has_group('discipline_management.group_discipline_pomd') or
+            user.has_group('discipline_management.group_discipline_cpco') or
+            user.has_group('discipline_management.group_discipline_ceo') or
+            user.has_group('discipline_management.group_discipline_audit') or
+            user.has_group('discipline_management.group_discipline_legal') or
+            user.has_group('base.group_system')
+        )
         for rec in self:
-            reporter = rec.reported_by_id or self.env.user.employee_id
-            if reporter:
+            if is_admin_or_officer:
+                rec.subordinate_employee_ids = self.env['hr.employee'].sudo().search([])
+            elif emp:
                 subs = self.env['hr.employee'].sudo().search([
                     '|', '|',
-                    ('id', 'child_of', reporter.id),
-                    ('coach_id', '=', reporter.id),
-                    ('department_id.manager_id', '=', reporter.id)
+                    ('parent_id', '=', emp.id),
+                    ('coach_id', '=', emp.id),
+                    ('department_id.manager_id', '=', emp.id)
                 ])
-                rec.subordinate_employee_ids = subs
+                rec.subordinate_employee_ids = subs | emp
             else:
-                rec.subordinate_employee_ids = self.env['hr.employee'].sudo().search([])
+                rec.subordinate_employee_ids = self.env['hr.employee']
 
     @api.depends('offense_id', 'offense_id.line_ids')
     def _compute_allowed_severity_level_ids(self):
@@ -652,6 +846,7 @@ class DisciplineCase(models.Model):
         ('submitted_chief', 'Submitted to Respective Chief'),
         ('ceo_review', 'Under CEO Review'),
         ('investigating', 'Under Audit Investigation'),
+        ('chairman_review', 'Committee Chairman Review'),
         ('committee_review', 'Committee Review'),
         ('pending_approval', 'Pending Final Approval'),
         ('enforced', 'Enforced / Finalized'),
@@ -712,6 +907,25 @@ class DisciplineCase(models.Model):
     # Computed counts for smart buttons
     appeal_count = fields.Integer(string='Appeal Count', compute='_compute_appeal_count')
     suspension_count = fields.Integer(string='Suspension Count', compute='_compute_suspension_count')
+    investigation_count = fields.Integer(string='Investigation Count', compute='_compute_investigation_count')
+    committee_meeting_count = fields.Integer(string='Meeting Count', compute='_compute_committee_meeting_count')
+
+    has_completed_committee_meeting = fields.Boolean(
+        string='Has Completed Committee Meeting',
+        compute='_compute_committee_meeting_state'
+    )
+    has_active_committee_meeting = fields.Boolean(
+        string='Has Active Committee Meeting',
+        compute='_compute_committee_meeting_state'
+    )
+
+    @api.depends('committee_meeting_ids', 'committee_meeting_ids.state')
+    def _compute_committee_meeting_state(self):
+        for rec in self:
+            completed = rec.committee_meeting_ids.filtered(lambda m: m.state == 'completed')
+            active = rec.committee_meeting_ids.filtered(lambda m: m.state not in ('completed', 'cancelled'))
+            rec.has_completed_committee_meeting = bool(completed)
+            rec.has_active_committee_meeting = bool(active)
 
     @api.depends('employee_id', 'employee_id.job_id', 'severity_level', 'punishment_type')
     def _compute_required_final_authority(self):
@@ -730,6 +944,14 @@ class DisciplineCase(models.Model):
     def _compute_suspension_count(self):
         for rec in self:
             rec.suspension_count = len(rec.suspension_ids)
+
+    def _compute_investigation_count(self):
+        for rec in self:
+            rec.investigation_count = len(rec.investigation_ids)
+
+    def _compute_committee_meeting_count(self):
+        for rec in self:
+            rec.committee_meeting_count = len(rec.committee_meeting_ids)
 
     @api.depends('create_date', 'incident_date', 'sla_target_days')
     def _compute_sla_deadline(self):
@@ -786,10 +1008,39 @@ class DisciplineCase(models.Model):
         string='Can Submit Appeal',
         compute='_compute_current_user_roles'
     )
+    can_submit_first_appeal = fields.Boolean(
+        string='Can Submit 1st Level Appeal',
+        compute='_compute_current_user_roles'
+    )
+    can_submit_second_appeal = fields.Boolean(
+        string='Can Submit 2nd Level Appeal',
+        compute='_compute_current_user_roles'
+    )
+    can_submit_third_appeal = fields.Boolean(
+        string='Can Submit 3rd Level Appeal',
+        compute='_compute_current_user_roles'
+    )
     can_lodge_appeal_on_behalf = fields.Boolean(
         string='Can Lodge Appeal On Behalf',
         compute='_compute_current_user_roles'
     )
+    can_lodge_first_appeal_on_behalf = fields.Boolean(
+        string='Can Lodge 1st Level Appeal (On Behalf)',
+        compute='_compute_current_user_roles'
+    )
+    can_lodge_second_appeal_on_behalf = fields.Boolean(
+        string='Can Lodge 2nd Level Appeal (On Behalf)',
+        compute='_compute_current_user_roles'
+    )
+    can_lodge_third_appeal_on_behalf = fields.Boolean(
+        string='Can Lodge 3rd Level Appeal (On Behalf)',
+        compute='_compute_current_user_roles'
+    )
+    next_appeal_level = fields.Selection([
+        ('first', '1st Level Appeal'),
+        ('second', '2nd Level Appeal'),
+        ('third', '3rd Level Appeal (Final to CEO)'),
+    ], string='Next Eligible Appeal Stage', compute='_compute_current_user_roles')
     is_pomd_user = fields.Boolean(
         string='Is POMD User',
         compute='_compute_current_user_roles'
@@ -817,19 +1068,46 @@ class DisciplineCase(models.Model):
 
     def _compute_current_user_roles(self):
         current_user = self.env.user
+        EmpModel = self.env['hr.employee']
+        cpco_user = EmpModel.get_cpco_user()
+        sec_user = EmpModel.get_secretary_user()
+        audit_user = EmpModel.get_audit_director_user()
+        ceo_user = EmpModel.get_ceo_user()
         is_admin = current_user.has_group('discipline_management.group_discipline_admin') or current_user.has_group('base.group_system')
-        is_pomd = current_user.has_group('discipline_management.group_discipline_pomd') or is_admin
-        is_aud = current_user.has_group('discipline_management.group_discipline_auditor') or is_admin
-        is_dir = current_user.has_group('discipline_management.group_discipline_director') or is_admin
-        is_chf = current_user.has_group('discipline_management.group_discipline_chief') or is_admin
-        is_ceo = current_user.has_group('discipline_management.group_discipline_ceo') or is_admin
-        is_cpco = current_user.has_group('discipline_management.group_discipline_cpco') or is_admin
+        emp = current_user.employee_id
+        job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+
+        # 1. CEO User
+        is_ceo = bool(
+            (ceo_user and current_user.id == ceo_user.id) or
+            (emp and (emp.executive_level == 'ceo' or any(k in job_name for k in ['ceo', 'president', 'chief executive']))) or
+            current_user.has_group('discipline_management.group_discipline_ceo') or
+            is_admin
+        )
+
+        # 2. CPCO / Committee Chairman User (Strictly Chairman, not CEO)
+        is_cpco = bool(
+            (cpco_user and current_user.id == cpco_user.id) or
+            (current_user.has_group('discipline_management.group_discipline_cpco') and not (ceo_user and current_user.id == ceo_user.id) and not current_user.has_group('discipline_management.group_discipline_ceo')) or
+            is_admin
+        )
+
+        # 3. POMD / Committee Secretary User (Strictly Secretary, not CPCO or CEO)
+        is_pomd = bool(
+            (sec_user and current_user.id == sec_user.id) or
+            (current_user.has_group('discipline_management.group_discipline_pomd') and not current_user.has_group('discipline_management.group_discipline_cpco') and not current_user.has_group('discipline_management.group_discipline_ceo')) or
+            is_admin
+        )
+
+        is_aud = bool((audit_user and current_user.id == audit_user.id) or current_user.has_group('discipline_management.group_discipline_auditor') or is_admin)
+        is_dir = bool((emp and (emp.executive_level in ('director', 'chief', 'ceo') or any(k in job_name for k in ['director', 'chief', 'ceo', 'president', 'vp']))) or current_user.has_group('discipline_management.group_discipline_director') or is_admin)
+        is_chf_base = bool((emp and (emp.executive_level in ('chief', 'ceo') or any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']))) or (cpco_user and current_user.id == cpco_user.id) or current_user.has_group('discipline_management.group_discipline_chief') or is_admin)
 
         for rec in self:
             rec.is_pomd_user = is_pomd
             rec.is_auditor_user = is_aud
             rec.is_director_user = is_dir
-            rec.is_chief_user = is_chf
+            rec.is_chief_user = is_chf_base or bool(rec.chief_id and rec.chief_id.id == current_user.id)
             rec.is_ceo_user = is_ceo
             rec.is_cpco_user = is_cpco
 
@@ -843,12 +1121,7 @@ class DisciplineCase(models.Model):
             )
             rec.is_current_user_employee = is_emp
 
-            has_pending_appeal = bool(rec.appeal_ids.filtered(lambda a: a.state in ['submitted', 'under_review']))
-
-            # Direct Appeal: ONLY visible for the subject employee, when appeal window is open, in enforced state, and no pending appeal
-            rec.can_submit_appeal = is_emp and rec.is_appeal_window_open and not has_pending_appeal and rec.state == 'enforced'
-
-            # On-Behalf Appeal: ONLY visible for POMD Director / Admin, when enforcement is dismissal AND employee is inactive
+            has_pending_appeal = any(a.state in ('draft', 'submitted', 'under_review') for a in rec.appeal_ids)
             is_dismissal = rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal'
             is_emp_inactive = bool(
                 rec.employee_id and (
@@ -856,14 +1129,100 @@ class DisciplineCase(models.Model):
                     (rec.employee_id.user_id and not rec.employee_id.user_id.active)
                 )
             )
-            rec.can_lodge_appeal_on_behalf = (
+            is_pomd_eligible = (
                 is_pomd and
                 is_dismissal and
                 is_emp_inactive and
-                rec.state in ('enforced', 'closed') and
-                rec.is_appeal_window_open and
-                not has_pending_appeal
+                rec.state in ('enforced', 'closed')
             )
+
+            # Determine case origin track for appeal escalation hierarchy
+            if rec.initiator_type == 'audit' or rec.case_action_track == 'committee_escalation':
+                origin_type = 'committee'
+            else:
+                initiator_emp = rec.reported_by_id.sudo().employee_id if rec.reported_by_id else False
+                if not initiator_emp and rec.employee_id:
+                    initiator_emp = rec.employee_id.sudo().coach_id or rec.employee_id.sudo().parent_id
+                
+                level = getattr(initiator_emp, 'executive_level', False) if initiator_emp else False
+                if not level and initiator_emp:
+                    job_name = (initiator_emp.job_id.sudo().name or '').lower() if initiator_emp.job_id else ''
+                    if any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+                        level = 'chief'
+                    elif any(k in job_name for k in ['director', 'directorate']):
+                        level = 'director'
+                    else:
+                        level = 'manager'
+                
+                if level == 'chief':
+                    origin_type = 'chief'
+                elif level == 'director':
+                    origin_type = 'director'
+                else:
+                    origin_type = 'manager'
+
+            first_appeal = rec.appeal_ids.filtered(lambda a: a.appeal_level == 'first')
+            second_appeal = rec.appeal_ids.filtered(lambda a: a.appeal_level == 'second')
+            third_appeal = rec.appeal_ids.filtered(lambda a: a.appeal_level == 'third')
+
+            is_exonerated = (
+                rec.appeal_outcome_type == 'exonerated' or
+                rec.punishment_type == 'exonerate'
+            )
+
+            # 1st Level Appeal Eligibility
+            eligible_first = (
+                not first_appeal and
+                rec.state == 'enforced' and
+                rec.is_appeal_window_open and
+                not has_pending_appeal and
+                not is_exonerated
+            )
+
+            # 2nd Level Appeal Eligibility
+            eligible_second = False
+            if first_appeal and not second_appeal and not has_pending_appeal and rec.state in ('enforced', 'closed') and not is_exonerated:
+                f_app = first_appeal[0]
+                if f_app.state == 'decided' and f_app.decision_outcome in ('upheld', 'penalty_reduced'):
+                    f_exonerated = (
+                        f_app.decision_outcome == 'overturned' or
+                        f_app.revised_punishment_type == 'exonerate' or
+                        (f_app.revised_penalty_percentage == 0.0 and f_app.revised_fine_days == 0.0 and f_app.revised_punishment_type in ('exonerate', False))
+                    )
+                    if not f_exonerated and origin_type in ('manager', 'director', 'committee'):
+                        eligible_second = True
+
+            # 3rd Level Appeal Eligibility (Manager track only)
+            eligible_third = False
+            if second_appeal and not third_appeal and not has_pending_appeal and rec.state in ('enforced', 'closed') and not is_exonerated:
+                s_app = second_appeal[0]
+                if s_app.state == 'decided' and s_app.decision_outcome in ('upheld', 'penalty_reduced'):
+                    s_exonerated = (
+                        s_app.decision_outcome == 'overturned' or
+                        s_app.revised_punishment_type == 'exonerate' or
+                        (s_app.revised_penalty_percentage == 0.0 and s_app.revised_fine_days == 0.0 and s_app.revised_punishment_type in ('exonerate', False))
+                    )
+                    if not s_exonerated and origin_type == 'manager':
+                        eligible_third = True
+
+            rec.can_submit_first_appeal = is_emp and eligible_first
+            rec.can_submit_second_appeal = is_emp and eligible_second
+            rec.can_submit_third_appeal = is_emp and eligible_third
+            rec.can_submit_appeal = rec.can_submit_first_appeal or rec.can_submit_second_appeal or rec.can_submit_third_appeal
+
+            rec.can_lodge_first_appeal_on_behalf = is_pomd_eligible and eligible_first
+            rec.can_lodge_second_appeal_on_behalf = is_pomd_eligible and eligible_second
+            rec.can_lodge_third_appeal_on_behalf = is_pomd_eligible and eligible_third
+            rec.can_lodge_appeal_on_behalf = rec.can_lodge_first_appeal_on_behalf or rec.can_lodge_second_appeal_on_behalf or rec.can_lodge_third_appeal_on_behalf
+
+            if eligible_first:
+                rec.next_appeal_level = 'first'
+            elif eligible_second:
+                rec.next_appeal_level = 'second'
+            elif eligible_third:
+                rec.next_appeal_level = 'third'
+            else:
+                rec.next_appeal_level = False
 
     @api.onchange('reported_by_id', 'employee_id', 'initiator_type')
     def _onchange_employee_id(self):
@@ -925,23 +1284,25 @@ class DisciplineCase(models.Model):
             current_user = self.env.user
             # Coach / Line Manager direct enforcement on subordinates for Levels 2-5 is permitted
             is_direct_mgr_enforcement = (
-                rec.initiator_type == 'manager' and
+                rec.case_action_track == 'direct_enforce' and
                 rec.severity_level != 'level_1' and
                 rec.punishment_type != 'dismissal'
             )
             if not is_direct_mgr_enforcement:
                 if rec.initiator_id and rec.reviewer_id and rec.initiator_id == rec.reviewer_id:
                     raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Reviewer must be different individuals.'))
-                if rec.initiator_id and rec.approver_id and rec.initiator_id == rec.approver_id and rec.initiator_type != 'manager':
+                if rec.initiator_id and rec.approver_id and rec.initiator_id == rec.approver_id and rec.case_action_track != 'direct_enforce':
                     raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Approver must be different individuals for escalated cases.'))
                 if rec.reviewer_id and rec.approver_id and rec.reviewer_id == rec.approver_id:
                     raise ValidationError(_('Segregation of Duties Violation: Case Reviewer and Approver must be different individuals.'))
 
             if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
-                if not current_user.has_group('discipline_management.group_discipline_admin') and not current_user.has_group('discipline_management.group_discipline_ceo'):
+                if (not current_user.has_group('discipline_management.group_discipline_admin') and
+                    not current_user.has_group('discipline_management.group_discipline_ceo') and
+                    not current_user.has_group('discipline_management.group_discipline_cpco')):
                     raise ValidationError(_(
                         'Approval Restriction: Decisions requiring Dismissal / Separation are restricted '
-                        'exclusively to authorized executive approvers (CEO / Disciplinary Committee).'
+                        'exclusively to authorized executive approvers (CEO / CPCO / Disciplinary Committee).'
                     ))
                 if not rec.dismissal_authority_id:
                     rec.dismissal_authority_id = current_user
@@ -971,7 +1332,7 @@ class DisciplineCase(models.Model):
 
     def write(self, vals):
         force_write = self.env.context.get('force_write')
-        if not force_write:
+        if not force_write and not self.env.su:
             whitelisted_fields = {
                 'state', 'revocation_reason', 'revocation_date', 'revoked_by_id', 'is_revoked',
                 'message_follower_ids', 'message_ids', 'activity_ids', 'is_locked_for_committee',
@@ -982,14 +1343,20 @@ class DisciplineCase(models.Model):
                 'punishment_type', 'penalty_percentage', 'fine_days',
                 'is_punishment_modified_by_committee', 'is_cash_shortage',
                 'statutory_deadline_date', 'is_deadline_exceeded', 'active_penalty_end_date',
-                'active_duration_days', 'legal_article_display', 'legal_clause_text'
+                'active_duration_days', 'legal_article_display', 'legal_clause_text',
+                'appeal_outcome_type', 'appeal_outcome_display', 'appeal_ids'
+            }
+            # Only enforce immutability on manually edited, non-computed user fields
+            explicit_user_fields = {
+                k for k in vals.keys()
+                if k in self._fields and not self._fields[k].compute
             }
             for rec in self:
                 if rec.state in ('enforced', 'closed', 'appealed'):
-                    if set(vals.keys()) - whitelisted_fields:
+                    if explicit_user_fields - whitelisted_fields:
                         raise UserError(_('Enforced, closed, or appealed disciplinary cases are immutable and cannot be edited. Use formal revocation if required.'))
                 if rec.is_locked_for_committee:
-                    if set(vals.keys()) - whitelisted_fields:
+                    if explicit_user_fields - whitelisted_fields:
                         raise UserError(_('Case %s is currently locked for committee review and cannot be edited.') % rec.name)
         return super().write(vals)
 
@@ -1017,10 +1384,11 @@ class DisciplineCase(models.Model):
         """Submit the initiated disciplinary case to the respective Chief Officer for review and escalation routing."""
         for rec in self:
             if not rec.chief_id:
-                chief_users = self._get_group_users('discipline_management.group_discipline_chief')
-                if chief_users:
-                    rec.chief_id = chief_users[0]
-            rec.with_context(force_write=True).write({'state': 'submitted_chief'})
+                rec.chief_id = rec._find_respective_chief_user()
+            rec.with_context(force_write=True).write({
+                'state': 'submitted_chief',
+                'chief_id': rec.chief_id.id if rec.chief_id else False
+            })
             rec.message_post(body=_('Case submitted to Respective Chief (%s) for review.') % (rec.chief_id.name if rec.chief_id else 'Chief Officer'))
 
     def action_chief_escalate_to_audit(self):
@@ -1030,15 +1398,15 @@ class DisciplineCase(models.Model):
             rec.with_context(force_write=True).write({'state': 'investigating'})
             rec.message_post(body=_('Chief reviewed case and escalated to Audit Directorate for investigation.'))
             
-            # Send informational activity notification to executive management
-            ceo_users = self._get_group_users('discipline_management.group_discipline_ceo')
-            for ceo in ceo_users:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('CEO Notification: Chief Escalated Disciplinary Case %s') % rec.name,
-                    note=_('Disciplinary Case %s for employee %s was escalated by Chief to Audit Directorate for investigation.') % (rec.name, rec.employee_id.name),
-                    user_id=ceo.id
-                )
+            # 1. Ensure Investigation record exists
+            if not rec.investigation_ids:
+                self.env['discipline.investigation'].create({
+                    'case_id': rec.id,
+                    'title': _('Audit Investigation: %s (%s)') % (rec.name, rec.employee_id.name),
+                    'applicable_policy': rec.offense_id.name if rec.offense_id else _('Bank Disciplinary Policy'),
+                    'summary_findings': rec.description or _('Escalated by Chief for Audit Investigation.'),
+                    'investigator_recommendation': _('Pending audit investigation and findings.'),
+                })
 
     def action_chief_escalate_to_ceo(self):
         """Escalate the case directly to the Chief Executive Officer for review."""
@@ -1046,15 +1414,6 @@ class DisciplineCase(models.Model):
             rec.escalation_target = 'ceo'
             rec.with_context(force_write=True).write({'state': 'ceo_review'})
             rec.message_post(body=_('Chief escalated case directly to CEO for executive review.'))
-            
-            ceo_users = self._get_group_users('discipline_management.group_discipline_ceo')
-            for ceo in ceo_users:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Executive Review Required: Disciplinary Case %s') % rec.name,
-                    note=_('Disciplinary Case %s has been submitted by Chief for CEO review and assignment.') % rec.name,
-                    user_id=ceo.id
-                )
 
     def action_ceo_announce_audit_and_suspend(self):
         """CEO action: formally announce case to Audit Directorate for investigation and instruct Committee Secretary (POMD) to suspend the employee."""
@@ -1077,17 +1436,7 @@ class DisciplineCase(models.Model):
                     'investigator_id': False,
                 })
 
-            # 2. Schedule Investigation Activity for Audit Directorate
-            auditor_users = self._get_group_users('discipline_management.group_discipline_auditor')
-            for auditor in auditor_users:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('CEO Directive: Conduct Audit Investigation on Case %s') % rec.name,
-                    note=_('The CEO has assigned Case %s (Employee: %s) to the Audit Directorate for formal investigation.') % (rec.name, rec.employee_id.name),
-                    user_id=auditor.id
-                )
-
-            # 3. Create Precautionary Suspension Record for Committee Secretary (POMD)
+            # 2. Create Precautionary Suspension Record for Committee Secretary (POMD)
             existing_suspension = rec.suspension_ids.filtered(lambda s: s.state != 'revoked')
             if not existing_suspension:
                 start_dt = fields.Date.context_today(self)
@@ -1103,22 +1452,42 @@ class DisciplineCase(models.Model):
                     'state': 'draft',
                 })
 
-            # 4. Schedule High-Priority Activity for Committee Secretary (POMD)
-            pomd_users = self._get_group_users('discipline_management.group_discipline_pomd')
-            for pomd_user in pomd_users:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('CEO Directive: Execute Precautionary Suspension for %s') % rec.employee_id.name,
-                    note=_(
-                        'Per CEO directive for Case %s, execute and formalize precautionary suspension '
-                        'for employee %s pending the audit investigation.'
-                    ) % (rec.name, rec.employee_id.name),
-                    user_id=pomd_user.id
-                )
-
     def action_ceo_assign_to_audit(self):
         """Backward compatibility alias for action_ceo_announce_audit_and_suspend."""
         return self.action_ceo_announce_audit_and_suspend()
+
+    def action_ceo_forward_to_committee_chair(self):
+        """CEO reviews audit report and forwards case to Disciplinary Committee Chairman (CPCO)."""
+        for rec in self:
+            if not (rec.is_ceo_user or rec.is_hr_admin):
+                raise UserError(_('Authority Restriction: Only the Chief Executive Officer (CEO) can forward cases to the Disciplinary Committee Chairman.'))
+            rec.with_context(force_write=True).write({
+                'state': 'chairman_review',
+            })
+            cpco_user = self.env['hr.employee'].sudo().get_cpco_user()
+            cpco_name = cpco_user.name if cpco_user else _('Chief People & Culture Officer')
+            rec.message_post(body=_(
+                'Case forwarded by Chief Executive Officer (CEO: %s) to Disciplinary Committee Chairman (CPCO: %s) for committee review.'
+            ) % (self.env.user.name, cpco_name))
+
+    def action_chair_forward_to_secretary(self):
+        """Disciplinary Committee Chairman (CPCO) reviews case and forwards to Committee Secretary (POMD) for scheduling hearing."""
+        for rec in self:
+            if not (rec.is_cpco_user or rec.is_hr_admin):
+                raise UserError(_('Authority Restriction: Only the Disciplinary Committee Chairman (CPCO) can forward cases to the Committee Secretary for meeting scheduling.'))
+            rec.with_context(force_write=True).write({
+                'state': 'committee_review',
+                'is_locked_for_committee': True,
+            })
+            sec_user = self.env['hr.employee'].sudo().get_secretary_user()
+            sec_name = sec_user.name if sec_user else _('People Operations Management Director')
+            rec.message_post(body=_(
+                'Case referred by Disciplinary Committee Chairman (%s) to Committee Secretary (%s) to schedule the committee hearing.'
+            ) % (self.env.user.name, sec_name))
+
+    def action_ceo_forward_to_committee(self):
+        """Forward directly to committee chair."""
+        return self.action_ceo_forward_to_committee_chair()
 
     def action_ceo_endorse_exoneration(self):
         """CEO Executive Action: officially endorse Audit Directorate Exoneration findings and instruct POMD to revoke suspension and reinstate employee."""
@@ -1133,16 +1502,6 @@ class DisciplineCase(models.Model):
             # Revoke linked suspensions
             for suspension in rec.suspension_ids.filtered(lambda s: s.state != 'revoked'):
                 suspension.action_revoke_exonerated()
-                
-            # Notify Committee Secretary (POMD)
-            pomd_users = self._get_group_users('discipline_management.group_discipline_pomd')
-            for pomd in pomd_users:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('CEO Directive: Employee Exonerated — Case %s Closed') % rec.name,
-                    note=_('Per CEO endorsement on Case %s, employee %s is exonerated. Please ensure suspension is lifted and payroll backpay is processed.') % (rec.name, rec.employee_id.name),
-                    user_id=pomd.id
-                )
 
     def action_start_investigation(self):
         for rec in self:
@@ -1160,14 +1519,76 @@ class DisciplineCase(models.Model):
         for rec in self:
             rec.with_context(force_write=True).write({'is_locked_for_committee': False})
             rec.message_post(body=_('Committee feedback received. Case unlocked for review.'))
-            target_user = rec.reviewer_id or rec.initiator_id or rec.create_uid
-            if target_user:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Committee Feedback Received: Case %s') % rec.name,
-                    note=_('Disciplinary Committee feedback is ready for your review.'),
-                    user_id=target_user.id
-                )
+
+    def action_schedule_committee_meeting(self):
+        """Open form to schedule a Disciplinary Committee Meeting pre-populated with panel members."""
+        self.ensure_one()
+        EmpModel = self.env['hr.employee'].sudo()
+        emp = self.employee_id
+        
+        # 1. Chairperson: CPCO
+        cpco_user = EmpModel.get_cpco_user()
+        
+        # 2. Respective Director
+        resp_dir_user = False
+        if emp and emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.user_id:
+            resp_dir_user = emp.department_id.manager_id.user_id
+        elif emp:
+            for sup in emp.get_supervisor_chain():
+                if sup.executive_level in ('director', 'chief', 'ceo') and sup.user_id:
+                    resp_dir_user = sup.user_id
+                    break
+
+        # 3. Legal Member
+        legal_user = EmpModel.get_legal_user()
+        
+        # 4. Secretary: POMD
+        sec_user = EmpModel.get_secretary_user()
+        
+        # 5. Union Rep
+        union_user = EmpModel.get_union_user()
+
+        member_ids = []
+        for u in [cpco_user, resp_dir_user, legal_user, sec_user, union_user]:
+            if u:
+                member_ids.append(u.id)
+
+        default_vals = {
+            'default_case_id': self.id,
+            'default_committee_chair_id': cpco_user.id if cpco_user else False,
+            'default_respective_director_id': resp_dir_user.id if resp_dir_user else False,
+            'default_legal_director_id': legal_user.id if legal_user else False,
+            'default_pomd_secretary_id': sec_user.id if sec_user else False,
+            'default_labour_union_rep_id': union_user.id if union_user else False,
+            'default_member_ids': [(6, 0, member_ids)],
+            'default_present_members_count': len(member_ids),
+        }
+
+        return {
+            'name': _('Schedule Committee Meeting — %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'discipline.committee.meeting',
+            'view_mode': 'form',
+            'target': 'current',
+            'context': default_vals,
+        }
+
+    def action_open_active_committee_meeting(self):
+        """Open the active/in-progress committee meeting linked to this case."""
+        self.ensure_one()
+        meeting = self.committee_meeting_ids.filtered(lambda m: m.state not in ('completed', 'cancelled'))[:1]
+        if not meeting:
+            meeting = self.committee_meeting_ids[:1]
+        if not meeting:
+            return self.action_schedule_committee_meeting()
+        return {
+            'name': _('Committee Meeting — %s') % meeting.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'discipline.committee.meeting',
+            'res_id': meeting.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
 
     def action_submit_for_approval(self):
         recom_to_punishment = {
@@ -1181,8 +1602,10 @@ class DisciplineCase(models.Model):
             'custom': 'custom',
         }
         for rec in self:
+            completed_meeting = rec.committee_meeting_ids.filtered(lambda m: m.state == 'completed' and m.final_recommendation)
+            if not completed_meeting and not rec.decided_punishment_type:
+                raise UserError(_('A completed Committee Meeting with a finalized recommendation is required before submitting for approval.'))
             if not rec.decided_punishment_type and not rec.punishment_type:
-                completed_meeting = rec.committee_meeting_ids.filtered(lambda m: m.state == 'completed' and m.final_recommendation)
                 if completed_meeting:
                     punish_val = recom_to_punishment.get(completed_meeting[-1].final_recommendation, completed_meeting[-1].final_recommendation)
                     rec.with_context(force_write=True).write({
@@ -1220,12 +1643,14 @@ class DisciplineCase(models.Model):
         """Enforces the disciplinary penalty (Coach/Manager direct enforcement for Levels 2-5, or Committee/Executive enforcement)."""
         for rec in self:
             current_user = self.env.user
-            # For Coach track, severity level and punishment must be set
-            if rec.initiator_type == 'manager':
+            # For Coach Direct Enforcement track (not formal escalation)
+            if rec.case_action_track == 'direct_enforce':
                 if not rec.severity_level_id:
                     raise UserError(_('Severity Level is required for Coach Direct Enforcement.'))
                 if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
-                    if not current_user.has_group('discipline_management.group_discipline_admin') and not current_user.has_group('discipline_management.group_discipline_ceo'):
+                    if (not current_user.has_group('discipline_management.group_discipline_admin') and 
+                        not current_user.has_group('discipline_management.group_discipline_ceo') and 
+                        not current_user.has_group('discipline_management.group_discipline_cpco')):
                         raise UserError(_(
                             'Dismissal Authority Restriction: Level 1 Dismissal cannot be directly enforced by a Coach or Line Manager. '
                             'Please escalate through the Chief / Executive Committee route.'
@@ -1327,21 +1752,25 @@ class DisciplineCase(models.Model):
             if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
                 rec.action_approve_dismissal()
 
-            # Auto-attach the warning letter PDF
+            # Auto-attach the official warning letter PDF and notify employee
             rec._attach_warning_letter()
 
-            rec.message_post(body=_('Disciplinary case decision approved and enforced. Warning letter auto-attached.'))
+    def action_print_warning_letter(self):
+        """Direct action to print or download the official disciplinary warning / decision letter."""
+        self.ensure_one()
+        return self.env.ref('discipline_management.action_report_disciplinary_warning_letter').report_action(self)
 
     def _attach_warning_letter(self):
-        """Generate and auto-attach the warning letter PDF to chatter."""
+        """Generate and auto-attach the official warning letter PDF and send targeted notification to the employee."""
         self.ensure_one()
         report_ref = 'discipline_management.action_report_disciplinary_warning_letter'
+        attachment = False
         try:
             report = self.env.ref(report_ref, raise_if_not_found=True)
-            pdf_content, _ = self.env['ir.actions.report']._render_qweb_pdf(
+            pdf_content, _unused_format = self.env['ir.actions.report']._render_qweb_pdf(
                 report, [self.id]
             )
-            filename = 'Warning_Letter_%s.pdf' % self.name.replace('/', '_')
+            filename = 'Official_Warning_Letter_%s.pdf' % self.name.replace('/', '_')
             attachment = self.env['ir.attachment'].create({
                 'name': filename,
                 'type': 'binary',
@@ -1350,32 +1779,78 @@ class DisciplineCase(models.Model):
                 'res_id': self.id,
                 'mimetype': 'application/pdf',
             })
-            self.message_post(
-                body=_('Warning letter attached: %s') % filename,
-                attachment_ids=[attachment.id]
-            )
         except Exception:
             import base64
             body_text = (
-                'WARNING LETTER\n'
-                '==============\n'
+                'OFFICIAL DISCIPLINARY WARNING NOTICE\n'
+                '====================================\n'
                 'Case Reference : %s\n'
                 'Employee       : %s\n'
                 'Decision Date  : %s\n'
                 'Offense        : %s\n'
-                'Penalty        : %s%%\n\n'
-                'This is a system-generated warning letter stub. '
-                'Please replace with the signed copy.'
+                'Penalty        : %s\n\n'
+                'Please refer to the official signed copy in the personnel file.'
             ) % (self.name, self.employee_id.name, self.final_decision_date,
-                 self.offense_id.name if self.offense_id else 'N/A', self.penalty_percentage)
-            self.env['ir.attachment'].create({
-                'name': 'Warning_Letter_%s.txt' % self.name.replace('/', '_'),
+                 self.offense_id.name if self.offense_id else 'N/A', self.punishment_type)
+            attachment = self.env['ir.attachment'].create({
+                'name': 'Official_Warning_Letter_%s.txt' % self.name.replace('/', '_'),
                 'type': 'binary',
                 'datas': base64.b64encode(body_text.encode('utf-8')),
                 'res_model': self._name,
                 'res_id': self.id,
                 'mimetype': 'text/plain',
             })
+
+        # Determine issuance track and role
+        is_direct = self.case_action_track == 'direct_enforce'
+        issuer_name = (self.initiator_id.name or self.reported_by_id.name or self.approver_id.name or self.env.user.name) if is_direct else (self.approver_id.name or self.env.user.name)
+        issuer_role = _('Line Manager / Coach') if is_direct else _('Disciplinary Committee / Authorized Executive Approver')
+        
+        sanction_name = dict(self._fields['punishment_type'].selection).get(self.punishment_type, str(self.punishment_type or ''))
+        penalty_details = []
+        if self.penalty_percentage > 0.0:
+            penalty_details.append(_('%s%% Salary Deduction') % self.penalty_percentage)
+        if self.fine_days > 0.0:
+            penalty_details.append(_('%d Day(s) Salary Fine') % int(self.fine_days))
+        penalty_sub = (' (' + ', '.join(penalty_details) + ')') if penalty_details else ''
+
+        body_html = _(
+            '<p><strong>Official Disciplinary Decision &amp; Warning Notice</strong></p>'
+            '<p>A formal disciplinary action has been enforced by <strong>%s</strong> (%s).</p>'
+            '<ul>'
+            '<li><strong>Case Reference:</strong> %s</li>'
+            '<li><strong>Employee:</strong> %s</li>'
+            '<li><strong>Misconduct Clause:</strong> %s</li>'
+            '<li><strong>Enforced Sanction:</strong> %s%s</li>'
+            '<li><strong>Decision Date:</strong> %s</li>'
+            '<li><strong>Statutory Appeal Deadline:</strong> %s (10-calendar-day window)</li>'
+            '</ul>'
+            '<p>The official warning letter has been generated and attached. You can view, download, or print the document directly from this case.</p>'
+        ) % (
+            issuer_name,
+            issuer_role,
+            self.name,
+            self.employee_id.name,
+            self.offense_id.name if self.offense_id else _('Misconduct Clause'),
+            sanction_name,
+            penalty_sub,
+            self.final_decision_date or fields.Date.context_today(self),
+            self.appeal_deadline or _('10 days from receipt')
+        )
+
+        partner_ids = []
+        if self.employee_id.user_id and self.employee_id.user_id.partner_id:
+            partner_ids.append(self.employee_id.user_id.partner_id.id)
+        if self.reported_by_id and self.reported_by_id.user_id and self.reported_by_id.user_id.partner_id:
+            partner_ids.append(self.reported_by_id.user_id.partner_id.id)
+
+        self.message_post(
+            body=body_html,
+            partner_ids=list(set(partner_ids)),
+            attachment_ids=[attachment.id] if attachment else [],
+            subtype_xmlid='mail.mt_comment'
+        )
+        return attachment
 
     def action_apply_demotion(self):
         """Execute demotion by reassigning job position while preserving basic salary scale."""
@@ -1437,6 +1912,43 @@ class DisciplineCase(models.Model):
             'context': {'default_case_id': self.id}
         }
 
+    def _action_open_appeal_wizard(self, level='first', is_on_behalf=False):
+        self.ensure_one()
+        parent_appeal = False
+        if level == 'second':
+            first_appeal = self.appeal_ids.filtered(lambda a: a.appeal_level == 'first')
+            if not first_appeal:
+                raise UserError(_('A 1st Level Appeal must exist before submitting a 2nd Level Appeal.'))
+            parent_appeal = first_appeal[0]
+            title = _('Submit 2nd Level Appeal for Case %s') % self.name
+        elif level == 'third':
+            second_appeal = self.appeal_ids.filtered(lambda a: a.appeal_level == 'second')
+            if not second_appeal:
+                raise UserError(_('A 2nd Level Appeal must exist before submitting a 3rd Level Appeal.'))
+            parent_appeal = second_appeal[0]
+            title = _('Submit 3rd Level Appeal (To CEO) for Case %s') % self.name
+        else:
+            title = _('Submit Appeal for Case %s') % self.name
+
+        if is_on_behalf:
+            title = _('Lodge %s Level Appeal on Behalf of %s') % (level.capitalize(), self.employee_id.name)
+
+        return {
+            'name': title,
+            'type': 'ir.actions.act_window',
+            'res_model': 'discipline.appeal',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_case_id': self.id,
+                'default_parent_appeal_id': parent_appeal.id if parent_appeal else False,
+                'default_appeal_level': level,
+                'default_is_submitted_on_behalf': is_on_behalf,
+                'default_submitted_by_id': self.env.user.id if is_on_behalf else False,
+                'default_submission_date': fields.Date.context_today(self),
+            }
+        }
+
     def action_create_appeal(self):
         self.ensure_one()
         current_user = self.env.user
@@ -1447,66 +1959,68 @@ class DisciplineCase(models.Model):
         )
         if not is_emp:
             raise UserError(_('Appeal Access Restriction: Direct appeals can only be submitted by the employee (%s) subject to this disciplinary case.') % self.employee_id.name)
+        
+        if self.can_submit_third_appeal:
+            return self.action_create_third_appeal()
+        elif self.can_submit_second_appeal:
+            return self.action_create_second_appeal()
+        
         if not self.is_appeal_window_open:
             raise UserError(_(
                 'Appeal Window Closed: The 10-calendar-day appeal submission window has expired. '
                 'Appeal deadline was %s.'
             ) % (self.appeal_deadline or 'N/A'))
-        existing_first = self.appeal_ids.filtered(lambda a: a.appeal_level == 'first')
-        if existing_first:
-            if any(a.state in ['draft', 'submitted', 'under_review'] for a in existing_first):
-                pending = existing_first.filtered(lambda a: a.state in ['draft', 'submitted', 'under_review'])[0]
-                raise UserError(_('An appeal (%s) is already in progress (%s) for this case.') % (pending.name, pending.state))
-            else:
-                raise UserError(_('A 1st Level Appeal (%s) has already been rendered for this case. Open that appeal record to view or submit an escalation.') % existing_first[0].name)
-        return {
-            'name': _('Submit Appeal for Case %s') % self.name,
-            'type': 'ir.actions.act_window',
-            'res_model': 'discipline.appeal',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'default_case_id': self.id,
-                'default_is_submitted_on_behalf': False,
-                'default_submission_date': fields.Date.context_today(self),
-            }
-        }
+        
+        return self._action_open_appeal_wizard(level='first', is_on_behalf=False)
+
+    def action_create_second_appeal(self):
+        self.ensure_one()
+        current_user = self.env.user
+        is_emp = bool(
+            (self.employee_id.user_id and self.employee_id.user_id.id == current_user.id) or
+            (current_user.employee_id and current_user.employee_id.id == self.employee_id.id) or
+            (hasattr(current_user, 'employee_ids') and self.employee_id.id in current_user.employee_ids.ids)
+        )
+        if not is_emp:
+            raise UserError(_('Appeal Access Restriction: Direct appeals can only be submitted by the employee (%s) subject to this disciplinary case.') % self.employee_id.name)
+        return self._action_open_appeal_wizard(level='second', is_on_behalf=False)
+
+    def action_create_third_appeal(self):
+        self.ensure_one()
+        current_user = self.env.user
+        is_emp = bool(
+            (self.employee_id.user_id and self.employee_id.user_id.id == current_user.id) or
+            (current_user.employee_id and current_user.employee_id.id == self.employee_id.id) or
+            (hasattr(current_user, 'employee_ids') and self.employee_id.id in current_user.employee_ids.ids)
+        )
+        if not is_emp:
+            raise UserError(_('Appeal Access Restriction: Direct appeals can only be submitted by the employee (%s) subject to this disciplinary case.') % self.employee_id.name)
+        return self._action_open_appeal_wizard(level='third', is_on_behalf=False)
 
     def action_create_appeal_on_behalf(self):
         self.ensure_one()
         current_user = self.env.user
         if not current_user.has_group('discipline_management.group_discipline_pomd') and not current_user.has_group('discipline_management.group_discipline_admin'):
             raise UserError(_('Authority Restriction: Only the People Operations Management Directorate (POMD) or HR Administrator can lodge an appeal on behalf of an employee.'))
-        if not (self.severity_level == 'level_1' or self.punishment_type == 'dismissal'):
-            raise UserError(_('On-behalf appeals can only be lodged for Level 1 Dismissal cases.'))
-        is_emp_inactive = bool(
-            not self.employee_id.active or
-            (self.employee_id.user_id and not self.employee_id.user_id.active)
-        )
-        if not is_emp_inactive:
-            raise UserError(_('On-behalf appeals can only be lodged when the employee has been deactivated following a dismissal.'))
-        if not self.is_appeal_window_open:
-            raise UserError(_('Appeal Window Closed: The 10-calendar-day appeal submission window has expired.'))
-        existing_first = self.appeal_ids.filtered(lambda a: a.appeal_level == 'first')
-        if existing_first:
-            if any(a.state in ['draft', 'submitted', 'under_review'] for a in existing_first):
-                pending = existing_first.filtered(lambda a: a.state in ['draft', 'submitted', 'under_review'])[0]
-                raise UserError(_('An appeal (%s) is already in progress (%s) for this case.') % (pending.name, pending.state))
-            else:
-                raise UserError(_('A 1st Level Appeal (%s) has already been rendered for this case. Open that appeal record to view or submit an escalation.') % existing_first[0].name)
-        return {
-            'name': _('Lodge Appeal on Behalf of %s') % self.employee_id.name,
-            'type': 'ir.actions.act_window',
-            'res_model': 'discipline.appeal',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'default_case_id': self.id,
-                'default_is_submitted_on_behalf': True,
-                'default_submitted_by_id': current_user.id,
-                'default_submission_date': fields.Date.context_today(self),
-            }
-        }
+        if self.can_lodge_third_appeal_on_behalf:
+            return self.action_create_third_appeal_on_behalf()
+        elif self.can_lodge_second_appeal_on_behalf:
+            return self.action_create_second_appeal_on_behalf()
+        return self._action_open_appeal_wizard(level='first', is_on_behalf=True)
+
+    def action_create_second_appeal_on_behalf(self):
+        self.ensure_one()
+        current_user = self.env.user
+        if not current_user.has_group('discipline_management.group_discipline_pomd') and not current_user.has_group('discipline_management.group_discipline_admin'):
+            raise UserError(_('Authority Restriction: Only the People Operations Management Directorate (POMD) or HR Administrator can lodge an appeal on behalf of an employee.'))
+        return self._action_open_appeal_wizard(level='second', is_on_behalf=True)
+
+    def action_create_third_appeal_on_behalf(self):
+        self.ensure_one()
+        current_user = self.env.user
+        if not current_user.has_group('discipline_management.group_discipline_pomd') and not current_user.has_group('discipline_management.group_discipline_admin'):
+            raise UserError(_('Authority Restriction: Only the People Operations Management Directorate (POMD) or HR Administrator can lodge an appeal on behalf of an employee.'))
+        return self._action_open_appeal_wizard(level='third', is_on_behalf=True)
 
     def action_view_appeals(self):
         self.ensure_one()
@@ -1518,6 +2032,52 @@ class DisciplineCase(models.Model):
             'domain': [('case_id', '=', self.id)],
             'context': {'default_case_id': self.id},
         }
+
+    def action_view_investigations(self):
+        self.ensure_one()
+        return {
+            'name': _('Audit Investigations — %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'discipline.investigation',
+            'view_mode': 'list,form',
+            'domain': [('case_id', '=', self.id)],
+            'context': {
+                'default_case_id': self.id,
+                'default_employee_id': self.employee_id.id if self.employee_id else False,
+                'default_offense_id': self.offense_id.id if self.offense_id else False,
+            },
+        }
+
+    def action_view_committee_meetings(self):
+        self.ensure_one()
+        return {
+            'name': _('Committee Meetings — %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'discipline.committee.meeting',
+            'view_mode': 'list,form',
+            'domain': [('case_id', '=', self.id)],
+            'context': {'default_case_id': self.id},
+        }
+
+    def action_view_suspensions(self):
+        self.ensure_one()
+        return {
+            'name': _('Suspensions — %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'discipline.suspension',
+            'view_mode': 'list,form',
+            'domain': [('case_id', '=', self.id)],
+            'context': {'default_case_id': self.id},
+        }
+
+    def action_audit_submit_to_ceo(self):
+        """Internal Audit Directorate submits audit-initiated case directly to CEO."""
+        for rec in self:
+            rec.write({
+                'state': 'ceo_review',
+                'case_action_track': 'audit_referral',
+            })
+            rec.message_post(body=_('Case %s submitted by Internal Audit Directorate directly to Chief Executive Officer (CEO) for executive review.') % rec.name)
 
     @api.model
     def get_discipline_analytics_payload(self, date_from=None, date_to=None):

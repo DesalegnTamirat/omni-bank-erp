@@ -22,7 +22,7 @@ class DisciplineOffenseCategory(models.Model):
 class DisciplineOffense(models.Model):
     _name = 'discipline.offense'
     _description = 'Disciplinary Offense Definition'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'article_number, sub_article_code, severity_level, name'
     _rec_names_search = ['name', 'sub_article_code', 'article_number', 'description']
 

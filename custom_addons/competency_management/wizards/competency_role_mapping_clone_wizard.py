@@ -4,7 +4,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class CompetencyRoleMappingCloneWizard(models.TransientModel):
-    """Bulk competency mapping & clone-and-adapt wizard for similar job positions (FR-MAP-004)."""
+    """Wizard to clone and adapt an existing role-competency mapping to similar job positions."""
     _name = 'competency.role.mapping.clone.wizard'
     _description = 'Clone & Adapt Competency Role Mapping'
 
@@ -25,7 +25,7 @@ class CompetencyRoleMappingCloneWizard(models.TransientModel):
         return res
 
     def action_clone_and_adapt(self):
-        """Clone source mapping lines across target job positions in draft state (FR-MAP-004)."""
+        """Clone competency mapping lines from the source mapping to each target job position in draft state."""
         self.ensure_one()
         if not self.target_job_ids:
             raise UserError(_('Please select at least one target Job Position.'))

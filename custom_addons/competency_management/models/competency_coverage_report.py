@@ -3,7 +3,7 @@ from odoo import api, fields, models, tools, _
 
 
 class CompetencyCoverageReport(models.Model):
-    """Competency mapping coverage report identifying unmapped roles and job families (FR-MAP-007)."""
+    """SQL view identifying unmapped roles and job families for competency coverage reporting."""
     _name = 'competency.coverage.report'
     _description = 'Competency Mapping Coverage Report'
     _auto = False

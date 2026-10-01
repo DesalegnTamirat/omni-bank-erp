@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pm_strategic_objective_form" model="ir.ui.view">
+        <field name="name">pm.strategic.objective.form</field>
+        <field name="model">pm.strategic.objective</field>
+        <field name="arch" type="xml">
+            <form string="Strategic Objective">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Strategic Objective Title"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Enhance Digital Customer Engagement &amp; Financial Inclusion"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <field name="code"/>
+                        <field name="active" widget="boolean_toggle"/>
+                    </group>
+                    <group string="Strategic Scope &amp; Target Impact">
+                        <field name="description" placeholder="Provide background on the corporate strategy pillar or long-term objective..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pm_strategic_objective_tree" model="ir.ui.view">
+        <field name="name">pm.strategic.objective.list</field>
+        <field name="model">pm.strategic.objective</field>
+        <field name="arch" type="xml">
+            <list string="Strategic Objectives" editable="bottom">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="description"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_pm_strategic_objective" model="ir.actions.act_window">
+        <field name="name">Strategic Objectives</field>
+        <field name="res_model">pm.strategic.objective</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Strategic Objective
+            </p>
+            <p>
+                Define corporate strategic objectives that guide initiatives and projects across the bank.
+            </p>
+        </field>
+    </record>
+</odoo>

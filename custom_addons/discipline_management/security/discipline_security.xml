@@ -16,12 +16,12 @@
             <field name="category_id" ref="discipline_management.module_category_discipline_management"/>
         </record>
 
-        <!-- Group: Employee / User -->
+        <!-- Group 1: Employee / User (Default for All Internal Users) -->
         <record id="group_discipline_user" model="res.groups">
             <field name="name">User / Employee</field>
             <field name="sequence">10</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="comment">Can view own disciplinary cases and submit appeals.</field>
+            <field name="comment">Default user access: view own disciplinary cases, submit appeals, view self-initiated cases, and enforce discipline on subordinates dynamically.</field>
         </record>
 
         <!-- Automatically imply group_discipline_user for all Internal Users -->
@@ -29,94 +29,58 @@
             <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
         </record>
 
-        <!-- Group: Officer / Investigator -->
-        <record id="group_discipline_officer" model="res.groups">
-            <field name="name">Officer / Investigator</field>
+        <!-- Group 2: Internal Audit Directorate -->
+        <record id="group_discipline_auditor" model="res.groups">
+            <field name="name">Internal Audit Directorate</field>
             <field name="sequence">20</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
             <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
-            <field name="comment">Can record investigation findings, evidence, and initiate cases.</field>
+            <field name="comment">Bank-wide case initiation, audit investigations, and direct submission of cases to the CEO.</field>
         </record>
 
-        <!-- Group: Internal Auditor -->
-        <record id="group_discipline_auditor" model="res.groups">
-            <field name="name">Internal Auditor / Compliance</field>
-            <field name="sequence">25</field>
-            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_officer'))]"/>
-            <field name="comment">Can initiate audit cases and record formal investigation reports.</field>
-        </record>
-
-        <!-- Group: Manager / Coach / Approver -->
-        <record id="group_discipline_manager" model="res.groups">
-            <field name="name">Coach / Line Manager</field>
-            <field name="sequence">30</field>
-            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_officer'))]"/>
-            <field name="comment">Can initiate and enforce non-dismissal disciplinary penalties for subordinates.</field>
-        </record>
-
-        <!-- Group: Directorate Director -->
-        <record id="group_discipline_director" model="res.groups">
-            <field name="name">Directorate Director</field>
-            <field name="sequence">35</field>
-            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_manager'))]"/>
-            <field name="comment">Can initiate cases to Chief, review 1st level appeals on line manager decisions, and participate in committee meetings.</field>
-        </record>
-
-        <!-- Group: POMD (People Operations Management Directorate) -->
-        <record id="group_discipline_pomd" model="res.groups">
-            <field name="name">People Operations Management Directorate (POMD / Secretary)</field>
-            <field name="sequence">38</field>
-            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_manager'))]"/>
-            <field name="comment">Committee Secretary, Non-Managerial Suspension approval, and appeal handling.</field>
-        </record>
-
-        <!-- Group: Legal Directorate -->
+        <!-- Group 3: Legal Directorate -->
         <record id="group_discipline_legal" model="res.groups">
             <field name="name">Legal Directorate</field>
-            <field name="sequence">39</field>
+            <field name="sequence">25</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_manager'))]"/>
-            <field name="comment">Designated Disciplinary Committee Member for legal review and voting.</field>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
+            <field name="comment">Designated Disciplinary Committee Member for legal review, statutory compliance, and voting.</field>
         </record>
 
-        <!-- Group: HR Administrator (Senior Authority) -->
-        <record id="group_discipline_admin" model="res.groups">
-            <field name="name">HR Administrator</field>
-            <field name="sequence">40</field>
+        <!-- Group 4: POMD (People Operations Management Directorate) -->
+        <record id="group_discipline_pomd" model="res.groups">
+            <field name="name">People Operations Management Directorate (POMD)</field>
+            <field name="sequence">30</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_director'))]"/>
-            <field name="comment">Full access to discipline configuration, policies, level 1 dismissal approvals, and case revocations.</field>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
+            <field name="comment">Disciplinary Committee Secretary, minute recording, hearing coordination, and non-managerial suspension execution.</field>
         </record>
 
-        <!-- Group: Respective Chief Officer -->
-        <record id="group_discipline_chief" model="res.groups">
-            <field name="name">Respective Chief Officer</field>
-            <field name="sequence">45</field>
-            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_admin'))]"/>
-            <field name="comment">Review cases from Directors and escalate to Audit Directorate or CEO.</field>
-        </record>
-
-        <!-- Group: Chief People Officer (CPCO) -->
+        <!-- Group 5: Chief People Officer (CPCO) -->
         <record id="group_discipline_cpco" model="res.groups">
             <field name="name">Chief People Officer (CPCO)</field>
-            <field name="sequence">50</field>
+            <field name="sequence">40</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_chief'))]"/>
-            <field name="comment">Committee Chairperson, Managerial suspension authority, and 2nd Level Appeal review for manager cases.</field>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_pomd'))]"/>
+            <field name="comment">Permanent Disciplinary Committee Chairperson, Managerial suspension approval authority, and 2nd Level Appeal reviewer for manager cases.</field>
         </record>
 
-        <!-- Group: Chief Executive Officer (CEO) -->
+        <!-- Group 6: Chief Executive Officer (CEO) -->
         <record id="group_discipline_ceo" model="res.groups">
             <field name="name">Chief Executive Officer (CEO)</field>
-            <field name="sequence">60</field>
+            <field name="sequence">50</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
             <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_cpco'))]"/>
-            <field name="comment">Final approval authority for executive cases, level 1 dismissals, assignments to audit, and 2nd Level Appeal review for committee cases.</field>
+            <field name="comment">Ultimate bank authority for Level 1 dismissal approvals, audit referrals, receiving audit reports, forwarding cases to committee, and final appeal review.</field>
+        </record>
+
+        <!-- Group 7: HR Administrator -->
+        <record id="group_discipline_admin" model="res.groups">
+            <field name="name">HR Administrator</field>
+            <field name="sequence">60</field>
+            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_pomd'))]"/>
+            <field name="comment">Full access to discipline configuration, policy versioning, offense catalog, penalty rules, statutory tables, and case revocations.</field>
         </record>
 
     </data>
@@ -124,24 +88,42 @@
     <!-- Record Rules -->
     <data noupdate="0">
 
-        <!-- Employee: view own cases -->
+        <!-- Universal Employee & Supervisor Rule: View own, self-created, and subordinate cases -->
+        <!-- Universal Employee & Supervisor Rule: View own, self-created, and subordinate cases across hierarchy -->
         <record id="rule_discipline_case_employee" model="ir.rule">
-            <field name="name">Employee Own Disciplinary Cases</field>
+            <field name="name">Employee and Supervisor Disciplinary Cases</field>
             <field name="model_id" ref="discipline_management.model_discipline_case"/>
-            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">['|', '|', '|', '|', '|', '|', '|', '|',
+                ('employee_id.user_id', '=', user.id),
+                ('create_uid', '=', user.id),
+                ('reported_by_id', '=', user.id),
+                ('chief_id', '=', user.id),
+                ('employee_id', 'child_of', user.employee_id.id if user.employee_id else -1),
+                ('reported_by_id.employee_id', 'child_of', user.employee_id.id if user.employee_id else -1),
+                ('employee_id.coach_id.user_id', '=', user.id),
+                ('employee_id.coach_id.coach_id.user_id', '=', user.id),
+                ('employee_id.coach_id.coach_id.coach_id.user_id', '=', user.id)
+            ]</field>
             <field name="groups" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
             <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <!-- Officer & Manager & Admin: view all cases -->
-        <record id="rule_discipline_case_officer_all" model="ir.rule">
-            <field name="name">Officer and Above All Cases</field>
+        <!-- Governance & Directorate Roles: View all cases -->
+        <record id="rule_discipline_case_governance_all" model="ir.rule">
+            <field name="name">Governance Roles All Disciplinary Cases</field>
             <field name="model_id" ref="discipline_management.model_discipline_case"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('discipline_management.group_discipline_officer'))]"/>
+            <field name="groups" eval="[(6, 0, [
+                ref('discipline_management.group_discipline_auditor'),
+                ref('discipline_management.group_discipline_legal'),
+                ref('discipline_management.group_discipline_pomd'),
+                ref('discipline_management.group_discipline_cpco'),
+                ref('discipline_management.group_discipline_ceo'),
+                ref('discipline_management.group_discipline_admin'),
+            ])]"/>
         </record>
 
         <!-- Multi-Company Rule -->
@@ -151,12 +133,21 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Appeal Record Rules -->
-        <!-- Employee: view & submit own appeals -->
+        <!-- Appeal Record Rules: View own, supervised, and subordinate appeals across hierarchy -->
         <record id="rule_discipline_appeal_employee" model="ir.rule">
-            <field name="name">Employee Own Disciplinary Appeals</field>
+            <field name="name">Employee and Supervisor Disciplinary Appeals</field>
             <field name="model_id" ref="discipline_management.model_discipline_appeal"/>
-            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">['|', '|', '|', '|', '|', '|', '|', '|',
+                ('employee_id.user_id', '=', user.id),
+                ('create_uid', '=', user.id),
+                ('reviewer_id', '=', user.id),
+                ('employee_id', 'child_of', user.employee_id.id if user.employee_id else -1),
+                ('employee_id.coach_id.user_id', '=', user.id),
+                ('employee_id.coach_id.coach_id.user_id', '=', user.id),
+                ('employee_id.coach_id.coach_id.coach_id.user_id', '=', user.id),
+                ('case_id.reported_by_id.employee_id.coach_id.user_id', '=', user.id),
+                ('case_id.reported_by_id.employee_id.coach_id.coach_id.user_id', '=', user.id)
+            ]</field>
             <field name="groups" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
@@ -164,27 +155,29 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <!-- Officer & Above: view all appeals -->
-        <record id="rule_discipline_appeal_officer_all" model="ir.rule">
-            <field name="name">Officer and Above All Appeals</field>
+        <!-- Governance Roles: View all appeals -->
+        <record id="rule_discipline_appeal_governance_all" model="ir.rule">
+            <field name="name">Governance Roles All Appeals</field>
             <field name="model_id" ref="discipline_management.model_discipline_appeal"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('discipline_management.group_discipline_officer'))]"/>
+            <field name="groups" eval="[(6, 0, [
+                ref('discipline_management.group_discipline_auditor'),
+                ref('discipline_management.group_discipline_legal'),
+                ref('discipline_management.group_discipline_pomd'),
+                ref('discipline_management.group_discipline_cpco'),
+                ref('discipline_management.group_discipline_ceo'),
+                ref('discipline_management.group_discipline_admin'),
+            ])]"/>
         </record>
 
-        <!-- Discipline Officers / Auditors / Managers / Directors / Admins / Employees: Bank-wide Read Access to Employees -->
+        <!-- Bank-wide Employee Read Access for Discipline Governance Roles -->
         <record id="rule_discipline_hr_employee_read" model="ir.rule">
             <field name="name">Discipline: Bank-wide Employee Read Access</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
             <field name="groups" eval="[(6, 0, [
-                ref('discipline_management.group_discipline_user'),
-                ref('discipline_management.group_discipline_officer'),
                 ref('discipline_management.group_discipline_auditor'),
-                ref('discipline_management.group_discipline_manager'),
-                ref('discipline_management.group_discipline_director'),
                 ref('discipline_management.group_discipline_pomd'),
                 ref('discipline_management.group_discipline_legal'),
-                ref('discipline_management.group_discipline_chief'),
                 ref('discipline_management.group_discipline_cpco'),
                 ref('discipline_management.group_discipline_ceo'),
                 ref('discipline_management.group_discipline_admin'),

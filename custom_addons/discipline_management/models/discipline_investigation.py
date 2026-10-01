@@ -23,7 +23,7 @@ class DisciplineInvestigationLiableEmployee(models.Model):
 class DisciplineInvestigation(models.Model):
     _name = 'discipline.investigation'
     _description = 'Disciplinary Investigation & Findings'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'investigation_date desc, id desc'
 
     name = fields.Char(string='Investigation Ref', required=True, default=lambda self: _('New'), copy=False)
@@ -33,8 +33,19 @@ class DisciplineInvestigation(models.Model):
     offense_category_id = fields.Many2one('discipline.offense.category', string='Offense Category', related='case_id.offense_category_id', store=True, readonly=True)
     
     # Audit Team Hierarchy & Assignment
-    director_id = fields.Many2one('res.users', string='Internal Audit Director', tracking=True)
-    audit_manager_id = fields.Many2one('res.users', string='Assigned Audit Manager', tracking=True)
+    @api.model
+    def _default_director_id(self):
+        emp_model = self.env['hr.employee'].sudo()
+        director_user = emp_model.get_audit_director_user()
+        return director_user.id if director_user else False
+
+    @api.model
+    def _default_audit_manager_id(self):
+        emp = self.env['hr.employee'].sudo().search([('job_id.name', 'ilike', 'Audit Manager'), ('user_id', '!=', False)], limit=1)
+        return emp.user_id.id if emp and emp.user_id else False
+
+    director_id = fields.Many2one('res.users', string='Internal Audit Director', default=_default_director_id, tracking=True)
+    audit_manager_id = fields.Many2one('res.users', string='Assigned Audit Manager', default=_default_audit_manager_id, tracking=True)
     investigator_id = fields.Many2one('res.users', string='Lead Investigator / Auditor', required=False, tracking=True)
     investigation_date = fields.Date(string='Investigation Date', required=True, default=fields.Date.context_today, tracking=True)
     target_completion_date = fields.Date(string='Target Completion Date', tracking=True)
@@ -100,6 +111,28 @@ class DisciplineInvestigation(models.Model):
     director_signoff_date = fields.Date(string='Director Sign-off Date', tracking=True)
     director_review_notes = fields.Text(string='Director Approval Remarks', tracking=True)
 
+    can_ceo_forward_case = fields.Boolean(
+        compute='_compute_can_ceo_forward_case',
+        string='Can CEO Forward Case'
+    )
+
+    @api.depends('state', 'case_id', 'case_id.state')
+    def _compute_can_ceo_forward_case(self):
+        current_user = self.env.user
+        EmpModel = self.env['hr.employee'].sudo()
+        ceo_user = EmpModel.get_ceo_user()
+        is_admin = current_user.has_group('discipline_management.group_discipline_admin') or current_user.has_group('base.group_system')
+        emp = current_user.employee_id
+        job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+        is_ceo = bool(
+            (ceo_user and current_user.id == ceo_user.id) or
+            (emp and (emp.executive_level == 'ceo' or any(k in job_name for k in ['ceo', 'president', 'chief executive']))) or
+            current_user.has_group('discipline_management.group_discipline_ceo') or
+            is_admin
+        )
+        for rec in self:
+            rec.can_ceo_forward_case = bool(is_ceo and rec.state == 'approved' and rec.case_id and rec.case_id.state == 'ceo_review')
+
     @api.onchange('case_id')
     def _onchange_case_id(self):
         if self.case_id:
@@ -139,12 +172,6 @@ class DisciplineInvestigation(models.Model):
             rec.message_post(body=_(
                 'Investigation %s assigned to Lead Auditor <strong>%s</strong> (Target Completion: %s).'
             ) % (rec.name, rec.investigator_id.name, rec.target_completion_date or _('Not Set')))
-            rec.activity_schedule(
-                'mail.mail_activity_data_todo',
-                summary=_('Audit Assignment: Case %s') % rec.case_id.name,
-                note=_('You have been assigned as Lead Auditor for investigation %s.') % rec.name,
-                user_id=rec.investigator_id.id
-            )
 
     def action_submit_for_manager_review(self):
         """Lead Auditor submits completed investigation packet for Audit Manager QA Review."""
@@ -162,7 +189,7 @@ class DisciplineInvestigation(models.Model):
             # 3. Liable Outcome Validations
             if rec.finding_outcome == 'liable':
                 if not rec.applicable_policy:
-                    raise UserError(_('Please specify the Applicable Policy / Rule Violated when misconduct is confirmed.'))
+                    rec.applicable_policy = rec.offense_id.name if rec.offense_id else _('Discipline Misconduct Policy')
                 if not rec.liable_employee_ids:
                     if rec.case_id and rec.case_id.employee_id:
                         self.env['discipline.investigation.liable'].create({
@@ -181,16 +208,6 @@ class DisciplineInvestigation(models.Model):
 
             rec.write({'state': 'manager_review'})
             rec.message_post(body=_('Investigation findings and signed report submitted for Audit Manager Quality Review by %s.') % self.env.user.name)
-            
-            # Notify Audit Manager
-            target_manager = rec.audit_manager_id
-            if target_manager:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Quality Review Required: Investigation %s') % rec.name,
-                    note=_('Lead Auditor %s has submitted the investigation packet for your review.') % (rec.investigator_id.name if rec.investigator_id else 'Investigator'),
-                    user_id=target_manager.id
-                )
 
     def action_manager_approve(self):
         """Audit Manager completes quality review and forwards to Audit Director."""
@@ -201,16 +218,6 @@ class DisciplineInvestigation(models.Model):
                 'manager_review_date': fields.Date.context_today(self),
             })
             rec.message_post(body=_('Audit Manager Quality Review approved by %s. Forwarded for Director Final Approval.') % self.env.user.name)
-            
-            # Notify Director
-            target_director = rec.director_id
-            if target_director:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Final Sign-off Required: Investigation %s') % rec.name,
-                    note=_('Investigation %s has passed Manager Quality Review and is ready for your final approval and announcement.') % rec.name,
-                    user_id=target_director.id
-                )
 
     def action_manager_return(self):
         """Audit Manager returns investigation to Lead Auditor for revision."""
@@ -222,13 +229,6 @@ class DisciplineInvestigation(models.Model):
                 'Investigation returned for revision by Audit Manager %s.<br/>'
                 '<strong>Revision Notes:</strong> %s'
             ) % (self.env.user.name, rec.manager_review_notes))
-            if rec.investigator_id:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Revision Required: Investigation %s') % rec.name,
-                    note=_('Audit Manager has requested revisions: %s') % rec.manager_review_notes,
-                    user_id=rec.investigator_id.id
-                )
 
     def action_director_approve_and_announce(self):
         """Audit Director approves and formally announces completed findings to Disciplinary System."""
@@ -267,67 +267,15 @@ class DisciplineInvestigation(models.Model):
 
             rec.message_post(body=announcement_body)
 
-            # Update Parent Case & Broadcast
+            # Update Parent Case & Route to CEO for Executive Review
             if rec.case_id:
                 rec.case_id.message_post(body=announcement_body)
-
-                if rec.finding_outcome == 'exonerated':
-                    # Notify CEO for Executive Endorsement
-                    ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
-                    ceo_users = (ceo_group.all_user_ids or ceo_group.user_ids) if ceo_group else self.env['res.users']
-                    for ceo in ceo_users:
-                        rec.case_id.activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('Action Required: Endorse Audit Exoneration for %s') % rec.case_id.name,
-                            note=_('Audit investigation %s concluded NO FAULT (Exonerated). Please review findings and click "Endorse Exoneration & Direct Reinstatement".') % rec.name,
-                            user_id=ceo.id
-                        )
-                    pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
-                    pomd_users = (pomd_group.all_user_ids or pomd_group.user_ids) if pomd_group else self.env['res.users']
-                    for pomd in pomd_users:
-                        rec.case_id.activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('Information: Audit Exonerated %s') % rec.case_id.name,
-                            note=_('Audit investigation %s concluded with Exoneration. Pending CEO executive endorsement to revoke suspension.') % rec.name,
-                            user_id=pomd.id
-                        )
-                else:
-                    # Move Case to Committee Review & lock
-                    rec.case_id.with_context(force_write=True).write({
-                        'state': 'committee_review',
-                        'is_locked_for_committee': True
-                    })
-
-                    # Notify CEO, POMD (Secretary), and CPCO (Chair)
-                    ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
-                    ceo_users = (ceo_group.all_user_ids or ceo_group.user_ids) if ceo_group else self.env['res.users']
-                    for ceo in ceo_users:
-                        rec.case_id.activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('Audit Findings Announced: Case %s (%s)') % (rec.case_id.name, rec.employee_id.name),
-                            note=_('Audit investigation %s is completed. Liable: %s. Case is now under Disciplinary Committee review.') % (rec.name, liable_names),
-                            user_id=ceo.id
-                        )
-
-                    pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
-                    pomd_users = (pomd_group.all_user_ids or pomd_group.user_ids) if pomd_group else self.env['res.users']
-                    for pomd in pomd_users:
-                        rec.case_id.activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('Schedule Hearing: Audit Findings Received for Case %s') % rec.case_id.name,
-                            note=_('Audit investigation %s findings are announced. Please schedule Disciplinary Committee meeting and notify members.') % rec.name,
-                            user_id=pomd.id
-                        )
-
-                    cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
-                    cpco_users = (cpco_group.all_user_ids or cpco_group.user_ids) if cpco_group else self.env['res.users']
-                    for cpco in cpco_users:
-                        rec.case_id.activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('Committee Chair Notification: Audit Findings for Case %s') % rec.case_id.name,
-                            note=_('Audit investigation %s findings received. Committee review is now active for case %s.') % (rec.name, rec.case_id.name),
-                            user_id=cpco.id
-                        )
+                rec.case_id.with_context(force_write=True).write({
+                    'state': 'ceo_review',
+                })
+                rec.case_id.message_post(body=_(
+                    'Audit investigation %s concluded and announced. Case submitted to Chief Executive Officer (CEO) for executive review.'
+                ) % rec.name)
 
     def action_director_return(self):
         """Audit Director returns investigation to Lead Auditor & Manager."""
@@ -339,13 +287,6 @@ class DisciplineInvestigation(models.Model):
                 'Investigation returned by Audit Director %s.<br/>'
                 '<strong>Director Remarks:</strong> %s'
             ) % (self.env.user.name, rec.director_review_notes))
-            if rec.investigator_id:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Director Revisions: Investigation %s') % rec.name,
-                    note=_('Audit Director has requested revisions: %s') % rec.director_review_notes,
-                    user_id=rec.investigator_id.id
-                )
 
     # Aliases for backward compatibility
     def action_announce_findings(self):
@@ -356,5 +297,26 @@ class DisciplineInvestigation(models.Model):
 
     def action_accept_findings(self):
         return self.action_director_approve_and_announce()
+
+    def action_ceo_forward_case_to_committee_chair(self):
+        """CEO forwards the parent disciplinary case to Disciplinary Committee Chairman directly from the investigation record."""
+        for rec in self:
+            if not rec.case_id:
+                raise UserError(_('No disciplinary case linked to this investigation.'))
+            rec.case_id.action_ceo_forward_to_committee_chair()
+            rec.message_post(body=_(
+                'Parent Disciplinary Case %s forwarded to Disciplinary Committee Chairman by CEO %s.'
+            ) % (rec.case_id.name, self.env.user.name))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Case Forwarded'),
+                'message': _('Disciplinary Case %s has been forwarded to Disciplinary Committee Chairman (CPCO).') % self.case_id.name,
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'}
+            }
+        }
 
 

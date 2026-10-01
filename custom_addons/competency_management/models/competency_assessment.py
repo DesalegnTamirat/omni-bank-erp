@@ -5,7 +5,7 @@ from odoo.exceptions import UserError, ValidationError, AccessError
 
 
 class CompetencyAssessmentCycle(models.Model):
-    """Scheduled competency assessment cycle /010,."""
+    """Scheduled competency assessment cycle."""
     _name = 'competency.assessment.cycle'
     _description = 'Competency Assessment Cycle'
     _inherit = ['mail.thread']
@@ -31,12 +31,48 @@ class CompetencyAssessmentCycle(models.Model):
     eligible_rater_count = fields.Integer(string='Eligible Raters Pool Size', default=0, readonly=True)
     selected_rater_count = fields.Integer(string='Sampled Raters Size', default=0, readonly=True)
     notes = fields.Text(string='Notes')
+    is_open_or_latest = fields.Boolean(
+        string='Is Current or Latest Cycle',
+        compute='_compute_is_open_or_latest', store=True, index=True
+    )
+
+    @api.constrains('name')
+    def _check_unique_name(self):
+        for rec in self:
+            if rec.name:
+                duplicate = self.search([
+                    ('id', '!=', rec.id),
+                    ('name', '=ilike', rec.name.strip()),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_("An Assessment Cycle named '%s' already exists. Cycle names must be unique.") % rec.name.strip())
+
+    @api.depends('state', 'active')
+    def _compute_is_open_or_latest(self):
+        all_cycles = self.search([('active', '=', True)])
+        open_cycles = all_cycles.filtered(lambda c: c.state == 'open')
+        if open_cycles:
+            target_ids = set(open_cycles.ids)
+        else:
+            latest = all_cycles.sorted(key=lambda c: (c.period_end or fields.Date.today(), c.id), reverse=True)
+            target_ids = {latest[0].id} if latest else set()
+
+        for rec in self:
+            rec.is_open_or_latest = rec.id in target_ids
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'state' in vals or 'active' in vals:
+            self.search([])._compute_is_open_or_latest()
+        return res
 
     @api.model_create_multi
     def create(self, vals_list):
         if not self.env.user.has_group('competency_management.group_competency_admin') and not self.env.su:
             raise UserError(_("Only Competency Administrators can create new Assessment Cycles."))
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        self.search([])._compute_is_open_or_latest()
+        return records
 
     @api.depends('assessment_ids', 'assessment_ids.state')
     def _compute_assessment_counts(self):
@@ -355,8 +391,8 @@ class CompetencyAssessmentCycle(models.Model):
 
     def _generate_cycle_assessments_batch(self):
         """High-performance in-memory 360 assessment batch generator.
-        Pre-caches employee metadata and indices in 1 pass ($O(1)$ lookups)
-        to generate thousands of assessments in seconds rather than minutes.
+        Pre-caches employee metadata in a single pass (O(1) lookups) to
+        generate assessments efficiently at scale.
         """
         self.ensure_one()
         import random
@@ -411,13 +447,26 @@ class CompetencyAssessmentCycle(models.Model):
                 is_dir = self.env['competency.assessment']._is_director_or_chief(emp)
 
             is_chief = is_dir and ('chief' in j_name or 'president' in j_name or 'vp' in j_name)
-            is_bm = 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name
-            is_mgr = is_dir or is_bm or any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'supervisor', 'controller'])
+            is_mgr_title = any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'supervisor', 'controller'])
+            is_mgr = is_dir or is_mgr_title or (getattr(ou, 'manager_id', False) and ou.manager_id.id == emp.id)
+
+            ou_type = (getattr(ou, 'work_unit_type', '') or '').strip().lower()
+            is_bm = False
+            is_district_mgr = False
+            is_ho_mgr = False
+            if is_mgr and not is_dir:
+                if ou_type in ('branch', 'sub_branch') or 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name or 'bm ' in j_name:
+                    is_bm = True
+                elif ou_type in ('district_office', 'regional_office') or 'district manager' in j_name or ('district' in j_name and 'manager' in j_name):
+                    is_district_mgr = True
+                else:
+                    is_ho_mgr = True
 
             emp_cache[emp.id] = {
                 'user_id': u_id,
                 'coach_id': c_id,
                 'ou_id': ou_id,
+                'ou_type': ou_type,
                 'job_id': j_id,
                 'job_name': j_name,
                 'grade_id': g_id,
@@ -426,6 +475,8 @@ class CompetencyAssessmentCycle(models.Model):
                 'is_director': is_dir,
                 'is_chief': is_chief,
                 'is_bm': is_bm,
+                'is_district_mgr': is_district_mgr,
+                'is_ho_mgr': is_ho_mgr,
                 'is_manager': is_mgr,
             }
             if c_id:
@@ -480,7 +531,7 @@ class CompetencyAssessmentCycle(models.Model):
         # If eligible raters < max_subs (e.g. 3, 2, 1), they are assessed by all of them.
         # Evaluators with lower current workload are prioritized to balance assessor assignments.
 
-        # A. Teammates assessing their subordinates under the same coach (Higher Grade assesses Lower Grade)
+        # A. Teammates assessing subordinates under the same coach (Different Job Grade)
         sub_candidates = {}
         for c_id, teammates in coached_by.items():
             for cand_id in teammates:
@@ -497,13 +548,13 @@ class CompetencyAssessmentCycle(models.Model):
                         continue
 
                     # 1. Same Coach: guaranteed by teammates
-                    # 2. Different Job Grade: Evaluator has higher grade than candidate
-                    diff_grade = (eval_data['grade_num'] > cand_data['grade_num']) if (eval_data['grade_num'] and cand_data['grade_num']) else (eval_data['grade_id'] != cand_data['grade_id'])
+                    # 2. Different Job Grade: Evaluator has different grade than candidate
+                    diff_grade = (eval_data['grade_num'] != cand_data['grade_num']) if (eval_data['grade_num'] and cand_data['grade_num']) else (eval_data['grade_id'] != cand_data['grade_id'])
                     if not diff_grade:
                         continue
 
-                    if eval_data['is_chief']:
-                        # Chiefs: 1. Same Coach, 2. Different Job Grade
+                    if eval_data['is_chief'] or eval_data['is_director'] or cand_data['is_chief'] or cand_data['is_director']:
+                        # Chiefs & Directors: 1. Same Coach, 2. Different Job Grade
                         eligible_evaluators.append(eval_id)
                     else:
                         # Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
@@ -538,6 +589,7 @@ class CompetencyAssessmentCycle(models.Model):
                         break
 
         # B. Direct reports evaluating their coach/superior upward (When someone assesses his coach that is subordinate)
+        # Rule: A coach is always evaluated upward by their team, whether in the same work unit or not.
         for m_id, dr_ids in reports_by_manager.items():
             m_data = emp_cache.get(m_id)
             if not m_data or not m_data['user_id']:
@@ -549,21 +601,16 @@ class CompetencyAssessmentCycle(models.Model):
                 if not r_data or not r_data['user_id']:
                     continue
 
-                # 1. Same Coach: guaranteed by dr_ids
+                # 1. Same Coach / Direct Reporting Line: guaranteed by dr_ids
                 # 2. Different Job Grade:
                 diff_grade = (r_data['grade_num'] != m_data['grade_num']) if (r_data['grade_num'] and m_data['grade_num']) else (r_data['grade_id'] != m_data['grade_id'])
                 if not diff_grade:
                     continue
 
-                if m_data['is_chief']:
-                    # Chiefs: 1. Same Coach, 2. Different Job Grade
+                # 3. Different Job Position:
+                diff_job = (r_data['job_id'] != m_data['job_id']) if (r_data['job_id'] and m_data['job_id']) else True
+                if diff_job:
                     eligible_subs.append(r)
-                else:
-                    # Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
-                    same_ou = (r_data['ou_id'] == m_data['ou_id']) if (r_data['ou_id'] and m_data['ou_id']) else True
-                    diff_job = (r_data['job_id'] != m_data['job_id']) if (r_data['job_id'] and m_data['job_id']) else True
-                    if same_ou and diff_job:
-                        eligible_subs.append(r)
 
             if not eligible_subs:
                 continue
@@ -594,34 +641,28 @@ class CompetencyAssessmentCycle(models.Model):
         # If eligible peers < max_peers (e.g. 3, 2, 1), they are assessed by all of them.
         # Evaluators with lower current workload are prioritized to balance assessor assignments.
 
-        # A. Director & Chief Peer Pool (Cross-directorate across bank via config or director pool)
-        dir_pool = [e_id for e_id in emp_cache if emp_cache[e_id]['is_director'] and emp_cache[e_id]['user_id']]
-        if len(dir_pool) > 1:
-            for e_id in sorted(dir_pool):
-                manual_peers = [p for p in dir_peer_map.get(e_id, []) if p != e_id and emp_cache.get(p, {}).get('user_id')]
-                candidate_pool = manual_peers if manual_peers else [p for p in dir_pool if p != e_id]
-                if not candidate_pool:
+        # A. Director & Chief Peer Pool (Strictly manual assignment via competency.director.peer.config)
+        # Unidirectional: The configured Director/Chief evaluates each peer in their assigned peer_ids.
+        # No automatic reciprocal peering: Derese does not evaluate Abayneh unless configured on Derese's own record.
+        # No random fallback: If an executive has no peers assigned in their config, they evaluate 0 peers.
+        for d_id, p_ids in dir_peer_map.items():
+            d_u_id = emp_cache.get(d_id, {}).get('user_id')
+            if not d_u_id or not p_ids:
+                continue
+            for p_id in p_ids:
+                if p_id == d_id or p_id not in emp_cache:
                     continue
-                k_dir = min(len(candidate_pool), max_peers) if max_peers > 0 else len(candidate_pool)
-                total_eligible_raters += len(candidate_pool)
-                sorted_candidates = sorted(candidate_pool, key=lambda pid: (peer_assessor_workload.get(emp_cache[pid]['user_id'], 0), pid))
-                chosen = 0
-                for pid in sorted_candidates:
-                    p_u_id = emp_cache[pid]['user_id']
-                    pair_peer = (e_id, p_u_id, 'peer')
-                    if pair_peer not in existing_pairs:
-                        assessments_to_create.append({
-                            'cycle_id': self.id,
-                            'employee_id': e_id,
-                            'assessor_id': p_u_id,
-                            'assessment_type': 'peer',
-                        })
-                        existing_pairs.add(pair_peer)
-                        peer_assessor_workload[p_u_id] = peer_assessor_workload.get(p_u_id, 0) + 1
-                        total_sampled_raters += 1
-                        chosen += 1
-                        if chosen >= k_dir:
-                            break
+                pair_peer = (p_id, d_u_id, 'peer')
+                if pair_peer not in existing_pairs:
+                    assessments_to_create.append({
+                        'cycle_id': self.id,
+                        'employee_id': p_id,
+                        'assessor_id': d_u_id,
+                        'assessment_type': 'peer',
+                    })
+                    existing_pairs.add(pair_peer)
+                    peer_assessor_workload[d_u_id] = peer_assessor_workload.get(d_u_id, 0) + 1
+                    total_sampled_raters += 1
 
         # B. Non-Director Peer Bucketing according to bank matrix:
         # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
@@ -643,9 +684,12 @@ class CompetencyAssessmentCycle(models.Model):
             if e_data['is_bm']:
                 # Rule 3: Branch Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Job Position
                 b_key = ('BM', c_id, g_id, 'BM_ROLE')
+            elif e_data.get('is_district_mgr'):
+                # Rule 2b: District Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
+                b_key = ('DISTRICT_MGR', c_id, g_id, ou_id)
             elif e_data['is_manager']:
-                # Rule 2: Managerial Positions HO & District: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
-                b_key = ('MGR', c_id, g_id, ou_id)
+                # Rule 2a: Head Office Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
+                b_key = ('HO_MGR', c_id, g_id, ou_id)
             else:
                 # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
                 b_key = ('NON_MGR', c_id, g_id, ou_id, j_id)
@@ -767,12 +811,36 @@ class CompetencyAssessmentCycle(models.Model):
 
 
 class CompetencyAssessment(models.Model):
-    """A single employee assessment within a cycle (FR-COM-011, FR-COM-012)."""
+    """A single employee assessment within a cycle."""
     _name = 'competency.assessment'
     _description = 'Competency Assessment'
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'id desc'
     _rec_name = 'name'
+
+    @api.model
+    def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
+
+    @api.model
+    def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+
+    @api.model
+    def _read_group(self, domain, groupby=(), aggregates=(), having=(), offset=0, limit=None, order=None):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super()._read_group(domain, groupby=groupby, aggregates=aggregates, having=having, offset=offset, limit=limit, order=order)
+
+    @api.model
+    def read_group(self, domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super().read_group(domain, fields, groupby, offset=offset, limit=limit, orderby=orderby, lazy=lazy)
 
     name = fields.Char(string='Reference', readonly=True, copy=False)
     active = fields.Boolean(string='Active', default=True)
@@ -819,6 +887,18 @@ class CompetencyAssessment(models.Model):
         'hr.employee', string='Assessor Employee',
         compute='_compute_assessor_employee_id', store=True, index=True
     )
+    assessor_job_id = fields.Many2one(
+        'hr.job', string='Assessor Job Position',
+        compute='_compute_assessor_job_and_grade', store=True, index=True
+    )
+    assessor_grade_id = fields.Many2one(
+        'employee.grade', string='Assessor Job Grade',
+        compute='_compute_assessor_job_and_grade', store=True, index=True
+    )
+    is_current_or_latest_cycle = fields.Boolean(
+        string='Current or Latest Cycle',
+        related='cycle_id.is_open_or_latest', store=True, index=True
+    )
     assessment_type = fields.Selection(
         selection='_get_assessment_type_selection', string='Assessment Type',
         required=True, tracking=True)
@@ -827,6 +907,17 @@ class CompetencyAssessment(models.Model):
     def _compute_assessor_employee_id(self):
         for rec in self:
             rec.assessor_employee_id = rec.assessor_id.employee_id if rec.assessor_id else False
+
+    @api.depends('assessor_employee_id')
+    def _compute_assessor_job_and_grade(self):
+        for rec in self:
+            emp = rec.assessor_employee_id
+            if emp:
+                rec.assessor_job_id = self._get_employee_job(emp)
+                rec.assessor_grade_id = self._resolve_employee_grade(emp)
+            else:
+                rec.assessor_job_id = False
+                rec.assessor_grade_id = False
 
     @api.model
     def _get_employee_ou_id(self, emp):
@@ -995,22 +1086,29 @@ class CompetencyAssessment(models.Model):
         return False
 
     @api.model
-    def _is_branch_manager(self, emp):
-        job = self._get_employee_job(emp)
-        if not emp or not job:
-            return False
-        j_name = (job.name or '').lower()
-        return 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name or 'bm ' in j_name
-
-    @api.model
     def _is_manager(self, emp):
-        if not emp:
+        if not emp or not emp.active:
             return False
-        if self._is_director_or_chief(emp) or self._is_branch_manager(emp) or self._is_district_manager_emp(emp):
+        if self._is_director_or_chief(emp):
+            return True
+        ou = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
+        if getattr(ou, 'manager_id', False) and ou.manager_id.id == emp.id:
             return True
         job = self._get_employee_job(emp)
         j_name = (job.name or '').lower() if job else ''
-        return any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'president', 'vp', 'supervisor'])
+        return any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'president', 'vp', 'supervisor', 'controller'])
+
+    @api.model
+    def _is_branch_manager(self, emp):
+        if not emp or not self._is_manager(emp):
+            return False
+        ou = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
+        ou_type = (getattr(ou, 'work_unit_type', '') or '').strip().lower()
+        if ou_type in ('branch', 'sub_branch'):
+            return True
+        job = self._get_employee_job(emp)
+        j_name = (job.name or '').lower() if job else ''
+        return 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name or 'bm ' in j_name
 
     @api.model
     def _is_director_emp(self, emp):
@@ -1018,11 +1116,15 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _is_district_manager_emp(self, emp):
-        job = self._get_employee_job(emp)
-        if not emp or not job:
+        if not emp or not self._is_manager(emp):
             return False
-        job_name = job.name or ''
-        return 'district manager' in job_name.lower() or ('district' in job_name.lower() and 'manager' in job_name.lower())
+        ou = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
+        ou_type = (getattr(ou, 'work_unit_type', '') or '').strip().lower()
+        if ou_type in ('district_office', 'regional_office'):
+            return True
+        job = self._get_employee_job(emp)
+        job_name = (job.name or '').lower() if job else ''
+        return 'district manager' in job_name or ('district' in job_name and 'manager' in job_name)
 
     @api.model
     def _get_eligible_peers_for_emp(self, emp):
@@ -1045,10 +1147,7 @@ class CompetencyAssessment(models.Model):
             config = self.env['competency.director.peer.config'].search([('director_id', '=', emp.id)], limit=1)
             if config and config.peer_ids:
                 peers |= config.peer_ids.filtered(lambda p: p.active and p.id != emp.id)
-            other_configs = self.env['competency.director.peer.config'].search([('peer_ids', 'in', [emp.id])])
-            if other_configs:
-                peers |= other_configs.mapped('director_id').filtered(lambda d: d.active and d.id != emp.id)
-            # Returns manually assigned peers ONLY (no random auto-assignment if unassigned)
+            # Returns manually assigned peers ONLY (strictly unidirectional: no reverse peering, no auto-assignment if unassigned)
             return peers
 
         emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
@@ -1340,7 +1439,7 @@ class CompetencyAssessment(models.Model):
             # 4. Default: Read-only
             rec.can_edit_ratings = False
 
-    # 360 Multi-Rater extension fields (FR-COM-012, FR-ASM-002, FR-ASM-005)
+    # 360 Multi-Rater extension fields
     parent_assessment_id = fields.Many2one('competency.assessment', string='Parent 360 Assessment', ondelete='cascade', tracking=True)
     child_assessment_ids = fields.One2many('competency.assessment', 'parent_assessment_id', string='Rater Assessments')
     is_rater_assessment = fields.Boolean(string='Is Child Rater Assessment', default=False)
@@ -1353,7 +1452,7 @@ class CompetencyAssessment(models.Model):
     ], string='Rater Type')
     rater_id = fields.Many2one('res.users', string='Rater User')
     is_anonymous = fields.Boolean(string='Anonymize 360 Feedback', default=False,
-                                   help='Hide rater name from line managers for peer/subordinate 360 reviews (FR-ASM-002).')
+                                   help='Hide rater name from line managers for peer/subordinate 360 reviews.')
     anonymized_rater_label = fields.Char(string='Display Rater Label', compute='_compute_anonymized_rater_label')
 
     @api.depends('is_anonymous', 'rater_type', 'rater_id')
@@ -1368,12 +1467,7 @@ class CompetencyAssessment(models.Model):
 
     def action_consolidate_multi_source(self):
         """Consolidate Self, Manager, 360 Feedback, and Skills Test scores into one weighted
-        achievement determination (FR-ASM-005).
-
-        Uses the same configured rater weights (competency.matrix.config) as the live 360°
-        calculation on assessment lines (_compute_360_ratings), so the consolidated result is
-        consistent with Scenario 5's Weighted Gap Calculation instead of a naive unweighted
-        average across however many raters happened to submit.
+        achievement determination using configured rater weights from competency.matrix.config.
         """
         config = self.env['competency.matrix.config'].sudo().get_active_config()
         sup_weight = float(config.weight_supervisor or 3.0)
@@ -1405,7 +1499,7 @@ class CompetencyAssessment(models.Model):
                     competency_scores.setdefault(cid, []).append((int(line.current_level), rater_weight))
                     competency_reqs[cid] = line.required_level
 
-            # 2. Skills Tests (FR-ASM-003) — verified/objective evidence
+            # 2. Skills Tests — verified/objective evidence
             skills_tests = self.env['competency.skills.test'].search([('employee_id', '=', parent.employee_id.id)])
             for test in skills_tests:
                 if test.verified_level:
@@ -1741,7 +1835,7 @@ class CompetencyAssessment(models.Model):
         return self.action_populate_competencies()
 
     def _check_submission_deadline(self):
-        """Guard method: Enforce cycle submission deadline (FR-ASM-005). Competency Admins can override."""
+        """Enforce cycle submission deadline. Competency Admins can override."""
         is_admin = bool(
             self.env.user.has_group('competency_management.group_competency_admin')
             or self.env.user.has_group('base.group_system')
@@ -1935,7 +2029,7 @@ class CompetencyAssessment(models.Model):
                 pass
 
     def action_submit(self):
-        """Draft -> Submitted with deadline checks, unrated checks, and bidirectional employee/coach notifications (FR-COM-047)."""
+        """Submit assessment: validates deadline, ratings completeness, and notifies supervisor."""
         for rec in self:
             rec._check_submission_deadline()
             if not rec.line_ids:
@@ -2055,7 +2149,7 @@ class CompetencyAssessment(models.Model):
         return self.action_consolidate_multi_source()
 
     def _check_segregation_of_duties(self):
-        """Segregation of duties guard: Block self-approval by subject, assessor, or creator (FR-COM-055)."""
+        """Block self-approval by the assessed subject, assessor, or record creator."""
         for rec in self:
             subject_user = rec.sudo().employee_id.user_id if rec.employee_id else False
             assessor_user = rec.assessor_id or False
@@ -2069,7 +2163,7 @@ class CompetencyAssessment(models.Model):
                     raise ValidationError(_("You cannot approve your own assessment/IDP. This action must be performed by a different authorized user."))
 
     def action_supervisor_review(self):
-        """Submitted -> Supervisor Review with supervisor activity notification (FR-COM-048)."""
+        """Transition assessment to Supervisor Review state and notify supervisor."""
         for rec in self:
             rec.with_context(force_write=True).sudo().write({'state': 'supervisor_review'})
             supervisor_user = rec.sudo().employee_id.parent_id.user_id if (rec.employee_id and rec.sudo().employee_id.parent_id) else False
@@ -2091,7 +2185,7 @@ class CompetencyAssessment(models.Model):
             rec.with_context(force_write=True).write({'state': 'hr_verified'})
 
     def action_approve(self):
-        """Approved -> final approval with Segregation of Duties guard (FR-COM-055)."""
+        """Approve assessment with Segregation of Duties guard."""
         for rec in self:
             rec._check_segregation_of_duties()
             rec.with_context(force_write=True).write({'state': 'approved'})
@@ -2137,7 +2231,7 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _cron_pending_assessment_reminders(self):
-        """Daily cron: pending assessment reminders, upcoming deadline alerts & overdue escalations (FR-COM-046, FR-COM-048)."""
+        """Daily cron: pending assessment reminders, upcoming deadline alerts & overdue escalations."""
         today = fields.Date.context_today(self)
         
         # 1. Upcoming Deadline Alerts (7 days, 3 days, 1 day before deadline)
@@ -2195,7 +2289,7 @@ class CompetencyAssessment(models.Model):
                     pass
 
     def get_achievement_summary_sentence(self):
-        """Returns plain-language alignment sentence (FR-RPT-001 / FR-GAP-007)."""
+        """Returns plain-language alignment sentence for this assessment."""
         self.ensure_one()
         total = len(self.line_ids)
         if not total:
@@ -2208,7 +2302,7 @@ class CompetencyAssessment(models.Model):
         )
 
     def get_recommended_development_actions(self):
-        """Returns recommended action mappings for below-status competencies (FR-GAP-004)."""
+        """Returns recommended development action mappings for below-target competencies."""
         self.ensure_one()
         below_lines = self.line_ids.filtered(lambda l: l.achievement_status == 'below')
         recommendations = []
@@ -2236,13 +2330,41 @@ class CompetencyAssessment(models.Model):
 
 
 class CompetencyAssessmentLine(models.Model):
-    """One competency rating inside an assessment (FR-ASM-006, FR-GAP-005)."""
+    """One competency rating line inside an assessment."""
     _name = 'competency.assessment.line'
     _description = 'Competency Assessment Line'
+
+    @api.model
+    def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
+
+    @api.model
+    def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+
+    @api.model
+    def _read_group(self, domain, groupby=(), aggregates=(), having=(), offset=0, limit=None, order=None):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super()._read_group(domain, groupby=groupby, aggregates=aggregates, having=having, offset=offset, limit=limit, order=order)
+
+    @api.model
+    def read_group(self, domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super().read_group(domain, fields, groupby, offset=offset, limit=limit, orderby=orderby, lazy=lazy)
 
     assessment_id = fields.Many2one(
         'competency.assessment', string='Assessment', required=True, ondelete='cascade')
     cycle_id = fields.Many2one(related='assessment_id.cycle_id', string='Assessment Cycle', store=True, readonly=True, index=True)
+    is_current_or_latest_cycle = fields.Boolean(
+        string='Current or Latest Cycle',
+        related='cycle_id.is_open_or_latest', store=True, index=True
+    )
     employee_id = fields.Many2one(related='assessment_id.employee_id', string='Employee', store=True, readonly=True, index=True)
     department_id = fields.Many2one(related='assessment_id.department_id', string='Department', store=True, readonly=True, index=True)
     operating_unit_id = fields.Many2one(related='assessment_id.employee_id.default_operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
@@ -2346,18 +2468,22 @@ class CompetencyAssessmentLine(models.Model):
                 rec.indicator_level_4 = l4
 
                 rec.behavioral_guide_html = f"""
-                <div style="font-family: inherit; font-size: 13px; color: #1d2b32;">
-                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #726732; border-radius: 4px;">
-                        <strong style="color: #726732;">Level 1 (Basic):</strong> {l1}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; width: 100%; margin-top: 6px; font-family: inherit;">
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #726732; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                        <div style="font-size: 11px; font-weight: 800; color: #726732; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Level 1 &bull; Basic</div>
+                        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; flex-grow: 1;">{l1}</div>
                     </div>
-                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #1d2b32; border-radius: 4px;">
-                        <strong style="color: #1d2b32;">Level 2 (Intermediate):</strong> {l2}
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #1d2b32; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                        <div style="font-size: 11px; font-weight: 800; color: #1d2b32; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Level 2 &bull; Intermediate</div>
+                        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; flex-grow: 1;">{l2}</div>
                     </div>
-                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #c17540; border-radius: 4px;">
-                        <strong style="color: #c17540;">Level 3 (Advanced):</strong> {l3}
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #c17540; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                        <div style="font-size: 11px; font-weight: 800; color: #c17540; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Level 3 &bull; Advanced</div>
+                        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; flex-grow: 1;">{l3}</div>
                     </div>
-                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #541718; border-radius: 4px;">
-                        <strong style="color: #541718;">Level 4 (Expert):</strong> {l4}
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #541718; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                        <div style="font-size: 11px; font-weight: 800; color: #541718; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Level 4 &bull; Expert</div>
+                        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; flex-grow: 1;">{l4}</div>
                     </div>
                 </div>
                 """

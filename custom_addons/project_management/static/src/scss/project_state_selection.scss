@@ -1,0 +1,49 @@
+.o_status_bubble {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    vertical-align: middle;
+
+    &.o_color_bubble_20 {
+        background-color: #28a745 !important; /* Green - On Track */
+    }
+    &.o_color_bubble_21 {
+        background-color: #17a2b8 !important; /* Cyan - On Hold */
+    }
+    &.o_color_bubble_22 {
+        background-color: #ffc107 !important; /* Yellow - At Risk */
+    }
+    &.o_color_bubble_23 {
+        background-color: #dc3545 !important; /* Red - Off Track */
+    }
+    &.o_color_bubble_24 {
+        background-color: #541718 !important; /* Maroon - Done */
+    }
+}
+
+.o_field_project_state_selection {
+    display: inline-flex;
+    align-items: center;
+
+    .dropdown-toggle {
+        padding: 0;
+        border: none;
+        background: transparent;
+        line-height: 1;
+
+        .o_status {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+            cursor: pointer;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+            transition: transform 0.15s ease-in-out;
+
+            &:hover {
+                transform: scale(1.2);
+            }
+        }
+    }
+}

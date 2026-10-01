@@ -26,10 +26,9 @@ class ResUsers(models.Model):
                 user.team_employee_ids = self.env['hr.employee']
                 continue
             subs = self.env['hr.employee'].sudo().search([
-                '|', '|',
+                '|',
                 ('coach_id', '=', emp.id),
                 ('parent_id', '=', emp.id),
-                ('id', 'child_of', emp.id),
             ])
             user.team_employee_ids = emp | subs
 
@@ -113,3 +112,42 @@ class ResUsers(models.Model):
         # 5. Regular Employee: Falls through with emp.job_id only
 
         return self.env['hr.job'].sudo().browse(list(allowed_job_ids))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        users = super().create(vals_list)
+        sup_group = self.env.ref('competency_management.group_competency_supervisor', raise_if_not_found=False)
+        if sup_group:
+            for user in users:
+                emp = user.employee_id
+                if emp:
+                    has_coachees = self.env['hr.employee'].sudo().search_count([
+                        ('active', '=', True),
+                        '|', ('coach_id', '=', emp.id), ('parent_id', '=', emp.id)
+                    ]) > 0
+                    if has_coachees:
+                        user_groups = user.group_ids if 'group_ids' in user._fields else getattr(user, 'groups_id', self.env['res.groups'])
+                        if sup_group not in user_groups:
+                            field_name = 'group_ids' if 'group_ids' in user._fields else 'groups_id'
+                            user.sudo().write({field_name: [(4, sup_group.id)]})
+        return users
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'employee_id' in vals or 'employee_ids' in vals:
+            sup_group = self.env.ref('competency_management.group_competency_supervisor', raise_if_not_found=False)
+            if sup_group:
+                for user in self:
+                    emp = user.employee_id
+                    if emp:
+                        has_coachees = self.env['hr.employee'].sudo().search_count([
+                            ('active', '=', True),
+                            '|', ('coach_id', '=', emp.id), ('parent_id', '=', emp.id)
+                        ]) > 0
+                        if has_coachees:
+                            user_groups = user.group_ids if 'group_ids' in user._fields else getattr(user, 'groups_id', self.env['res.groups'])
+                            if sup_group not in user_groups:
+                                field_name = 'group_ids' if 'group_ids' in user._fields else 'groups_id'
+                                user.sudo().write({field_name: [(4, sup_group.id)]})
+        return res
+

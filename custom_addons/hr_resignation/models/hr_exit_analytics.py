@@ -9,7 +9,7 @@ class HrExitAnalytics(models.Model):
 
     resignation_type_id = fields.Many2one('hr.separation.type', string='Separation Type', readonly=True)
     department_id = fields.Many2one('hr.department', string='Department', readonly=True)
-    question_name = fields.Char(string='Question', readonly=True)
+    question_name = fields.Char(string='Question', readonly=True, translate=True)
     question_type = fields.Selection([
         ('rating',       'Rating'),
         ('satisfaction', 'Satisfaction'),

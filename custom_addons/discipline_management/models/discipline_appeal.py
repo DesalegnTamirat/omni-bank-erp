@@ -7,7 +7,7 @@ from odoo.exceptions import UserError, ValidationError
 class DisciplineAppeal(models.Model):
     _name = 'discipline.appeal'
     _description = 'Disciplinary Appeal Record'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'submission_date desc, id desc'
 
     name = fields.Char(
@@ -69,7 +69,8 @@ class DisciplineAppeal(models.Model):
         readonly=True
     )
 
-    @api.depends('case_id', 'case_id.punishment_type', 'case_id.penalty_percentage', 'case_id.fine_days',
+    @api.depends('case_id', 'case_id.original_punishment_type', 'case_id.original_penalty_percentage', 'case_id.original_fine_days',
+                 'case_id.punishment_type', 'case_id.penalty_percentage', 'case_id.fine_days',
                  'parent_appeal_id', 'parent_appeal_id.revised_punishment_type', 'parent_appeal_id.revised_penalty_percentage', 'parent_appeal_id.revised_fine_days')
     def _compute_original_penalty_details(self):
         for rec in self:
@@ -78,9 +79,9 @@ class DisciplineAppeal(models.Model):
                 rec.original_penalty_percentage = rec.parent_appeal_id.revised_penalty_percentage
                 rec.original_fine_days = rec.parent_appeal_id.revised_fine_days
             elif rec.case_id:
-                rec.original_punishment_type = rec.case_id.punishment_type
-                rec.original_penalty_percentage = rec.case_id.penalty_percentage
-                rec.original_fine_days = rec.case_id.fine_days
+                rec.original_punishment_type = rec.case_id.original_punishment_type or rec.case_id.punishment_type
+                rec.original_penalty_percentage = rec.case_id.original_penalty_percentage if rec.case_id.original_penalty_percentage > 0 else rec.case_id.penalty_percentage
+                rec.original_fine_days = rec.case_id.original_fine_days if rec.case_id.original_fine_days > 0 else rec.case_id.fine_days
             else:
                 rec.original_punishment_type = False
                 rec.original_penalty_percentage = 0.0
@@ -120,20 +121,20 @@ class DisciplineAppeal(models.Model):
     @api.depends('case_id', 'case_id.initiator_type', 'case_id.case_action_track', 'case_id.reported_by_id', 'case_id.employee_id')
     def _compute_case_origin_type(self):
         for rec in self:
-            case = rec.case_id
+            case = rec.case_id.sudo()
             if not case:
                 rec.case_origin_type = 'manager'
                 continue
             if case.initiator_type == 'audit' or case.case_action_track == 'committee_escalation':
                 rec.case_origin_type = 'committee'
             else:
-                initiator_emp = case.reported_by_id.employee_id if case.reported_by_id else False
+                initiator_emp = case.reported_by_id.sudo().employee_id if case.reported_by_id else False
                 if not initiator_emp and case.employee_id:
-                    initiator_emp = case.employee_id.coach_id or case.employee_id.parent_id
+                    initiator_emp = case.employee_id.sudo().coach_id or case.employee_id.sudo().parent_id
                 
                 level = getattr(initiator_emp, 'executive_level', False) if initiator_emp else False
                 if not level and initiator_emp:
-                    job_name = (initiator_emp.job_id.name or '').lower() if initiator_emp.job_id else ''
+                    job_name = (initiator_emp.job_id.sudo().name or '').lower() if initiator_emp.job_id else ''
                     if any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
                         level = 'chief'
                     elif any(k in job_name for k in ['director', 'directorate']):
@@ -227,7 +228,7 @@ class DisciplineAppeal(models.Model):
             self.revised_fine_days = 0.0
             return
 
-        emp = self.employee_id or (self.case_id and self.case_id.employee_id)
+        emp = self.sudo().employee_id or (self.case_id and self.case_id.sudo().employee_id)
         job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
         is_managerial = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
 
@@ -242,21 +243,18 @@ class DisciplineAppeal(models.Model):
         if target_code:
             severity_level = self.env['discipline.severity.level'].search([('code', '=', target_code)], limit=1)
 
-        if severity_level:
-            pct = (getattr(severity_level, 'default_managerial_penalty_pct', 0.0) if is_managerial else getattr(severity_level, 'default_non_managerial_penalty_pct', 0.0)) or getattr(severity_level, 'default_penalty_percentage', 0.0)
-            days = (getattr(severity_level, 'default_managerial_fine_days', 0.0) if is_managerial else getattr(severity_level, 'default_non_managerial_fine_days', 0.0)) or getattr(severity_level, 'default_fine_days', 0.0)
-            self.revised_penalty_percentage = pct
-            self.revised_fine_days = days
+        if is_managerial:
+            self.revised_penalty_percentage = 0.0
+            if severity_level:
+                self.revised_fine_days = getattr(severity_level, 'default_managerial_fine_days', 0.0) or getattr(severity_level, 'default_fine_days', 0.0) or (3.0 if target_code == 'level_2' else (2.0 if target_code == 'level_3' else 1.0))
+            else:
+                self.revised_fine_days = 3.0 if self.revised_punishment_type == 'final_warning_penalty' else (2.0 if self.revised_punishment_type == 'second_warning_penalty' else 1.0)
         else:
-            fallback_map = {
-                'final_warning_penalty': (20.0, 3.0 if is_managerial else 0.0),
-                'second_warning_penalty': (10.0, 2.0 if is_managerial else 0.0),
-                'first_warning_penalty': (5.0, 1.0 if is_managerial else 0.0),
-            }
-            if self.revised_punishment_type in fallback_map:
-                pct, days = fallback_map[self.revised_punishment_type]
-                self.revised_penalty_percentage = pct
-                self.revised_fine_days = days
+            self.revised_fine_days = 0.0
+            if severity_level:
+                self.revised_penalty_percentage = getattr(severity_level, 'default_non_managerial_penalty_pct', 0.0) or getattr(severity_level, 'default_penalty_percentage', 0.0) or (20.0 if target_code == 'level_2' else (10.0 if target_code == 'level_3' else 5.0))
+            else:
+                self.revised_penalty_percentage = 20.0 if self.revised_punishment_type == 'final_warning_penalty' else (10.0 if self.revised_punishment_type == 'second_warning_penalty' else 5.0)
 
     state = fields.Selection([
         ('draft', 'Draft'),
@@ -283,8 +281,8 @@ class DisciplineAppeal(models.Model):
 
     def _compute_is_appeal_reviewer_or_admin(self):
         user = self.env.user
-        emp = user.employee_id
-        job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+        emp = user.sudo().employee_id
+        job_name = (emp.sudo().job_id.name or '').lower() if emp and emp.job_id else ''
         is_reviewer = (
             user.has_group('discipline_management.group_discipline_director') or
             user.has_group('discipline_management.group_discipline_pomd') or
@@ -301,22 +299,25 @@ class DisciplineAppeal(models.Model):
     @api.depends('appeal_target_authority', 'appeal_level', 'case_origin_type', 'case_id', 'case_id.reported_by_id', 'case_id.employee_id')
     def _compute_can_user_review_current_stage(self):
         user = self.env.user
+        EmpModel = self.env['hr.employee'].sudo()
+        cpco_user = EmpModel.get_cpco_user()
+        sec_user = EmpModel.get_secretary_user()
+        ceo_user = EmpModel.get_ceo_user()
         is_admin = user.has_group('discipline_management.group_discipline_admin') or user.has_group('base.group_system')
-        is_ceo = user.has_group('discipline_management.group_discipline_ceo')
-        is_chief = user.has_group('discipline_management.group_discipline_chief') or user.has_group('discipline_management.group_discipline_cpco')
-        is_director = user.has_group('discipline_management.group_discipline_director')
-        is_pomd = user.has_group('discipline_management.group_discipline_pomd')
-        emp = user.employee_id
-        job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+        is_ceo = bool((ceo_user and user.id == ceo_user.id) or user.has_group('discipline_management.group_discipline_ceo'))
+        is_chief = bool((cpco_user and user.id == cpco_user.id) or user.has_group('discipline_management.group_discipline_cpco') or user.has_group('discipline_management.group_discipline_chief'))
+        is_pomd = bool((sec_user and user.id == sec_user.id) or user.has_group('discipline_management.group_discipline_pomd'))
+        emp = user.sudo().employee_id
+        job_name = (emp.sudo().job_id.name or '').lower() if emp and emp.job_id else ''
 
         for rec in self:
             target = rec.appeal_target_authority
             can_review = False
-            case = rec.case_id
+            case = rec.case_id.sudo()
 
-            initiator_emp = case.reported_by_id.employee_id if case and case.reported_by_id else False
+            initiator_emp = case.reported_by_id.sudo().employee_id if case and case.reported_by_id else False
             if not initiator_emp and case and case.employee_id:
-                initiator_emp = case.employee_id.parent_id or case.employee_id.coach_id
+                initiator_emp = case.employee_id.sudo().parent_id or case.employee_id.sudo().coach_id
 
             is_coach_of_initiator = bool(
                 emp and initiator_emp and (
@@ -326,9 +327,14 @@ class DisciplineAppeal(models.Model):
                 )
             )
 
-            is_director_role = is_director or 'director' in job_name or is_coach_of_initiator
-            is_chief_role = is_chief or 'chief' in job_name or 'cpco' in job_name
-            is_ceo_role = is_ceo or 'ceo' in job_name or 'president' in job_name
+            is_director_role = (
+                is_coach_of_initiator or
+                (emp and emp.executive_level in ('director', 'chief', 'ceo')) or
+                user.has_group('discipline_management.group_discipline_director') or
+                'director' in job_name
+            )
+            is_chief_role = is_chief or (emp and emp.executive_level in ('chief', 'ceo')) or 'chief' in job_name or 'cpco' in job_name
+            is_ceo_role = is_ceo or (emp and emp.executive_level == 'ceo') or 'ceo' in job_name or 'president' in job_name
 
             if target == 'directorate':
                 can_review = is_director_role or is_chief_role or is_ceo_role or is_admin
@@ -345,15 +351,16 @@ class DisciplineAppeal(models.Model):
     @api.depends('case_id', 'case_id.employee_id', 'employee_id')
     def _compute_is_appellant_employee(self):
         current_user = self.env.user
+        current_emp = current_user.sudo().employee_id
         for rec in self:
-            emp = rec.employee_id or (rec.case_id and rec.case_id.employee_id)
-            if not emp and current_user.employee_id:
-                emp = current_user.employee_id
+            emp = rec.sudo().employee_id or (rec.case_id and rec.case_id.sudo().employee_id)
+            if not emp and current_emp:
+                emp = current_emp
             is_emp = bool(
                 emp and (
                     (emp.user_id and emp.user_id.id == current_user.id) or
-                    (current_user.employee_id and current_user.employee_id.id == emp.id) or
-                    (hasattr(current_user, 'employee_ids') and emp.id in current_user.employee_ids.ids)
+                    (current_emp and current_emp.id == emp.id) or
+                    (hasattr(current_user, 'employee_ids') and emp.id in current_user.sudo().employee_ids.ids)
                 )
             )
             # Default to True for new/unsaved records
@@ -394,10 +401,17 @@ class DisciplineAppeal(models.Model):
             )
             eligible_user = is_emp or (is_pomd and is_dismissal_inactive)
 
-            # Check if record is decided and outcome is not fully exonerated
+            is_fully_cleared = (
+                rec.decision_outcome == 'overturned' or
+                rec.revised_punishment_type == 'exonerate' or
+                (rec.revised_penalty_percentage == 0.0 and rec.revised_fine_days == 0.0 and rec.revised_punishment_type in ('exonerate', False))
+            )
+
+            # Check if record is decided and outcome has remaining penalty to appeal
             is_decided_with_penalty = (
                 rec.state == 'decided' and
-                rec.decision_outcome in ('upheld', 'penalty_reduced')
+                rec.decision_outcome in ('upheld', 'penalty_reduced') and
+                not is_fully_cleared
             )
 
             # Check if next level is available
@@ -426,6 +440,17 @@ class DisciplineAppeal(models.Model):
 
             rec.can_submit_next_appeal = eligible_user and is_decided_with_penalty and has_next_level and not has_child
             rec.next_appeal_button_label = label
+
+    # Case Completed / Enforced Validation
+    @api.constrains('case_id')
+    def _check_case_enforced_for_appeal(self):
+        for rec in self:
+            if rec.case_id and rec.case_id.state not in ('enforced', 'closed', 'appealed'):
+                case_status = dict(rec.case_id._fields['state'].selection).get(rec.case_id.state, rec.case_id.state)
+                raise ValidationError(_(
+                    'Invalid Appeal Request: An appeal cannot be requested before the disciplinary case is completed and enforced. '
+                    'Case "%s" is currently in "%s" state.'
+                ) % (rec.case_id.name, case_status))
 
     # Appeal Window Enforcement (10 Calendar Days for 1st level appeal)
     @api.constrains('submission_date', 'case_id')
@@ -589,6 +614,8 @@ class DisciplineAppeal(models.Model):
         for rec in self:
             if not rec.appeal_grounds:
                 raise UserError(_('Please provide the grounds and justification for your appeal before submitting.'))
+            if rec.case_id and rec.case_id.state not in ('enforced', 'closed', 'appealed'):
+                raise UserError(_('An appeal can only be submitted for a disciplinary case that has been finalized and enforced.'))
             if rec.appeal_level == 'first' and rec.case_id:
                 rec._check_appeal_window()
             rec.write({'state': 'submitted'})
@@ -629,6 +656,18 @@ class DisciplineAppeal(models.Model):
                     raise UserError(_('Permission Denied: Only the appellant employee can attach or modify supporting appeal documents.'))
 
         return super().write(vals)
+
+    def unlink(self):
+        cases = self.mapped('case_id')
+        res = super().unlink()
+        for case in cases:
+            if case.exists():
+                active_appeals = case.appeal_ids.filtered(lambda a: a.state in ('submitted', 'under_review'))
+                if not active_appeals and case.state == 'appealed':
+                    case.sudo().with_context(force_write=True).write({'state': 'enforced'})
+                case._compute_appeal_outcome()
+                case._compute_appeal_stats()
+        return res
 
     def action_start_review(self):
         for rec in self:
@@ -689,7 +728,14 @@ class DisciplineAppeal(models.Model):
                 if hasattr(case, 'payroll_penalty_ids') and case.payroll_penalty_ids:
                     case.payroll_penalty_ids.sudo().filtered(lambda p: p.state == 'pending').write({'state': 'cancelled'})
                 
-                case.sudo().with_context(force_write=True).write({'state': 'closed'})
+                case.sudo().with_context(force_write=True).write({
+                    'penalty_percentage': 0.0,
+                    'fine_days': 0.0,
+                    'punishment_type': 'exonerate',
+                    'active_duration_days': 0,
+                    'active_penalty_end_date': False,
+                    'state': 'closed'
+                })
                 case.sudo().message_post(body=_('Appeal %s decided: Decision OVERTURNED. Employee exonerated and records restored.') % rec.name)
 
             elif rec.decision_outcome == 'penalty_reduced':
@@ -714,17 +760,28 @@ class DisciplineAppeal(models.Model):
                         'penalty_percentage': 0.0,
                         'fine_days': 0.0,
                         'punishment_type': 'exonerate',
+                        'active_duration_days': 0,
+                        'active_penalty_end_date': False,
                         'state': 'closed'
                     })
                     case.sudo().message_post(body=_('Appeal %s decided: Penalty REDUCED to ZERO (Exonerated). Employee records restored.') % rec.name)
                 else:
+                    new_punish = rec.revised_punishment_type or case.punishment_type
+                    val_days = 180
+                    if new_punish == 'first_warning_penalty':
+                        val_days = 90
+                    elif new_punish in ('verbal_warning', 'exonerate'):
+                        val_days = 0
+                    elif new_punish in ('second_warning_penalty', 'final_warning_penalty'):
+                        val_days = 180
+
                     new_vals = {
                         'penalty_percentage': rec.revised_penalty_percentage,
                         'fine_days': rec.revised_fine_days,
+                        'punishment_type': new_punish,
+                        'active_duration_days': val_days,
                         'state': 'enforced'
                     }
-                    if rec.revised_punishment_type:
-                        new_vals['punishment_type'] = rec.revised_punishment_type
                     case.sudo().with_context(force_write=True).write(new_vals)
                     
                     # Update pending payroll penalties

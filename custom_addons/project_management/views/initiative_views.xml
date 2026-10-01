@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pm_initiative_form" model="ir.ui.view">
+        <field name="name">pm.initiative.form</field>
+        <field name="model">pm.initiative</field>
+        <field name="arch" type="xml">
+            <form string="Strategic Initiative">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,achieved" options="{'clickable': '1'}"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Initiative Title"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Digital Banking Modernization 2026-2028"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Ownership &amp; Reference">
+                            <field name="code"/>
+                            <field name="owner_id"/>
+                        </group>
+                        <group string="Timeline &amp; Progress">
+                            <field name="date_start" required="1"/>
+                            <field name="date_end" required="1"/>
+                            <field name="progress_rate" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Projects" name="projects">
+                            <field name="project_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="manager_id"/>
+                                    <field name="date_start"/>
+                                    <field name="date_end"/>
+                                    <field name="status" widget="badge"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Initiative Description" name="initiative_description">
+                            <field name="description" placeholder="Add detailed initiative narrative, background, and strategic scope..."/>
+                        </page>
+                        <page string="Strategic Alignment" name="strategic_alignment">
+                            <group>
+                                <field name="strategic_source_id" options="{'no_create_edit': False}" placeholder="Select or create strategic source..."/>
+                                <field name="strategic_objective_id" options="{'no_create_edit': False}" placeholder="Select or create strategic objective..."/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pm_initiative_tree" model="ir.ui.view">
+        <field name="name">pm.initiative.list</field>
+        <field name="model">pm.initiative</field>
+        <field name="arch" type="xml">
+            <list string="Strategic Initiatives">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="owner_id"/>
+                <field name="strategic_source_id" optional="show"/>
+                <field name="strategic_objective_id" optional="show"/>
+                <field name="date_start" optional="show"/>
+                <field name="date_end" optional="show"/>
+                <field name="project_count"/>
+                <field name="progress_rate" widget="progressbar"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-success="state == 'achieved'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_initiative_search" model="ir.ui.view">
+        <field name="name">pm.initiative.search</field>
+        <field name="model">pm.initiative</field>
+        <field name="arch" type="xml">
+            <search string="Search Initiatives">
+                <field name="name" string="Initiative"/>
+                <field name="code"/>
+                <field name="owner_id"/>
+                <field name="strategic_source_id"/>
+                <field name="strategic_objective_id"/>
+                <filter name="active_initiatives" string="Active" domain="[('state', '=', 'in_progress')]"/>
+                <filter name="achieved_initiatives" string="Achieved" domain="[('state', '=', 'achieved')]"/>
+                <group>
+                    <filter name="group_owner" string="Owner" context="{'group_by': 'owner_id'}"/>
+                    <filter name="group_source" string="Strategic Source" context="{'group_by': 'strategic_source_id'}"/>
+                    <filter name="group_objective" string="Strategic Objective" context="{'group_by': 'strategic_objective_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pm_initiative" model="ir.actions.act_window">
+        <field name="name">Initiatives</field>
+        <field name="res_model">pm.initiative</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_pm_initiative_search"/>
+        <field name="context">{'search_default_active_initiatives': 1}</field>
+    </record>
+</odoo>

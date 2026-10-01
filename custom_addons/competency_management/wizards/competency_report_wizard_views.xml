@@ -43,11 +43,11 @@
                         <notebook>
                             <page string="Organizational Filters" name="org_filters">
                                 <group>
-                                    <field name="department_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_dept_readonly" placeholder="All Departments"/>
-                                    <field name="operating_unit_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_ou_readonly" placeholder="All Workunits / Branches" domain="operating_unit_domain"/>
-                                    <field name="job_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Job Roles / Positions"/>
-                                    <field name="grade_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Job Grades"/>
-                                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_emp_readonly" placeholder="All Employees" domain="employee_domain"/>
+                                    <field name="department_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" readonly="is_dept_readonly" placeholder="All Departments"/>
+                                    <field name="operating_unit_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" readonly="is_ou_readonly" placeholder="All Workunits / Branches" domain="operating_unit_domain"/>
+                                    <field name="job_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Job Roles / Positions"/>
+                                    <field name="grade_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Job Grades"/>
+                                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" context="{'competency_employee_select': True}" readonly="is_emp_readonly" placeholder="All Employees" domain="employee_domain"/>
                                 </group>
                             </page>
                         </notebook>
@@ -67,6 +67,7 @@
             <field name="name">Competency Reports &amp; Analytics (Excel / PDF)</field>
             <field name="res_model">competency.report.wizard</field>
             <field name="view_mode">form</field>
+            <field name="context">{'competency_employee_select': True}</field>
             <field name="target">new</field>
         </record>
 

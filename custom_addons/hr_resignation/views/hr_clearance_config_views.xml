@@ -87,9 +87,7 @@
         <field name="name">hr.resignation.clearance.template.list</field>
         <field name="model">hr.resignation.clearance.template</field>
         <field name="arch" type="xml">
-            <list string="Clearance Work Units"
-                  decoration-muted="not active"
-                  decoration-warning="not is_mandatory">
+            <list string="Clearance Work Units">
                 <field name="sequence" widget="handle"/>
                 <field name="work_unit_id" string="Operating Unit"/>
                 <field name="responsible_user" string="Responsible User"/>

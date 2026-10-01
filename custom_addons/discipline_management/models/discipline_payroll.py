@@ -6,7 +6,7 @@ from odoo.exceptions import UserError
 class DisciplinePayrollPenalty(models.Model):
     _name = 'discipline.payroll.penalty'
     _description = 'Disciplinary Payroll Salary Penalty Deduction'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'effective_date desc, id desc'
 
     name = fields.Char(string='Penalty Reference', compute='_compute_name', store=True)

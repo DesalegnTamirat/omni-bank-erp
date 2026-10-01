@@ -69,6 +69,16 @@
         ]"/>
     </record>
 
+    <!-- Auditor -->
+    <record id="group_resignation_auditor" model="res.groups">
+        <field name="name">Auditor</field>
+        <field name="privilege_id" ref="privilege_hr_resignation"/>
+        <field name="implied_ids" eval="[
+            (4, ref('base.group_user')),
+            (4, ref('hr.group_hr_manager')),
+        ]"/>
+    </record>
+
     <!-- HR Manager -->
     <record id="group_resignation_hr_manager" model="res.groups">
         <field name="name">HR Manager</field>
@@ -174,6 +184,14 @@
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
     </record>
 
+    <!-- Auditor sees ALL records (like POMD) -->
+    <record id="hr_resignation_rule_auditor" model="ir.rule">
+        <field name="name">Resignation: Auditor sees all records</field>
+        <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
+        <field name="domain_force">[]</field>
+        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_auditor'))]"/>
+    </record>
+
     <!--
         HR Manager sees ALL records (any state except submitted, per existing rule)
         AND also sees their direct reports at ALL states including submitted —
@@ -262,6 +280,14 @@
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
     </record>
 
+    <!-- Auditor sees all clearance lines -->
+    <record id="hr_clearance_rule_auditor" model="ir.rule">
+        <field name="name">Clearance Line: Auditor sees all lines</field>
+        <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance"/>
+        <field name="domain_force">[]</field>
+        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_auditor'))]"/>
+    </record>
+
     <!-- HR sees all clearance lines -->
     <record id="hr_clearance_rule_hr" model="ir.rule">
         <field name="name">Clearance Line: HR sees all lines</field>
@@ -295,6 +321,13 @@
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_template"/>
         <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
+    </record>
+
+    <record id="hr_clearance_template_rule_auditor" model="ir.rule">
+        <field name="name">Clearance Template: Auditor full access</field>
+        <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_template"/>
+        <field name="domain_force">[]</field>
+        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_auditor'))]"/>
     </record>
 
     <record id="hr_clearance_template_rule_hr" model="ir.rule">
@@ -357,6 +390,13 @@
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
     </record>
 
+    <record id="hr_clearance_item_rule_auditor" model="ir.rule">
+        <field name="name">Clearance Item: Auditor sees all</field>
+        <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_line_item"/>
+        <field name="domain_force">[]</field>
+        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_auditor'))]"/>
+    </record>
+
     <record id="hr_clearance_item_rule_hr" model="ir.rule">
         <field name="name">Clearance Item: HR sees all</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_line_item"/>
@@ -405,5 +445,16 @@
         <field name="perm_write"  eval="True"/>
         <field name="perm_create" eval="True"/>
         <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         RECORD RULES — hr.resignation.settlement
+    ════════════════════════════════════════════════════════════════ -->
+
+    <record id="hr_settlement_rule_auditor" model="ir.rule">
+        <field name="name">Settlement: Auditor sees all records</field>
+        <field name="model_id" ref="hr_resignation.model_hr_resignation_settlement"/>
+        <field name="domain_force">[]</field>
+        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_auditor'))]"/>
     </record>
 </odoo>

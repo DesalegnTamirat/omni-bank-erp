@@ -6,7 +6,7 @@ from odoo.exceptions import UserError, ValidationError
 class DisciplinePolicyVersion(models.Model):
     _name = 'discipline.policy.version'
     _description = 'Disciplinary Regulation & Policy Document'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'effective_date desc, name desc'
 
     name = fields.Char(string='Regulation / Document Title', required=True, tracking=True)
@@ -50,7 +50,7 @@ class DisciplinePolicyVersion(models.Model):
 class DisciplineArticle(models.Model):
     _name = 'discipline.article'
     _description = 'Disciplinary Regulation Article'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'article_number, name'
 
     name = fields.Char(string='Article Title (Amharic / English)', required=True, tracking=True)
