@@ -48,6 +48,7 @@
         # Views
         'views/attendance_preapproval_views.xml',
         'views/location_based_exception_views.xml',
+        'views/attendance_gate_exception_views.xml',
         'views/job_shift_views.xml',
         'views/job_position_exception_views.xml',
         'views/job_position_roster_exception_views.xml',

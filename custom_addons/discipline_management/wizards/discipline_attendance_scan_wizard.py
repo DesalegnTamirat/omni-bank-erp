@@ -7,12 +7,37 @@ from odoo.exceptions import UserError
 
 class DisciplineAttendanceScanWizard(models.TransientModel):
     _name = 'discipline.attendance.scan.wizard'
-    _description = 'Scan Attendance Violations & Initiate Disciplinary Cases'
+    _description = 'Scan Attendance & Absence Violations'
 
     @api.model
-    def _default_threshold(self):
+    def _default_late_minutes_threshold(self):
         ICP = self.env['ir.config_parameter'].sudo()
-        return int(ICP.get_param('discipline.attendance_lateness_threshold', 3))
+        return int(ICP.get_param('discipline.attendance_late_minutes_threshold', 60))
+
+    @api.model
+    def _default_absence_cumulative_threshold(self):
+        ICP = self.env['ir.config_parameter'].sudo()
+        return int(ICP.get_param('discipline.absence_cumulative_days_threshold', 2))
+
+    @api.model
+    def _default_absence_warning_days(self):
+        ICP = self.env['ir.config_parameter'].sudo()
+        return int(ICP.get_param('discipline.absence_warning_consecutive_days', 3))
+
+    @api.model
+    def _default_absence_dismissal_days(self):
+        ICP = self.env['ir.config_parameter'].sudo()
+        return int(ICP.get_param('discipline.absence_dismissal_consecutive_days', 5))
+
+    @api.model
+    def _default_enable_force_checkout(self):
+        ICP = self.env['ir.config_parameter'].sudo()
+        return ICP.get_param('discipline.enable_force_checkout_discipline', 'False').lower() in ('true', '1')
+
+    @api.model
+    def _default_force_threshold(self):
+        ICP = self.env['ir.config_parameter'].sudo()
+        return int(ICP.get_param('discipline.attendance_force_checkout_threshold', 3))
 
     @api.model
     def _default_scan_scope(self):
@@ -46,6 +71,13 @@ class DisciplineAttendanceScanWizard(models.TransientModel):
         string='Target Employees'
     )
 
+    violation_type = fields.Selection([
+        ('all', 'All Violations (Absence, Lateness & Force Check-Out)'),
+        ('absence', 'Unexcused Absence (Statutory Escalation)'),
+        ('late', 'Cumulative Late Time (Minutes Duration)'),
+        ('force_checkout', 'Force Check-Out (Operational Compliance)'),
+    ], string='Violation Filter', default='all', required=True)
+
     period_preset = fields.Selection([
         ('last_7_days', 'Last 7 Days'),
         ('last_14_days', 'Last 14 Days'),
@@ -58,16 +90,46 @@ class DisciplineAttendanceScanWizard(models.TransientModel):
     date_from = fields.Date(string='Scan Start Date', required=True, default=lambda self: fields.Date.today() - timedelta(days=30))
     date_to = fields.Date(string='Scan End Date', required=True, default=fields.Date.context_today)
     
-    late_threshold = fields.Integer(
-        string='Lateness Count Threshold',
+    late_minutes_threshold = fields.Integer(
+        string='Total Late Time Threshold (Minutes)',
         required=True,
-        default=_default_threshold,
-        help='Minimum number of late check-ins in the selected period to trigger a disciplinary case initiation.'
+        default=_default_late_minutes_threshold,
+        help='Cumulative late minutes across the period required to initiate a disciplinary case.'
     )
+    absence_cumulative_threshold = fields.Integer(
+        string='Cumulative Absence Threshold (Days)',
+        required=True,
+        default=_default_absence_cumulative_threshold,
+        help='Minimum unexcused absent days to trigger a written warning.'
+    )
+    absence_consecutive_warning = fields.Integer(
+        string='Consecutive Absence for Final Warning',
+        required=True,
+        default=_default_absence_warning_days,
+        help='Consecutive unexcused absent days triggering Level 2 Final Warning.'
+    )
+    absence_consecutive_dismissal = fields.Integer(
+        string='Consecutive Absence for Dismissal',
+        required=True,
+        default=_default_absence_dismissal_days,
+        help='Consecutive unexcused absent days triggering Level 1 Dismissal / Committee Escalation.'
+    )
+
+    enable_force_checkout = fields.Boolean(
+        string='Evaluate Force Check-Out Violations',
+        default=_default_enable_force_checkout,
+        help='If checked, repeated force check-outs exceeding the threshold will trigger cases.'
+    )
+    force_threshold = fields.Integer(
+        string='Force Check-Out Count Threshold',
+        default=_default_force_threshold,
+        help='Minimum number of force check-out events required to trigger a case.'
+    )
+
     skip_existing_active_cases = fields.Boolean(
         string='Skip Employees with Open Cases',
         default=True,
-        help='If checked, will not create a new case for employees who already have an active/pending attendance disciplinary case for this evaluation period.'
+        help='If checked, will not create a duplicate case for employees who already have an active/pending disciplinary case in this period.'
     )
 
     @api.depends('scan_scope')
@@ -153,7 +215,6 @@ class DisciplineAttendanceScanWizard(models.TransientModel):
             if not self.employee_ids:
                 raise UserError(_('Please select at least one employee to scan.'))
             if not is_admin and emp:
-                # Restrict to user subordinates
                 sub_ids = self.env['hr.employee'].sudo().search([
                     '|', '|',
                     ('parent_id', '=', emp.id),
@@ -196,12 +257,12 @@ class DisciplineAttendanceScanWizard(models.TransientModel):
         return self.env['hr.employee']
 
     def action_scan_and_initiate(self):
-        """Execute attendance scan and open created disciplinary cases."""
+        """Execute multi-tier attendance & absence scan and open created disciplinary cases."""
         self.ensure_one()
         if self.date_from > self.date_to:
             raise UserError(_('Scan Start Date cannot be later than Scan End Date.'))
-        if self.late_threshold < 1:
-            raise UserError(_('Lateness Count Threshold must be at least 1.'))
+        if self.late_minutes_threshold < 1:
+            raise UserError(_('Late Time Threshold must be at least 1 minute.'))
 
         employees = self._get_target_employees()
 
@@ -209,7 +270,13 @@ class DisciplineAttendanceScanWizard(models.TransientModel):
             employee_ids=employees,
             date_from=self.date_from,
             date_to=self.date_to,
-            late_threshold=self.late_threshold,
+            violation_type=self.violation_type,
+            late_minutes_threshold=self.late_minutes_threshold,
+            absence_warning_consecutive_days=self.absence_consecutive_warning,
+            absence_dismissal_consecutive_days=self.absence_consecutive_dismissal,
+            absence_cumulative_days_threshold=self.absence_cumulative_threshold,
+            enable_force_checkout=self.enable_force_checkout,
+            force_threshold=self.force_threshold,
             skip_existing_active_cases=self.skip_existing_active_cases,
         )
 
@@ -221,11 +288,11 @@ class DisciplineAttendanceScanWizard(models.TransientModel):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': _('Attendance Scan Complete'),
+                    'title': _('Attendance & Absence Evaluation Complete'),
                     'message': _(
                         'Evaluation completed across %d employee(s) for period %s to %s.\n'
-                        'No attendance violations exceeding the threshold of %d late check-ins were found.'
-                    ) % (emp_count, self.date_from, self.date_to, self.late_threshold),
+                        'No attendance or unexcused absence violations exceeding configured thresholds were found.'
+                    ) % (emp_count, self.date_from, self.date_to),
                     'type': 'info',
                     'sticky': False,
                 }
@@ -234,7 +301,7 @@ class DisciplineAttendanceScanWizard(models.TransientModel):
         if case_count == 1:
             return {
                 'type': 'ir.actions.act_window',
-                'name': _('Initiated Attendance Case: %s') % cases.name,
+                'name': _('Initiated Disciplinary Case: %s') % cases.name,
                 'res_model': 'discipline.case',
                 'res_id': cases.id,
                 'view_mode': 'form',

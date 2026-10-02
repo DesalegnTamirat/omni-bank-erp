@@ -45,6 +45,14 @@
                         </block>
 
                         <block title="Attendance &amp; Absence Escalation Rules" id="discipline_attendance_rules">
+                            <setting id="lateness_setting" string="Cumulative Late Time Threshold (Minutes)" help="Total cumulative late duration in minutes across evaluation period triggering minor discipline case.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="attendance_late_minutes_threshold" class="col-lg-5 o_light_label"/>
+                                        <field name="attendance_late_minutes_threshold" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
                             <setting id="absence_warning_setting" string="Consecutive Absence: Final Warning" help="Consecutive unexcused absence days triggering Level 2 Final Warning.">
                                 <div class="content-group">
                                     <div class="row mt16">
@@ -61,19 +69,20 @@
                                     </div>
                                 </div>
                             </setting>
-                            <setting id="force_checkout_setting" string="Forced Check-Out Threshold" help="Number of force check-out events within rolling window triggering minor discipline case.">
+                            <setting id="absence_cumulative_setting" string="Cumulative Absence: Warning" help="Cumulative unexcused absence days within rolling period triggering minor warning.">
                                 <div class="content-group">
                                     <div class="row mt16">
-                                        <label for="attendance_force_checkout_threshold" class="col-lg-5 o_light_label"/>
-                                        <field name="attendance_force_checkout_threshold" class="col-lg-3"/>
+                                        <label for="absence_cumulative_days_threshold" class="col-lg-5 o_light_label"/>
+                                        <field name="absence_cumulative_days_threshold" class="col-lg-3"/>
                                     </div>
                                 </div>
                             </setting>
-                            <setting id="lateness_setting" string="Late Time Count Threshold" help="Number of late time occurrences within rolling window triggering minor discipline case.">
-                                <div class="content-group">
+                            <setting id="force_checkout_setting" string="Forced Check-Out Discipline Configuration" help="Optionally treat repeated force check-outs as disciplinary misconduct.">
+                                <field name="enable_force_checkout_discipline"/>
+                                <div class="content-group" invisible="not enable_force_checkout_discipline">
                                     <div class="row mt16">
-                                        <label for="attendance_lateness_threshold" class="col-lg-5 o_light_label"/>
-                                        <field name="attendance_lateness_threshold" class="col-lg-3"/>
+                                        <label for="attendance_force_checkout_threshold" class="col-lg-5 o_light_label"/>
+                                        <field name="attendance_force_checkout_threshold" class="col-lg-3"/>
                                     </div>
                                 </div>
                             </setting>

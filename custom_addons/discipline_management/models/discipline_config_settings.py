@@ -50,18 +50,39 @@ class ResConfigSettings(models.TransientModel):
         help='Number of consecutive unexcused absence days that automatically triggers a Critical Misconduct / Dismissal case.'
     )
 
+    absence_cumulative_days_threshold = fields.Integer(
+        string='Cumulative Absence Threshold (Days)',
+        default=2,
+        config_parameter='discipline.absence_cumulative_days_threshold',
+        help='Number of cumulative unexcused absence days within rolling period to trigger minor disciplinary action.'
+    )
+
+    enable_force_checkout_discipline = fields.Boolean(
+        string='Enable Force Check-Out Disciplinary Cases',
+        default=False,
+        config_parameter='discipline.enable_force_checkout_discipline',
+        help='If checked, repeated force check-outs exceeding the threshold will trigger minor disciplinary cases.'
+    )
+
     attendance_force_checkout_threshold = fields.Integer(
         string='Forced Check-Out Threshold Count',
         default=3,
         config_parameter='discipline.attendance_force_checkout_threshold',
-        help='Number of forced check-out violations within rolling period to trigger disciplinary action.'
+        help='Number of forced check-out violations within rolling period to trigger disciplinary action (when enabled).'
+    )
+
+    attendance_late_minutes_threshold = fields.Integer(
+        string='Cumulative Late Time Threshold (Minutes)',
+        default=60,
+        config_parameter='discipline.attendance_late_minutes_threshold',
+        help='Total cumulative late duration in minutes across evaluation period to trigger disciplinary action.'
     )
 
     attendance_lateness_threshold = fields.Integer(
-        string='Late Time Count Threshold',
+        string='Late Time Count Threshold (Legacy)',
         default=3,
         config_parameter='discipline.attendance_lateness_threshold',
-        help='Number of late time occurrences within rolling period to trigger disciplinary action.'
+        help='Legacy count threshold.'
     )
 
     attendance_rolling_days = fields.Integer(

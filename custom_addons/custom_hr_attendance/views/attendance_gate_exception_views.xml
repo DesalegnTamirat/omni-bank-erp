@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- List View -->
+    <record id="view_attendance_gate_exception_list" model="ir.ui.view">
+        <field name="name">attendance.gate.exception.list</field>
+        <field name="model">attendance.gate.exception</field>
+        <field name="arch" type="xml">
+            <list string="ERP Gate Access Exceptions">
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="job_id"/>
+                <field name="reason"/>
+                <field name="created_by"/>
+                <field name="create_date" string="Date Added"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_attendance_gate_exception_form" model="ir.ui.view">
+        <field name="name">attendance.gate.exception.form</field>
+        <field name="model">attendance.gate.exception</field>
+        <field name="arch" type="xml">
+            <form string="ERP Gate Access Exemption">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="employee_id" placeholder="Select Employee..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Employee Details">
+                            <field name="department_id"/>
+                            <field name="job_id"/>
+                            <field name="user_id"/>
+                        </group>
+                        <group string="Exemption Settings">
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="reason" placeholder="e.g. Executive, Urgent Field Mission, System Support"/>
+                            <field name="created_by"/>
+                            <field name="create_date" string="Date Added" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_attendance_gate_exception_search" model="ir.ui.view">
+        <field name="name">attendance.gate.exception.search</field>
+        <field name="model">attendance.gate.exception</field>
+        <field name="arch" type="xml">
+            <search string="Search Gate Exceptions">
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="job_id"/>
+                <field name="reason"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter string="Department" name="group_by_department" context="{'group_by': 'department_id'}"/>
+                <filter string="Job Position" name="group_by_job" context="{'group_by': 'job_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_attendance_gate_exception" model="ir.actions.act_window">
+        <field name="name">ERP Gate Exceptions</field>
+        <field name="res_model">attendance.gate.exception</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_attendance_gate_exception_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add an Employee to the ERP Gate Access Exemption List
+            </p>
+            <p>
+                Employees in this list are permitted to access all ERP modules without checking in.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Item under Attendance > Configuration -->
+    <menuitem id="menu_attendance_gate_exception"
+              name="ERP Gate Exceptions"
+              parent="menu_bunna_attendance_configuration"
+              action="action_attendance_gate_exception"
+              sequence="26"
+              groups="hr_attendance.group_hr_attendance_manager"/>
+
+</odoo>

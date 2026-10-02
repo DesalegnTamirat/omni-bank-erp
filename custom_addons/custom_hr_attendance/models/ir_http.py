@@ -68,14 +68,42 @@ class IrHttp(models.AbstractModel):
     _inherit = 'ir.http'
 
     @classmethod
+    def _is_user_gate_exempt(cls, user):
+        """
+        Determines whether the user is exempt from ERP check-in gate enforcement:
+        1. Superuser, System Administrator (base.group_system), or Attendance Manager (hr_attendance.group_hr_attendance_manager)
+        2. Technical/portal accounts with no linked employee profile
+        3. Active exemption record in attendance.gate.exception
+        """
+        if not user or user._is_public() or user._is_superuser() or not user.employee_id:
+            return True
+
+        # System Administrator & Attendance Administrator: full access to all modules for support/maintenance
+        if user.has_group('base.group_system') or user.has_group('hr_attendance.group_hr_attendance_manager'):
+            return True
+
+        # Exceptional user check from dedicated attendance.gate.exception table
+        env = (request.env if request and getattr(request, 'env', None) else None) or user.env
+        if env and 'attendance.gate.exception' in env:
+            try:
+                return bool(env['attendance.gate.exception'].sudo().search_count([
+                    ('employee_id', '=', user.employee_id.id),
+                    ('active', '=', True),
+                ]))
+            except Exception:
+                return False
+
+        return False
+
+    @classmethod
     def _dispatch(cls, endpoint):
         if cls._attendance_gate_enabled() and cls._route_requires_gate():
             user = request.env.user if (request and request.env and request.env.user) else None
             if not user or user._is_public():
                 return super()._dispatch(endpoint)
 
-            # Pure root superuser (system maintenance) & technical accounts without an employee profile are exempt
-            if user._is_superuser() or not user.employee_id:
+            # Administrators & registered exceptional users bypass gate checks completely
+            if cls._is_user_gate_exempt(user):
                 return super()._dispatch(endpoint)
 
             # 1. Fast path: check session cache first with a 120s TTL
@@ -154,11 +182,13 @@ class IrHttp(models.AbstractModel):
             gate_enabled = self._attendance_gate_enabled()
             is_admin = user.has_group('base.group_system')
             is_attendance_admin = is_admin or user.has_group('hr_attendance.group_hr_attendance_manager')
+            is_gate_exempt = self._is_user_gate_exempt(user)
             employee = user.employee_id
             checked_in = bool(employee and employee.attendance_state == 'checked_in')
             res['enable_checkin_gate'] = gate_enabled
             res['is_system_admin'] = is_admin
             res['is_attendance_admin'] = is_attendance_admin
+            res['is_gate_exempt'] = is_gate_exempt
             res['attendance_checked_in'] = checked_in
         return res
 
