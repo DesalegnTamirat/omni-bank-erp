@@ -32,7 +32,7 @@
                                     <field name="operating_unit_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Workunits / Branches"/>
                                     <field name="job_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Job Roles / Positions"/>
                                     <field name="grade_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Job Grades"/>
-                                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Employees"/>
+                                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" context="{'competency_employee_select': True}" placeholder="All Employees"/>
                                     <field name="competency_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" placeholder="All Competencies"/>
                                 </group>
                             </page>
@@ -52,6 +52,7 @@
             <field name="name">Multi-Cycle Capability Gap &amp; Trend Report</field>
             <field name="res_model">competency.multi.cycle.report.wizard</field>
             <field name="view_mode">form</field>
+            <field name="context">{'competency_employee_select': True}</field>
             <field name="target">new</field>
             <field name="group_ids" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
         </record>

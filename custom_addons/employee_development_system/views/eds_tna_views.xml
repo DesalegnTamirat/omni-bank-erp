@@ -210,10 +210,10 @@
                             <group string="Employee &amp; Organization">
                                 <field name="name" readonly="1" invisible="name == 'New'"/>
                                 <field name="cycle_id" readonly="state != 'draft'"/>
-                                <field name="employee_id" readonly="state != 'draft'"/>
-                                <field name="job_position_id" readonly="1"/>
-                                <field name="department_id" readonly="1"/>
-                                <field name="work_unit_id" readonly="1"/>
+                                <field name="department_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="work_unit_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="job_position_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="employee_id" readonly="state != 'draft'" options="{'no_create': True}"/>
                                 <field name="source" readonly="state != 'draft'"/>
                                 <field name="competency_id" readonly="state != 'draft'"/>
                             </group>

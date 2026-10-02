@@ -30,19 +30,16 @@
                                 confirm="Are you sure you want to start this assessment cycle? 360-degree assessments will be generated for all active employees."
                                 groups="competency_management.group_competency_admin"/>
                         <button name="action_notify_assessors" string="📢 Notify Employees to Fill Assessments"
-                                type="object" class="btn-primary" invisible="state not in ('open','in_review') or pending_assessment_count == 0"
+                                type="object" class="btn-primary" invisible="state != 'open' or pending_assessment_count == 0"
                                 groups="competency_management.group_competency_admin"/>
-                        <button name="action_start_review" string="Start Review"
-                                type="object" invisible="state != 'open'"
-                                groups="competency_management.group_competency_officer"/>
                         <button name="action_send_deadline_reminders" string="⚠️ Send Deadline Warning to Pending Assessors"
-                                type="object" class="btn-warning" invisible="state not in ('open','in_review') or pending_assessment_count == 0"
+                                type="object" class="btn-warning" invisible="state != 'open' or pending_assessment_count == 0"
                                 groups="competency_management.group_competency_admin"/>
                         <button name="action_close" string="Close Cycle"
-                                type="object" invisible="state not in ('open','in_review')"
+                                type="object" invisible="state != 'open'"
                                 confirm="Are you sure you want to close this assessment cycle? All submitted assessments will be locked and final snapshots generated."
                                 groups="competency_management.group_competency_admin"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,open,in_review,closed"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,open,closed"/>
                     </header>
                     <sheet>
                         <div class="oe_button_box" name="button_box">
@@ -100,7 +97,6 @@
                     <field name="name"/>
                     <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
                     <filter string="Open" name="state_open" domain="[('state','=','open')]"/>
-                    <filter string="In Review" name="state_in_review" domain="[('state','=','in_review')]"/>
                     <filter string="Closed" name="state_closed" domain="[('state','=','closed')]"/>
                     <separator/>
                     <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
@@ -231,7 +227,9 @@
                         <button name="action_submit" string="Submit"
                                 type="object" class="oe_highlight" invisible="state != 'draft' or (is_deadline_passed and not is_admin_or_officer) or not can_edit_ratings"/>
                         <button name="action_submit" string="Admin Submit (Override Deadline)"
-                                type="object" class="btn-warning" invisible="state != 'draft' or not is_deadline_passed or not is_admin_or_officer or is_override_active"/>
+                                type="object" class="btn-warning"
+                                groups="competency_management.group_competency_admin,competency_management.group_competency_officer"
+                                invisible="state != 'draft' or not is_deadline_passed or not is_admin_or_officer or is_override_active"/>
                         <button name="action_enable_override" string="Override Ratings"
                                 type="object" class="btn-warning"
                                 groups="competency_management.group_competency_admin,competency_management.group_competency_officer"

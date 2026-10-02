@@ -59,6 +59,7 @@
                     <field name="name"/>
                     <field name="cycle_id"/>
                     <field name="work_unit_id"/>
+                    <field name="department_id" optional="show"/>
                     <field name="entry_count"/>
                     <field name="duplicate_count"/>
                     <field name="non_training_count"/>
@@ -124,7 +125,8 @@
                             <group string="Consolidation">
                                 <field name="name" readonly="1"/>
                                 <field name="cycle_id" readonly="state != 'draft'"/>
-                                <field name="work_unit_id" readonly="state != 'draft'"/>
+                                <field name="department_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="work_unit_id" readonly="state != 'draft'" options="{'no_create': True}"/>
                                 <field name="priority_score"/>
                             </group>
                             <group string="Deadline &amp; Approval">

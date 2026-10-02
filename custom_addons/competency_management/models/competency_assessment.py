@@ -19,7 +19,6 @@ class CompetencyAssessmentCycle(models.Model):
     state = fields.Selection([
         ('draft', 'Draft'),
         ('open', 'Open'),
-        ('in_review', 'In Review'),
         ('closed', 'Closed'),
     ], string='Status', default='draft', tracking=True)
     active = fields.Boolean(string='Active', default=True, tracking=True)
@@ -79,19 +78,19 @@ class CompetencyAssessmentCycle(models.Model):
         # Update is_open_or_latest for all cycles in a single SQL statement.
         # Open cycles take priority; if none are open, the most recently ended active cycle wins.
         self.env.cr.execute("""
-            WITH ranked AS (
-                SELECT id,
-                       ROW_NUMBER() OVER (
-                           ORDER BY
-                               CASE WHEN state = 'open' THEN 0 ELSE 1 END,
-                               COALESCE(period_end, CURRENT_DATE) DESC,
-                               id DESC
-                       ) AS rn
-                FROM competency_assessment_cycle
-                WHERE active = true
-            )
             UPDATE competency_assessment_cycle
-            SET is_open_or_latest = (id IN (SELECT id FROM ranked WHERE rn = 1));
+            SET is_open_or_latest = (
+                CASE
+                    WHEN EXISTS (SELECT 1 FROM competency_assessment_cycle WHERE active = true AND state = 'open')
+                    THEN (active = true AND state = 'open')
+                    ELSE (id IN (
+                        SELECT id FROM competency_assessment_cycle
+                        WHERE active = true
+                        ORDER BY COALESCE(period_end, CURRENT_DATE) DESC, id DESC
+                        LIMIT 1
+                    ))
+                END
+            );
         """)
         self.invalidate_model(['is_open_or_latest'])
 
@@ -821,16 +820,13 @@ class CompetencyAssessmentCycle(models.Model):
 
 
     def action_start_review(self):
-        for rec in self:
-            if rec.state != 'open':
-                raise UserError(_("Only open assessment cycles can transition to review state."))
-        self.with_context(force_write=True).write({'state': 'in_review'})
+        """Deprecated: Evaluations and review are conducted continuously while cycle is open."""
         return True
 
     def action_close(self):
         for rec in self:
-            if rec.state not in ('open', 'in_review'):
-                raise UserError(_("Only open or in-review assessment cycles can be closed."))
+            if rec.state != 'open':
+                raise UserError(_("Only open assessment cycles can be closed."))
         self.with_context(force_write=True).write({'state': 'closed'})
         for rec in self:
             rec.message_post(body=_('Assessment cycle %s closed.') % rec.name)
@@ -908,6 +904,14 @@ class CompetencyAssessment(models.Model):
     department_id = fields.Many2one(related='employee_id.department_id', string='Department', store=True, readonly=True)
     job_id = fields.Many2one('hr.job', string='Job Position', compute='_compute_job_id', store=True, readonly=True)
     grade_id = fields.Many2one('employee.grade', string='Job Grade', compute='_compute_grade_id', store=True, readonly=True)
+    operating_unit_id = fields.Many2one(
+        'operating.unit', string='Operating Unit',
+        compute='_compute_operating_unit_id', store=True, readonly=True, index=True
+    )
+    is_fully_assessed_notified = fields.Boolean(
+        string='Fully Assessed Notified', default=False, copy=False,
+        help='True if the employee has been notified that all assigned 360 assessors completed their evaluations.'
+    )
 
     @api.model
     def get_bunna_logo_base64(self):
@@ -942,6 +946,17 @@ class CompetencyAssessment(models.Model):
     def _compute_grade_id(self):
         for rec in self:
             rec.grade_id = self._resolve_employee_grade(rec.employee_id) if rec.employee_id else False
+
+    @api.depends('employee_id', 'employee_id.default_operating_unit_id', 'employee_id.operating_unit_id', 'department_id.operating_unit_id')
+    def _compute_operating_unit_id(self):
+        for rec in self:
+            emp = rec.employee_id
+            rec.operating_unit_id = (
+                getattr(emp, 'default_operating_unit_id', False)
+                or getattr(emp, 'operating_unit_id', False)
+                or (emp.department_id.operating_unit_id if emp and emp.department_id else False)
+                or False
+            )
 
     @api.model
     def _get_assessment_type_selection(self):
@@ -2040,7 +2055,15 @@ class CompetencyAssessment(models.Model):
                         "The submission deadline (%s) for assessment cycle '%s' has passed. "
                         "This assessment is locked for editing and submissions are closed unless HR extends the deadline or enables Override."
                     ) % (deadline_str, rec.cycle_id.name))
-        return super(CompetencyAssessment, self).write(vals)
+        res = super(CompetencyAssessment, self).write(vals)
+        if vals.get('state') == 'draft':
+            for rec in self:
+                if rec.cycle_id and rec.employee_id:
+                    self.env['competency.assessment'].sudo().search([
+                        ('cycle_id', '=', rec.cycle_id.id),
+                        ('employee_id', '=', rec.employee_id.id)
+                    ]).with_context(force_write=True).write({'is_fully_assessed_notified': False})
+        return res
 
     def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None):
         """Ensure notification appears in standard Odoo notification channels:
@@ -2208,6 +2231,32 @@ class CompetencyAssessment(models.Model):
                         rec.cycle_id.name if rec.cycle_id else ''
                     )
                     rec._notify_user_inbox_and_activity(peer_user, summary_str, note_str, msg_text, target_rec=rec)
+
+            # Immediate Notification on Complete 360 Assessment (All Assigned Assessors Submitted)
+            if rec.cycle_id and rec.employee_id:
+                all_emp_asms = self.env['competency.assessment'].sudo().search([
+                    ('cycle_id', '=', rec.cycle_id.id),
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('active', '=', True),
+                ])
+                draft_asms = all_emp_asms.filtered(lambda a: a.state == 'draft')
+                if all_emp_asms and not draft_asms and not any(all_emp_asms.mapped('is_fully_assessed_notified')):
+                    emp_user = rec.sudo().employee_id.user_id
+                    if emp_user:
+                        assessor_names = ", ".join(filter(None, all_emp_asms.mapped(lambda a: a.assessor_id.name or a.employee_id.name)))
+                        cycle_name = rec.cycle_id.name or _('Current Cycle')
+                        msg_text = Markup(_(
+                            "🎉 <b>360° Competency Evaluation Completed!</b><br/>"
+                            "All assigned assessors (%s) have completed and submitted your evaluations for cycle '<b>%s</b>'.<br/>"
+                            "Your full competency evaluation results and capability gap analysis are now available for you to review.<br/><br/>"
+                            "<a href='/web#action=competency_management.action_my_competency_evaluations' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                            "👁️ View My Full Evaluation Results</a>"
+                        )) % (escape(assessor_names or ''), escape(cycle_name))
+                        summary_str = _('360° Evaluation Completed: %s') % cycle_name
+                        note_str = _('All assigned assessors have completed your evaluations for cycle \'%s\'. You can now view your full evaluation results.') % cycle_name
+                        target_rec = all_emp_asms.filtered(lambda a: a.assessment_type == 'self')[:1] or rec
+                        rec._notify_user_inbox_and_activity(emp_user, summary_str, note_str, msg_text, target_rec=target_rec)
+                        all_emp_asms.with_context(force_write=True).write({'is_fully_assessed_notified': True})
 
     def compute_aggregate_360_ratings(self):
         return self.action_consolidate_multi_source()
@@ -2827,7 +2876,7 @@ class CompetencyAssessmentLine(models.Model):
 
             calc_weighted = round(num / den, 2) if den > 0 else float(s_val or sup_val or sub_val or t_val or 0.0)
 
-            all_lines = self.env['competency.assessment.line'].browse([l.id for l in lines_for_key])
+            all_lines = self.env['competency.assessment.line'].sudo().browse([l.id for l in lines_for_key])
             all_lines.with_context(skip_360_recompute=True).write({
                 'self_rating': float(s_val),
                 'peer_avg': float(p_val),

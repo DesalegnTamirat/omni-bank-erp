@@ -713,18 +713,6 @@ class CompetencyReportWizard(models.TransientModel):
         self.ensure_one()
         output = io.StringIO()
 
-        # Bunna Bank Corporate Metadata Banner
-        cycle_name = self.cycle_id.name if self.cycle_id else 'All Cycles'
-        focus_label = dict(self._fields['assessment_type_filter'].selection).get(self.assessment_type_filter, 'All 360° Ratings')
-        now_str = fields.Datetime.now().strftime('%Y-%m-%d %H:%M')
-        output.write('# ==============================================================================\n')
-        output.write('# BUNNA BANK S.C. - COMPETENCY MANAGEMENT & CAPABILITY ASSESSMENT REPORT\n')
-        output.write(f'# Campaign: {cycle_name}   |   Assessment Focus: {focus_label}\n')
-        output.write(f'# Generated: {now_str}\n')
-        output.write('# Note: Graphic images (Logos) cannot be embedded in raw plaintext CSV format.\n')
-        output.write('# For official branded reports with the Bunna Bank logo, use PDF or Excel (.xlsx).\n')
-        output.write('# ==============================================================================\n')
-
         writer = csv.writer(output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
         if self.report_type == 'detailed_matrix':
@@ -815,8 +803,9 @@ class CompetencyReportWizard(models.TransientModel):
                 tot_comps = len(a.line_ids)
                 gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
                 overall_score = round(sum([float(l.weighted_current_level or l.current_level or 0) for l in a.line_ids]) / tot_comps, 2) if tot_comps else 0.0
+                emp_code = getattr(a.employee_id, 'staff_id', False) or getattr(a.employee_id, 'employee_code', False) or getattr(a.employee_id, 'identification_id', False) or str(a.employee_id.id)
                 writer.writerow([
-                    self.cycle_id.name, a.name, a.employee_id.id, a.employee_id.name,
+                    self.cycle_id.name, a.name, emp_code, a.employee_id.name,
                     a.department_id.name if a.department_id else 'N/A',
                     ou_name, a.job_id.name if a.job_id else 'N/A',
                     tot_comps, gap_cnt, round(a.average_gap or 0.0, 2),
@@ -851,7 +840,7 @@ class CompetencyReportWizard(models.TransientModel):
                     sup_cnt, hr_cnt, app_cnt, lock_cnt, f"{rate}%"
                 ])
 
-        csv_bytes = output.getvalue().encode('utf-8')
+        csv_bytes = output.getvalue().encode('utf-8-sig')
         output.close()
 
         attachment = self.env['ir.attachment'].create({

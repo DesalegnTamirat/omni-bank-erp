@@ -10,17 +10,22 @@
             <field name="arch" type="xml">
                 <form string="Nominate Employees for a Session">
                     <group>
-                        <group>
-                            <field name="session_id" options="{'no_create': True}"/>
+                        <group string="Session &amp; Type">
+                            <field name="session_id" options="{'no_create': True}" readonly="context.get('session_readonly') or context.get('default_session_id')"/>
                             <field name="course_name" readonly="1"/>
                             <field name="nomination_type"/>
                         </group>
-                        <group>
-                            <field name="employee_ids" widget="many2many_tags"/>
-                            <field name="tna_entry_ids" widget="many2many_tags"
-                                    invisible="nomination_type != 'tna_based'"/>
-                            <field name="justification" invisible="nomination_type != 'ad_hoc'"/>
+                        <group string="Organization Filter (Optional)">
+                            <field name="department_id" options="{'no_create': True}"/>
+                            <field name="work_unit_id" options="{'no_create': True}"/>
+                            <field name="job_position_id" options="{'no_create': True}"/>
                         </group>
+                    </group>
+                    <group string="Nominated Participants">
+                        <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                        <field name="tna_entry_ids" widget="many2many_tags"
+                               invisible="nomination_type != 'tna_based'"/>
+                        <field name="justification" invisible="nomination_type != 'ad_hoc'"/>
                     </group>
                     <footer>
                         <button name="action_create_nominations" string="Create &amp; Submit Nominations"

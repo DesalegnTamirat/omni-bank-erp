@@ -11,6 +11,7 @@
                 <field name="field_of_study"/>
                 <field name="submitted_date"/>
                 <field name="work_unit_id"/>
+                <field name="department_id" optional="show"/>
                 <field name="supervisor_id"/>
                 <field name="status" widget="badge"
                        decoration-info="status == 'received'"
@@ -54,8 +55,9 @@
                             <field name="submitted_date"/>
                         </group>
                         <group string="Placement &amp; Supervision">
-                            <field name="work_unit_id"/>
-                            <field name="supervisor_id"/>
+                            <field name="department_id" options="{'no_create': True}"/>
+                            <field name="work_unit_id" options="{'no_create': True}"/>
+                            <field name="supervisor_id" options="{'no_create': True}"/>
                             <field name="start_date"/>
                             <field name="end_date"/>
                         </group>

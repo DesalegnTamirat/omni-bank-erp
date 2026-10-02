@@ -52,6 +52,62 @@ class CompetencyMultiCycleReportWizard(models.TransientModel):
         ('other', 'Other'),
     ], string='Gender Filter', default='all')
 
+    @api.model
+    def default_get(self, fields_list):
+        user = self.env.user
+        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR Officers and Competency Administrators can access reporting."))
+        self = self.with_context(competency_employee_select=True)
+        return super(CompetencyMultiCycleReportWizard, self).default_get(fields_list)
+
+    def web_read(self, specification):
+        user = self.env.user
+        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR Officers and Competency Administrators can access reporting."))
+        return super(CompetencyMultiCycleReportWizard, self.sudo().with_context(competency_employee_select=True)).web_read(specification)
+
+    def read(self, fields=None, load='_classic_read'):
+        user = self.env.user
+        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR Officers and Competency Administrators can access reporting."))
+        return super(CompetencyMultiCycleReportWizard, self.sudo().with_context(competency_employee_select=True)).read(fields=fields, load=load)
+
+    @api.onchange('department_ids')
+    def _onchange_department_ids(self):
+        """Cascading Filter: Department -> Operating Unit, Jobs, and Employees."""
+        if self.department_ids:
+            ou_direct = self.env['operating.unit'].search([('department', 'in', self.department_ids.ids)])
+            ou_from_dept = self.department_ids.mapped('operating_unit_id')
+            dept_emps = self.env['hr.employee'].with_context(competency_employee_select=True).search([('department_id', 'in', self.department_ids.ids)])
+            ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+            allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
+            domain_ou = [('id', 'in', allowed_ous.ids)]
+            domain_job = [('department_id', 'in', self.department_ids.ids)]
+            domain_emp = [('department_id', 'in', self.department_ids.ids)]
+
+            if self.operating_unit_ids:
+                self.operating_unit_ids = self.operating_unit_ids.filtered(lambda u: u.id in allowed_ous.ids)
+            if self.job_ids:
+                matching_jobs = self.env['hr.job'].search(domain_job)
+                self.job_ids = self.job_ids & matching_jobs
+            if self.employee_ids:
+                self.employee_ids = self.employee_ids.filtered(lambda e: e.department_id.id in self.department_ids.ids)
+
+            return {
+                'domain': {
+                    'operating_unit_ids': domain_ou,
+                    'job_ids': domain_job,
+                    'employee_ids': domain_emp,
+                }
+            }
+        return {
+            'domain': {
+                'operating_unit_ids': [],
+                'job_ids': [],
+                'employee_ids': [],
+            }
+        }
+
     def _build_domain_for_cycle(self, cycle):
         """Construct search domain for lines belonging to a specific cycle."""
         domain = [('cycle_id', '=', cycle.id), ('is_primary_reporting_line', '=', True)]

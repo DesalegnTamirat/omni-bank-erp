@@ -69,6 +69,18 @@ class EdsSessionAttendance(models.Model):
         'Attendance is already recorded for this participant on this session!',
     )
 
+    @api.constrains('session_id', 'employee_id')
+    def _check_employee_enrolled(self):
+        for rec in self:
+            if rec.session_id and rec.employee_id:
+                enrolled_emps = rec.session_id.enrollment_ids.filtered(
+                    lambda e: e.state in ('enrolled', 'completed')
+                ).mapped('employee_id')
+                if enrolled_emps and rec.employee_id not in enrolled_emps:
+                    raise ValidationError(_(
+                        'Participant Error: Employee %s is not an enrolled participant in session %s.'
+                    ) % (rec.employee_id.name, rec.session_id.name))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -279,6 +291,18 @@ class EdsFeedback(models.Model):
             if rec.day_number and rec.day_number < 1:
                 raise ValidationError(_('The training day number must be positive.'))
 
+    @api.constrains('session_id', 'employee_id')
+    def _check_employee_enrolled(self):
+        for rec in self:
+            if rec.session_id and rec.employee_id:
+                enrolled_emps = rec.session_id.enrollment_ids.filtered(
+                    lambda e: e.state in ('enrolled', 'completed')
+                ).mapped('employee_id')
+                if enrolled_emps and rec.employee_id not in enrolled_emps:
+                    raise ValidationError(_(
+                        'Participant Error: Employee %s is not an enrolled participant in session %s.'
+                    ) % (rec.employee_id.name, rec.session_id.name))
+
 
 class EdsAssessment(models.Model):
     """Pre/post training assessment score (, ).
@@ -327,6 +351,18 @@ class EdsAssessment(models.Model):
         'CHECK(score >= 0 AND score <= 100)',
         'The assessment score must be between 0 and 100!',
     )
+
+    @api.constrains('session_id', 'employee_id')
+    def _check_employee_enrolled(self):
+        for rec in self:
+            if rec.session_id and rec.employee_id:
+                enrolled_emps = rec.session_id.enrollment_ids.filtered(
+                    lambda e: e.state in ('enrolled', 'completed')
+                ).mapped('employee_id')
+                if enrolled_emps and rec.employee_id not in enrolled_emps:
+                    raise ValidationError(_(
+                        'Participant Error: Employee %s is not an enrolled participant in session %s.'
+                    ) % (rec.employee_id.name, rec.session_id.name))
 
     @api.depends('score')
     def _compute_passed(self):

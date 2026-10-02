@@ -79,6 +79,35 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_course_development_request_search"/>
         </record>
 
+        <record id="view_eds_course_competency_line_form" model="ir.ui.view">
+            <field name="name">eds.course.competency.line.form</field>
+            <field name="model">eds.course.competency.line</field>
+            <field name="arch" type="xml">
+                <form string="Competency Behavioral Guidance">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="competency_id" readonly="1"/>
+                                <field name="competency_code" readonly="1"/>
+                                <field name="competency_pillar" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="required_level" readonly="1"/>
+                                <field name="weight_pct" readonly="1"/>
+                                <field name="notes" readonly="1"/>
+                            </group>
+                        </group>
+                        <group string="Competency Definition">
+                            <field name="level_definition" readonly="1" nolabel="1"/>
+                        </group>
+                        <group string="Demonstrated Behavioral Indicators for Required Level">
+                            <field name="behavioral_indicators" readonly="1" nolabel="1"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
         <record id="view_eds_course_form" model="ir.ui.view">
             <field name="name">eds.course.form</field>
             <field name="model">eds.course</field>
@@ -89,8 +118,11 @@
                                 type="object" class="oe_highlight" invisible="status != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_generate_learning_objectives" string="Auto-Compile Learning Outcomes"
-                                type="object" class="btn-secondary" icon="fa-magic" invisible="status == 'retired'"
+                                type="object" class="btn-secondary" icon="fa-magic" invisible="status != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_set_to_draft" string="Set to Draft / Revise"
+                                type="object" invisible="status not in ('suspended','retired')"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_suspend" string="Suspend"
                                 type="object" invisible="status not in ('draft','active')"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
@@ -106,102 +138,110 @@
                                 <field name="competency_count" widget="statinfo" string="Competencies"/>
                             </button>
                             <button name="%(employee_development_system.action_eds_curriculum)d"
-                                    type="action" class="oe_stat_button" icon="fa-book"
-                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                                     type="action" class="oe_stat_button" icon="fa-book"
+                                     groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="curriculum_count" widget="statinfo" string="Curriculums"/>
                             </button>
                             <button name="%(employee_development_system.action_eds_course_development_request)d"
-                                    type="action" class="oe_stat_button" icon="fa-gears"
-                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                                     type="action" class="oe_stat_button" icon="fa-gears"
+                                     groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="development_request_count" widget="statinfo" string="Dev Requests"/>
                             </button>
                             <button name="action_view_materials" type="object"
-                                    class="oe_stat_button" icon="fa-folder-open"
-                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                                     class="oe_stat_button" icon="fa-folder-open"
+                                     groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="material_count" widget="statinfo" string="Materials"/>
-                                <span class="o_stat_text">Approval gate ()</span>
+                                <span class="o_stat_text">Approval gate</span>
                             </button>
                         </div>
                         <group>
                             <group string="Course">
                                 <field name="code" readonly="1"/>
-                                <field name="name"/>
-                                <field name="category"/>
-                                <field name="delivery_method"/>
-                                <field name="duration_days"/>
+                                <field name="name" readonly="status != 'draft'"/>
+                                <field name="category" readonly="status != 'draft'"/>
+                                <field name="delivery_method" readonly="status != 'draft'"/>
+                                <field name="duration_days" readonly="status != 'draft'"/>
                                 <field name="version" readonly="1"/>
                             </group>
                             <group string="Target Scope &amp; Eligibility">
-                                <field name="target_scope" widget="badge"/>
-                                <field name="department_ids" widget="many2many_tags" placeholder="Bank-Wide (All Departments) if empty"/>
-                                <field name="operating_unit_ids" widget="many2many_tags" placeholder="All Operating Units / Branches if empty"/>
-                                <field name="target_audience_ids" widget="many2many_tags" placeholder="All Job Positions if empty"/>
-                                <field name="prerequisite_course_ids" widget="many2many_tags"/>
+                                <field name="target_scope" widget="badge" readonly="status != 'draft'"/>
+                                <field name="department_ids" widget="many2many_tags" placeholder="All Departments if empty"
+                                       options="{'no_create': True}" readonly="status != 'draft'"/>
+                                <field name="operating_unit_ids" widget="many2many_tags" placeholder="All Operating Units / Branches if empty"
+                                       options="{'no_create': True}" readonly="status != 'draft'"/>
+                                <field name="target_audience_ids" widget="many2many_tags" placeholder="All Job Positions if empty"
+                                       options="{'no_create': True}" readonly="status != 'draft'"/>
+                                <field name="prerequisite_course_ids" widget="many2many_tags" readonly="status != 'draft'"/>
                                 <field name="current_curriculum_id" readonly="1"/>
-                                <field name="schedule"/>
+                                <field name="schedule" readonly="status != 'draft'"/>
                             </group>
                         </group>
-                        <group string="Sourcing Recommendation ()">
-                            <field name="recommended_source"/>
-                            <field name="sourcing_justification"/>
-                            <field name="sourcing_state" readonly="1"/>
+                        <group string="Sourcing Recommendation">
+                            <field name="recommended_source" readonly="status != 'draft'"/>
+                            <field name="sourcing_justification" readonly="status != 'draft'"/>
+                            <field name="sourcing_state" widget="badge"/>
                             <field name="sourcing_decision"
                                    invisible="sourcing_state != 'director_review'"/>
-                            <field name="sourcing_decision_date" readonly="1"/>
-                            <field name="sourcing_decided_by_id" readonly="1"/>
-                            <button name="action_submit_sourcing" string="Submit for Director PPDD Review"
+                            <field name="sourcing_decision_date" readonly="1"
+                                   invisible="not sourcing_decision_date"/>
+                            <field name="sourcing_decided_by_id" readonly="1"
+                                   invisible="not sourcing_decided_by_id"/>
+                            <button name="action_submit_sourcing" string="Submit Sourcing Recommendation"
                                     type="object" class="oe_highlight"
-                                    invisible="sourcing_state != 'draft'"
+                                    invisible="sourcing_state != 'draft' or status == 'retired'"
                                     groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                             <button name="action_record_sourcing_decision" string="Record Director Decision"
                                     type="object" invisible="sourcing_state != 'director_review'"
                                     groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         </group>
                         <group string="Course Definition / Summary">
-                            <field name="description" placeholder="Provide general definition, target competencies and objectives..."/>
+                            <field name="description" placeholder="Provide general definition, target competencies and objectives..." readonly="status != 'draft'"/>
                         </group>
                         <notebook>
-                            <page string="Competency Mapping &amp; Behavioral Standards" name="competency_mapping">
-                                <field name="competency_line_ids">
+                            <page string="Competency Standards" name="competency_mapping">
+                                <field name="competency_line_ids" readonly="status != 'draft'">
                                     <list editable="bottom">
+                                        <button name="action_open_indicators" type="object" icon="fa-info-circle"
+                                                title="View Behavioral Indicators &amp; Guidance"
+                                                class="btn-link text-primary"/>
                                         <field name="competency_id"/>
                                         <field name="competency_code" optional="show"/>
                                         <field name="competency_pillar" widget="badge" optional="show"/>
                                         <field name="required_level"/>
                                         <field name="weight_pct"/>
                                         <field name="level_definition" optional="hide"/>
-                                        <field name="behavioral_indicators" optional="show"/>
+                                        <field name="behavioral_indicators" optional="hide"/>
                                         <field name="notes" placeholder="Focus area / learning modules..."/>
                                     </list>
                                 </field>
                             </page>
-                            <page string="Expected Learning Outcomes &amp; Behavioral Objectives" name="learning_outcomes">
+                            <page string="Learning Outcomes" name="learning_outcomes">
                                 <div class="alert alert-info" role="alert" invisible="learning_outcomes">
                                     Click <strong>Auto-Compile Learning Outcomes</strong> in the header to automatically assemble structured course learning objectives and demonstrated behavioral indicators from the mapped competencies.
                                 </div>
-                                <field name="learning_outcomes" widget="html"/>
+                                <field name="learning_outcomes" widget="html" readonly="status != 'draft'"/>
                             </page>
-                            <page string="Certificate Template &amp; Signatures" name="certificate_config">
+                            <page string="Certificate Template" name="certificate_config">
                                 <group>
                                     <group string="Certificate Wording">
-                                        <field name="certificate_title"/>
-                                        <field name="certificate_body_text" placeholder="Custom certificate awarding statement... Use placeholders like {employee_name}, {course_name}..."/>
+                                        <field name="certificate_title" readonly="status != 'draft'"/>
+                                        <field name="certificate_body_text" placeholder="Custom certificate awarding statement... Use placeholders like {employee_name}, {course_name}..." readonly="status != 'draft'"/>
                                     </group>
                                     <group string="Signatory Details">
-                                        <field name="certificate_signatory_name" placeholder="e.g. Director Name"/>
-                                        <field name="certificate_signatory_title"/>
+                                        <field name="certificate_signatory_name" placeholder="e.g. Director Name" readonly="status != 'draft'"/>
+                                        <field name="certificate_signatory_title" readonly="status != 'draft'"/>
                                     </group>
                                 </group>
                             </page>
-                            <page string="Evaluation &amp; Assessment Questionnaires" name="evaluation_instruments">
+                            <page string="Evaluation Instruments" name="evaluation_instruments">
                                 <group>
-                                    <field name="level1_instrument_id"/>
-                                    <field name="level2_instrument_id"/>
-                                    <field name="level3_instrument_id"/>
+                                    <field name="level1_instrument_id" readonly="status != 'draft'"/>
+                                    <field name="level2_instrument_id" readonly="status != 'draft'"/>
+                                    <field name="level3_instrument_id" readonly="status != 'draft'"/>
                                 </group>
                             </page>
-                            <page string="Training Materials ()" name="materials">
-                                <field name="material_ids">
+                            <page string="Training Materials" name="materials">
+                                <field name="material_ids" readonly="status == 'retired'">
                                     <list editable="bottom">
                                         <field name="name" readonly="1"/>
                                         <field name="title"/>

@@ -240,7 +240,7 @@
                     <field name="date_start"/>
                     <field name="date_end"/>
                     <field name="venue_id"/>
-                    <field name="trainer_ids" widget="many2many_tags"/>
+                    <field name="trainer_count" string="Trainers"/>
                     <field name="capacity"/>
                     <field name="enrolled_count"/>
                     <field name="conflict_flag" decoration-danger="conflict_flag"/>
@@ -330,10 +330,11 @@
                                 </div>
                             </button>
                         </div>
+                        <field name="enrolled_employee_ids" invisible="1"/>
                         <group>
                             <group string="Program">
                                 <field name="name" readonly="1"/>
-                                <field name="course_id" options="{'no_create': True}"/>
+                                <field name="course_id" options="{'no_create': True}" readonly="status != 'draft'"/>
                                 <field name="program_name"/>
                                 <field name="plan_line_id" options="{'no_create': True}"/>
                                 <field name="batch_id" options="{'no_create': True}"/>
@@ -407,7 +408,7 @@
                                 <field name="attendance_ids">
                                     <list editable="bottom">
                                         <field name="name" readonly="1"/>
-                                        <field name="employee_id"/>
+                                        <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True}"/>
                                         <field name="attendance_date"/>
                                         <field name="attended" widget="boolean_toggle"/>
                                         <field name="hours_attended" widget="float_time"/>
@@ -432,7 +433,7 @@
                             <page string="Daily Feedback" name="feedback">
                                 <field name="feedback_ids">
                                     <list editable="bottom">
-                                        <field name="employee_id"/>
+                                        <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True}"/>
                                         <field name="feedback_date"/>
                                         <field name="day_number"/>
                                         <field name="rating" widget="badge"/>
@@ -444,7 +445,7 @@
                             <page string="Assessments" name="assessments">
                                 <field name="assessment_ids">
                                     <list editable="bottom">
-                                        <field name="employee_id"/>
+                                        <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True}"/>
                                         <field name="assessment_type"/>
                                         <field name="score"/>
                                         <field name="passed"/>

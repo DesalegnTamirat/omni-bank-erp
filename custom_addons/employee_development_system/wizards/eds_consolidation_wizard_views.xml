@@ -9,8 +9,10 @@
                 <form string="Consolidate TNA">
                     <group>
                         <field name="cycle_id"/>
-                        <field name="work_unit_id"
-                               help="Leave empty to consolidate the whole cycle bank-wide."/>
+                        <field name="department_id" options="{'no_create': True}"
+                               help="Leave empty to consolidate all departments bank-wide or in the work unit."/>
+                        <field name="work_unit_id" options="{'no_create': True}"
+                               help="Leave empty to consolidate all work units in the department or bank-wide."/>
                     </group>
                     <footer>
                         <button name="action_consolidate" string="Consolidate"

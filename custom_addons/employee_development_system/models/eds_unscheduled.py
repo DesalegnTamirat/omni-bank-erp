@@ -22,6 +22,7 @@ class EdsUnscheduledRequest(models.Model):
     employee_id = fields.Many2one('hr.employee', string='Requested By', tracking=True)
     work_unit_id = fields.Many2one('operating.unit', string='Work Unit')
     department_id = fields.Many2one('hr.department', string='Department')
+    job_position_id = fields.Many2one('hr.job', string='Job Position')
     course_id = fields.Many2one('eds.course', string='Training Program',
                                 domain=[('status', 'in', ('draft', 'active'))])
     program_name = fields.Char(string='Program Name',
@@ -70,12 +71,80 @@ class EdsUnscheduledRequest(models.Model):
         if self.course_id:
             self.program_name = self.course_id.name
 
+    @api.onchange('department_id')
+    def _onchange_department_id(self):
+        """Top of hierarchy: Department -> Operating Unit -> Job Position.
+        - If department selected:
+          work_unit_id domain restricted to operating units belonging to this department.
+          If selected work_unit_id doesn't belong to the department, clear it.
+          job_position_id and employee_id restricted to the department.
+        - If no department selected:
+          All operating units and jobs are available.
+        """
+        ou_domain = self.env['eds.hr.compat'].get_operating_unit_domain(departments=self.department_id)
+        if self.department_id:
+            if self.work_unit_id and not self.env['eds.hr.compat'].is_operating_unit_in_departments(self.work_unit_id, self.department_id):
+                self.work_unit_id = False
+            if self.job_position_id and self.job_position_id.department_id and self.job_position_id.department_id != self.department_id:
+                self.job_position_id = False
+            if self.employee_id and self.employee_id.department_id != self.department_id:
+                self.employee_id = False
+        job_domain = self.env['eds.hr.compat'].get_job_domain(
+            departments=self.department_id, operating_units=self.work_unit_id)
+        emp_domain = self.env['eds.hr.compat'].get_employee_domain(
+            department=self.department_id, operating_unit=self.work_unit_id, job=self.job_position_id)
+        return {'domain': {'work_unit_id': ou_domain, 'job_position_id': job_domain, 'employee_id': emp_domain}}
+
+    @api.onchange('work_unit_id')
+    def _onchange_work_unit_id(self):
+        """Middle of hierarchy: Operating Unit -> Job Position.
+        Filter job position and employee based on selected work unit and department.
+        """
+        if self.work_unit_id and not self.department_id:
+            if hasattr(self.work_unit_id, 'department') and self.work_unit_id.department:
+                self.department_id = self.work_unit_id.department
+            elif 'operating_unit_id' in self.env['hr.department']._fields:
+                linked_dept = self.env['hr.department'].search([('operating_unit_id', '=', self.work_unit_id.id)], limit=1)
+                if linked_dept:
+                    self.department_id = linked_dept
+
+        if self.work_unit_id:
+            if self.employee_id:
+                emp_ou = self.env['eds.hr.compat'].get_employee_operating_unit(self.employee_id)
+                if emp_ou and emp_ou != self.work_unit_id:
+                    self.employee_id = False
+        job_domain = self.env['eds.hr.compat'].get_job_domain(
+            departments=self.department_id, operating_units=self.work_unit_id)
+        emp_domain = self.env['eds.hr.compat'].get_employee_domain(
+            department=self.department_id, operating_unit=self.work_unit_id, job=self.job_position_id)
+        return {'domain': {'job_position_id': job_domain, 'employee_id': emp_domain}}
+
+    @api.onchange('job_position_id')
+    def _onchange_job_position_id(self):
+        if self.job_position_id and self.job_position_id.department_id:
+            if not self.department_id:
+                self.department_id = self.job_position_id.department_id
+            if self.department_id.operating_unit_id and not self.work_unit_id:
+                self.work_unit_id = self.department_id.operating_unit_id
+        if self.job_position_id and self.employee_id:
+            emp_job = self.env['eds.hr.compat'].get_employee_job(self.employee_id)
+            if emp_job and emp_job != self.job_position_id:
+                self.employee_id = False
+        emp_domain = self.env['eds.hr.compat'].get_employee_domain(
+            department=self.department_id, operating_unit=self.work_unit_id, job=self.job_position_id)
+        return {'domain': {'employee_id': emp_domain}}
+
     @api.onchange('employee_id')
     def _onchange_employee_id(self):
         if self.employee_id:
-            self.department_id = self.employee_id.department_id
-            if not self.work_unit_id and hasattr(self.employee_id, 'default_operating_unit_id'):
-                self.work_unit_id = self.employee_id.default_operating_unit_id
+            job = self.env['eds.hr.compat'].get_employee_job(self.employee_id)
+            if job:
+                self.job_position_id = job
+            if self.employee_id.department_id:
+                self.department_id = self.employee_id.department_id
+            ou = self.env['eds.hr.compat'].get_employee_operating_unit(self.employee_id)
+            if ou:
+                self.work_unit_id = ou
 
     @api.model_create_multi
     def create(self, vals_list):

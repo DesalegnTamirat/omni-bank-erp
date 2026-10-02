@@ -31,7 +31,15 @@ class EdsCourse(models.Model):
         ('international', 'International Provider'),
     ], string='Delivery Method', default='internal', tracking=True)
     duration_days = fields.Integer(string='Duration (Days)', default=1, tracking=True)
-    schedule = fields.Text(string='Schedule / Frequency')
+    schedule = fields.Selection([
+        ('annual', 'Annual (Once a Year)'),
+        ('semi_annual', 'Semi-Annual (Twice a Year)'),
+        ('quarterly', 'Quarterly (Every 3 Months)'),
+        ('monthly', 'Monthly'),
+        ('on_demand', 'On-Demand / As Needed'),
+        ('continuous', 'Continuous / Rolling'),
+    ], string='Schedule / Frequency', default='annual', tracking=True,
+       help='Planned operational cadence or frequency of conducting this course.')
     description = fields.Text(string='Description')
     version = fields.Char(string='Current Version', default='v1.0', tracking=True)
     status = fields.Selection([
@@ -189,6 +197,48 @@ class EdsCourse(models.Model):
                 return False
         return True
 
+    @api.onchange('department_ids')
+    def _onchange_department_ids(self):
+        """Top of hierarchy: Department -> Operating Unit -> Job Position.
+        - If department(s) selected:
+          Operating units are filtered to only those belonging to the selected department(s).
+          Any currently selected operating units not belonging to the department(s) are cleared.
+          Target jobs are filtered to those belonging to the selected department(s).
+        - If no department selected:
+          All operating units are available ([]).
+        """
+        ou_domain = self.env['eds.hr.compat'].get_operating_unit_domain(departments=self.department_ids)
+        if self.department_ids:
+            if self.operating_unit_ids and ou_domain:
+                valid_ous = self.operating_unit_ids.filtered(
+                    lambda u: self.env['eds.hr.compat'].is_operating_unit_in_departments(u, self.department_ids)
+                )
+                if len(valid_ous) != len(self.operating_unit_ids):
+                    self.operating_unit_ids = valid_ous
+            job_domain = self.env['eds.hr.compat'].get_job_domain(
+                departments=self.department_ids, operating_units=self.operating_unit_ids
+            )
+            if self.target_audience_ids:
+                valid_jobs = self.target_audience_ids.filtered(
+                    lambda j: not j.department_id or j.department_id in self.department_ids
+                )
+                if len(valid_jobs) != len(self.target_audience_ids):
+                    self.target_audience_ids = valid_jobs
+            return {'domain': {'operating_unit_ids': ou_domain, 'target_audience_ids': job_domain}}
+        else:
+            job_domain = self.env['eds.hr.compat'].get_job_domain(operating_units=self.operating_unit_ids)
+            return {'domain': {'operating_unit_ids': [], 'target_audience_ids': job_domain}}
+
+    @api.onchange('operating_unit_ids')
+    def _onchange_operating_unit_ids(self):
+        """Middle of hierarchy: Operating Unit -> Job Position.
+        Filter target job positions based on selected operating units and departments.
+        """
+        job_domain = self.env['eds.hr.compat'].get_job_domain(
+            departments=self.department_ids, operating_units=self.operating_unit_ids
+        )
+        return {'domain': {'target_audience_ids': job_domain}}
+
     @api.depends('curriculum_ids', 'development_request_ids', 'material_ids', 'competency_line_ids')
     def _compute_counts(self):
         for rec in self:
@@ -228,8 +278,9 @@ class EdsCourse(models.Model):
                 outcomes_html.append("<span class='badge bg-primary' style='font-size: 12px; padding: 4px 8px;'>Target: %s</span>" % lvl_label)
                 outcomes_html.append("</div>")
                 
-                if comp.description:
-                    outcomes_html.append("<p style='margin: 4px 0 8px 0; font-size: 13px; color: #555;'><em>%s</em></p>" % comp.description)
+                comp_desc = getattr(comp, 'definition', False) or getattr(comp, 'description', False)
+                if comp_desc:
+                    outcomes_html.append("<p style='margin: 4px 0 8px 0; font-size: 13px; color: #555;'><em>%s</em></p>" % comp_desc)
                 if line.behavioral_indicators:
                     outcomes_html.append("<div style='font-size: 13px; color: #222; background: #fdfdfd; padding: 8px 12px; border-radius: 4px; border: 1px dashed #d5d5d5;'>")
                     outcomes_html.append("<strong>%s:</strong><br/>%s" % (_("Demonstrated Behavioral Indicators"), line.behavioral_indicators.replace('\n', '<br/>')))
@@ -272,6 +323,12 @@ class EdsCourse(models.Model):
         for rec in self:
             rec.status = 'retired'
             rec.message_post(body=_('Course %s retired.') % rec.name)
+
+    def action_set_to_draft(self):
+        for rec in self:
+            rec._require_manager()
+            rec.status = 'draft'
+            rec.message_post(body=_('Course %s reset to Draft for revision.') % rec.name)
 
     def _require_manager(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
@@ -330,6 +387,19 @@ class EdsCourseCompetencyLine(models.Model):
             else:
                 rec.level_definition = ''
                 rec.behavioral_indicators = ''
+
+    def action_open_indicators(self):
+        """Open modal dialog with full competency definition and level behavioral indicators."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Behavioral Indicators & Guidance: %s') % (self.competency_id.name if self.competency_id else ''),
+            'res_model': 'eds.course.competency.line',
+            'res_id': self.id,
+            'view_mode': 'form',
+            'views': [(self.env.ref('employee_development_system.view_eds_course_competency_line_form').id, 'form')],
+            'target': 'new',
+        }
 
 
 class EdsCourseDevelopmentRequest(models.Model):

@@ -230,6 +230,7 @@ class EdsSession(models.Model):
         'eds.trainer', 'eds_session_trainer_rel', 'session_id', 'trainer_id',
         string='Trainers', tracking=True,
         help='Only active trainers from the register may be assigned (Task 4 register).')
+    trainer_count = fields.Integer(string='Trainers', compute='_compute_trainer_count', store=True)
     capacity = fields.Integer(
         string='Capacity', default=lambda self: self._get_default_capacity(),
         help='Maximum number of participants (default 25-30 from EDS settings, ).')
@@ -261,6 +262,10 @@ class EdsSession(models.Model):
     nomination_ids = fields.One2many('eds.nomination', 'session_id', string='Nominations')
     nomination_count = fields.Integer(string='Nominations', compute='_compute_nomination_count')
     enrollment_ids = fields.One2many('eds.enrollment', 'session_id', string='Enrollments')
+    enrolled_employee_ids = fields.Many2many(
+        'hr.employee', compute='_compute_enrolled_employee_ids',
+        string='Enrolled Employees',
+        help='Employees confirmed or attended for this session.')
     enrolled_count = fields.Integer(string='Enrolled', compute='_compute_enrollment_counts')
     waitlist_count = fields.Integer(string='Waitlisted', compute='_compute_enrollment_counts')
     recurrence = fields.Selection([
@@ -349,6 +354,18 @@ class EdsSession(models.Model):
         for rec in self:
             active = rec.booking_ids.filtered(lambda b: b.state != 'cancelled')
             rec.booking_id = active[0] if active else False
+
+    @api.depends('trainer_ids')
+    def _compute_trainer_count(self):
+        for rec in self:
+            rec.trainer_count = len(rec.trainer_ids)
+
+    @api.depends('enrollment_ids.state', 'enrollment_ids.employee_id')
+    def _compute_enrolled_employee_ids(self):
+        for rec in self:
+            rec.enrolled_employee_ids = rec.enrollment_ids.filtered(
+                lambda e: e.state in ('enrolled', 'completed')
+            ).mapped('employee_id')
 
     @api.depends('enrollment_ids', 'enrollment_ids.state')
     def _compute_enrollment_counts(self):
@@ -439,7 +456,40 @@ class EdsSession(models.Model):
         return sessions
 
     def write(self, vals):
+        # Validate that finished or cancelled sessions cannot have schedule/trainers altered
+        if any(f in vals for f in ('date_start', 'date_end', 'course_id', 'venue_id', 'trainer_ids')):
+            for rec in self:
+                if rec.status in ('completed', 'cancelled'):
+                    raise UserError(_('Cannot modify schedule, course, venue, or trainers of a %s session.') % rec.status)
+        if 'course_id' in vals:
+            for rec in self:
+                if rec.status != 'draft':
+                    raise UserError(_('Cannot change the training program of a session that is already %s.') % rec.status)
+
         res = super().write(vals)
+
+        # Re-synchronize venue booking if dates or venue changed while scheduled/ongoing
+        for rec in self:
+            if rec.status in ('scheduled', 'ongoing'):
+                if any(f in vals for f in ('date_start', 'date_end', 'venue_id')):
+                    if rec.venue_id:
+                        if rec.booking_id:
+                            rec.booking_id.write({
+                                'venue_id': rec.venue_id.id,
+                                'date_start': rec.date_start,
+                                'date_end': rec.date_end,
+                            })
+                        else:
+                            self.env['eds.venue.booking'].create({
+                                'venue_id': rec.venue_id.id,
+                                'session_id': rec.id,
+                                'date_start': rec.date_start,
+                                'date_end': rec.date_end,
+                                'state': 'confirmed',
+                            })
+                    elif rec.booking_id:
+                        rec.booking_id.action_cancel()
+
         if any(f in vals for f in ('date_start', 'date_end', 'status')):
             for rec in self:
                 rec._sync_plan_line_status()
@@ -581,31 +631,66 @@ class EdsSession(models.Model):
         """Scheduled -> Ongoing: delivery has begun.
 
         Attendance records are auto-created for every enrolled participant so the
-        trainer only marks who attended ().
+        trainer only marks who attended.
         """
+        today = fields.Date.today()
         for rec in self:
             if rec.status != 'scheduled':
                 raise UserError(_('Only scheduled sessions can be started.'))
+            if not rec.date_start:
+                raise UserError(_('Session start date is not defined.'))
+            if not self.env.context.get('test_skip_date_check') and fields.Date.to_date(rec.date_start) > today:
+                raise UserError(_(
+                    'Cannot start session %s before its scheduled start date (%s). Today is %s.'
+                ) % (rec.name, fields.Date.to_date(rec.date_start), today))
+            enrolled = rec.enrollment_ids.filtered(lambda e: e.state == 'enrolled')
+            if not enrolled:
+                raise UserError(_(
+                    'Cannot start session %s: No participants are enrolled. Nominate and enroll participants before starting.'
+                ) % rec.name)
+            if not rec.trainer_ids:
+                raise UserError(_(
+                    'Cannot start session %s: At least one trainer must be assigned.'
+                ) % rec.name)
+            if not rec.venue_id and not rec.awarded_venue_id:
+                raise UserError(_(
+                    'Cannot start session %s: A venue must be specified.'
+                ) % rec.name)
+
             rec.status = 'ongoing'
             rec._ensure_attendance_records()
-            rec.message_post(body=_('Session %s started - attendance sheet opened for the '
-                                    'trainer ().') % rec.name)
+            rec.message_post(body=_('Session %s started - attendance sheet opened for the trainer.') % rec.name)
 
     def action_complete(self):
         """Ongoing -> Completed: delivery finished.
 
-        Posts the attendance summary; per-program attendance % and the 80% rule
-        are computed on the attendance records (Task 10 certification reads them).
+        Posts the attendance summary; enrolled participants transition to completed.
         """
+        today = fields.Date.today()
         for rec in self:
             if rec.status != 'ongoing':
                 raise UserError(_('Only ongoing sessions can be completed.'))
+            if not rec.date_end:
+                raise UserError(_('Session end date is not defined.'))
+            if not self.env.context.get('test_skip_date_check') and fields.Date.to_date(rec.date_end) > today:
+                raise UserError(_(
+                    'Cannot complete session %s before its scheduled end date (%s). The training is still in progress.'
+                ) % (rec.name, fields.Date.to_date(rec.date_end)))
+            if not rec.attendance_ids:
+                raise UserError(_(
+                    'Cannot complete session %s: No attendance records found. Record participant attendance first.'
+                ) % rec.name)
+
             rec.status = 'completed'
+            enrolled = rec.enrollment_ids.filtered(lambda e: e.state == 'enrolled')
+            enrolled.write({'state': 'completed'})
+
             present = len(rec.attendance_ids.filtered('attended'))
             total = len(rec.attendance_ids)
             rec.message_post(
-                body=_('Session %s completed () - attendance %d/%d recorded '
-                       '().') % (rec.name, present, total))
+                body=_('Session %s completed - attendance %d/%d recorded.') % (rec.name, present, total)
+            )
+            rec._sync_plan_line_status()
 
     def action_reschedule(self):
         """Scheduled/Ongoing -> Rescheduled: allow date edits, then confirm again ."""
@@ -705,7 +790,10 @@ class EdsSession(models.Model):
             'res_model': 'eds.nomination.wizard',
             'view_mode': 'form',
             'target': 'new',
-            'context': {'default_session_id': self.id},
+            'context': {
+                'default_session_id': self.id,
+                'session_readonly': True,
+            },
         }
 
     def action_view_enrollments(self):

@@ -513,6 +513,7 @@ class CompetencyDashboard(models.TransientModel):
             is_dept_readonly = False
             is_ou_readonly = False
             persona = 'executive'
+            dept_id_int = int(department_id) if department_id else False
 
             if operating_unit_id:
                 ou_id_int = int(operating_unit_id)
@@ -531,7 +532,16 @@ class CompetencyDashboard(models.TransientModel):
             else:
                 all_departments = self.env['hr.department'].sudo().search_read([], ['id', 'name'], order='name asc')
 
-            all_operating_units = self.env['operating.unit'].sudo().search_read([], ['id', 'name'], order='name asc')
+            if dept_id_int:
+                dept_rec = self.env['hr.department'].sudo().browse(dept_id_int)
+                ou_direct = self.env['operating.unit'].sudo().search([('department', '=', dept_id_int)])
+                ou_from_dept = dept_rec.operating_unit_id | dept_rec.operating_unit
+                dept_emps = self.env['hr.employee'].sudo().search([('department_id', '=', dept_id_int)])
+                ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+                allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
+                all_operating_units = [{'id': u.id, 'name': u.name} for u in allowed_ous.sorted(key=lambda u: u.name or '')]
+            else:
+                all_operating_units = self.env['operating.unit'].sudo().search_read([], ['id', 'name'], order='name asc')
         elif is_dept_manager:
             is_dept_readonly = True
             is_ou_readonly = False
@@ -584,7 +594,7 @@ class CompetencyDashboard(models.TransientModel):
                 cycle = self.env['competency.assessment.cycle'].sudo().search([], order='id desc', limit=1)
 
         # Active Assessment Cycle Info for Dashboard Header Banner
-        open_cycle = self.env['competency.assessment.cycle'].sudo().search([('state', 'in', ['open', 'in_review'])], order='id desc', limit=1)
+        open_cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], order='id desc', limit=1)
         active_cycle_info = {}
         if open_cycle:
             p_start = open_cycle.period_start.strftime('%b %d, %Y') if open_cycle.period_start else 'N/A'
@@ -595,10 +605,8 @@ class CompetencyDashboard(models.TransientModel):
 
             if is_deadline_passed:
                 state_label = 'Deadline Passed'
-            elif open_cycle.state == 'open':
-                state_label = 'Open for Submissions'
             else:
-                state_label = 'In Review'
+                state_label = 'Open for Submissions'
 
             active_cycle_info = {
                 'has_active': True,

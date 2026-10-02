@@ -126,6 +126,35 @@ class EdsTnaConsolidation(models.Model):
     work_unit_id = fields.Many2one(
         'operating.unit', string='Work Unit',
         help='Leave empty to consolidate the whole cycle bank-wide.', tracking=True)
+    department_id = fields.Many2one(
+        'hr.department', string='Department',
+        help='Leave empty to consolidate all departments in the work unit or bank-wide.', tracking=True)
+
+    @api.onchange('department_id')
+    def _onchange_department_id(self):
+        """Top of hierarchy: Department -> Operating Unit.
+        - If department selected:
+          work_unit_id domain restricted to operating units belonging to this department.
+          If selected work_unit_id doesn't belong to the department, clear it.
+        - If no department selected:
+          All operating units are available.
+        """
+        ou_domain = self.env['eds.hr.compat'].get_operating_unit_domain(departments=self.department_id)
+        if self.department_id and self.work_unit_id and not self.env['eds.hr.compat'].is_operating_unit_in_departments(self.work_unit_id, self.department_id):
+            self.work_unit_id = False
+        return {'domain': {'work_unit_id': ou_domain}}
+
+    @api.onchange('work_unit_id')
+    def _onchange_work_unit_id(self):
+        """Middle of hierarchy: sync department if unset and known from operating unit."""
+        if self.work_unit_id and not self.department_id:
+            if hasattr(self.work_unit_id, 'department') and self.work_unit_id.department:
+                self.department_id = self.work_unit_id.department
+            elif 'operating_unit_id' in self.env['hr.department']._fields:
+                linked_dept = self.env['hr.department'].search([('operating_unit_id', '=', self.work_unit_id.id)], limit=1)
+                if linked_dept:
+                    self.department_id = linked_dept
+
     entry_ids = fields.One2many(
         'eds.tna.entry', 'consolidation_id', string='Training Needs')
     entry_count = fields.Integer(string='Needs', compute='_compute_counts')
@@ -238,6 +267,8 @@ class EdsTnaConsolidation(models.Model):
                   ('state', 'in', ('submitted', 'validated'))]
         if self.work_unit_id:
             domain.append(('work_unit_id', '=', self.work_unit_id.id))
+        if self.department_id:
+            domain.append(('department_id', '=', self.department_id.id))
         entries = self.env['eds.tna.entry'].search(domain)
         # Detach entries that no longer match (cycle/work unit changed) but stay on this record
         self.entry_ids.filtered(lambda e: e not in entries).write({'consolidation_id': False})

@@ -18,8 +18,59 @@ class EdsInternshipApplication(models.Model):
     submitted_date = fields.Date(string='Received Date', default=fields.Date.context_today, required=True)
     start_date = fields.Date(string='Internship Start Date', tracking=True)
     end_date = fields.Date(string='Internship End Date', tracking=True)
-    work_unit_id = fields.Many2one('operating.unit', string='Assigned Work Unit / Department', tracking=True)
+    work_unit_id = fields.Many2one('operating.unit', string='Assigned Work Unit / Branch', tracking=True)
+    department_id = fields.Many2one('hr.department', string='Assigned Department', tracking=True)
     supervisor_id = fields.Many2one('hr.employee', string='Assigned Work Unit Supervisor', tracking=True)
+
+    @api.onchange('department_id')
+    def _onchange_department_id(self):
+        """Top of hierarchy: Department -> Operating Unit.
+        - If department selected:
+          work_unit_id domain restricted to operating units belonging to this department.
+          If selected work_unit_id doesn't belong to the department, clear it.
+          supervisor_id restricted to the department.
+        - If no department selected:
+          All operating units and supervisors are available.
+        """
+        ou_domain = self.env['eds.hr.compat'].get_operating_unit_domain(departments=self.department_id)
+        if self.department_id:
+            if self.work_unit_id and not self.env['eds.hr.compat'].is_operating_unit_in_departments(self.work_unit_id, self.department_id):
+                self.work_unit_id = False
+            if self.supervisor_id and self.supervisor_id.department_id != self.department_id:
+                self.supervisor_id = False
+        sup_domain = self.env['eds.hr.compat'].get_employee_domain(
+            department=self.department_id, operating_unit=self.work_unit_id)
+        return {'domain': {'work_unit_id': ou_domain, 'supervisor_id': sup_domain}}
+
+    @api.onchange('work_unit_id')
+    def _onchange_work_unit_id(self):
+        """Middle of hierarchy: Operating Unit.
+        Filter supervisor based on selected work unit and department.
+        """
+        if self.work_unit_id and not self.department_id:
+            if hasattr(self.work_unit_id, 'department') and self.work_unit_id.department:
+                self.department_id = self.work_unit_id.department
+            elif 'operating_unit_id' in self.env['hr.department']._fields:
+                linked_dept = self.env['hr.department'].search([('operating_unit_id', '=', self.work_unit_id.id)], limit=1)
+                if linked_dept:
+                    self.department_id = linked_dept
+
+        if self.work_unit_id and self.supervisor_id:
+            sup_ou = self.env['eds.hr.compat'].get_employee_operating_unit(self.supervisor_id)
+            if sup_ou and sup_ou != self.work_unit_id:
+                self.supervisor_id = False
+        sup_domain = self.env['eds.hr.compat'].get_employee_domain(
+            department=self.department_id, operating_unit=self.work_unit_id)
+        return {'domain': {'supervisor_id': sup_domain}}
+
+    @api.onchange('supervisor_id')
+    def _onchange_supervisor_id(self):
+        if self.supervisor_id:
+            if self.supervisor_id.department_id and not self.department_id:
+                self.department_id = self.supervisor_id.department_id
+            ou = self.env['eds.hr.compat'].get_employee_operating_unit(self.supervisor_id)
+            if ou and not self.work_unit_id:
+                self.work_unit_id = ou
     progress_notes = fields.Text(string='Placement & Progress Notes')
     outcome_report = fields.Text(string='Final Internship Performance & Outcome Summary')
     evaluation_ids = fields.One2many('eds.internship.evaluation', 'application_id', string='Periodic Evaluations')

@@ -135,7 +135,7 @@
                                         <td style="font-weight: 600; color: #726732; padding: 4px;">Department:</td>
                                         <td style="padding: 4px;"><t t-out="doc.department_id.name or 'N/A'"/></td>
                                         <td style="font-weight: 600; color: #726732; padding: 4px;">Operating Unit:</td>
-                                        <td style="padding: 4px;"><t t-out="doc.operating_unit_id.name or 'Head Office'"/></td>
+                                        <td style="padding: 4px;"><t t-out="doc.operating_unit_id.name if doc.operating_unit_id else (doc.employee_id.default_operating_unit_id.name if doc.employee_id and doc.employee_id.default_operating_unit_id else 'Head Office')"/></td>
                                     </tr>
                                     <tr>
                                         <td style="font-weight: 600; color: #726732; padding: 4px;">Assessment Cycle:</td>

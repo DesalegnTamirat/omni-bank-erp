@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields, _
+from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 
 
@@ -37,6 +37,18 @@ class EdsCompetencyGapImport(models.TransientModel):
         help='Optionally limit gap ingestion to employees in a specific department.'
     )
     result_log = fields.Text(string='Ingestion Summary', readonly=True)
+
+    @api.onchange('operating_unit_id')
+    def _onchange_operating_unit_id(self):
+        if self.operating_unit_id and self.department_id and self.department_id.operating_unit_id != self.operating_unit_id:
+            self.department_id = False
+        dept_domain = self.env['eds.hr.compat'].get_department_domain(self.operating_unit_id)
+        return {'domain': {'department_id': dept_domain}}
+
+    @api.onchange('department_id')
+    def _onchange_department_id(self):
+        if self.department_id and self.department_id.operating_unit_id and not self.operating_unit_id:
+            self.operating_unit_id = self.department_id.operating_unit_id
 
     def action_pull_competency_gaps(self):
         """Query assessment lines from the selected closed cycle and generate TNA entries."""

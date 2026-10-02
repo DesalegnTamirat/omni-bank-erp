@@ -11,6 +11,8 @@
                 <list string="Unscheduled Training Requests">
                     <field name="name"/>
                     <field name="employee_id"/>
+                    <field name="department_id" optional="show"/>
+                    <field name="work_unit_id" optional="hide"/>
                     <field name="course_id"/>
                     <field name="program_name"/>
                     <field name="reason" widget="badge"/>
@@ -29,6 +31,8 @@
                 <search>
                     <field name="name"/>
                     <field name="employee_id"/>
+                    <field name="department_id"/>
+                    <field name="work_unit_id"/>
                     <field name="course_id"/>
                     <field name="annual_plan_id"/>
                     <filter string="Pending" name="pending"
@@ -37,6 +41,8 @@
                     <filter string="Rejected" name="rejected" domain="[('state','=','rejected')]"/>
                     <separator/>
                     <group name="group_by">
+                        <filter string="Department" name="g_dept" context="{'group_by':'department_id'}"/>
+                        <filter string="Work Unit" name="g_wu" context="{'group_by':'work_unit_id'}"/>
                         <filter string="Reason" name="g_reason" context="{'group_by':'reason'}"/>
                         <filter string="Status" name="g_state" context="{'group_by':'state'}"/>
                     </group>
@@ -68,11 +74,12 @@
                     </header>
                     <sheet>
                         <group>
-                            <group string="Request">
+                            <group string="Request &amp; Organization">
                                 <field name="name" readonly="1"/>
-                                <field name="employee_id"/>
-                                <field name="work_unit_id"/>
-                                <field name="department_id"/>
+                                <field name="department_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="work_unit_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="job_position_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="employee_id" readonly="state != 'draft'" options="{'no_create': True}"/>
                             </group>
                             <group string="Training">
                                 <field name="course_id" options="{'no_create': True}"/>
