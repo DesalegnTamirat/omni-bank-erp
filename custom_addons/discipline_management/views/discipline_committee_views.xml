@@ -32,8 +32,16 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
+                        <!-- Single-Action Fast Finalize & Submit for Executive Approval -->
+                        <button name="action_finalize_and_submit_for_approval"
+                                string="Finalize Hearing &amp; Submit for Approval"
+                                type="object"
+                                class="oe_highlight btn-success"
+                                invisible="state == 'completed'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
+
                         <!-- Stage 1: Schedule & Notify -->
-                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight"
+                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="btn-primary"
                                 invisible="state != 'draft'"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
                         
@@ -52,13 +60,8 @@
                         <button name="action_director_signoff" string="Director: Approve &amp; Open Voting" type="object" class="btn-warning"
                                 invisible="state != 'director_review' or not can_director_signoff"
                                 help="Respective Director confirms review of deliberations and opens voting."/>
-                        
-                        <!-- Stage 5: Finalize Meeting & Push Verdict -->
-                        <button name="action_finalize_meeting" string="Finalize Meeting &amp; Conclude Verdict" type="object" class="btn-success"
-                                invisible="state not in ('voting', 'minutes_recorded')"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
 
-                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,director_review,voting,completed"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,completed"/>
                     </header>
                     <sheet>
                         <field name="can_director_signoff" invisible="1"/>

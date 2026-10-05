@@ -121,6 +121,7 @@ class BunnaMyAttendance(http.Controller):
             day_shift = week_schedules.get(cur_date, {})
             is_day_off = day_shift.get('is_day_off', False)
             is_on_leave = day_shift.get('is_on_leave', False)
+            is_public_holiday = day_shift.get('is_public_holiday', False)
             leave_name = day_shift.get('leave_name', 'Time Off')
 
             # Calculate expected scheduled hours for this day
@@ -140,7 +141,9 @@ class BunnaMyAttendance(http.Controller):
             if expected_hours > 0:
                 pct = min(100, int(round((hrs / expected_hours) * 100)))
 
-            if is_on_leave and hrs == 0:
+            if is_public_holiday and hrs == 0:
+                hours_formatted = f"🌴 {leave_name}"
+            elif is_on_leave and hrs == 0:
                 hours_formatted = f"🌴 {leave_name}"
             elif is_day_off and hrs == 0:
                 hours_formatted = 'Day Off'
@@ -163,6 +166,7 @@ class BunnaMyAttendance(http.Controller):
                 'checked_in': daily_checked_in[d],
                 'is_day_off': is_day_off,
                 'is_on_leave': is_on_leave,
+                'is_public_holiday': is_public_holiday,
                 'leave_name': leave_name,
             })
 
@@ -352,20 +356,21 @@ class BunnaMyAttendance(http.Controller):
         sessions_info = []
         if today_shift and today_shift.get('is_on_leave') and not today_shift.get('is_half_day_leave'):
             l_name = today_shift.get('leave_name', 'Time Off')
+            badge_prefix = "Public Holiday" if today_shift.get('is_public_holiday') else "Approved Time Off"
             sessions_info = [
                 {
                     'session_name': 'Morning Session',
                     'icon': 'fa-sun-o',
                     'time_range': '08:00 - 12:00',
                     'status': 'leave',
-                    'badge': f"Approved Time Off ({l_name})"
+                    'badge': f"{badge_prefix} ({l_name})"
                 },
                 {
                     'session_name': 'Afternoon Session',
                     'icon': 'fa-cloud-sun-o',
                     'time_range': '13:00 - 17:00',
                     'status': 'leave',
-                    'badge': f"Approved Time Off ({l_name})"
+                    'badge': f"{badge_prefix} ({l_name})"
                 }
             ]
         elif has_lunch and not today_shift.get('is_day_off'):

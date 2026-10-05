@@ -231,8 +231,36 @@ class DisciplineInvestigation(models.Model):
             ) % (self.env.user.name, rec.manager_review_notes))
 
     def action_director_approve_and_announce(self):
-        """Audit Director approves and formally announces completed findings to Disciplinary System."""
+        """Audit Directorate completes investigation and formally submits findings directly to CPCO while notifying CEO."""
         for rec in self:
+            # 1. Mandatory Validations
+            if not rec.summary_findings or rec.summary_findings.strip() in ['', '<p><br></p>', '<p></p>']:
+                raise UserError(_('Factual Audit Findings (Facts Established) must be completed before finishing the investigation.'))
+            if not rec.investigator_recommendation or rec.investigator_recommendation.strip() in ['', '<p><br></p>', '<p></p>']:
+                raise UserError(_('Audit Recommendations & Proposed Actions must be completed before finishing the investigation.'))
+            if not rec.report_file:
+                raise UserError(_('Mandatory Document Missing: Please upload the Official Signed Investigation Report (PDF) before finishing.'))
+
+            # 2. Liable Outcome Validations
+            if rec.finding_outcome == 'liable':
+                if not rec.applicable_policy:
+                    rec.applicable_policy = rec.offense_id.name if rec.offense_id else _('Discipline Misconduct Policy')
+                if not rec.liable_employee_ids:
+                    if rec.case_id and rec.case_id.employee_id:
+                        self.env['discipline.investigation.liable'].create({
+                            'investigation_id': rec.id,
+                            'employee_id': rec.case_id.employee_id.id,
+                            'role_in_incident': 'Primary Subject of Incident',
+                            'degree_of_liability': 'principal',
+                            'recommended_action': 'Disciplinary Action per Policy',
+                        })
+                    else:
+                        raise UserError(_('At least one Liable Employee must be recorded when misconduct is confirmed.'))
+
+            # 3. Financial Loss Resolution Check
+            if rec.financial_loss_amount > 0 and rec.loss_resolution_status == 'not_applicable':
+                raise UserError(_('Financial Shortage is ETB %s. Please update Loss Resolution Status to Resolved or Unresolved.') % rec.financial_loss_amount)
+
             today = fields.Date.context_today(self)
             rec.write({
                 'state': 'approved',
@@ -243,39 +271,61 @@ class DisciplineInvestigation(models.Model):
 
             liable_names = ', '.join(rec.liable_employee_ids.mapped('employee_id.name')) if rec.liable_employee_ids else _('None (Exonerated)')
             outcome_label = _('Misconduct Confirmed (Liable)') if rec.finding_outcome == 'liable' else _('No Fault Found (Exonerated)')
+            
+            # Resolve CPCO and CEO users
+            EmpModel = self.env['hr.employee'].sudo()
+            cpco_user = EmpModel.get_cpco_user()
+            ceo_user = EmpModel.get_ceo_user()
+            
+            cpco_name = cpco_user.name if cpco_user else _('Chief People & Culture Officer')
+            ceo_name = ceo_user.name if ceo_user else _('Chief Executive Officer')
+
             announcement_body = _(
-                '<strong>Audit Investigation Approved &amp; Formally Announced:</strong><br/>'
+                '<strong>Audit Investigation Completed &amp; Formally Announced:</strong><br/>'
                 '• Investigation Ref: %s<br/>'
-                '• Lead Auditor: %s | Manager: %s | Director: %s<br/>'
-                '• Outcome: <strong>%s</strong><br/>'
+                '• Submitting Auditor / Director: %s<br/>'
+                '• Finding Outcome: <strong>%s</strong><br/>'
                 '• Liable Employee(s): %s<br/>'
-                '• Financial Loss: ETB %0.2f (%s)<br/>'
-                '• Policy Violated: %s<br/>'
-                '• Announcement Date: %s'
+                '• Financial Shortage: ETB %0.2f (%s)<br/>'
+                '• Applicable Policy: %s<br/>'
+                '• Target Authority for Next Action: <strong>%s (CPCO)</strong><br/>'
+                '• Executive FYI: %s (CEO)<br/>'
+                '• Completed On: %s'
             ) % (
                 rec.name,
-                rec.investigator_id.name if rec.investigator_id else 'N/A',
-                rec.manager_signed_off_by_id.name if rec.manager_signed_off_by_id else (rec.audit_manager_id.name if rec.audit_manager_id else 'N/A'),
                 self.env.user.name,
                 outcome_label,
                 liable_names,
                 rec.financial_loss_amount,
                 dict(rec._fields['loss_resolution_status'].selection).get(rec.loss_resolution_status, 'N/A'),
                 rec.applicable_policy or 'N/A',
+                cpco_name,
+                ceo_name,
                 today
             )
 
             rec.message_post(body=announcement_body)
 
-            # Update Parent Case & Route to CEO for Executive Review
+            # Update Parent Case & Route directly to CPCO (chairman_review) with multi-recipient notifications
             if rec.case_id:
-                rec.case_id.message_post(body=announcement_body)
                 rec.case_id.with_context(force_write=True).write({
-                    'state': 'ceo_review',
+                    'state': 'chairman_review',
                 })
-                rec.case_id.message_post(body=_(
-                    'Audit investigation %s concluded and announced. Case submitted to Chief Executive Officer (CEO) for executive review.'
-                ) % rec.name)
+                
+                partners_to_notify = []
+                if cpco_user and cpco_user.partner_id:
+                    partners_to_notify.append(cpco_user.partner_id.id)
+                if ceo_user and ceo_user.partner_id:
+                    partners_to_notify.append(ceo_user.partner_id.id)
+                if rec.case_id.employee_id and rec.case_id.employee_id.user_id and rec.case_id.employee_id.user_id.partner_id:
+                    partners_to_notify.append(rec.case_id.employee_id.user_id.partner_id.id)
+
+                rec.case_id.message_post(
+                    body=announcement_body,
+                    partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+                )
+
+    action_audit_complete_and_submit_to_cpco = action_director_approve_and_announce
 
     def action_director_return(self):
         """Audit Director returns investigation to Lead Auditor & Manager."""

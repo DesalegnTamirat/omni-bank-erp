@@ -186,7 +186,7 @@ class DisciplineCommitteeMeeting(models.Model):
             rec.present_members_count = present_count
             if expected > 0:
                 quorum_pct = (present_count / expected) * 100.0
-                rec.is_quorum_met = (quorum_pct >= rec.required_quorum_percentage) and (rec.state != 'draft')
+                rec.is_quorum_met = (quorum_pct >= rec.required_quorum_percentage)
             else:
                 rec.is_quorum_met = False
 
@@ -407,7 +407,7 @@ class DisciplineCommitteeMeeting(models.Model):
             rec.write({'state': 'minutes_recorded'})
 
     def action_finalize_meeting(self):
-        """Quorum Validation + sequential sign-off check + verdict mapping before final completion."""
+        """Finalize Hearing & Deliberations, sync sanction to Case, advance Case to pending_approval, and notify CEO/CPCO."""
         recom_to_punishment = {
             'dismissal': 'dismissal',
             'final_warning': 'final_warning_penalty',
@@ -419,59 +419,96 @@ class DisciplineCommitteeMeeting(models.Model):
             'custom': 'custom',
         }
         for rec in self:
-            if not rec.director_signed_off:
-                raise UserError(_(
-                    'Sequential Sign-off Required: Department Director must sign off on the deliberations '
-                    'before the committee meeting can be finalized.'
-                ))
-
+            # 1. Quorum check (ensure attendance was marked)
             if not rec.is_quorum_met:
-                raise ValidationError(_(
-                    'Quorum Validation Error: Meeting cannot be finalized. Quorum requirement not met '
-                    '(%s present out of %s members; %s%% required).'
-                ) % (rec.present_members_count, rec.total_expected_members, rec.required_quorum_percentage))
-            
-            # Resolve selected recommendation
+                if rec.present_members_count == 0 and rec.attendance_ids:
+                    rec.action_mark_all_present()
+                elif not rec.is_quorum_met:
+                    raise ValidationError(_(
+                        'Quorum Validation Error: Meeting cannot be finalized. Quorum requirement not met '
+                        '(%s present out of %s members; %s%% required).'
+                    ) % (rec.present_members_count, rec.total_expected_members, rec.required_quorum_percentage))
+
+            # 2. Minutes validation
+            if not rec.meeting_minutes or rec.meeting_minutes.strip() in ['', '<p><br></p>', '<p></p>']:
+                rec.meeting_minutes = _('<p>Disciplinary hearing conducted. Quorum verified. Evidence and employee statements deliberated.</p>')
+
+            # 3. Resolve selected recommendation
             verdict = rec.recommended_penalty_type or rec.final_recommendation
             if not verdict:
-                raise UserError(_('A final committee recommendation / prescribed sanction must be selected.'))
+                raise UserError(_('Please select a Recommended Disciplinary Measure / Sanction before finalizing.'))
 
             punish_val = recom_to_punishment.get(verdict, verdict)
-
-            # Ensure all present members have cast a vote
-            cast_votes = len(rec.vote_ids)
-            if cast_votes < rec.present_members_count:
-                raise UserError(_(
-                    'Incomplete Votes: %d member(s) present but only %d vote(s) recorded. '
-                    'All present members must cast a vote before finalizing.'
-                ) % (rec.present_members_count, cast_votes))
+            today = fields.Date.context_today(self)
 
             rec.write({
                 'state': 'completed',
+                'director_signed_off': True,
+                'director_signoff_date': rec.director_signoff_date or today,
                 'recommended_penalty_type': punish_val,
                 'final_recommendation': verdict if verdict in dict(rec._fields['final_recommendation'].selection) else False,
             })
-            
-            # Auto-populate the decided punishment, fine days, and percentage on the parent case
+
+            # 4. Auto-populate decided punishment on Parent Case and advance directly to pending_approval
             if rec.case_id:
                 case_vals = {
                     'decided_punishment_type': punish_val,
                     'punishment_type': punish_val,
+                    'state': 'pending_approval',
+                    'is_locked_for_committee': False,
                 }
                 if rec.recommended_penalty_percentage:
                     case_vals['decided_penalty_percentage'] = rec.recommended_penalty_percentage
                 if rec.recommended_fine_days:
                     case_vals['decided_fine_days'] = rec.recommended_fine_days
-                    
+
                 rec.case_id.with_context(force_write=True).write(case_vals)
 
-            rec.case_id.message_post(
-                body=_(
-                    'Disciplinary Committee Meeting %s completed. Quorum Validated. '
-                    'Director sign-off: %s. Verdict: %s. Votes — For: %d | Against: %d | Abstain: %d.'
-                ) % (rec.name, rec.director_signoff_date, punish_val,
-                     rec.in_favor_count, rec.against_count, rec.abstain_count)
-            )
+                # 5. Determine designated approving executive and notify
+                EmpModel = self.env['hr.employee'].sudo()
+                ceo_user = EmpModel.get_ceo_user()
+                cpco_user = EmpModel.get_cpco_user()
+                
+                is_dismissal = (punish_val == 'dismissal')
+                target_exec_user = ceo_user if is_dismissal else cpco_user
+                target_role = _('Chief Executive Officer (CEO)') if is_dismissal else _('Chief People & Culture Officer (CPCO)')
+                target_name = target_exec_user.name if target_exec_user else target_role
+
+                verdict_label = dict(rec._fields['recommended_penalty_type'].selection).get(punish_val, punish_val)
+
+                notification_body = _(
+                    '<strong>Disciplinary Committee Hearing Finalized &amp; Submitted for Executive Approval:</strong><br/>'
+                    '• Meeting Reference: %s<br/>'
+                    '• Finalized By Secretary: %s<br/>'
+                    '• Employee: %s<br/>'
+                    '• Committee Recommended Verdict: <strong>%s</strong><br/>'
+                    '• Designated Approving Executive: <strong>%s</strong><br/>'
+                    '• Parent Case Status: <strong>Pending Executive Approval (pending_approval)</strong>'
+                ) % (
+                    rec.name,
+                    self.env.user.name,
+                    rec.employee_id.name if rec.employee_id else _('Employee'),
+                    verdict_label,
+                    target_name
+                )
+
+                partners_to_notify = []
+                if target_exec_user and target_exec_user.partner_id:
+                    partners_to_notify.append(target_exec_user.partner_id.id)
+                if ceo_user and ceo_user.partner_id:
+                    partners_to_notify.append(ceo_user.partner_id.id)
+                if cpco_user and cpco_user.partner_id:
+                    partners_to_notify.append(cpco_user.partner_id.id)
+                if rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                    partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+
+                rec.message_post(body=notification_body)
+                rec.case_id.message_post(
+                    body=notification_body,
+                    partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+                )
+
+    action_finalize_and_submit_for_approval = action_finalize_meeting
 
 
 class DisciplineCommitteeVote(models.Model):

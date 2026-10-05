@@ -86,12 +86,24 @@ class IrHttp(models.AbstractModel):
         env = (request.env if request and getattr(request, 'env', None) else None) or user.env
         if env and 'attendance.gate.exception' in env:
             try:
-                return bool(env['attendance.gate.exception'].sudo().search_count([
+                if env['attendance.gate.exception'].sudo().search_count([
                     ('employee_id', '=', user.employee_id.id),
                     ('active', '=', True),
-                ]))
+                ]):
+                    return True
             except Exception:
-                return False
+                pass
+
+        # 4. Non-working day exemption: employees are not forced to check in on Public Holidays or scheduled Days Off
+        try:
+            emp = user.employee_id
+            if emp:
+                today = fields.Date.context_today(emp)
+                sched = emp._resolve_employee_full_schedule(target_date=today)
+                if sched.get('is_day_off') or sched.get('is_on_leave'):
+                    return True
+        except Exception:
+            pass
 
         return False
 

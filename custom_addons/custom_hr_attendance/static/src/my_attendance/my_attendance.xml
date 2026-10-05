@@ -56,7 +56,16 @@
                             </div>
                                 <!-- PRIMARY CHECK IN / OUT ACTION BUTTON -->
                             <div class="w-100 d-flex justify-content-center mt-1 mb-3">
-                                <t t-if="state.shiftInfo &amp;&amp; state.shiftInfo.is_on_leave &amp;&amp; !state.checkedIn">
+                                <t t-if="state.shiftInfo &amp;&amp; state.shiftInfo.is_public_holiday &amp;&amp; !state.checkedIn">
+                                    <button disabled="disabled"
+                                            class="btn o_smart_action_btn w-50 d-flex align-items-center justify-content-center gap-2 opacity-75"
+                                            style="background: #fef3c7 !important; color: #b45309 !important; border: 1px solid #fde68a !important; cursor: not-allowed;"
+                                            t-attf-title="Today is a recognized Public Holiday ({{ state.shiftInfo.leave_name || 'Public Holiday' }}). Check-in is disabled.">
+                                        <i class="fa fa-sun-o fa-lg text-warning"/>
+                                        <span>PUBLIC HOLIDAY</span>
+                                    </button>
+                                </t>
+                                <t t-elif="state.shiftInfo &amp;&amp; state.shiftInfo.is_on_leave &amp;&amp; !state.checkedIn">
                                     <button disabled="disabled"
                                             class="btn o_smart_action_btn w-50 d-flex align-items-center justify-content-center gap-2 opacity-75"
                                             style="background: #eff6ff !important; color: #1d4ed8 !important; border: 1px solid #bfdbfe !important; cursor: not-allowed;"
@@ -89,7 +98,25 @@
 
                                 <!-- ASSIGNED WORK SHIFT HEADER CARD -->
                             <div t-if="state.shiftInfo" class="premium-card o_shift_info_card w-100 p-3 mb-3">
-                                <t t-if="state.shiftInfo.is_on_leave">
+                                <t t-if="state.shiftInfo.is_public_holiday">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="o_shift_icon_box d-flex align-items-center justify-content-center" style="background: #fef3c7; color: #b45309; width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;">
+                                            <i class="fa fa-sun-o fa-lg"/>
+                                        </div>
+                                        <div>
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <h5 class="fw-bold mb-0 text-dark" t-esc="state.shiftInfo.name"/>
+                                                <span class="badge rounded-pill px-2.5 py-1 small" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600;">
+                                                    🌴 Recognized Public Holiday
+                                                </span>
+                                            </div>
+                                            <div class="text-muted small mt-1" style="font-weight: 500;">
+                                                Bank Public Holiday: <span class="fw-semibold text-dark" t-esc="state.shiftInfo.leave_name || 'Public Holiday'"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </t>
+                                <t t-elif="state.shiftInfo.is_on_leave">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="o_shift_icon_box d-flex align-items-center justify-content-center" style="background: #eff6ff; color: #1d4ed8; width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;">
                                             <i class="fa fa-umbrella fa-lg"/>
@@ -391,7 +418,12 @@
 
                                             <!-- HOURS VALUE (Fixed Width, Tabular Numeric) -->
                                             <div style="width: 95px; flex-shrink: 0;" class="text-end hours-val">
-                                                <t t-if="day.is_on_leave &amp;&amp; day.hours == 0">
+                                                <t t-if="day.is_public_holiday &amp;&amp; day.hours == 0">
+                                                    <span class="badge rounded-pill px-2 py-1" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-size: 0.725rem; font-weight: 600;" t-att-title="day.leave_name">
+                                                        <t t-esc="day.leave_name ? ('🌴 ' + day.leave_name.toUpperCase()) : '🌴 HOLIDAY'"/>
+                                                    </span>
+                                                </t>
+                                                <t t-elif="day.is_on_leave &amp;&amp; day.hours == 0">
                                                     <span class="badge rounded-pill px-2 py-1" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 0.725rem; font-weight: 600;" t-att-title="day.leave_name">
                                                         🌴 TIME OFF
                                                     </span>

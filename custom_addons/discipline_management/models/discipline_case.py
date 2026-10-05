@@ -391,12 +391,14 @@ class DisciplineCase(models.Model):
         2: first_warning_penalty (Level 4)
         3: second_warning_penalty (Level 3)
         4: final_warning_penalty (Level 2)
+        6: dismissal (Level 1)
         """
         punish_to_rank = {
             'verbal_warning': (1, ['level_5']),
             'first_warning_penalty': (2, ['level_5', 'level_4']),
             'second_warning_penalty': (3, ['level_5', 'level_4', 'level_3']),
             'final_warning_penalty': (4, ['level_5', 'level_4', 'level_3', 'level_2']),
+            'dismissal': (6, ['level_5', 'level_4', 'level_3', 'level_2', 'level_1']),
         }
         ICP = self.env['ir.config_parameter'].sudo()
         cfg_punish = ICP.get_param('discipline.coach_max_punishment', 'final_warning_penalty')
@@ -455,12 +457,14 @@ class DisciplineCase(models.Model):
                 ('staff_category', 'in', [cat, 'all'])
             ]
             if self.case_action_track == 'direct_enforce':
-                offense_domain.append(('severity_level', '!=', 'level_1'))
+                _, _, allowed_levels = self._get_coach_max_authority()
+                offense_domain.append(('severity_level', 'in', allowed_levels))
             res['domain']['offense_id'] = offense_domain
         else:
             offense_domain = [('staff_category', 'in', [cat, 'all'])]
             if self.case_action_track == 'direct_enforce':
-                offense_domain.append(('severity_level', '!=', 'level_1'))
+                _, _, allowed_levels = self._get_coach_max_authority()
+                offense_domain.append(('severity_level', 'in', allowed_levels))
             res['domain']['offense_id'] = offense_domain
         self._compute_punishment_details()
         return res
@@ -1350,11 +1354,10 @@ class DisciplineCase(models.Model):
     def _validate_segregation_of_duties(self):
         for rec in self:
             current_user = self.env.user
-            # Coach / Line Manager direct enforcement on subordinates for Levels 2-5 is permitted
+            _, max_rank, _ = self._get_coach_max_authority()
             is_direct_mgr_enforcement = (
                 rec.case_action_track == 'direct_enforce' and
-                rec.severity_level != 'level_1' and
-                rec.punishment_type != 'dismissal'
+                ((rec.severity_level != 'level_1' and rec.punishment_type != 'dismissal') or max_rank >= 6)
             )
             if not is_direct_mgr_enforcement:
                 if rec.initiator_id and rec.reviewer_id and rec.initiator_id == rec.reviewer_id:
@@ -1364,7 +1367,7 @@ class DisciplineCase(models.Model):
                 if rec.reviewer_id and rec.approver_id and rec.reviewer_id == rec.approver_id:
                     raise ValidationError(_('Segregation of Duties Violation: Case Reviewer and Approver must be different individuals.'))
 
-            if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
+            if (rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal') and not is_direct_mgr_enforcement:
                 if (not current_user.has_group('discipline_management.group_discipline_admin') and
                     not current_user.has_group('discipline_management.group_discipline_ceo') and
                     not current_user.has_group('discipline_management.group_discipline_cpco')):
@@ -1372,6 +1375,9 @@ class DisciplineCase(models.Model):
                         'Approval Restriction: Decisions requiring Dismissal / Separation are restricted '
                         'exclusively to authorized executive approvers (CEO / CPCO / Disciplinary Committee).'
                     ))
+                if not rec.dismissal_authority_id:
+                    rec.dismissal_authority_id = current_user
+            elif (rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal') and is_direct_mgr_enforcement:
                 if not rec.dismissal_authority_id:
                     rec.dismissal_authority_id = current_user
 
@@ -1409,6 +1415,8 @@ class DisciplineCase(models.Model):
                 'is_escalated_by_active_warning', 'auto_applied_rule_summary',
                 'original_punishment_type', 'original_penalty_percentage', 'original_fine_days',
                 'punishment_type', 'penalty_percentage', 'fine_days',
+                'decided_punishment_type', 'decided_penalty_percentage', 'decided_fine_days',
+                'dismissal_authority_id', 'enforced_by_id', 'enforcement_date', 'executive_decision_notes',
                 'is_punishment_modified_by_committee', 'is_cash_shortage',
                 'statutory_deadline_date', 'is_deadline_exceeded', 'active_penalty_end_date',
                 'active_duration_days', 'legal_article_display', 'legal_clause_text',
@@ -1440,7 +1448,15 @@ class DisciplineCase(models.Model):
             if not rec.description:
                 raise UserError(_('Detailed Description is mandatory before initiating a case.'))
             rec.with_context(force_write=True).write({'state': 'initiated'})
-            rec.message_post(body=_('Disciplinary case initiated for employee %s.') % rec.employee_id.name)
+            partners_to_notify = []
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+            if rec.reported_by_id and rec.reported_by_id.user_id and rec.reported_by_id.user_id.partner_id:
+                partners_to_notify.append(rec.reported_by_id.user_id.partner_id.id)
+            rec.message_post(
+                body=_('Disciplinary case <strong>%s</strong> initiated for employee %s.') % (rec.name, rec.employee_id.name),
+                partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+            )
 
     def _get_group_users(self, xml_id):
         """Retrieve active users belonging to an XML-defined group in modern Odoo 19."""
@@ -1458,14 +1474,38 @@ class DisciplineCase(models.Model):
                 'state': 'submitted_chief',
                 'chief_id': rec.chief_id.id if rec.chief_id else False
             })
-            rec.message_post(body=_('Case submitted to Respective Chief (%s) for review.') % (rec.chief_id.name if rec.chief_id else 'Chief Officer'))
+            partners_to_notify = []
+            if rec.chief_id and rec.chief_id.partner_id:
+                partners_to_notify.append(rec.chief_id.partner_id.id)
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+            rec.message_post(
+                body=_('Case <strong>%s</strong> submitted to Respective Chief (%s) for review.') % (rec.name, rec.chief_id.name if rec.chief_id else 'Chief Officer'),
+                partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+            )
 
     def action_chief_escalate_to_audit(self):
         """Escalate the case to the Audit Directorate for investigation, notifying the CEO simultaneously."""
         for rec in self:
             rec.escalation_target = 'audit'
             rec.with_context(force_write=True).write({'state': 'investigating'})
-            rec.message_post(body=_('Chief reviewed case and escalated to Audit Directorate for investigation.'))
+            
+            EmpModel = self.env['hr.employee'].sudo()
+            audit_user = EmpModel.get_audit_director_user()
+            ceo_user = EmpModel.get_ceo_user()
+            
+            partners_to_notify = []
+            if audit_user and audit_user.partner_id:
+                partners_to_notify.append(audit_user.partner_id.id)
+            if ceo_user and ceo_user.partner_id:
+                partners_to_notify.append(ceo_user.partner_id.id)
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+
+            rec.message_post(
+                body=_('Chief reviewed case <strong>%s</strong> and escalated to Audit Directorate for investigation.') % rec.name,
+                partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+            )
             
             # 1. Ensure Investigation record exists
             if not rec.investigation_ids:
@@ -1482,17 +1522,48 @@ class DisciplineCase(models.Model):
         for rec in self:
             rec.escalation_target = 'ceo'
             rec.with_context(force_write=True).write({'state': 'ceo_review'})
-            rec.message_post(body=_('Chief escalated case directly to CEO for executive review.'))
+            
+            EmpModel = self.env['hr.employee'].sudo()
+            ceo_user = EmpModel.get_ceo_user()
+            partners_to_notify = []
+            if ceo_user and ceo_user.partner_id:
+                partners_to_notify.append(ceo_user.partner_id.id)
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+
+            rec.message_post(
+                body=_('Chief escalated case <strong>%s</strong> directly to CEO for executive review.') % rec.name,
+                partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+            )
 
     def action_ceo_announce_audit_and_suspend(self):
         """CEO action: formally announce case to Audit Directorate for investigation and instruct Committee Secretary (POMD) to suspend the employee."""
         for rec in self:
             rec.with_context(force_write=True).write({'state': 'investigating'})
-            rec.message_post(body=_(
-                '<strong>CEO Executive Directive:</strong><br/>'
-                '1. Case officially assigned to Audit Directorate for formal investigation.<br/>'
-                '2. Disciplinary Committee Secretary (POMD) instructed to execute employee precautionary suspension.'
-            ))
+            
+            EmpModel = self.env['hr.employee'].sudo()
+            audit_user = EmpModel.get_audit_director_user()
+            sec_user = EmpModel.get_secretary_user()
+            cpco_user = EmpModel.get_cpco_user()
+            
+            partners_to_notify = []
+            if audit_user and audit_user.partner_id:
+                partners_to_notify.append(audit_user.partner_id.id)
+            if sec_user and sec_user.partner_id:
+                partners_to_notify.append(sec_user.partner_id.id)
+            if cpco_user and cpco_user.partner_id:
+                partners_to_notify.append(cpco_user.partner_id.id)
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+
+            rec.message_post(
+                body=_(
+                    '<strong>CEO Executive Directive:</strong><br/>'
+                    '1. Case officially assigned to Audit Directorate for formal investigation.<br/>'
+                    '2. Disciplinary Committee Secretary (POMD) instructed to execute employee precautionary suspension.'
+                ),
+                partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+            )
 
             # 1. Create linked Investigation record if none exists
             if not rec.investigation_ids:
@@ -1542,7 +1613,7 @@ class DisciplineCase(models.Model):
     def action_chair_forward_to_secretary(self):
         """Disciplinary Committee Chairman (CPCO) reviews case and forwards to Committee Secretary (POMD) for scheduling hearing."""
         for rec in self:
-            if not (rec.is_cpco_user or rec.is_hr_admin):
+            if not (rec.is_cpco_user or rec.is_hr_admin or rec.is_ceo_user):
                 raise UserError(_('Authority Restriction: Only the Disciplinary Committee Chairman (CPCO) can forward cases to the Committee Secretary for meeting scheduling.'))
             rec.with_context(force_write=True).write({
                 'state': 'committee_review',
@@ -1550,27 +1621,83 @@ class DisciplineCase(models.Model):
             })
             sec_user = self.env['hr.employee'].sudo().get_secretary_user()
             sec_name = sec_user.name if sec_user else _('People Operations Management Director')
-            rec.message_post(body=_(
-                'Case referred by Disciplinary Committee Chairman (%s) to Committee Secretary (%s) to schedule the committee hearing.'
-            ) % (self.env.user.name, sec_name))
+            ceo_user = self.env['hr.employee'].sudo().get_ceo_user()
+            
+            partners_to_notify = []
+            if sec_user and sec_user.partner_id:
+                partners_to_notify.append(sec_user.partner_id.id)
+            if ceo_user and ceo_user.partner_id:
+                partners_to_notify.append(ceo_user.partner_id.id)
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+
+            rec.message_post(
+                body=_(
+                    '<strong>CPCO Action — Case Referred to Committee:</strong><br/>'
+                    '• Decision Maker: %s (CPCO)<br/>'
+                    '• Action: Case referred to Committee Secretary (%s) to schedule the formal committee hearing.<br/>'
+                    '• Status: Locked for Committee Review (committee_review)'
+                ) % (self.env.user.name, sec_name),
+                partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+            )
 
     def action_ceo_forward_to_committee(self):
         """Forward directly to committee chair."""
         return self.action_ceo_forward_to_committee_chair()
 
-    def action_ceo_endorse_exoneration(self):
-        """CEO Executive Action: officially endorse Audit Directorate Exoneration findings and instruct POMD to revoke suspension and reinstate employee."""
+    def action_cpco_endorse_exoneration(self):
+        """CPCO / Executive Action: officially endorse Audit Directorate Exoneration findings, close case, and revoke suspensions."""
         for rec in self:
-            rec.with_context(force_write=True).write({'state': 'closed'})
-            rec.message_post(body=_(
-                '<strong>CEO Executive Action — Exoneration Endorsed:</strong><br/>'
-                'The CEO has reviewed and officially endorsed the Audit Directorate investigation findings concluding no disciplinary liability. '
-                'The case is formally closed as Exonerated with immediate effect.'
-            ))
-            
-            # Revoke linked suspensions
+            if not (rec.is_cpco_user or rec.is_hr_admin or rec.is_ceo_user):
+                raise UserError(_('Authority Restriction: Only the Chief People & Culture Officer (CPCO) or CEO can endorse exonerations.'))
+            rec.with_context(force_write=True).write({
+                'state': 'closed',
+                'punishment_type': 'exonerate',
+                'final_decision_date': fields.Date.context_today(self),
+            })
+
+            # Revert any disciplinary markings on employee
+            if rec.employee_id:
+                rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({
+                    'active_disciplinary_action': False,
+                    'is_ineligible_for_promotion_transfer': False,
+                    'is_suspended': False,
+                    'suspension_type': False,
+                })
+
+            # Revoke linked suspensions & restore ERP access/backpay
             for suspension in rec.suspension_ids.filtered(lambda s: s.state != 'revoked'):
                 suspension.action_revoke_exonerated()
+
+            # Multi-stakeholder notifications
+            ceo_user = self.env['hr.employee'].sudo().get_ceo_user()
+            audit_user = self.env['hr.employee'].sudo().get_audit_director_user()
+            sec_user = self.env['hr.employee'].sudo().get_secretary_user()
+
+            partners_to_notify = []
+            if ceo_user and ceo_user.partner_id:
+                partners_to_notify.append(ceo_user.partner_id.id)
+            if audit_user and audit_user.partner_id:
+                partners_to_notify.append(audit_user.partner_id.id)
+            if sec_user and sec_user.partner_id:
+                partners_to_notify.append(sec_user.partner_id.id)
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+
+            rec.message_post(
+                body=_(
+                    '<strong>Executive Action — Case Exonerated &amp; Closed:</strong><br/>'
+                    '• Decision Maker: %s (CPCO / Executive Authority)<br/>'
+                    '• Employee: %s<br/>'
+                    '• Decision: The Audit Directorate investigation findings of <strong>No Fault Found (Exonerated)</strong> have been officially endorsed.<br/>'
+                    '• Immediate Effects: All precautionary suspensions are revoked, full salary backpay and ERP access are restored, and the case is closed with immediate effect.'
+                ) % (self.env.user.name, rec.employee_id.name if rec.employee_id else _('Employee')),
+                partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+            )
+
+    def action_ceo_endorse_exoneration(self):
+        """Backward compatibility alias for action_cpco_endorse_exoneration."""
+        return self.action_cpco_endorse_exoneration()
 
     def action_start_investigation(self):
         for rec in self:

@@ -201,8 +201,20 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                                 FROM hr_leave l
                                 WHERE l.employee_id = emp.id
                                   AND l.state = 'validate'
-                                  AND l.date_from::date <= d::date
-                                  AND l.date_to::date >= d::date
+                                  AND COALESCE(l.request_date_from, (l.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) <= d::date
+                                  AND COALESCE(l.request_date_to, (l.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date) >= d::date
+                                LIMIT 1
+                            ),
+                            -- 1b. Check Public Holiday (resource_calendar_leaves) on this date
+                            (
+                                SELECT 0.0
+                                FROM resource_calendar_leaves rcl
+                                WHERE (rcl.resource_id IS NULL OR rcl.resource_id = emp.resource_id)
+                                  AND (rcl.calendar_id IS NULL OR rcl.calendar_id = emp.resource_calendar_id)
+                                  AND (
+                                      (rcl.day_of_week IS NOT NULL AND rcl.day_of_week = EXTRACT(DOW FROM d)::text)
+                                      OR ((rcl.date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date <= d::date AND (rcl.date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date >= d::date)
+                                  )
                                 LIMIT 1
                             ),
                             -- 2. Check Date-based Roster Exception (job_position_roster_exception_line)

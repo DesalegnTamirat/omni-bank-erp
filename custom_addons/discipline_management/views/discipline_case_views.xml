@@ -98,12 +98,20 @@
                                 class="btn-primary"
                                 invisible="state != 'ceo_review' or not is_ceo_user and not is_hr_admin"/>
 
-                        <!-- Committee Chairman Action: Forward to Secretary for Meeting Scheduling -->
+                        <!-- Committee Chairman Action: Forward to Secretary for Meeting Scheduling (When Liable / Misconduct Confirmed) -->
                         <button name="action_chair_forward_to_secretary"
                                 string="Send to Secretary for Meeting Scheduling"
                                 type="object"
-                                class="btn-primary"
-                                invisible="state != 'chairman_review' or not is_cpco_user and not is_hr_admin"/>
+                                class="oe_highlight btn-primary"
+                                invisible="state != 'chairman_review' or not is_cpco_user and not is_hr_admin and not is_ceo_user"/>
+
+                        <!-- Committee Chairman / Executive Action: Endorse Exoneration (When No Fault Found) -->
+                        <button name="action_cpco_endorse_exoneration"
+                                string="Endorse Exoneration &amp; Close Case"
+                                type="object"
+                                class="btn-success"
+                                invisible="state != 'chairman_review' or not is_cpco_user and not is_hr_admin and not is_ceo_user"
+                                confirm="Are you sure you want to endorse exoneration and close this case? Any active precautionary suspension will be revoked immediately."/>
 
                         <!-- Step 1 in Committee Review: Schedule Committee Meeting -->
                         <button name="action_schedule_committee_meeting"

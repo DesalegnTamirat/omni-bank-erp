@@ -59,8 +59,83 @@ class HrEmployeePrivate(models.Model):
         }
 
     # ============================================================
-    # UNIVERSAL SCHEDULE RESOLVER
+    # PUBLIC HOLIDAY & UNIVERSAL SCHEDULE RESOLVER
     # ============================================================
+    def _to_local_date(self, dt):
+        """Converts UTC datetime or date to local calendar date based on user/calendar/company timezone."""
+        if not dt:
+            return False
+        if isinstance(dt, datetime.date) and not isinstance(dt, datetime.datetime):
+            return dt
+        tz_name = (
+            self.env.context.get('tz') or
+            self.env.user.tz or
+            (self.resource_calendar_id and self.resource_calendar_id.tz) or
+            (self.company_id and self.company_id.resource_calendar_id and self.company_id.resource_calendar_id.tz) or
+            'Africa/Addis_Ababa'
+        )
+        try:
+            user_tz = pytz.timezone(tz_name)
+            raw_dt = fields.Datetime.to_datetime(dt)
+            if not raw_dt.tzinfo:
+                raw_dt = pytz.utc.localize(raw_dt)
+            return raw_dt.astimezone(user_tz).date()
+        except Exception:
+            return fields.Datetime.to_datetime(dt).date()
+
+    def _get_employee_public_holiday(self, target_date=None):
+        """
+        Returns the matching resource.calendar.leaves record for this employee on target_date,
+        or False if target_date is not a public holiday.
+        Checks both dated public holidays and recurring day_of_week holidays, honoring calendar and work unit type.
+        """
+        self.ensure_one()
+        if not target_date:
+            target_date = fields.Date.context_today(self)
+
+        target_dt = fields.Date.to_date(target_date)
+        weekday_str = str(target_dt.weekday())
+
+        cal_ids = [False]
+        if self.resource_calendar_id:
+            cal_ids.append(self.resource_calendar_id.id)
+        if self.company_id and self.company_id.resource_calendar_id:
+            cal_ids.append(self.company_id.resource_calendar_id.id)
+
+        emp_ou = self.default_operating_unit_id
+        emp_wut = emp_ou.work_unit_type if emp_ou else False
+        wut_filter = [False]
+        if emp_wut:
+            normalized_wut = 'head_office' if emp_wut in ('head_office', 'head_offices', 'ho') else ('branch' if emp_wut in ('branch', 'area_office', 'district_office') else emp_wut)
+            wut_filter.extend([emp_wut, normalized_wut])
+
+        res_ids = [False]
+        if self.resource_id:
+            res_ids.append(self.resource_id.id)
+
+        if 'resource.calendar.leaves' not in self.env:
+            return False
+
+        domain = [
+            ('resource_id', 'in', res_ids),
+            ('calendar_id', 'in', list(set(cal_ids))),
+        ]
+        if 'work_unit_type' in self.env['resource.calendar.leaves']._fields:
+            domain.append(('work_unit_type', 'in', list(set(wut_filter))))
+
+        pub_holidays = self.env['resource.calendar.leaves'].sudo().search(domain)
+        for h in pub_holidays:
+            dow = getattr(h, 'day_of_week', False)
+            if dow and str(dow) == weekday_str:
+                return h
+            if h.date_from and h.date_to:
+                p_start = self._to_local_date(h.date_from)
+                p_end = self._to_local_date(h.date_to)
+                if p_start and p_end and p_start <= target_dt <= p_end:
+                    return h
+
+        return False
+
     def _resolve_employee_full_schedule(self, current_float=None, target_date=None):
         """
         Universally resolves an employee's full schedule for target_date.
@@ -97,9 +172,17 @@ class HrEmployeePrivate(models.Model):
         leave = self.env['hr.leave'].sudo().search([
             ('employee_id', '=', self.id),
             ('state', '=', 'validate'),
-            ('date_from', '<=', datetime.datetime.combine(target_date, datetime.time.max)),
-            ('date_to', '>=', datetime.datetime.combine(target_date, datetime.time.min)),
+            '|',
+                '&', ('request_date_from', '<=', target_date),
+                     ('request_date_to', '>=', target_date),
+                '&', ('date_from', '<=', datetime.datetime.combine(target_date + datetime.timedelta(days=1), datetime.time.max)),
+                     ('date_to', '>=', datetime.datetime.combine(target_date - datetime.timedelta(days=1), datetime.time.min)),
         ], limit=1)
+        if leave:
+            l_start = getattr(leave, 'request_date_from', False) or self._to_local_date(leave.date_from)
+            l_end = getattr(leave, 'request_date_to', False) or self._to_local_date(leave.date_to) or l_start
+            if not (l_start and l_end and l_start <= target_date <= l_end):
+                leave = False
 
         if leave:
             l_name = leave.holiday_status_id.name or _('Time Off')
@@ -131,6 +214,32 @@ class HrEmployeePrivate(models.Model):
                     'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
                     'is_on_leave': True, 'leave_name': l_name,
                     'shift_name': f"Approved Time Off ({l_name})"
+                }
+
+        # 0b. Public Holiday (resource.calendar.leaves)
+        pub_holiday = self._get_employee_public_holiday(target_date=target_date)
+        if pub_holiday:
+            h_name = pub_holiday.name or _('Public Holiday')
+            if isinstance(h_name, dict):
+                h_name = h_name.get('en_US', list(h_name.values())[0]) if h_name else _('Public Holiday')
+            h_weight = getattr(pub_holiday, 'holiday_day_weight', 1.0) or 1.0
+            if h_weight == 0.5:
+                return {
+                    'shift_start': 13.0, 'shift_end': default_exit_time,
+                    'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                    'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': False,
+                    'is_on_leave': False, 'is_half_day_leave': True, 'is_public_holiday': True,
+                    'leave_name': h_name, 'shift_name': f"Afternoon Shift (Morning Public Holiday: {h_name})",
+                    'source_label': 'Public Holiday',
+                }
+            else:
+                return {
+                    'shift_start': 0.0, 'shift_end': 0.0,
+                    'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                    'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
+                    'is_on_leave': True, 'is_public_holiday': True,
+                    'leave_name': h_name, 'shift_name': f"Public Holiday ({h_name})",
+                    'source_label': 'Public Holiday',
                 }
 
         # 1. Roster Exception (Date-Based)
@@ -290,6 +399,41 @@ class HrEmployeePrivate(models.Model):
             ('date_to', '>=', datetime.datetime.combine(date_from, datetime.time.min)),
         ])
 
+        # 1b. Batch fetch public holidays (resource.calendar.leaves)
+        pub_holidays = self.env['resource.calendar.leaves'].browse()
+        if 'resource.calendar.leaves' in self.env:
+            cal_ids = [False]
+            if self.resource_calendar_id:
+                cal_ids.append(self.resource_calendar_id.id)
+            if self.company_id and self.company_id.resource_calendar_id:
+                cal_ids.append(self.company_id.resource_calendar_id.id)
+
+            emp_ou = self.default_operating_unit_id
+            emp_wut = emp_ou.work_unit_type if emp_ou else False
+            wut_filter = [False]
+            if emp_wut:
+                normalized_wut = 'head_office' if emp_wut in ('head_office', 'head_offices', 'ho') else ('branch' if emp_wut in ('branch', 'area_office', 'district_office') else emp_wut)
+                wut_filter.extend([emp_wut, normalized_wut])
+
+            res_ids = [False]
+            if self.resource_id:
+                res_ids.append(self.resource_id.id)
+
+            pub_domain = [
+                ('resource_id', 'in', res_ids),
+                ('calendar_id', 'in', list(set(cal_ids))),
+            ]
+            if 'work_unit_type' in self.env['resource.calendar.leaves']._fields:
+                pub_domain.append(('work_unit_type', 'in', list(set(wut_filter))))
+
+            date_domain = ['|',
+                ('day_of_week', '!=', False) if 'day_of_week' in self.env['resource.calendar.leaves']._fields else ('id', '=', False),
+                '&', ('date_from', '<=', datetime.datetime.combine(date_to + datetime.timedelta(days=1), datetime.time.max)),
+                     ('date_to', '>=', datetime.datetime.combine(date_from - datetime.timedelta(days=1), datetime.time.min)),
+            ]
+            pub_domain.extend(date_domain)
+            pub_holidays = self.env['resource.calendar.leaves'].sudo().search(pub_domain)
+
         # 2. Batch fetch active roster lines
         roster_lines = self.env['job.position.roster.exception.line'].sudo().search([
             ('employee_id', '=', self.id),
@@ -330,8 +474,11 @@ class HrEmployeePrivate(models.Model):
             is_saturday = (cur_date.weekday() == 5)
             is_sunday = (cur_date.weekday() == 6)
 
-            # Check leave for cur_date
-            matching_leave = leaves.filtered(lambda l: l.date_from.date() <= cur_date <= l.date_to.date())
+            # Check individual leave for cur_date
+            matching_leave = leaves.filtered(lambda l: (
+                (getattr(l, 'request_date_from', False) and (l.request_date_from <= cur_date <= (getattr(l, 'request_date_to', False) or l.request_date_from))) or
+                (l.date_from and l.date_to and self._to_local_date(l.date_from) <= cur_date <= self._to_local_date(l.date_to))
+            ))
             if matching_leave:
                 leave = matching_leave[0]
                 l_name = leave.holiday_status_id.name or _('Time Off')
@@ -363,6 +510,38 @@ class HrEmployeePrivate(models.Model):
                         'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
                         'is_on_leave': True, 'leave_name': l_name,
                         'shift_name': f"Approved Time Off ({l_name})"
+                    }
+                cur_date += datetime.timedelta(days=1)
+                continue
+
+            # Check public holiday for cur_date
+            matching_pub = pub_holidays.filtered(lambda h: (
+                (getattr(h, 'day_of_week', False) and str(h.day_of_week) == str(cur_date.weekday())) or
+                (h.date_from and h.date_to and self._to_local_date(h.date_from) <= cur_date <= self._to_local_date(h.date_to))
+            ))
+            if matching_pub:
+                pub = matching_pub[0]
+                p_name = pub.name or _('Public Holiday')
+                if isinstance(p_name, dict):
+                    p_name = p_name.get('en_US', list(p_name.values())[0]) if p_name else _('Public Holiday')
+                p_weight = getattr(pub, 'holiday_day_weight', 1.0) or 1.0
+                if p_weight == 0.5:
+                    result[cur_date] = {
+                        'shift_start': 13.0, 'shift_end': default_exit_time,
+                        'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                        'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': False,
+                        'is_on_leave': False, 'is_half_day_leave': True, 'is_public_holiday': True,
+                        'leave_name': p_name, 'shift_name': f"Afternoon Shift (Morning Public Holiday: {p_name})",
+                        'source_label': 'Public Holiday',
+                    }
+                else:
+                    result[cur_date] = {
+                        'shift_start': 0.0, 'shift_end': 0.0,
+                        'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                        'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
+                        'is_on_leave': True, 'is_public_holiday': True,
+                        'leave_name': p_name, 'shift_name': f"Public Holiday ({p_name})",
+                        'source_label': 'Public Holiday',
                     }
                 cur_date += datetime.timedelta(days=1)
                 continue
@@ -544,7 +723,10 @@ class HrEmployeePrivate(models.Model):
             'hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1')
 
         sched = self._resolve_employee_full_schedule(current_float=current_float, target_date=target_date)
-        if sched.get('is_on_leave'):
+        if sched.get('is_public_holiday') and sched.get('is_day_off'):
+            if not is_manager:
+                raise UserError(_("Attendance cannot be recorded.\n\nToday is a recognized Public Holiday: %s.") % sched.get('leave_name', 'Public Holiday'))
+        elif sched.get('is_on_leave'):
             if not is_manager:
                 raise UserError(_("Attendance cannot be recorded.\n\nYou have an approved Time Off today: %s.") % sched.get('leave_name', 'Time Off'))
         elif sched.get('is_day_off'):

@@ -70,31 +70,43 @@
                   groups="discipline_management.group_discipline_user"
                   sequence="2"/>
 
-        <!-- 4. Regulatory Catalog & Reference -->
+        <!-- 4. Regulatory Catalog & Reference (All Policy & Regulatory Master Data) -->
         <menuitem id="menu_discipline_reference_root"
                   name="Regulatory Catalog"
                   parent="menu_discipline_root"
                   sequence="30"/>
 
+        <menuitem id="menu_discipline_policy_versions_ref"
+                  name="Regulation Documents &amp; Policies"
+                  parent="menu_discipline_reference_root"
+                  action="action_discipline_policy_version"
+                  sequence="1"/>
+
         <menuitem id="menu_discipline_articles_ref"
                   name="Regulatory Articles &amp; Clauses"
                   parent="menu_discipline_reference_root"
                   action="action_discipline_article"
-                  sequence="1"/>
+                  sequence="2"/>
 
         <menuitem id="menu_discipline_offenses_ref"
                   name="Misconduct &amp; Penalty Index"
                   parent="menu_discipline_reference_root"
                   action="action_discipline_offense"
-                  sequence="2"/>
-
-        <menuitem id="menu_discipline_policy_versions_ref"
-                  name="Regulation Documents &amp; Policies"
-                  parent="menu_discipline_reference_root"
-                  action="action_discipline_policy_version"
                   sequence="3"/>
 
-        <!-- 5. Configuration Menu Group -->
+        <menuitem id="menu_discipline_offense_categories"
+                  name="Offense Categories"
+                  parent="menu_discipline_reference_root"
+                  action="action_discipline_offense_category"
+                  sequence="4"/>
+
+        <menuitem id="menu_discipline_severity_levels"
+                  name="Severity Levels"
+                  parent="menu_discipline_reference_root"
+                  action="action_discipline_severity_level"
+                  sequence="5"/>
+
+        <!-- 5. Configuration Menu Group (Admin Settings & Engine Parameters) -->
         <menuitem id="menu_discipline_config"
                   name="Configuration"
                   parent="menu_discipline_root"
@@ -107,38 +119,6 @@
                   action="action_discipline_config_settings"
                   groups="discipline_management.group_discipline_admin"
                   sequence="1"/>
-
-        <menuitem id="menu_discipline_severity_levels"
-                  name="Severity Levels"
-                  parent="menu_discipline_config"
-                  action="action_discipline_severity_level"
-                  groups="discipline_management.group_discipline_admin"
-                  sequence="2"/>
-
-        <menuitem id="menu_discipline_offenses"
-                  name="Offense Rules &amp; Penalties"
-                  parent="menu_discipline_config"
-                  action="action_discipline_offense"
-                  sequence="3"/>
-
-        <menuitem id="menu_discipline_offense_categories"
-                  name="Offense Categories"
-                  parent="menu_discipline_config"
-                  action="action_discipline_offense_category"
-                  sequence="4"/>
-
-        <menuitem id="menu_discipline_policy_versions"
-                  name="Policy Versions"
-                  parent="menu_discipline_config"
-                  action="action_discipline_policy_version"
-                  groups="discipline_management.group_discipline_admin"
-                  sequence="5"/>
-
-        <menuitem id="menu_discipline_articles"
-                  name="Regulatory Articles"
-                  parent="menu_discipline_config"
-                  action="action_discipline_article"
-                  sequence="6"/>
 
     </data>
 </odoo>

@@ -30,13 +30,21 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
+                        <!-- Single-Process & Fast Finalization: Direct Submission to CPCO -->
+                        <button name="action_audit_complete_and_submit_to_cpco"
+                                string="Complete Investigation &amp; Submit to CPCO"
+                                type="object"
+                                class="oe_highlight btn-success"
+                                invisible="state == 'approved'"
+                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
+
                         <!-- Stage 1: Assignment -->
-                        <button name="action_assign_investigation" string="Assign / Start Investigation" type="object" class="oe_highlight"
+                        <button name="action_assign_investigation" string="Assign / Start Investigation" type="object" class="btn-primary"
                                 invisible="state != 'draft'"
                                 groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
                         
                         <!-- Stage 2: Officer Submission for Quality Review -->
-                        <button name="action_submit_for_manager_review" string="Submit for Manager Review" type="object" class="oe_highlight"
+                        <button name="action_submit_for_manager_review" string="Submit for Manager Review" type="object" class="btn-secondary"
                                 invisible="state != 'assigned'"
                                 groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
                         
@@ -63,7 +71,7 @@
                                 class="oe_highlight"
                                 invisible="not can_ceo_forward_case"/>
 
-                        <field name="state" widget="statusbar" statusbar_visible="draft,assigned,manager_review,director_review,approved"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,assigned,approved"/>
                     </header>
                     <sheet>
                         <field name="can_ceo_forward_case" invisible="1"/>

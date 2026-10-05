@@ -102,6 +102,24 @@ class MyShiftSchedule(models.TransientModel):
                 time_range = _("On Approved Time Off")
                 lunch_time_range = _("On Approved Time Off")
 
+            elif employee._get_employee_public_holiday(target_date=today):
+                pub = employee._get_employee_public_holiday(target_date=today)
+                assignment_source = 'leave'
+                p_name = pub.name or _('Public Holiday')
+                if isinstance(p_name, dict):
+                    p_name = p_name.get('en_US', list(p_name.values())[0]) if p_name else _('Public Holiday')
+                p_start = fields.Datetime.to_datetime(pub.date_from).date() if pub.date_from else today
+                p_end = fields.Datetime.to_datetime(pub.date_to).date() if pub.date_to else today
+                schedule_name = _("Public Holiday - %s") % p_name
+                start_date = p_start
+                end_date = p_end
+                shift_obj = False
+                start_time = 0.0
+                end_time = 0.0
+                duration = 0.0
+                time_range = _("Public Holiday (%s)") % p_name
+                lunch_time_range = _("Public Holiday")
+
             else:
                 # Priority 1: Job Position Roster Exception (Date-based)
                 roster = self.env['job.position.roster.exception'].sudo().search([

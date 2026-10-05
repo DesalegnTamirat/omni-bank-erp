@@ -31,6 +31,7 @@ class ResConfigSettings(models.TransientModel):
         ('first_warning_penalty', 'Up to 1st Written Warning (Level 4 Low)'),
         ('second_warning_penalty', 'Up to 2nd Written Warning (Level 3 Medium)'),
         ('final_warning_penalty', 'Up to Final Written Warning (Level 2 High)'),
+        ('dismissal', 'Up to Dismissal / Separation (Level 1 Critical)'),
     ], string='Direct Coach Max Punishment Authority',
        default='final_warning_penalty',
        config_parameter='discipline.coach_max_punishment',

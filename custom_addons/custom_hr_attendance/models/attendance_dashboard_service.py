@@ -462,6 +462,23 @@ class HrAttendanceDashboardService(models.Model):
         return present or 0, late or 0
 
     def _dashboard_on_leave(self, cr, target_date, scoped_emp_ids=None):
+        # 1. Check if target_date is a global Public Holiday in resource.calendar.leaves
+        dow_str = str(target_date.weekday())
+        try:
+            cr.execute("""
+                SELECT id FROM resource_calendar_leaves
+                WHERE resource_id IS NULL
+                  AND (
+                      (day_of_week IS NOT NULL AND day_of_week = %s)
+                      OR ((date_from AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date <= %s AND (date_to AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date >= %s)
+                  )
+                LIMIT 1
+            """, (dow_str, target_date, target_date))
+            if cr.fetchone():
+                return self._dashboard_total_employees(cr, scoped_emp_ids)
+        except Exception:
+            pass
+
         if scoped_emp_ids is not None:
             if not scoped_emp_ids:
                 return 0
