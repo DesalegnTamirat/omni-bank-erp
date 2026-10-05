@@ -2173,14 +2173,21 @@ class CompetencyAssessment(models.Model):
                         coach_user = sup_asm.assessor_id
 
                 if coach_user:
-                    msg_text = Markup(_("📥 Subordinate Employee <b>%s</b> has completed and submitted their Self-Assessment for cycle '<b>%s</b>'.")) % (
-                        escape(rec.employee_id.name or ''), escape(rec.cycle_id.name if rec.cycle_id else '')
+                    target_rec = sup_asm or rec
+                    eval_url = f"/web#id={target_rec.id}&model=competency.assessment"
+                    msg_text = Markup(_(
+                        "📥 Subordinate Employee <b>%s</b> has completed and submitted their Self-Assessment for cycle '<b>%s</b>'.<br/>"
+                        "You can now evaluate their competencies and provide supervisor ratings.<br/>"
+                        "<div style='margin-top: 10px;'>"
+                        "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                        "👉 Complete Supervisor Evaluation</a></div>"
+                    )) % (
+                        escape(rec.employee_id.name or ''), escape(rec.cycle_id.name if rec.cycle_id else ''), eval_url
                     )
                     summary_str = _('Subordinate Self-Assessment Submitted: %s') % rec.employee_id.name
                     note_str = _('Employee %s has submitted their self-assessment for cycle %s. You may now evaluate.') % (
                         rec.employee_id.name, rec.cycle_id.name if rec.cycle_id else ''
                     )
-                    target_rec = sup_asm or rec
                     rec._notify_user_inbox_and_activity(coach_user, summary_str, note_str, msg_text, target_rec=target_rec)
 
             elif rec.assessment_type in ('supervisor', 'team'):
@@ -2195,8 +2202,14 @@ class CompetencyAssessment(models.Model):
                     ], limit=1)
 
                 coach_name = rec.assessor_id.name if rec.assessor_id else _("Supervisor/Coach")
-                msg_text = Markup(_("✅ Your supervisor/coach (<b>%s</b>) has completed and submitted your competency assessment for cycle '<b>%s</b>'.")) % (
-                    escape(coach_name or ''), escape(rec.cycle_id.name if rec.cycle_id else '')
+                view_eval_url = "/web#action=competency_management.action_my_competency_evaluations"
+                msg_text = Markup(_(
+                    "✅ Your supervisor/coach (<b>%s</b>) has completed and submitted your competency assessment for cycle '<b>%s</b>'.<br/>"
+                    "<div style='margin-top: 10px;'>"
+                    "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                    "👁️ View My Competency Results</a></div>"
+                )) % (
+                    escape(coach_name or ''), escape(rec.cycle_id.name if rec.cycle_id else ''), view_eval_url
                 )
                 summary_str = _('Supervisor Assessment Completed: %s') % coach_name
                 note_str = _('Your supervisor/coach (%s) has completed and submitted your competency assessment for cycle \'%s\'.') % (
@@ -2211,8 +2224,14 @@ class CompetencyAssessment(models.Model):
                 # Employee submitted assessment for boss / coach
                 boss_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
                 if boss_user:
-                    msg_text = Markup(_("📥 A subordinate evaluation has been completed and submitted for cycle '<b>%s</b>'.")) % (
-                        escape(rec.cycle_id.name if rec.cycle_id else '')
+                    view_eval_url = "/web#action=competency_management.action_my_competency_evaluations"
+                    msg_text = Markup(_(
+                        "📥 A subordinate evaluation has been completed and submitted for cycle '<b>%s</b>'.<br/>"
+                        "<div style='margin-top: 10px;'>"
+                        "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                        "👁️ View Evaluations</a></div>"
+                    )) % (
+                        escape(rec.cycle_id.name if rec.cycle_id else ''), view_eval_url
                     )
                     summary_str = _('Subordinate Evaluation Submitted: %s') % rec.name
                     note_str = _('A subordinate evaluation has been submitted for cycle %s.') % (
@@ -2223,8 +2242,14 @@ class CompetencyAssessment(models.Model):
             elif rec.assessment_type == 'peer':
                 peer_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
                 if peer_user:
-                    msg_text = Markup(_("📥 A peer evaluation has been completed and submitted for cycle '<b>%s</b>'.")) % (
-                        escape(rec.cycle_id.name if rec.cycle_id else '')
+                    view_eval_url = "/web#action=competency_management.action_my_competency_evaluations"
+                    msg_text = Markup(_(
+                        "📥 A peer evaluation has been completed and submitted for cycle '<b>%s</b>'.<br/>"
+                        "<div style='margin-top: 10px;'>"
+                        "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                        "👁️ View Evaluations</a></div>"
+                    )) % (
+                        escape(rec.cycle_id.name if rec.cycle_id else ''), view_eval_url
                     )
                     summary_str = _('Peer Evaluation Submitted: %s') % rec.name
                     note_str = _('A peer evaluation has been submitted for cycle %s.') % (

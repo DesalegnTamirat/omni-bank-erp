@@ -2,6 +2,7 @@
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 import logging
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 
 _logger = logging.getLogger(__name__)
@@ -99,15 +100,20 @@ class KmsContributorPoint(models.Model):
             (500, 'Gold Champion (500 Points)'),
             (1000, 'Platinum Legend (1000 Points)'),
         ]
+        action_link = "/web#action=knowledge_management.action_kms_points_ledger"
         for threshold, title in milestones:
             if pts_before < threshold <= pts_after:
-                msg = _("🎉 Congratulations %s! You have reached the %s milestone with %d total knowledge points!") % (
+                msg_text = _("🎉 Congratulations %s! You have reached the %s milestone with %d total knowledge points!") % (
                     employee.name, title, pts_after
                 )
+                body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">🏅 View Contributor Profile</a>
+</div>""")
                 try:
                     partner_ids = [employee.user_id.partner_id.id] if employee.user_id and employee.user_id.partner_id else []
                     employee.message_post(
-                        body=msg,
+                        body=body,
                         message_type='notification',
                         subtype_xmlid='mail.mt_note',
                         partner_ids=partner_ids

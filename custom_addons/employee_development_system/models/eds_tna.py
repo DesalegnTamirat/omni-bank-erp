@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import calendar
 from datetime import date, timedelta
+from markupsafe import Markup, escape
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -216,13 +217,19 @@ class EdsTnaCycle(models.Model):
             if cycle.last_reminder_date and (today - cycle.last_reminder_date).days < 7:
                 continue
             if days_left >= 0:
-                body = _('Reminder (): TNA cycle %s must be approved by %s - %d days left.'
-                         ' Pending approvers: PPDD Validation, Director PPDD, CPCO, SMC.') % (
+                msg_text = _('Reminder: TNA cycle %s must be approved by %s - %d days left.'
+                             ' Pending approvers: PPDD Validation, Director PPDD, CPCO, SMC.') % (
                     cycle.name, cycle.approval_deadline, days_left)
             else:
-                body = _('DEADLINE BREACHED (): TNA cycle %s approval deadline (%s) has been'
-                         ' missed by %d days. Escalated for senior management review.') % (
+                msg_text = _('DEADLINE BREACHED: TNA cycle %s approval deadline (%s) has been'
+                             ' missed by %d days. Escalated for senior management review.') % (
                     cycle.name, cycle.approval_deadline, -days_left)
+
+            action_link = f"/web#id={cycle.id}&model=eds.tna.cycle"
+            body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">📋 Open TNA Cycle</a>
+</div>""")
             cycle.message_post(body=body, partner_ids=partner_ids)
             cycle.last_reminder_date = today
         return True

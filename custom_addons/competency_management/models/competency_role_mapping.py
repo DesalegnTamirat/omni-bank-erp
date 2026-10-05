@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -250,13 +250,18 @@ class CompetencyRoleMapping(models.Model):
                 continue
             employees = self.env['hr.employee'].search([('job_id', '=', rec.job_position_id.id)])
             users = employees.mapped('user_id')
+            mapping_url = f"/web#id={rec.id}&model=competency.role.mapping"
             for u in users:
                 if not u.partner_id:
                     continue
-                msg = _(
-                    "Competency expectations for your job position '%s' have been updated (Version %s). "
-                    "Please review your role mapping to prepare and improve before upcoming assessments."
-                ) % (rec.job_position_id.name, rec.version)
+                msg = Markup(_(
+                    "📋 <b>Competency Expectations Updated</b><br/>"
+                    "Competency requirements for your job position '<b>%s</b>' have been updated (Version %s).<br/>"
+                    "Please review your role mapping to prepare and develop the required proficiency levels before upcoming assessments.<br/>"
+                    "<div style='margin-top: 10px;'>"
+                    "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                    "👉 View Role-Competency Mapping</a></div>"
+                )) % (escape(rec.job_position_id.name or ''), escape(str(rec.version or '1.0')), mapping_url)
                 rec.message_post(
                     body=msg,
                     partner_ids=[u.partner_id.id],

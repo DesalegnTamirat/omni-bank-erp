@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import date
+from markupsafe import Markup, escape
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -200,6 +201,25 @@ class EdsNomination(models.Model):
             rec._check_submission_rules()
             rec.state = 'submitted'
             rec._notify(_('Nomination %s submitted for approval .') % rec.name)
+            manager_user = rec.employee_id.parent_id.user_id if rec.employee_id.parent_id else False
+            if manager_user:
+                action_link = f"/web#id={rec.id}&model=eds.nomination"
+                note = Markup(
+                    f"<p>Nomination <b>{escape(rec.name)}</b> for employee <b>{escape(rec.employee_id.name or '')}</b> "
+                    f"is submitted and awaits your review.</p>"
+                    f"<div style='margin-top: 8px;'>"
+                    f"<a href='{action_link}' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>👉 Review &amp; Approve Nomination</a>"
+                    f"</div>"
+                )
+                try:
+                    rec.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        user_id=manager_user.id,
+                        summary=_('Review Nomination: %s') % rec.name,
+                        note=note
+                    )
+                except Exception:
+                    pass
 
     def action_line_manager_approve(self):
         """Submitted -> Line Manager Approved (skippable via settings)."""
@@ -376,12 +396,25 @@ class EdsNomination(models.Model):
         }
 
     def _notify(self, body):
-        """chatter notification to the employee (and their manager)."""
+        """Chatter notification to the employee (and their manager) with direct action link."""
         self.ensure_one()
         partner_ids = []
         if self.employee_id and self.employee_id.work_contact_id:
             partner_ids.append(self.employee_id.work_contact_id.id)
-        self.message_post(body=body, partner_ids=partner_ids)
+        if self.employee_id and self.employee_id.parent_id and self.employee_id.parent_id.work_contact_id:
+            if self.employee_id.parent_id.work_contact_id.id not in partner_ids:
+                partner_ids.append(self.employee_id.parent_id.work_contact_id.id)
+
+        action_link = f"/web#id={self.id}&model=eds.nomination"
+        buttons_html = f"""<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">👉 View Nomination Details</a>"""
+        if self.enrollment_id:
+            seat_link = f"/web#id={self.enrollment_id.id}&model=eds.enrollment"
+            buttons_html += f""" <a href="{seat_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block; margin-left: 6px;">🎓 View Session Seat</a>"""
+        buttons_html += "</div>"
+
+        formatted_body = Markup(f"<p>{escape(str(body))}</p>{buttons_html}")
+        self.message_post(body=formatted_body, partner_ids=partner_ids)
 
 
 class EdsEnrollment(models.Model):

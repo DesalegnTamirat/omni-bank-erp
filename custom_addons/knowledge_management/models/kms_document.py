@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import base64
 import logging
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, AccessError, ValidationError
 
@@ -244,8 +245,29 @@ class KmsDocument(models.Model):
             if not rec.file_data:
                 raise UserError(_('Cannot submit a document without an uploaded file.'))
             rec.write({'state': 'review'})
-            rec.message_post(body=_('Document submitted for review and approval.'))
+            action_link = f"/web#id={rec.id}&model=kms.document"
+            msg_text = _('Document %s (%s) submitted for review and approval.') % (rec.name, rec.code)
+            body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">📄 Review Document</a>
+</div>""")
+            partner_ids = []
+            reviewer_emp = rec.reviewer_id or rec.approver_id
+            if reviewer_emp and reviewer_emp.work_contact_id:
+                partner_ids.append(reviewer_emp.work_contact_id.id)
+            rec.message_post(body=body, partner_ids=partner_ids)
             rec._log_audit_action('modify', 'Submitted for review')
+            reviewer_user = reviewer_emp.user_id if reviewer_emp else False
+            if reviewer_user:
+                try:
+                    rec.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        user_id=reviewer_user.id,
+                        summary=_('Review Document: %s') % rec.name,
+                        note=body
+                    )
+                except Exception:
+                    pass
 
     def action_approve(self):
         for rec in self:
@@ -267,10 +289,19 @@ class KmsDocument(models.Model):
                 'change_summary': rec.change_summary or _('Initial approval'),
                 'approved_by_id': self.env.user.employee_id.id if self.env.user.employee_id else False,
             })
-            rec.message_post(body=_('Document approved and published to the active repository.'))
+            action_link = f"/web#id={rec.id}&model=kms.document"
+            msg_text = _('Document %s (%s) approved and published to the active repository.') % (rec.name, rec.code)
+            body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">👁️ View Published Document</a>
+</div>""")
+            partner_ids = []
+            owner = rec.sudo().owner_id
+            if owner and owner.work_contact_id:
+                partner_ids.append(owner.work_contact_id.id)
+            rec.message_post(body=body, partner_ids=partner_ids)
             rec._log_audit_action('approve', f'Approved version {rec.version}')
             # Award points to content owner
-            owner = rec.sudo().owner_id
             if owner and owner.user_id:
                 self.env['kms.contributor.point'].award_points(
                     owner.user_id,
@@ -282,7 +313,17 @@ class KmsDocument(models.Model):
     def action_reject(self):
         for rec in self:
             rec.write({'state': 'draft'})
-            rec.message_post(body=_('Document rejected and returned to draft.'))
+            action_link = f"/web#id={rec.id}&model=kms.document"
+            msg_text = _('Document %s (%s) rejected and returned to draft.') % (rec.name, rec.code)
+            body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">✏️ View &amp; Revise Document</a>
+</div>""")
+            partner_ids = []
+            owner = rec.sudo().owner_id
+            if owner and owner.work_contact_id:
+                partner_ids.append(owner.work_contact_id.id)
+            rec.message_post(body=body, partner_ids=partner_ids)
             rec._log_audit_action('modify', 'Document rejected back to Draft')
 
     def action_archive(self):

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -756,13 +757,18 @@ class EdsSession(models.Model):
             rec._notify_participants(_('Session %s has been cancelled.') % rec.name)
 
     def _notify_participants(self, message):
-        """notify enrolled participants on reschedule/cancel ."""
+        """Notify enrolled participants on reschedule/cancel with direct action link."""
         self.ensure_one()
-        self.message_post(body=message)
+        action_link = f"/web#id={self.id}&model=eds.session"
+        formatted_message = Markup(f"""<p>{escape(str(message))}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">👉 View Training Session</a>
+</div>""")
+        self.message_post(body=formatted_message)
         partner_ids = self.enrollment_ids.filtered(lambda e: e.state == 'enrolled') \
             .mapped('employee_id').mapped('work_contact_id').filtered('id').ids
         if partner_ids:
-            self.message_post(body=message, partner_ids=partner_ids)
+            self.message_post(body=formatted_message, partner_ids=partner_ids)
 
     def _promote_waitlisted(self):
         """FIFO promotion of this session's waitlist (delegates to enrollment)."""

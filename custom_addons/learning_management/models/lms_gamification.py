@@ -2,6 +2,7 @@
 from datetime import date
 from dateutil.relativedelta import relativedelta
 import logging
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 
 _logger = logging.getLogger(__name__)
@@ -95,15 +96,20 @@ class LmsGamificationPoint(models.Model):
             (500, 'Gold Scholar (500 Points)'),
             (1000, 'Platinum Scholar (1000 Points)'),
         ]
+        action_link = "/web#action=learning_management.action_lms_points_ledger"
         for threshold, title in milestones:
             if pts_before < threshold <= pts_after:
-                msg = _("🎉 Congratulations %s! You have achieved the %s milestone with %d total learning points!") % (
+                msg_text = _("🎉 Congratulations %s! You have achieved the %s milestone with %d total learning points!") % (
                     employee.name, title, pts_after
                 )
+                body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">🏆 View My Learning Achievements</a>
+</div>""")
                 try:
                     partner_ids = [employee.user_id.partner_id.id] if employee.user_id and employee.user_id.partner_id else []
                     employee.message_post(
-                        body=msg,
+                        body=body,
                         message_type='notification',
                         subtype_xmlid='mail.mt_note',
                         partner_ids=partner_ids

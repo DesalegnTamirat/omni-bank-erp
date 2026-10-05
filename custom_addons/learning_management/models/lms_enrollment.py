@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import date, datetime
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
@@ -147,12 +148,17 @@ class LmsEnrollment(models.Model):
         todo_activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
         for rec in records:
             rec._initialize_lesson_progress()
-            # Notify learner via chatter
+            # Notify learner via chatter with direct link
             due_txt = _(" Please complete it before %s.") % rec.due_date if rec.due_date else ""
-            body = _("You have been enrolled in the course '%(course)s'.%(due)s") % {
+            msg_text = _("You have been enrolled in the course '%(course)s'.%(due)s") % {
                 'course': rec.course_id.name,
                 'due': due_txt,
             }
+            action_link = f"/web#id={rec.id}&model=lms.enrollment"
+            body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">🎓 Start Learning / Open Course</a>
+</div>""")
             partner_ids = [rec.user_id.partner_id.id] if rec.user_id and rec.user_id.partner_id else []
             rec.message_post(
                 body=body,
@@ -162,10 +168,15 @@ class LmsEnrollment(models.Model):
             # Schedule To-Do activity if user account is linked
             if rec.user_id and todo_activity_type:
                 deadline = rec.due_date or fields.Date.today()
+                note_label = _("Mandatory Course Enrollment") if rec.is_mandatory else _("Course Enrollment")
+                note = Markup(f"""<p>{escape(note_label)}: <b>{escape(rec.course_id.name or '')}</b></p>
+<div style="margin-top: 8px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">🎓 Start Learning / Open Course</a>
+</div>""")
                 rec.activity_schedule(
                     activity_type_id=todo_activity_type.id,
                     summary=_("Complete Course: %s") % rec.course_id.name,
-                    note=_("Mandatory Course Enrollment") if rec.is_mandatory else _("Course Enrollment"),
+                    note=note,
                     date_deadline=deadline,
                     user_id=rec.user_id.id,
                 )
@@ -191,19 +202,30 @@ class LmsEnrollment(models.Model):
         """Check and send chatter notifications when learner hits 50% or 100% progress thresholds."""
         for rec in self:
             partner_ids = [rec.user_id.partner_id.id] if rec.user_id and rec.user_id.partner_id else []
+            action_link = f"/web#id={rec.id}&model=lms.enrollment"
             if rec.progress_percentage >= 50.0 and not rec.threshold_50_notified:
                 rec.threshold_50_notified = True
+                msg_text = _("Milestone Reached: You have reached %.1f%% progress in '%s'!") % (
+                    rec.progress_percentage, rec.course_id.name
+                )
+                body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">📈 View Course Progress</a>
+</div>""")
                 rec.message_post(
-                    body=_("Milestone Reached: You have reached %.1f%% progress in '%s'!") % (
-                        rec.progress_percentage, rec.course_id.name
-                    ),
+                    body=body,
                     subject=_("Course Progress: 50% Milestone Reached"),
                     partner_ids=partner_ids,
                 )
             if rec.progress_percentage >= 100.0 and not rec.threshold_100_notified:
                 rec.threshold_100_notified = True
+                msg_text = _("Course Progress: You have completed 100%% of the lessons in '%s'!") % rec.course_id.name
+                body = Markup(f"""<p>{escape(msg_text)}</p>
+<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">📈 View Course Progress</a>
+</div>""")
                 rec.message_post(
-                    body=_("Course Progress: You have completed 100%% of the lessons in '%s'!") % rec.course_id.name,
+                    body=body,
                     subject=_("Course Progress: 100% Milestone Reached"),
                     partner_ids=partner_ids,
                 )
@@ -269,9 +291,14 @@ class LmsEnrollment(models.Model):
             mgr = emp.parent_id
             course_name = enrollment.course_id.name
 
+            action_link = f"/web#id={enrollment.id}&model=lms.enrollment"
+            button_html = f"""<div style="margin-top: 10px;">
+    <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">⚠️ Resume Course Now</a>
+</div>"""
+
             if enrollment.due_date < today:
                 days_overdue = (today - enrollment.due_date).days
-                body = _(
+                msg_text = _(
                     "MANDATORY TRAINING OVERDUE: '%(course)s' was due on %(due)s (%(days)d days overdue). "
                     "Please complete immediately to maintain regulatory compliance."
                 ) % {
@@ -279,6 +306,7 @@ class LmsEnrollment(models.Model):
                     'due': enrollment.due_date,
                     'days': days_overdue,
                 }
+                body = Markup(f"<p>{escape(msg_text)}</p>{button_html}")
                 partner_ids = [p.id for p in [emp.user_id.partner_id, mgr.user_id.partner_id] if p]
                 enrollment.message_post(
                     body=body,
@@ -287,13 +315,14 @@ class LmsEnrollment(models.Model):
                 )
             elif 0 <= (enrollment.due_date - today).days <= reminder_days:
                 days_left = (enrollment.due_date - today).days
-                body = _(
+                msg_text = _(
                     "UPCOMING DEADLINE: Mandatory course '%(course)s' is due in %(days)d day(s) (deadline: %(due)s)."
                 ) % {
                     'course': course_name,
                     'days': days_left,
                     'due': enrollment.due_date,
                 }
+                body = Markup(f"<p>{escape(msg_text)}</p>{button_html}")
                 partner_ids = [emp.user_id.partner_id.id] if emp.user_id.partner_id else []
                 enrollment.message_post(
                     body=body,
