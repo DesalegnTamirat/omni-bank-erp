@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_knowledge_sharing" model="ir.actions.report">
+        <field name="name">Post-Training Knowledge Sharing &amp; Debrief Form (EDS-F-12)</field>
+        <field name="model">eds.knowledge.sharing</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_knowledge_sharing_document</field>
+        <field name="report_file">employee_development_system.report_eds_knowledge_sharing_document</field>
+        <field name="print_report_name">'Knowledge_Sharing_%s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_eds_knowledge_sharing"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_knowledge_sharing_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-12
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">POST-TRAINING KNOWLEDGE SHARING &amp; ACTION DEBRIEF FORM</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Mandatory step-down sharing session conducted within 30 days of training completion.</p>
+                        </div>
+
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Reference Code:</td>
+                                    <td style="width: 30%;"><strong t-field="o.name"/></td>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Current State:</td>
+                                    <td style="width: 30%;"><strong t-field="o.state"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Employee Presenter:</td>
+                                    <td><strong t-field="o.employee_id.name"/> (<span t-esc="o.employee_id.barcode or 'N/A'"/>)</td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Department / Unit:</td>
+                                    <td><span t-field="o.department_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Originating Session:</td>
+                                    <td><span t-field="o.session_id.name"/> - <span t-field="o.course_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Training Category:</td>
+                                    <td><span t-field="o.training_type"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Debrief Date:</td>
+                                    <td><span t-field="o.session_date"/> (Deadline: <span t-field="o.debrief_deadline"/>)</td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Audience &amp; Attendees:</td>
+                                    <td><span t-field="o.target_audience"/> | <span t-field="o.attendees_count"/> Colleagues</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">1. TOPICS &amp; CORE TAKEAWAYS DELIVERED</h5>
+                        <div style="background-color: #fafafa; border: 1px solid #eee; padding: 8px; margin-bottom: 12px; font-size: 9.5pt;">
+                            <p style="margin: 0; white-space: pre-wrap;" t-field="o.key_takeaways"/>
+                        </div>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">2. DEPARTMENTAL ACTION ITEMS &amp; PRACTICE CHANGES</h5>
+                        <div style="background-color: #fafafa; border: 1px solid #eee; padding: 8px; margin-bottom: 12px; font-size: 9.5pt;">
+                            <p style="margin: 0; white-space: pre-wrap;" t-field="o.workplace_action_plan"/>
+                        </div>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">3. VERIFICATION &amp; SIGN-OFF</h5>
+                        <table class="table table-bordered table-sm" style="margin-top: 10px; font-size: 9pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th style="width: 33%;">Employee / Presenter</th>
+                                    <th style="width: 34%;">Line Manager</th>
+                                    <th style="width: 33%;">L&amp;D Officer</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="height: 50px; vertical-align: top;">
+                                        <span t-esc="o.sign_employee or o.employee_id.name"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Date: <span t-field="o.session_date"/></span>
+                                    </td>
+                                    <td style="height: 50px; vertical-align: top;">
+                                        <span t-esc="o.sign_manager or 'Verified'"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Line Manager Sign-off</span>
+                                    </td>
+                                    <td style="height: 50px; vertical-align: top;">
+                                        <span t-esc="o.sign_officer or 'Approved'"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">L&amp;D Directorate</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

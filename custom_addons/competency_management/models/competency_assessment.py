@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError, AccessError
@@ -1139,7 +1140,6 @@ class CompetencyAssessment(models.Model):
         if g_str in roman_map:
             return roman_map[g_str]
 
-        import re
         numbers = re.findall(r'\d+', g_str)
         if numbers:
             return int(numbers[0])
@@ -1158,7 +1158,6 @@ class CompetencyAssessment(models.Model):
             tokens = str(grade_code).lower().strip().replace('-', ' ').replace('_', ' ').split()
             if tokens and tokens[0] in roman_map:
                 return roman_map[tokens[0]]
-            import re
             m = re.findall(r'\d+', str(grade_code))
             if m:
                 return int(m[0])
@@ -1674,13 +1673,14 @@ class CompetencyAssessment(models.Model):
         return super().create(vals_list)
 
     def web_read(self, specification):
-        """Auto-populate rating lines when an assessor opens a draft assessment that has no lines yet."""
-        for rec in self:
-            if rec.state == 'draft' and not rec.line_ids and rec.employee_id and rec.cycle_id:
-                try:
-                    rec.sudo()._do_populate_lines()
-                except Exception:
-                    pass
+        """Auto-populate rating lines only when an assessor opens a single draft assessment in form view that has no lines yet."""
+        if len(self) == 1 and specification and 'line_ids' in specification:
+            for rec in self:
+                if rec.state == 'draft' and not rec.line_ids and rec.employee_id and rec.cycle_id:
+                    try:
+                        rec.sudo()._do_populate_lines()
+                    except Exception:
+                        pass
 
         # Enforce competency.assessment's own row-level rules first (assessor_id = user,
         # supervisor/team rules, officer-sees-all) — unchanged, still blocks anyone not
@@ -2008,7 +2008,14 @@ class CompetencyAssessment(models.Model):
         return True
 
     def write(self, vals):
-        force_write = self.env.context.get('force_write')
+        # force_write is only honoured when the caller is a trusted internal context
+        # (system superuser or a Competency/System Administrator). Regular users
+        # cannot exploit this flag via a JSON-RPC context payload.
+        force_write = self.env.context.get('force_write') and (
+            self.env.su
+            or self.env.user.has_group('competency_management.group_competency_admin')
+            or self.env.user.has_group('base.group_system')
+        )
         user = self.env.user
         emp = user.employee_id
         is_elevated = self._is_elevated_evaluator(user)
@@ -2118,6 +2125,11 @@ class CompetencyAssessment(models.Model):
     def action_submit(self):
         """Submit assessment: validates deadline, ratings completeness, and notifies supervisor."""
         for rec in self:
+            if rec.state != 'draft':
+                raise UserError(_(
+                    "Only draft assessments can be submitted. "
+                    "'%s' is currently in '%s' state and cannot be re-submitted."
+                ) % (rec.name, rec.state))
             rec._check_submission_deadline()
             if not rec.line_ids:
                 raise UserError(_('Add at least one competency rating line before submitting.'))
@@ -2202,7 +2214,7 @@ class CompetencyAssessment(models.Model):
                     ], limit=1)
 
                 coach_name = rec.assessor_id.name if rec.assessor_id else _("Supervisor/Coach")
-                view_eval_url = "/web#action=competency_management.action_my_competency_evaluations"
+                view_eval_url = "/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1"
                 msg_text = Markup(_(
                     "✅ Your supervisor/coach (<b>%s</b>) has completed and submitted your competency assessment for cycle '<b>%s</b>'.<br/>"
                     "<div style='margin-top: 10px;'>"
@@ -2224,7 +2236,7 @@ class CompetencyAssessment(models.Model):
                 # Employee submitted assessment for boss / coach
                 boss_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
                 if boss_user:
-                    view_eval_url = "/web#action=competency_management.action_my_competency_evaluations"
+                    view_eval_url = "/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1"
                     msg_text = Markup(_(
                         "📥 A subordinate evaluation has been completed and submitted for cycle '<b>%s</b>'.<br/>"
                         "<div style='margin-top: 10px;'>"
@@ -2242,7 +2254,7 @@ class CompetencyAssessment(models.Model):
             elif rec.assessment_type == 'peer':
                 peer_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
                 if peer_user:
-                    view_eval_url = "/web#action=competency_management.action_my_competency_evaluations"
+                    view_eval_url = "/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1"
                     msg_text = Markup(_(
                         "📥 A peer evaluation has been completed and submitted for cycle '<b>%s</b>'.<br/>"
                         "<div style='margin-top: 10px;'>"
@@ -2259,29 +2271,42 @@ class CompetencyAssessment(models.Model):
 
             # Immediate Notification on Complete 360 Assessment (All Assigned Assessors Submitted)
             if rec.cycle_id and rec.employee_id:
-                all_emp_asms = self.env['competency.assessment'].sudo().search([
-                    ('cycle_id', '=', rec.cycle_id.id),
-                    ('employee_id', '=', rec.employee_id.id),
-                    ('active', '=', True),
-                ])
-                draft_asms = all_emp_asms.filtered(lambda a: a.state == 'draft')
-                if all_emp_asms and not draft_asms and not any(all_emp_asms.mapped('is_fully_assessed_notified')):
-                    emp_user = rec.sudo().employee_id.user_id
-                    if emp_user:
-                        assessor_names = ", ".join(filter(None, all_emp_asms.mapped(lambda a: a.assessor_id.name or a.employee_id.name)))
-                        cycle_name = rec.cycle_id.name or _('Current Cycle')
-                        msg_text = Markup(_(
-                            "🎉 <b>360° Competency Evaluation Completed!</b><br/>"
-                            "All assigned assessors (%s) have completed and submitted your evaluations for cycle '<b>%s</b>'.<br/>"
-                            "Your full competency evaluation results and capability gap analysis are now available for you to review.<br/><br/>"
-                            "<a href='/web#action=competency_management.action_my_competency_evaluations' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
-                            "👁️ View My Full Evaluation Results</a>"
-                        )) % (escape(assessor_names or ''), escape(cycle_name))
-                        summary_str = _('360° Evaluation Completed: %s') % cycle_name
-                        note_str = _('All assigned assessors have completed your evaluations for cycle \'%s\'. You can now view your full evaluation results.') % cycle_name
-                        target_rec = all_emp_asms.filtered(lambda a: a.assessment_type == 'self')[:1] or rec
-                        rec._notify_user_inbox_and_activity(emp_user, summary_str, note_str, msg_text, target_rec=target_rec)
-                        all_emp_asms.with_context(force_write=True).write({'is_fully_assessed_notified': True})
+                # Atomically lock employee's assessment rows to prevent concurrent submission race conditions
+                try:
+                    self.env.cr.execute(
+                        "SELECT id, is_fully_assessed_notified FROM competency_assessment "
+                        "WHERE cycle_id = %s AND employee_id = %s AND active = TRUE FOR UPDATE",
+                        [rec.cycle_id.id, rec.employee_id.id]
+                    )
+                    locked_rows = self.env.cr.fetchall()
+                    already_notified = any(r[1] for r in locked_rows)
+                except Exception:
+                    already_notified = False
+
+                if not already_notified:
+                    all_emp_asms = self.env['competency.assessment'].sudo().search([
+                        ('cycle_id', '=', rec.cycle_id.id),
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('active', '=', True),
+                    ])
+                    draft_asms = all_emp_asms.filtered(lambda a: a.state == 'draft')
+                    if all_emp_asms and not draft_asms and not any(all_emp_asms.mapped('is_fully_assessed_notified')):
+                        emp_user = rec.sudo().employee_id.user_id
+                        if emp_user:
+                            assessor_names = ", ".join(filter(None, all_emp_asms.mapped(lambda a: a.assessor_id.name or a.employee_id.name)))
+                            cycle_name = rec.cycle_id.name or _('Current Cycle')
+                            msg_text = Markup(_(
+                                "🎉 <b>360° Competency Evaluation Completed!</b><br/>"
+                                "All assigned assessors (%s) have completed and submitted your evaluations for cycle '<b>%s</b>'.<br/>"
+                                "Your full competency evaluation results and capability gap analysis are now available for you to review.<br/><br/>"
+                                "<a href='/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                                "👁️ View My Full Evaluation Results</a>"
+                            )) % (escape(assessor_names or ''), escape(cycle_name))
+                            summary_str = _('360° Evaluation Completed: %s') % cycle_name
+                            note_str = _('All assigned assessors have completed your evaluations for cycle \'%s\'. You can now view your full evaluation results.') % cycle_name
+                            target_rec = all_emp_asms.filtered(lambda a: a.assessment_type == 'self')[:1] or rec
+                            rec._notify_user_inbox_and_activity(emp_user, summary_str, note_str, msg_text, target_rec=target_rec)
+                            all_emp_asms.with_context(force_write=True).write({'is_fully_assessed_notified': True})
 
     def compute_aggregate_360_ratings(self):
         return self.action_consolidate_multi_source()
@@ -2650,25 +2675,25 @@ class CompetencyAssessmentLine(models.Model):
         ('3', 'Level 3 - Advanced'),
         ('4', 'Level 4 - Expert'),
     ], string='Required Proficiency', required=True, default='2')
-    gap = fields.Integer(string='Gap', compute='_compute_gap', store=True, group_operator='avg',
+    gap = fields.Integer(string='Gap', compute='_compute_gap', store=True, aggregator='avg',
                          help='Required minus Current proficiency (positive = development gap).')
-    current_level_num = fields.Integer(string='Current Level (Numeric)', compute='_compute_level_nums', store=True, group_operator='avg')
-    required_level_num = fields.Integer(string='Required Level (Numeric)', compute='_compute_level_nums', store=True, group_operator='avg')
+    current_level_num = fields.Integer(string='Current Level (Numeric)', compute='_compute_level_nums', store=True, aggregator='avg')
+    required_level_num = fields.Integer(string='Required Level (Numeric)', compute='_compute_level_nums', store=True, aggregator='avg')
 
     # 360 Multi-Rater Ratings Breakdown
-    self_rating = fields.Float(string='Self Rating', compute='_compute_360_ratings', store=True, group_operator='avg')
-    peer_avg = fields.Float(string='Peer Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
-    subordinate_avg = fields.Float(string='Subordinate Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
-    supervisor_avg = fields.Float(string='Supervisor Rating', compute='_compute_360_ratings', store=True, group_operator='avg')
-    team_avg = fields.Float(string='Team Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
-    weighted_current_level = fields.Float(string='Weighted Current Level', compute='_compute_360_ratings', store=True, group_operator='avg')
-    self_gap = fields.Float(string='Self Gap', compute='_compute_specific_gaps', store=True, group_operator='avg',
+    self_rating = fields.Float(string='Self Rating', compute='_compute_360_ratings', store=True, aggregator='avg')
+    peer_avg = fields.Float(string='Peer Avg', compute='_compute_360_ratings', store=True, aggregator='avg')
+    subordinate_avg = fields.Float(string='Subordinate Avg', compute='_compute_360_ratings', store=True, aggregator='avg')
+    supervisor_avg = fields.Float(string='Supervisor Rating', compute='_compute_360_ratings', store=True, aggregator='avg')
+    team_avg = fields.Float(string='Team Avg', compute='_compute_360_ratings', store=True, aggregator='avg')
+    weighted_current_level = fields.Float(string='Weighted Current Level', compute='_compute_360_ratings', store=True, aggregator='avg')
+    self_gap = fields.Float(string='Self Gap', compute='_compute_specific_gaps', store=True, aggregator='avg',
                             help='Required proficiency minus Self rating.')
-    peer_gap = fields.Float(string='Peer Gap', compute='_compute_specific_gaps', store=True, group_operator='avg',
+    peer_gap = fields.Float(string='Peer Gap', compute='_compute_specific_gaps', store=True, aggregator='avg',
                             help='Required proficiency minus Peer average rating.')
-    subordinate_gap = fields.Float(string='Subordinate Gap', compute='_compute_specific_gaps', store=True, group_operator='avg',
+    subordinate_gap = fields.Float(string='Subordinate Gap', compute='_compute_specific_gaps', store=True, aggregator='avg',
                                    help='Required proficiency minus Subordinate average rating.')
-    supervisor_gap = fields.Float(string='Supervisor Gap', compute='_compute_specific_gaps', store=True, group_operator='avg',
+    supervisor_gap = fields.Float(string='Supervisor Gap', compute='_compute_specific_gaps', store=True, aggregator='avg',
                                   help='Required proficiency minus Supervisor rating.')
 
     @api.depends('assessment_id.employee_id', 'assessment_id.cycle_id', 'competency_id', 'current_level')
@@ -2787,7 +2812,12 @@ class CompetencyAssessmentLine(models.Model):
         return lines
 
     def write(self, vals):
-        force_write = self.env.context.get('force_write')
+        # force_write is only honoured when the caller is a trusted internal context
+        force_write = self.env.context.get('force_write') and (
+            self.env.su
+            or self.env.user.has_group('competency_management.group_competency_admin')
+            or self.env.user.has_group('base.group_system')
+        )
         user = self.env.user
         emp = user.employee_id
         is_elevated = self.env['competency.assessment']._is_elevated_evaluator(user)
@@ -3039,10 +3069,10 @@ class CompetencyAssessmentLine(models.Model):
                 rec.achievement_status = 'below'
                 rec.gap_priority = 'high'
 
-    _sql_constraints = [
-        ('assessment_competency_uniq', 'unique(assessment_id, competency_id)',
-         'This competency is already rated in the assessment!'),
-    ]
+    _assessment_competency_uniq = models.Constraint(
+        'UNIQUE (assessment_id, competency_id)',
+        'This competency is already rated in the assessment!'
+    )
 
     @api.ondelete(at_uninstall=False)
     def _prevent_unlink_on_locked(self):

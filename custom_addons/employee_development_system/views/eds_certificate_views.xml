@@ -58,15 +58,64 @@
         <field name="name">eds.certificate.tree</field>
         <field name="model">eds.certificate</field>
         <field name="arch" type="xml">
-            <list string="Issued Certificates">
+            <list string="Issued Certificates" decoration-info="state == 'pending'" decoration-success="state == 'issued'" decoration-danger="state == 'void'">
                 <field name="code"/>
                 <field name="employee_id"/>
                 <field name="course_id"/>
                 <field name="session_id"/>
+                <field name="training_dates_text"/>
                 <field name="issue_date"/>
                 <field name="is_eligible" widget="boolean_toggle"/>
-                <field name="state" widget="badge" decoration-info="state == 'pending'" decoration-success="state == 'issued'" decoration-danger="state == 'void'"/>
+                <field name="state" widget="badge"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_eds_certificate_kanban" model="ir.ui.view">
+        <field name="name">eds.certificate.kanban</field>
+        <field name="model">eds.certificate</field>
+        <field name="arch" type="xml">
+            <kanban string="Certificates Gallery" sample="1">
+                <field name="id"/>
+                <field name="code"/>
+                <field name="employee_id"/>
+                <field name="course_id"/>
+                <field name="issue_date"/>
+                <field name="state"/>
+                <field name="certificate_image"/>
+                <field name="certificate_image_filename"/>
+                <field name="file_name"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click p-2">
+                            <div class="text-center mb-2" t-if="record.certificate_image.raw_value" style="overflow: hidden; max-height: 160px; border-radius: 4px; border: 1px solid #e0e0e0;">
+                                <img t-att-src="'/web/image/eds.certificate/' + record.id.raw_value + '/certificate_image'" alt="Certificate Preview" style="width: 100%; object-fit: contain;"/>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="badge bg-secondary font-monospace"><t t-esc="record.code.value"/></span>
+                                <field name="state" widget="badge" decoration-info="state == 'pending'" decoration-success="state == 'issued'" decoration-danger="state == 'void'"/>
+                            </div>
+                            <h5 class="mb-1 text-truncate font-weight-bold" style="color: #721c24;">
+                                <t t-esc="record.employee_id.value"/>
+                            </h5>
+                            <div class="text-muted small mb-2 text-truncate">
+                                <i class="fa fa-graduation-cap me-1"/> <t t-esc="record.course_id.value"/>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                <span class="text-muted small"><i class="fa fa-calendar me-1"/> <t t-esc="record.issue_date.value"/></span>
+                                <div class="btn-group btn-group-sm">
+                                    <a t-if="record.state.raw_value == 'issued'" t-att-href="'/web/content/eds.certificate/' + record.id.raw_value + '/certificate_image/' + record.certificate_image_filename.raw_value + '?download=true'" class="btn btn-outline-danger" role="button" title="Download Image">
+                                        <i class="fa fa-picture-o"/>
+                                    </a>
+                                    <a t-if="record.state.raw_value == 'issued'" t-att-href="'/web/content/eds.certificate/' + record.id.raw_value + '/file/' + record.file_name.raw_value + '?download=true'" class="btn btn-outline-info" role="button" title="Download PDF">
+                                        <i class="fa fa-file-pdf-o"/>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
         </field>
     </record>
 
@@ -76,44 +125,73 @@
         <field name="arch" type="xml">
             <form string="Completion Certificate">
                 <header>
-                    <button name="action_issue" string="Issue Certificate" type="object" class="oe_highlight" invisible="state != 'pending'"
+                    <button name="action_issue" string="Issue Official Certificate" type="object" class="oe_highlight" invisible="state != 'pending'"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_download_image" string="Download Image (.png)" type="object" class="btn-primary" icon="fa-picture-o"
+                            invisible="state != 'issued' or not certificate_image"/>
+                    <button name="action_download_pdf" string="Download PDF (.pdf)" type="object" class="btn-info" icon="fa-file-pdf-o"
+                            invisible="state != 'issued' or not file"/>
+                    <button name="action_regenerate_assets" string="Regenerate Certificate Assets" type="object" class="btn-secondary" icon="fa-refresh"
+                            invisible="state != 'issued'" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_admin"/>
                     <button name="action_void" string="Void Certificate" type="object" invisible="state == 'void'"
                             groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="pending,issued,void"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
+                        <span class="o_form_label">Certificate Number</span>
                         <h1><field name="code" readonly="1" invisible="code == 'New'"/></h1>
                     </div>
                     <group>
-                        <group>
-                            <field name="employee_id"/>
-                            <field name="session_id"/>
-                            <field name="course_id"/>
+                        <group string="Recipient &amp; Training Details">
+                            <field name="employee_id" readonly="state != 'pending'"/>
+                            <field name="course_id" readonly="1"/>
+                            <field name="session_id" readonly="state != 'pending'"/>
+                            <field name="training_dates_text"/>
                         </group>
-                        <group>
-                            <field name="issue_date"/>
-                            <field name="issued_by"/>
-                            <field name="is_eligible"/>
+                        <group string="Issue &amp; Verification Details">
+                            <field name="issue_date" readonly="state != 'pending'"/>
+                            <field name="issued_by" readonly="1"/>
+                            <field name="is_eligible" readonly="1"/>
+                            <field name="verification_token" readonly="1" groups="base.group_no_one"/>
+                            <field name="verification_url" widget="url" readonly="1"/>
                         </group>
                     </group>
                     <notebook>
+                        <page string="Certificate Preview" invisible="not certificate_image">
+                            <div class="text-center p-3" style="background-color: #f8f9fa; border-radius: 6px;">
+                                <field name="certificate_image" widget="image" readonly="1" style="max-width: 780px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 4px;"/>
+                            </div>
+                        </page>
+                        <page string="Signatories &amp; Wording">
+                            <group>
+                                <group string="Prepared By (Left Signatory)">
+                                    <field name="prepared_by_name"/>
+                                    <field name="prepared_by_title"/>
+                                </group>
+                                <group string="Approved By (Right Signatory)">
+                                    <field name="signatory_name"/>
+                                    <field name="signatory_title"/>
+                                </group>
+                            </group>
+                            <group string="Wording">
+                                <field name="certificate_title"/>
+                                <field name="certificate_body_text"/>
+                            </group>
+                        </page>
                         <page string="Eligibility Analysis">
                             <field name="eligibility_reason" readonly="1"/>
                         </page>
-                        <page string="Certificate Content &amp; Signatures">
+                        <page string="File Downloads &amp; Attachments">
                             <group>
-                                <field name="certificate_title"/>
-                                <field name="certificate_body_text"/>
-                                <field name="signatory_name"/>
-                                <field name="signatory_title"/>
-                            </group>
-                        </page>
-                        <page string="Certificate Attachment">
-                            <group>
-                                <field name="file" filename="file_name"/>
-                                <field name="file_name" invisible="1"/>
+                                <group string="Image Asset">
+                                    <field name="certificate_image_filename" invisible="1"/>
+                                    <field name="certificate_image" filename="certificate_image_filename"/>
+                                </group>
+                                <group string="PDF Asset">
+                                    <field name="file_name" invisible="1"/>
+                                    <field name="file" filename="file_name"/>
+                                </group>
                             </group>
                         </page>
                     </notebook>
@@ -123,9 +201,48 @@
         </field>
     </record>
 
+    <record id="view_eds_certificate_search" model="ir.ui.view">
+        <field name="name">eds.certificate.search</field>
+        <field name="model">eds.certificate</field>
+        <field name="arch" type="xml">
+            <search string="Search Certificates">
+                <field name="code"/>
+                <field name="employee_id"/>
+                <field name="course_id"/>
+                <field name="session_id"/>
+                <filter string="Issued" name="filter_issued" domain="[('state','=','issued')]"/>
+                <filter string="Pending Eligibility" name="filter_pending" domain="[('state','=','pending')]"/>
+                <group name="group_by">
+                    <filter string="Course" name="group_course" context="{'group_by':'course_id'}"/>
+                    <filter string="Session" name="group_session" context="{'group_by':'session_id'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by':'state'}"/>
+                    <filter string="Issue Month" name="group_issue_date" context="{'group_by':'issue_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_eds_certificate" model="ir.actions.act_window">
-        <field name="name">Issued Completion Certificates</field>
+        <field name="name">Issued Certificates</field>
         <field name="res_model">eds.certificate</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_eds_certificate_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No completion certificates found.
+            </p>
+            <p>
+                Certificates are generated when employees successfully complete training sessions meeting attendance and assessment requirements.
+            </p>
+        </field>
+    </record>
+
+    <!-- My Certificates Action for Self-Service Employees -->
+    <record id="action_eds_certificate_own" model="ir.actions.act_window">
+        <field name="name">My Certificates</field>
+        <field name="res_model">eds.certificate</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="search_view_id" ref="view_eds_certificate_search"/>
     </record>
 </odoo>

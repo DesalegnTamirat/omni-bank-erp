@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_level3" model="ir.actions.report">
+        <field name="name">Behavioral Impact Form (EDS-F-04)</field>
+        <field name="model">eds.evaluation.level3</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_level3_document</field>
+        <field name="report_file">employee_development_system.report_eds_level3_document</field>
+        <field name="print_report_name">'Behavioral_Impact_%s' % (object.id)</field>
+        <field name="binding_model_id" ref="model_eds_evaluation_level3"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_level3_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-04
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">KIRKPATRICK LEVEL 3 – BEHAVIORAL APPLICATION &amp; JOB IMPACT FORM</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Completed by Line Manager in consultation with trainee at 30, 60, or 90 days post-training.</p>
+                        </div>
+
+                        <!-- Meta Info -->
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Employee Name:</td>
+                                    <td style="width: 30%;"><strong t-field="o.employee_id.name"/></td>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Staff ID:</td>
+                                    <td style="width: 30%;"><span t-esc="o.employee_id.barcode or 'N/A'"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Job Position:</td>
+                                    <td><span t-field="o.employee_id.job_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Department:</td>
+                                    <td><span t-field="o.employee_id.department_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Training Program:</td>
+                                    <td><span t-field="o.session_id.course_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Date Attended:</td>
+                                    <td><span t-field="o.session_id.date_start"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Line Manager / Assessor:</td>
+                                    <td><span t-field="o.manager_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Evaluation Period:</td>
+                                    <td>
+                                        <strong t-esc="dict([('30_days','30 Days Post-Training'),('60_days','60 Days Post-Training'),('90_days','90 Days Post-Training')]).get(o.evaluation_period, o.evaluation_period)"/>
+                                        (<span t-field="o.due_date"/>)
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Competency Lines Table -->
+                        <h5 style="color: #003366; font-weight: bold; margin-bottom: 6px;">Behavioral Competency Application</h5>
+                        <p style="font-size: 8.5pt; color: #555; margin-bottom: 4px;">
+                            <em>Frequency Rating: 1 = Never, 2 = Rarely, 3 = Sometimes, 4 = Often, 5 = Always</em>
+                        </p>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 8.5pt;">
+                            <thead style="background-color: #f2f2f2;">
+                                <tr>
+                                    <th style="width: 5%; text-align: center;">#</th>
+                                    <th style="width: 25%;">Competency</th>
+                                    <th style="width: 40%;">Observable Behavior Description</th>
+                                    <th style="width: 15%; text-align: center;">Proficiency Level</th>
+                                    <th style="width: 15%; text-align: center;">Frequency Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="c_seq" t-value="1"/>
+                                <t t-foreach="o.line_ids" t-as="cl">
+                                    <tr>
+                                        <td style="text-align: center;" t-esc="c_seq"/>
+                                        <td><strong t-field="cl.competency_id.name"/></td>
+                                        <td><span t-esc="cl.behavior_description or cl.comment or '-'"/></td>
+                                        <td style="text-align: center;"><span t-field="cl.observed_level"/></td>
+                                        <td style="text-align: center;">
+                                            <strong t-esc="cl.frequency_rating or '4'"/> / 5 (<span t-esc="'%.0f%%' % cl.score_pct"/>)
+                                        </td>
+                                    </tr>
+                                    <t t-set="c_seq" t-value="c_seq + 1"/>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Overall Result Selection -->
+                        <div style="margin-bottom: 12px; border: 1px solid #d0dbe5; padding: 8px 10px; background-color: #fbfcfd; border-radius: 4px;">
+                            <strong style="color: #003366; font-size: 9.5pt;">Overall Behavioral Change Rating:</strong>
+                            <div style="margin-top: 6px; font-size: 9pt;">
+                                <span t-esc="'[X]' if o.overall_result == 'significant_improvement' else '[ ]'"/> Significant Improvement (&gt;80% application)<br/>
+                                <span t-esc="'[X]' if o.overall_result == 'some_improvement' else '[ ]'"/> Some Improvement (50–79% application)<br/>
+                                <span t-esc="'[X]' if o.overall_result == 'no_change' else '[ ]'"/> No Change (&lt;50% application)<br/>
+                                <span t-esc="'[X]' if o.overall_result == 'decline' else '[ ]'"/> Decline (investigate cause)
+                            </div>
+                        </div>
+
+                        <!-- Impact and Support -->
+                        <table class="table table-sm table-bordered" style="margin-bottom: 15px; font-size: 9pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; width: 35%; font-weight: bold;">
+                                        Concrete Business Impact Observed:
+                                    </td>
+                                    <td><span t-esc="o.business_impact_observed or o.observation_notes or 'None noted'"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">
+                                        Recommended Follow-up Support / Coaching:
+                                    </td>
+                                    <td><span t-esc="o.recommended_support or 'None required'"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Sign-Off Section -->
+                        <div style="margin-top: 25px; border-top: 1px solid #003366; padding-top: 10px;">
+                            <h6 style="color: #003366; font-weight: bold; margin-bottom: 12px;">Sign-Off &amp; Agreement</h6>
+                            <table style="width: 100%; font-size: 9pt;">
+                                <tr>
+                                    <td style="width: 33%; vertical-align: top;">
+                                        <strong>Line Manager:</strong><br/>
+                                        Name: <span t-esc="o.sign_manager_name or o.manager_id.name or '___________________'"/><br/>
+                                        Signature: ___________________<br/>
+                                        Date: ___________________
+                                    </td>
+                                    <td style="width: 33%; vertical-align: top;">
+                                        <strong>Trainee:</strong><br/>
+                                        Name: <span t-esc="o.sign_trainee_name or o.employee_id.name or '___________________'"/><br/>
+                                        Signature: ___________________<br/>
+                                        Date: ___________________
+                                    </td>
+                                    <td style="width: 33%; vertical-align: top;">
+                                        <strong>L&amp;D Officer:</strong><br/>
+                                        Name: <span t-esc="o.sign_officer_name or '___________________'"/><br/>
+                                        Signature: ___________________<br/>
+                                        Date: ___________________
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_vrs" model="ir.actions.report">
+        <field name="name">Venue Requirement Specification (EDS-F-05)</field>
+        <field name="model">eds.venue.requirement</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_vrs_document</field>
+        <field name="report_file">employee_development_system.report_eds_vrs_document</field>
+        <field name="print_report_name">'VRS_%s' % (object.name or object.id)</field>
+        <field name="binding_model_id" ref="model_eds_venue_requirement"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_vrs_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 9.5pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Property &amp; Administration</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-05
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">VENUE REQUIREMENT SPECIFICATION (VRS) FORM</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Specification submitted to Property &amp; Administration for procurement of external training venues / hotels.</p>
+                        </div>
+
+                        <!-- Section 1 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">1. General Training Information</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 9pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">VRS Reference:</td>
+                                    <td style="width: 25%;"><strong t-field="o.name"/></td>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Training Program:</td>
+                                    <td style="width: 25%;"><span t-esc="o.course_id.name or o.session_id.course_id.name or o.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Required Capacity:</td>
+                                    <td><strong t-field="o.capacity_required"/> persons</td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Facilitators:</td>
+                                    <td><span t-field="o.facilitator_count"/> persons</td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Training Dates:</td>
+                                    <td><span t-field="o.date_start"/> to <span t-field="o.date_end"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Preferred Location:</td>
+                                    <td><span t-field="o.location_preference"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Estimated Budget:</td>
+                                    <td colspan="3">
+                                        <strong t-esc="'%.2f %s' % (o.estimated_budget, o.currency_id.name or 'ETB')"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 2 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">2. Hall &amp; Seating Layout</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 9pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Seating Layout:</td>
+                                    <td style="width: 25%;">
+                                        <strong t-esc="dict([('cluster','Cluster / Round Tables'),('ushape','U-Shape'),('classroom','Classroom'),('boardroom','Boardroom'),('theater','Theater')]).get(o.seating_layout, o.seating_layout)"/>
+                                    </td>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Breakout Rooms Needed:</td>
+                                    <td style="width: 25%;"><strong t-field="o.breakout_rooms"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 3 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">3. Audio-Visual &amp; Technical Requirements</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 50%;"><span t-esc="'[X]' if o.has_projector else '[ ]'"/> LCD Projector &amp; Projection Screen (HDMI)</td>
+                                    <td style="width: 50%;"><span t-esc="'[X]' if o.has_sound_system else '[ ]'"/> Sound System &amp; Wireless Microphones</td>
+                                </tr>
+                                <tr>
+                                    <td><span t-esc="'[X]' if o.has_flipcharts else '[ ]'"/> Flipcharts, Stands &amp; Markers (minimum 2)</td>
+                                    <td><span t-esc="'[X]' if o.has_wifi else '[ ]'"/> Dedicated High-Speed Wi-Fi for all participants</td>
+                                </tr>
+                                <tr>
+                                    <td><span t-esc="'[X]' if o.has_videoconference else '[ ]'"/> Video Conferencing Facilities</td>
+                                    <td><span t-esc="'[X]' if o.has_power_backup else '[ ]'"/> Dedicated Backup Generator / Uninterrupted Power</td>
+                                </tr>
+                                <tr>
+                                    <td><span t-esc="'[X]' if o.has_air_conditioning else '[ ]'"/> Air Conditioning / Climate Control</td>
+                                    <td><span t-esc="'[X]' if o.has_parking else '[ ]'"/> Dedicated Parking for Participants</td>
+                                </tr>
+                                <tr>
+                                    <td><span t-esc="'[X]' if o.has_accessibility else '[ ]'"/> Wheelchair Accessible Venue &amp; Restrooms</td>
+                                    <td><span t-esc="'[X]' if o.has_reg_desk else '[ ]'"/> Registration Desk &amp; Materials Distribution Area</td>
+                                </tr>
+                                <t t-if="o.other_tech_requirements or o.facilities_required or o.special_requirements">
+                                    <tr>
+                                        <td colspan="2" style="background-color: #fbfbfb;">
+                                            <strong>Other Technical Specifications:</strong> 
+                                            <span t-esc="o.other_tech_requirements or o.facilities_required or o.special_requirements"/>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 4 & 5 -->
+                        <div class="row" style="margin-bottom: 10px;">
+                            <div class="col-7">
+                                <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">4. Catering Requirements</h6>
+                                <table class="table table-sm table-bordered" style="font-size: 8.5pt;">
+                                    <tr><td><span t-esc="'[X]' if o.catering_morning_tea else '[ ]'"/> Morning Tea/Coffee &amp; Snacks</td></tr>
+                                    <tr><td><span t-esc="'[X]' if o.catering_lunch else '[ ]'"/> Buffet Lunch &amp; Soft Drinks</td></tr>
+                                    <tr><td><span t-esc="'[X]' if o.catering_afternoon_tea else '[ ]'"/> Afternoon Tea/Coffee &amp; Pastries</td></tr>
+                                    <tr><td><span t-esc="'[X]' if o.catering_water else '[ ]'"/> Bottled Mineral Water throughout the day</td></tr>
+                                    <tr><td><strong>Menu:</strong> <span t-field="o.menu_type"/> | <strong>Dietary:</strong> <span t-field="o.special_dietary_needs or 'Standard'"/> | <strong>Pax:</strong> <strong t-field="o.catering_count"/></td></tr>
+                                </table>
+                            </div>
+                            <div class="col-5">
+                                <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">5. Accommodation</h6>
+                                <table class="table table-sm table-bordered" style="font-size: 8.5pt;">
+                                    <tr><td><strong>Required:</strong> <span t-esc="'Yes' if o.accommodation_required else 'No'"/></td></tr>
+                                    <tr><td><strong>Rooms Required:</strong> <span t-field="o.rooms_required"/></td></tr>
+                                    <tr><td><strong>Room Nights:</strong> <span t-field="o.room_nights"/></td></tr>
+                                    <tr><td><strong>Notes:</strong> <span t-field="o.accommodation_notes or 'None'"/></td></tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Section 6: Approval -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">6. Review &amp; Approval Sign-Off</h6>
+                        <table style="width: 100%; font-size: 8.5pt; margin-top: 6px;">
+                            <tr>
+                                <td style="width: 33%; vertical-align: top;">
+                                    <strong>Prepared by (L&amp;D Officer):</strong><br/>
+                                    Name: <span t-esc="o.prepared_by or '___________________'"/><br/>
+                                    Date: ___________________<br/>
+                                    Signature: ___________________
+                                </td>
+                                <td style="width: 33%; vertical-align: top;">
+                                    <strong>Reviewed by (TL L&amp;D):</strong><br/>
+                                    Name: <span t-esc="o.reviewed_by or '___________________'"/><br/>
+                                    Date: ___________________<br/>
+                                    Signature: ___________________
+                                </td>
+                                <td style="width: 33%; vertical-align: top;">
+                                    <strong>Approved by (Director PPDD):</strong><br/>
+                                    Name: <span t-esc="o.director_sign or (o.approved_by_id and o.approved_by_id.name) or '___________________'"/><br/>
+                                    Date: <span t-esc="o.approval_date and o.approval_date.strftime('%Y-%m-%d') or '___________________'"/><br/>
+                                    Signature: ___________________
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

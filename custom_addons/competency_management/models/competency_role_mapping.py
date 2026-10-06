@@ -448,10 +448,10 @@ class CompetencyRoleMappingLine(models.Model):
         string='Weight', default=1.0,
         help='Relative importance of this competency for the role.')
 
-    _sql_constraints = [
-        ('mapping_competency_uniq', 'unique(mapping_id, competency_id)',
-         'This competency is already mapped for the role!'),
-    ]
+    _mapping_competency_uniq = models.Constraint(
+        'UNIQUE (mapping_id, competency_id)',
+        'This competency is already mapped for the role!'
+    )
 
     @api.depends('competency_id', 'mapping_id.job_position_id', 'mapping_id.grade_id')
     def _compute_matrix_proficiency(self):

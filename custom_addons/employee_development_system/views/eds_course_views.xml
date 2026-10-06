@@ -11,6 +11,9 @@
                 <list>
                     <field name="code"/>
                     <field name="name"/>
+                    <field name="program_category" optional="show"/>
+                    <field name="target_audience" optional="show"/>
+                    <field name="delivery_place" optional="hide"/>
                     <field name="category" widget="badge"/>
                     <field name="competency_count" string="Competencies"/>
                     <field name="target_pillar_summary" optional="show"/>
@@ -159,6 +162,9 @@
                                 <field name="code" readonly="1"/>
                                 <field name="name" readonly="status != 'draft'"/>
                                 <field name="category" readonly="status != 'draft'"/>
+                                <field name="program_category" readonly="status != 'draft'"/>
+                                <field name="target_audience" readonly="status != 'draft'"/>
+                                <field name="delivery_place" readonly="status != 'draft'"/>
                                 <field name="delivery_method" readonly="status != 'draft'"/>
                                 <field name="duration_days" readonly="status != 'draft'"/>
                                 <field name="version" readonly="1"/>

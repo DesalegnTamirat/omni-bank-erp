@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_internship_appraisal" model="ir.actions.report">
+        <field name="name">Internship Appraisal &amp; Exit Clearance (EDS-F-14)</field>
+        <field name="model">eds.internship.application</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_internship_appraisal_document</field>
+        <field name="report_file">employee_development_system.report_eds_internship_appraisal_document</field>
+        <field name="print_report_name">'Internship_Clearance_%s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_eds_internship_application"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_internship_appraisal_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-14
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">INTERNSHIP PERFORMANCE APPRAISAL &amp; EXIT CLEARANCE FORM</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Final institutional evaluation, departmental exit clearance, and potential talent pipelining.</p>
+                        </div>
+
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Intern Full Name:</td>
+                                    <td style="width: 30%;"><strong t-field="o.applicant_name"/></td>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Application Code:</td>
+                                    <td style="width: 30%;"><strong t-field="o.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Educational Institution:</td>
+                                    <td><span t-field="o.institution"/> (<span t-field="o.field_of_study"/>)</td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Assigned Unit / Branch:</td>
+                                    <td><span t-field="o.work_unit_id.name"/> / <span t-field="o.department_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Internship Period:</td>
+                                    <td><span t-field="o.start_date"/> to <span t-field="o.end_date"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Assigned Supervisor:</td>
+                                    <td><span t-field="o.supervisor_id.name"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">1. SUPERVISOR PERFORMANCE EVALUATION</h5>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th>Evaluation Metric</th>
+                                    <th style="width: 40%; text-align: center;">Result</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Final Overall Performance Rating:</td>
+                                    <td style="text-align: center; font-weight: bold; font-size: 10.5pt; color: #003366;"><span t-field="o.final_intern_rating"/></td>
+                                </tr>
+                                <tr>
+                                    <td>Hiring / Talent Pipeline Recommendation:</td>
+                                    <td style="text-align: center; font-weight: bold;"><span t-field="o.mentor_overall_recommendation"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div style="background-color: #fafafa; border: 1px solid #eee; padding: 8px; margin-bottom: 12px; font-size: 9pt;">
+                            <strong>Supervisor Outcome &amp; Remarks:</strong>
+                            <p style="margin: 4px 0 0;" t-field="o.clearance_notes"/>
+                        </div>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">2. INSTITUTIONAL EXIT CLEARANCE</h5>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th>Clearance Checkpoint</th>
+                                    <th style="width: 25%; text-align: center;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Temporary ID Badge Surrendered:</td>
+                                    <td style="text-align: center;"><span t-esc="'CLEARED' if o.clearance_id_badge else 'PENDING'"/></td>
+                                </tr>
+                                <tr>
+                                    <td>Bank Library / Resource Clearance:</td>
+                                    <td style="text-align: center;"><span t-esc="'CLEARED' if o.clearance_library else 'PENDING'"/></td>
+                                </tr>
+                                <tr>
+                                    <td>IT / Workstation Access Cleared:</td>
+                                    <td style="text-align: center;"><span t-esc="'CLEARED' if o.clearance_it_assets else 'PENDING'"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">3. FORMAL CLEARANCE &amp; CERTIFICATION SIGN-OFF</h5>
+                        <table class="table table-bordered table-sm" style="margin-top: 10px; font-size: 9pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th style="width: 50%;">Supervisor / Mentor Sign-Off</th>
+                                    <th style="width: 50%;">Clearance Officer Sign-Off</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-esc="o.mentor_sign_name or o.supervisor_id.name"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Date: <span t-field="o.end_date"/></span>
+                                    </td>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-esc="o.clearance_officer_name or 'PPDD Officer'"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Date: <span t-field="o.clearance_date"/></span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

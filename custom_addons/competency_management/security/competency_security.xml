@@ -72,11 +72,11 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <!-- Assessment: supervisor sees assessments of team members if and only if both employee and assessor are in team, and supervisor is not the evaluatee being assessed by someone else -->
+        <!-- Assessment: supervisor sees assessments of employees they directly manage or coach -->
         <record id="rule_competency_assessment_supervisor_team" model="ir.rule">
             <field name="name">Supervisor Team Competency Assessments</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>
-            <field name="domain_force">['&amp;', '&amp;', ('employee_id', 'in', user.team_employee_ids.ids), ('assessor_employee_id', 'in', user.team_employee_ids.ids), '|', ('employee_id', '!=', user.employee_id.id), ('assessor_id', '=', user.id)]</field>
+            <field name="domain_force">['|', '|', ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id), ('assessor_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -127,7 +127,7 @@
         <record id="rule_hr_employee_competency_read" model="ir.rule">
             <field name="name">360 Competency Evaluation HR Employee Read Access</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
-            <field name="domain_force">['|', '|', ('user_id', '=', user.id), ('id', 'child_of', user.employee_id.id), ('id', 'in', user.env['competency.assessment'].search([('assessor_id', '=', user.id)]).mapped('employee_id').ids)]</field>
+            <field name="domain_force">['|', '|', ('user_id', '=', user.id), ('id', 'child_of', user.employee_id.id), ('coach_id.user_id', '=', user.id)]</field>
             <field name="global" eval="False"/>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_employee')), (4, ref('competency_management.group_competency_supervisor'))]"/>
             <field name="perm_read" eval="True"/>
@@ -167,7 +167,7 @@
         <record id="rule_competency_assessment_line_supervisor_team" model="ir.rule">
             <field name="name">Supervisor Team Assessment Lines Read</field>
             <field name="model_id" ref="competency_management.model_competency_assessment_line"/>
-            <field name="domain_force">['&amp;', '&amp;', ('assessment_id.employee_id', 'in', user.team_employee_ids.ids), ('assessment_id.assessor_employee_id', 'in', user.team_employee_ids.ids), '|', ('assessment_id.employee_id', '!=', user.employee_id.id), ('assessment_id.assessor_id', '=', user.id)]</field>
+            <field name="domain_force">['|', '|', ('assessment_id.employee_id.parent_id.user_id', '=', user.id), ('assessment_id.employee_id.coach_id.user_id', '=', user.id), ('assessment_id.assessor_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>

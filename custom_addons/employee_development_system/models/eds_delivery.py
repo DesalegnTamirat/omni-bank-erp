@@ -40,12 +40,13 @@ class EdsSessionAttendance(models.Model):
     session_id = fields.Many2one('eds.session', string='Session', required=True,
                                  ondelete='cascade', index=True, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Participant', required=True,
-                                  tracking=True)
+                                  index=True, tracking=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position',
                                       related='employee_id.job_position', readonly=True)
     department_id = fields.Many2one('hr.department', string='Department',
                                     related='employee_id.department_id', readonly=True)
-    attendance_date = fields.Date(string='Attendance Date', default=fields.Date.context_today)
+    attendance_date = fields.Date(string='Attendance Date', default=fields.Date.context_today,
+                                  index=True)
     attended = fields.Boolean(string='Attended', default=True, tracking=True)
     hours_attended = fields.Float(string='Hours Attended', default=0.0)
     notes = fields.Text(string='Notes')
@@ -91,27 +92,39 @@ class EdsSessionAttendance(models.Model):
 
     @api.depends('session_id.course_id', 'employee_id', 'attended')
     def _compute_program_attendance(self):
-        """Program (course) attendance % across all its sessions ().
+        """Program (course) attendance % across all its sessions.
 
-        Total = attendance records of the participant on any session of the same
-        course; attended = the subset marked as attended. A participant with no
-        records yet computes 0% until a session is recorded.
+        Batch-computed to avoid N+1 queries.
         """
+        threshold = self._get_float_param('eds.min_attendance_pct', 80.0)
+        valid_recs = self.filtered(lambda r: r.session_id.course_id and r.employee_id)
+        if not valid_recs:
+            for rec in self:
+                rec.attendance_percentage = 0.0
+                rec.meets_min_attendance = False
+            return
+
+        pairs = set((r.employee_id.id, r.session_id.course_id.id) for r in valid_recs)
+        domain = ['|'] * (len(pairs) - 1) if len(pairs) > 1 else []
+        for emp_id, course_id in pairs:
+            domain.extend(['&', ('employee_id', '=', emp_id), ('session_id.course_id', '=', course_id)])
+
+        all_records = self.search(domain)
+        counts = {}
+        for r in all_records:
+            key = (r.employee_id.id, r.session_id.course_id.id)
+            tot, att = counts.get(key, (0, 0))
+            counts[key] = (tot + 1, att + (1 if r.attended else 0))
+
         for rec in self:
             course = rec.session_id.course_id
             if not course or not rec.employee_id:
                 rec.attendance_percentage = 0.0
                 rec.meets_min_attendance = False
                 continue
-            records = self.search([
-                ('employee_id', '=', rec.employee_id.id),
-                ('session_id.course_id', '=', course.id),
-            ])
-            total = len(records)
-            attended = len(records.filtered('attended'))
-            rec.attendance_percentage = round(attended * 100.0 / total, 2) if total else 0.0
-            threshold = rec._get_float_param('eds.min_attendance_pct', 80.0)
-            rec.meets_min_attendance = bool(total) and rec.attendance_percentage >= threshold
+            tot, att = counts.get((rec.employee_id.id, course.id), (0, 0))
+            rec.attendance_percentage = round(att * 100.0 / tot, 2) if tot else 0.0
+            rec.meets_min_attendance = bool(tot) and rec.attendance_percentage >= threshold
 
     @api.model
     def _get_float_param(self, key, default):
@@ -323,7 +336,7 @@ class EdsAssessment(models.Model):
     session_id = fields.Many2one('eds.session', string='Session', required=True,
                                  ondelete='cascade', index=True, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Participant', required=True,
-                                  tracking=True)
+                                  index=True, tracking=True)
     assessment_type = fields.Selection([
         ('pre', 'Pre-Training Assessment'),
         ('post', 'Post-Training Assessment'),
@@ -596,3 +609,73 @@ class EdsInternationalReport(models.Model):
     document = fields.Binary(string='Document')
     filename = fields.Char(string='Filename')
     notes = fields.Text(string='Notes')
+
+
+class EdsKnowledgeSharing(models.Model):
+    """Post-Training Knowledge Sharing & Action Debrief Form (EDS-F-12)."""
+    _name = 'eds.knowledge.sharing'
+    _description = 'Post-Training Knowledge Sharing & Action Debrief'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'session_date desc, id desc'
+
+    name = fields.Char(string='Debrief Ref', required=True, copy=False, default=lambda self: _('New'))
+    employee_id = fields.Many2one('hr.employee', string='Participant', required=True, tracking=True)
+    department_id = fields.Many2one('hr.department', string='Department', related='employee_id.department_id', store=True)
+    session_id = fields.Many2one('eds.session', string='Training Session', tracking=True)
+    course_id = fields.Many2one('eds.course', string='Course / Program', tracking=True)
+    training_type = fields.Selection([
+        ('local_specialized', 'Local Specialized / External Program'),
+        ('international', 'Overseas / International Program'),
+        ('internal_tot', 'Internal ToT / Advanced Cohort'),
+    ], string='Training Category', default='local_specialized', required=True)
+    completion_date = fields.Date(string='Training Completion Date', required=True, default=fields.Date.context_today)
+    debrief_deadline = fields.Date(string='Knowledge Transfer Deadline (30 Days)', compute='_compute_deadline', store=True)
+    session_date = fields.Date(string='Debrief Session Date', default=fields.Date.context_today)
+    
+    # Debrief Execution Details
+    target_audience = fields.Char(string='Target Peer Audience / Branch Units', required=True, default='Department / Branch Team Members')
+    attendees_count = fields.Integer(string='Number of Peer Attendees', default=5)
+    key_takeaways = fields.Text(string='Key Banking Knowledge & Insights Acquired', required=True)
+    workplace_action_plan = fields.Text(string='Action Plan / Recommended Process Improvements', required=True)
+    materials_deposited = fields.Boolean(string='Training Materials Deposited with L&D Library', default=True)
+    presentation_file = fields.Binary(string='Debrief Presentation Slides / Summary', attachment=True)
+    presentation_filename = fields.Char(string='Presentation Filename')
+
+    # Signatures
+    sign_employee = fields.Char(string='Employee Signoff')
+    sign_manager = fields.Char(string='Line Manager / Department Head Signoff')
+    sign_officer = fields.Char(string='L&D Officer Verification')
+    state = fields.Selection([
+        ('draft', 'Draft'),
+        ('scheduled', 'Debrief Scheduled'),
+        ('completed', 'Completed & Verified'),
+    ], string='Status', default='draft', required=True, tracking=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('name', _('New')) == _('New'):
+                vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.knowledge.sharing') or _('New')
+        return super().create(vals_list)
+
+    @api.depends('completion_date')
+    def _compute_deadline(self):
+        for rec in self:
+            if rec.completion_date:
+                rec.debrief_deadline = fields.Date.add(rec.completion_date, days=30)
+            else:
+                rec.debrief_deadline = False
+
+    def action_schedule(self):
+        for rec in self:
+            rec.state = 'scheduled'
+
+    def action_complete(self):
+        for rec in self:
+            rec.state = 'completed'
+            rec.message_post(body=_("Knowledge transfer debrief completed and verified by L&D."))
+
+    def action_print_form(self):
+        """Prints Form EDS-F-12 Knowledge Sharing & Debrief Form."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_knowledge_sharing').report_action(self)

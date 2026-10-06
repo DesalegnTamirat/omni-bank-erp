@@ -39,6 +39,7 @@
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_reject" string="Reject" type="object" invisible="status in ['completed', 'rejected']"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_print_clearance_form" string="Print Clearance &amp; Appraisal (EDS-F-14)" type="object" icon="fa-print"/>
                     <field name="status" widget="statusbar" statusbar_visible="received,notified,accepted,placed,ongoing,completed"/>
                 </header>
                 <sheet>
@@ -79,6 +80,22 @@
                                     <field name="evaluated_by"/>
                                 </list>
                             </field>
+                        </page>
+                        <page string="Exit Clearance &amp; Final Appraisal (EDS-F-14)" name="clearance">
+                            <group>
+                                <group string="Institutional Exit Clearance">
+                                    <field name="clearance_id_badge"/>
+                                    <field name="clearance_library"/>
+                                    <field name="clearance_it_assets"/>
+                                    <field name="clearance_notes"/>
+                                </group>
+                                <group string="Appraisal &amp; Talent Recommendation">
+                                    <field name="final_intern_rating"/>
+                                    <field name="mentor_overall_recommendation"/>
+                                    <field name="clearance_officer_name"/>
+                                    <field name="clearance_date"/>
+                                </group>
+                            </group>
                         </page>
                         <page string="Progress &amp; Outcome Report">
                             <group>

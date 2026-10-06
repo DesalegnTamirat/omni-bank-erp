@@ -7,12 +7,14 @@
             name="Competency Management"
             web_icon="competency_management,static/description/icon.svg"
             action="action_competency_dashboard_client"
+            groups="competency_management.group_competency_employee"
             sequence="60" />
 
         <!-- 1. Framework & Roles Category -->
         <menuitem id="menu_competency_framework_categ"
             name="Framework &amp; Roles"
             parent="menu_competency_management_root"
+            groups="competency_management.group_competency_employee"
             sequence="10" />
 
         <menuitem id="menu_competency_dictionary"
@@ -50,6 +52,7 @@
         <menuitem id="menu_competency_assessments_categ"
             name="Assessments"
             parent="menu_competency_management_root"
+            groups="competency_management.group_competency_employee"
             sequence="20" />
 
         <menuitem id="menu_my_competency_assessments"

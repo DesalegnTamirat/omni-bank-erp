@@ -1,39 +1,139 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <template id="report_eds_certificate_document">
-        <t t-call="web.basic_layout">
+        <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <div class="page" style="border: 10px double #003366; padding: 40px; text-align: center; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                    <div style="margin-bottom: 20px;">
-                        <h2 style="color: #003366; font-size: 28px; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">BUNNA BANK S.C.</h2>
-                        <h4 style="color: #666; font-size: 16px; margin-top: 0;">Human Capital &amp; Learning Center</h4>
-                    </div>
-                    
-                    <div style="margin-top: 35px; margin-bottom: 25px;">
-                        <h1 style="font-size: 36px; color: #b8860b; font-family: 'Georgia', serif; font-style: italic;">
-                            <span t-field="o.certificate_title"/>
-                        </h1>
-                    </div>
+                <div class="article" style="page-break-after: always; margin: 0; padding: 0; font-family: 'DejaVu Serif', 'Georgia', serif; background-color: #ffffff;">
+                    <style>
+                        @page {
+                            size: landscape;
+                            margin: 0mm;
+                        }
+                        .cert-wrapper {
+                            position: relative;
+                            width: 100%;
+                            height: 100vh;
+                            min-height: 680px;
+                            box-sizing: border-box;
+                            text-align: center;
+                            background-image: url('/employee_development_system/static/src/img/eds_certificate_bg.png');
+                            background-size: 100% 100%;
+                            background-position: center;
+                            background-repeat: no-repeat;
+                            padding: 30px 40px;
+                        }
+                        .cert-cno {
+                            position: absolute;
+                            top: 155px;
+                            right: 65px;
+                            font-family: 'DejaVu Sans', 'Arial', sans-serif;
+                            font-size: 14px;
+                            font-weight: bold;
+                            color: #1a1a1a;
+                        }
+                        .cert-subtitle {
+                            margin-top: 175px;
+                            font-size: 18px;
+                            color: #2b2b2b;
+                            font-style: italic;
+                        }
+                        .cert-recipient {
+                            margin-top: 25px;
+                            font-size: 28px;
+                            font-weight: bold;
+                            color: #721c24;
+                            letter-spacing: 0.5px;
+                        }
+                        .cert-body {
+                            margin-top: 25px;
+                            font-size: 16px;
+                            color: #333333;
+                            line-height: 1.6;
+                            padding: 0 70px;
+                        }
+                        .cert-signatures {
+                            position: absolute;
+                            bottom: 120px;
+                            left: 0;
+                            width: 100%;
+                            padding: 0 75px;
+                            box-sizing: border-box;
+                        }
+                        .sig-block-left {
+                            float: left;
+                            width: 250px;
+                            text-align: left;
+                        }
+                        .sig-block-right {
+                            float: right;
+                            width: 270px;
+                            text-align: left;
+                        }
+                        .sig-line {
+                            border-top: 1px solid #444444;
+                            margin-bottom: 8px;
+                            width: 90%;
+                        }
+                        .sig-name {
+                            font-family: 'DejaVu Sans', sans-serif;
+                            font-size: 13px;
+                            font-weight: bold;
+                            color: #222222;
+                        }
+                        .sig-title {
+                            font-family: 'DejaVu Sans', sans-serif;
+                            font-size: 11px;
+                            color: #555555;
+                            margin-top: 2px;
+                        }
+                        .cert-verify-footer {
+                            position: absolute;
+                            bottom: 25px;
+                            right: 40px;
+                            font-family: 'DejaVu Sans', sans-serif;
+                            font-size: 10px;
+                            color: #888888;
+                        }
+                    </style>
 
-                    <div style="font-size: 18px; color: #333; line-height: 1.8; margin: 25px auto; max-width: 85%;">
-                        <span t-field="o.certificate_body_text"/>
-                    </div>
-
-                    <p style="font-size: 14px; color: #666; margin-top: 25px;">
-                        Issued on <span t-field="o.issue_date"/> | Certificate No: <strong><span t-field="o.code"/></strong>
-                    </p>
-
-                    <div style="margin-top: 60px; width: 100%;">
-                        <div style="float: left; width: 45%; text-align: center;">
-                            <div style="border-bottom: 1px solid #333; width: 80%; margin: 0 auto; height: 40px;"></div>
-                            <p style="font-size: 12px; margin-top: 5px; font-weight: bold;">L&amp;D Specialist / Facilitator</p>
+                    <div class="cert-wrapper">
+                        <!-- Certificate Number -->
+                        <div class="cert-cno">
+                            CNO: <span t-esc="o.code"/>
                         </div>
-                        <div style="float: right; width: 45%; text-align: center;">
-                            <div style="border-bottom: 1px solid #333; width: 80%; margin: 0 auto; height: 40px;"></div>
-                            <p style="font-size: 12px; margin-top: 5px; font-weight: bold;">
-                                <t t-if="o.signatory_name"><span t-field="o.signatory_name"/><br/></t>
-                                <span t-field="o.signatory_title"/>
-                            </p>
+
+                        <!-- Subtitle -->
+                        <div class="cert-subtitle">
+                            This Certificate is proudly presented to
+                        </div>
+
+                        <!-- Participant Name -->
+                        <div class="cert-recipient">
+                            <span t-esc="o.employee_id.name"/>
+                        </div>
+
+                        <!-- Completion Statement -->
+                        <div class="cert-body">
+                            For completing the training titled “<strong t-esc="o.course_id.name or (o.session_id and o.session_id.program_name) or 'Training Program'"/>” conducted from <span t-esc="o.training_dates_text or '2026'"/>.
+                        </div>
+
+                        <!-- Signatures -->
+                        <div class="cert-signatures">
+                            <div class="sig-block-left">
+                                <div class="sig-line"></div>
+                                <div class="sig-name">Prepared by: <span t-esc="o.prepared_by_name or 'Talent Development Specialist'"/></div>
+                                <div class="sig-title">[<span t-esc="o.prepared_by_title or 'Talent Development Specialist'"/>]</div>
+                            </div>
+                            <div class="sig-block-right">
+                                <div class="sig-line"></div>
+                                <div class="sig-name">Approved by: <span t-esc="o.signatory_name or 'Director, PPDD'"/></div>
+                                <div class="sig-title">[<span t-esc="o.signatory_title or 'Director, People Performance &amp; Development'"/>]</div>
+                            </div>
+                        </div>
+
+                        <!-- Verification Footer -->
+                        <div class="cert-verify-footer" t-if="o.verification_token">
+                            Verify: <span t-esc="o.verification_url"/>
                         </div>
                     </div>
                 </div>

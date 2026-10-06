@@ -99,6 +99,7 @@ class CompetencyMatrixConfig(models.Model):
     grade_matrix_count = fields.Integer(string='Job Grade Guidelines Count', compute='_compute_matrix_counts')
     job_matrix_count = fields.Integer(string='Job Position Guidelines Count', compute='_compute_matrix_counts')
 
+    @api.depends('grade_matrix_line_ids', 'job_matrix_line_ids')
     def _compute_matrix_counts(self):
         for rec in self:
             rec.grade_matrix_count = len(rec.grade_matrix_line_ids)

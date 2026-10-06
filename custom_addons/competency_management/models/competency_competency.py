@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
+import logging
+import os
+import re
+import xml.etree.ElementTree as ET
+import zipfile
 from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class CompetencyRatingModel(models.Model):
@@ -19,9 +26,7 @@ class CompetencyRatingModel(models.Model):
     active = fields.Boolean(default=True)
     line_ids = fields.One2many('competency.rating.model.line', 'rating_model_id', string='Proficiency Levels', copy=True)
 
-    _sql_constraints = [
-        ('code_uniq', 'unique(code)', 'The Rating Model code must be unique!'),
-    ]
+    _code_uniq = models.Constraint('UNIQUE (code)', 'The Rating Model code must be unique!')
 
     @api.onchange('max_rating')
     def _onchange_max_rating(self):
@@ -70,9 +75,7 @@ class CompetencyRatingModelLine(models.Model):
     name = fields.Char(string='Level Name', required=True)
     sequence = fields.Integer(string='Sequence', default=10)
 
-    _sql_constraints = [
-        ('rating_model_level_uniq', 'unique(rating_model_id, level)', 'Level rank number must be unique per Rating Model!'),
-    ]
+    _rating_model_level_uniq = models.Constraint('UNIQUE (rating_model_id, level)', 'Level rank number must be unique per Rating Model!')
 
 
 class CompetencyLevelChangeLog(models.Model):
@@ -106,10 +109,10 @@ class CompetencyProficiencyLevel(models.Model):
     definition = fields.Text(string='Definition')
     behavioral_indicators = fields.Text(string='Behavioral Indicators', required=True)
 
-    _sql_constraints = [
-        ('competency_level_uniq', 'unique(competency_id, level)',
-         'This proficiency level already exists for this competency. You cannot create duplicate levels. Please edit the existing record instead.'),
-    ]
+    _competency_level_uniq = models.Constraint(
+        'UNIQUE (competency_id, level)',
+        'This proficiency level already exists for this competency. You cannot create duplicate levels. Please edit the existing record instead.'
+    )
 
     @api.constrains('competency_id', 'level')
     def _check_level_uniqueness_and_limit(self):
@@ -251,6 +254,7 @@ class Competency(models.Model):
     rating_model_id = fields.Many2one('competency.rating.model', string='Rating Model', default=_default_rating_model_id)
     is_rating_model_readonly = fields.Boolean(compute='_compute_is_rating_model_readonly')
 
+    @api.depends_context('company')
     def _compute_is_rating_model_readonly(self):
         count = self.env['competency.rating.model'].search_count([])
         is_ro = (count <= 1)
@@ -265,12 +269,17 @@ class Competency(models.Model):
     @api.depends('status')
     def _compute_applicable_job_ids(self):
         RoleMappingLine = self.env['competency.role.mapping.line']
+        lines = RoleMappingLine.search([
+            ('competency_id', 'in', self.ids),
+            ('mapping_id.state', '=', 'approved')
+        ])
+        jobs_by_comp = {}
+        for line in lines:
+            if line.mapping_id and line.mapping_id.job_position_id:
+                jobs_by_comp.setdefault(line.competency_id.id, self.env['hr.job'])
+                jobs_by_comp[line.competency_id.id] |= line.mapping_id.job_position_id
         for rec in self:
-            lines = RoleMappingLine.search([
-                ('competency_id', '=', rec.id),
-                ('mapping_id.state', '=', 'approved')
-            ])
-            rec.applicable_job_ids = lines.mapped('mapping_id.job_position_id')
+            rec.applicable_job_ids = jobs_by_comp.get(rec.id, self.env['hr.job'])
     change_log_ids = fields.One2many(
         'competency.level.change.log', 'competency_id', string='Definition Change Logs', readonly=True)
     state = fields.Selection([
@@ -339,6 +348,7 @@ class Competency(models.Model):
                 '|', ('id', '=', root_id), ('parent_competency_id', '=', root_id)
             ])
 
+    @api.depends('parent_competency_id')
     def _compute_version_history(self):
         for rec in self:
             root_id = rec.parent_competency_id.id if rec.parent_competency_id else rec.id
@@ -539,9 +549,7 @@ class Competency(models.Model):
                 if rec_root_id != dup_root_id:
                     raise ValidationError(_("A competency with the code '%s' already exists for a different competency (%s). Code must be unique across different competencies.") % (rec.code.strip(), dup.name))
 
-    _sql_constraints = [
-        ('code_version_uniq', 'unique(code, version)', 'The Competency Code and Version combination must be unique!'),
-    ]
+    _code_version_uniq = models.Constraint('UNIQUE (code, version)', 'The Competency Code and Version combination must be unique!')
 
     @api.constrains('proficiency_level_ids', 'rating_model_id')
     def _check_proficiency_levels_completeness(self):
@@ -654,11 +662,6 @@ class Competency(models.Model):
     @api.model
     def action_seed_matrix_data(self):
         """Seed competencies, framework, clusters, and role mappings from docs/edited Final Comptency Matrix......xlsx."""
-        import os, zipfile, re, logging
-        import xml.etree.ElementTree as ET
-
-        _logger = logging.getLogger(__name__)
-
         possible_paths = [
             r'docs/edited Final Comptency Matrix......xlsx',
             r'/mnt/extra-addons/competency_management/data/competency_matrix.xlsx',

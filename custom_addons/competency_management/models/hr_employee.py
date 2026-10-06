@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 from datetime import timedelta
 from odoo import api, fields, models, _
 
@@ -32,36 +33,84 @@ class HrEmployeeCompetency(models.Model):
         string='Is Director or Chief',
         compute='_compute_is_director_or_chief',
         search='_search_is_director_or_chief',
-        store=False,
-        help="Designates whether the employee holds Grade XVI (Director) or Grade XVII (Chief)."
+        help='Indicates if employee is classified as Executive (Grade 15, Director, Chief, VP, President).'
     )
 
-    def _search_is_director_or_chief(self, operator, value):
-        peer_config_model = self.env['competency.director.peer.config'].sudo()
-        all_active = self.env['hr.employee'].sudo().search([('active', '=', True)])
-        matched_ids = [e.id for e in all_active if peer_config_model._is_director_or_chief(e)]
-
-        if operator in ('=', '=='):
-            is_true = bool(value)
-        elif operator in ('!=', '<>'):
-            is_true = not bool(value)
-        elif operator == 'in':
-            is_true = any(bool(v) for v in value)
-        elif operator == 'not in':
-            is_true = not any(bool(v) for v in value)
-        else:
-            is_true = True
-
-        if is_true:
-            return [('id', 'in', matched_ids)]
-        else:
-            return [('id', 'not in', matched_ids)]
-
-    @api.depends('job_grade', 'grade_id', 'job_id', 'active')
+    @api.depends('job_id', 'job_id.name', 'grade_id', 'job_grade')
     def _compute_is_director_or_chief(self):
-        peer_config_model = self.env['competency.director.peer.config'].sudo()
         for emp in self:
-            emp.is_director_or_chief = peer_config_model._is_director_or_chief(emp.sudo())
+            emp.is_director_or_chief = emp._check_is_director_or_chief()
+
+    def _check_is_director_or_chief(self):
+        self.ensure_one()
+        if not self.active:
+            return False
+        j_name = (self.job_id.name or '').strip().lower()
+        if any(k in j_name for k in ['director', 'chief', 'vp', 'vice president', 'president']):
+            return True
+
+        raw_str = ''
+        grade_rec = getattr(self, 'grade_id', False) or getattr(self, 'job_grade', False) or getattr(self, 'grade', False)
+        if grade_rec:
+            raw_str = (
+                getattr(grade_rec, 'grade_name', False)
+                or getattr(grade_rec, 'grade_code', False)
+                or getattr(grade_rec, 'name', False)
+                or getattr(grade_rec, 'code', False)
+                or str(grade_rec)
+            )
+        if not raw_str and self.job_id:
+            job_g = getattr(self.job_id, 'grade', False) or getattr(self.job_id, 'grade_id', False)
+            if job_g:
+                raw_str = (
+                    getattr(job_g, 'grade_name', False)
+                    or getattr(job_g, 'grade_code', False)
+                    or getattr(job_g, 'name', False)
+                    or getattr(job_g, 'code', False)
+                    or str(job_g)
+                )
+
+        g_str = str(raw_str).lower().strip()
+        if g_str:
+            tokens = g_str.replace('-', ' ').replace('_', ' ').split()
+            roman_map = {
+                'xvii': 17, 'xvi': 16, 'xv': 15, 'xiv': 14, 'xiii': 13, 'xii': 12, 'xi': 11,
+                'x': 10, 'ix': 9, 'viii': 8, 'vii': 7, 'vi': 6, 'v': 5, 'iv': 4, 'iii': 3, 'ii': 2, 'i': 1
+            }
+            g_num = 0
+            for token in tokens:
+                if token in roman_map:
+                    g_num = roman_map[token]
+                    break
+            if not g_num and g_str in roman_map:
+                g_num = roman_map[g_str]
+            if not g_num:
+                nums = re.findall(r'\d+', g_str)
+                if nums:
+                    g_num = int(nums[0])
+            if g_num in (15, 16, 17):
+                return True
+        return False
+
+    def _search_is_director_or_chief(self, operator, value):
+        if operator not in ('=', '!='):
+            return []
+        keywords = ['director', 'chief', 'vp', 'vice president', 'president']
+        candidate_domain = ['&', ('active', '=', True), '|', '|', '|']
+        kw_domain = ['|'] * (len(keywords) - 1)
+        for kw in keywords:
+            kw_domain.append(('job_id.name', 'ilike', kw))
+        candidate_domain.extend(kw_domain)
+        candidate_domain.append(('job_grade', 'in', ['15', '16', '17', 'XV', 'XVI', 'XVII', 'xv', 'xvi', 'xvii']))
+        candidate_domain.append(('job_id.name', 'ilike', 'grade 1'))
+        candidate_domain.append(('grade_id.grade_code', 'in', ['15', '16', '17', 'XV', 'XVI', 'XVII', 'xv', 'xvi', 'xvii']))
+
+        candidates = self.env['hr.employee'].sudo().search(candidate_domain)
+        matched_ids = [e.id for e in candidates if e._check_is_director_or_chief()]
+        is_true = bool(value) if operator == '=' else not bool(value)
+        return [('id', 'in', matched_ids)] if is_true else [('id', 'not in', matched_ids)]
+
+
 
     def _is_competency_scoped_context(self):
         ctx = self.env.context
@@ -256,14 +305,17 @@ class HrEmployeeCompetency(models.Model):
             ('parent_id', '!=', False)
         ])
         for emp in employees_due:
-            has_assessment = emp.competency_assessment_ids.filtered(lambda a: a.state in ('approved', 'locked'))
-            if not has_assessment and emp.parent_id.user_id:
-                emp.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('REMINDER: Baseline Competency Assessment Due Soon for %s') % emp.name,
-                    note=_('3-Month Baseline Assessment deadline for %s is on %s (14 days remaining).') % (emp.name, emp.baseline_assessment_deadline),
-                    user_id=emp.parent_id.user_id.id,
-                )
+            try:
+                has_assessment = emp.competency_assessment_ids.filtered(lambda a: a.state in ('approved', 'locked'))
+                if not has_assessment and emp.parent_id.user_id:
+                    emp.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('REMINDER: Baseline Competency Assessment Due Soon for %s') % emp.name,
+                        note=_('3-Month Baseline Assessment deadline for %s is on %s (14 days remaining).') % (emp.name, emp.baseline_assessment_deadline),
+                        user_id=emp.parent_id.user_id.id,
+                    )
+            except Exception:
+                pass
 
 
     def action_view_competency_assessments(self):
@@ -324,15 +376,13 @@ class HrEmployeeCompetency(models.Model):
                 coach_ids.add(vals['coach_id'])
             if vals.get('parent_id'):
                 coach_ids.add(vals['parent_id'])
-        for rec in records:
-            if rec.user_id:
-                # If newly created employee is already a coach
-                has_coachees = self.sudo().search_count([
-                    ('active', '=', True),
-                    '|', ('coach_id', '=', rec.id), ('parent_id', '=', rec.id)
-                ]) > 0
-                if has_coachees:
-                    coach_ids.add(rec.id)
+        user_emp_ids = [rec.id for rec in records if rec.user_id]
+        if user_emp_ids:
+            found = self.sudo().search([
+                ('active', '=', True),
+                '|', ('coach_id', 'in', user_emp_ids), ('parent_id', 'in', user_emp_ids)
+            ])
+            coach_ids.update(found.mapped('coach_id').ids + found.mapped('parent_id').ids)
         if coach_ids:
             self._sync_coach_supervisor_group(coach_ids)
         return records
@@ -351,13 +401,14 @@ class HrEmployeeCompetency(models.Model):
                     coach_ids.add(emp.coach_id.id)
                 if emp.parent_id:
                     coach_ids.add(emp.parent_id.id)
-                if 'user_id' in vals and emp.user_id:
-                    has_coachees = self.sudo().search_count([
+            if 'user_id' in vals:
+                u_emp_ids = [emp.id for emp in self if emp.user_id]
+                if u_emp_ids:
+                    found = self.sudo().search([
                         ('active', '=', True),
-                        '|', ('coach_id', '=', emp.id), ('parent_id', '=', emp.id)
-                    ]) > 0
-                    if has_coachees:
-                        coach_ids.add(emp.id)
+                        '|', ('coach_id', 'in', u_emp_ids), ('parent_id', 'in', u_emp_ids)
+                    ])
+                    coach_ids.update(found.mapped('coach_id').ids + found.mapped('parent_id').ids)
             if coach_ids:
                 self._sync_coach_supervisor_group(coach_ids)
         return res

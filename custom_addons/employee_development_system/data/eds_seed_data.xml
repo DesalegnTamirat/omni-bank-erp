@@ -62,42 +62,137 @@
             <field name="notes">Standard 5-point feedback survey for classroom training programs.</field>
         </record>
 
+                <!-- Official EDS-F-02 Level 1 Reaction Survey Questions (18 Items) -->
+        <!-- A. Training Content -->
         <record id="inst_q1" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">10</field>
-            <field name="name">Course objectives were clearly communicated and achieved.</field>
-            <field name="category">objective</field>
+            <field name="name">Content was relevant to my job role</field>
+            <field name="category">content</field>
             <field name="question_type">scale_1_5</field>
         </record>
-
         <record id="inst_q2" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">20</field>
-            <field name="name">The trainer demonstrated deep expertise and engaged participants.</field>
-            <field name="category">trainer</field>
+            <field name="name">Content was well organized and easy to follow</field>
+            <field name="category">content</field>
             <field name="question_type">scale_1_5</field>
         </record>
-
         <record id="inst_q3" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
             <field name="sequence">30</field>
-            <field name="name">Training materials and handouts were clear and relevant.</field>
+            <field name="name">Materials and handouts were useful</field>
+            <field name="category">content</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q4" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">40</field>
+            <field name="name">Practical exercises/case studies were effective</field>
+            <field name="category">content</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q5" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">50</field>
+            <field name="name">Duration was appropriate for the content</field>
             <field name="category">content</field>
             <field name="question_type">scale_1_5</field>
         </record>
 
-        <record id="inst_q4" model="eds.evaluation.instrument.question">
+        <!-- B. Trainer -->
+        <record id="inst_q6" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
-            <field name="sequence">40</field>
-            <field name="name">The training venue, equipment and facilities were comfortable.</field>
+            <field name="sequence">60</field>
+            <field name="name">Showed strong knowledge of the subject</field>
+            <field name="category">trainer</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q7" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">70</field>
+            <field name="name">Explained concepts clearly</field>
+            <field name="category">trainer</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q8" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">80</field>
+            <field name="name">Encouraged participation and questions</field>
+            <field name="category">trainer</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q9" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">90</field>
+            <field name="name">Managed time well</field>
+            <field name="category">trainer</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q10" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">100</field>
+            <field name="name">Linked content to banking practice</field>
+            <field name="category">trainer</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+
+        <!-- C. Venue, Food & Logistics -->
+        <record id="inst_q11" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">110</field>
+            <field name="name">Training room (space, seating, temperature)</field>
+            <field name="category">venue</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q12" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">120</field>
+            <field name="name">Projector, sound and equipment</field>
+            <field name="category">venue</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q13" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">130</field>
+            <field name="name">Refreshments and lunch quality</field>
             <field name="category">venue</field>
             <field name="question_type">scale_1_5</field>
         </record>
 
-        <record id="inst_q5" model="eds.evaluation.instrument.question">
+        <!-- D. Objectives & Overall -->
+        <record id="inst_q14" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>
-            <field name="sequence">50</field>
-            <field name="name">I will be able to apply the learned knowledge to my daily work.</field>
+            <field name="sequence">140</field>
+            <field name="name">Stated objectives of the program were met</field>
+            <field name="category">objective</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q15" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">150</field>
+            <field name="name">I gained new knowledge/skills</field>
+            <field name="category">impact</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q16" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">160</field>
+            <field name="name">I will be able to apply this at work</field>
+            <field name="category">impact</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q17" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">170</field>
+            <field name="name">Overall rating of the program</field>
+            <field name="category">impact</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+        <record id="inst_q18" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">180</field>
+            <field name="name">I would recommend this program to colleagues</field>
             <field name="category">impact</field>
             <field name="question_type">scale_1_5</field>
         </record>
@@ -121,6 +216,42 @@
             <field name="require_level2_pass">1</field>
             <field name="min_level2_score">70.0</field>
             <field name="active">1</field>
+        </record>
+        <!-- Official Vendor Evaluation Criteria (7-Vendor Evaluation Matrix.xlsx) -->
+        <record id="criteria_technical_quality" model="eds.evaluation.criteria">
+            <field name="sequence">10</field>
+            <field name="name">Technical Quality and Relevance</field>
+            <field name="evaluation_type">technical</field>
+            <field name="weight">30.0</field>
+            <field name="description">Clarity of methodology, quality of curriculum refinement.</field>
+        </record>
+        <record id="criteria_firm_trainer_exp" model="eds.evaluation.criteria">
+            <field name="sequence">20</field>
+            <field name="name">Firm and Trainer Experience</field>
+            <field name="evaluation_type">technical</field>
+            <field name="weight">20.0</field>
+            <field name="description">Relevant institutional experience, breadth of facilitator expertise across subject areas, and track record in similar assignments.</field>
+        </record>
+        <record id="criteria_delivery_scalability" model="eds.evaluation.criteria">
+            <field name="sequence">30</field>
+            <field name="name">Delivery &amp; Scalability Plan</field>
+            <field name="evaluation_type">technical</field>
+            <field name="weight">10.0</field>
+            <field name="description">Feasibility and clarity of the proposed cohort and delivery schedule across multiple District Offices and Branches.</field>
+        </record>
+        <record id="criteria_demo_presentation" model="eds.evaluation.criteria">
+            <field name="sequence">40</field>
+            <field name="name">Demo Presentation</field>
+            <field name="evaluation_type">technical</field>
+            <field name="weight">10.0</field>
+            <field name="description">Quality of the live demo delivered to the Training Evaluator Committee - facilitation skill, content quality, and demonstrated tiering across levels.</field>
+        </record>
+        <record id="criteria_financial_proposal" model="eds.evaluation.criteria">
+            <field name="sequence">50</field>
+            <field name="name">Financial Proposal</field>
+            <field name="evaluation_type">financial</field>
+            <field name="weight">30.0</field>
+            <field name="description">Competitiveness, clarity, and completeness of the cost structure, including per-cohort pricing.</field>
         </record>
     </data>
 </odoo>

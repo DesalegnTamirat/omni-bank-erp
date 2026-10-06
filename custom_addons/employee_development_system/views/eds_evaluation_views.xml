@@ -93,6 +93,7 @@
             <form string="Level 1 Participant Feedback">
                 <header>
                     <button name="action_submit_feedback" string="Submit Feedback" type="object" class="oe_highlight" invisible="state != 'distributed'"/>
+                    <button name="action_print_form" string="Print Reaction Survey (EDS-F-02)" type="object" icon="fa-print"/>
                     <field name="state" widget="statusbar" statusbar_visible="distributed,submitted,consolidated"/>
                 </header>
                 <sheet>
@@ -105,6 +106,7 @@
                         <group>
                             <field name="submitted_date"/>
                             <field name="report_sla_deadline"/>
+                            <field name="is_anonymous"/>
                             <field name="overall_score" widget="progressbar"/>
                             <field name="recommend_to_others"/>
                         </group>
@@ -120,6 +122,22 @@
                                     <field name="text_val"/>
                                 </list>
                             </field>
+                        </page>
+                        <page string="Sub-Scores &amp; Qualitative Feedback (EDS-F-02)">
+                            <group string="Category Scores (EDS-F-02)">
+                                <group>
+                                    <field name="score_content" widget="progressbar"/>
+                                    <field name="score_trainer" widget="progressbar"/>
+                                </group>
+                                <group>
+                                    <field name="score_venue" widget="progressbar"/>
+                                    <field name="score_objective" widget="progressbar"/>
+                                </group>
+                            </group>
+                            <group string="Open Qualitative Feedback">
+                                <field name="most_valuable_feedback" placeholder="What was most valuable about this program?"/>
+                                <field name="improvement_suggestions" placeholder="What should be improved? Suggested future training topics?"/>
+                            </group>
                         </page>
                         <page string="General Comments">
                             <field name="general_comments" placeholder="Additional feedback..."/>
@@ -163,18 +181,17 @@
                 <header>
                     <button name="action_evaluate" string="Complete Evaluation" type="object" class="oe_highlight" invisible="state != 'draft'"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_print_form" string="Print Assessment Sheet (EDS-F-03)" type="object" icon="fa-print"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
                 </header>
                 <sheet>
                     <group>
-                        <group>
+                        <group string="Session &amp; Trainee">
                             <field name="session_id"/>
                             <field name="course_id"/>
                             <field name="employee_id"/>
                         </group>
-                        <group>
-                            <field name="pre_assessment_id"/>
-                            <field name="post_assessment_id"/>
+                        <group string="Assessment Results">
                             <field name="pre_score"/>
                             <field name="post_score"/>
                             <field name="learning_gain"/>
@@ -182,6 +199,31 @@
                             <field name="passed"/>
                         </group>
                     </group>
+                    <notebook>
+                        <page string="EDS-F-03 Standard Scoring &amp; Signatories">
+                            <group string="Raw Test Marks &amp; Gain (EDS-F-03)">
+                                <group>
+                                    <field name="total_marks"/>
+                                    <field name="pre_test_score"/>
+                                    <field name="post_test_score"/>
+                                </group>
+                                <group>
+                                    <field name="pre_test_pct"/>
+                                    <field name="post_test_pct"/>
+                                    <field name="remarks"/>
+                                </group>
+                            </group>
+                            <group string="Official Signatures &amp; Approvals">
+                                <group>
+                                    <field name="trainer_assessor_name"/>
+                                    <field name="training_coordinator_name"/>
+                                </group>
+                                <group>
+                                    <field name="approved_by_tl_name"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
                 <chatter/>
             </form>
@@ -218,6 +260,7 @@
                 <header>
                     <button name="action_submit_level3" string="Submit Manager Assessment" type="object" class="oe_highlight" invisible="status == 'completed'"
                             groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_print_form" string="Print Impact Form (EDS-F-04)" type="object" icon="fa-print"/>
                     <field name="status" widget="statusbar" statusbar_visible="pending,in_progress,completed,overdue"/>
                 </header>
                 <sheet>
@@ -239,6 +282,8 @@
                             <field name="line_ids">
                                 <list editable="bottom">
                                     <field name="competency_id"/>
+                                    <field name="behavior_description"/>
+                                    <field name="frequency_rating"/>
                                     <field name="observed_level"/>
                                     <field name="score_pct" widget="progressbar"/>
                                     <field name="comment"/>
@@ -247,6 +292,27 @@
                         </page>
                         <page string="Observation Evidence">
                             <field name="observation_notes" placeholder="Enter detailed workplace behavior evidence..."/>
+                        </page>
+                        <page string="Behavioral Impact &amp; Sign-Off (EDS-F-04)">
+                            <group string="Impact Evaluation">
+                                <group>
+                                    <field name="evaluation_period"/>
+                                    <field name="overall_result"/>
+                                </group>
+                                <group>
+                                    <field name="business_impact_observed"/>
+                                    <field name="recommended_support"/>
+                                </group>
+                            </group>
+                            <group string="Sign-Off Details">
+                                <group>
+                                    <field name="sign_manager_name"/>
+                                    <field name="sign_trainee_name"/>
+                                </group>
+                                <group>
+                                    <field name="sign_officer_name"/>
+                                </group>
+                            </group>
                         </page>
                     </notebook>
                 </sheet>
@@ -286,6 +352,7 @@
                 <header>
                     <button name="action_evaluate" string="Publish Impact Assessment" type="object" class="oe_highlight" invisible="state != 'draft'"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_print_form" string="Print Level 4 Report (EDS-F-11)" type="object" icon="fa-print"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
                 </header>
                 <sheet>
@@ -295,6 +362,7 @@
                     <group>
                         <group>
                             <field name="course_id"/>
+                            <field name="session_id"/>
                             <field name="measurement_date"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
@@ -302,6 +370,7 @@
                             <field name="total_program_cost"/>
                             <field name="estimated_financial_benefit"/>
                             <field name="roi_percentage"/>
+                            <field name="evaluator_id"/>
                         </group>
                     </group>
                     <notebook>

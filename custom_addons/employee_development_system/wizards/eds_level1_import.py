@@ -47,6 +47,21 @@ class EdsLevel1Import(models.TransientModel):
         EmployeeModel = self.env['hr.employee']
         SessionModel = self.env['eds.session']
 
+        # Pre-fetch default Level 1 questionnaire instrument
+        instrument = self.env['eds.evaluation.instrument'].search([
+            ('instrument_type', '=', 'level1'),
+            ('state', '=', 'published'),
+        ], limit=1)
+        if not instrument:
+            instrument = self.env['eds.evaluation.instrument'].search([
+                ('instrument_type', '=', 'level1'),
+            ], limit=1)
+
+        q_map = {}
+        if instrument:
+            for q in instrument.question_ids:
+                q_map[q.category] = q
+
         for line_no, row in enumerate(reader, start=2):
             session_ref = row.get('session_ref', '').strip()
             badge = row.get('employee_badge', '').strip()
@@ -95,17 +110,27 @@ class EdsLevel1Import(models.TransientModel):
                 ('employee_id', '=', employee.id),
             ], limit=1)
 
+            line_commands = []
+            if 'content' in q_map:
+                line_commands.append((0, 0, {'question_id': q_map['content'].id, 'rating_val': content_r}))
+            if 'trainer' in q_map:
+                line_commands.append((0, 0, {'question_id': q_map['trainer'].id, 'rating_val': trainer_r}))
+            if 'venue' in q_map:
+                line_commands.append((0, 0, {'question_id': q_map['venue'].id, 'rating_val': fac_r}))
+
             vals = {
                 'session_id': session.id,
                 'employee_id': employee.id,
-                'score_content': content_r,
-                'score_trainer': trainer_r,
-                'score_facilities': fac_r,
-                'feedback_text': comments,
+                'instrument_id': instrument.id if instrument else False,
+                'general_comments': comments,
                 'state': 'submitted',
+                'submitted_date': fields.Date.context_today(self),
             }
+            if line_commands:
+                vals['line_ids'] = line_commands
 
             if existing_eval:
+                existing_eval.line_ids.unlink()
                 existing_eval.sudo().write(vals)
             else:
                 Level1Model.sudo().create(vals)

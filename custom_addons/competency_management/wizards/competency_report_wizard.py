@@ -12,12 +12,7 @@ class CompetencyReportWizard(models.TransientModel):
     _name = 'competency.report.wizard'
     _description = 'Competency Cascading Report & Export Wizard'
 
-    @api.model
-    def default_get(self, fields_list):
-        user = self.env.user
-        if not (self.env.is_admin() or self.env.su or user.has_group('competency_management.group_competency_officer') or user.has_group('competency_management.group_competency_admin')):
-            raise AccessError(_("Access Denied: Only HR / People Solution Officers and Competency Administrators can access reporting."))
-        return super().default_get(fields_list)
+
 
     def web_read(self, specification):
         user = self.env.user
@@ -190,6 +185,12 @@ class CompetencyReportWizard(models.TransientModel):
 
     @api.model
     def default_get(self, fields_list):
+        # Access guard: only Officers and Administrators may open reporting wizards
+        _user = self.env.user
+        if not (self.env.is_admin() or self.env.su
+                or _user.has_group('competency_management.group_competency_officer')
+                or _user.has_group('competency_management.group_competency_admin')):
+            raise AccessError(_("Access Denied: Only HR Officers and Competency Administrators can access reporting."))
         res = super().default_get(fields_list)
         user = self.env.user.sudo()
         emp = user.employee_id

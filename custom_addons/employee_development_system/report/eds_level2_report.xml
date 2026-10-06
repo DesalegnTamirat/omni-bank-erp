@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_level2" model="ir.actions.report">
+        <field name="name">Pre/Post Assessment Sheet (EDS-F-03)</field>
+        <field name="model">eds.evaluation.level2</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_level2_document</field>
+        <field name="report_file">employee_development_system.report_eds_level2_document</field>
+        <field name="print_report_name">'Level2_Assessment_%s' % (object.id)</field>
+        <field name="binding_model_id" ref="model_eds_evaluation_level2"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_level2_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-03
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">KIRKPATRICK LEVEL 2 – PRE/POST ASSESSMENT SHEET</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Trainee knowledge retention and pre vs post gain scoring.</p>
+                        </div>
+
+                        <!-- Session Meta Information -->
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Session Code:</td>
+                                    <td style="width: 30%;"><span t-esc="o.session_id.code or o.session_id.name"/></td>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Program Title:</td>
+                                    <td style="width: 30%;"><span t-field="o.session_id.course_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Trainer / Assessor:</td>
+                                    <td><span t-esc="o.trainer_assessor_name or o.session_id.trainer_id.name or 'Assessor'"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Pass Mark (%):</td>
+                                    <td><strong t-esc="'%.1f%%' % o.passing_score"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Total Marks (Test):</td>
+                                    <td><span t-field="o.total_marks"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Status:</td>
+                                    <td><span t-field="o.state"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Formula Banner -->
+                        <div style="background-color: #eef2f7; border: 1px solid #d0dbe5; padding: 6px 10px; font-size: 8.5pt; margin-bottom: 15px; border-radius: 4px;">
+                            <strong>Official Bank Formulas:</strong> Pre-test % = Pre ÷ Total × 100 | Post-test % = Post ÷ Total × 100 | Knowledge Gain % = Post % − Pre % | Status = <strong>PASS</strong> if Post % &gt;= Pass Mark, otherwise <strong>FAIL</strong>.
+                        </div>
+
+                        <!-- Assessment Score Summary -->
+                        <h5 style="color: #003366; font-weight: bold; margin-bottom: 6px;">Individual Assessment Result</h5>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 15px; font-size: 9.5pt; text-align: center;">
+                            <thead style="background-color: #f2f2f2;">
+                                <tr>
+                                    <th style="text-align: left; width: 25%;">Trainee Name</th>
+                                    <th style="width: 15%;">Staff ID</th>
+                                    <th style="width: 15%;">Pre-Test Score</th>
+                                    <th style="width: 15%;">Post-Test Score</th>
+                                    <th style="width: 15%;">Knowledge Gain</th>
+                                    <th style="width: 15%;">Result Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="text-align: left;"><strong t-field="o.employee_id.name"/></td>
+                                    <td><span t-esc="o.employee_id.barcode or 'N/A'"/></td>
+                                    <td>
+                                        <span t-esc="'%.1f / %.1f' % (o.pre_test_score, o.total_marks)"/><br/>
+                                        <small class="text-muted">(<span t-esc="'%.1f%%' % o.pre_test_pct"/>)</small>
+                                    </td>
+                                    <td>
+                                        <strong t-esc="'%.1f / %.1f' % (o.post_test_score, o.total_marks)"/><br/>
+                                        <small class="text-muted">(<strong t-esc="'%.1f%%' % o.post_test_pct"/>)</small>
+                                    </td>
+                                    <td style="color: #006600; font-weight: bold;">
+                                        <span t-esc="'+%.1f%%' % o.learning_gain if o.learning_gain &gt; 0 else '%.1f%%' % o.learning_gain"/>
+                                    </td>
+                                    <td>
+                                        <t t-if="o.passed">
+                                            <span style="color: white; background-color: #28a745; padding: 2px 8px; border-radius: 3px; font-weight: bold;">PASS</span>
+                                        </t>
+                                        <t t-else="">
+                                            <span style="color: white; background-color: #dc3545; padding: 2px 8px; border-radius: 3px; font-weight: bold;">FAIL</span>
+                                        </t>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <t t-if="o.remarks">
+                            <div style="margin-bottom: 15px;">
+                                <table class="table table-sm table-bordered" style="font-size: 9pt;">
+                                    <tr>
+                                        <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Remarks:</td>
+                                        <td><span t-field="o.remarks"/></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </t>
+
+                        <!-- Signatures & Verification -->
+                        <div style="margin-top: 30px; border-top: 1px solid #003366; padding-top: 10px;">
+                            <h6 style="color: #003366; font-weight: bold; margin-bottom: 15px;">Official Signatures &amp; Approvals</h6>
+                            <table style="width: 100%; font-size: 9pt;">
+                                <tr>
+                                    <td style="width: 33%; vertical-align: top;">
+                                        <strong>Trainer / Assessor:</strong><br/>
+                                        Name: <span t-esc="o.trainer_assessor_name or o.session_id.trainer_id.name or '___________________'"/><br/>
+                                        Signature: ___________________<br/>
+                                        Date: ___________________
+                                    </td>
+                                    <td style="width: 33%; vertical-align: top;">
+                                        <strong>Training Coordinator:</strong><br/>
+                                        Name: <span t-esc="o.training_coordinator_name or '___________________'"/><br/>
+                                        Signature: ___________________<br/>
+                                        Date: ___________________
+                                    </td>
+                                    <td style="width: 33%; vertical-align: top;">
+                                        <strong>Approved by (TL L&amp;D):</strong><br/>
+                                        Name: <span t-esc="o.approved_by_tl_name or '___________________'"/><br/>
+                                        Signature: ___________________<br/>
+                                        Date: ___________________
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

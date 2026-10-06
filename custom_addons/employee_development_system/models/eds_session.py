@@ -331,16 +331,23 @@ class EdsSession(models.Model):
         """Default class size from EDS settings (BRD: 25-30, )."""
         return self._get_int_param('eds.default_class_capacity', 30)
 
-    @api.depends('date_start', 'venue_id', 'trainer_ids', 'status')
+    @api.depends('date_start', 'date_end', 'venue_id', 'trainer_ids', 'status')
     def _compute_conflict_flag(self):
         for rec in self:
+            if rec.status in ('completed', 'cancelled') or not rec.date_start or not rec.date_end:
+                rec.conflict_flag = False
+                continue
             rec.conflict_flag = bool(
                 rec._get_venue_conflicts() or rec._get_trainer_conflicts()
                 or rec._get_blocked_trainer_availability())
 
     def _search_conflict_flag(self, operator, value):
         """Search support for the computed conflict flag (e.g. the "Conflicts" filter)."""
-        sessions = self.search([])
+        sessions = self.search([
+            ('status', 'not in', ('completed', 'cancelled')),
+            ('date_start', '!=', False),
+            ('date_end', '!=', False),
+        ])
         target = bool(value)
         if operator in ('=', 'ilike', 'like'):
             matched = [s.id for s in sessions if s.conflict_flag == target]

@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import api, SUPERUSER_ID
+
+_logger = logging.getLogger(__name__)
 
 def post_init_hook(env):
     """Clean up and enforce strict menu security group assignments after module installation/upgrade.
@@ -28,8 +31,8 @@ def post_init_hook(env):
             ], limit=1)
             if stale:
                 stale.unlink()
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("post_init_hook: Failed to clean stale xml_id %s.%s: %s", module_name, xml_id_name, e)
 
     # ── 1. Menu Security Group Assignments ───────────────────────────────────
     menu_map = {
@@ -57,8 +60,8 @@ def post_init_hook(env):
             if menu:
                 groups = [env.ref(g_xml, raise_if_not_found=False).id for g_xml in group_xml_ids if env.ref(g_xml, raise_if_not_found=False)]
                 menu.write({'group_ids': [(6, 0, groups)]})
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("post_init_hook: Failed to configure menu %s: %s", xml_id, e)
 
     # Clean up removed reporting menus from DB
     removed_menu_xml_ids = [
@@ -70,8 +73,8 @@ def post_init_hook(env):
             m = env.ref(m_xml, raise_if_not_found=False)
             if m:
                 m.unlink()
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("post_init_hook: Failed to clean removed menu %s: %s", m_xml, e)
 
     # ── 2. Ensure 4-Scale Rating Model exists (search-or-create) ─────────────
     # Using search-or-create in the hook (not just XML seed data) means:
@@ -94,8 +97,8 @@ def post_init_hook(env):
                     (0, 0, {'level': '4', 'name': 'Level 4 - Expert', 'sequence': 40}),
                 ],
             })
-    except Exception:
-        pass
+    except Exception as e:
+        _logger.warning("post_init_hook: Failed ensuring 4-scale rating model: %s", e)
 
     # ── 3. Remove 5-Scale Rating Model if it exists (from old seed data) ─────
     try:
@@ -108,12 +111,12 @@ def post_init_hook(env):
             )
             if not competencies_using_it:
                 rating_5scale.unlink()
-    except Exception:
-        pass
+    except Exception as e:
+        _logger.warning("post_init_hook: Failed removing 5-scale rating model: %s", e)
 
     # ── 4. Ensure singleton competency.matrix.config exists ──────────────────
     try:
         env['competency.matrix.config'].get_active_config()
-    except Exception:
-        pass
+    except Exception as e:
+        _logger.warning("post_init_hook: Failed ensuring competency.matrix.config: %s", e)
 

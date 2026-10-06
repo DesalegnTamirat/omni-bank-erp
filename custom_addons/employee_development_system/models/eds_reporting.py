@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields, api
+from odoo import models, fields, api, tools
 
 class EdsReportTna(models.Model):
     _name = 'eds.report.tna'
@@ -23,6 +23,7 @@ class EdsReportTna(models.Model):
     total_entries = fields.Integer(string='Total Requested Entries', readonly=True)
 
     def init(self):
+        tools.drop_view_if_exists(self._cr, 'eds_report_tna')
         self._cr.execute("""
             CREATE OR REPLACE VIEW eds_report_tna AS (
                 SELECT
@@ -57,6 +58,7 @@ class EdsReportAnnualPlan(models.Model):
     total_lines = fields.Integer(string='Count', readonly=True)
 
     def init(self):
+        tools.drop_view_if_exists(self._cr, 'eds_report_annual_plan')
         self._cr.execute("""
             CREATE OR REPLACE VIEW eds_report_annual_plan AS (
                 SELECT
@@ -83,6 +85,7 @@ class EdsReportDelivery(models.Model):
     attendance_percentage = fields.Float(string='Attendance Percentage (%)', readonly=True)
 
     def init(self):
+        tools.drop_view_if_exists(self._cr, 'eds_report_delivery')
         self._cr.execute("""
             CREATE OR REPLACE VIEW eds_report_delivery AS (
                 SELECT
@@ -110,6 +113,7 @@ class EdsReportEvaluation(models.Model):
     l2_passed = fields.Boolean(string='L2 Passed', readonly=True)
 
     def init(self):
+        tools.drop_view_if_exists(self._cr, 'eds_report_evaluation')
         self._cr.execute("""
             CREATE OR REPLACE VIEW eds_report_evaluation AS (
                 SELECT
@@ -140,6 +144,7 @@ class EdsReportTranscript(models.Model):
     certificate_code = fields.Char(string='Certificate Code', readonly=True)
 
     def init(self):
+        tools.drop_view_if_exists(self._cr, 'eds_report_transcript')
         self._cr.execute("""
             CREATE OR REPLACE VIEW eds_report_transcript AS (
                 SELECT
@@ -160,12 +165,14 @@ class EdsDashboard(models.TransientModel):
 
     @api.model
     def get_eds_dashboard_data(self):
-        tna_count = self.env['eds.tna.entry'].search_count([])
-        session_count = self.env['eds.session'].search_count([])
-        completed_sessions = self.env['eds.session'].search_count([('status', '=', 'completed')])
-        cert_count = self.env['eds.certificate'].search_count([('state', '=', 'issued')])
-        total_budget = sum(self.env['eds.budget'].search([('state', '=', 'approved')]).mapped('allocated'))
-        spent_budget = sum(self.env['eds.budget'].search([('state', '=', 'approved')]).mapped('spent'))
+        company_domain = [('company_id', 'in', self.env.companies.ids)]
+        tna_count = self.env['eds.tna.entry'].search_count(company_domain)
+        session_count = self.env['eds.session'].search_count(company_domain)
+        completed_sessions = self.env['eds.session'].search_count(company_domain + [('status', '=', 'completed')])
+        cert_count = self.env['eds.certificate'].search_count(company_domain + [('state', '=', 'issued')])
+        budgets = self.env['eds.budget'].search(company_domain + [('state', '=', 'approved')])
+        total_budget = sum(budgets.mapped('allocated'))
+        spent_budget = sum(budgets.mapped('spent'))
 
         return {
             'tna_requests': tna_count,

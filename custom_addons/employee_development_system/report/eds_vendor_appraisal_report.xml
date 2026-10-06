@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_vendor_appraisal" model="ir.actions.report">
+        <field name="name">Training Provider Performance Appraisal (EDS-F-13)</field>
+        <field name="model">eds.provider.performance.history</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_vendor_appraisal_document</field>
+        <field name="report_file">employee_development_system.report_eds_vendor_appraisal_document</field>
+        <field name="print_report_name">'Provider_Appraisal_%s' % (object.id)</field>
+        <field name="binding_model_id" ref="model_eds_provider_performance_history"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_vendor_appraisal_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-13
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">TRAINING PROVIDER POST-DELIVERY PERFORMANCE APPRAISAL</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Rigorous evaluation of external institutional vendor adherence, quality, and service level agreements.</p>
+                        </div>
+
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Provider / Firm:</td>
+                                    <td style="width: 30%;"><strong t-esc="o.provider_id.name or o.venue_name"/></td>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Evaluation Date:</td>
+                                    <td style="width: 30%;"><span t-field="o.evaluation_date"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Training Course:</td>
+                                    <td><span t-field="o.course_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Session Ref:</td>
+                                    <td><span t-field="o.session_id.name"/></td>
+                                </tr>
+                                <tr style="background-color: #eaf2f8;">
+                                    <td style="font-weight: bold; color: #003366;">Overall Rating:</td>
+                                    <td style="font-size: 11pt; font-weight: bold; color: #003366;"><span t-field="o.rating"/></td>
+                                    <td style="font-weight: bold; color: #003366;">Future Recommendation:</td>
+                                    <td style="font-size: 10pt; font-weight: bold; color: #003366;"><strong t-field="o.recommend_future_tenders"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">1. DETAILED PERFORMANCE DIMENSION RATINGS (1 - 5)</h5>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th>Evaluation Dimension</th>
+                                    <th style="width: 30%; text-align: center;">Rating (1 to 5)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>1. Content Relevance &amp; Syllabus Adherence:</strong> Alignment to training requirements.</td>
+                                    <td style="text-align: center;"><strong><span t-field="o.score_content_relevance"/></strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>2. Trainer Competence &amp; Delivery:</strong> Facilitator quality and interaction.</td>
+                                    <td style="text-align: center;"><strong><span t-field="o.score_trainer_quality"/></strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>3. Punctuality &amp; Schedule Adherence:</strong> Time management and attendance.</td>
+                                    <td style="text-align: center;"><strong><span t-field="o.score_time_management"/></strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>4. Materials, Handouts &amp; Exercises:</strong> Practicality of materials provided.</td>
+                                    <td style="text-align: center;"><strong><span t-field="o.score_logistics_handouts"/></strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>5. Administrative Responsiveness &amp; Reporting:</strong> Timely reporting and communications.</td>
+                                    <td style="text-align: center;"><strong><span t-field="o.score_responsiveness"/></strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">2. APPRAISAL REMARKS &amp; ISSUES IDENTIFIED</h5>
+                        <div style="background-color: #fafafa; border: 1px solid #eee; padding: 8px; margin-bottom: 8px; font-size: 9.5pt;">
+                            <strong>Issues Raised / Gaps:</strong>
+                            <p style="margin: 2px 0 0;" t-field="o.issues_raised"/>
+                        </div>
+                        <div style="background-color: #fafafa; border: 1px solid #eee; padding: 8px; margin-bottom: 14px; font-size: 9.5pt;">
+                            <strong>Corrective Actions &amp; General Notes:</strong>
+                            <p style="margin: 2px 0 0;" t-field="o.notes"/>
+                        </div>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">3. APPRAISAL TEAM &amp; APPROVAL SIGN-OFF</h5>
+                        <table class="table table-bordered table-sm" style="margin-top: 10px; font-size: 9pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th style="width: 50%;">Evaluated by (L&amp;D Officer)</th>
+                                    <th style="width: 50%;">Approved by (Team Leader, L&amp;D)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-esc="o.evaluated_by_officer or o.evaluated_by_id.name"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Date: <span t-field="o.evaluation_date"/></span>
+                                    </td>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-esc="o.approved_by_tl or 'Verified'"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Official Sign-Off</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

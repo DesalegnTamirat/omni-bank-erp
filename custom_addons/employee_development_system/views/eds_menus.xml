@@ -53,6 +53,12 @@
                   action="action_eds_budget"
                   sequence="60"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_template_import"
+                  name="Import L&amp;D Templates"
+                  parent="menu_eds_planning"
+                  action="action_eds_template_import_wizard"
+                  sequence="70"
+                  groups="employee_development_system.group_eds_officer"/>
 
 
         <!-- ══════════════════════════════════════════════════════════════ -->
@@ -135,12 +141,30 @@
                   action="action_eds_international_training"
                   sequence="60"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_knowledge_sharing"
+                  name="Knowledge Sharing Debriefs (EDS-F-12)"
+                  parent="menu_eds_delivery"
+                  action="action_eds_knowledge_sharing"
+                  sequence="65"
+                  groups="employee_development_system.group_eds_employee"/>
         <menuitem id="menu_eds_attendance"
                   name="Attendance &amp; Materials"
                   parent="menu_eds_delivery"
                   action="action_eds_session_attendance"
                   sequence="70"
                   groups="employee_development_system.group_eds_trainer"/>
+        <menuitem id="menu_eds_delivery_certificates"
+                  name="Issued Certificates"
+                  parent="menu_eds_delivery"
+                  action="action_eds_certificate"
+                  sequence="80"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_my_certificates_delivery"
+                  name="My Certificates"
+                  parent="menu_eds_delivery"
+                  action="action_eds_certificate_own"
+                  sequence="85"
+                  groups="employee_development_system.group_eds_employee"/>
 
 
         <!-- ══════════════════════════════════════════════════════════════ -->
@@ -150,7 +174,7 @@
                   name="Evaluations &amp; Certificates"
                   parent="menu_eds_root"
                   sequence="40"
-                  groups="employee_development_system.group_eds_trainer"/>
+                  groups="employee_development_system.group_eds_employee"/>
 
         <menuitem id="menu_eds_level1"
                   name="Reaction Surveys (Level 1)"
@@ -177,10 +201,16 @@
                   sequence="40"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_certificates"
-                  name="Certificates &amp; Renewals"
+                  name="Issued Certificates"
                   parent="menu_eds_evaluations_root"
                   action="action_eds_certificate"
                   sequence="50"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_certificates_my"
+                  name="My Certificates"
+                  parent="menu_eds_evaluations_root"
+                  action="action_eds_certificate_own"
+                  sequence="60"
                   groups="employee_development_system.group_eds_employee"/>
 
 
@@ -322,6 +352,12 @@
                   parent="menu_eds_configuration_root"
                   action="action_eds_external_provider"
                   sequence="60"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_provider_appraisals"
+                  name="Provider Appraisals (EDS-F-13)"
+                  parent="menu_eds_configuration_root"
+                  action="action_eds_provider_performance_appraisal"
+                  sequence="65"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_venues"
                   name="Training Venues"

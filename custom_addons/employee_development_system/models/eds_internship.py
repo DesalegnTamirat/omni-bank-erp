@@ -149,6 +149,33 @@ class EdsInternshipApplication(models.Model):
             rec.status = 'rejected'
             rec.message_post(body=_("Internship application rejected."))
 
+    # EDS-F-14 Clearance & Final Appraisal Fields
+    clearance_library = fields.Boolean(string='Bank Library / Resource Clearance', default=True)
+    clearance_id_badge = fields.Boolean(string='Temporary ID Badge Surrendered', default=True)
+    clearance_it_assets = fields.Boolean(string='IT / Workstation Access Cleared', default=True)
+    clearance_notes = fields.Char(string='Clearance Remarks')
+    clearance_officer_name = fields.Char(string='Clearance Officer Name')
+    clearance_date = fields.Date(string='Clearance Date')
+    final_intern_rating = fields.Selection([
+        ('1', '1 - Unsatisfactory'),
+        ('2', '2 - Needs Improvement'),
+        ('3', '3 - Satisfactory / Meets Expectations'),
+        ('4', '4 - Very Good'),
+        ('5', '5 - Outstanding'),
+    ], string='Final Overall Performance Rating', default='4')
+    mentor_overall_recommendation = fields.Selection([
+        ('highly_recommended', 'Highly Recommended for Future Employment'),
+        ('suitable', 'Suitable Graduate Trainee Candidate'),
+        ('not_recommended', 'Not Recommended for Hiring'),
+    ], string='Employment Recommendation', default='suitable')
+    mentor_sign_name = fields.Char(string='Supervisor / Mentor Signature')
+    intern_sign_name = fields.Char(string='Intern Acknowledgment Signature')
+
+    def action_print_clearance_form(self):
+        """Prints official Form EDS-F-14 Internship Appraisal & Clearance PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_internship_appraisal').report_action(self)
+
 class EdsInternshipEvaluation(models.Model):
     _name = 'eds.internship.evaluation'
     _description = 'EDS Internship Periodic Assessment'

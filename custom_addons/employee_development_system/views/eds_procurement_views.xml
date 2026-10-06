@@ -76,32 +76,103 @@
                         <button name="action_return_draft" string="Return to Draft" type="object"
                                 invisible="state != 'submitted'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_print_vrs" string="Print VRS Form (EDS-F-05)" type="object" icon="fa-print"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,submitted,director_approved,rfp_initiated"/>
                     </header>
                     <sheet>
                         <group>
-                            <group string="VRS">
+                            <group string="VRS Overview">
                                 <field name="name" readonly="1"/>
                                 <field name="course_id"/>
+                                <field name="session_id"/>
                                 <field name="capacity_required"/>
+                                <field name="facilitator_count"/>
+                            </group>
+                            <group string="Schedule &amp; Budget">
+                                <field name="date_start"/>
+                                <field name="date_end"/>
                                 <field name="location_preference"/>
-                            </group>
-                            <group string="Approval ()">
-                                <field name="approved_by_id" readonly="1"/>
-                                <field name="approval_date" readonly="1"/>
+                                <field name="estimated_budget"/>
+                                <field name="currency_id" invisible="1"/>
                             </group>
                         </group>
-                        <group string="Requirements">
-                            <field name="facilities_required"/>
-                            <field name="special_requirements"/>
-                            <field name="accommodation_required"/>
-                            <field name="catering_required"/>
-                        </group>
-                        <group string="VRS Document">
-                            <field name="vrs_document" filename="vrs_document_name"/>
-                            <field name="vrs_document_name" invisible="1"/>
-                        </group>
+                        <notebook>
+                            <page string="Seating &amp; Technical AV (EDS-F-05)">
+                                <group string="Room &amp; Seating Layout">
+                                    <group>
+                                        <field name="seating_layout"/>
+                                    </group>
+                                    <group>
+                                        <field name="breakout_rooms"/>
+                                    </group>
+                                </group>
+                                <group string="Technical &amp; Audio-Visual Requirements">
+                                    <group>
+                                        <field name="has_projector"/>
+                                        <field name="has_sound_system"/>
+                                        <field name="has_flipcharts"/>
+                                        <field name="has_wifi"/>
+                                        <field name="has_videoconference"/>
+                                    </group>
+                                    <group>
+                                        <field name="has_power_backup"/>
+                                        <field name="has_air_conditioning"/>
+                                        <field name="has_parking"/>
+                                        <field name="has_accessibility"/>
+                                        <field name="has_reg_desk"/>
+                                    </group>
+                                </group>
+                                <group string="Other Technical Specifications">
+                                    <field name="other_tech_requirements" placeholder="Additional AV/IT specifications..."/>
+                                    <field name="facilities_required"/>
+                                    <field name="special_requirements"/>
+                                </group>
+                            </page>
+                            <page string="Catering &amp; Accommodation">
+                                <group string="Catering Specifications">
+                                    <group>
+                                        <field name="catering_required"/>
+                                        <field name="catering_morning_tea"/>
+                                        <field name="catering_lunch"/>
+                                        <field name="catering_afternoon_tea"/>
+                                        <field name="catering_water"/>
+                                    </group>
+                                    <group>
+                                        <field name="menu_type"/>
+                                        <field name="special_dietary_needs"/>
+                                        <field name="catering_count"/>
+                                    </group>
+                                </group>
+                                <group string="Accommodation Specifications">
+                                    <group>
+                                        <field name="accommodation_required"/>
+                                        <field name="rooms_required"/>
+                                    </group>
+                                    <group>
+                                        <field name="room_nights"/>
+                                        <field name="accommodation_notes"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Vetting &amp; Sign-Off">
+                                <group string="Sign-Off (EDS-F-05)">
+                                    <group>
+                                        <field name="prepared_by"/>
+                                        <field name="reviewed_by"/>
+                                    </group>
+                                    <group>
+                                        <field name="director_sign"/>
+                                        <field name="approved_by_id" readonly="1"/>
+                                        <field name="approval_date" readonly="1"/>
+                                    </group>
+                                </group>
+                                <group string="Attachment">
+                                    <field name="vrs_document" filename="vrs_document_name"/>
+                                    <field name="vrs_document_name" invisible="1"/>
+                                </group>
+                            </page>
+                        </notebook>
                     </sheet>
                     <chatter/>
                 </form>
@@ -493,6 +564,88 @@
         <record id="action_eds_training_contract" model="ir.actions.act_window">
             <field name="name">Training Contracts</field>
             <field name="res_model">eds.training.contract</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- EDS-F-13 Provider Performance Appraisal Views -->
+        <record id="view_eds_provider_performance_history_tree" model="ir.ui.view">
+            <field name="name">eds.provider.performance.history.tree</field>
+            <field name="model">eds.provider.performance.history</field>
+            <field name="arch" type="xml">
+                <list string="Training Provider Performance Appraisals">
+                    <field name="provider_id"/>
+                    <field name="venue_name"/>
+                    <field name="course_id"/>
+                    <field name="session_id"/>
+                    <field name="evaluation_date"/>
+                    <field name="rating" widget="badge"/>
+                    <field name="recommend_future_tenders"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_provider_performance_history_form" model="ir.ui.view">
+            <field name="name">eds.provider.performance.history.form</field>
+            <field name="model">eds.provider.performance.history</field>
+            <field name="arch" type="xml">
+                <form string="Provider Performance Appraisal (EDS-F-13)">
+                    <header>
+                        <button name="action_print_appraisal" string="Print Appraisal Form (EDS-F-13)" type="object" icon="fa-print"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Provider &amp; Engagement">
+                                <field name="provider_id"/>
+                                <field name="venue_name"/>
+                                <field name="course_id"/>
+                                <field name="session_id"/>
+                                <field name="contract_id"/>
+                                <field name="evaluation_date"/>
+                            </group>
+                            <group string="Overall Assessment">
+                                <field name="rating"/>
+                                <field name="service_quality"/>
+                                <field name="recommend_future_tenders"/>
+                                <field name="evaluated_by_id"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Performance Ratings (1 - 5)" name="ratings">
+                                <group>
+                                    <group>
+                                        <field name="score_content_relevance"/>
+                                        <field name="score_trainer_quality"/>
+                                        <field name="score_time_management"/>
+                                    </group>
+                                    <group>
+                                        <field name="score_logistics_handouts"/>
+                                        <field name="score_responsiveness"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Qualitative Feedback &amp; Action Notes" name="notes">
+                                <group>
+                                    <field name="venue_readiness"/>
+                                    <field name="issues_raised"/>
+                                    <field name="corrective_actions"/>
+                                    <field name="notes"/>
+                                </group>
+                            </page>
+                            <page string="Signatures &amp; Vetting" name="signatures">
+                                <group>
+                                    <field name="evaluated_by_officer"/>
+                                    <field name="approved_by_tl"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_provider_performance_appraisal" model="ir.actions.act_window">
+            <field name="name">Provider Appraisals (EDS-F-13)</field>
+            <field name="res_model">eds.provider.performance.history</field>
             <field name="view_mode">list,form</field>
         </record>
 

@@ -21,6 +21,71 @@ class EdsVenueRequirement(models.Model):
                        default=lambda self: _('New'))
     course_id = fields.Many2one('eds.course', string='Training Program', required=True,
                                 tracking=True)
+    session_id = fields.Many2one('eds.session', string='Training Session', tracking=True)
+    date_start = fields.Date(string='Start Date')
+    date_end = fields.Date(string='End Date')
+    facilitator_count = fields.Integer(string='No. of Facilitators', default=1)
+    participant_count = fields.Integer(string='Expected Participants', default=30)
+    duration_days = fields.Integer(string='Duration (Days)', compute='_compute_duration_days', store=True, readonly=False)
+    target_audience = fields.Char(string='Target Audience')
+    preferred_location = fields.Char(string='Preferred Location / City', related='location_preference', readonly=False)
+    estimated_budget = fields.Monetary(string='Estimated Budget (ETB)', currency_field='currency_id')
+
+    @api.depends('date_start', 'date_end')
+    def _compute_duration_days(self):
+        for rec in self:
+            if rec.date_start and rec.date_end:
+                rec.duration_days = max(1, (rec.date_end - rec.date_start).days + 1)
+            else:
+                rec.duration_days = 1
+    currency_id = fields.Many2one('res.currency', string='Currency', default=lambda self: self.env.company.currency_id)
+
+    # 2. Room & Seating
+    seating_layout = fields.Selection([
+        ('ushape', 'U-Shape'),
+        ('theater', 'Theater'),
+        ('classroom', 'Classroom'),
+        ('cluster', 'Cluster / Round Tables'),
+        ('boardroom', 'Boardroom'),
+    ], string='Seating Layout', default='classroom', tracking=True)
+    breakout_rooms = fields.Integer(string='Breakout Rooms Required', default=0)
+
+    # 3. Equipment & Facilities Checkboxes
+    has_projector = fields.Boolean(string='Projector / Screen', default=True)
+    has_sound_system = fields.Boolean(string='Sound System & Microphones', default=True)
+    has_flipcharts = fields.Boolean(string='Flip Charts & Markers', default=True)
+    has_wifi = fields.Boolean(string='Wi-Fi / Internet', default=True)
+    has_videoconference = fields.Boolean(string='Video-Conferencing Set-up')
+    has_power_backup = fields.Boolean(string='Power Backup / Generator', default=True)
+    has_air_conditioning = fields.Boolean(string='Air Conditioning', default=True)
+    has_parking = fields.Boolean(string='Parking Space Available')
+    has_accessibility = fields.Boolean(string='Accessibility (Ramp / Lift)')
+    has_reg_desk = fields.Boolean(string='Registration Desk Available', default=True)
+    other_tech_requirements = fields.Text(string='Other Technical Requirements')
+
+    # 4. Catering & Lunch Specifications
+    catering_morning_tea = fields.Boolean(string='Morning Tea/Coffee', default=True)
+    catering_lunch = fields.Boolean(string='Lunch Buffet', default=True)
+    catering_afternoon_tea = fields.Boolean(string='Afternoon Tea/Coffee', default=True)
+    catering_water = fields.Boolean(string='Bottled Water', default=True)
+    menu_type = fields.Selection([
+        ('fasting', 'Fasting Only'),
+        ('non_fasting', 'Non-Fasting Only'),
+        ('mixed', 'Mixed / Standard Buffet'),
+    ], string='Menu Type', default='mixed')
+    special_dietary_needs = fields.Char(string='Special Dietary Needs')
+    catering_count = fields.Integer(string='Catering Heads / Pax', default=30)
+
+    # 5. Accommodation Details
+    rooms_required = fields.Integer(string='Rooms Required', default=0)
+    room_nights = fields.Integer(string='Nights', default=0)
+    accommodation_notes = fields.Text(string='Accommodation Details')
+
+    # Signatories
+    prepared_by = fields.Char(string='Prepared by (L&D Officer)')
+    reviewed_by = fields.Char(string='Reviewed by (Team Leader, L&D)')
+    director_sign = fields.Char(string='Approved by (Director, PPDD)')
+
     vrs_document = fields.Binary(string='VRS Document')
     vrs_document_name = fields.Char(string='VRS Document Filename')
     capacity_required = fields.Integer(string='Required Capacity', default=30)
@@ -39,6 +104,11 @@ class EdsVenueRequirement(models.Model):
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
     rfp_ids = fields.One2many('eds.rfp', 'venue_requirement_id', string='RFPs')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
+
+    def action_print_vrs(self):
+        """Prints official Form EDS-F-05 Venue Requirement Specification PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_vrs').report_action(self)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -209,6 +279,7 @@ class EdsRfp(models.Model):
 
     def action_award(self):
         """Evaluation -> Awarded: pick the winning proposal and auto-generate the contract."""
+        last_contract = False
         for rec in self:
             rec._require_group('group_eds_manager')
             if rec.state != 'evaluation':
@@ -218,17 +289,18 @@ class EdsRfp(models.Model):
             rec.state = 'awarded'
             rec.message_post(body=_('RFP %s awarded to %s ().')
                              % (rec.name, rec.awarded_proposal_id.provider_id.name))
-            contract = self.env['eds.training.contract'].create({
+            last_contract = self.env['eds.training.contract'].create({
                 'rfp_id': rec.id,
                 'course_id': rec.course_id.id,
                 'provider_id': rec.awarded_proposal_id.provider_id.id,
                 'proposal_id': rec.awarded_proposal_id.id,
                 'combined_score': rec.awarded_proposal_id.combined_score,
             })
+        if last_contract:
             return {
                 'type': 'ir.actions.act_window',
                 'res_model': 'eds.training.contract',
-                'res_id': contract.id,
+                'res_id': last_contract.id,
                 'view_mode': 'form',
             }
 
@@ -425,7 +497,7 @@ class EdsVendorEvaluation(models.Model):
             if rec.evaluation_type != 'technical':
                 rec.threshold_met = True
                 continue
-            threshold = rec._get_int_param('eds.technical_min_threshold', 70)
+            threshold = rec._get_int_param('eds.technical_min_threshold', 40)
             rec.threshold_met = bool(rec.total_score and rec.total_score >= threshold)
 
     @api.model

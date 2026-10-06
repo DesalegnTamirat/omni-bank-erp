@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_knowledge_sharing_tree" model="ir.ui.view">
+        <field name="name">eds.knowledge.sharing.tree</field>
+        <field name="model">eds.knowledge.sharing</field>
+        <field name="arch" type="xml">
+            <list string="Post-Training Knowledge Sharing Sessions">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="session_id"/>
+                <field name="session_date"/>
+                <field name="training_type"/>
+                <field name="attendees_count"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'scheduled'" decoration-success="state == 'completed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_knowledge_sharing_form" model="ir.ui.view">
+        <field name="name">eds.knowledge.sharing.form</field>
+        <field name="model">eds.knowledge.sharing</field>
+        <field name="arch" type="xml">
+            <form string="Post-Training Knowledge Sharing (EDS-F-12)">
+                <header>
+                    <button name="action_schedule" string="Schedule Debrief" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_complete" string="Complete &amp; Verify" type="object" class="oe_highlight" groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin" invisible="state != 'scheduled'"/>
+                    <button name="action_print_form" string="Print Knowledge Sharing Form (EDS-F-12)" type="object" icon="fa-print"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Reference"/>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Session &amp; Participant">
+                            <field name="employee_id" readonly="state != 'draft'"/>
+                            <field name="department_id"/>
+                            <field name="session_id" readonly="state != 'draft'"/>
+                            <field name="course_id"/>
+                            <field name="training_type" readonly="state != 'draft'"/>
+                            <field name="completion_date" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Knowledge Transfer Execution">
+                            <field name="session_date" readonly="state != 'draft'"/>
+                            <field name="debrief_deadline" readonly="1"/>
+                            <field name="target_audience" readonly="state != 'draft'"/>
+                            <field name="attendees_count" readonly="state != 'draft'"/>
+                            <field name="materials_deposited" readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Takeaways &amp; Action Plan" name="takeaways">
+                            <group>
+                                <field name="key_takeaways" readonly="state != 'draft'" placeholder="Detail key banking competencies, concepts, or skills disseminated to colleagues..."/>
+                                <field name="workplace_action_plan" readonly="state != 'draft'" placeholder="Concrete workflows, processes, or tools being changed or improved in the branch/unit..."/>
+                            </group>
+                        </page>
+                        <page string="Materials &amp; Presentation" name="materials">
+                            <group>
+                                <field name="presentation_file" filename="presentation_filename"/>
+                                <field name="presentation_filename" invisible="1"/>
+                            </group>
+                        </page>
+                        <page string="Signatures &amp; Verification" name="verification">
+                            <group>
+                                <field name="sign_employee"/>
+                                <field name="sign_manager"/>
+                                <field name="sign_officer"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_knowledge_sharing" model="ir.actions.act_window">
+        <field name="name">Knowledge Sharing Debriefs (EDS-F-12)</field>
+        <field name="res_model">eds.knowledge.sharing</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Record a post-training knowledge sharing session.
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_unscheduled" model="ir.actions.report">
+        <field name="name">Unscheduled Request (EDS-F-09)</field>
+        <field name="model">eds.unscheduled.request</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_unscheduled_document</field>
+        <field name="report_file">employee_development_system.report_eds_unscheduled_document</field>
+        <field name="print_report_name">'Unscheduled_Request_%s' % (object.name or object.id)</field>
+        <field name="binding_model_id" ref="model_eds_unscheduled_request"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_unscheduled_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 9.5pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-09
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">UNSCHEDULED / EMERGENCY TRAINING REQUEST FORM</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Formal request form for training not included in the approved Annual L&amp;D Plan.</p>
+                        </div>
+
+                        <!-- Section 1 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">1. Requesting Unit Details</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 9pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Request Ref:</td>
+                                    <td style="width: 25%;"><strong t-field="o.name"/></td>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Requested Start:</td>
+                                    <td style="width: 25%;"><span t-field="o.requested_date_start"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Department / Unit:</td>
+                                    <td><span t-field="o.department_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Operating Unit:</td>
+                                    <td><span t-field="o.work_unit_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Requested By:</td>
+                                    <td><span t-field="o.employee_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Unit Head:</td>
+                                    <td><span t-field="o.unit_head_id.name"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 2 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">2. Training Program Details</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 9pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Course / Topic:</td>
+                                    <td style="width: 25%;"><strong t-esc="o.course_id.name or o.program_name"/></td>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Delivery Mode:</td>
+                                    <td style="width: 25%;"><span t-field="o.delivery_mode"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Nominated Participants:</td>
+                                    <td><strong t-field="o.participant_count"/> persons</td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Preferred Provider:</td>
+                                    <td><span t-field="o.preferred_provider"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Proposed Dates:</td>
+                                    <td><span t-field="o.proposed_dates_text"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Duration:</td>
+                                    <td><span t-field="o.duration_text"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 3 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">3. Business Justification &amp; Risk of Delay</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 25%; font-weight: bold; background-color: #f5f5f5;">Trigger / Driver:</td>
+                                    <td><span t-field="o.reason"/></td>
+                                    <td style="width: 25%; font-weight: bold; background-color: #f5f5f5;">Urgency Category:</td>
+                                    <td><strong t-field="o.urgency_category"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold; background-color: #f5f5f5;">Business Justification:</td>
+                                    <td colspan="3"><span t-field="o.justification"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold; background-color: #f5f5f5;">Risk of Delay:</td>
+                                    <td colspan="3">
+                                        <span t-esc="'[X]' if o.risk_regulatory else '[ ]'"/> Regulatory Penalty / Audit Finding &amp;nbsp;&amp;nbsp;
+                                        <span t-esc="'[X]' if o.risk_operational else '[ ]'"/> Operational Disruption / Errors &amp;nbsp;&amp;nbsp;
+                                        <span t-esc="'[X]' if o.risk_financial else '[ ]'"/> Financial Loss<br/>
+                                        <span t-esc="'[X]' if o.risk_customer else '[ ]'"/> Customer Service Impact &amp;nbsp;&amp;nbsp;
+                                        <span t-esc="'[X]' if o.risk_reputation else '[ ]'"/> Reputational Risk<br/>
+                                        <t t-if="o.risk_details">
+                                            <strong>Risk Details:</strong> <span t-field="o.risk_details"/>
+                                        </t>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 4 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">4. Budget &amp; Cost Implication</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                            <tr>
+                                <td style="width: 25%; font-weight: bold; background-color: #f5f5f5;">Estimated Cost:</td>
+                                <td style="width: 25%;"><strong t-esc="'%.2f ETB' % o.estimated_cost"/></td>
+                                <td style="width: 25%; font-weight: bold; background-color: #f5f5f5;">Budget Source:</td>
+                                <td style="width: 25%;"><span t-field="o.budget_source"/></td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold; background-color: #f5f5f5;">Cost Centre Code:</td>
+                                <td colspan="3"><span t-field="o.cost_centre_code"/></td>
+                            </tr>
+                        </table>
+
+                        <!-- Section 5 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">5. Review &amp; Approval Sign-Off</h6>
+                        <table style="width: 100%; font-size: 8pt; margin-top: 6px;">
+                            <tr>
+                                <td style="width: 25%; vertical-align: top;">
+                                    <strong>1. Requesting Unit Head:</strong><br/>
+                                    Name: <span t-esc="o.sign_unit_head or (o.unit_head_id and o.unit_head_id.name) or '_______________'"/><br/>
+                                    Sign: _______________
+                                </td>
+                                <td style="width: 25%; vertical-align: top;">
+                                    <strong>2. Team Leader, L&amp;D:</strong><br/>
+                                    Name: <span t-esc="o.sign_tl_lnd or '_______________'"/><br/>
+                                    Sign: _______________
+                                </td>
+                                <td style="width: 25%; vertical-align: top;">
+                                    <strong>3. Director, Finance:</strong><br/>
+                                    Name: <span t-esc="o.sign_finance or '_______________'"/><br/>
+                                    Sign: _______________
+                                </td>
+                                <td style="width: 25%; vertical-align: top;">
+                                    <strong>4. Director, PPDD:</strong><br/>
+                                    Name: <span t-esc="o.sign_director or '_______________'"/><br/>
+                                    Sign: _______________
+                                </td>
+                            </tr>
+                        </table>
+
+                        <t t-if="o.decision_type">
+                            <div style="margin-top: 10px; background-color: #f5f8fa; border: 1px solid #ccdbe8; padding: 6px 10px; font-size: 8.5pt;">
+                                <strong>Final Decision:</strong> <strong t-field="o.decision_type"/> | <strong>Comments:</strong> <span t-field="o.decision_comments"/>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

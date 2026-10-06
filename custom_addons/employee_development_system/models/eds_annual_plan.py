@@ -150,16 +150,23 @@ class EdsAnnualPlan(models.Model):
         courses = curricula.mapped('course_id')
         courses |= self.env['eds.course'].search(
             [('status', '=', 'active'), ('id', 'not in', courses.ids)])
-        created = 0
+        existing_course_ids = set(self.line_ids.mapped('course_id.id'))
+        existing_prog_names = set(self.line_ids.mapped('program_name'))
+        new_lines = []
         for course in courses:
-            if self.line_ids.filtered(lambda l: l.course_id == course):
+            if course.id in existing_course_ids:
                 continue
-            self.write({'line_ids': [(0, 0, {
+            new_lines.append((0, 0, {
                 'course_id': course.id,
                 'program_name': course.name,
                 'delivery_method': course.delivery_method,
-            })]})
-            created += 1
+                'program_category': course.program_category or 'technical_functional',
+                'target_audience': course.target_audience or 'all_staff',
+                'duration_days': course.duration_days or 1,
+            }))
+            existing_course_ids.add(course.id)
+            existing_prog_names.add(course.name)
+
         # Approved TNA needs not yet converted to a course (e.g. externally sourced).
         # Only Classroom (+ the classroom part of Blended) is actioned in EDS;
         # pure e-learning needs route to the LMS instead ( business rule).
@@ -169,15 +176,20 @@ class EdsAnnualPlan(models.Model):
             ('proposed_program', '!=', False),
             ('converted_course_ref', '=', False),
         ]):
-            if not entry.proposed_program:
+            if not entry.proposed_program or entry.proposed_program in existing_prog_names:
                 continue
-            if self.line_ids.filtered(lambda l: l.program_name == entry.proposed_program):
-                continue
-            self.write({'line_ids': [(0, 0, {
+            new_lines.append((0, 0, {
                 'program_name': entry.proposed_program,
                 'delivery_method': 'internal',
-            })]})
-            created += 1
+                'target_audience': entry.target_audience or 'all_staff',
+                'planned_participants': entry.target_participant_count or 25,
+                'quarter': entry.hr_target_quarter or 'unallocated',
+            }))
+            existing_prog_names.add(entry.proposed_program)
+
+        if new_lines:
+            self.write({'line_ids': new_lines})
+        created = len(new_lines)
         self.calendar_generation_date = date.today()
         self.message_post(
             body=_('Calendar generated for %s - %d programs added. SLA deadline: %s ().')
@@ -193,12 +205,15 @@ class EdsAnnualPlan(models.Model):
     def _add_approved_curriculum(self, curriculum):
         """ hook called when a curriculum is CPCO-approved: insert its course
         into the current draft annual plan."""
+        fy = curriculum.fiscal_year or f"{date.today().year}/{date.today().year + 1}"
         plan = self.search([
-            ('fiscal_year', '=', str(date.today().year)),
+            ('fiscal_year', '=', fy),
             ('state', '=', 'draft'),
         ], limit=1)
         if not plan:
-            plan = self.create({'fiscal_year': str(date.today().year)})
+            plan = self.search([('state', '=', 'draft')], limit=1)
+        if not plan:
+            plan = self.create({'fiscal_year': fy})
         if not plan.line_ids.filtered(lambda l: l.course_id == curriculum.course_id):
             plan.write({'line_ids': [(0, 0, {
                 'course_id': curriculum.course_id.id,
@@ -352,6 +367,53 @@ class EdsAnnualPlanLine(models.Model):
     program_name = fields.Char(string='Program Name',
                                 help='Used when the program is not in the course catalog '
                                      '(e.g. unscheduled-request addenda, /076).')
+    program_category = fields.Selection([
+        ('induction', 'Induction Program'),
+        ('compliance', 'Compliance'),
+        ('leadership', 'Leadership'),
+        ('technical_functional', 'Technical / Functional'),
+        ('digital_it', 'Digital & IT'),
+        ('soft_skills', 'Soft Skills'),
+        ('risk_audit', 'Risk & Audit'),
+        ('customer_service', 'Customer Service'),
+        ('other', 'Other'),
+    ], string='Program Category', default='technical_functional')
+    training_category = fields.Selection([
+        ('in_house', 'In-house'),
+        ('local_external', 'Local External'),
+        ('international', 'International'),
+        ('e_learning', 'E-Learning'),
+    ], string='Training Category', default='in_house')
+    target_audience = fields.Selection([
+        ('bod', 'BoD (Board of Directors)'),
+        ('smc', 'SMC (Senior Management Committee)'),
+        ('mlm', 'MLM (Middle Level Management)'),
+        ('below_mlm', 'Staff Below MLM'),
+        ('all_staff', 'All Staff'),
+    ], string='Target Group', default='all_staff')
+    quarter = fields.Selection([
+        ('q1', 'Q1 (Jul–Sep)'),
+        ('q2', 'Q2 (Oct–Dec)'),
+        ('q3', 'Q3 (Jan–Mar)'),
+        ('q4', 'Q4 (Apr–Jun)'),
+        ('unallocated', 'Q1–Q4 / TBD (Unallocated)'),
+    ], string='Quarter', compute='_compute_quarter', store=True, readonly=False)
+    duration_days = fields.Integer(string='Duration (Days)', default=1)
+    planned_participants = fields.Integer(string='Planned Participants', default=25)
+    num_sessions = fields.Integer(string='Number of Sessions', default=1)
+    est_provider_cost_per_pax = fields.Monetary(
+        string='Est. Provider Cost per Person per Session (ETB)',
+        currency_field='budget_currency_id', default=0.0)
+    total_provider_cost = fields.Monetary(
+        string='Total Est. Provider Cost (ETB)', currency_field='budget_currency_id',
+        compute='_compute_cost_breakdown', store=True)
+    est_venue_cost_per_pax_day = fields.Monetary(
+        string='Est. Venue/Lunch/Refreshment per Person per Day (ETB)',
+        currency_field='budget_currency_id', default=0.0)
+    total_venue_cost = fields.Monetary(
+        string='Total Est. Venue/Lunch/Refreshment (ETB)', currency_field='budget_currency_id',
+        compute='_compute_cost_breakdown', store=True)
+
     scheduled_date = fields.Date(
         string='Scheduled Month',
         help='Target month / planned start date for the program execution.')
@@ -365,7 +427,7 @@ class EdsAnnualPlanLine(models.Model):
         ('international', 'International Provider'),
     ], string='Delivery Method', default='internal')
     target_employee_segment = fields.Char(string='Target Employee Segment')
-    budget_allocated = fields.Monetary(string='Budget Allocated',
+    budget_allocated = fields.Monetary(string='Budget Allocated (ETB)',
                                        currency_field='budget_currency_id')
     budget_currency_id = fields.Many2one('res.currency', related='plan_id.budget_currency_id',
                                          readonly=True)
@@ -386,6 +448,39 @@ class EdsAnnualPlanLine(models.Model):
         string='Addendum', default=False,
         help='Added through an approved unscheduled training request (/076).')
     notes = fields.Text(string='Notes')
+
+    @api.depends('scheduled_date', 'scheduled_month')
+    def _compute_quarter(self):
+        for rec in self:
+            month_num = None
+            if rec.scheduled_date:
+                month_num = rec.scheduled_date.month
+            elif rec.scheduled_month and '-' in rec.scheduled_month:
+                try:
+                    month_num = int(rec.scheduled_month.split('-')[1])
+                except (ValueError, IndexError):
+                    month_num = None
+            if month_num in (7, 8, 9):
+                rec.quarter = 'q1'
+            elif month_num in (10, 11, 12):
+                rec.quarter = 'q2'
+            elif month_num in (1, 2, 3):
+                rec.quarter = 'q3'
+            elif month_num in (4, 5, 6):
+                rec.quarter = 'q4'
+            elif not rec.quarter:
+                rec.quarter = 'unallocated'
+
+    @api.depends('planned_participants', 'num_sessions', 'duration_days', 'est_provider_cost_per_pax',
+                 'est_venue_cost_per_pax_day', 'course_id.duration_days')
+    def _compute_cost_breakdown(self):
+        for rec in self:
+            days = rec.duration_days or (rec.course_id and rec.course_id.duration_days) or 1
+            participants = rec.planned_participants or 0
+            rec.total_provider_cost = participants * rec.est_provider_cost_per_pax
+            rec.total_venue_cost = participants * days * rec.est_venue_cost_per_pax_day
+            if rec.est_provider_cost_per_pax > 0 or rec.est_venue_cost_per_pax_day > 0:
+                rec.budget_allocated = rec.total_provider_cost + rec.total_venue_cost
 
     @api.depends('scheduled_date')
     def _compute_scheduled_month(self):

@@ -153,6 +153,10 @@
                     <field name="work_unit_id"/>
                     <field name="course_id" optional="show"/>
                     <field name="proposed_program" optional="show"/>
+                    <field name="target_audience" optional="show"/>
+                    <field name="target_participant_count" optional="show"/>
+                    <field name="competency_level" optional="show"/>
+                    <field name="quarter" optional="show"/>
                     <field name="urgency" widget="badge"/>
                     <field name="competency_id" optional="show"/>
                     <field name="delivery_mode" widget="badge"/>
@@ -203,6 +207,10 @@
                                        placeholder="e.g. Advanced Branch AML Risk Controls" readonly="state != 'draft'"/>
                                 <field name="custom_course_description" invisible="not is_custom_course"
                                        placeholder="Describe what the course is about and expected learning objectives..." readonly="state != 'draft'"/>
+                                <field name="target_audience" readonly="state != 'draft'"/>
+                                <field name="target_participant_count" readonly="state != 'draft'"/>
+                                <field name="competency_level" readonly="state != 'draft'"/>
+                                <field name="quarter" readonly="state != 'draft'"/>
                                 <field name="urgency" readonly="state != 'draft'"/>
                                 <field name="delivery_mode" readonly="state != 'draft'"/>
                                 <field name="proposed_program" readonly="state != 'draft'" placeholder="Standardized program title (auto-populated)..."/>

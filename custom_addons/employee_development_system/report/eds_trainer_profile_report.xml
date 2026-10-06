@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_trainer_profile" model="ir.actions.report">
+        <field name="name">Trainer Profile &amp; Qualification (EDS-F-06)</field>
+        <field name="model">eds.trainer</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_trainer_profile_document</field>
+        <field name="report_file">employee_development_system.report_eds_trainer_profile_document</field>
+        <field name="print_report_name">'Trainer_Profile_%s' % (object.name or object.id)</field>
+        <field name="binding_model_id" ref="model_eds_trainer"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_trainer_profile_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 9.5pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Trainer Qualification Register</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-06
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">TRAINER PROFILE &amp; QUALIFICATION FORM</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Registration &amp; vetting document for internal trainers and external consultants.</p>
+                        </div>
+
+                        <!-- Section 1 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">1. Personal &amp; Professional Details</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 9pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Full Name:</td>
+                                    <td style="width: 25%;"><strong t-field="o.name"/></td>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Trainer ID / Ref:</td>
+                                    <td style="width: 25%;"><span t-esc="o.trainer_id_code or 'Pending'"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Trainer Type:</td>
+                                    <td><strong t-field="o.trainer_type"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Organization / Firm:</td>
+                                    <td><span t-field="o.organization_name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Phone:</td>
+                                    <td><span t-field="o.phone"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Email:</td>
+                                    <td><span t-field="o.email"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Total Banking Experience:</td>
+                                    <td><strong t-field="o.banking_experience_years"/> years</td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Total Training Experience:</td>
+                                    <td><strong t-field="o.trainer_experience_years"/> years</td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Institutions Worked With:</td>
+                                    <td colspan="3"><span t-field="o.institutions_worked_with"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 2 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">2. Educational Qualifications &amp; Certifications</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                            <thead style="background-color: #f2f2f2;">
+                                <tr>
+                                    <th>Degree / Qualification / Certification</th>
+                                    <th>Field of Study / Specialization</th>
+                                    <th>Institution / Awarding Body</th>
+                                    <th style="text-align: center;">Year</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="o.education_ids">
+                                    <t t-foreach="o.education_ids" t-as="ed">
+                                        <tr>
+                                            <td><strong t-field="ed.degree_title"/></td>
+                                            <td><span t-field="ed.field_of_study"/></td>
+                                            <td><span t-field="ed.institution_name"/></td>
+                                            <td style="text-align: center;"><span t-field="ed.year_obtained"/></td>
+                                        </tr>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <tr><td colspan="4" class="text-muted text-center">No formal qualifications entered</td></tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 3 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">3. Training Expertise Areas &amp; Certified Course Topics</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                            <thead style="background-color: #f2f2f2;">
+                                <tr>
+                                    <th>Subject / Banking Domain</th>
+                                    <th>Specific Course Topics</th>
+                                    <th>Target Participant Level</th>
+                                    <th style="text-align: center;">Years Exp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="o.expertise_ids">
+                                    <t t-foreach="o.expertise_ids" t-as="ex">
+                                        <tr>
+                                            <td><strong t-field="ex.subject_domain"/></td>
+                                            <td><span t-field="ex.course_topics"/></td>
+                                            <td><span t-field="ex.target_level"/></td>
+                                            <td style="text-align: center;"><span t-field="ex.years_experience"/></td>
+                                        </tr>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <tr><td colspan="4" class="text-muted text-center">No specific expertise topics registered</td></tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 4 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">4. Delivery History &amp; References</h6>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                            <thead style="background-color: #f2f2f2;">
+                                <tr>
+                                    <th>Program Title</th>
+                                    <th>Client / Bank Organization</th>
+                                    <th style="text-align: center;">Year</th>
+                                    <th style="text-align: center;">Participants</th>
+                                    <th style="text-align: center;">Avg Rating (/5)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="o.delivery_history_ids">
+                                    <t t-foreach="o.delivery_history_ids" t-as="dh">
+                                        <tr>
+                                            <td><span t-field="dh.program_title"/></td>
+                                            <td><span t-field="dh.client_organization"/></td>
+                                            <td style="text-align: center;"><span t-field="dh.delivery_year"/></td>
+                                            <td style="text-align: center;"><span t-field="dh.participant_count"/></td>
+                                            <td style="text-align: center;"><strong t-field="dh.participant_rating"/></td>
+                                        </tr>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <tr><td colspan="5" class="text-muted text-center">No delivery history records added</td></tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Section 5 -->
+                        <t t-if="o.trainer_type == 'external'">
+                            <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">5. Commercials &amp; Fee Structure</h6>
+                            <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                                <tr>
+                                    <td style="width: 25%; font-weight: bold; background-color: #f5f5f5;">Daily Rate:</td>
+                                    <td style="width: 25%;"><strong t-esc="'%.2f %s' % (o.daily_fee, o.currency_id.name or 'ETB')"/></td>
+                                    <td style="width: 25%; font-weight: bold; background-color: #f5f5f5;">Hourly Rate:</td>
+                                    <td style="width: 25%;"><span t-esc="'%.2f %s' % (o.hourly_fee, o.currency_id.name or 'ETB')"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold; background-color: #f5f5f5;">Tax Status:</td>
+                                    <td><span t-field="o.tax_status"/></td>
+                                    <td style="font-weight: bold; background-color: #f5f5f5;">Fee Validity:</td>
+                                    <td><span t-field="o.fee_validity_period"/></td>
+                                </tr>
+                            </table>
+                        </t>
+
+                        <!-- Section 6 -->
+                        <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">6. Declaration &amp; Approvals</h6>
+                        <table style="width: 100%; font-size: 8.5pt; margin-top: 6px;">
+                            <tr>
+                                <td style="width: 50%; vertical-align: top;">
+                                    <strong>Trainer Declaration:</strong><br/>
+                                    <em>I certify that all information submitted in this form is true and complete.</em><br/>
+                                    Declaration Confirmed: <strong>Yes</strong><br/>
+                                    Signature: ___________________
+                                </td>
+                                <td style="width: 25%; vertical-align: top;">
+                                    <strong>Reviewed by (Officer):</strong><br/>
+                                    Name: <span t-esc="o.reviewed_by_officer or '___________________'"/><br/>
+                                    Signature: _________________
+                                </td>
+                                <td style="width: 25%; vertical-align: top;">
+                                    <strong>Approved by (TL L&amp;D):</strong><br/>
+                                    Name: <span t-esc="o.approved_by_tl or '___________________'"/><br/>
+                                    Signature: _________________
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

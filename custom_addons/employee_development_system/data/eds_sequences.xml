@@ -281,5 +281,14 @@
             <field name="company_id" eval="False"/>
         </record>
 
+        <!-- EDS-F-12: Knowledge Sharing Debrief -->
+        <record id="seq_eds_knowledge_sharing" model="ir.sequence">
+            <field name="name">Knowledge Sharing Debrief Sequence</field>
+            <field name="code">eds.knowledge.sharing</field>
+            <field name="prefix">KSH/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
     </data>
 </odoo>

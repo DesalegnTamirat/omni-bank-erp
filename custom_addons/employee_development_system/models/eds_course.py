@@ -25,11 +25,33 @@ class EdsCourse(models.Model):
         ('values_ethics', 'Values & Ethics'),
         ('technical_compliance', 'Technical / Compliance'),
     ], string='Category', default='developmental', required=True, tracking=True)
+    program_category = fields.Selection([
+        ('induction', 'Induction Program'),
+        ('compliance', 'Compliance'),
+        ('leadership', 'Leadership'),
+        ('technical_functional', 'Technical / Functional'),
+        ('digital_it', 'Digital & IT'),
+        ('soft_skills', 'Soft Skills'),
+        ('risk_audit', 'Risk & Audit'),
+        ('customer_service', 'Customer Service'),
+        ('other', 'Other'),
+    ], string='Program Category', default='technical_functional', tracking=True)
+    target_audience = fields.Selection([
+        ('bod', 'BoD (Board of Directors)'),
+        ('smc', 'SMC (Senior Management Committee)'),
+        ('mlm', 'MLM (Middle Level Management)'),
+        ('below_mlm', 'Staff Below MLM'),
+        ('all_staff', 'All Staff'),
+    ], string='Target Audience Group', default='all_staff', tracking=True)
     delivery_method = fields.Selection([
         ('internal', 'Internal Delivery'),
         ('local_external', 'Local External Provider'),
         ('international', 'International Provider'),
     ], string='Delivery Method', default='internal', tracking=True)
+    delivery_place = fields.Selection([
+        ('local', 'Local'),
+        ('international', 'International'),
+    ], string='Delivery Place', default='local', tracking=True)
     duration_days = fields.Integer(string='Duration (Days)', default=1, tracking=True)
     schedule = fields.Selection([
         ('annual', 'Annual (Once a Year)'),

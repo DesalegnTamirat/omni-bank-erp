@@ -46,6 +46,7 @@ class CompetencyRoleBulkAssignWizard(models.TransientModel):
         updated_count = 0
         skipped_count = 0
 
+        lines_to_create = []
         for job in self.job_ids:
             # Check if an approved mapping already exists for this job position
             approved_existing = Mapping.search([
@@ -74,7 +75,7 @@ class CompetencyRoleBulkAssignWizard(models.TransientModel):
                             'weight': line.weight,
                         })
                     else:
-                        MappingLine.create({
+                        lines_to_create.append({
                             'mapping_id': draft_existing.id,
                             'competency_id': line.competency_id.id,
                             'required_proficiency': line.required_proficiency,
@@ -92,7 +93,7 @@ class CompetencyRoleBulkAssignWizard(models.TransientModel):
                     'change_description': _('Bulk auto-assigned competencies via Bulk Assignment Wizard.'),
                 })
                 for line in self.line_ids:
-                    MappingLine.create({
+                    lines_to_create.append({
                         'mapping_id': new_mapping.id,
                         'competency_id': line.competency_id.id,
                         'required_proficiency': line.required_proficiency,
@@ -100,6 +101,9 @@ class CompetencyRoleBulkAssignWizard(models.TransientModel):
                         'weight': line.weight,
                     })
                 created_count += 1
+
+        if lines_to_create:
+            MappingLine.create(lines_to_create)
 
         total_configured = created_count + updated_count
         msg = _(

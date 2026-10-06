@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_level4" model="ir.actions.report">
+        <field name="name">Level 4 ROI &amp; Impact Report (EDS-F-11)</field>
+        <field name="model">eds.evaluation.level4</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_level4_document</field>
+        <field name="report_file">employee_development_system.report_eds_level4_document</field>
+        <field name="print_report_name">'Level4_Impact_%s' % (object.id)</field>
+        <field name="binding_model_id" ref="model_eds_evaluation_level4"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_level4_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-11
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">KIRKPATRICK LEVEL 4 – BUSINESS RESULTS &amp; ROI REPORT</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Executive synthesis of operational metric movement, financial benefit, and return on investment.</p>
+                        </div>
+
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Training Session:</td>
+                                    <td style="width: 30%;"><strong t-esc="o.session_id.name or 'All Sessions'"/></td>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Course Title:</td>
+                                    <td style="width: 30%;"><span t-field="o.course_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Measurement Date:</td>
+                                    <td><span t-field="o.measurement_date"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Evaluation Status:</td>
+                                    <td><span t-field="o.state"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Total Program Cost:</td>
+                                    <td><span t-field="o.total_program_cost" widget="monetary"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Estimated Financial Benefit:</td>
+                                    <td><span t-field="o.estimated_financial_benefit" widget="monetary"/></td>
+                                </tr>
+                                <tr style="background-color: #eaf2f8;">
+                                    <td style="font-weight: bold; color: #003366;">ROI Percentage (%):</td>
+                                    <td style="font-size: 11pt; font-weight: bold; color: #003366;"><span t-field="o.roi_percentage"/> %</td>
+                                    <td style="font-weight: bold; color: #003366;">Net Gain:</td>
+                                    <td style="font-size: 11pt; font-weight: bold; color: #003366;"><span t-esc="o.estimated_financial_benefit - o.total_program_cost"/> ETB</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">1. BUSINESS KPIS &amp; PERFORMANCE METRICS</h5>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th>Metric / Indicator</th>
+                                    <th>Baseline Value</th>
+                                    <th>Target Value</th>
+                                    <th>Achieved Value</th>
+                                    <th>Improvement (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="o.kpi_ids" t-as="m">
+                                    <tr>
+                                        <td><strong><span t-field="m.kpi_name"/></strong></td>
+                                        <td><span t-field="m.baseline_value"/></td>
+                                        <td><span t-field="m.target_value"/></td>
+                                        <td><span t-field="m.achieved_value"/></td>
+                                        <td><span t-field="m.improvement_pct"/> %</td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">2. EXECUTIVE SYNTHESIS &amp; OBSERVATIONS</h5>
+                        <div style="background-color: #fafafa; border: 1px solid #eee; padding: 8px; margin-bottom: 10px; font-size: 9.5pt;">
+                            <strong>Organizational Impact Summary:</strong>
+                            <p style="margin: 4px 0 0;" t-field="o.impact_summary"/>
+                        </div>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">3. EVALUATOR &amp; EXECUTIVE SIGN-OFF</h5>
+                        <table class="table table-bordered table-sm" style="margin-top: 10px; font-size: 9pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th style="width: 34%;">Evaluator / Officer</th>
+                                    <th style="width: 33%;">Team Leader, L&amp;D</th>
+                                    <th style="width: 33%;">Director, PPDD</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-field="o.evaluator_id.name"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Date: <span t-field="o.measurement_date"/></span>
+                                    </td>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-esc="o.sign_tl_lnd or 'Verified'"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Signature Verified</span>
+                                    </td>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-esc="o.sign_director_ppdd or 'Approved'"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Executive Seal</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

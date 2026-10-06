@@ -9,7 +9,8 @@
             <field name="arch" type="xml">
                 <xpath expr="//div[@name='button_box']" position="inside">
                     <button name="action_view_competency_assessments" type="object"
-                            class="oe_stat_button" icon="fa-clipboard-check">
+                            class="oe_stat_button" icon="fa-clipboard-check"
+                            groups="competency_management.group_competency_supervisor,competency_management.group_competency_officer,competency_management.group_competency_admin">
                         <field name="competency_assessment_count" widget="statinfo"
                                string="Competency Assessments"/>
                     </button>

@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import base64
+import logging
 from odoo import api, fields, models, _
+
+_logger = logging.getLogger(__name__)
 
 
 class CompetencyDashboardSnapshot(models.Model):
@@ -74,45 +77,53 @@ class CompetencyDashboardSnapshot(models.Model):
         self.env.cr.execute(query, (c_ids,))
         rows = self.env.cr.dictfetchall()
 
+        if not rows:
+            return 0
+
+        # Pre-fetch existing snapshots for today in a single query
+        existing_records = self.search([
+            ('cycle_id', 'in', c_ids),
+            ('snapshot_date', '=', today),
+        ])
+        existing_keys = {(s.cycle_id.id, s.department_id.id, s.pillar) for s in existing_records}
+
+        # Pre-fetch departments to resolve operating units
+        dept_ids = list({r['department_id'] for r in rows if r.get('department_id')})
+        depts = self.env['hr.department'].browse(dept_ids) if dept_ids else self.env['hr.department']
+        dept_ou_map = {d.id: getattr(d, 'operating_unit_id', False).id for d in depts if hasattr(d, 'operating_unit_id') and d.operating_unit_id}
+
+        vals_list = []
         for row in rows:
             cy_id = row['cycle_id']
             dept_id = row['department_id']
-            pillar_val = row['pillar_val']
+            pillar_val = row['pillar_val'] if row['pillar_val'] in ('core', 'leadership', 'technical') else 'all'
 
-            existing = self.search([
-                ('cycle_id', '=', cy_id),
-                ('department_id', '=', dept_id),
-                ('pillar', '=', pillar_val),
-                ('snapshot_date', '=', today)
-            ], limit=1)
-            if existing:
+            if (cy_id, dept_id, pillar_val) in existing_keys:
                 continue
 
-            dept_rec = self.env['hr.department'].browse(dept_id) if dept_id else False
-            ou_id = dept_rec.operating_unit_id.id if dept_rec and hasattr(dept_rec, 'operating_unit_id') else False
+            existing_keys.add((cy_id, dept_id, pillar_val))
+            ou_id = dept_ou_map.get(dept_id, False)
 
-            self.create({
+            vals_list.append({
                 'snapshot_date': today,
                 'cycle_id': cy_id,
                 'department_id': dept_id,
                 'operating_unit_id': ou_id,
-                'pillar': pillar_val if pillar_val in ('core', 'leadership', 'technical') else 'all',
+                'pillar': pillar_val,
                 'total_assessed': row['total_assessed'] or 0,
                 'avg_gap': float(row['avg_gap'] or 0.0),
                 'below_count': row['below_cnt'] or 0,
                 'meets_count': row['meets_cnt'] or 0,
                 'exceeds_count': row['exceeds_cnt'] or 0,
             })
-            snapshot_count += 1
 
-        return snapshot_count
+        if vals_list:
+            self.create(vals_list)
+        return len(vals_list)
 
     @api.model
     def _cron_send_scheduled_competency_reports(self):
         """Cron: generate and email the organizational capability report to admins and supervisors."""
-        import logging
-        _logger = logging.getLogger(__name__)
-
         admin_group = self.env.ref('competency_management.group_competency_admin', raise_if_not_found=False)
         supervisor_group = self.env.ref('competency_management.group_competency_supervisor', raise_if_not_found=False)
 

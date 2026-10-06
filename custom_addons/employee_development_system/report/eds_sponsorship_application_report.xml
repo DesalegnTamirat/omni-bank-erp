@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_sponsorship_application" model="ir.actions.report">
+        <field name="name">Sponsorship Application &amp; Scoring Matrix (EDS-F-15)</field>
+        <field name="model">eds.sponsorship</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_sponsorship_application_document</field>
+        <field name="report_file">employee_development_system.report_eds_sponsorship_application_document</field>
+        <field name="print_report_name">'Sponsorship_Matrix_%s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_eds_sponsorship"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_sponsorship_application_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-15
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">STAFF SPONSORSHIP APPLICATION &amp; SELECTION COMMITTEE SCORING MATRIX</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Formal application and objective matrix evaluation for academic and executive sponsorship awards.</p>
+                        </div>
+
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Application Code:</td>
+                                    <td style="width: 30%;"><strong t-field="o.name"/></td>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Application Status:</td>
+                                    <td style="width: 30%;"><strong t-field="o.state"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Applicant Name:</td>
+                                    <td><strong t-field="o.employee_id.name"/> (<span t-esc="o.employee_id.barcode or 'N/A'"/>)</td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Department:</td>
+                                    <td><span t-field="o.employee_id.department_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Academic Institution:</td>
+                                    <td><span t-field="o.institution_name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Field of Study:</td>
+                                    <td><span t-field="o.field_of_study"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Program / Cert:</td>
+                                    <td><span t-field="o.program_name"/> (<span t-field="o.sponsorship_type"/>)</td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Continuous Service:</td>
+                                    <td><span t-field="o.service_months"/> Months</td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Sponsored Amount:</td>
+                                    <td><span t-field="o.approved_amount" widget="monetary"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Service Bond:</td>
+                                    <td><span t-field="o.bond_duration_months"/> Months</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">1. COMMITTEE OBJECTIVE SCORING MATRIX (100 PTS)</h5>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th>Evaluation Dimension</th>
+                                    <th style="width: 25%; text-align: center;">Max Pts</th>
+                                    <th style="width: 25%; text-align: center;">Awarded Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>A. Service Tenure Score:</strong> Continuous loyal service at Bunna Bank</td>
+                                    <td style="text-align: center;">30</td>
+                                    <td style="text-align: center;"><strong><span t-field="o.tenure_score"/></strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>B. Performance Appraisal Score:</strong> Past performance ratings and achievements</td>
+                                    <td style="text-align: center;">40</td>
+                                    <td style="text-align: center;"><strong><span t-field="o.performance_score"/></strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>C. Strategic Alignment Score:</strong> Relevance of certification/study to bank's roadmap</td>
+                                    <td style="text-align: center;">30</td>
+                                    <td style="text-align: center;"><strong><span t-field="o.strategic_alignment_score"/></strong></td>
+                                </tr>
+                                <tr style="background-color: #eaf2f8; font-weight: bold; font-size: 10.5pt; color: #003366;">
+                                    <td>TOTAL COMPOSITE MATRIX SCORE</td>
+                                    <td style="text-align: center;">100</td>
+                                    <td style="text-align: center;"><span t-field="o.total_matrix_score"/> / 100</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">2. COMMITTEE DELIBERATION &amp; DECISION</h5>
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Committee Decision:</td>
+                                    <td><strong t-field="o.committee_decision"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Admission Letter Attached:</td>
+                                    <td><span t-esc="'VERIFIED ATTACHED' if o.admission_letter_attached else 'NOT ATTACHED'"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 style="font-size: 10pt; font-weight: bold; color: #003366; margin-top: 14px; margin-bottom: 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">3. COMMITTEE CHAIR &amp; HR DIRECTOR SIGN-OFF</h5>
+                        <table class="table table-bordered table-sm" style="margin-top: 10px; font-size: 9pt;">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th style="width: 50%;">Sponsorship Committee Chairperson</th>
+                                    <th style="width: 50%;">Director, People &amp; Professional Development</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-esc="o.committee_chair_name or 'Chairperson'"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Date: <span t-field="o.application_date"/></span>
+                                    </td>
+                                    <td style="height: 55px; vertical-align: top;">
+                                        <span t-esc="o.ppdd_director_name or 'PPDD Director'"/><br/>
+                                        <span style="font-size: 8pt; color: #666;">Date: ________________________</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

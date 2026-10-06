@@ -41,6 +41,33 @@ class EdsSponsorship(models.Model):
         currency_field='currency_id',
         readonly=True, tracking=True)
 
+    # EDS-F-15 Sponsorship Application & Scoring Matrix
+    application_date = fields.Date(string='Application Date', default=fields.Date.context_today)
+    institution_name = fields.Char(string='University / Educational Institution')
+    field_of_study = fields.Char(string='Field of Study / Degree Title')
+    admission_letter_attached = fields.Boolean(string='Official Admission Letter Attached', default=True)
+    tenure_score = fields.Float(string='Service Tenure Score (Max 30 pts)', default=25.0)
+    performance_score = fields.Float(string='PMS Performance Score (Max 40 pts)', default=35.0)
+    strategic_alignment_score = fields.Float(string='Strategic Need Score (Max 30 pts)', default=25.0)
+    total_matrix_score = fields.Float(string='Total Matrix Score (/100)', compute='_compute_total_matrix_score', store=True)
+    committee_decision = fields.Selection([
+        ('recommended', 'Recommended for Full Sponsorship'),
+        ('waitlisted', 'Waitlisted for Next Cohort'),
+        ('rejected', 'Rejected'),
+    ], string='Committee Recommendation', default='recommended')
+    committee_chair_name = fields.Char(string='Committee Chairperson')
+    ppdd_director_name = fields.Char(string='Director, PPDD Approval')
+
+    @api.depends('tenure_score', 'performance_score', 'strategic_alignment_score')
+    def _compute_total_matrix_score(self):
+        for rec in self:
+            rec.total_matrix_score = (rec.tenure_score or 0.0) + (rec.performance_score or 0.0) + (rec.strategic_alignment_score or 0.0)
+
+    def action_print_application_form(self):
+        """Prints official Form EDS-F-15 Staff Sponsorship Application & Scoring Matrix PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_sponsorship_application').report_action(self)
+
     state = fields.Selection([
         ('draft', 'Draft'),
         ('eligibility_check', 'Eligibility Verified'),

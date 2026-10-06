@@ -22,6 +22,4 @@ class CompetencyCluster(models.Model):
         domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_uniq', 'unique(code)', 'The Competency Cluster code must be unique!'),
-    ]
+    _code_uniq = models.Constraint('UNIQUE (code)', 'The Competency Cluster code must be unique!')

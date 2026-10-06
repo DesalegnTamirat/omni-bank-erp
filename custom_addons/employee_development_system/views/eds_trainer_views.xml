@@ -58,6 +58,7 @@
                         <button name="action_mark_reviewed" string="Mark Reviewed" type="object"
                                 invisible="state != 'active'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_print_profile" string="Print Trainer Profile (EDS-F-06)" type="object" icon="fa-print"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
@@ -77,17 +78,23 @@
                             </div>
                         </div>
                         <group>
-                            <group string="Trainer">
+                            <group string="Trainer Profile &amp; Contact">
                                 <field name="trainer_type"/>
+                                <field name="trainer_id_code"/>
                                 <field name="employee_id" invisible="trainer_type != 'internal'"/>
                                 <field name="external_partner_id" invisible="trainer_type != 'external'"/>
                                 <field name="external_provider_id" invisible="trainer_type != 'external'"/>
                                 <field name="name"/>
+                                <field name="organization_name"/>
                                 <field name="job_title"/>
                                 <field name="phone"/>
                                 <field name="email"/>
+                                <field name="address"/>
                             </group>
-                            <group string="Qualification ()">
+                            <group string="Experience &amp; Vetting">
+                                <field name="banking_experience_years"/>
+                                <field name="trainer_experience_years"/>
+                                <field name="institutions_worked_with"/>
                                 <field name="competency_ids" widget="many2many_tags"/>
                                 <field name="tot_certified"/>
                                 <field name="review_cycle_months"/>
@@ -141,6 +148,59 @@
                                     </list>
                                 </field>
                             </page>
+                            <page string="Education &amp; Qualifications (EDS-F-06)" name="education">
+                                <field name="education_ids">
+                                    <list editable="bottom">
+                                        <field name="degree_title"/>
+                                        <field name="field_of_study"/>
+                                        <field name="institution_name"/>
+                                        <field name="year_obtained"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Certified Expertise (EDS-F-06)" name="expertise">
+                                <field name="expertise_ids">
+                                    <list editable="bottom">
+                                        <field name="subject_domain"/>
+                                        <field name="course_topics"/>
+                                        <field name="target_level"/>
+                                        <field name="years_experience"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Delivery History (EDS-F-06)" name="delivery_hist">
+                                <field name="delivery_history_ids">
+                                    <list editable="bottom">
+                                        <field name="program_title"/>
+                                        <field name="client_organization"/>
+                                        <field name="delivery_year"/>
+                                        <field name="participant_count"/>
+                                        <field name="participant_rating"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Commercials &amp; Sign-Off (EDS-F-06)" name="commercials">
+                                <group string="External Consultant Commercials" invisible="trainer_type != 'external'">
+                                    <group>
+                                        <field name="daily_fee"/>
+                                        <field name="hourly_fee"/>
+                                        <field name="currency_id" invisible="1"/>
+                                    </group>
+                                    <group>
+                                        <field name="tax_status"/>
+                                        <field name="fee_validity_period"/>
+                                    </group>
+                                </group>
+                                <group string="Declaration &amp; Approvals">
+                                    <group>
+                                        <field name="declaration_agreed"/>
+                                    </group>
+                                    <group>
+                                        <field name="reviewed_by_officer"/>
+                                        <field name="approved_by_tl"/>
+                                    </group>
+                                </group>
+                            </page>
                         </notebook>
                     </sheet>
                     <chatter/>
@@ -164,6 +224,8 @@
                 <list string="External Providers">
                     <field name="code"/>
                     <field name="name"/>
+                    <field name="provider_type" optional="show"/>
+                    <field name="rate_per_session" optional="show"/>
                     <field name="category" widget="badge"/>
                     <field name="country_id"/>
                     <field name="accreditation"/>
@@ -190,6 +252,8 @@
                                 <field name="code" readonly="1"/>
                                 <field name="name"/>
                                 <field name="partner_id"/>
+                                <field name="provider_type"/>
+                                <field name="rate_per_session"/>
                                 <field name="category"/>
                                 <field name="country_id"/>
                                 <field name="tax_id"/>

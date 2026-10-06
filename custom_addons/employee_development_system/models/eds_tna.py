@@ -400,7 +400,7 @@ class EdsTnaEntry(models.Model):
 
     name = fields.Char(string='Reference', readonly=True, copy=False)
     cycle_id = fields.Many2one(
-        'eds.tna.cycle', string='TNA Cycle', required=True, ondelete='cascade', tracking=True)
+        'eds.tna.cycle', string='TNA Cycle', required=True, ondelete='cascade', index=True, tracking=True)
     work_unit_id = fields.Many2one(
         'operating.unit', string='Work Unit', default=_default_work_unit_id, tracking=True)
     department_id = fields.Many2one(
@@ -408,7 +408,7 @@ class EdsTnaEntry(models.Model):
     job_position_id = fields.Many2one(
         'hr.job', string='Job Position', default=_default_job_position_id, tracking=True)
     employee_id = fields.Many2one(
-        'hr.employee', string='Employee', default=_default_employee_id, tracking=True)
+        'hr.employee', string='Employee', default=_default_employee_id, index=True, tracking=True)
     competency_id = fields.Many2one(
         'competency.competency', string='Competency',
         help='Linked to the approved competency framework .', tracking=True)
@@ -428,19 +428,49 @@ class EdsTnaEntry(models.Model):
         ('customer_feedback', 'Customer Feedback'),
         ('industry_trend', 'Industry Trend'),
     ], string='Source', default='manual', required=True, tracking=True)
+    target_audience = fields.Selection([
+        ('bod', 'BoD (Board of Directors)'),
+        ('smc', 'SMC (Senior Management Committee)'),
+        ('mlm', 'MLM (Middle Level Management)'),
+        ('below_mlm', 'Staff Below MLM'),
+        ('all_staff', 'All Staff'),
+    ], string='Target Group / Audience', default='all_staff', tracking=True)
+    target_participant_count = fields.Integer(
+        string='Number of Participants', default=1,
+        help='Planned participant headcount for this training need.')
+    competency_level = fields.Selection([
+        ('basic', 'Basic'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced'),
+        ('expert', 'Expert'),
+    ], string='Required Competency Level', default='intermediate', tracking=True)
     delivery_mode = fields.Selection([
         ('classroom', 'Classroom'),
+        ('virtual', 'Virtual'),
         ('e_learning', 'E-Learning'),
         ('blended', 'Blended'),
+        ('workshop', 'Workshop'),
+        ('on_the_job', 'On-the-job'),
+        ('coaching', 'Coaching / Mentoring'),
+        ('exposure', 'Abroad - Training & Exposure'),
+        ('conference', 'Summit / Conference'),
     ], string='Delivery Mode', default='classroom', required=True, tracking=True,
-        help='Decided at TNA stage : only Classroom (and the classroom part of '
-             'Blended) are actioned within EDS; E-Learning routes to the LMS.')
+        help='Decided at TNA stage: only Classroom (and the classroom part of '
+             'Blended/Workshop) are actioned within EDS; pure E-Learning routes to the LMS.')
     # Course Pool Selection & Ad-Hoc Requests
     course_id = fields.Many2one(
         'eds.course', string='Course from Catalog', domain="[('status', '=', 'active')]", tracking=True)
     is_custom_course = fields.Boolean(string='Course Not in Catalog', default=False, tracking=True)
     custom_course_title = fields.Char(string='Custom Course Title', tracking=True)
     custom_course_description = fields.Text(string='What the Course is About / Content Summary')
+    quarter = fields.Selection([
+        ('q1', 'Q1 Jul-Sep'),
+        ('q2', 'Q2 Oct-Dec'),
+        ('q3', 'Q3 Jan-Mar'),
+        ('q4', 'Q4 Apr-Jun'),
+        ('all', 'Q1-Q4'),
+        ('tbd', 'TBD'),
+    ], string='Preferred Quarter', default='q1', tracking=True)
     urgency = fields.Selection([
         ('critical', 'Critical (Immediate Operational Urgency)'),
         ('high', 'High Priority'),
@@ -491,7 +521,7 @@ class EdsTnaEntry(models.Model):
         ('approved', 'Approved'),
         ('converted', 'Converted to Program'),
         ('excluded', 'Excluded'),
-    ], string='Status', default='draft', tracking=True)
+    ], string='Status', default='draft', index=True, tracking=True)
     submitted_by = fields.Many2one(
         'res.users', string='Submitted By', default=lambda self: self.env.user, readonly=True, copy=False)
     validated_by = fields.Many2one('res.users', string='Validated By', readonly=True)
@@ -839,6 +869,11 @@ class EdsTnaEntry(models.Model):
         return super().write(vals)
 
     # ── Workflow (manager review; exclusion) ───────────
+    def _require_group(self, group_xml_id):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
+                or self.env.user.has_group('employee_development_system.group_eds_admin')):
+            raise UserError(_('You do not have the required authority for this step.'))
+
     def action_submit(self):
         for rec in self:
             if rec.state != 'draft':
@@ -847,8 +882,9 @@ class EdsTnaEntry(models.Model):
             rec.message_post(body=_('Training need %s submitted.') % rec.name)
 
     def action_validate(self):
-        """PPDD validation of a submitted entry ()."""
+        """Line Manager or PPDD validation of a submitted entry."""
         for rec in self:
+            rec._require_group('group_eds_line_manager')
             if rec.state not in ('submitted', 'validated'):
                 raise UserError(_('Only submitted entries can be validated.'))
             rec.write({
@@ -861,6 +897,7 @@ class EdsTnaEntry(models.Model):
     def action_exclude(self):
         """Flag duplicate/invalid/non-training items for exclusion ()."""
         if len(self) == 1 and not self.excluded_reason:
+            self._require_group('group_eds_officer')
             return {
                 'name': _('Exclude Training Need'),
                 'type': 'ir.actions.act_window',
@@ -874,6 +911,7 @@ class EdsTnaEntry(models.Model):
                 },
             }
         for rec in self:
+            rec._require_group('group_eds_officer')
             if not rec.excluded_reason:
                 raise UserError(_('An exclusion reason is required.'))
             rec.state = 'excluded'
@@ -881,11 +919,15 @@ class EdsTnaEntry(models.Model):
 
     def action_reopen_draft(self):
         for rec in self:
+            is_submitter = (rec.submitted_by == self.env.user or rec.employee_id.user_id == self.env.user)
+            if not (is_submitter and rec.state == 'submitted'):
+                rec._require_group('group_eds_officer')
             rec.state = 'draft'
 
     def action_restore_from_exclusion(self):
         """Restore an excluded need back to submitted / validated active status."""
         for rec in self:
+            rec._require_group('group_eds_officer')
             if rec.state == 'excluded':
                 target_state = 'validated' if rec.validated_by else 'submitted'
                 rec.write({
@@ -900,6 +942,7 @@ class EdsTnaEntry(models.Model):
     def action_clear_screening_flags(self):
         """Clear duplicate and non-training flags to keep the need active as training."""
         for rec in self:
+            rec._require_group('group_eds_officer')
             rec.write({
                 'is_duplicate': False,
                 'exclusion_type': False,

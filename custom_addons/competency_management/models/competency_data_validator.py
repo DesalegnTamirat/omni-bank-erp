@@ -21,16 +21,20 @@ class CompetencyDataValidator(models.Model):
 
         if unmapped_jobs:
             admin_group = self.env.ref('competency_management.group_competency_admin', raise_if_not_found=False)
-            admins = admin_group.user_ids if admin_group else self.env['res.users']
+            admins = getattr(admin_group, 'users', getattr(admin_group, 'user_ids', self.env['res.users'])) if admin_group else self.env['res.users']
             body = Markup(_(
                 "<b>Competency Data Quality Audit Report</b><br/>"
                 "• Active Roles Missing Approved Mapping (%s): %s"
             )) % (
                 len(unmapped_jobs), escape(", ".join(unmapped_jobs[:10]) or "None")
             )
-            for admin in admins:
-                self.env['mail.thread'].message_notify(
-                    partner_ids=admin.partner_id.ids,
-                    subject=_("Data Quality Audit Alert: Competency Management"),
-                    body=body
-                )
+            partner_ids = admins.mapped('partner_id').ids
+            if partner_ids:
+                try:
+                    self.env['mail.thread'].message_notify(
+                        partner_ids=partner_ids,
+                        subject=_("Data Quality Audit Alert: Competency Management"),
+                        body=body
+                    )
+                except Exception:
+                    pass

@@ -24,6 +24,18 @@ class EdsExternalProvider(models.Model):
         ('international', 'International Provider'),
     ], string='Category', default='local', required=True, tracking=True)
     country_id = fields.Many2one('res.country', string='Country')
+    provider_type = fields.Selection([
+        ('university', 'University / Academic Institute'),
+        ('consultancy', 'Consultancy Firm'),
+        ('vendor', 'Software / Tech Vendor'),
+        ('individual', 'Individual Consultant'),
+        ('association', 'Professional Association'),
+        ('regulatory', 'Regulatory / Standards Body'),
+        ('other', 'Other'),
+    ], string='Provider Type', default='consultancy', tracking=True)
+    currency_id = fields.Many2one('res.currency', string='Currency',
+                                  default=lambda self: self.env.company.currency_id)
+    rate_per_session = fields.Monetary(string='Indicative Rate per Session', currency_field='currency_id')
     accreditation = fields.Char(string='Accreditation Status')
     service_offerings = fields.Text(string='Service Offerings')
     pre_qualified = fields.Boolean(
@@ -116,6 +128,36 @@ class EdsProviderPerformanceHistory(models.Model):
     notes = fields.Text(string='Notes')
     evaluated_by_id = fields.Many2one('res.users', string='Evaluated By',
                                       default=lambda self: self.env.user)
+    session_id = fields.Many2one('eds.session', string='Training Session')
+    contract_id = fields.Many2one('eds.training.contract', string='Contract Ref')
+    score_content_relevance = fields.Selection([
+        ('1', '1 - Poor'), ('2', '2 - Fair'), ('3', '3 - Good'), ('4', '4 - Very Good'), ('5', '5 - Excellent')
+    ], string='Content Relevance & Syllabus Adherence', default='4')
+    score_trainer_quality = fields.Selection([
+        ('1', '1 - Poor'), ('2', '2 - Fair'), ('3', '3 - Good'), ('4', '4 - Very Good'), ('5', '5 - Excellent')
+    ], string='Trainer Competence & Delivery', default='4')
+    score_time_management = fields.Selection([
+        ('1', '1 - Poor'), ('2', '2 - Fair'), ('3', '3 - Good'), ('4', '4 - Very Good'), ('5', '5 - Excellent')
+    ], string='Punctuality & Schedule Adherence', default='4')
+    score_logistics_handouts = fields.Selection([
+        ('1', '1 - Poor'), ('2', '2 - Fair'), ('3', '3 - Good'), ('4', '4 - Very Good'), ('5', '5 - Excellent')
+    ], string='Materials, Handouts & Exercises', default='4')
+    score_responsiveness = fields.Selection([
+        ('1', '1 - Poor'), ('2', '2 - Fair'), ('3', '3 - Good'), ('4', '4 - Very Good'), ('5', '5 - Excellent')
+    ], string='Administrative Responsiveness & Reporting', default='4')
+    recommend_future_tenders = fields.Selection([
+        ('strongly_recommend', 'Strongly Recommended for Future Programs'),
+        ('recommend', 'Recommended with Minor Improvements'),
+        ('conditional', 'Conditional / Watchlist'),
+        ('do_not_recommend', 'Do Not Recommend / Blacklist'),
+    ], string='Future Procurement Recommendation', default='recommend', required=True)
+    evaluated_by_officer = fields.Char(string='Evaluated by (L&D Officer)')
+    approved_by_tl = fields.Char(string='Approved by (Team Leader, L&D)')
+
+    def action_print_appraisal(self):
+        """Prints official Form EDS-F-13 Provider Performance Appraisal PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_vendor_appraisal').report_action(self)
     _check_provider_or_venue_required = models.Constraint(
         'CHECK(provider_id IS NOT NULL OR venue_name IS NOT NULL)',
         'Link the evaluation to a provider or enter a venue name!',

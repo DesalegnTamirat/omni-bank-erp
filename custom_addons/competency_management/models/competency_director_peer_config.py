@@ -66,6 +66,7 @@ class CompetencyDirectorPeerConfig(models.Model):
     def onchange(self, values, field_name, field_onchange):
         return super(CompetencyDirectorPeerConfig, self.sudo()).onchange(values, field_name, field_onchange)
 
+    @api.depends_context('company')
     def _compute_has_open_cycle(self):
         has_open = bool(self.env['competency.assessment.cycle'].search_count([('state', '=', 'open')]))
         for rec in self:

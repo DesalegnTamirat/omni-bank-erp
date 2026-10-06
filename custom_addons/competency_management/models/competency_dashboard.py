@@ -29,6 +29,7 @@ class CompetencyDashboard(models.TransientModel):
             cycle = self.env['competency.assessment.cycle'].sudo().search([], order='id desc', limit=1)
         return cycle
 
+    @api.depends_context('uid')
     def _compute_user_access(self):
         user = self.env.user
         is_admin = user.has_group('competency_management.group_competency_admin')

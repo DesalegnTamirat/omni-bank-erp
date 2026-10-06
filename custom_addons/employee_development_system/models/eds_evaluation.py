@@ -78,9 +78,9 @@ class EdsEvaluationLevel1(models.Model):
     _description = 'EDS Level 1 Reaction & Satisfaction Feedback'
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
-    session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', tracking=True)
+    session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', index=True, tracking=True)
     course_id = fields.Many2one('eds.course', related='session_id.course_id', string='Course', store=True)
-    employee_id = fields.Many2one('hr.employee', string='Participant', required=True, tracking=True)
+    employee_id = fields.Many2one('hr.employee', string='Participant', required=True, index=True, tracking=True)
     instrument_id = fields.Many2one('eds.evaluation.instrument', string='Evaluation Instrument')
     submitted_date = fields.Date(string='Submission Date', default=fields.Date.context_today)
     report_sla_deadline = fields.Date(string='Report SLA Deadline (7 Days)', compute='_compute_sla_deadline', store=True)
@@ -93,6 +93,15 @@ class EdsEvaluationLevel1(models.Model):
     line_ids = fields.One2many('eds.evaluation.level1.line', 'evaluation_id', string='Question Responses')
     general_comments = fields.Text(string='General Comments & Suggestions')
     recommend_to_others = fields.Selection([('yes', 'Yes'), ('no', 'No'), ('maybe', 'Maybe')], string='Would recommend course?')
+    
+    # EDS-F-02 Standard Form Fields
+    most_valuable_feedback = fields.Text(string='What was most valuable about this program?')
+    improvement_suggestions = fields.Text(string='What should be improved? Suggested future training topics?')
+    score_content = fields.Float(string='Content Score (%)', compute='_compute_category_scores', store=True)
+    score_trainer = fields.Float(string='Trainer Score (%)', compute='_compute_category_scores', store=True)
+    score_venue = fields.Float(string='Venue & Food Score (%)', compute='_compute_category_scores', store=True)
+    score_objective = fields.Float(string='Objectives & Overall Score (%)', compute='_compute_category_scores', store=True)
+    is_anonymous = fields.Boolean(string='Submit Anonymously', default=False, help='If checked, participant name and badge are suppressed on reports.')
 
     @api.constrains('session_id', 'employee_id')
     def _check_unique_session_participant(self):
@@ -112,14 +121,29 @@ class EdsEvaluationLevel1(models.Model):
             else:
                 rec.report_sla_deadline = False
 
-    @api.depends('line_ids.score_pct')
+    @api.depends('line_ids.score_pct', 'line_ids.question_id.question_type')
     def _compute_overall_score(self):
         for rec in self:
-            valid_lines = rec.line_ids.filtered(lambda l: l.score_pct > 0)
-            if valid_lines:
-                rec.overall_score = sum(valid_lines.mapped('score_pct')) / len(valid_lines)
+            scorable_lines = rec.line_ids.filtered(
+                lambda l: l.question_id.question_type in ('scale_1_5', 'scale_1_10', 'yes_no')
+            )
+            if scorable_lines:
+                rec.overall_score = round(sum(scorable_lines.mapped('score_pct')) / len(scorable_lines), 2)
             else:
                 rec.overall_score = 0.0
+
+    @api.depends('line_ids.score_pct', 'line_ids.question_id.category')
+    def _compute_category_scores(self):
+        for rec in self:
+            def avg_cat(categories):
+                lines = rec.line_ids.filtered(
+                    lambda l: l.question_id.category in categories and l.question_id.question_type in ('scale_1_5', 'scale_1_10', 'yes_no')
+                )
+                return round(sum(lines.mapped('score_pct')) / len(lines), 2) if lines else 0.0
+            rec.score_content = avg_cat(['content'])
+            rec.score_trainer = avg_cat(['trainer'])
+            rec.score_venue = avg_cat(['venue'])
+            rec.score_objective = avg_cat(['objective', 'impact'])
 
     def action_submit_feedback(self):
         for rec in self:
@@ -128,6 +152,11 @@ class EdsEvaluationLevel1(models.Model):
             rec.state = 'submitted'
             rec.submitted_date = fields.Date.context_today(self)
             rec.message_post(body=_("Level 1 feedback submitted by %s with score %.1f%%.") % (rec.employee_id.name, rec.overall_score))
+
+    def action_print_form(self):
+        """Prints official Form EDS-F-02 Reaction Survey PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_level1').report_action(self)
 
 class EdsEvaluationLevel1Line(models.Model):
     _name = 'eds.evaluation.level1.line'
@@ -157,17 +186,30 @@ class EdsEvaluationLevel2(models.Model):
     _description = 'EDS Level 2 Learning Evaluation (Pre vs Post Gain)'
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
-    session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', tracking=True)
+    session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', index=True, tracking=True)
     course_id = fields.Many2one('eds.course', related='session_id.course_id', string='Course', store=True)
-    employee_id = fields.Many2one('hr.employee', string='Participant', required=True, tracking=True)
+    employee_id = fields.Many2one('hr.employee', string='Participant', required=True, index=True, tracking=True)
     pre_assessment_id = fields.Many2one('eds.assessment', string='Pre-Assessment', domain="[('session_id', '=', session_id), ('employee_id', '=', employee_id), ('assessment_type', '=', 'pre')]")
     post_assessment_id = fields.Many2one('eds.assessment', string='Post-Assessment', domain="[('session_id', '=', session_id), ('employee_id', '=', employee_id), ('assessment_type', '=', 'post')]")
     pre_score = fields.Float(string='Pre Score (%)', related='pre_assessment_id.score', store=True)
     post_score = fields.Float(string='Post Score (%)', related='post_assessment_id.score', store=True)
+    
+    # EDS-F-03 Standard Pre/Post Scoring & Signatories
+    total_marks = fields.Float(string='Total Marks (Test)', default=100.0)
+    pre_test_score = fields.Float(string='Pre-test Raw Score', default=0.0)
+    post_test_score = fields.Float(string='Post-test Raw Score', default=0.0)
+    pre_test_pct = fields.Float(string='Pre-test (%)', compute='_compute_test_percentages', store=True)
+    post_test_pct = fields.Float(string='Post-test (%)', compute='_compute_test_percentages', store=True)
     learning_gain = fields.Float(string='Knowledge Gain (%)', compute='_compute_learning_gain', store=True)
     passing_score = fields.Float(string='Passing Score (%)', default=60.0)
     passed = fields.Boolean(string='Level 2 Passed', compute='_compute_passed', store=True)
     objective_achieved = fields.Boolean(string='Learning Objective Achieved', compute='_compute_passed', store=True)
+    remarks = fields.Char(string='Remarks')
+
+    trainer_assessor_name = fields.Char(string='Trainer / Assessor')
+    training_coordinator_name = fields.Char(string='Training Coordinator (L&D)')
+    approved_by_tl_name = fields.Char(string='Team Leader, L&D')
+
     state = fields.Selection([
         ('draft', 'Draft'),
         ('evaluated', 'Evaluated'),
@@ -183,26 +225,48 @@ class EdsEvaluationLevel2(models.Model):
                         rec.employee_id.name, rec.session_id.name
                     ))
 
-    @api.depends('pre_score', 'post_score')
+    @api.depends('pre_test_score', 'post_test_score', 'total_marks', 'pre_score', 'post_score')
+    def _compute_test_percentages(self):
+        for rec in self:
+            tm = rec.total_marks or 100.0
+            if rec.pre_test_score > 0:
+                rec.pre_test_pct = round((rec.pre_test_score / tm) * 100.0, 2)
+            else:
+                rec.pre_test_pct = rec.pre_score or 0.0
+
+            if rec.post_test_score > 0:
+                rec.post_test_pct = round((rec.post_test_score / tm) * 100.0, 2)
+            else:
+                rec.post_test_pct = rec.post_score or 0.0
+
+    @api.depends('pre_test_pct', 'post_test_pct', 'pre_score', 'post_score')
     def _compute_learning_gain(self):
         for rec in self:
-            rec.learning_gain = rec.post_score - rec.pre_score
+            pre = rec.pre_test_pct if rec.pre_test_pct else (rec.pre_score or 0.0)
+            post = rec.post_test_pct if rec.post_test_pct else (rec.post_score or 0.0)
+            rec.learning_gain = round(post - pre, 2)
 
-    @api.depends('post_score', 'passing_score')
+    @api.depends('post_test_pct', 'post_score', 'passing_score')
     def _compute_passed(self):
         for rec in self:
-            rec.passed = rec.post_score >= rec.passing_score
+            post = rec.post_test_pct if rec.post_test_pct else (rec.post_score or 0.0)
+            rec.passed = post >= rec.passing_score
             rec.objective_achieved = rec.passed
 
     def action_evaluate(self):
         for rec in self:
             rec.state = 'evaluated'
             rec.message_post(body=_("Level 2 evaluation completed: Pre %.1f%%, Post %.1f%%, Gain %.1f%%, Passed: %s.") % (
-                rec.pre_score, rec.post_score, rec.learning_gain, rec.passed
+                rec.pre_test_pct, rec.post_test_pct, rec.learning_gain, rec.passed
             ))
             # Trigger low-score flag for next cycle TNA if post score is below threshold
             if not rec.passed and rec.course_id:
                 rec._flag_tna_gap_candidate()
+
+    def action_print_form(self):
+        """Prints official Form EDS-F-03 Assessment Sheet PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_level2').report_action(self)
 
     def _flag_tna_gap_candidate(self):
         # Implementation of feedback loop to TNA for low Level-2 scores
@@ -223,9 +287,9 @@ class EdsEvaluationLevel3(models.Model):
     _description = 'EDS Level 3 Behavioral Application Assessment (Post 30-90 Days)'
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
-    session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', tracking=True)
+    session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade', index=True, tracking=True)
     course_id = fields.Many2one('eds.course', related='session_id.course_id', string='Course', store=True)
-    employee_id = fields.Many2one('hr.employee', string='Participant', required=True, tracking=True)
+    employee_id = fields.Many2one('hr.employee', string='Participant', required=True, index=True, tracking=True)
     manager_id = fields.Many2one('hr.employee', string='Line Manager / Assessor', required=True, tracking=True)
     due_date = fields.Date(string='Assessment Due Date', required=True, tracking=True)
     completed_date = fields.Date(string='Completion Date')
@@ -239,11 +303,32 @@ class EdsEvaluationLevel3(models.Model):
     line_ids = fields.One2many('eds.evaluation.level3.line', 'evaluation_id', string='Competency Observations')
     observation_notes = fields.Text(string='Manager Behavioral Observation & Evidence')
 
+    # EDS-F-04 Standard Form Fields
+    evaluation_period = fields.Selection([
+        ('30_days', '30 Days'),
+        ('60_days', '60 Days'),
+        ('90_days', '90 Days'),
+    ], string='Evaluation Period', default='60_days', required=True, tracking=True)
+    overall_result = fields.Selection([
+        ('significant_improvement', 'Significant Improvement'),
+        ('some_improvement', 'Some Improvement'),
+        ('no_change', 'No Change'),
+        ('decline', 'Decline'),
+    ], string='Overall Result', default='some_improvement', tracking=True)
+    business_impact_observed = fields.Text(
+        string='Business Impact Observed',
+        help='Observed impact on productivity, quality, customer service, or risk/compliance.')
+    recommended_support = fields.Text(
+        string='Further Support / Development Needs Recommended')
+    sign_manager_name = fields.Char(string='Line Manager')
+    sign_trainee_name = fields.Char(string='Trainee Acknowledgement')
+    sign_officer_name = fields.Char(string='L&D Officer (Received)')
+
     @api.depends('line_ids.score_pct')
     def _compute_behavior_score(self):
         for rec in self:
             if rec.line_ids:
-                rec.behavior_score = sum(rec.line_ids.mapped('score_pct')) / len(rec.line_ids)
+                rec.behavior_score = round(sum(rec.line_ids.mapped('score_pct')) / len(rec.line_ids), 2)
             else:
                 rec.behavior_score = 0.0
 
@@ -255,26 +340,42 @@ class EdsEvaluationLevel3(models.Model):
             rec.completed_date = fields.Date.context_today(self)
             rec.message_post(body=_("Level 3 behavioral evaluation completed by manager %s with score %.1f%%.") % (rec.manager_id.name, rec.behavior_score))
 
+    def action_print_form(self):
+        """Prints official Form EDS-F-04 Behavioral Evaluation PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_level3').report_action(self)
+
 class EdsEvaluationLevel3Line(models.Model):
     _name = 'eds.evaluation.level3.line'
     _description = 'EDS Level 3 Competency Observation Line'
 
     evaluation_id = fields.Many2one('eds.evaluation.level3', string='Level 3 Evaluation', ondelete='cascade')
     competency_id = fields.Many2one('competency.competency', string='Target Competency', required=True)
+    behavior_description = fields.Char(string='Observable On-the-Job Behavior')
+    frequency_rating = fields.Selection([
+        ('1', '1 - Never'),
+        ('2', '2 - Rarely'),
+        ('3', '3 - Sometimes'),
+        ('4', '4 - Often'),
+        ('5', '5 - Always'),
+    ], string='Frequency Rating', default='4')
     observed_level = fields.Selection([
         ('1', 'Level 1: Basic'),
         ('2', 'Level 2: Intermediate'),
         ('3', 'Level 3: Advanced'),
         ('4', 'Level 4: Expert'),
-    ], string='Observed Proficiency Level', required=True, default='2')
+    ], string='Observed Proficiency Level', default='2')
     score_pct = fields.Float(string='Score (%)', compute='_compute_score_pct', store=True)
     comment = fields.Text(string='Workplace Evidence / Comment')
 
-    @api.depends('observed_level')
+    @api.depends('observed_level', 'frequency_rating')
     def _compute_score_pct(self):
         for rec in self:
-            val = int(rec.observed_level) if rec.observed_level else 1
-            rec.score_pct = (val / 4.0) * 100.0
+            if rec.frequency_rating:
+                rec.score_pct = (int(rec.frequency_rating) / 5.0) * 100.0
+            else:
+                val = int(rec.observed_level) if rec.observed_level else 1
+                rec.score_pct = (val / 4.0) * 100.0
 
 class EdsEvaluationLevel4(models.Model):
     _name = 'eds.evaluation.level4'
@@ -310,6 +411,17 @@ class EdsEvaluationLevel4(models.Model):
                 rec.roi_percentage = (net_benefit / rec.total_program_cost) * 100.0
             else:
                 rec.roi_percentage = 0.0
+
+    session_id = fields.Many2one('eds.session', string='Training Session', tracking=True)
+    evaluator_id = fields.Many2one('res.users', string='Evaluated by', default=lambda self: self.env.user)
+    sign_tl_lnd = fields.Char(string='Team Leader, L&D Signoff')
+    sign_director_ppdd = fields.Char(string='Director, PPDD Approval')
+    sign_executive = fields.Char(string='Executive Management Sign-Off')
+
+    def action_print_form(self):
+        """Prints official Form EDS-F-11 Level 4 Impact & ROI Assessment PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_level4').report_action(self)
 
     def action_evaluate(self):
         for rec in self:

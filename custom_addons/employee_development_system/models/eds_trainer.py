@@ -35,6 +35,42 @@ class EdsTrainer(models.Model):
     job_title = fields.Char(string='Job Title / Specialization')
     phone = fields.Char(string='Phone')
     email = fields.Char(string='Email')
+
+    # EDS-F-06 Standard Profile Fields
+    trainer_id_code = fields.Char(string='Trainer ID / Code')
+    organization_name = fields.Char(string='Organization / Firm')
+    address = fields.Text(string='Physical Address')
+    
+    # 2. Education & Certifications
+    education_ids = fields.One2many('eds.trainer.education', 'trainer_id', string='Education & Certifications')
+
+    # 3. Banking & Training Experience
+    banking_experience_years = fields.Float(string='Total Years in Banking / Finance', default=0.0)
+    trainer_experience_years = fields.Float(string='Total Years as a Trainer', default=0.0)
+    institutions_worked_with = fields.Text(string='Banks / Institutions Worked With')
+
+    # 4. Certified Topics / Areas of Expertise
+    expertise_ids = fields.One2many('eds.trainer.expertise', 'trainer_id', string='Certified Topics & Expertise')
+
+    # 5. Previous Training Delivered & Ratings
+    delivery_history_ids = fields.One2many('eds.trainer.delivery.history', 'trainer_id', string='Previous Training Delivered')
+
+    # 6. Fee Structure
+    hourly_fee = fields.Monetary(string='Hourly Fee (ETB)', currency_field='currency_id')
+    daily_fee = fields.Monetary(string='Daily Fee (ETB)', currency_field='currency_id')
+    currency_id = fields.Many2one('res.currency', string='Currency', default=lambda self: self.env.company.currency_id)
+    tax_status = fields.Char(string='Currency / Tax Status', default='ETB (VAT Inclusive)')
+    fee_validity_period = fields.Char(string='Fee Validity Period', default='Annual / Current Fiscal Year')
+
+    # Declaration & Signatures
+    declaration_agreed = fields.Boolean(string='Agreed to Standards & Confidentiality', default=True)
+    reviewed_by_officer = fields.Char(string='Reviewed by (L&D Officer)')
+    approved_by_tl = fields.Char(string='Approved by (Team Leader, L&D)')
+
+    def action_print_profile(self):
+        """Prints official Form EDS-F-06 Trainer Profile PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_trainer_profile').report_action(self)
     competency_ids = fields.Many2many(
         'competency.competency', string='Competencies',
         help='Competencies the trainer is qualified to deliver (Task 5 uses this to '
@@ -259,3 +295,61 @@ class EdsTrainerFeedback(models.Model):
         ('5', '5 - Excellent'),
     ], string='Rating', required=True)
     comment = fields.Text(string='Comment')
+
+
+class EdsTrainerEducation(models.Model):
+    """Education & Professional Certifications (EDS-F-06)."""
+    _name = 'eds.trainer.education'
+    _description = 'Trainer Education & Certification'
+    _order = 'year_obtained desc, id desc'
+
+    trainer_id = fields.Many2one('eds.trainer', string='Trainer', required=True, ondelete='cascade')
+    degree_title = fields.Char(string='Degree / Qualification / Certification', required=True)
+    field_of_study = fields.Char(string='Field of Study / Specialization')
+    institution_name = fields.Char(string='Institution / Awarding Body')
+    year_obtained = fields.Char(string='Year Obtained')
+    # Backward compatibility aliases
+    qualification = fields.Char(related='degree_title', readonly=False)
+    institution = fields.Char(related='institution_name', readonly=False)
+    year = fields.Char(related='year_obtained', readonly=False)
+
+
+class EdsTrainerExpertise(models.Model):
+    """Certified Topics & Areas of Expertise (EDS-F-06)."""
+    _name = 'eds.trainer.expertise'
+    _description = 'Trainer Certified Topics & Expertise'
+    _order = 'id'
+
+    trainer_id = fields.Many2one('eds.trainer', string='Trainer', required=True, ondelete='cascade')
+    subject_domain = fields.Char(string='Subject / Banking Domain')
+    course_topics = fields.Char(string='Specific Course Topics', required=True)
+    target_level = fields.Selection([
+        ('basic', 'Basic / Foundation'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced / Senior'),
+        ('executive', 'Executive / Leadership'),
+    ], string='Target Participant Level', default='intermediate', required=True)
+    years_experience = fields.Float(string='Years of Experience in Domain', default=1.0)
+    # Backward compatibility aliases
+    topic = fields.Char(related='course_topics', readonly=False)
+    level = fields.Selection(related='target_level', readonly=False)
+    language = fields.Char(string='Language', default='English / Amharic')
+
+
+class EdsTrainerDeliveryHistory(models.Model):
+    """Previous Training Delivered & Historical Ratings (EDS-F-06)."""
+    _name = 'eds.trainer.delivery.history'
+    _description = 'Trainer Previous Delivery History'
+    _order = 'delivery_year desc, id desc'
+
+    trainer_id = fields.Many2one('eds.trainer', string='Trainer', required=True, ondelete='cascade')
+    program_title = fields.Char(string='Program Title', required=True)
+    client_organization = fields.Char(string='Client / Bank Organization')
+    delivery_year = fields.Char(string='Delivery Year')
+    participant_count = fields.Integer(string='Participants')
+    participant_rating = fields.Float(string='Avg. Rating (/5)', default=4.5)
+    # Backward compatibility aliases
+    program_name = fields.Char(related='program_title', readonly=False)
+    client_year = fields.Char(related='client_organization', readonly=False)
+    participants_count = fields.Integer(related='participant_count', readonly=False)
+    avg_rating = fields.Float(related='participant_rating', readonly=False)

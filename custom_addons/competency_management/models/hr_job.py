@@ -65,6 +65,16 @@ class HrJobCompetency(models.Model):
                     mappings = Mapping.search([('grade_id', '=', grade_obj.id)])
                 governance_type = 'job_grade'
 
+        all_comps = mappings.mapped('line_ids.competency_id')
+        comp_ids = all_comps.ids
+        cluster_by_comp = {}
+        if comp_ids:
+            clusters = self.env['competency.cluster'].search([('competency_ids', 'in', comp_ids)])
+            for cl in clusters:
+                for cid in cl.competency_ids.ids:
+                    if cid not in cluster_by_comp:
+                        cluster_by_comp[cid] = cl
+
         result = []
         for m in mappings:
             for line in m.line_ids:
@@ -73,7 +83,7 @@ class HrJobCompetency(models.Model):
                     continue
                 lvl_val = line.required_proficiency or '2'
                 selection_dict = dict(line._fields['required_proficiency'].selection) if 'required_proficiency' in line._fields else {}
-                cluster = self.env['competency.cluster'].search([('competency_ids', 'in', [comp.id])], limit=1)
+                cluster = cluster_by_comp.get(comp.id)
                 result.append({
                     'mapping_id': m.id,
                     'line_id': line.id,

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_template_import_wizard_form" model="ir.ui.view">
+        <field name="name">eds.template.import.wizard.form</field>
+        <field name="model">eds.template.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import EDS Business Templates (2026/27)">
+                <div class="alert alert-info mb-3" role="alert">
+                    Upload the official <strong>EDS_LD_Templates_2026-27.xlsx</strong> workbook or individual sheet data. The system will auto-import TNA entries, Curriculum &amp; Courses, Annual Plan Calendar lines, and Provider Registers.
+                </div>
+                <group>
+                    <group>
+                        <field name="file_data" filename="file_name" widget="binary"/>
+                        <field name="file_name" invisible="1"/>
+                        <field name="template_type"/>
+                        <field name="fiscal_year"/>
+                    </group>
+                    <group>
+                        <field name="annual_plan_id" options="{'no_create': True}" invisible="template_type not in ('auto', 'calendar')"/>
+                        <field name="tna_cycle_id" options="{'no_create': True}" invisible="template_type not in ('auto', 'tna')"/>
+                    </group>
+                </group>
+                <group string="Import Results" invisible="not result_summary">
+                    <field name="result_summary" nolabel="1" readonly="1"/>
+                </group>
+                <footer>
+                    <button name="action_import" string="Import Template Data" type="object" class="btn-primary" invisible="result_summary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_template_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Business Templates (2026/27)</field>
+        <field name="res_model">eds.template.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -20,13 +20,27 @@ class EdsUnscheduledRequest(models.Model):
     name = fields.Char(string='Reference', required=True, readonly=True, copy=False,
                        default=lambda self: _('New'))
     employee_id = fields.Many2one('hr.employee', string='Requested By', tracking=True)
+    contact_phone_email = fields.Char(string='Contact Phone / Email')
     work_unit_id = fields.Many2one('operating.unit', string='Work Unit')
     department_id = fields.Many2one('hr.department', string='Department')
     job_position_id = fields.Many2one('hr.job', string='Job Position')
+    unit_head_id = fields.Many2one('hr.employee', string='Unit Head')
+
     course_id = fields.Many2one('eds.course', string='Training Program',
                                 domain=[('status', 'in', ('draft', 'active'))])
     program_name = fields.Char(string='Program Name',
                                help='Free-text program when it is not in the course catalog.')
+    proposed_dates_text = fields.Char(string='Proposed Dates Text')
+    participant_count = fields.Integer(string='No. of Participants', default=1)
+    preferred_provider = fields.Char(string='Preferred Provider')
+    duration_text = fields.Char(string='Duration (Days / Hours)')
+    urgency_category = fields.Selection([
+        ('urgent_2weeks', 'Urgent (Within 2 Weeks)'),
+        ('high_1month', 'High (Within 1 Month)'),
+        ('other', 'Other Timeframe'),
+    ], string='Urgency Category', default='urgent_2weeks', tracking=True)
+    urgency_other = fields.Char(string='Other Urgency Specification')
+
     justification = fields.Text(string='Justification', required=True,
                                 help='Mandatory - ad-hoc requests must be justified and approved '
                                      'by L&D (business rule / ).')
@@ -37,10 +51,42 @@ class EdsUnscheduledRequest(models.Model):
         ('opportunity', 'Time-Bound Opportunity'),
         ('other', 'Other'),
     ], string='Reason', default='urgent_operational', required=True)
+
+    # Risk Checkboxes of NOT Conducting
+    risk_regulatory = fields.Boolean(string='Regulatory / Compliance Risk')
+    risk_operational = fields.Boolean(string='Operational Risk')
+    risk_financial = fields.Boolean(string='Financial Loss Risk')
+    risk_customer = fields.Boolean(string='Customer Service Impact')
+    risk_reputation = fields.Boolean(string='Reputational Risk')
+    risk_other = fields.Boolean(string='Other Risk')
+    risk_details = fields.Text(string='Risk of NOT Conducting Details')
+
     requested_date_start = fields.Date(string='Requested Start Date')
     requested_date_end = fields.Date(string='Requested End Date')
     estimated_cost = fields.Monetary(string='Estimated Cost',
                                      currency_field='company_currency_id')
+    cost_per_participant = fields.Monetary(
+        string='Cost per Participant',
+        currency_field='company_currency_id',
+        compute='_compute_cost_per_participant',
+        store=True)
+
+    @api.depends('estimated_cost', 'participant_count')
+    def _compute_cost_per_participant(self):
+        for rec in self:
+            if rec.participant_count and rec.participant_count > 0:
+                rec.cost_per_participant = rec.estimated_cost / rec.participant_count
+            else:
+                rec.cost_per_participant = 0.0
+    budget_source = fields.Selection([
+        ('unit_budget', 'Requesting Unit Budget'),
+        ('training_budget', 'Training Department Budget'),
+        ('contingency', 'Contingency / Reallocation'),
+        ('other', 'Other Source'),
+    ], string='Budget Source', default='training_budget')
+    budget_source_other = fields.Char(string='Other Budget Source Specification')
+    cost_centre_code = fields.Char(string='Cost Centre / Budget Code')
+
     delivery_mode = fields.Selection([
         ('classroom', 'Classroom'),
         ('e_learning', 'E-Learning'),
@@ -51,6 +97,23 @@ class EdsUnscheduledRequest(models.Model):
         domain="[('state', 'in', ('draft', 'published', 'amended'))]",
         help='Target annual plan the approved request is appended to as an addendum '
              '().')
+
+    # Approval Signatories & Decision
+    sign_unit_head = fields.Char(string='Requesting Unit Head Signoff')
+    sign_tl_lnd = fields.Char(string='Team Leader, L&D (Verified)')
+    sign_finance = fields.Char(string='Finance (Budget Confirmed)')
+    sign_director = fields.Char(string='Director, PPDD (Approved)')
+    decision_type = fields.Selection([
+        ('approved', 'Approved'),
+        ('approved_with_changes', 'Approved with Changes'),
+        ('rejected', 'Rejected'),
+    ], string='Final Committee Decision', default='approved', tracking=True)
+    decision_comments = fields.Text(string='Committee / Approver Comments')
+
+    def action_print_form(self):
+        """Prints official Form EDS-F-09 Unscheduled Training Request PDF."""
+        self.ensure_one()
+        return self.env.ref('employee_development_system.action_report_eds_unscheduled').report_action(self)
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),

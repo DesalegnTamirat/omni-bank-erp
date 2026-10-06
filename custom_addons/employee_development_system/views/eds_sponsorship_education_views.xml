@@ -29,6 +29,7 @@
                     <button name="action_approve" string="Approve Sponsorship" type="object" class="oe_highlight" invisible="state != 'eligibility_check'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_activate_bond" string="Activate Bond Agreement" type="object" class="oe_highlight" invisible="state != 'approved'" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_mark_breached" string="Mark Bond Breached" type="object" class="btn-danger" invisible="state != 'active'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_print_application_form" string="Print Application &amp; Matrix (EDS-F-15)" type="object" icon="fa-print"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,eligibility_check,approved,active,completed"/>
                 </header>
                 <sheet>
@@ -56,6 +57,25 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Application &amp; Scoring Matrix (EDS-F-15)" name="application_matrix">
+                            <group>
+                                <group string="Educational Program Application">
+                                    <field name="institution_name"/>
+                                    <field name="field_of_study"/>
+                                    <field name="application_date"/>
+                                    <field name="admission_letter_attached"/>
+                                </group>
+                                <group string="Committee Matrix Scoring (100 Pts)">
+                                    <field name="tenure_score"/>
+                                    <field name="performance_score"/>
+                                    <field name="strategic_alignment_score"/>
+                                    <field name="total_matrix_score"/>
+                                    <field name="committee_decision"/>
+                                    <field name="committee_chair_name"/>
+                                    <field name="ppdd_director_name"/>
+                                </group>
+                            </group>
+                        </page>
                         <page string="Signed Bond Document">
                             <group>
                                 <field name="bond_agreement" filename="bond_filename"/>

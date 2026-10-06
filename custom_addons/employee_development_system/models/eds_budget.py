@@ -9,7 +9,7 @@ class EdsBudget(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
     name = fields.Char(string='Budget Reference', required=True, copy=False, default=lambda self: _('New'))
-    fiscal_year = fields.Char(string='Fiscal Year', required=True, tracking=True, default='2025/2026')
+    fiscal_year = fields.Char(string='Fiscal Year', required=True, index=True, tracking=True, default='2025/2026')
     category = fields.Selection([
         ('internal', 'Internal Classroom Training'),
         ('local_external', 'Local External Training'),
@@ -18,6 +18,7 @@ class EdsBudget(models.Model):
         ('education_assistance', 'Staff Education Assistance'),
     ], string='Budget Category', required=True, tracking=True, default='internal')
     currency_id = fields.Many2one('res.currency', string='Currency', default=lambda self: self.env.company.currency_id)
+    company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company, index=True)
     allocated = fields.Monetary(string='Allocated Budget', currency_field='currency_id', required=True, tracking=True)
     committed = fields.Monetary(string='Committed Amount', compute='_compute_amounts', currency_field='currency_id', store=True)
     spent = fields.Monetary(string='Spent Amount', compute='_compute_amounts', currency_field='currency_id', store=True)
@@ -28,7 +29,7 @@ class EdsBudget(models.Model):
         ('draft', 'Draft'),
         ('approved', 'Approved'),
         ('locked', 'Locked'),
-    ], string='Status', default='draft', required=True, tracking=True)
+    ], string='Status', default='draft', required=True, index=True, tracking=True)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -203,6 +204,4 @@ class EdsLearningPartner(models.Model):
             if not rec.mou_document:
                 raise ValidationError(_("Please attach the signed MoU document before finalizing."))
             rec.state = 'active'
-            rec.message_post(body=_("Strategic MoU activated."))
-            rec.state = 'active'
-            rec.message_post(body=_("Strategic MoU activated."))
+            rec.message_post(body=_("Strategic MoU signed and activated."))

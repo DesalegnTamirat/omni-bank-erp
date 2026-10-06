@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_eds_level1" model="ir.actions.report">
+        <field name="name">Level 1 Reaction Survey (EDS-F-02)</field>
+        <field name="model">eds.evaluation.level1</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_level1_document</field>
+        <field name="report_file">employee_development_system.report_eds_level1_document</field>
+        <field name="print_report_name">'Reaction_Survey_%s' % (object.name or object.id)</field>
+        <field name="binding_model_id" ref="model_eds_evaluation_level1"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_eds_level1_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
+                        <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
+                                        <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
+                                    </td>
+                                    <td style="text-align: right; vertical-align: top;">
+                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
+                                            EDS-F-02
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; font-weight: bold; color: #222;">KIRKPATRICK LEVEL 1 – REACTION SURVEY</h4>
+                            <p style="margin: 2px 0 0; font-style: italic; font-size: 8.5pt; color: #555;">Participant satisfaction questionnaire collected at session close.</p>
+                        </div>
+
+                        <!-- Session Meta Information -->
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; font-size: 9.5pt;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Session Code:</td>
+                                    <td style="width: 30%;"><span t-esc="o.session_id.code or o.session_id.name"/></td>
+                                    <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Date:</td>
+                                    <td style="width: 30%;"><span t-field="o.submitted_date"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Program Title:</td>
+                                    <td><span t-field="o.session_id.course_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Trainer:</td>
+                                    <td><span t-field="o.session_id.trainer_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Venue:</td>
+                                    <td><span t-field="o.session_id.venue_id.name"/></td>
+                                    <td style="background-color: #f5f5f5; font-weight: bold;">Employee ID (Trainee):</td>
+                                    <td>
+                                        <span t-esc="o.employee_id.barcode or 'N/A'"/> 
+                                        (<span t-field="o.employee_id.name"/>)
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Sub-Score Breakdown Cards -->
+                        <table class="table table-sm table-bordered" style="margin-bottom: 12px; text-align: center; font-size: 9pt;">
+                            <thead style="background-color: #eaeff5;">
+                                <tr>
+                                    <th style="width: 20%;">A. Training Content</th>
+                                    <th style="width: 20%;">B. Trainer</th>
+                                    <th style="width: 20%;">C. Venue &amp; Logistics</th>
+                                    <th style="width: 20%;">D. Objectives &amp; Overall</th>
+                                    <th style="width: 20%; background-color: #dbe4ee; font-weight: bold;">Overall Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong t-esc="'%.1f%%' % o.score_content"/></td>
+                                    <td><strong t-esc="'%.1f%%' % o.score_trainer"/></td>
+                                    <td><strong t-esc="'%.1f%%' % o.score_venue"/></td>
+                                    <td><strong t-esc="'%.1f%%' % o.score_objective"/></td>
+                                    <td style="background-color: #f0f4f8; font-size: 10.5pt; color: #003366;">
+                                        <strong t-esc="'%.1f%%' % o.overall_score"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Questions and Ratings Table -->
+                        <div style="margin-bottom: 12px;">
+                            <p style="font-size: 8.5pt; margin-bottom: 4px; color: #555;">
+                                <em>Rating scale: 1 = Very Poor (20%), 2 = Poor (40%), 3 = Fair (60%), 4 = Good (80%), 5 = Excellent (100%)</em>
+                            </p>
+                            <table class="table table-sm table-bordered" style="font-size: 8.5pt;">
+                                <thead style="background-color: #f2f2f2;">
+                                    <tr>
+                                        <th style="width: 5%; text-align: center;">#</th>
+                                        <th style="width: 60%;">Survey Item / Statement</th>
+                                        <th style="width: 20%;">Category</th>
+                                        <th style="width: 15%; text-align: center;">Rating / Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-set="seq" t-value="1"/>
+                                    <t t-foreach="o.line_ids" t-as="l">
+                                        <tr>
+                                            <td style="text-align: center;" t-esc="seq"/>
+                                            <td><span t-field="l.question_id.name"/></td>
+                                            <td><span t-field="l.question_id.category"/></td>
+                                            <td style="text-align: center;">
+                                                <t t-if="l.question_id.question_type == 'scale_1_5'">
+                                                    <span t-esc="'%d / 5 (%.0f%%)' % (l.rating_val, l.score_pct)"/>
+                                                </t>
+                                                <t t-elif="l.question_id.question_type == 'yes_no'">
+                                                    <span t-esc="'Yes' if l.yes_no_val == 'yes' else 'No'"/>
+                                                </t>
+                                                <t t-else="">
+                                                    <span t-esc="l.text_val or '-'"/>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                        <t t-set="seq" t-value="seq + 1"/>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Qualitative Comments -->
+                        <div style="margin-bottom: 12px;">
+                            <table class="table table-sm table-bordered" style="font-size: 9pt;">
+                                <tbody>
+                                    <tr>
+                                        <td style="background-color: #f9f9f9; width: 35%; font-weight: bold;">
+                                            What was most valuable about this program?
+                                        </td>
+                                        <td>
+                                            <span t-esc="o.most_valuable_feedback or o.general_comments or 'None specified'"/>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="background-color: #f9f9f9; font-weight: bold;">
+                                            What should be improved? Suggested future topics:
+                                        </td>
+                                        <td>
+                                            <span t-esc="o.improvement_suggestions or 'None specified'"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 6px; font-size: 8pt; color: #777;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>Evaluated By: <span t-field="o.employee_id.name"/></td>
+                                    <td style="text-align: center;">Status: <span t-field="o.state"/></td>
+                                    <td style="text-align: right;">Generated on: <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

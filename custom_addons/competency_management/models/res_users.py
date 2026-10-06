@@ -19,19 +19,31 @@ class ResUsers(models.Model):
         compute_sudo=True,
     )
 
+    @api.depends('employee_id', 'employee_id.coach_id', 'employee_id.parent_id')
     def _compute_team_employee_ids(self):
+        emp_ids = self.mapped('employee_id').ids
+        if not emp_ids:
+            self.team_employee_ids = self.env['hr.employee']
+            return
+        all_subs = self.env['hr.employee'].sudo().search([
+            '|', ('coach_id', 'in', emp_ids), ('parent_id', 'in', emp_ids)
+        ])
+        sub_by_emp = {}
+        for sub in all_subs:
+            if sub.coach_id and sub.coach_id.id in emp_ids:
+                sub_by_emp.setdefault(sub.coach_id.id, self.env['hr.employee'])
+                sub_by_emp[sub.coach_id.id] |= sub
+            if sub.parent_id and sub.parent_id.id in emp_ids:
+                sub_by_emp.setdefault(sub.parent_id.id, self.env['hr.employee'])
+                sub_by_emp[sub.parent_id.id] |= sub
         for user in self:
             emp = user.employee_id
-            if not emp:
+            if emp:
+                user.team_employee_ids = emp | sub_by_emp.get(emp.id, self.env['hr.employee'])
+            else:
                 user.team_employee_ids = self.env['hr.employee']
-                continue
-            subs = self.env['hr.employee'].sudo().search([
-                '|',
-                ('coach_id', '=', emp.id),
-                ('parent_id', '=', emp.id),
-            ])
-            user.team_employee_ids = emp | subs
 
+    @api.depends('employee_id', 'employee_id.job_id', 'employee_id.department_id')
     def _compute_allowed_role_mapping_job_ids(self):
         for user in self:
             user.allowed_role_mapping_job_ids = user._get_allowed_role_mapping_jobs()
@@ -117,38 +129,32 @@ class ResUsers(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         users = super().create(vals_list)
-        sup_group = self.env.ref('competency_management.group_competency_supervisor', raise_if_not_found=False)
-        if sup_group:
-            for user in users:
-                emp = user.employee_id
-                if emp:
-                    has_coachees = self.env['hr.employee'].sudo().search_count([
-                        ('active', '=', True),
-                        '|', ('coach_id', '=', emp.id), ('parent_id', '=', emp.id)
-                    ]) > 0
-                    if has_coachees:
-                        user_groups = user.group_ids if 'group_ids' in user._fields else getattr(user, 'groups_id', self.env['res.groups'])
-                        if sup_group not in user_groups:
-                            field_name = 'group_ids' if 'group_ids' in user._fields else 'groups_id'
-                            user.sudo().write({field_name: [(4, sup_group.id)]})
+        self._sync_supervisor_group(users)
         return users
 
     def write(self, vals):
         res = super().write(vals)
         if 'employee_id' in vals or 'employee_ids' in vals:
-            sup_group = self.env.ref('competency_management.group_competency_supervisor', raise_if_not_found=False)
-            if sup_group:
-                for user in self:
-                    emp = user.employee_id
-                    if emp:
-                        has_coachees = self.env['hr.employee'].sudo().search_count([
-                            ('active', '=', True),
-                            '|', ('coach_id', '=', emp.id), ('parent_id', '=', emp.id)
-                        ]) > 0
-                        if has_coachees:
-                            user_groups = user.group_ids if 'group_ids' in user._fields else getattr(user, 'groups_id', self.env['res.groups'])
-                            if sup_group not in user_groups:
-                                field_name = 'group_ids' if 'group_ids' in user._fields else 'groups_id'
-                                user.sudo().write({field_name: [(4, sup_group.id)]})
+            self._sync_supervisor_group(self)
         return res
+
+    @api.model
+    def _sync_supervisor_group(self, users):
+        sup_group = self.env.ref('competency_management.group_competency_supervisor', raise_if_not_found=False)
+        if not sup_group or not users:
+            return
+        emp_ids = [u.employee_id.id for u in users if u.employee_id]
+        if not emp_ids:
+            return
+        coaches_and_parents = self.env['hr.employee'].sudo().search([
+            ('active', '=', True),
+            '|', ('coach_id', 'in', emp_ids), ('parent_id', 'in', emp_ids)
+        ])
+        supervisor_emp_ids = set(coaches_and_parents.mapped('coach_id').ids + coaches_and_parents.mapped('parent_id').ids)
+        for user in users:
+            if user.employee_id and user.employee_id.id in supervisor_emp_ids:
+                user_groups = user.group_ids if 'group_ids' in user._fields else getattr(user, 'groups_id', self.env['res.groups'])
+                if sup_group not in user_groups:
+                    field_name = 'group_ids' if 'group_ids' in user._fields else 'groups_id'
+                    user.sudo().write({field_name: [(4, sup_group.id)]})
 

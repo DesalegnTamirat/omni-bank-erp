@@ -4,6 +4,7 @@ import io
 import re
 import openpyxl
 import xlsxwriter
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -496,9 +497,9 @@ class CompetencyRoleMappingImportWizard(models.TransientModel):
             for err in errors[:50]:
                 err_html += f"""
                     <tr>
-                        <td style="text-align: center; font-weight: bold;">{err['row']}</td>
-                        <td><span class="badge bg-secondary">{err['field']}</span></td>
-                        <td style="color: #c92a2a;">{err['message']}</td>
+                        <td style="text-align: center; font-weight: bold;">{escape(str(err['row']))}</td>
+                        <td><span class="badge bg-secondary">{escape(str(err['field']))}</span></td>
+                        <td style="color: #c92a2a;">{escape(str(err['message']))}</td>
                     </tr>
                 """
             if len(errors) > 50:
@@ -709,12 +710,12 @@ class CompetencyRoleMappingImportWizard(models.TransientModel):
             status_badge = 'bg-success' if l['status'] == 'Approved' else 'bg-warning text-dark'
             summary_html += f"""
                 <tr>
-                    <td style="font-weight: 600;">{l['job_name']}</td>
-                    <td><span class="text-muted">{l['ou_name']}</span></td>
-                    <td style="text-align: center;"><strong>{l['version']}</strong></td>
-                    <td style="text-align: center;"><span class="badge bg-info text-dark">{l['comp_count']} lines</span></td>
-                    <td>{l['action']}</td>
-                    <td style="text-align: center;"><span class="badge {status_badge}">{l['status']}</span></td>
+                    <td style="font-weight: 600;">{escape(str(l['job_name']))}</td>
+                    <td><span class="text-muted">{escape(str(l['ou_name']))}</span></td>
+                    <td style="text-align: center;"><strong>{escape(str(l['version']))}</strong></td>
+                    <td style="text-align: center;"><span class="badge bg-info text-dark">{escape(str(l['comp_count']))} lines</span></td>
+                    <td>{escape(str(l['action']))}</td>
+                    <td style="text-align: center;"><span class="badge {status_badge}">{escape(str(l['status']))}</span></td>
                 </tr>
             """
         summary_html += "</tbody></table>"
