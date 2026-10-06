@@ -198,5 +198,506 @@
             </t>
         </template>
 
+        <!-- Official Exoneration & Clearance Certificate Template -->
+        <template id="report_exoneration_certificate_template">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="o">
+                    <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Times New Roman', Times, serif; color: #111111; font-size: 13.5px; line-height: 1.6; padding: 15px 35px; position: relative;">
+
+                        <!-- Official Header: Full Bunna Logo + Green/Brown Accent Bar -->
+                        <table style="width: 100%; margin-bottom: 22px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 32%; vertical-align: middle;">
+                                    <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 95px; max-width: 180px; height: auto;" alt="Bunna Bank S.C."/>
+                                </td>
+                                <td style="width: 68%; vertical-align: middle; padding-left: 15px;">
+                                    <div style="background-color: #2e7d32; height: 26px; width: 100%; border-radius: 2px;"></div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Date & Reference Numbers -->
+                        <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 55%;"></td>
+                                <td style="width: 45%; font-size: 13.5px; line-height: 1.6; text-align: left; padding-left: 20px;">
+                                    <div>
+                                        <strong>Date: </strong>
+                                        <span t-esc="o.final_decision_date.strftime('%B %d, %Y') if o.final_decision_date else (context_timestamp(datetime.datetime.now()).strftime('%B %d, %Y'))"/>
+                                    </div>
+                                    <div>
+                                        <strong>Ref. No: </strong>
+                                        <span t-esc="o.name or ''"/>
+                                    </div>
+                                    <div>
+                                        <strong>ID No: </strong>
+                                        <span t-esc="o.employee_id.identification_id or o.employee_id.barcode or ''"/>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Recipient Block -->
+                        <div class="mb-3" style="font-size: 14px; line-height: 1.4;">
+                            <div>
+                                <strong><span t-esc="o.get_salutation_label()"/> </strong>
+                                <span style="text-decoration: underline; font-weight: bold;" t-esc="o.employee_id.name if o.employee_id else '____________________'"/>
+                            </div>
+                            <div t-if="o.job_id">
+                                <strong><span t-esc="o.job_id.name"/></strong>
+                            </div>
+                            <div t-if="o.department_id">
+                                <strong><span t-esc="o.department_id.name"/></strong>
+                            </div>
+                            <div><strong>Bunna Bank S.C.</strong></div>
+                            <div><u><strong><span t-esc="o.work_location_id.name if o.work_location_id else 'Addis Ababa'"/></strong></u></div>
+                        </div>
+
+                        <!-- Formal Subject -->
+                        <div class="text-center my-4" style="font-size: 15.5px; font-weight: bold; text-decoration: underline; text-transform: uppercase;">
+                            OFFICIAL DISCIPLINARY EXONERATION &amp; CLEARANCE CERTIFICATE
+                        </div>
+
+                        <!-- Formal Salutation -->
+                        <div class="mb-3">
+                            <strong>Dear <span t-esc="o.get_salutation_title_and_first_name()"/>,</strong>
+                        </div>
+
+                        <!-- Official Body Text -->
+                        <div style="text-align: justify; margin-bottom: 20px;">
+                            <p>
+                                This is to officially certify that following comprehensive review and statutory evaluation regarding the alleged disciplinary matter under reference <strong><span t-esc="o.name"/></strong> (Alleged Offense: <em><span t-esc="o.offense_id.name if o.offense_id else 'Disciplinary Case'"/></em>, Incident Date: <strong><span t-esc="o.incident_date.strftime('%B %d, %Y') if o.incident_date else 'N/A'"/></strong>), the competent bank authority has concluded that you are <strong>FULLY EXONERATED OF ALL CHARGES</strong>.
+                            </p>
+                            <p>
+                                Consequently, this official certificate confirms:
+                            </p>
+                            <ol style="margin-left: 20px; line-height: 1.8;">
+                                <li><strong>Complete Drop of Allegations:</strong> All charges, inquiries, and proposed disciplinary measures associated with this case are hereby formally dismissed and nullified.</li>
+                                <li><strong>Preservation of Employment Record:</strong> No disciplinary warning, penalty record, or adverse remark shall be maintained in your official personnel file.</li>
+                                <li><strong>Full Reinstatement &amp; Rights:</strong> You remain in good professional standing with full entitlements, benefits, and career progression privileges unaffected.</li>
+                            </ol>
+                            <p>
+                                Bunna Bank S.C. appreciates your continued commitment and professional dedication.
+                            </p>
+                        </div>
+
+                        <!-- Signatory Section -->
+                        <div style="margin-top: 35px; page-break-inside: avoid;">
+                            <div>Sincerely,</div>
+                            <div style="height: 38px;"></div>
+                            <div><u><strong><span t-esc="o.approver_id.name if o.approver_id else (o.chief_id.name if o.chief_id else 'Authorized Executive Authority')"/></strong></u></div>
+                            <div><strong><span t-esc="o.get_signatory_title()"/></strong></div>
+                            <div><strong>Bunna Bank S.C.</strong></div>
+                        </div>
+
+                        <!-- CC Section -->
+                        <div style="margin-top: 30px; font-size: 11.5px; line-height: 1.5; page-break-inside: avoid;">
+                            <strong><u>CC:</u></strong>
+                            <ul style="list-style-type: none; padding-left: 0; margin-top: 4px;">
+                                <t t-foreach="o.get_discipline_letter_cc_lines()" t-as="cc_line">
+                                    <li>- <span t-esc="cc_line"/></li>
+                                </t>
+                                <li><u><strong>Bunna Bank S.C</strong></u></li>
+                            </ul>
+                        </div>
+
+                        <!-- Official Footer -->
+                        <div class="footer" style="border-top: 1px solid #7d8285; padding-top: 8px; margin-top: 25px; font-size: 10px; color: #555555;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: center; vertical-align: middle;">
+                                <tr>
+                                    <td style="width: 5%;"><div style="background-color: #2e7d32; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                                    <td style="width: 32%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>Tel</strong> +251 111 580 861 | 62</div>
+                                        <div><strong>Fax</strong> +251 111 580 832 | 76</div>
+                                    </td>
+                                    <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>Email</strong> info@bunnabanksc.com</div>
+                                        <div><strong>Website</strong> www.bunnabanksc.com</div>
+                                    </td>
+                                    <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>P.O.Box</strong> 1743 code 1110</div>
+                                        <div>Addis Ababa | Ethiopia</div>
+                                    </td>
+                                    <td style="width: 5%;"><div style="background-color: #2e7d32; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                                </tr>
+                            </table>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </template>
+
+        <!-- Main Report Template: Official Suspension Letter -->
+        <template id="report_suspension_letter_template">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="o">
+                    <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Times New Roman', Times, serif; color: #111111; font-size: 13.5px; line-height: 1.6; padding: 15px 35px; position: relative;">
+
+                        <!-- Official Header: Full Bunna Logo + Brown Accent Bar -->
+                        <table style="width: 100%; margin-bottom: 22px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 32%; vertical-align: middle;">
+                                    <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 95px; max-width: 180px; height: auto;" alt="Bunna Bank S.C."/>
+                                </td>
+                                <td style="width: 68%; vertical-align: middle; padding-left: 15px;">
+                                    <div style="background-color: #9C7D73; height: 26px; width: 100%; border-radius: 2px;"></div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Date & Reference Numbers -->
+                        <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 50%;"></td>
+                                <td style="width: 50%; font-size: 13.5px; line-height: 1.6; text-align: left; padding-left: 20px;">
+                                    <div>
+                                        <strong>Date: </strong>
+                                        <span t-esc="o.start_date.strftime('%B %d, %Y') if o.start_date else (context_timestamp(datetime.datetime.now()).strftime('%B %d, %Y'))"/>
+                                    </div>
+                                    <div>
+                                        <strong>Ref. No: </strong>
+                                        <span t-esc="o.name or ''"/>
+                                    </div>
+                                    <div>
+                                        <strong>Case Ref: </strong>
+                                        <span t-esc="o.case_id.name or ''"/>
+                                    </div>
+                                    <div>
+                                        <strong>ID No: </strong>
+                                        <span t-esc="o.employee_id.identification_id or o.employee_id.barcode or ''"/>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Recipient Block -->
+                        <div class="mb-3" style="font-size: 14px; line-height: 1.4;">
+                            <div>
+                                <strong><span t-esc="o.get_salutation_label()"/> </strong>
+                                <span style="text-decoration: underline; font-weight: bold;" t-esc="o.employee_id.name if o.employee_id else '____________________'"/>
+                            </div>
+                            <div t-if="o.job_title">
+                                <strong><span t-esc="o.job_title"/></strong>
+                            </div>
+                            <div t-if="o.department_id">
+                                <strong><span t-esc="o.department_id.name"/></strong>
+                            </div>
+                            <div><strong>Bunna Bank S.C.</strong></div>
+                            <div><u><strong>Addis Ababa, Ethiopia</strong></u></div>
+                        </div>
+
+                        <!-- Salutation -->
+                        <div class="mb-3" style="font-size: 14px;">
+                            Dear <span t-esc="o.get_salutation_title_and_first_name()"/>,
+                        </div>
+
+                        <!-- Subject -->
+                        <div class="text-center my-3">
+                            <span style="font-size: 15px; font-weight: bold;">
+                                <t t-if="o.suspension_type == 'without_pay'">
+                                    Subject: – <u>Notice of Precautionary Suspension Without Pay</u>
+                                </t>
+                                <t t-else="">
+                                    Subject: – <u>Notice of Precautionary Suspension With Pay</u>
+                                </t>
+                            </span>
+                        </div>
+
+                        <!-- Body Content -->
+                        <div style="text-align: justify; font-size: 13.5px; line-height: 1.65;">
+                            <p style="margin-bottom: 14px;">
+                                This is to formally notify you that in connection with the ongoing disciplinary proceedings under Case 
+                                <strong><span t-esc="o.case_id.name"/></strong> concerning alleged misconduct under 
+                                <strong><span t-esc="o.offense_id.name if o.offense_id else 'Bank Disciplinary Regulations'"/></strong>, 
+                                the Bank Management has resolved to place you on precautionary suspension effective from 
+                                <strong><span t-esc="o.start_date.strftime('%B %d, %Y') if o.start_date else ''"/></strong> to 
+                                <strong><span t-esc="o.end_date.strftime('%B %d, %Y') if o.end_date else ''"/></strong> 
+                                (<span t-esc="o.working_days_count"/> working days).
+                            </p>
+
+                            <!-- Grounds Indented Block -->
+                            <div style="background-color: #f9f9f9; border-left: 3px solid #9C7D73; padding: 10px 14px; margin-bottom: 14px;">
+                                <strong>Grounds for Precautionary Suspension:</strong>
+                                <div style="margin-top: 5px;" t-esc="o.reason or 'Precautionary suspension pending audit investigation and disciplinary inquiry.'"/>
+                            </div>
+
+                            <!-- Terms & Statutory Conditions -->
+                            <p style="margin-bottom: 12px;">
+                                <strong>Terms and Conditions during Suspension:</strong>
+                            </p>
+                            <ol style="margin-bottom: 14px; padding-left: 20px;">
+                                <li style="margin-bottom: 6px;">
+                                    <strong>Access Restriction:</strong> Your ERP system credentials, internal application access, and physical premises access to Bank work areas are temporarily suspended for the duration of this inquiry.
+                                </li>
+                                <t t-if="o.suspension_type == 'without_pay'">
+                                    <li style="margin-bottom: 6px;">
+                                        <strong>Salary Withholding:</strong> In accordance with Bank Disciplinary Policy, payment of monthly salary is withheld during the active period of this unpaid precautionary suspension. Final salary settlement and backpayment (if applicable) will be determined upon final resolution of your case.
+                                    </li>
+                                </t>
+                                <li style="margin-bottom: 6px;">
+                                    <strong>Availability for Inquiry:</strong> You are required to remain reachable and available to appear before the Audit Directorate and the Disciplinary Committee whenever summoned for interviews, clarifications, or hearings.
+                                </li>
+                            </ol>
+
+                            <p style="margin-bottom: 25px;">
+                                This suspension is a precautionary administrative measure to ensure a fair and unimpeded investigation and does not constitute a final determination of guilt.
+                            </p>
+                        </div>
+
+                        <!-- Sign-off Block -->
+                        <div style="margin-top: 25px; page-break-inside: avoid;">
+                            <div style="margin-bottom: 35px;">With best regards,</div>
+                            <div style="font-weight: bold;">
+                                <t t-if="o.suspending_authority == 'cpco'">
+                                    Chief People &amp; Culture Officer (CPCO)
+                                </t>
+                                <t t-elif="o.suspending_authority == 'bod'">
+                                    Executive Office / On behalf of Board of Directors
+                                </t>
+                                <t t-else="">
+                                    People Operations Management Directorate (POMD)
+                                </t>
+                            </div>
+                            <div><u><strong>Bunna Bank S.C.</strong></u></div>
+                        </div>
+
+                        <!-- Official Footer -->
+                        <div class="footer" style="border-top: 1px solid #7d8285; padding-top: 8px; margin-top: 25px; font-size: 10px; color: #555555;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: center; vertical-align: middle;">
+                                <tr>
+                                    <td style="width: 5%;"><div style="background-color: #9C7D73; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                                    <td style="width: 32%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>Tel</strong> +251 111 580 861 | 62</div>
+                                        <div><strong>Fax</strong> +251 111 580 832 | 76</div>
+                                    </td>
+                                    <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>Email</strong> info@bunnabanksc.com</div>
+                                        <div><strong>Website</strong> www.bunnabanksc.com</div>
+                                    </td>
+                                    <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                        <div><strong>P.O.Box</strong> 1743 code 1110</div>
+                                        <div>Addis Ababa | Ethiopia</div>
+                                    </td>
+                                    <td style="width: 5%;"><div style="background-color: #9C7D73; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                                </tr>
+                            </table>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </template>
+
+        <!-- Main Report Template: Committee Hearing Resolution & Minutes -->
+        <template id="report_committee_resolution_template">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="o">
+                    <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Times New Roman', Times, serif; color: #111111; font-size: 13px; line-height: 1.55; padding: 15px 35px; position: relative;">
+
+                        <!-- Official Header: Full Logo + Brown Accent Bar -->
+                        <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 32%; vertical-align: middle;">
+                                    <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 90px; max-width: 175px; height: auto;" alt="Bunna Bank S.C."/>
+                                </td>
+                                <td style="width: 68%; vertical-align: middle; padding-left: 15px;">
+                                    <div style="background-color: #9C7D73; height: 26px; width: 100%; border-radius: 2px;"></div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Title -->
+                        <div class="text-center my-3">
+                            <h3 style="margin: 0; font-size: 17px; font-weight: bold; text-decoration: underline;">
+                                DISCIPLINARY COMMITTEE HEARING MINUTES &amp; RESOLUTION REPORT
+                            </h3>
+                            <div style="font-size: 13px; margin-top: 5px; color: #555555;">
+                                <strong>Meeting Reference: </strong><span t-esc="o.name"/> | 
+                                <strong>Date: </strong><span t-esc="o.meeting_date.strftime('%B %d, %Y - %I:%M %p') if o.meeting_date else ''"/> | 
+                                <strong>Venue: </strong><span t-esc="o.location or 'Main HR Conference Room'"/>
+                            </div>
+                        </div>
+
+                        <!-- Case & Employee Profile Table -->
+                        <table style="width: 100%; margin-top: 15px; margin-bottom: 15px; border-collapse: collapse; font-size: 12.5px;">
+                            <tr style="background-color: #f2f2f2;">
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc; width: 22%;"><strong>Disciplinary Case Ref:</strong></td>
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc; width: 28%;"><span t-esc="o.case_id.name"/></td>
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc; width: 22%;"><strong>Subject Employee:</strong></td>
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc; width: 28%; font-weight: bold;"><span t-esc="o.employee_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc;"><strong>Job Position:</strong></td>
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc;"><span t-esc="o.job_id.name or 'N/A'"/></td>
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc;"><strong>Department / Branch:</strong></td>
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc;"><span t-esc="o.department_id.name or 'N/A'"/></td>
+                            </tr>
+                            <tr style="background-color: #f2f2f2;">
+                                <td style="padding: 6px 10px; border: 1px solid #cccccc;"><strong>Misconduct Clause:</strong></td>
+                                <td colspan="3" style="padding: 6px 10px; border: 1px solid #cccccc;">
+                                    <span t-esc="o.offense_id.name if o.offense_id else 'General Conduct Violation'"/>
+                                    (<span t-esc="o.severity_level or 'Standard'"/>)
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Panel Attendance Table -->
+                        <div style="margin-top: 15px; margin-bottom: 15px;">
+                            <div style="font-weight: bold; font-size: 13.5px; margin-bottom: 6px; border-bottom: 1.5px solid #9C7D73;">
+                                I. Committee Panel Composition &amp; Quorum Verification (<t t-if="o.is_quorum_met">Quorum Verified: </t><span t-esc="o.present_members_count"/> of <span t-esc="o.total_expected_members"/> Present)
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 5px;">
+                                <thead>
+                                    <tr style="background-color: #f7f7f7; text-align: left;">
+                                        <th style="padding: 5px 8px; border: 1px solid #dddddd; width: 25%;">Designated Panel Role</th>
+                                        <th style="padding: 5px 8px; border: 1px solid #dddddd; width: 35%;">Panel Member Name</th>
+                                        <th style="padding: 5px 8px; border: 1px solid #dddddd; width: 18%;">Status</th>
+                                        <th style="padding: 5px 8px; border: 1px solid #dddddd; width: 22%;">Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="o.attendance_ids" t-as="att">
+                                        <tr>
+                                            <td style="padding: 5px 8px; border: 1px solid #dddddd;">
+                                                <span t-esc="dict(att._fields['role'].selection).get(att.role, att.role)"/>
+                                            </td>
+                                            <td style="padding: 5px 8px; border: 1px solid #dddddd; font-weight: bold;">
+                                                <span t-esc="att.user_id.name"/>
+                                            </td>
+                                            <td style="padding: 5px 8px; border: 1px solid #dddddd;">
+                                                <t t-if="att.is_present">
+                                                    <span style="color: #2e7d32; font-weight: bold;">Present</span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span style="color: #c62828;">Absent</span>
+                                                </t>
+                                            </td>
+                                            <td style="padding: 5px 8px; border: 1px solid #dddddd;">
+                                                <span t-esc="att.remarks or '-'"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Employee Defense Summary -->
+                        <div style="margin-top: 15px; margin-bottom: 15px;" t-if="o.employee_defense_summary">
+                            <div style="font-weight: bold; font-size: 13.5px; margin-bottom: 6px; border-bottom: 1.5px solid #9C7D73;">
+                                II. Summary of Employee Defense &amp; Submissions
+                            </div>
+                            <div style="background-color: #fbfbfb; border-left: 3px solid #9C7D73; padding: 8px 12px; font-size: 12.5px;" t-raw="o.employee_defense_summary"/>
+                        </div>
+
+                        <!-- Deliberations & Findings -->
+                        <div style="margin-top: 15px; margin-bottom: 15px;" t-if="o.meeting_minutes">
+                            <div style="font-weight: bold; font-size: 13.5px; margin-bottom: 6px; border-bottom: 1.5px solid #9C7D73;">
+                                III. Official Committee Deliberations &amp; Established Facts
+                            </div>
+                            <div style="font-size: 12.5px; text-align: justify;" t-raw="o.meeting_minutes"/>
+                        </div>
+
+                        <!-- Recommended Disciplinary Measure -->
+                        <div style="margin-top: 15px; margin-bottom: 20px; background-color: #f9f9f9; border: 1.5px solid #9C7D73; padding: 12px 16px; border-radius: 4px; page-break-inside: avoid;">
+                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #4a2c22;">
+                                IV. Committee Recommended Disciplinary Measure &amp; Sanction:
+                            </div>
+                            <div style="font-size: 13.5px; margin-bottom: 6px;">
+                                <strong>Recommended Measure: </strong>
+                                <span style="font-weight: bold; color: #9C7D73; text-decoration: underline;" t-esc="dict(o._fields['recommended_penalty_type'].selection).get(o.recommended_penalty_type, o.recommended_penalty_type)"/>
+                            </div>
+                            <t t-if="o.recommended_penalty_percentage">
+                                <div style="font-size: 13px;">
+                                    <strong>Salary Deduction Rate: </strong><span t-esc="o.recommended_penalty_percentage"/>%
+                                </div>
+                            </t>
+                            <t t-if="o.recommended_fine_days">
+                                <div style="font-size: 13px;">
+                                    <strong>Salary Fine Duration: </strong><span t-esc="o.recommended_fine_days"/> Days
+                                </div>
+                            </t>
+                            <t t-if="o.recommended_warning_validity_days">
+                                <div style="font-size: 13px;">
+                                    <strong>Warning Active Validity: </strong><span t-esc="o.recommended_warning_validity_days"/> Days
+                                </div>
+                            </t>
+                            <t t-if="o.recommendation_rationale">
+                                <div style="margin-top: 8px; font-size: 12.5px;">
+                                    <strong>Policy &amp; Legal Justification: </strong>
+                                    <div style="margin-top: 4px;" t-raw="o.recommendation_rationale"/>
+                                </div>
+                            </t>
+                        </div>
+
+                        <!-- Committee Signatures Block -->
+                        <div style="margin-top: 25px; page-break-inside: avoid;">
+                            <div style="font-weight: bold; font-size: 13px; margin-bottom: 15px; border-bottom: 1.5px solid #9C7D73;">
+                                V. Committee Panel Signatures &amp; Endorsement
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: center;">
+                                <tr>
+                                    <td style="width: 33%; padding: 10px; vertical-align: bottom;">
+                                        <div style="border-top: 1px solid #333333; padding-top: 5px;">
+                                            <strong><span t-esc="o.committee_chair_id.name if o.committee_chair_id else ''"/></strong><br/>
+                                            Committee Chairperson (CPCO)
+                                        </div>
+                                    </td>
+                                    <td style="width: 33%; padding: 10px; vertical-align: bottom;">
+                                        <div style="border-top: 1px solid #333333; padding-top: 5px;">
+                                            <strong><span t-esc="o.pomd_secretary_id.name if o.pomd_secretary_id else ''"/></strong><br/>
+                                            Committee Secretary (POMD)
+                                        </div>
+                                    </td>
+                                    <td style="width: 33%; padding: 10px; vertical-align: bottom;">
+                                        <div style="border-top: 1px solid #333333; padding-top: 5px;">
+                                            <strong><span t-esc="o.legal_director_id.name if o.legal_director_id else ''"/></strong><br/>
+                                            Legal Directorate Member
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="width: 33%; padding: 10px; vertical-align: bottom;">
+                                        <div style="border-top: 1px solid #333333; padding-top: 5px;">
+                                            <strong><span t-esc="o.respective_director_id.name if o.respective_director_id else ''"/></strong><br/>
+                                            Respective Directorate Director
+                                        </div>
+                                    </td>
+                                    <td style="width: 33%; padding: 10px; vertical-align: bottom;">
+                                        <div style="border-top: 1px solid #333333; padding-top: 5px;">
+                                            <strong><span t-esc="o.labour_union_rep_id.name if o.labour_union_rep_id else ''"/></strong><br/>
+                                            Labour Union Representative
+                                        </div>
+                                    </td>
+                                    <td style="width: 33%; padding: 10px; vertical-align: bottom;">
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Official Footer -->
+                        <div class="footer" style="border-top: 1px solid #7d8285; padding-top: 6px; margin-top: 20px; font-size: 10px; color: #555555;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: center; vertical-align: middle;">
+                                <tr>
+                                    <td style="width: 5%;"><div style="background-color: #9C7D73; height: 16px; width: 100%; border-radius: 2px;"></div></td>
+                                    <td style="width: 32%; font-size: 10px; line-height: 1.3;">
+                                        <div><strong>Tel</strong> +251 111 580 861 | 62</div>
+                                    </td>
+                                    <td style="width: 29%; font-size: 10px; line-height: 1.3;">
+                                        <div><strong>Email</strong> info@bunnabanksc.com</div>
+                                    </td>
+                                    <td style="width: 29%; font-size: 10px; line-height: 1.3;">
+                                        <div>Addis Ababa | Ethiopia</div>
+                                    </td>
+                                    <td style="width: 5%;"><div style="background-color: #9C7D73; height: 16px; width: 100%; border-radius: 2px;"></div></td>
+                                </tr>
+                            </table>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </template>
+
     </data>
 </odoo>

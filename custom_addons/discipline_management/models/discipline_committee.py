@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import format_datetime
+from markupsafe import Markup
+import base64
+import os
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class DisciplineCommitteeAttendance(models.Model):
@@ -22,7 +29,7 @@ class DisciplineCommitteeAttendance(models.Model):
     role_order = fields.Integer(string='Sort Order', default=10)
     is_present = fields.Boolean(string='Present', default=False)
     attendance_status = fields.Selection([
-        ('present', 'Present in Person / Virtual'),
+        ('present', 'Present in Person'),
         ('absent', 'Absent (Unexcused)'),
         ('excused', 'Excused / Prior Notice'),
         ('represented', 'Represented by Alternate'),
@@ -57,7 +64,7 @@ class DisciplineCommitteeMeeting(models.Model):
     severity_level = fields.Char(string='Severity Classification', related='case_id.severity_level', store=True, readonly=True)
     incident_date = fields.Date(string='Misconduct Incident Date', related='case_id.incident_date', store=True, readonly=True)
     
-    # Audit Investigation Brief (if applicable)
+    # Audit Investigation Brief
     investigation_id = fields.Many2one('discipline.investigation', string='Audit Investigation Reference', compute='_compute_investigation_brief', store=True)
     investigation_outcome = fields.Selection(string='Audit Finding Outcome', related='investigation_id.finding_outcome', readonly=True)
     financial_loss_amount = fields.Float(string='Financial Loss Amount (ETB)', related='investigation_id.financial_loss_amount', readonly=True)
@@ -67,11 +74,9 @@ class DisciplineCommitteeMeeting(models.Model):
         for rec in self:
             rec.investigation_id = rec.case_id.investigation_ids[:1].id if rec.case_id and rec.case_id.investigation_ids else False
 
-    # Meeting Schedule & Logistics
-    meeting_date = fields.Datetime(string='Scheduled Hearing Time', required=True, tracking=True)
-    meeting_end_time = fields.Datetime(string='Estimated End Time', tracking=True)
-    location = fields.Char(string='Hearing Room / Location', default='Main HR Conference Room', tracking=True)
-    meeting_link = fields.Char(string='Virtual Meeting Link / Video Room')
+    # Meeting Schedule & Logistics (In-Person Hearing)
+    meeting_date = fields.Datetime(string='Scheduled Hearing Date & Time', required=True, tracking=True)
+    location = fields.Char(string='Hearing Room / Physical Location', default='Main HR Conference Room', required=True, tracking=True)
 
     # Designated Statutory Panel Roles
     committee_chair_id = fields.Many2one('res.users', string='Committee Chair (CPCO)', required=True, tracking=True)
@@ -88,10 +93,10 @@ class DisciplineCommitteeMeeting(models.Model):
     required_quorum_percentage = fields.Float(string='Required Quorum (%)', default=50.0, required=True, help='Minimum percentage of members present required for valid decision')
     is_quorum_met = fields.Boolean(string='Quorum Validated', compute='_compute_quorum', store=True, tracking=True)
 
-    # Deliberations, Minutes & Employee Defense
+    # Deliberations, Minutes & Employee Defense (Recorded by Secretary / Chairman)
     agenda = fields.Html(string='Meeting Agenda & Points of Order')
-    employee_defense_summary = fields.Html(string='Employee Defense, Statements & Mitigating Facts', tracking=True)
-    meeting_minutes = fields.Html(string='Official Hearing Deliberations & Minutes', tracking=True)
+    employee_defense_summary = fields.Html(string='Summary of Employee Defense & Statements')
+    meeting_minutes = fields.Html(string='Official Hearing Deliberations & Findings')
 
     # Document & Evidence Attachments
     signed_minutes_file = fields.Binary(string='Official Signed Meeting Minutes (PDF)', attachment=True)
@@ -128,7 +133,7 @@ class DisciplineCommitteeMeeting(models.Model):
     recommended_penalty_percentage = fields.Float(string='Recommended Salary Deduction Rate (%)', tracking=True)
     recommended_fine_days = fields.Integer(string='Recommended Salary Fine (Days)', tracking=True)
     recommended_warning_validity_days = fields.Integer(string='Warning Active Validity (Days)', default=30, tracking=True)
-    recommendation_rationale = fields.Html(string='Committee Deliberation & Verdict Rationale', tracking=True)
+    recommendation_rationale = fields.Html(string='Deliberation Verdict Rationale & Policy Justification')
 
     # Member Voting
     vote_ids = fields.One2many('discipline.committee.vote', 'meeting_id', string='Member Votes')
@@ -136,41 +141,14 @@ class DisciplineCommitteeMeeting(models.Model):
     against_count = fields.Integer(string='Votes Against', compute='_compute_vote_counts', store=True)
     abstain_count = fields.Integer(string='Abstentions', compute='_compute_vote_counts', store=True)
 
-    # 5-Stage Lifecycle
+    # Streamlined 4-Stage Lifecycle
     state = fields.Selection([
-        ('draft', 'Scheduled'),
+        ('draft', 'Draft / Planning'),
+        ('scheduled', 'Hearing Scheduled'),
         ('in_progress', 'Hearing In Progress'),
-        ('director_review', 'Pending Director Review Sign-off'),
-        ('voting', 'Voting in Progress'),
-        ('minutes_recorded', 'Minutes & Votes Captured'),
         ('completed', 'Finalized & Submitted'),
         ('cancelled', 'Cancelled'),
     ], string='Status', default='draft', required=True, tracking=True)
-
-    # Director Sequential Sign-off Tracking
-    director_signed_off = fields.Boolean(
-        string='Immediate Director Sign-off Completed',
-        default=False,
-        tracking=True,
-        help='Immediate Director of employee under investigation must sign first to initiate final review.'
-    )
-    director_signoff_date = fields.Date(string='Director Sign-off Date', tracking=True)
-    director_signoff_by_id = fields.Many2one('res.users', string='Signed Off By (Director)', tracking=True)
-    director_signoff_remarks = fields.Text(string='Director Sign-off Remarks', tracking=True)
-    can_director_signoff = fields.Boolean(compute='_compute_can_director_signoff', string='Can Director Signoff')
-
-    def _compute_can_director_signoff(self):
-        user = self.env.user
-        is_admin = user.has_group('discipline_management.group_discipline_admin') or user.has_group('base.group_system')
-        for rec in self:
-            is_resp_dir = bool(rec.respective_director_id and rec.respective_director_id.id == user.id)
-            is_dir_role = (
-                is_resp_dir or
-                user.has_group('discipline_management.group_discipline_director') or
-                (user.employee_id and user.employee_id.executive_level in ('director', 'chief', 'ceo')) or
-                is_admin
-            )
-            rec.can_director_signoff = is_dir_role
 
     @api.depends('attendance_ids.is_present', 'attendance_ids', 'member_ids', 'required_quorum_percentage', 'state')
     def _compute_quorum(self):
@@ -181,7 +159,7 @@ class DisciplineCommitteeMeeting(models.Model):
             if rec.attendance_ids:
                 present_count = len(rec.attendance_ids.filtered(lambda a: a.is_present))
             else:
-                present_count = len(rec.member_ids) if rec.state != 'draft' else 0
+                present_count = len(rec.member_ids) if rec.state not in ('draft', 'scheduled') else 0
             
             rec.present_members_count = present_count
             if expected > 0:
@@ -227,30 +205,36 @@ class DisciplineCommitteeMeeting(models.Model):
             # 5. Member: Labour Union Representative
             self.labour_union_rep_id = EmpModel.get_union_user()
 
-            # Assemble full member set & attendance lines
-            role_map = [
-                ('chair', 1, self.committee_chair_id),
-                ('secretary', 2, self.pomd_secretary_id),
-                ('legal', 3, self.legal_director_id),
-                ('director', 4, self.respective_director_id),
-                ('union', 5, self.labour_union_rep_id),
-            ]
-            members = set()
-            att_lines = []
-            for r_code, r_order, u in role_map:
-                if u:
-                    members.add(u.id)
-                    att_lines.append((0, 0, {
-                        'user_id': u.id,
-                        'role': r_code,
-                        'role_order': r_order,
-                        'is_present': False,
-                        'attendance_status': 'absent',
-                    }))
-            
-            self.member_ids = [(6, 0, list(members))]
-            if not self.attendance_ids:
-                self.attendance_ids = att_lines
+            self._sync_panel_attendance_matrix()
+
+    @api.onchange('committee_chair_id', 'pomd_secretary_id', 'respective_director_id', 'legal_director_id', 'labour_union_rep_id')
+    def _onchange_panel_officers(self):
+        """Dynamically update attendance matrix whenever any panel officer is modified."""
+        self._sync_panel_attendance_matrix()
+
+    def _sync_panel_attendance_matrix(self):
+        """Synchronize the 5 panel officers into member_ids and attendance lines."""
+        role_map = [
+            ('chair', 1, self.committee_chair_id),
+            ('secretary', 2, self.pomd_secretary_id),
+            ('legal', 3, self.legal_director_id),
+            ('director', 4, self.respective_director_id),
+            ('union', 5, self.labour_union_rep_id),
+        ]
+        members = []
+        att_lines = []
+        for r_code, r_order, u in role_map:
+            if u:
+                members.append(u.id)
+                att_lines.append((0, 0, {
+                    'user_id': u.id,
+                    'role': r_code,
+                    'role_order': r_order,
+                    'is_present': False,
+                    'attendance_status': 'absent',
+                }))
+        self.member_ids = [(6, 0, members)]
+        self.attendance_ids = [(5, 0, 0)] + att_lines
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -340,74 +324,129 @@ class DisciplineCommitteeMeeting(models.Model):
                     'attendance_status': 'absent',
                 })
 
+    def _send_discuss_direct_message(self, sender_user, target_partner, msg_html):
+        """Safely dispatch 1-on-1 Odoo Discuss direct chat message."""
+        if not target_partner or not sender_user:
+            return
+        try:
+            channel = self.env['discuss.channel'].sudo().with_user(sender_user)._get_or_create_chat(
+                partners_to=[target_partner.id]
+            )
+            if channel:
+                channel.sudo().with_user(sender_user).message_post(
+                    body=Markup(msg_html),
+                    message_type='comment',
+                    subtype_xmlid='mail.mt_comment',
+                    author_id=sender_user.partner_id.id,
+                )
+        except Exception as e:
+            _logger.warning("Failed to dispatch Discuss direct message to partner %s: %s", target_partner.id, str(e))
+
+    def action_confirm_schedule_and_send_summons(self):
+        """Confirm schedule and dispatch hearing notice to designated committee panel members."""
+        for rec in self:
+            if not rec.meeting_date:
+                raise UserError(_('Please specify the Scheduled Hearing Date & Time before confirming the schedule.'))
+            rec.write({'state': 'scheduled'})
+            
+            # Collect recipient panel members (employee is not notified at this stage; they are notified after final decision)
+            recipient_partners = []
+            recipient_users = []
+            
+            panel_users = [
+                rec.committee_chair_id,
+                rec.pomd_secretary_id,
+                rec.respective_director_id,
+                rec.legal_director_id,
+                rec.labour_union_rep_id,
+            ]
+            for m in rec.member_ids:
+                if m not in panel_users:
+                    panel_users.append(m)
+            
+            for u in panel_users:
+                if u and u.partner_id:
+                    recipient_users.append(u)
+                    recipient_partners.append(u.partner_id)
+            
+            formatted_date = format_datetime(rec.env, rec.meeting_date, dt_format='MMM d, y, h:mm a') if rec.meeting_date else 'N/A'
+
+            msg = _(
+                '<div style="font-family: inherit; line-height: 1.6;">'
+                '<div style="background-color: #f8f9fa; border-left: 4px solid #714B67; padding: 10px 15px; margin-bottom: 10px; border-radius: 4px;">'
+                '<h4 style="margin: 0 0 5px 0; color: #714B67; font-weight: bold;">⚖️ Hearing Session Schedule — Disciplinary Committee</h4>'
+                '<div style="font-size: 13px; color: #555;">Hearing Ref: <strong>%s</strong> | Linked Case: <strong>%s</strong></div>'
+                '</div>'
+                '<table style="width: 100%%; font-size: 13px; border-collapse: collapse; margin-bottom: 10px;">'
+                '<tr><td style="padding: 4px 0; width: 35%%; color: #666;"><strong>Subject Employee:</strong></td><td style="padding: 4px 0; font-weight: bold;">%s</td></tr>'
+                '<tr><td style="padding: 4px 0; color: #666;"><strong>Scheduled Date &amp; Time:</strong></td><td style="padding: 4px 0; font-weight: bold; color: #714B67;">%s</td></tr>'
+                '<tr><td style="padding: 4px 0; color: #666;"><strong>Physical Hearing Venue:</strong></td><td style="padding: 4px 0; font-weight: bold;">%s</td></tr>'
+                '<tr><td style="padding: 4px 0; color: #666;"><strong>Committee Chairperson:</strong></td><td style="padding: 4px 0;">%s</td></tr>'
+                '<tr><td style="padding: 4px 0; color: #666;"><strong>Committee Secretary:</strong></td><td style="padding: 4px 0;">%s</td></tr>'
+                '</table>'
+                '<div style="background-color: #fff3cd; border: 1px solid #ffeeba; padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #856404;">'
+                '⚠️ <strong>Mandatory Panel Attendance Notice:</strong> This is an official notice to designated committee members. All designated panel members are required to attend the hearing session in person at the scheduled time and venue.'
+                '</div>'
+                '</div>'
+            ) % (
+                rec.name,
+                rec.case_id.name if rec.case_id else 'N/A',
+                rec.employee_id.name if rec.employee_id else 'N/A',
+                formatted_date,
+                rec.location or _('Main HR Conference Room'),
+                rec.committee_chair_id.name if rec.committee_chair_id else 'N/A',
+                rec.pomd_secretary_id.name if rec.pomd_secretary_id else 'N/A',
+            )
+
+            p_ids = [p.id for p in recipient_partners if p]
+            if p_ids:
+                rec.sudo().message_subscribe(partner_ids=list(set(p_ids)))
+                if rec.case_id:
+                    rec.case_id.sudo().message_subscribe(partner_ids=list(set(p_ids)))
+
+            if rec.case_id:
+                rec.case_id.message_post(
+                    body=Markup(msg),
+                    partner_ids=list(set(p_ids)) if p_ids else False,
+                    subtype_xmlid='mail.mt_comment'
+                )
+            rec.message_post(body=Markup(msg))
+
+            # Dispatch Direct 1-on-1 Chat in Odoo Discuss to each committee member
+            sender = self.env.user
+            for target_partner in recipient_partners:
+                if target_partner:
+                    self._send_discuss_direct_message(sender, target_partner, msg)
+
+    def action_begin_hearing_session(self):
+        """Begin the active hearing session on the meeting day (unlocks roll call and minute recording)."""
+        for rec in self:
+            rec.write({'state': 'in_progress'})
+            rec.message_post(body=_('Disciplinary Hearing session officially commenced by %s. Panel is in session.') % self.env.user.name)
+
+    def action_reset_to_draft(self):
+        """Reset meeting to draft for rescheduling."""
+        for rec in self:
+            rec.write({'state': 'draft'})
+
+    def action_cancel_meeting(self):
+        """Cancel the scheduled hearing."""
+        for rec in self:
+            rec.write({'state': 'cancelled'})
+            rec.message_post(body=_('Disciplinary Committee Meeting cancelled by %s.') % self.env.user.name)
+
     def action_mark_all_present(self):
         """Quick action for Secretary to mark all designated panel members present."""
         for rec in self:
             for att in rec.attendance_ids:
                 att.write({'is_present': True, 'attendance_status': 'present'})
 
-    def action_schedule_and_notify(self):
-        """Schedule hearing and notify panel members and employee."""
-        for rec in self:
-            if not rec.meeting_date:
-                raise UserError(_('Please specify the Scheduled Hearing Time before notifying participants.'))
-            rec.write({'state': 'in_progress'})
-            
-            partner_ids = [m.partner_id.id for m in rec.member_ids if m.partner_id]
-            if rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
-                partner_ids.append(rec.employee_id.user_id.partner_id.id)
-            
-            rec.case_id.message_post(
-                body=_('Disciplinary Committee Hearing %s scheduled for %s at %s.') % (rec.name, rec.meeting_date, rec.location),
-                partner_ids=partner_ids,
-                subtype_xmlid='mail.mt_comment'
-            )
+    # Backward compatibility aliases
+    action_start_hearing_and_notify = action_confirm_schedule_and_send_summons
+    action_schedule_and_notify = action_confirm_schedule_and_send_summons
 
-    def action_request_director_review(self):
-        """Send hearing deliberations to Department Director for formal sign-off before voting."""
-        for rec in self:
-            if rec.state != 'in_progress':
-                raise UserError(_('Hearing must be In Progress before requesting director review.'))
-            if not rec.is_quorum_met:
-                raise ValidationError(_(
-                    'Quorum Error: Quorum is not met (%s of %s members present). '
-                    'Please confirm panel attendance before proceeding.'
-                ) % (rec.present_members_count, rec.total_expected_members))
-            
-            rec.write({'state': 'director_review'})
-            rec.case_id.message_post(
-                body=_('Committee meeting %s: Deliberations and minutes submitted for Director sign-off prior to voting.') % rec.name
-            )
-
-    def action_director_signoff(self):
-        """Department Director approves deliberations; voting is now opened."""
-        for rec in self:
-            if rec.state != 'director_review':
-                raise UserError(_('This action is only valid when pending Director Review.'))
-            if not rec.can_director_signoff:
-                raise UserError(_('Permission Denied: Only the Respective Directorate Director or HR Administrator can execute director sign-off.'))
-            rec.write({
-                'state': 'voting',
-                'director_signed_off': True,
-                'director_signoff_date': fields.Date.context_today(self),
-                'director_signoff_by_id': self.env.user.id,
-            })
-            rec.case_id.message_post(
-                body=_('Director sign-off confirmed by %s on %s. Panel voting is now open.') % (
-                    self.env.user.name, fields.Date.context_today(self)
-                )
-            )
-
-    def action_record_minutes_and_votes(self):
-        for rec in self:
-            if rec.state not in ['voting', 'in_progress']:
-                raise UserError(_('Voting must be in progress before recording minutes.'))
-            if not rec.meeting_minutes or rec.meeting_minutes.strip() in ['', '<p><br></p>', '<p></p>']:
-                raise UserError(_('Official Hearing Deliberations & Minutes must be recorded before proceeding.'))
-            rec.write({'state': 'minutes_recorded'})
-
-    def action_finalize_meeting(self):
-        """Finalize Hearing & Deliberations, sync sanction to Case, advance Case to pending_approval, and notify CEO/CPCO."""
+    def action_conclude_and_submit_recommendation(self):
+        """Conclude Hearing & Deliberations, sync sanction to Case, advance Case to pending_approval, and notify CEO/CPCO."""
         recom_to_punishment = {
             'dismissal': 'dismissal',
             'final_warning': 'final_warning_penalty',
@@ -419,7 +458,7 @@ class DisciplineCommitteeMeeting(models.Model):
             'custom': 'custom',
         }
         for rec in self:
-            # 1. Quorum check (ensure attendance was marked)
+            # 1. Quorum validation
             if not rec.is_quorum_met:
                 if rec.present_members_count == 0 and rec.attendance_ids:
                     rec.action_mark_all_present()
@@ -431,20 +470,17 @@ class DisciplineCommitteeMeeting(models.Model):
 
             # 2. Minutes validation
             if not rec.meeting_minutes or rec.meeting_minutes.strip() in ['', '<p><br></p>', '<p></p>']:
-                rec.meeting_minutes = _('<p>Disciplinary hearing conducted. Quorum verified. Evidence and employee statements deliberated.</p>')
+                raise UserError(_('Official Hearing Deliberations & Findings must be recorded before concluding the hearing.'))
 
             # 3. Resolve selected recommendation
             verdict = rec.recommended_penalty_type or rec.final_recommendation
             if not verdict:
-                raise UserError(_('Please select a Recommended Disciplinary Measure / Sanction before finalizing.'))
+                raise UserError(_('Please select a Recommended Disciplinary Measure before submitting.'))
 
             punish_val = recom_to_punishment.get(verdict, verdict)
-            today = fields.Date.context_today(self)
 
             rec.write({
                 'state': 'completed',
-                'director_signed_off': True,
-                'director_signoff_date': rec.director_signoff_date or today,
                 'recommended_penalty_type': punish_val,
                 'final_recommendation': verdict if verdict in dict(rec._fields['final_recommendation'].selection) else False,
             })
@@ -477,19 +513,24 @@ class DisciplineCommitteeMeeting(models.Model):
                 verdict_label = dict(rec._fields['recommended_penalty_type'].selection).get(punish_val, punish_val)
 
                 notification_body = _(
-                    '<strong>Disciplinary Committee Hearing Finalized &amp; Submitted for Executive Approval:</strong><br/>'
-                    '• Meeting Reference: %s<br/>'
-                    '• Finalized By Secretary: %s<br/>'
-                    '• Employee: %s<br/>'
-                    '• Committee Recommended Verdict: <strong>%s</strong><br/>'
-                    '• Designated Approving Executive: <strong>%s</strong><br/>'
-                    '• Parent Case Status: <strong>Pending Executive Approval (pending_approval)</strong>'
+                    '<div style="font-family: inherit; line-height: 1.6;">'
+                    '<div style="background-color: #e8f4fd; border-left: 4px solid #0056b3; padding: 10px 15px; margin-bottom: 10px; border-radius: 4px;">'
+                    '<h4 style="margin: 0 0 5px 0; color: #0056b3; font-weight: bold;">⚖️ Hearing Concluded &amp; Recommendation Submitted</h4>'
+                    '<div style="font-size: 13px; color: #555;">Hearing Ref: <strong>%s</strong> | Status: <strong>Pending Executive Final Approval</strong></div>'
+                    '</div>'
+                    '<table style="width: 100%%; font-size: 13px; border-collapse: collapse; margin-bottom: 10px;">'
+                    '<tr><td style="padding: 4px 0; width: 35%%; color: #666;"><strong>Subject Employee:</strong></td><td style="padding: 4px 0; font-weight: bold;">%s</td></tr>'
+                    '<tr><td style="padding: 4px 0; color: #666;"><strong>Committee Recommended Verdict:</strong></td><td style="padding: 4px 0; font-weight: bold; color: #c0392b;">%s</td></tr>'
+                    '<tr><td style="padding: 4px 0; color: #666;"><strong>Designated Approving Executive:</strong></td><td style="padding: 4px 0; font-weight: bold;">%s</td></tr>'
+                    '<tr><td style="padding: 4px 0; color: #666;"><strong>Finalized By Secretary:</strong></td><td style="padding: 4px 0;">%s</td></tr>'
+                    '</table>'
+                    '</div>'
                 ) % (
                     rec.name,
-                    self.env.user.name,
                     rec.employee_id.name if rec.employee_id else _('Employee'),
                     verdict_label,
-                    target_name
+                    target_name,
+                    self.env.user.name,
                 )
 
                 partners_to_notify = []
@@ -499,16 +540,58 @@ class DisciplineCommitteeMeeting(models.Model):
                     partners_to_notify.append(ceo_user.partner_id.id)
                 if cpco_user and cpco_user.partner_id:
                     partners_to_notify.append(cpco_user.partner_id.id)
-                if rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
-                    partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+                if rec.respective_director_id and rec.respective_director_id.partner_id:
+                    partners_to_notify.append(rec.respective_director_id.partner_id.id)
 
-                rec.message_post(body=notification_body)
-                rec.case_id.message_post(
-                    body=notification_body,
-                    partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
-                )
+                rec.message_post(body=Markup(notification_body))
+                if rec.case_id:
+                    rec.case_id.message_post(
+                        body=Markup(notification_body),
+                        partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+                    )
 
-    action_finalize_and_submit_for_approval = action_finalize_meeting
+                # Dispatch Direct 1-on-1 Chat in Odoo Discuss to each executive
+                sender = self.env.user
+                for pid in set(partners_to_notify):
+                    p_obj = self.env['res.partner'].browse(pid)
+                    if p_obj.exists():
+                        self._send_discuss_direct_message(sender, p_obj, notification_body)
+
+    # Legacy aliases
+    action_finalize_meeting = action_conclude_and_submit_recommendation
+    action_finalize_and_submit_for_approval = action_conclude_and_submit_recommendation
+
+    # Helper methods for PDF Report
+    @api.model
+    def get_official_bunna_logo_base64(self):
+        """Returns base64 string of the official logo for QWeb PDF rendering."""
+        logo_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+        )
+        if not os.path.exists(logo_path):
+            logo_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), '..', '..', 'custom_recruitment', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+            )
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        return ""
+
+    def get_salutation_label(self):
+        """Returns formal Ethiopian salutation based on gender (Ato / W/ro / W/t)."""
+        self.ensure_one()
+        gender = getattr(self.employee_id, 'gender', False)
+        if gender == 'male':
+            return 'Ato'
+        elif gender == 'female':
+            marital = getattr(self.employee_id, 'marital', False)
+            return 'W/t' if marital == 'single' else 'W/ro'
+        return 'Ato/W/ro'
+
+    def action_print_hearing_report(self):
+        """Print official Disciplinary Committee Hearing Minutes & Resolution Report PDF."""
+        self.ensure_one()
+        return self.env.ref('discipline_management.action_report_committee_resolution').report_action(self)
 
 
 class DisciplineCommitteeVote(models.Model):
@@ -527,4 +610,3 @@ class DisciplineCommitteeVote(models.Model):
     _sql_constraints = [
         ('uniq_member_vote', 'unique(meeting_id, member_id)', 'A committee member can only vote once per meeting!')
     ]
-

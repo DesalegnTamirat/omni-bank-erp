@@ -39,7 +39,12 @@ class DisciplineOffense(models.Model):
     ], string='Applicable Staff Category', default='all', tracking=True)
 
     severity_level_id = fields.Many2one('discipline.severity.level', string='Default Severity Level', tracking=True)
-    severity_level = fields.Char(related='severity_level_id.code', string='Severity Level Code', store=True, readonly=True)
+    severity_level = fields.Char(string='Severity Level Code', compute='_compute_severity_level', store=True, readonly=True)
+
+    @api.depends('severity_level_id', 'severity_level_id.code', 'article_id.severity_level_id', 'article_id.severity_level_id.code')
+    def _compute_severity_level(self):
+        for rec in self:
+            rec.severity_level = rec.severity_level_id.code or (rec.article_id and rec.article_id.severity_level_id and rec.article_id.severity_level_id.code) or False
 
     description = fields.Text(string='Offense Description & Guidelines')
     full_clause_text = fields.Text(string='Verbatim Statutory Clause Text (Amharic / English)', tracking=True)

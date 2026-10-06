@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
+from datetime import timedelta
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+from markupsafe import Markup
 
 
 class DisciplineInvestigationLiableEmployee(models.Model):
@@ -32,6 +34,11 @@ class DisciplineInvestigation(models.Model):
     offense_id = fields.Many2one('discipline.offense', string='Offense Type / Misconduct', related='case_id.offense_id', store=True, readonly=True)
     offense_category_id = fields.Many2one('discipline.offense.category', string='Offense Category', related='case_id.offense_category_id', store=True, readonly=True)
     
+    # Referral context from parent case
+    case_description = fields.Text(related='case_id.description', string='Initiator Allegation & Incident Description', readonly=True)
+    chief_review_notes = fields.Text(related='case_id.chief_review_notes', string='Executive Remark (Chief)', readonly=True)
+    ceo_assignment_notes = fields.Text(related='case_id.ceo_assignment_notes', string='CEO Directive & Mandate', readonly=True)
+
     # Audit Team Hierarchy & Assignment
     @api.model
     def _default_director_id(self):
@@ -39,24 +46,27 @@ class DisciplineInvestigation(models.Model):
         director_user = emp_model.get_audit_director_user()
         return director_user.id if director_user else False
 
-    @api.model
-    def _default_audit_manager_id(self):
-        emp = self.env['hr.employee'].sudo().search([('job_id.name', 'ilike', 'Audit Manager'), ('user_id', '!=', False)], limit=1)
-        return emp.user_id.id if emp and emp.user_id else False
+    def _default_target_completion_date(self):
+        return fields.Date.context_today(self) + timedelta(days=10)
 
-    director_id = fields.Many2one('res.users', string='Internal Audit Director', default=_default_director_id, tracking=True)
-    audit_manager_id = fields.Many2one('res.users', string='Assigned Audit Manager', default=_default_audit_manager_id, tracking=True)
-    investigator_id = fields.Many2one('res.users', string='Lead Investigator / Auditor', required=False, tracking=True)
+    director_id = fields.Many2one('res.users', string='Internal Audit Director', default=_default_director_id, readonly=True, tracking=True)
+    investigator_id = fields.Many2one(
+        'res.users',
+        string='Assisting Lead Auditor / Team Member',
+        required=False,
+        tracking=True,
+        help='Optional selection of assisting auditor/staff under Audit Director for information.'
+    )
     investigation_date = fields.Date(string='Investigation Date', required=True, default=fields.Date.context_today, tracking=True)
-    target_completion_date = fields.Date(string='Target Completion Date', tracking=True)
+    target_completion_date = fields.Date(string='Target Completion Date', default=_default_target_completion_date, tracking=True)
 
     title = fields.Char(string='Investigation Subject / Title', required=True, default=lambda self: _('Investigation of Misconduct'), tracking=True)
     
     # Narrative Audit Sections (Rich Text / Html)
-    introduction = fields.Html(string='Executive Summary & Mandate', tracking=True)
-    scope_limitations = fields.Html(string='Scope & Audit Methodology', tracking=True)
-    summary_findings = fields.Html(string='Factual Audit Findings (Facts Established)', tracking=True)
-    investigator_recommendation = fields.Html(string='Audit Recommendations & Proposed Actions', tracking=True)
+    introduction = fields.Html(string='Executive Summary & Mandate')
+    scope_limitations = fields.Html(string='Scope & Audit Methodology')
+    summary_findings = fields.Html(string='Factual Audit Findings (Facts Established)')
+    investigator_recommendation = fields.Html(string='Audit Recommendations & Proposed Actions')
 
     # Financial Shortage / Loss Details
     financial_loss_amount = fields.Float(string='Financial Shortage / Loss Amount (ETB)', default=0.0, tracking=True)
@@ -93,11 +103,11 @@ class DisciplineInvestigation(models.Model):
 
     # 5-Tier Audit Lifecycle State
     state = fields.Selection([
-        ('draft', 'Unassigned / Referral'),
+        ('draft', 'Audit Referral / Received'),
         ('assigned', 'Under Investigation'),
         ('manager_review', 'Audit Manager Review'),
         ('director_review', 'Audit Director Approval'),
-        ('approved', 'Reviewed & Announced'),
+        ('approved', 'Investigation Completed'),
     ], string='Status', default='draft', required=True, tracking=True)
 
     # Manager Quality Review Sign-off
@@ -155,7 +165,7 @@ class DisciplineInvestigation(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if vals.get('name', _('New')) == _('New'):
+            if not vals.get('name') or vals.get('name') in (_('New'), 'New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('discipline.investigation') or _('New')
         return super().create(vals_list)
 
@@ -163,72 +173,191 @@ class DisciplineInvestigation(models.Model):
     # WORKFLOW ACTION METHODS
     # -------------------------------------------------------------------------
 
-    def action_assign_investigation(self):
-        """Audit Director / Manager assigns Lead Auditor and target date."""
+    def action_start_investigation(self):
+        """Audit Directorate formally commences the investigation and dispatches notifications to all 5 key stakeholders."""
         for rec in self:
-            if not rec.investigator_id:
-                raise UserError(_('Please assign a Lead Investigator / Auditor before starting investigation.'))
             rec.write({'state': 'assigned'})
-            rec.message_post(body=_(
-                'Investigation %s assigned to Lead Auditor <strong>%s</strong> (Target Completion: %s).'
-            ) % (rec.name, rec.investigator_id.name, rec.target_completion_date or _('Not Set')))
+            
+            # Post chatter update on investigation record
+            rec.message_post(body=Markup(_(
+                'Formal internal audit investigation <strong>%s</strong> has commenced under Internal Audit Director <strong>%s</strong> (Target Completion: %s).'
+            ) % (rec.name, self.env.user.name, rec.target_completion_date or _('Not Set'))))
+            
+            # Post chatter update on parent case record
+            if rec.case_id:
+                rec.case_id.message_post(body=Markup(_(
+                    'Internal Audit Directorate has formally commenced investigation on case <strong>%s</strong> (Investigation Ref: <strong>%s</strong>).'
+                ) % (rec.case_id.name, rec.name)))
 
-    def action_submit_for_manager_review(self):
-        """Lead Auditor submits completed investigation packet for Audit Manager QA Review."""
+            rec._send_investigation_started_discuss_notifications()
+
+    action_assign_investigation = action_start_investigation
+
+    def _send_investigation_started_discuss_notifications(self):
+        """Send 1-on-1 Odoo Discuss direct messages to 5 key stakeholders: Employee, Coach, Director, Chief, and CEO."""
         for rec in self:
-            # 1. Mandatory Text Validations
-            if not rec.summary_findings or rec.summary_findings.strip() in ['', '<p><br></p>', '<p></p>']:
-                raise UserError(_('Factual Audit Findings (Facts Established) must be completed before submitting.'))
-            if not rec.investigator_recommendation or rec.investigator_recommendation.strip() in ['', '<p><br></p>', '<p></p>']:
-                raise UserError(_('Audit Recommendations & Proposed Actions must be completed before submitting.'))
+            EmpModel = self.env['hr.employee'].sudo()
+            sender_user = self.env.user
+            sender_partner = sender_user.partner_id
 
-            # 2. Mandatory Signed PDF Report Document
-            if not rec.report_file:
-                raise UserError(_('Mandatory Document Missing: Please upload the Official Signed Investigation Report (PDF) before submitting.'))
+            # Stakeholder Resolution
+            emp_user = rec.employee_id.user_id if rec.employee_id else False
+            coach_user = (rec.case_id.reported_by_id and rec.case_id.reported_by_id.user_id) or (rec.employee_id.parent_id and rec.employee_id.parent_id.user_id) if rec.employee_id else False
+            director_user = rec.case_id.director_id or (rec.case_id.initiator_id if rec.case_id.initiator_id != emp_user else False)
+            chief_user = rec.case_id.chief_id or EmpModel.get_cpco_user()
+            ceo_user = EmpModel.get_ceo_user()
 
-            # 3. Liable Outcome Validations
-            if rec.finding_outcome == 'liable':
-                if not rec.applicable_policy:
-                    rec.applicable_policy = rec.offense_id.name if rec.offense_id else _('Discipline Misconduct Policy')
-                if not rec.liable_employee_ids:
-                    if rec.case_id and rec.case_id.employee_id:
-                        self.env['discipline.investigation.liable'].create({
-                            'investigation_id': rec.id,
-                            'employee_id': rec.case_id.employee_id.id,
-                            'role_in_incident': 'Primary Subject of Incident',
-                            'degree_of_liability': 'principal',
-                            'recommended_action': 'Disciplinary Action per Policy',
-                        })
-                    else:
-                        raise UserError(_('At least one Liable Employee must be recorded when misconduct is confirmed.'))
+            incident_str = rec.case_id.incident_date.strftime('%B %d, %Y') if (rec.case_id and rec.case_id.incident_date) else _('N/A')
+            offense_name = rec.offense_id.name if rec.offense_id else (rec.case_id.offense_id.name if rec.case_id and rec.case_id.offense_id else _('Alleged Misconduct Clause'))
+            sev_name = rec.case_id.severity_level_id.name if (rec.case_id and rec.case_id.severity_level_id) else (dict(rec.case_id._fields['severity_level'].selection).get(rec.case_id.severity_level, rec.case_id.severity_level or _('N/A')) if rec.case_id else _('N/A'))
+            target_date_str = rec.target_completion_date.strftime('%B %d, %Y') if rec.target_completion_date else _('Standard Target (10 Days)')
 
-            # 4. Financial Loss Resolution Check
-            if rec.financial_loss_amount > 0 and rec.loss_resolution_status == 'not_applicable':
-                raise UserError(_('Financial Shortage is ETB %s. Please update Loss Resolution Status to Resolved or Unresolved.') % rec.financial_loss_amount)
+            # Helper to safely post 1-on-1 discuss message
+            def _post_discuss_msg(recipient_user, header_title, msg_html):
+                if not recipient_user or not recipient_user.partner_id or recipient_user.id == sender_user.id:
+                    return
+                try:
+                    rec.message_subscribe(partner_ids=[recipient_user.partner_id.id])
+                    channel = False
+                    if hasattr(self.env['discuss.channel'], '_get_or_create_chat'):
+                        channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[recipient_user.partner_id.id])
+                    elif hasattr(self.env['discuss.channel'], 'channel_get'):
+                        channel_info = self.env['discuss.channel'].sudo().channel_get(partners_to=[sender_partner.id, recipient_user.partner_id.id])
+                        if channel_info and 'id' in channel_info:
+                            channel = self.env['discuss.channel'].sudo().browse(channel_info['id'])
+                    
+                    if channel:
+                        channel.message_post(
+                            body=msg_html,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=sender_partner.id,
+                        )
+                except Exception:
+                    pass
 
-            rec.write({'state': 'manager_review'})
-            rec.message_post(body=_('Investigation findings and signed report submitted for Audit Manager Quality Review by %s.') % self.env.user.name)
+            # 1. Notify Subject Employee
+            if emp_user:
+                emp_msg = Markup(_(
+                    '<p><strong>Official Notice: Disciplinary Audit Investigation Commenced</strong></p>'
+                    '<p>Dear %s,</p>'
+                    '<p>Please be notified that the Internal Audit Directorate has formally commenced an investigation regarding disciplinary case Ref: <strong>%s</strong> (Investigation Ref: <strong>%s</strong>).</p>'
+                    '<ul>'
+                    '<li><strong>Alleged Misconduct:</strong> %s</li>'
+                    '<li><strong>Incident Date:</strong> %s</li>'
+                    '<li><strong>Target Completion:</strong> %s</li>'
+                    '</ul>'
+                    '<p>The Internal Audit Directorate may contact you to provide testimony, interrogation statements, and corroborating records.</p>'
+                ) % (
+                    emp_user.name,
+                    rec.case_id.name if rec.case_id else rec.name,
+                    rec.name,
+                    offense_name,
+                    incident_str,
+                    target_date_str,
+                ))
+                _post_discuss_msg(emp_user, 'Audit Investigation Commenced', emp_msg)
 
-    def action_manager_approve(self):
-        """Audit Manager completes quality review and forwards to Audit Director."""
-        for rec in self:
-            rec.write({
-                'state': 'director_review',
-                'manager_signed_off_by_id': self.env.user.id,
-                'manager_review_date': fields.Date.context_today(self),
-            })
-            rec.message_post(body=_('Audit Manager Quality Review approved by %s. Forwarded for Director Final Approval.') % self.env.user.name)
+            # 2. Notify Immediate Coach / Reporting Manager
+            if coach_user:
+                coach_msg = Markup(_(
+                    '<p><strong>Notice: Internal Audit Investigation Started for Subordinate Employee</strong></p>'
+                    '<p>Dear %s,</p>'
+                    '<p>Formal internal audit inquiry has officially commenced regarding your team member <strong>%s</strong> under Case Ref: <strong>%s</strong> (Investigation Ref: <strong>%s</strong>).</p>'
+                    '<ul>'
+                    '<li><strong>Subject Employee:</strong> %s (%s)</li>'
+                    '<li><strong>Alleged Offense:</strong> %s</li>'
+                    '<li><strong>Target Completion:</strong> %s</li>'
+                    '</ul>'
+                    '<p>You can track the ongoing case status in Bunna Bank ERP under <strong>Discipline Management</strong>.</p>'
+                ) % (
+                    coach_user.name,
+                    rec.employee_id.name if rec.employee_id else _('Staff'),
+                    rec.case_id.name if rec.case_id else rec.name,
+                    rec.name,
+                    rec.employee_id.name if rec.employee_id else _('Staff'),
+                    rec.employee_id.job_id.name if rec.employee_id and rec.employee_id.job_id else _('Position'),
+                    offense_name,
+                    target_date_str,
+                ))
+                _post_discuss_msg(coach_user, 'Audit Started - Subordinate', coach_msg)
 
-    def action_manager_return(self):
-        """Audit Manager returns investigation to Lead Auditor for revision."""
-        for rec in self:
-            if not rec.manager_review_notes:
-                raise UserError(_('Please provide Manager Review Notes explaining what revisions are required.'))
-            rec.write({'state': 'assigned'})
-            rec.message_post(body=_(
-                'Investigation returned for revision by Audit Manager %s.<br/>'
-                '<strong>Revision Notes:</strong> %s'
-            ) % (self.env.user.name, rec.manager_review_notes))
+            # 3. Notify Directorate Director
+            if director_user and director_user.id != coach_user.id:
+                dir_msg = Markup(_(
+                    '<p><strong>Audit Directorate Update: Investigation In Progress</strong></p>'
+                    '<p>Dear %s,</p>'
+                    '<p>Formal audit investigation (Ref: <strong>%s</strong>) has been initiated for escalated case <strong>%s</strong> regarding employee <strong>%s</strong>.</p>'
+                    '<ul>'
+                    '<li><strong>Subject Employee:</strong> %s (%s)</li>'
+                    '<li><strong>Department / Unit:</strong> %s</li>'
+                    '<li><strong>Alleged Offense:</strong> %s</li>'
+                    '<li><strong>Target Completion:</strong> %s</li>'
+                    '</ul>'
+                ) % (
+                    director_user.name,
+                    rec.name,
+                    rec.case_id.name if rec.case_id else rec.name,
+                    rec.employee_id.name if rec.employee_id else _('Staff'),
+                    rec.employee_id.name if rec.employee_id else _('Staff'),
+                    rec.employee_id.job_id.name if rec.employee_id and rec.employee_id.job_id else _('Position'),
+                    rec.case_id.department_id.name if rec.case_id and rec.case_id.department_id else _('Department'),
+                    offense_name,
+                    target_date_str,
+                ))
+                _post_discuss_msg(director_user, 'Audit Started - Department', dir_msg)
+
+            # 4. Notify Respective Chief Officer
+            if chief_user:
+                chief_msg = Markup(_(
+                    '<p><strong>Executive Update: Audit Investigation Commenced</strong></p>'
+                    '<p>Dear %s,</p>'
+                    '<p>Internal Audit Directorate has formally commenced the investigation for disciplinary case Ref: <strong>%s</strong> (Investigation Ref: <strong>%s</strong>) regarding employee <strong>%s</strong>.</p>'
+                    '<ul>'
+                    '<li><strong>Subject Employee:</strong> %s (%s, %s)</li>'
+                    '<li><strong>Offense Clause:</strong> %s</li>'
+                    '<li><strong>Severity Level:</strong> %s</li>'
+                    '<li><strong>Target Completion:</strong> %s</li>'
+                    '</ul>'
+                ) % (
+                    chief_user.name,
+                    rec.case_id.name if rec.case_id else rec.name,
+                    rec.name,
+                    rec.employee_id.name if rec.employee_id else _('Staff'),
+                    rec.employee_id.name if rec.employee_id else _('Staff'),
+                    rec.employee_id.job_id.name if rec.employee_id and rec.employee_id.job_id else _('Position'),
+                    rec.case_id.department_id.name if rec.case_id and rec.case_id.department_id else _('Department'),
+                    offense_name,
+                    sev_name,
+                    target_date_str,
+                ))
+                _post_discuss_msg(chief_user, 'Executive Update: Audit Started', chief_msg)
+
+            # 5. Notify Chief Executive Officer (CEO)
+            if ceo_user:
+                ceo_msg = Markup(_(
+                    '<p><strong>CEO Briefing: Formal Disciplinary Investigation Commenced</strong></p>'
+                    '<p>Dear %s,</p>'
+                    '<p>Per your executive directive, the Internal Audit Directorate has officially commenced formal investigation on case Ref: <strong>%s</strong> (Investigation Ref: <strong>%s</strong>).</p>'
+                    '<ul>'
+                    '<li><strong>Subject Employee:</strong> %s (%s, %s)</li>'
+                    '<li><strong>Offense Clause:</strong> %s</li>'
+                    '<li><strong>Severity Level:</strong> %s</li>'
+                    '<li><strong>Target Completion Date:</strong> %s</li>'
+                    '</ul>'
+                    '<p>Upon completion, the full investigative dossier and signed findings report will be submitted for committee action.</p>'
+                ) % (
+                    ceo_user.name,
+                    rec.case_id.name if rec.case_id else rec.name,
+                    rec.name,
+                    rec.employee_id.name if rec.employee_id else _('Staff'),
+                    rec.employee_id.job_id.name if rec.employee_id and rec.employee_id.job_id else _('Position'),
+                    rec.case_id.department_id.name if rec.case_id and rec.case_id.department_id else _('Department'),
+                    offense_name,
+                    sev_name,
+                    target_date_str,
+                ))
+                _post_discuss_msg(ceo_user, 'CEO Briefing: Audit Commenced', ceo_msg)
 
     def action_director_approve_and_announce(self):
         """Audit Directorate completes investigation and formally submits findings directly to CPCO while notifying CEO."""
@@ -280,9 +409,9 @@ class DisciplineInvestigation(models.Model):
             cpco_name = cpco_user.name if cpco_user else _('Chief People & Culture Officer')
             ceo_name = ceo_user.name if ceo_user else _('Chief Executive Officer')
 
-            announcement_body = _(
+            announcement_body = Markup(_(
                 '<strong>Audit Investigation Completed &amp; Formally Announced:</strong><br/>'
-                '• Investigation Ref: %s<br/>'
+                '• Investigation Ref: <strong>%s</strong><br/>'
                 '• Submitting Auditor / Director: %s<br/>'
                 '• Finding Outcome: <strong>%s</strong><br/>'
                 '• Liable Employee(s): %s<br/>'
@@ -301,8 +430,8 @@ class DisciplineInvestigation(models.Model):
                 rec.applicable_policy or 'N/A',
                 cpco_name,
                 ceo_name,
-                today
-            )
+                today.strftime('%B %d, %Y') if today else _('Today'),
+            ))
 
             rec.message_post(body=announcement_body)
 

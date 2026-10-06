@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+        <!-- List View -->
         <record id="view_discipline_committee_meeting_tree" model="ir.ui.view">
             <field name="name">discipline.committee.meeting.list</field>
             <field name="model">discipline.committee.meeting</field>
             <field name="arch" type="xml">
                 <list decoration-info="state == 'draft'"
-                      decoration-warning="state in ('in_progress', 'director_review', 'voting')"
+                      decoration-warning="state == 'scheduled'"
+                      decoration-primary="state == 'in_progress'"
                       decoration-success="state == 'completed'">
                     <field name="name"/>
                     <field name="case_id"/>
@@ -14,75 +16,125 @@
                     <field name="offense_id"/>
                     <field name="meeting_date"/>
                     <field name="location"/>
-                    <field name="present_members_count" string="Present / Quorum"/>
+                    <field name="present_members_count" string="Present Members"/>
                     <field name="is_quorum_met" widget="boolean" optional="show"/>
                     <field name="recommended_penalty_type" optional="show"/>
                     <field name="state" widget="badge"
                            decoration-info="state == 'draft'"
-                           decoration-warning="state in ('in_progress', 'director_review', 'voting')"
-                           decoration-primary="state == 'minutes_recorded'"
+                           decoration-warning="state == 'scheduled'"
+                           decoration-primary="state == 'in_progress'"
                            decoration-success="state == 'completed'"/>
                 </list>
             </field>
         </record>
 
+        <!-- Form View -->
         <record id="view_discipline_committee_meeting_form" model="ir.ui.view">
             <field name="name">discipline.committee.meeting.form</field>
             <field name="model">discipline.committee.meeting</field>
             <field name="arch" type="xml">
-                <form>
+                <form string="Disciplinary Committee Hearing">
                     <header>
-                        <!-- Single-Action Fast Finalize & Submit for Executive Approval -->
-                        <button name="action_finalize_and_submit_for_approval"
-                                string="Finalize Hearing &amp; Submit for Approval"
-                                type="object"
-                                class="oe_highlight btn-success"
-                                invisible="state == 'completed'"
+                        <!-- Step 1: Draft / Planning -> Confirm Schedule & Notify Committee -->
+                        <button name="action_confirm_schedule_and_send_summons" 
+                                string="Confirm Schedule &amp; Notify Committee" 
+                                type="object" 
+                                class="oe_highlight btn-primary"
+                                invisible="state != 'draft'"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
 
-                        <!-- Stage 1: Schedule & Notify -->
-                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="btn-primary"
-                                invisible="state != 'draft'"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
-                        
-                        <!-- Stage 2: Quick Roll-Call Helper -->
-                        <button name="action_mark_all_present" string="Mark All Panel Present" type="object" class="btn-secondary"
-                                invisible="state not in ('in_progress', 'draft')"
+                        <!-- Step 2: Scheduled -> Begin Hearing Session on Meeting Day -->
+                        <button name="action_begin_hearing_session" 
+                                string="Begin Hearing Session" 
+                                type="object" 
+                                class="oe_highlight btn-success"
+                                invisible="state != 'scheduled'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
+
+                        <button name="action_reset_to_draft" 
+                                string="Reschedule / Edit Planning" 
+                                type="object" 
+                                class="btn-secondary"
+                                invisible="state != 'scheduled'"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
 
-                        <!-- Stage 3: Request Director Sign-off -->
-                        <button name="action_request_director_review" string="Request Director Sign-off" type="object" class="btn-info"
+                        <!-- Step 3: Hearing In Progress -> Roll Call & Submit -->
+                        <button name="action_mark_all_present" 
+                                string="Mark All Panel Present" 
+                                type="object" 
+                                class="btn-secondary"
                                 invisible="state != 'in_progress'"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
-                                help="Submit hearing minutes to Department Director for formal sign-off before voting."/>
-                        
-                        <!-- Stage 4: Director Approval -->
-                        <button name="action_director_signoff" string="Director: Approve &amp; Open Voting" type="object" class="btn-warning"
-                                invisible="state != 'director_review' or not can_director_signoff"
-                                help="Respective Director confirms review of deliberations and opens voting."/>
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
 
-                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,completed"/>
+                        <button name="action_conclude_and_submit_recommendation"
+                                string="Conclude Hearing &amp; Submit Recommendation"
+                                type="object"
+                                class="oe_highlight btn-primary"
+                                invisible="state != 'in_progress'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"
+                                confirm="Are you sure you want to conclude this hearing and submit the committee's recommended verdict for executive approval?"/>
+
+                        <!-- Step 4: Finalized -> Print Resolution Report PDF -->
+                        <button name="action_print_hearing_report" 
+                                string="Print Resolution Report" 
+                                type="object" 
+                                class="btn-secondary" 
+                                icon="fa-print"
+                                invisible="state != 'completed'"/>
+
+                        <button name="action_cancel_meeting" 
+                                string="Cancel Meeting" 
+                                type="object" 
+                                class="btn-outline-danger"
+                                invisible="state in ('completed', 'cancelled')"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"
+                                confirm="Are you sure you want to cancel this committee meeting?"/>
+
+                        <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,in_progress,completed"/>
                     </header>
                     <sheet>
-                        <field name="can_director_signoff" invisible="1"/>
                         <field name="total_expected_members" invisible="1"/>
                         <field name="present_members_count" invisible="1"/>
                         <field name="required_quorum_percentage" invisible="1"/>
-                        <field name="director_signed_off" invisible="1"/>
                         <field name="is_quorum_met" invisible="1"/>
 
-                        <widget name="web_ribbon" title="Quorum Met" bg_color="text-bg-success" invisible="state == 'draft' or not is_quorum_met"/>
-                        <widget name="web_ribbon" title="Finalized" bg_color="text-bg-primary" invisible="state != 'completed'"/>
+                        <widget name="web_ribbon" title="Quorum Met" bg_color="text-bg-success" invisible="state in ('draft', 'scheduled') or not is_quorum_met"/>
+                        <widget name="web_ribbon" title="Finalized &amp; Submitted" bg_color="text-bg-primary" invisible="state != 'completed'"/>
 
                         <div class="oe_title">
-                            <label for="name" string="Meeting Reference"/>
+                            <label for="name" string="Hearing Reference"/>
                             <h1>
                                 <field name="name" readonly="1"/>
                             </h1>
                         </div>
 
-                        <!-- Top Card 1: Case & Misconduct Brief -->
-                        <group string="Case &amp; Allegation Summary">
+                        <!-- Lifecycle Context Banners -->
+                        <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="state != 'draft'">
+                            <i class="fa fa-calendar-plus-o fa-2x me-3 text-warning"/>
+                            <div>
+                                <h5 class="alert-heading mb-1 font-weight-bold">Hearing Planning &amp; Summons Preparation</h5>
+                                <p class="mb-0">Enter the scheduled date, time, hearing conference room, and verify designated panel officers below. Click <strong>Confirm Schedule &amp; Send Summons</strong> to officially summon the employee and panel.</p>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" invisible="state != 'scheduled'">
+                            <i class="fa fa-clock-o fa-2x me-3 text-info"/>
+                            <div>
+                                <h5 class="alert-heading mb-1 font-weight-bold">Hearing Scheduled — Official Summons Dispatched</h5>
+                                <p class="mb-0">The hearing has been officially scheduled. On the day of the meeting, click <strong>Begin Hearing Session</strong> to start live attendance and open the deliberation minutes.</p>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-primary d-flex align-items-center mb-3" role="alert" invisible="state != 'in_progress'">
+                            <i class="fa fa-gavel fa-2x me-3 text-primary"/>
+                            <div>
+                                <h5 class="alert-heading mb-1 font-weight-bold">Hearing In Session — Live Deliberations</h5>
+                                <p class="mb-0">Verify member attendance, record employee statements in <strong>Deliberations &amp; Minutes</strong>, and select the final sanction in <strong>Verdict &amp; Sanctions</strong> before submitting.</p>
+                            </div>
+                        </div>
+
+                        <!-- Top Card 1: Case & Misconduct Summary -->
+                        <group string="Case &amp; Misconduct Summary">
                             <group>
                                 <field name="case_id" readonly="state != 'draft'"/>
                                 <field name="employee_id" readonly="1"/>
@@ -96,41 +148,40 @@
                                 <field name="severity_level" readonly="1"/>
                                 <field name="incident_date" readonly="1"/>
                                 <field name="investigation_id" readonly="1" invisible="not investigation_id"/>
-                                <field name="financial_loss_amount" readonly="1" invisible="financial_loss_amount == 0"/>
+                                <field name="investigation_outcome" readonly="1" invisible="not investigation_id"/>
                             </group>
                         </group>
 
-                        <!-- Top Card 2: Hearing Schedule & Venue -->
-                        <group string="Hearing Logistics &amp; Schedule">
+                        <!-- Top Card 2: Hearing Logistics & Panel Officers -->
+                        <group string="Hearing Logistics &amp; Panel Officers">
                             <group>
-                                <field name="meeting_date" readonly="state in ('director_review', 'voting', 'completed')"/>
-                                <field name="meeting_end_time" readonly="state in ('director_review', 'voting', 'completed')"/>
-                                <field name="location" readonly="state in ('director_review', 'voting', 'completed')"/>
+                                <field name="meeting_date" readonly="state == 'completed'"/>
+                                <field name="location" readonly="state == 'completed'"/>
                             </group>
                             <group>
-                                <field name="meeting_link" readonly="state in ('director_review', 'voting', 'completed')" placeholder="https://teams.microsoft.com/..."/>
-                                <field name="committee_chair_id" readonly="state in ('director_review', 'voting', 'completed')"/>
-                                <field name="pomd_secretary_id" readonly="state in ('director_review', 'voting', 'completed')"/>
+                                <field name="committee_chair_id" readonly="state == 'completed'"/>
+                                <field name="pomd_secretary_id" readonly="state == 'completed'"/>
                             </group>
                         </group>
 
                         <notebook>
-                            <!-- Tab 1: Panel & Roll-Call Attendance -->
-                            <page string="Panel &amp; Roll-Call Attendance">
+                            <!-- Tab 1: Panel Attendance & Quorum Matrix (Always Available) -->
+                            <page string="Panel Attendance &amp; Quorum Matrix" name="attendance_quorum">
                                 <group>
-                                    <group string="Quorum Status">
+                                    <group string="Quorum Verification">
                                         <field name="required_quorum_percentage" readonly="1"/>
                                         <field name="present_members_count" string="Members Present" readonly="1"/>
                                         <field name="total_expected_members" string="Total Panel Size" readonly="1"/>
+                                        <field name="is_quorum_met" string="Quorum Validated" readonly="1"/>
                                     </group>
-                                    <group string="Key Statutory Members">
-                                        <field name="respective_director_id" readonly="state in ('director_review', 'voting', 'completed')"/>
-                                        <field name="legal_director_id" readonly="state in ('director_review', 'voting', 'completed')"/>
-                                        <field name="labour_union_rep_id" readonly="state in ('director_review', 'voting', 'completed')"/>
+                                    <group string="Designated Panel Officers">
+                                        <field name="respective_director_id" readonly="state == 'completed'"/>
+                                        <field name="legal_director_id" readonly="state == 'completed'"/>
+                                        <field name="labour_union_rep_id" readonly="state == 'completed'"/>
                                     </group>
                                 </group>
-                                <group string="Roll-Call Attendance Matrix">
-                                    <field name="attendance_ids" nolabel="1" readonly="state in ('director_review', 'voting', 'completed')">
+                                <group string="Panel Roll-Call Attendance Matrix">
+                                    <field name="attendance_ids" nolabel="1" readonly="state == 'completed'">
                                         <list editable="bottom">
                                             <field name="role"/>
                                             <field name="user_id"/>
@@ -142,21 +193,26 @@
                                 </group>
                             </page>
 
-                            <!-- Tab 2: Deliberations, Minutes & Defense -->
-                            <page string="Deliberations &amp; Minutes">
-                                <group string="Meeting Agenda">
-                                    <field name="agenda" widget="html" nolabel="1" readonly="state in ('director_review', 'voting', 'completed')"
+                            <!-- Tab 2: Deliberations & Minutes (Revealed during Hearing) -->
+                            <page string="Deliberations &amp; Minutes" name="deliberations_minutes" invisible="state in ('draft', 'scheduled')">
+                                <div class="mt-2">
+                                    <separator string="Meeting Agenda &amp; Points of Order"/>
+                                    <field name="agenda" widget="html" class="w-100 mb-3" style="min-height: 80px; width: 100%;" 
+                                           readonly="state == 'completed'"
                                            placeholder="Enter hearing agenda, points of order, and procedural steps..."/>
-                                </group>
-                                <group string="Summary of Employee Defense &amp; Evidence">
-                                    <field name="employee_defense_summary" widget="html" nolabel="1" readonly="state in ('director_review', 'voting', 'completed')"
-                                           placeholder="Record employee statements, justifications, mitigating circumstances, and witness testimonies..."/>
-                                </group>
-                                <group string="Official Committee Deliberations &amp; Findings">
-                                    <field name="meeting_minutes" widget="html" nolabel="1" readonly="state in ('director_review', 'voting', 'completed')"
-                                           placeholder="Record full committee deliberations, facts weighed, policy interpretations, and majority consensus..."/>
-                                </group>
-                                <group string="Official Supporting Documents &amp; Attachments">
+
+                                    <separator string="Summary of Employee Defense &amp; Statements"/>
+                                    <field name="employee_defense_summary" widget="html" class="w-100 mb-3" style="min-height: 120px; width: 100%;" 
+                                           readonly="state == 'completed'"
+                                           placeholder="Record statements made by the employee, mitigating factors, justifications, and witness testimonies during the hearing..."/>
+
+                                    <separator string="Official Committee Deliberations &amp; Established Findings"/>
+                                    <field name="meeting_minutes" widget="html" class="w-100 mb-3" style="min-height: 150px; width: 100%;" 
+                                           readonly="state == 'completed'"
+                                           placeholder="Record full committee deliberations, evaluation of evidence, policy considerations, and majority findings..."/>
+                                </div>
+
+                                <group string="Signed Documents &amp; Exhibits Attachment">
                                     <group>
                                         <field name="signed_minutes_file" filename="signed_minutes_filename" readonly="state == 'completed'"/>
                                         <field name="signed_minutes_filename" invisible="1"/>
@@ -170,31 +226,30 @@
                                 </group>
                             </page>
 
-                            <!-- Tab 3: Director Sign-off & Member Voting -->
-                            <page string="Director Sign-off &amp; Voting">
-                                <group string="Immediate Director Review &amp; Sign-off">
+                            <!-- Tab 3: Committee Verdict & Sanctions (Revealed during Hearing) -->
+                            <page string="Committee Verdict &amp; Sanctions" name="verdict_sanctions" invisible="state in ('draft', 'scheduled')">
+                                <group string="Final Prescribed Disciplinary Measure">
                                     <group>
-                                        <field name="respective_director_id" string="Designated Directorate Director" readonly="1"/>
-                                        <field name="director_signed_off" string="Director Sign-off Status" readonly="1"/>
+                                        <field name="recommended_penalty_type" widget="radio" readonly="state == 'completed'"/>
+                                        <field name="recommended_warning_validity_days" readonly="state == 'completed'"
+                                               invisible="recommended_penalty_type not in ('verbal_warning', 'first_warning_penalty', 'second_warning_penalty', 'final_warning_penalty')"/>
                                     </group>
                                     <group>
-                                        <field name="director_signoff_by_id" readonly="1"/>
-                                        <field name="director_signoff_date" readonly="1"/>
+                                        <field name="recommended_penalty_percentage" readonly="state == 'completed'"
+                                               invisible="staff_category == 'managerial' or recommended_penalty_type in ('verbal_warning', 'exonerate', 'dismissal')"/>
+                                        <field name="recommended_fine_days" readonly="state == 'completed'"
+                                               invisible="staff_category == 'non_managerial' or recommended_penalty_type in ('verbal_warning', 'exonerate', 'dismissal')"/>
                                     </group>
-                                </group>
-                                <group string="Director Sign-off Remarks" invisible="not director_signed_off">
-                                    <field name="director_signoff_remarks" readonly="state == 'completed'" nolabel="1"
-                                           placeholder="Director endorsement remarks prior to member voting..."/>
                                 </group>
 
-                                <group string="Member Voting Summary">
-                                    <group>
-                                        <field name="in_favor_count" string="Votes In Favor" readonly="1"/>
-                                        <field name="against_count" string="Votes Against" readonly="1"/>
-                                        <field name="abstain_count" string="Abstentions" readonly="1"/>
-                                    </group>
-                                </group>
-                                <group string="Individual Panel Member Votes">
+                                <div class="mt-2">
+                                    <separator string="Deliberation Verdict Rationale &amp; Policy Justification"/>
+                                    <field name="recommendation_rationale" widget="html" class="w-100 mb-3" style="min-height: 120px; width: 100%;" 
+                                           readonly="state == 'completed'"
+                                           placeholder="State the legal and policy basis for the prescribed sanction, aggravating or mitigating considerations..."/>
+                                </div>
+
+                                <group string="Individual Member Voting (Optional Consensus Record)" invisible="not vote_ids and state == 'completed'">
                                     <field name="vote_ids" nolabel="1" readonly="state == 'completed'">
                                         <list editable="bottom">
                                             <field name="member_id"/>
@@ -204,27 +259,6 @@
                                     </field>
                                 </group>
                             </page>
-
-                            <!-- Tab 4: Verdict & Recommended Sanction -->
-                            <page string="Committee Verdict &amp; Sanctions">
-                                <group string="Final Prescribed Measure">
-                                    <group>
-                                        <field name="recommended_penalty_type" widget="radio" readonly="state == 'completed'"/>
-                                        <field name="recommended_warning_validity_days" readonly="state == 'completed'"
-                                               invisible="recommended_penalty_type not in ('verbal_warning', 'first_warning_penalty', 'second_warning_penalty', 'final_warning_penalty')"/>
-                                    </group>
-                                    <group>
-                                        <field name="recommended_penalty_percentage" readonly="state == 'completed'"
-                                               invisible="staff_category == 'managerial'"/>
-                                        <field name="recommended_fine_days" readonly="state == 'completed'"
-                                               invisible="staff_category == 'non_managerial'"/>
-                                    </group>
-                                </group>
-                                <group string="Deliberation Verdict Rationale &amp; Policy Justification">
-                                    <field name="recommendation_rationale" widget="html" nolabel="1" readonly="state == 'completed'"
-                                           placeholder="State the legal and policy basis for the prescribed sanction, aggravating or mitigating considerations..."/>
-                                </group>
-                            </page>
                         </notebook>
                     </sheet>
                     <chatter/>
@@ -232,10 +266,19 @@
             </field>
         </record>
 
+        <!-- Action -->
         <record id="action_discipline_committee_meeting" model="ir.actions.act_window">
             <field name="name">Disciplinary Committee Meetings</field>
             <field name="res_model">discipline.committee.meeting</field>
             <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Committee Meetings Scheduled
+                </p>
+                <p>
+                    Schedule formal hearing sessions, verify panel quorum, capture employee defense and deliberations, and submit recommended disciplinary measures.
+                </p>
+            </field>
         </record>
     </data>
 </odoo>

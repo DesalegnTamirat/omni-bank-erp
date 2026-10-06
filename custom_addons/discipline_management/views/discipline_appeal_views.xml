@@ -73,22 +73,22 @@
                                 <field name="appeal_grounds" readonly="state != 'draft'" placeholder="Explain grounds for appeal, new evidence, or mitigating circumstances..."/>
                             </page>
                             <page string="Decision Outcome &amp; Revised Actions" invisible="state in ('draft', 'submitted')">
+                                <field name="is_managerial" invisible="1"/>
                                 <group>
                                     <group string="Original Enforced Penalty (Reference)">
                                         <field name="original_punishment_type" readonly="1"/>
-                                        <field name="original_penalty_percentage" readonly="1" invisible="original_penalty_percentage == 0 and original_fine_days > 0"/>
-                                        <field name="original_fine_days" readonly="1" invisible="original_fine_days == 0 and original_penalty_percentage > 0"/>
+                                        <field name="original_penalty_percentage" readonly="1" invisible="is_managerial"/>
+                                        <field name="original_fine_days" readonly="1" invisible="not is_managerial"/>
                                     </group>
                                     <group string="Revised Appeal Decision">
                                         <field name="decision_outcome" readonly="state != 'under_review' or not can_user_review_current_stage"/>
-                                        <field name="revised_punishment_type" readonly="state != 'under_review' or not can_user_review_current_stage"/>
-                                        <field name="revised_penalty_percentage" readonly="state != 'under_review' or not can_user_review_current_stage" invisible="revised_penalty_percentage == 0 and revised_fine_days > 0"/>
-                                        <field name="revised_fine_days" readonly="state != 'under_review' or not can_user_review_current_stage" invisible="revised_fine_days == 0 and revised_penalty_percentage > 0"/>
+                                        <field name="revised_punishment_type" readonly="state != 'under_review' or not can_user_review_current_stage or decision_outcome != 'penalty_reduced'"/>
+                                        <field name="revised_penalty_percentage" readonly="state != 'under_review' or not can_user_review_current_stage or decision_outcome != 'penalty_reduced'" invisible="is_managerial"/>
+                                        <field name="revised_fine_days" readonly="state != 'under_review' or not can_user_review_current_stage or decision_outcome != 'penalty_reduced'" invisible="not is_managerial"/>
                                     </group>
                                 </group>
-                                <group string="Decision Justification &amp; Rationale">
-                                    <field name="appeal_decision_notes" nolabel="1" readonly="state != 'under_review' or not can_user_review_current_stage" placeholder="Appeal authority justification for upholding, overturning, or reducing penalty..."/>
-                                </group>
+                                <separator string="Decision Justification &amp; Rationale"/>
+                                <field name="appeal_decision_notes" placeholder="Appeal authority justification for upholding, overturning, or reducing penalty..." readonly="state != 'under_review' or not can_user_review_current_stage" class="w-100" style="min-height: 120px;"/>
                             </page>
                         </notebook>
                     </sheet>

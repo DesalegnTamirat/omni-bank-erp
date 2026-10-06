@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
-from datetime import timedelta
+from datetime import timedelta, date
+from markupsafe import Markup
 
 
 class DisciplineCase(models.Model):
@@ -74,14 +75,23 @@ class DisciplineCase(models.Model):
     decided_fine_days = fields.Float(string='Final Decided Salary Fine (Days)', tracking=True)
     is_punishment_modified_by_committee = fields.Boolean(string='Punishment Modified by Committee', compute='_compute_is_punishment_modified', store=True)
 
-    @api.depends('article_id', 'offense_id', 'offense_id.sub_article_code', 'article_id.article_number')
+    @api.depends('article_id', 'offense_id', 'offense_id.sub_article_code', 'article_id.article_number', 'article_id.name')
     def _compute_legal_citation(self):
         for rec in self:
             citations = []
-            if rec.article_id and rec.article_id.article_number:
-                citations.append(_('Article %s') % rec.article_id.article_number)
+            art_val = (rec.article_id and (rec.article_id.article_number or rec.article_id.name)) or ''
+            if art_val:
+                art_clean = art_val.strip()
+                if art_clean.lower().startswith('article'):
+                    citations.append(art_clean)
+                else:
+                    citations.append(_('Article %s') % art_clean)
             if rec.offense_id and rec.offense_id.sub_article_code:
-                citations.append(_('Clause %s') % rec.offense_id.sub_article_code)
+                sub_clean = rec.offense_id.sub_article_code.strip()
+                if sub_clean.lower().startswith('clause') or sub_clean.lower().startswith('art'):
+                    citations.append(sub_clean)
+                else:
+                    citations.append(_('Clause %s') % sub_clean)
             rec.legal_article_display = ' - '.join(citations) if citations else False
             rec.legal_clause_text = (rec.offense_id and rec.offense_id.full_clause_text) or (rec.article_id and rec.article_id.description) or False
 
@@ -178,7 +188,14 @@ class DisciplineCase(models.Model):
         'decided_fine_days',
         'cash_shortage_amount',
         'is_statutory_mitigation_applied',
-        'appeal_outcome_type'
+        'appeal_outcome_type',
+        'appeal_ids',
+        'appeal_ids.state',
+        'appeal_ids.decision_outcome',
+        'appeal_ids.revised_punishment_type',
+        'appeal_ids.revised_penalty_percentage',
+        'appeal_ids.revised_fine_days',
+        'appeal_ids.review_date',
     )
     def _compute_punishment_details(self):
         rank_order = {
@@ -368,15 +385,29 @@ class DisciplineCase(models.Model):
             rec.original_penalty_percentage = pct
             rec.original_fine_days = days
 
-            if rec.appeal_outcome_type == 'exonerated' or (rec.state in ('enforced', 'closed', 'appealed') and rec.punishment_type == 'exonerate'):
+            # Check decided appeals first
+            decided_appeals = rec.appeal_ids.filtered(lambda a: a.state == 'decided').sorted(
+                lambda a: (a.review_date or (a.write_date.date() if a.write_date else fields.Date.today()), a.id or 0),
+                reverse=True
+            )
+            if decided_appeals:
+                last_app = decided_appeals[0]
+                if last_app.decision_outcome == 'overturned' or last_app.revised_punishment_type == 'exonerate':
+                    rec.punishment_type = 'exonerate'
+                    rec.penalty_percentage = 0.0
+                    rec.fine_days = 0.0
+                elif last_app.decision_outcome == 'penalty_reduced':
+                    rec.punishment_type = last_app.revised_punishment_type or punish
+                    rec.penalty_percentage = last_app.revised_penalty_percentage
+                    rec.fine_days = last_app.revised_fine_days
+                elif last_app.decision_outcome == 'upheld':
+                    rec.punishment_type = rec.decided_punishment_type or punish
+                    rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
+                    rec.fine_days = rec.decided_fine_days if rec.decided_fine_days > 0 else days
+            elif rec.appeal_outcome_type == 'exonerated' or (rec.state in ('enforced', 'closed', 'appealed') and rec.punishment_type == 'exonerate'):
                 rec.punishment_type = 'exonerate'
                 rec.penalty_percentage = 0.0
                 rec.fine_days = 0.0
-            elif rec.appeal_outcome_type == 'reduced' and rec.latest_appeal_id and rec.latest_appeal_id.state == 'decided':
-                last_app = rec.latest_appeal_id
-                rec.punishment_type = last_app.revised_punishment_type or punish
-                rec.penalty_percentage = last_app.revised_penalty_percentage
-                rec.fine_days = last_app.revised_fine_days
             else:
                 rec.punishment_type = rec.decided_punishment_type or punish
                 rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
@@ -424,8 +455,12 @@ class DisciplineCase(models.Model):
 
             offense_domain = [('staff_category', 'in', [cat, 'all'])]
             if self.case_action_track == 'direct_enforce':
-                _, _, allowed_levels = self._get_coach_max_authority()
-                offense_domain.append(('severity_level', 'in', allowed_levels))
+                cfg_p, max_rk, allowed_levels = self._get_coach_max_authority()
+                offense_domain.extend([
+                    '|',
+                    ('severity_level', 'in', allowed_levels),
+                    ('article_id.severity_level_id.code', 'in', allowed_levels)
+                ])
 
             return {
                 'domain': {
@@ -457,14 +492,22 @@ class DisciplineCase(models.Model):
                 ('staff_category', 'in', [cat, 'all'])
             ]
             if self.case_action_track == 'direct_enforce':
-                _, _, allowed_levels = self._get_coach_max_authority()
-                offense_domain.append(('severity_level', 'in', allowed_levels))
+                cfg_p, max_rk, allowed_levels = self._get_coach_max_authority()
+                offense_domain.extend([
+                    '|',
+                    ('severity_level', 'in', allowed_levels),
+                    ('article_id.severity_level_id.code', 'in', allowed_levels)
+                ])
             res['domain']['offense_id'] = offense_domain
         else:
             offense_domain = [('staff_category', 'in', [cat, 'all'])]
             if self.case_action_track == 'direct_enforce':
-                _, _, allowed_levels = self._get_coach_max_authority()
-                offense_domain.append(('severity_level', 'in', allowed_levels))
+                cfg_p, max_rk, allowed_levels = self._get_coach_max_authority()
+                offense_domain.extend([
+                    '|',
+                    ('severity_level', 'in', allowed_levels),
+                    ('article_id.severity_level_id.code', 'in', allowed_levels)
+                ])
             res['domain']['offense_id'] = offense_domain
         self._compute_punishment_details()
         return res
@@ -558,73 +601,85 @@ class DisciplineCase(models.Model):
         ('audit', 'Internal Audit / Compliance'),
     ], string='Case Initiator Source', default=_default_initiator_type, store=True, readonly=False, tracking=True)
 
-    chief_id = fields.Many2one(
+    director_id = fields.Many2one(
         'res.users',
-        string='Respective Chief Officer',
-        compute='_compute_chief_id',
+        string='Directorate Director / Deputy Chief',
+        compute='_compute_hierarchy_stakeholders',
         store=True,
         readonly=False,
         tracking=True
     )
 
-    def _find_respective_chief_user(self):
-        """Locate the respective Chief Officer by traversing the supervisor/coach hierarchy chain."""
-        self.ensure_one()
-        # 1. Start from Initiator / Reporter employee if available, or subject employee
-        start_emp = (self.reported_by_id and self.reported_by_id.employee_id) or (self.create_uid and self.create_uid.employee_id) or self.employee_id
-        
-        curr = start_emp
-        visited = set()
-        while curr and curr.id not in visited:
-            visited.add(curr.id)
-            mgr = curr.coach_id or curr.parent_id or (curr.department_id and curr.department_id.manager_id)
-            if not mgr or mgr.id == curr.id:
-                break
-            
-            job_name = (mgr.job_id.name or '').lower() if mgr.job_id else ''
-            exec_lvl = getattr(mgr, 'executive_level', False)
-            if exec_lvl in ('chief', 'ceo') or any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
-                if mgr.user_id:
-                    return mgr.user_id
-            curr = mgr
+    chief_id = fields.Many2one(
+        'res.users',
+        string='Respective Chief Officer',
+        compute='_compute_hierarchy_stakeholders',
+        store=True,
+        readonly=False,
+        tracking=True
+    )
 
-        # 2. If not found via reporter, try subject employee hierarchy
-        if self.employee_id and self.employee_id != start_emp:
-            curr = self.employee_id
+    def _resolve_case_hierarchy_stakeholders(self):
+        """
+        Traverse the supervisor/coach hierarchy chain to locate:
+        1. Directorate Director / Regional Manager / Deputy Chief
+        2. Respective Chief Officer (CPCO, CFO, CIO, CDO, COO, etc.)
+        """
+        self.ensure_one()
+        start_emp = (self.reported_by_id and self.reported_by_id.employee_id) or (self.create_uid and self.create_uid.employee_id) or self.employee_id
+        director_user = False
+        chief_user = False
+
+        for target in [start_emp, self.employee_id]:
+            if not target:
+                continue
+            curr = target
             visited = set()
             while curr and curr.id not in visited:
                 visited.add(curr.id)
                 mgr = curr.coach_id or curr.parent_id or (curr.department_id and curr.department_id.manager_id)
                 if not mgr or mgr.id == curr.id:
                     break
+
                 job_name = (mgr.job_id.name or '').lower() if mgr.job_id else ''
                 exec_lvl = getattr(mgr, 'executive_level', False)
-                if exec_lvl in ('chief', 'ceo') or any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+
+                # Director / Deputy Chief detection
+                if not director_user and (exec_lvl == 'director' or any(k in job_name for k in ['director', 'regional manager', 'deputy chief'])):
                     if mgr.user_id:
-                        return mgr.user_id
+                        director_user = mgr.user_id
+
+                # Chief Officer detection
+                if not chief_user and (exec_lvl in ('chief', 'ceo') or any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp'])):
+                    if mgr.user_id:
+                        chief_user = mgr.user_id
+                        break
                 curr = mgr
 
-        # 3. Fallback: Search for an employee with executive_level='chief' or CPCO
-        chief_emp = self.env['hr.employee'].sudo().search([
-            ('executive_level', '=', 'chief'),
-            ('user_id', '!=', False)
-        ], limit=1)
-        if chief_emp and chief_emp.user_id:
-            return chief_emp.user_id
-        
-        cpco_user = self.env['hr.employee'].get_cpco_user()
-        if cpco_user:
-            return cpco_user
-            
-        return False
+            if chief_user:
+                break
+
+        # Fallback for Chief Officer if not in direct reporting line
+        if not chief_user:
+            chief_emp = self.env['hr.employee'].sudo().search([
+                ('executive_level', '=', 'chief'),
+                ('user_id', '!=', False)
+            ], limit=1)
+            if chief_emp and chief_emp.user_id:
+                chief_user = chief_emp.user_id
+            else:
+                chief_user = self.env['hr.employee'].get_cpco_user()
+
+        return director_user, chief_user
 
     @api.depends('employee_id', 'reported_by_id', 'case_action_track')
-    def _compute_chief_id(self):
+    def _compute_hierarchy_stakeholders(self):
         for rec in self:
-            if not rec.chief_id or rec.case_action_track == 'committee_escalation':
-                chief_u = rec._find_respective_chief_user()
-                if chief_u:
-                    rec.chief_id = chief_u
+            dir_u, chief_u = rec._resolve_case_hierarchy_stakeholders()
+            if dir_u and not rec.director_id:
+                rec.director_id = dir_u
+            if chief_u and (not rec.chief_id or rec.case_action_track == 'committee_escalation'):
+                rec.chief_id = chief_u
     escalation_target = fields.Selection([
         ('audit', 'Audit Directorate'),
         ('ceo', 'Chief Executive Officer (CEO)'),
@@ -663,7 +718,7 @@ class DisciplineCase(models.Model):
             rec.latest_appeal_id = appeals[0] if appeals else False
             rec.has_active_appeal = any(a.state in ('submitted', 'under_review') for a in appeals)
 
-    @api.depends('appeal_ids', 'appeal_ids.state', 'appeal_ids.decision_outcome', 'appeal_ids.revised_punishment_type', 'appeal_ids.revised_penalty_percentage', 'appeal_ids.revised_fine_days', 'appeal_ids.review_date')
+    @api.depends('appeal_ids', 'appeal_ids.state', 'appeal_ids.decision_outcome', 'appeal_ids.revised_punishment_type', 'appeal_ids.revised_penalty_percentage', 'appeal_ids.revised_fine_days', 'appeal_ids.review_date', 'state')
     def _compute_appeal_outcome(self):
         for rec in self:
             appeals = rec.appeal_ids.sorted(lambda a: (a.submission_date or fields.Date.today(), a.id or 0), reverse=True)
@@ -672,7 +727,7 @@ class DisciplineCase(models.Model):
                 rec.appeal_outcome_display = False
                 continue
 
-            has_pending = any(a.state in ('submitted', 'under_review') for a in appeals)
+            has_pending = any(a.state in ('submitted', 'under_review') for a in appeals) and rec.state == 'appealed'
             decided_appeals = appeals.filtered(lambda a: a.state == 'decided')
             if decided_appeals:
                 last_decision = decided_appeals[0]
@@ -747,33 +802,48 @@ class DisciplineCase(models.Model):
                 rec.active_penalty_end_date = False
 
     is_coach_or_manager = fields.Boolean(string='Is Coach or Line Manager', compute='_compute_is_coach_or_manager')
+    is_case_direct_supervisor = fields.Boolean(string='Is Case Direct Supervisor', compute='_compute_is_coach_or_manager')
+    is_case_director_user = fields.Boolean(string='Is Case Director User', compute='_compute_is_coach_or_manager')
+    is_case_chief_user = fields.Boolean(string='Is Case Chief User', compute='_compute_is_coach_or_manager')
+    is_exonerated_case = fields.Boolean(string='Is Exonerated Case', compute='_compute_is_exonerated_case')
+
+    @api.depends('punishment_type', 'decided_punishment_type', 'appeal_outcome_type', 'state', 'fine_days', 'penalty_percentage')
+    def _compute_is_exonerated_case(self):
+        for rec in self:
+            effective_punish = rec.decided_punishment_type or rec.punishment_type
+            rec.is_exonerated_case = bool(
+                effective_punish == 'exonerate' or
+                rec.appeal_outcome_type == 'exonerated' or
+                (rec.state == 'closed' and not effective_punish and (rec.fine_days or 0.0) == 0.0 and (rec.penalty_percentage or 0.0) == 0.0)
+            )
 
     def _compute_is_coach_or_manager(self):
-        current_emp = self.env.user.employee_id
+        current_user = self.env.user
+        current_emp = current_user.employee_id
+        is_admin = current_user.has_group('discipline_management.group_discipline_admin') or current_user.has_group('base.group_system')
         for rec in self:
-            if not current_emp or not rec.employee_id:
-                rec.is_coach_or_manager = (
-                    self.env.user.has_group('discipline_management.group_discipline_admin') or
-                    self.env.user.has_group('discipline_management.group_discipline_manager') or
-                    self.env.user.has_group('discipline_management.group_discipline_director') or
-                    self.env.user.has_group('discipline_management.group_discipline_chief') or
-                    self.env.user.has_group('discipline_management.group_discipline_ceo')
+            # 1. Contextual Direct Supervisor check (strict hierarchy)
+            is_direct_sub = False
+            if current_emp and rec.employee_id:
+                is_direct_sub = bool(
+                    rec.employee_id.coach_id.id == current_emp.id or
+                    rec.employee_id.parent_id.id == current_emp.id or
+                    (rec.employee_id.department_id and rec.employee_id.department_id.manager_id and rec.employee_id.department_id.manager_id.id == current_emp.id) or
+                    (rec.reported_by_id and rec.reported_by_id.id == current_emp.id)
                 )
-                continue
-            is_sub = (
-                rec.employee_id.parent_id.id == current_emp.id or
-                rec.employee_id.coach_id.id == current_emp.id or
-                rec.employee_id.department_id.manager_id.id == current_emp.id or
-                rec.employee_id.id in self.env['hr.employee'].search([('id', 'child_of', current_emp.id)]).ids
-            )
-            rec.is_coach_or_manager = (
-                is_sub or
-                self.env.user.has_group('discipline_management.group_discipline_manager') or
-                self.env.user.has_group('discipline_management.group_discipline_director') or
-                self.env.user.has_group('discipline_management.group_discipline_chief') or
-                self.env.user.has_group('discipline_management.group_discipline_ceo') or
-                self.env.user.has_group('discipline_management.group_discipline_admin')
-            )
+            rec.is_case_direct_supervisor = is_direct_sub or bool(rec.create_uid and rec.create_uid.id == current_user.id) or is_admin
+            rec.is_coach_or_manager = rec.is_case_direct_supervisor
+
+            # 2. Contextual Directorate Director check
+            is_dir = bool(rec.director_id and rec.director_id.id == current_user.id)
+            if not is_dir and current_emp and rec.employee_id:
+                dept = rec.employee_id.department_id
+                if dept and dept.parent_id and dept.parent_id.manager_id and dept.parent_id.manager_id.id == current_emp.id:
+                    is_dir = True
+            rec.is_case_director_user = is_dir or is_admin
+
+            # 3. Contextual Chief Officer check
+            rec.is_case_chief_user = bool(rec.chief_id and rec.chief_id.id == current_user.id) or is_admin
 
     is_coach_enforce_allowed = fields.Boolean(
         string='Is Coach Enforcement Allowed',
@@ -782,7 +852,7 @@ class DisciplineCase(models.Model):
 
     @api.depends('case_action_track', 'severity_level_id', 'punishment_type', 'decided_punishment_type')
     def _compute_is_coach_enforce_allowed(self):
-        _, max_rank, allowed_levels = self._get_coach_max_authority()
+        cfg_punish, max_rank, allowed_levels = self._get_coach_max_authority()
         punish_ranks = {
             'verbal_warning': 1,
             'first_warning_penalty': 2,
@@ -811,6 +881,26 @@ class DisciplineCase(models.Model):
         compute='_compute_allowed_severity_level_ids',
         string='Allowed Severity Levels'
     )
+
+    allowed_offense_ids = fields.Many2many(
+        'discipline.offense',
+        compute='_compute_allowed_offense_ids',
+        string='Allowed Offenses'
+    )
+
+    @api.depends('staff_category', 'employee_id', 'case_action_track')
+    def _compute_allowed_offense_ids(self):
+        cfg_punish, max_rank, allowed_levels = self._get_coach_max_authority()
+        for rec in self:
+            cat = rec.staff_category or 'non_managerial'
+            domain = [('staff_category', 'in', [cat, 'all'])]
+            if rec.case_action_track == 'direct_enforce':
+                domain.extend([
+                    '|',
+                    ('severity_level', 'in', allowed_levels),
+                    ('article_id.severity_level_id.code', 'in', allowed_levels)
+                ])
+            rec.allowed_offense_ids = self.env['discipline.offense'].search(domain)
 
     subordinate_employee_ids = fields.Many2many(
         'hr.employee',
@@ -849,7 +939,7 @@ class DisciplineCase(models.Model):
     @api.depends('offense_id', 'offense_id.line_ids', 'case_action_track')
     def _compute_allowed_severity_level_ids(self):
         all_levels = self.env['discipline.severity.level'].search([])
-        _, _, allowed_levels_codes = self._get_coach_max_authority()
+        cfg_p, max_rank, allowed_levels_codes = self._get_coach_max_authority()
         for rec in self:
             if rec.case_action_track == 'direct_enforce':
                 levels = all_levels.filtered(lambda l: l.code in allowed_levels_codes)
@@ -903,15 +993,18 @@ class DisciplineCase(models.Model):
     )
     
     reference = fields.Char(string='Reference')
+    active = fields.Boolean(string='Active', default=True, tracking=True)
+    chief_review_notes = fields.Text(string='Executive Remark', tracking=True)
     # State Machine
     state = fields.Selection([
         ('draft', 'Draft'),
         ('initiated', 'Initiated'),
+        ('submitted_director', 'Submitted to Directorate Director'),
         ('submitted_chief', 'Submitted to Respective Chief'),
         ('ceo_review', 'Under CEO Review'),
         ('investigating', 'Under Audit Investigation'),
         ('chairman_review', 'Committee Chairman Review'),
-        ('committee_review', 'Committee Review'),
+        ('committee_review', 'Committee Review & Hearing'),
         ('pending_approval', 'Pending Final Approval'),
         ('enforced', 'Enforced / Finalized'),
         ('appealed', 'Appealed'),
@@ -926,7 +1019,7 @@ class DisciplineCase(models.Model):
     # SLA Tracking
     sla_deadline = fields.Date(string='SLA Resolution Deadline', compute='_compute_sla_deadline', store=True)
     is_sla_exceeded = fields.Boolean(string='SLA Breached', compute='_compute_is_sla_exceeded', store=True, tracking=True)
-    sla_target_days = fields.Integer(string='SLA Target (Days)', default=_default_sla_target_days, help='Target resolution days per policy')
+    sla_target_days = fields.Integer(string='SLA Target (Days)', default=_default_sla_target_days, readonly=True, help='Target resolution days per policy')
 
     # Associated Records
     investigation_ids = fields.One2many('discipline.investigation', 'case_id', string='Investigations')
@@ -948,12 +1041,24 @@ class DisciplineCase(models.Model):
         string='Has Exonerated Investigation',
         compute='_compute_has_exonerated_investigation'
     )
+    has_completed_investigation = fields.Boolean(
+        string='Has Completed Investigation',
+        compute='_compute_has_completed_investigation'
+    )
 
     @api.depends('investigation_ids.state', 'investigation_ids.finding_outcome')
     def _compute_has_exonerated_investigation(self):
         for rec in self:
             rec.has_exonerated_investigation = any(
                 inv.state in ('submitted', 'approved') and inv.finding_outcome == 'exonerated'
+                for inv in rec.investigation_ids
+            )
+
+    @api.depends('investigation_ids', 'investigation_ids.state')
+    def _compute_has_completed_investigation(self):
+        for rec in self:
+            rec.has_completed_investigation = any(
+                inv.state in ('approved', 'submitted')
                 for inv in rec.investigation_ids
             )
 
@@ -1045,22 +1150,97 @@ class DisciplineCase(models.Model):
             else:
                 rec.is_sla_exceeded = False
 
-    @api.depends('delivery_receipt_date', 'final_decision_date', 'state')
+    def _get_case_origin_type(self):
+        """Determine origin hierarchy for appeal escalation."""
+        self.ensure_one()
+        if (
+            self.initiator_type == 'audit' or
+            self.case_action_track == 'committee_escalation' or
+            getattr(self, 'has_completed_committee_meeting', False) or
+            bool(self.committee_meeting_ids)
+        ):
+            return 'committee'
+        initiator_emp = self.reported_by_id.sudo().employee_id if self.reported_by_id else False
+        if not initiator_emp and self.employee_id:
+            initiator_emp = self.employee_id.sudo().coach_id or self.employee_id.sudo().parent_id
+        level = getattr(initiator_emp, 'executive_level', False) if initiator_emp else False
+        if not level and initiator_emp:
+            job_name = (initiator_emp.job_id.sudo().name or '').lower() if initiator_emp.job_id else ''
+            if any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+                level = 'chief'
+            elif any(k in job_name for k in ['director', 'directorate']):
+                level = 'director'
+            else:
+                level = 'manager'
+        if level == 'chief':
+            return 'chief'
+        elif level == 'director':
+            return 'director'
+        return 'manager'
+
+    @api.depends('delivery_receipt_date', 'final_decision_date', 'state', 'appeal_ids', 'appeal_ids.state', 'appeal_ids.appeal_level', 'appeal_ids.review_date', 'appeal_ids.submission_date', 'appeal_ids.decision_outcome', 'appeal_outcome_type', 'initiator_type', 'case_action_track', 'committee_meeting_ids')
     def _compute_appeal_deadline(self):
         ICP = self.env['ir.config_parameter'].sudo()
         appeal_days = int(ICP.get_param('discipline.appeal_window_days', 10))
         for rec in self:
-            base_date = rec.delivery_receipt_date or rec.final_decision_date
-            if base_date and rec.state in ('enforced', 'appealed', 'closed'):
-                rec.appeal_deadline = base_date + timedelta(days=appeal_days)
+            if rec.state not in ('enforced', 'appealed', 'closed') or rec.appeal_outcome_type == 'exonerated':
+                rec.appeal_deadline = False
+                continue
+
+            origin_type = rec._get_case_origin_type()
+            first_appeal = rec.appeal_ids.filtered(lambda a: a.appeal_level == 'first')
+            second_appeal = rec.appeal_ids.filtered(lambda a: a.appeal_level == 'second')
+            third_appeal = rec.appeal_ids.filtered(lambda a: a.appeal_level == 'third')
+
+            # 1. No appeal filed yet -> deadline based on initial decision receipt
+            if not first_appeal:
+                base_date = rec.delivery_receipt_date or rec.final_decision_date
+                rec.appeal_deadline = (base_date + timedelta(days=appeal_days)) if base_date else False
+
+            # 2. First appeal exists
+            elif first_appeal and not second_appeal:
+                # If committee or chief case: 1st appeal was directly to CEO and is final. No further appeal window.
+                if origin_type in ('committee', 'chief'):
+                    rec.appeal_deadline = False
+                else:
+                    # Manager / Director track: 2nd level window from 1st appeal decision
+                    f_app = first_appeal[0]
+                    if f_app.state == 'decided' and f_app.decision_outcome in ('upheld', 'penalty_reduced'):
+                        base_date = f_app.review_date or f_app.submission_date or rec.final_decision_date
+                        rec.appeal_deadline = (base_date + timedelta(days=appeal_days)) if base_date else False
+                    else:
+                        rec.appeal_deadline = False
+
+            # 3. Second appeal exists
+            elif second_appeal and not third_appeal:
+                # If director case: 2nd appeal was to CEO and is final. No further appeal window.
+                if origin_type in ('committee', 'chief', 'director'):
+                    rec.appeal_deadline = False
+                else:
+                    # Manager track: 3rd level window from 2nd appeal decision
+                    s_app = second_appeal[0]
+                    if s_app.state == 'decided' and s_app.decision_outcome in ('upheld', 'penalty_reduced'):
+                        base_date = s_app.review_date or s_app.submission_date or rec.final_decision_date
+                        rec.appeal_deadline = (base_date + timedelta(days=appeal_days)) if base_date else False
+                    else:
+                        rec.appeal_deadline = False
+
+            # 4. Third appeal exists or all appeals exhausted
             else:
                 rec.appeal_deadline = False
 
-    @api.depends('appeal_deadline', 'state')
+    @api.depends('appeal_deadline', 'state', 'appeal_outcome_type', 'appeal_ids', 'appeal_ids.state')
     def _compute_is_appeal_window_open(self):
         today = fields.Date.context_today(self)
         for rec in self:
-            if rec.state == 'enforced' and rec.appeal_deadline and today <= rec.appeal_deadline:
+            has_pending = any(a.state in ('draft', 'submitted', 'under_review') for a in rec.appeal_ids)
+            if (
+                rec.state == 'enforced' and
+                rec.appeal_deadline and
+                today <= rec.appeal_deadline and
+                not has_pending and
+                rec.appeal_outcome_type != 'exonerated'
+            ):
                 rec.is_appeal_window_open = True
             else:
                 rec.is_appeal_window_open = False
@@ -1209,29 +1389,7 @@ class DisciplineCase(models.Model):
             )
 
             # Determine case origin track for appeal escalation hierarchy
-            if rec.initiator_type == 'audit' or rec.case_action_track == 'committee_escalation':
-                origin_type = 'committee'
-            else:
-                initiator_emp = rec.reported_by_id.sudo().employee_id if rec.reported_by_id else False
-                if not initiator_emp and rec.employee_id:
-                    initiator_emp = rec.employee_id.sudo().coach_id or rec.employee_id.sudo().parent_id
-                
-                level = getattr(initiator_emp, 'executive_level', False) if initiator_emp else False
-                if not level and initiator_emp:
-                    job_name = (initiator_emp.job_id.sudo().name or '').lower() if initiator_emp.job_id else ''
-                    if any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
-                        level = 'chief'
-                    elif any(k in job_name for k in ['director', 'directorate']):
-                        level = 'director'
-                    else:
-                        level = 'manager'
-                
-                if level == 'chief':
-                    origin_type = 'chief'
-                elif level == 'director':
-                    origin_type = 'director'
-                else:
-                    origin_type = 'manager'
+            origin_type = rec._get_case_origin_type()
 
             first_appeal = rec.appeal_ids.filtered(lambda a: a.appeal_level == 'first')
             second_appeal = rec.appeal_ids.filtered(lambda a: a.appeal_level == 'second')
@@ -1261,7 +1419,7 @@ class DisciplineCase(models.Model):
                         f_app.revised_punishment_type == 'exonerate' or
                         (f_app.revised_penalty_percentage == 0.0 and f_app.revised_fine_days == 0.0 and f_app.revised_punishment_type in ('exonerate', False))
                     )
-                    if not f_exonerated and origin_type in ('manager', 'director', 'committee'):
+                    if not f_exonerated and origin_type in ('manager', 'director'):
                         eligible_second = True
 
             # 3rd Level Appeal Eligibility (Manager track only)
@@ -1354,7 +1512,7 @@ class DisciplineCase(models.Model):
     def _validate_segregation_of_duties(self):
         for rec in self:
             current_user = self.env.user
-            _, max_rank, _ = self._get_coach_max_authority()
+            cfg_p, max_rank, allowed_levels = self._get_coach_max_authority()
             is_direct_mgr_enforcement = (
                 rec.case_action_track == 'direct_enforce' and
                 ((rec.severity_level != 'level_1' and rec.punishment_type != 'dismissal') or max_rank >= 6)
@@ -1406,6 +1564,10 @@ class DisciplineCase(models.Model):
 
     def write(self, vals):
         force_write = self.env.context.get('force_write')
+        if 'employee_id' in vals and not force_write and not self.env.su:
+            for rec in self:
+                if rec.state != 'draft' and rec.employee_id.id != vals['employee_id']:
+                    raise UserError(_('The Subject Employee cannot be modified once the case has been initiated.'))
         if not force_write and not self.env.su:
             whitelisted_fields = {
                 'state', 'revocation_reason', 'revocation_date', 'revoked_by_id', 'is_revoked',
@@ -1421,7 +1583,8 @@ class DisciplineCase(models.Model):
                 'statutory_deadline_date', 'is_deadline_exceeded', 'active_penalty_end_date',
                 'active_duration_days', 'legal_article_display', 'legal_clause_text',
                 'appeal_outcome_type', 'appeal_outcome_display', 'appeal_ids',
-                'deduction_status', 'computed_deduction_month', 'payroll_month'
+                'deduction_status', 'computed_deduction_month', 'payroll_month', 'active',
+                'chief_review_notes'
             }
             # Only enforce immutability on manually edited, non-computed user fields
             explicit_user_fields = {
@@ -1441,12 +1604,83 @@ class DisciplineCase(models.Model):
         for rec in self:
             if rec.state in ['enforced', 'closed', 'appealed']:
                 raise UserError(_('Preservation Policy Violation: Enforced or finalized disciplinary records cannot be deleted. Use formal Revocation if required.'))
-        return super().unlink()
+            if rec.state not in ['draft', 'initiated'] and not self.env.user.has_group('discipline_management.group_discipline_admin') and not self.env.su:
+                raise UserError(_('Active Workflow Protection: Once a case has advanced past initiation to executive/committee review, it must follow formal workflow resolution.'))
+            if rec.create_uid and rec.create_uid.id != self.env.user.id and not self.env.user.has_group('discipline_management.group_discipline_admin') and not self.env.su:
+                raise UserError(_('Permission Denied: You can only delete cases that you created.'))
+
+        initiated_cases = self.filtered(lambda r: r.state == 'initiated')
+        draft_cases = self.filtered(lambda r: r.state == 'draft')
+        other_cases = self - initiated_cases - draft_cases
+
+        # Soft delete initiated cases (Archiving & chatter log)
+        if initiated_cases:
+            initiated_cases.with_context(force_write=True).write({'active': False})
+            for rec in initiated_cases:
+                rec.message_post(
+                    body=Markup(_('Case <strong>%s</strong> was withdrawn/soft-deleted by %s.') % (rec.name, self.env.user.name))
+                )
+
+        # Permanently purge draft cases
+        if draft_cases:
+            super(DisciplineCase, draft_cases).unlink()
+
+        if other_cases and (self.env.user.has_group('discipline_management.group_discipline_admin') or self.env.su):
+            super(DisciplineCase, other_cases).unlink()
+
+        return True
+
+    def action_delete_draft(self):
+        """Allow creators to safely purge draft cases and redirect back to case list."""
+        self.ensure_one()
+        if self.state != 'draft':
+            raise UserError(_('Only draft cases can be deleted.'))
+        self.unlink()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Disciplinary Cases'),
+            'res_model': 'discipline.case',
+            'view_mode': 'list,form',
+            'views': [[False, 'list'], [False, 'form']],
+            'target': 'current',
+        }
+
+    def action_withdraw_initiated_case(self):
+        """Allow creators to safely soft-delete (withdraw) initiated cases before escalation."""
+        self.ensure_one()
+        if self.state != 'initiated':
+            raise UserError(_('Only initiated cases can be withdrawn/soft-deleted.'))
+        self.unlink()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Disciplinary Cases'),
+            'res_model': 'discipline.case',
+            'view_mode': 'list,form',
+            'views': [[False, 'list'], [False, 'form']],
+            'target': 'current',
+        }
 
     def action_initiate(self):
         for rec in self:
             if not rec.description:
                 raise UserError(_('Detailed Description is mandatory before initiating a case.'))
+            # Governance Check: Committee escalation cases can only be initiated by Directorate Directors, Audit, or Admins
+            if rec.case_action_track == 'committee_escalation':
+                user = self.env.user
+                emp = user.employee_id
+                job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+                is_director_or_exec = (
+                    (emp and (emp.executive_level in ('director', 'chief', 'ceo') or any(k in job_name for k in ['director', 'chief', 'ceo', 'president', 'vp']))) or
+                    user.has_group('discipline_management.group_discipline_director') or
+                    user.has_group('discipline_management.group_discipline_auditor') or
+                    user.has_group('discipline_management.group_discipline_admin') or
+                    user.has_group('base.group_system')
+                )
+                if not is_director_or_exec:
+                    raise UserError(_(
+                        "Unauthorized Action Pathway: Line Managers and Coaches can only initiate 'Direct Action' cases within their authority limits. "
+                        "Formal Committee Escalation cases must be initiated by a Directorate Director, Internal Audit, or HR Administration."
+                    ))
             rec.with_context(force_write=True).write({'state': 'initiated'})
             partners_to_notify = []
             if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
@@ -1454,9 +1688,85 @@ class DisciplineCase(models.Model):
             if rec.reported_by_id and rec.reported_by_id.user_id and rec.reported_by_id.user_id.partner_id:
                 partners_to_notify.append(rec.reported_by_id.user_id.partner_id.id)
             rec.message_post(
-                body=_('Disciplinary case <strong>%s</strong> initiated for employee %s.') % (rec.name, rec.employee_id.name),
+                body=Markup(_('Disciplinary case <strong>%s</strong> initiated for employee %s.') % (rec.name, rec.employee_id.name)),
                 partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
             )
+            rec._send_employee_discuss_direct_message(message_type='initiate')
+
+    def _send_employee_discuss_direct_message(self, message_type='enforce'):
+        """Send official notification directly into 1-on-1 Odoo Discuss direct message channel for the employee."""
+        for rec in self:
+            emp_user = rec.employee_id.user_id if rec.employee_id else False
+            if not emp_user or not emp_user.partner_id:
+                continue
+            
+            manager_user = (rec.reported_by_id and rec.reported_by_id.user_id) or rec.env.user
+            manager_partner = manager_user.partner_id
+            emp_partner = emp_user.partner_id
+            
+            # Ensure employee is following the case record
+            rec.message_subscribe(partner_ids=[emp_partner.id])
+            
+            try:
+                channel = False
+                if hasattr(self.env['discuss.channel'], '_get_or_create_chat'):
+                    channel = self.env['discuss.channel'].with_user(manager_user)._get_or_create_chat(partners_to=[emp_partner.id])
+                elif hasattr(self.env['discuss.channel'], 'channel_get'):
+                    channel_info = self.env['discuss.channel'].sudo().channel_get(partners_to=[manager_partner.id, emp_partner.id])
+                    if channel_info and 'id' in channel_info:
+                        channel = self.env['discuss.channel'].sudo().browse(channel_info['id'])
+                
+                if channel:
+                    if message_type == 'initiate':
+                        msg_body = Markup(_(
+                            '<p><strong>Disciplinary Case Notice</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>A formal disciplinary case (Ref: <strong>%s</strong>) has been initiated regarding alleged misconduct: <em>%s</em> (Incident Date: %s).</p>'
+                            '<p>You can view full details in Bunna Bank ERP under <strong>Discipline Management</strong>.</p>'
+                        ) % (
+                            rec.employee_id.name,
+                            rec.name,
+                            rec.offense_id.name if rec.offense_id else _('Misconduct Clause'),
+                            rec.incident_date.strftime('%B %d, %Y') if rec.incident_date else _('N/A'),
+                        ))
+                    else:
+                        sanction_name = dict(rec._fields['punishment_type'].selection).get(rec.punishment_type, str(rec.punishment_type or ''))
+                        penalty_details = []
+                        if rec.penalty_percentage > 0.0:
+                            penalty_details.append(_('%s%% Salary Deduction') % rec.penalty_percentage)
+                        if rec.fine_days > 0.0:
+                            penalty_details.append(_('%d Day(s) Salary Fine') % int(rec.fine_days))
+                        penalty_sub = (' (' + ', '.join(penalty_details) + ')') if penalty_details else ''
+
+                        msg_body = Markup(_(
+                            '<p><strong>Official Disciplinary Decision &amp; Warning Notice</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>A formal disciplinary decision has been enforced under Case Reference: <strong>%s</strong>.</p>'
+                            '<ul>'
+                            '<li><strong>Misconduct Clause:</strong> %s</li>'
+                            '<li><strong>Enforced Sanction:</strong> %s%s</li>'
+                            '<li><strong>Decision Date:</strong> %s</li>'
+                            '<li><strong>Statutory Appeal Deadline:</strong> %s (10-calendar-day statutory window)</li>'
+                            '</ul>'
+                            '<p>You have the right to lodge a formal written appeal in Bunna Bank ERP within 10 calendar days.</p>'
+                        ) % (
+                            rec.employee_id.name,
+                            rec.name,
+                            rec.offense_id.name if rec.offense_id else _('Misconduct Clause'),
+                            sanction_name,
+                            penalty_sub,
+                            rec.final_decision_date.strftime('%B %d, %Y') if rec.final_decision_date else fields.Date.today(),
+                            rec.appeal_deadline.strftime('%B %d, %Y') if rec.appeal_deadline else _('10 calendar days from receipt'),
+                        ))
+                    
+                    channel.message_post(
+                        body=msg_body,
+                        message_type='comment',
+                        subtype_xmlid='mail.mt_comment',
+                        author_id=manager_partner.id,
+                    )
+            except Exception:
+                pass
 
     def _get_group_users(self, xml_id):
         """Retrieve active users belonging to an XML-defined group in modern Odoo 19."""
@@ -1465,11 +1775,46 @@ class DisciplineCase(models.Model):
             return self.env['res.users']
         return group.all_user_ids or group.user_ids or self.env['res.users']
 
+    def action_coach_submit_to_director(self):
+        """Submit the initiated disciplinary case to the Directorate Director / Deputy Chief for intermediate review."""
+        for rec in self:
+            if not rec.director_id:
+                dir_u, chief_u = rec._resolve_case_hierarchy_stakeholders()
+                rec.director_id = dir_u
+            if rec.director_id:
+                rec.with_context(force_write=True).write({
+                    'state': 'submitted_director',
+                    'reviewer_id': rec.director_id.id,
+                })
+                partners_to_notify = []
+                if rec.director_id.partner_id:
+                    partners_to_notify.append(rec.director_id.partner_id.id)
+                if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                    partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
+                rec.message_post(
+                    body=_('Case <strong>%s</strong> submitted to Directorate Director (%s) for departmental review.') % (rec.name, rec.director_id.name),
+                    partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+                )
+            else:
+                # If no director in line, submit directly to Chief
+                rec.action_submit_to_chief()
+
+    def action_director_forward_to_chief(self):
+        """Director endorses and forwards the case to the Respective Chief Officer."""
+        for rec in self:
+            rec.action_submit_to_chief()
+
+    def action_director_resolve(self):
+        """Director directly resolves/enforces the case within departmental authority."""
+        for rec in self:
+            rec.action_approve_and_enforce()
+
     def action_submit_to_chief(self):
-        """Submit the initiated disciplinary case to the respective Chief Officer for review and escalation routing."""
+        """Submit the disciplinary case to the respective Chief Officer for review and escalation routing."""
         for rec in self:
             if not rec.chief_id:
-                rec.chief_id = rec._find_respective_chief_user()
+                dir_u, chief_u = rec._resolve_case_hierarchy_stakeholders()
+                rec.chief_id = chief_u
             rec.with_context(force_write=True).write({
                 'state': 'submitted_chief',
                 'chief_id': rec.chief_id.id if rec.chief_id else False
@@ -1480,9 +1825,161 @@ class DisciplineCase(models.Model):
             if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
                 partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
             rec.message_post(
-                body=_('Case <strong>%s</strong> submitted to Respective Chief (%s) for review.') % (rec.name, rec.chief_id.name if rec.chief_id else 'Chief Officer'),
+                body=Markup(_('Case <strong>%s</strong> submitted to Respective Chief (%s) for executive review.') % (rec.name, rec.chief_id.name if rec.chief_id else 'Chief Officer')),
                 partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
             )
+            rec._send_chief_submission_discuss_notification()
+
+    def _send_chief_submission_discuss_notification(self):
+        """Send 1-on-1 Odoo Discuss direct message to the Respective Chief Officer upon case submission."""
+        for rec in self:
+            chief_user = rec.chief_id or self.env['hr.employee'].get_cpco_user()
+            if not chief_user or not chief_user.partner_id:
+                continue
+
+            sender_user = (rec.reported_by_id and rec.reported_by_id.user_id) or (rec.initiator_id) or self.env.user
+            sender_partner = sender_user.partner_id
+            chief_partner = chief_user.partner_id
+
+            if sender_partner.id == chief_partner.id:
+                continue
+
+            # Ensure chief is following the case record
+            rec.message_subscribe(partner_ids=[chief_partner.id])
+
+            try:
+                channel = False
+                if hasattr(self.env['discuss.channel'], '_get_or_create_chat'):
+                    channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[chief_partner.id])
+                elif hasattr(self.env['discuss.channel'], 'channel_get'):
+                    channel_info = self.env['discuss.channel'].sudo().channel_get(partners_to=[sender_partner.id, chief_partner.id])
+                    if channel_info and 'id' in channel_info:
+                        channel = self.env['discuss.channel'].sudo().browse(channel_info['id'])
+
+                if channel:
+                    incident_str = rec.incident_date.strftime('%B %d, %Y') if rec.incident_date else _('N/A')
+                    sev_name = rec.severity_level_id.name if rec.severity_level_id else (dict(rec._fields['severity_level'].selection).get(rec.severity_level, rec.severity_level or _('N/A')))
+                    msg_body = Markup(_(
+                        '<p><strong>Formal Disciplinary Case Forwarded for Executive Review</strong></p>'
+                        '<p>Dear %s,</p>'
+                        '<p>A formal disciplinary case (Ref: <strong>%s</strong>) regarding subject employee <strong>%s</strong> has been submitted to you by <strong>%s</strong> for executive review and decision.</p>'
+                        '<ul>'
+                        '<li><strong>Misconduct Clause:</strong> %s</li>'
+                        '<li><strong>Severity Classification:</strong> %s</li>'
+                        '<li><strong>Misconduct Incident Date:</strong> %s</li>'
+                        '<li><strong>Legal Citation:</strong> %s</li>'
+                        '</ul>'
+                        '<p>Please access Bunna Bank ERP under <strong>Discipline Management &gt; Disciplinary Cases</strong> to review the incident facts and proceed with escalation routing or exoneration.</p>'
+                    ) % (
+                        chief_user.name,
+                        rec.name,
+                        rec.employee_id.name if rec.employee_id else _('N/A'),
+                        sender_user.name,
+                        rec.offense_id.name if rec.offense_id else _('Misconduct Clause'),
+                        sev_name,
+                        incident_str,
+                        rec.legal_article_display or _('N/A'),
+                    ))
+
+                    channel.message_post(
+                        body=msg_body,
+                        message_type='comment',
+                        subtype_xmlid='mail.mt_comment',
+                        author_id=sender_partner.id,
+                    )
+            except Exception:
+                pass
+
+    def action_chief_exonerate(self):
+        """Chief Officer reviews and officially exonerates the employee, dropping all charges."""
+        for rec in self:
+            rec.with_context(force_write=True).write({
+                'state': 'closed',
+                'punishment_type': 'exonerate',
+                'penalty_percentage': 0.0,
+                'fine_days': 0.0,
+                'active_duration_days': 0,
+                'final_decision_date': fields.Date.context_today(self),
+                'approver_id': self.env.user.id,
+            })
+            partners = []
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                partners.append(rec.employee_id.user_id.partner_id.id)
+            rec.message_post(
+                body=Markup(_('Case <strong>%s</strong> officially Exonerated and Closed by Respective Chief Officer %s. Clean employment record maintained.') % (rec.name, self.env.user.name)),
+                partner_ids=partners if partners else False,
+            )
+            rec._send_chief_exoneration_discuss_notification()
+
+    def _send_chief_exoneration_discuss_notification(self):
+        """Send 1-on-1 Odoo Discuss direct message to Subject Employee and Initiator when Chief exonerates."""
+        for rec in self:
+            sender_user = self.env.user
+            sender_partner = sender_user.partner_id
+
+            # 1. Notify Subject Employee
+            if rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.partner_id:
+                emp_user = rec.employee_id.user_id
+                try:
+                    channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[emp_user.partner_id.id])
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Official Disciplinary Exoneration Notice</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>We are pleased to inform you that disciplinary case (Ref: <strong>%s</strong>) regarding alleged misconduct has been reviewed by <strong>%s</strong> (Respective Chief Officer) and <strong>OFFICIALLY EXONERATED &amp; CLOSED</strong>.</p>'
+                            '<p>All charges have been dropped, and your employment record remains clear with zero disciplinary penalties.</p>'
+                        ) % (
+                            rec.employee_id.name,
+                            rec.name,
+                            sender_user.name,
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=sender_partner.id,
+                        )
+                except Exception:
+                    pass
+
+            # 2. Notify Initiator / Director
+            initiator_user = (rec.reported_by_id and rec.reported_by_id.user_id) or (rec.initiator_id)
+            if initiator_user and initiator_user.partner_id and initiator_user.id != sender_user.id:
+                try:
+                    channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[initiator_user.partner_id.id])
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Executive Decision Update: Case Exonerated &amp; Closed</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>Disciplinary case (Ref: <strong>%s</strong>) regarding employee <strong>%s</strong> was reviewed by <strong>%s</strong> (Respective Chief Officer) and officially exonerated with no sanction.</p>'
+                        ) % (
+                            initiator_user.name,
+                            rec.name,
+                            rec.employee_id.name if rec.employee_id else _('N/A'),
+                            sender_user.name,
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=sender_partner.id,
+                        )
+                except Exception:
+                    pass
+
+    def action_print_warning_letter(self):
+        """Print the formal Disciplinary Sanction / Decision Notice Letter."""
+        self.ensure_one()
+        if self.is_exonerated_case:
+            raise UserError(_("Cannot Print Warning Letter: This case has been Exonerated with no disciplinary penalty. Please print the 'Clearance Certificate' instead."))
+        return self.env.ref('discipline_management.action_report_disciplinary_warning_letter').report_action(self)
+
+    def action_print_exoneration_certificate(self):
+        """Print the official Exoneration & Clearance Certificate."""
+        self.ensure_one()
+        if not self.is_exonerated_case:
+            raise UserError(_("Cannot Print Clearance Certificate: This case resulted in an active disciplinary penalty. Please print the 'Disciplinary Decision Notice' instead."))
+        return self.env.ref('discipline_management.action_report_exoneration_certificate').report_action(self)
 
     def action_chief_escalate_to_audit(self):
         """Escalate the case to the Audit Directorate for investigation, notifying the CEO simultaneously."""
@@ -1503,7 +2000,7 @@ class DisciplineCase(models.Model):
                 partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
 
             rec.message_post(
-                body=_('Chief reviewed case <strong>%s</strong> and escalated to Audit Directorate for investigation.') % rec.name,
+                body=Markup(_('Chief reviewed case <strong>%s</strong> and escalated to Audit Directorate for investigation.') % rec.name),
                 partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
             )
             
@@ -1513,9 +2010,100 @@ class DisciplineCase(models.Model):
                     'case_id': rec.id,
                     'title': _('Audit Investigation: %s (%s)') % (rec.name, rec.employee_id.name),
                     'applicable_policy': rec.offense_id.name if rec.offense_id else _('Bank Disciplinary Policy'),
-                    'summary_findings': rec.description or _('Escalated by Chief for Audit Investigation.'),
+                    'summary_findings': rec.chief_review_notes or rec.description or _('Escalated by Chief for Audit Investigation.'),
                     'investigator_recommendation': _('Pending audit investigation and findings.'),
                 })
+
+            rec._send_chief_to_audit_discuss_notification()
+
+    def _send_chief_to_audit_discuss_notification(self):
+        """Send 1-on-1 Odoo Discuss direct message to Audit Directorate Director and CEO when Chief escalates for investigation."""
+        for rec in self:
+            EmpModel = self.env['hr.employee'].sudo()
+            audit_user = EmpModel.get_audit_director_user()
+            ceo_user = EmpModel.get_ceo_user()
+            sender_user = self.env.user
+            sender_partner = sender_user.partner_id
+
+            incident_str = rec.incident_date.strftime('%B %d, %Y') if rec.incident_date else _('N/A')
+            sev_name = rec.severity_level_id.name if rec.severity_level_id else (dict(rec._fields['severity_level'].selection).get(rec.severity_level, rec.severity_level or _('N/A')))
+            chief_notes_html = Markup(_('<p><strong>Chief Executive Directive / Investigation Scope:</strong><br/><em>%s</em></p>') % rec.chief_review_notes) if rec.chief_review_notes else ''
+
+            # 1. Notify Audit Directorate Director
+            if audit_user and audit_user.partner_id and audit_user.id != sender_user.id:
+                rec.message_subscribe(partner_ids=[audit_user.partner_id.id])
+                try:
+                    channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[audit_user.partner_id.id])
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Disciplinary Investigation Assignment Directive</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>Disciplinary case (Ref: <strong>%s</strong>) regarding employee <strong>%s</strong> has been formally escalated to the Internal Audit Directorate by <strong>%s</strong> (Respective Chief Officer) for thorough investigation and findings submission.</p>'
+                            '<ul>'
+                            '<li><strong>Subject Employee:</strong> %s (%s, %s)</li>'
+                            '<li><strong>Alleged Misconduct:</strong> %s</li>'
+                            '<li><strong>Severity Classification:</strong> %s</li>'
+                            '<li><strong>Incident Date:</strong> %s</li>'
+                            '<li><strong>Legal Citation:</strong> %s</li>'
+                            '</ul>'
+                            '%s'
+                            '<p>Please assign an auditor in Bunna Bank ERP under <strong>Hearings &amp; Investigations &gt; Investigations</strong>.</p>'
+                        ) % (
+                            audit_user.name,
+                            rec.name,
+                            rec.employee_id.name if rec.employee_id else _('N/A'),
+                            sender_user.name,
+                            rec.employee_id.name if rec.employee_id else _('N/A'),
+                            rec.job_id.name if rec.job_id else _('Staff'),
+                            rec.department_id.name if rec.department_id else _('Department'),
+                            rec.offense_id.name if rec.offense_id else _('Misconduct Clause'),
+                            sev_name,
+                            incident_str,
+                            rec.legal_article_display or _('N/A'),
+                            chief_notes_html,
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=sender_partner.id,
+                        )
+                except Exception:
+                    pass
+
+            # 2. Notify CEO for awareness
+            if ceo_user and ceo_user.partner_id and ceo_user.id != sender_user.id:
+                rec.message_subscribe(partner_ids=[ceo_user.partner_id.id])
+                try:
+                    channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[ceo_user.partner_id.id])
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Executive Notification: Case Referred to Audit Investigation</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>Please be informed that <strong>%s</strong> (Respective Chief Officer) has escalated disciplinary case (Ref: <strong>%s</strong>) regarding <strong>%s</strong> to the Audit Directorate for comprehensive investigation.</p>'
+                            '<ul>'
+                            '<li><strong>Misconduct Clause:</strong> %s</li>'
+                            '<li><strong>Incident Date:</strong> %s</li>'
+                            '<li><strong>Audit Directorate:</strong> Assigned for Investigation</li>'
+                            '</ul>'
+                            '%s'
+                        ) % (
+                            ceo_user.name,
+                            sender_user.name,
+                            rec.name,
+                            rec.employee_id.name if rec.employee_id else _('N/A'),
+                            rec.offense_id.name if rec.offense_id else _('Misconduct Clause'),
+                            incident_str,
+                            chief_notes_html,
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=sender_partner.id,
+                        )
+                except Exception:
+                    pass
 
     def action_chief_escalate_to_ceo(self):
         """Escalate the case directly to the Chief Executive Officer for review."""
@@ -1532,9 +2120,69 @@ class DisciplineCase(models.Model):
                 partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
 
             rec.message_post(
-                body=_('Chief escalated case <strong>%s</strong> directly to CEO for executive review.') % rec.name,
+                body=Markup(_('Chief escalated case <strong>%s</strong> directly to CEO for executive review.') % rec.name),
                 partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
             )
+            rec._send_chief_to_ceo_discuss_notification()
+
+    def _send_chief_to_ceo_discuss_notification(self):
+        """Send 1-on-1 Odoo Discuss direct message to CEO when Chief escalates case."""
+        for rec in self:
+            ceo_user = self.env['hr.employee'].sudo().get_ceo_user()
+            if not ceo_user or not ceo_user.partner_id:
+                continue
+
+            sender_user = self.env.user
+            sender_partner = sender_user.partner_id
+            ceo_partner = ceo_user.partner_id
+
+            if sender_partner.id == ceo_partner.id:
+                continue
+
+            rec.message_subscribe(partner_ids=[ceo_partner.id])
+
+            try:
+                channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[ceo_partner.id])
+                if channel:
+                    incident_str = rec.incident_date.strftime('%B %d, %Y') if rec.incident_date else _('N/A')
+                    sev_name = rec.severity_level_id.name if rec.severity_level_id else (dict(rec._fields['severity_level'].selection).get(rec.severity_level, rec.severity_level or _('N/A')))
+                    chief_notes_html = Markup(_('<p><strong>Chief Executive Directive / Remarks:</strong><br/><em>%s</em></p>') % rec.chief_review_notes) if rec.chief_review_notes else ''
+                    msg_body = Markup(_(
+                        '<p><strong>Formal Disciplinary Case Escalated to CEO for Executive Review</strong></p>'
+                        '<p>Dear %s,</p>'
+                        '<p>Disciplinary case (Ref: <strong>%s</strong>) regarding employee <strong>%s</strong> has been escalated to you by <strong>%s</strong> (Respective Chief Officer) for your executive review and directive.</p>'
+                        '<ul>'
+                        '<li><strong>Subject Employee:</strong> %s (%s, %s)</li>'
+                        '<li><strong>Misconduct Clause:</strong> %s</li>'
+                        '<li><strong>Severity Classification:</strong> %s</li>'
+                        '<li><strong>Incident Date:</strong> %s</li>'
+                        '<li><strong>Legal Citation:</strong> %s</li>'
+                        '</ul>'
+                        '%s'
+                        '<p>Please access Bunna Bank ERP under <strong>Discipline Management &gt; Disciplinary Cases</strong> to review and assign for investigation / committee scheduling.</p>'
+                    ) % (
+                        ceo_user.name,
+                        rec.name,
+                        rec.employee_id.name if rec.employee_id else _('N/A'),
+                        sender_user.name,
+                        rec.employee_id.name if rec.employee_id else _('N/A'),
+                        rec.job_id.name if rec.job_id else _('Staff'),
+                        rec.department_id.name if rec.department_id else _('Department'),
+                        rec.offense_id.name if rec.offense_id else _('Misconduct Clause'),
+                        sev_name,
+                        incident_str,
+                        rec.legal_article_display or _('N/A'),
+                        chief_notes_html,
+                    ))
+
+                    channel.message_post(
+                        body=msg_body,
+                        message_type='comment',
+                        subtype_xmlid='mail.mt_comment',
+                        author_id=sender_partner.id,
+                    )
+            except Exception:
+                pass
 
     def action_ceo_announce_audit_and_suspend(self):
         """CEO action: formally announce case to Audit Directorate for investigation and instruct Committee Secretary (POMD) to suspend the employee."""
@@ -1557,21 +2205,22 @@ class DisciplineCase(models.Model):
                 partners_to_notify.append(rec.employee_id.user_id.partner_id.id)
 
             rec.message_post(
-                body=_(
+                body=Markup(_(
                     '<strong>CEO Executive Directive:</strong><br/>'
                     '1. Case officially assigned to Audit Directorate for formal investigation.<br/>'
                     '2. Disciplinary Committee Secretary (POMD) instructed to execute employee precautionary suspension.'
-                ),
+                )),
                 partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
             )
 
             # 1. Create linked Investigation record if none exists
             if not rec.investigation_ids:
+                investigation_summary = rec.ceo_assignment_notes or rec.chief_review_notes or rec.description or _('Initiated via Executive Escalation.')
                 self.env['discipline.investigation'].create({
                     'case_id': rec.id,
                     'title': _('Audit Investigation: %s (%s)') % (rec.name, rec.employee_id.name),
                     'applicable_policy': rec.offense_id.name if rec.offense_id else _('Bank Disciplinary Policy'),
-                    'summary_findings': rec.description or _('Initiated via Executive Escalation.'),
+                    'summary_findings': f'<p>{investigation_summary}</p>',
                     'investigator_recommendation': _('Pending audit investigation and findings.'),
                     'investigator_id': False,
                 })
@@ -1592,6 +2241,86 @@ class DisciplineCase(models.Model):
                     'state': 'draft',
                 })
 
+            rec._send_ceo_announce_audit_discuss_notification()
+
+    def _send_ceo_announce_audit_discuss_notification(self):
+        """Send 1-on-1 Odoo Discuss direct message to Audit Directorate Director and POMD Secretary upon CEO directive."""
+        for rec in self:
+            EmpModel = self.env['hr.employee'].sudo()
+            audit_user = EmpModel.get_audit_director_user()
+            sec_user = EmpModel.get_secretary_user()
+            sender_user = self.env.user
+            sender_partner = sender_user.partner_id
+
+            incident_str = rec.incident_date.strftime('%B %d, %Y') if rec.incident_date else _('N/A')
+            sev_name = rec.severity_level_id.name if rec.severity_level_id else (dict(rec._fields['severity_level'].selection).get(rec.severity_level, rec.severity_level or _('N/A')))
+            ceo_notes_html = Markup(_('<p><strong>CEO Directive &amp; Investigation Mandate:</strong><br/><em>%s</em></p>') % rec.ceo_assignment_notes) if rec.ceo_assignment_notes else ''
+
+            # 1. Notify Audit Directorate Director
+            if audit_user and audit_user.partner_id and audit_user.id != sender_user.id:
+                rec.message_subscribe(partner_ids=[audit_user.partner_id.id])
+                try:
+                    channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[audit_user.partner_id.id])
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>CEO Directive: Immediate Disciplinary Audit Investigation</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>Disciplinary case (Ref: <strong>%s</strong>) regarding employee <strong>%s</strong> has been officially referred to the Internal Audit Directorate by the <strong>Chief Executive Officer (CEO)</strong> for formal investigation.</p>'
+                            '<ul>'
+                            '<li><strong>Subject Employee:</strong> %s (%s, %s)</li>'
+                            '<li><strong>Misconduct Clause:</strong> %s</li>'
+                            '<li><strong>Severity Level:</strong> %s</li>'
+                            '<li><strong>Incident Date:</strong> %s</li>'
+                            '</ul>'
+                            '%s'
+                            '<p>Please access Bunna Bank ERP to assign a Lead Auditor and commence the investigation.</p>'
+                        ) % (
+                            audit_user.name,
+                            rec.name,
+                            rec.employee_id.name if rec.employee_id else _('N/A'),
+                            rec.employee_id.name if rec.employee_id else _('N/A'),
+                            rec.job_id.name if rec.job_id else _('Staff'),
+                            rec.department_id.name if rec.department_id else _('Department'),
+                            rec.offense_id.name if rec.offense_id else _('Misconduct Clause'),
+                            sev_name,
+                            incident_str,
+                            ceo_notes_html,
+                        ))
+                        channel.message_post(body=msg_body, message_type='comment', subtype_xmlid='mail.mt_comment', author_id=sender_partner.id)
+                except Exception:
+                    pass
+
+            # 2. Notify Disciplinary Committee Secretary (POMD) for Precautionary Suspension
+            if sec_user and sec_user.partner_id and sec_user.id != sender_user.id:
+                rec.message_subscribe(partner_ids=[sec_user.partner_id.id])
+                try:
+                    channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[sec_user.partner_id.id])
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>CEO Directive: Precautionary Employee Suspension Instruction</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>Per directive of the <strong>Chief Executive Officer (CEO)</strong>, employee <strong>%s</strong> is subject to immediate 30-day precautionary suspension pending audit investigation on case <strong>%s</strong>.</p>'
+                            '<ul>'
+                            '<li><strong>Subject Employee:</strong> %s (%s, %s)</li>'
+                            '<li><strong>Suspension Type:</strong> 30 Days Precautionary (Without Pay)</li>'
+                            '<li><strong>Case Ref:</strong> %s</li>'
+                            '</ul>'
+                            '%s'
+                            '<p>Please review and execute the precautionary suspension notice in Bunna Bank ERP under <strong>Suspensions</strong>.</p>'
+                        ) % (
+                            sec_user.name,
+                            rec.employee_id.name if rec.employee_id else _('N/A'),
+                            rec.name,
+                            rec.employee_id.name if rec.employee_id else _('N/A'),
+                            rec.job_id.name if rec.job_id else _('Staff'),
+                            rec.department_id.name if rec.department_id else _('Department'),
+                            rec.name,
+                            ceo_notes_html,
+                        ))
+                        channel.message_post(body=msg_body, message_type='comment', subtype_xmlid='mail.mt_comment', author_id=sender_partner.id)
+                except Exception:
+                    pass
+
     def action_ceo_assign_to_audit(self):
         """Backward compatibility alias for action_ceo_announce_audit_and_suspend."""
         return self.action_ceo_announce_audit_and_suspend()
@@ -1606,9 +2335,57 @@ class DisciplineCase(models.Model):
             })
             cpco_user = self.env['hr.employee'].sudo().get_cpco_user()
             cpco_name = cpco_user.name if cpco_user else _('Chief People & Culture Officer')
-            rec.message_post(body=_(
+            rec.message_post(body=Markup(_(
                 'Case forwarded by Chief Executive Officer (CEO: %s) to Disciplinary Committee Chairman (CPCO: %s) for committee review.'
-            ) % (self.env.user.name, cpco_name))
+            ) % (self.env.user.name, cpco_name)))
+            rec._send_ceo_forward_to_chair_discuss_notification()
+
+    def _send_ceo_forward_to_chair_discuss_notification(self):
+        """Send 1-on-1 Odoo Discuss direct message to CPCO (Committee Chairman) when CEO forwards investigated case."""
+        for rec in self:
+            cpco_user = self.env['hr.employee'].sudo().get_cpco_user()
+            if not cpco_user or not cpco_user.partner_id:
+                continue
+
+            sender_user = self.env.user
+            sender_partner = sender_user.partner_id
+            if sender_partner.id == cpco_user.partner_id.id:
+                continue
+
+            rec.message_subscribe(partner_ids=[cpco_user.partner_id.id])
+            try:
+                channel = self.env['discuss.channel'].with_user(sender_user)._get_or_create_chat(partners_to=[cpco_user.partner_id.id])
+                if channel:
+                    incident_str = rec.incident_date.strftime('%B %d, %Y') if rec.incident_date else _('N/A')
+                    sev_name = rec.severity_level_id.name if rec.severity_level_id else (dict(rec._fields['severity_level'].selection).get(rec.severity_level, rec.severity_level or _('N/A')))
+                    ceo_notes_html = Markup(_('<p><strong>CEO Directive / Remarks:</strong><br/><em>%s</em></p>') % rec.ceo_assignment_notes) if rec.ceo_assignment_notes else ''
+                    msg_body = Markup(_(
+                        '<p><strong>Disciplinary Case Forwarded to Committee Chairman</strong></p>'
+                        '<p>Dear %s,</p>'
+                        '<p>The <strong>Chief Executive Officer (CEO)</strong> has reviewed the completed audit investigation for case <strong>%s</strong> and forwarded it to you as Disciplinary Committee Chairman.</p>'
+                        '<ul>'
+                        '<li><strong>Subject Employee:</strong> %s (%s, %s)</li>'
+                        '<li><strong>Misconduct Clause:</strong> %s</li>'
+                        '<li><strong>Severity Level:</strong> %s</li>'
+                        '<li><strong>Incident Date:</strong> %s</li>'
+                        '</ul>'
+                        '%s'
+                        '<p>Please access Bunna Bank ERP under <strong>Discipline Management</strong> to review findings and instruct the Committee Secretary to schedule a committee hearing.</p>'
+                    ) % (
+                        cpco_user.name,
+                        rec.name,
+                        rec.employee_id.name if rec.employee_id else _('N/A'),
+                        rec.employee_id.name if rec.employee_id else _('N/A'),
+                        rec.job_id.name if rec.job_id else _('Staff'),
+                        rec.department_id.name if rec.department_id else _('Department'),
+                        rec.offense_id.name if rec.offense_id else _('Misconduct Clause'),
+                        sev_name,
+                        incident_str,
+                        ceo_notes_html,
+                    ))
+                    channel.message_post(body=msg_body, message_type='comment', subtype_xmlid='mail.mt_comment', author_id=sender_partner.id)
+            except Exception:
+                pass
 
     def action_chair_forward_to_secretary(self):
         """Disciplinary Committee Chairman (CPCO) reviews case and forwards to Committee Secretary (POMD) for scheduling hearing."""
@@ -1719,6 +2496,10 @@ class DisciplineCase(models.Model):
     def action_schedule_committee_meeting(self):
         """Open form to schedule a Disciplinary Committee Meeting pre-populated with panel members."""
         self.ensure_one()
+        existing_meeting = self.committee_meeting_ids.filtered(lambda m: m.state not in ('completed', 'cancelled'))[:1]
+        if existing_meeting:
+            return self.action_open_active_committee_meeting()
+
         EmpModel = self.env['hr.employee'].sudo()
         emp = self.employee_id
         
@@ -1883,11 +2664,11 @@ class DisciplineCase(models.Model):
             rec.approver_id = current_user
             rec._validate_segregation_of_duties()
 
-            # Verify linked committee meetings are completed with quorum and signoff (only if committee route)
+            # Verify linked committee meetings are completed with quorum (only if committee route)
             if rec.committee_meeting_ids:
                 for meeting in rec.committee_meeting_ids:
-                    if meeting.state != 'completed' or not meeting.director_signed_off or not meeting.is_quorum_met:
-                        raise UserError(_('Cannot enforce case decision. Linked committee meeting (%s) must be in Completed state with director sign-off and valid quorum.') % meeting.name)
+                    if meeting.state != 'completed' or not meeting.is_quorum_met:
+                        raise UserError(_('Cannot enforce case decision. Linked committee meeting (%s) must be in Completed state with valid panel quorum.') % meeting.name)
 
             rec.final_decision_date = fields.Date.context_today(self)
             if not rec.delivery_receipt_date:
@@ -1918,18 +2699,21 @@ class DisciplineCase(models.Model):
             )
             if has_financial_penalty:
                 rec.with_context(force_write=True).write({'deduction_status': 'appeal_pending'})
-                rec.message_post(body=_(
-                    'Financial deductions (salary fine / percentage deduction) are held in abeyance pending expiration of the 10-calendar-day statutory appeal window (Appeal Deadline: %s).'
-                ) % (rec.appeal_deadline or _('10 days from receipt')))
+                rec._generate_immediate_payroll_penalty_line()
             else:
                 rec.with_context(force_write=True).write({'deduction_status': 'not_applicable'})
 
             # Dismissal Handling & Separation Workflow
             if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
                 rec.action_approve_dismissal()
+            else:
+                # For non-dismissal decisions (Demotion, Warnings, Exoneration), auto-reinstate any active precautionary suspensions
+                for susp in rec.suspension_ids.filtered(lambda s: s.state in ['active', 'extended', 'pending_approval']):
+                    susp.action_reinstate_employee()
 
-            # Auto-attach the official warning letter PDF and notify employee
-            rec._attach_warning_letter()
+            # Fast executive notification to chatter and Discuss direct message to employee
+            rec._post_enforcement_notification()
+            rec._send_employee_discuss_direct_message(message_type='enforce')
 
     @api.model
     def _compute_target_payroll_month(self, closure_date):
@@ -1961,16 +2745,7 @@ class DisciplineCase(models.Model):
         from datetime import date
         today = fields.Date.context_today(self)
         for rec in self:
-            if rec.state not in ('enforced', 'closed', 'appealed') or rec.deduction_status not in ('appeal_pending', 'scheduled'):
-                continue
-
-            # If an active appeal is in progress, deductions remain deferred
-            active_appeals = rec.appeal_ids.filtered(lambda a: a.state not in ('decided', 'revoked', 'closed', 'cancelled'))
-            if active_appeals:
-                continue
-
-            # Check if 10-day appeal window is still open
-            if rec.state == 'enforced' and rec.appeal_deadline and today <= rec.appeal_deadline and not rec.appeal_ids:
+            if rec.state not in ('enforced', 'closed', 'appealed'):
                 continue
 
             has_financial_penalty = (
@@ -1985,8 +2760,8 @@ class DisciplineCase(models.Model):
             # Determine closure date
             if rec.appeal_ids:
                 decided_appeals = rec.appeal_ids.filtered(lambda a: a.state in ('decided', 'closed'))
-                latest_decision = decided_appeals.sorted('decision_date', reverse=True)
-                closure_date = latest_decision[0].decision_date if (latest_decision and latest_decision[0].decision_date) else (rec.appeal_deadline or today)
+                latest_decision = decided_appeals.sorted(lambda a: a.review_date or (a.write_date.date() if a.write_date else today), reverse=True)
+                closure_date = latest_decision[0].review_date if (latest_decision and latest_decision[0].review_date) else (rec.appeal_deadline or today)
             else:
                 closure_date = rec.appeal_deadline or today
 
@@ -2000,14 +2775,23 @@ class DisciplineCase(models.Model):
             month_dict = dict(rec._fields['payroll_month'].selection) if 'payroll_month' in rec._fields else {}
             month_display = month_dict.get(target_month, str(target_month))
 
-            if existing_penalties:
-                existing_penalties.filtered(lambda p: p.state == 'pending').write({
-                    'effective_date': deduction_date,
-                    'payroll_month': target_month,
-                })
-            else:
-                # 1. Percentage deduction for non-managerial staff
-                if not rec.is_managerial and rec.penalty_percentage > 0.0:
+            # 1. Percentage / Managerial Sanction Deduction
+            percentage_pens = existing_penalties.filtered(lambda p: p.penalty_type in ('percentage', 'managerial') and p.state == 'pending')
+            if not rec.is_managerial and rec.penalty_percentage > 0.0:
+                if percentage_pens:
+                    percentage_pens[0].write({
+                        'penalty_type': 'percentage',
+                        'penalty_percentage': rec.penalty_percentage,
+                        'managerial_days': 0,
+                        'effective_date': deduction_date,
+                        'payroll_month': target_month,
+                        'notes': _('Scheduled percentage penalty of %s%% for Case %s (Target Payroll Month: %s - Post Appeal Decision).') % (
+                            rec.penalty_percentage, rec.name, month_display
+                        )
+                    })
+                    if len(percentage_pens) > 1:
+                        percentage_pens[1:].unlink()
+                else:
                     self.env['discipline.payroll.penalty'].create({
                         'case_id': rec.id,
                         'employee_id': rec.employee_id.id,
@@ -2016,12 +2800,25 @@ class DisciplineCase(models.Model):
                         'effective_date': deduction_date,
                         'payroll_month': target_month,
                         'state': 'pending',
-                        'notes': _('Scheduled percentage penalty of %s%% for Case %s (Target Payroll Month: %s - Post Appeal Window).') % (
+                        'notes': _('Scheduled percentage penalty of %s%% for Case %s (Target Payroll Month: %s - Post Appeal Decision).') % (
                             rec.penalty_percentage, rec.name, month_display
                         )
                     })
-                # 2. Daily wage unit deduction for managerial staff
-                elif rec.is_managerial and rec.fine_days > 0.0:
+            elif rec.is_managerial and rec.fine_days > 0.0:
+                if percentage_pens:
+                    percentage_pens[0].write({
+                        'penalty_type': 'managerial',
+                        'penalty_percentage': 0.0,
+                        'managerial_days': int(rec.fine_days),
+                        'effective_date': deduction_date,
+                        'payroll_month': target_month,
+                        'notes': _('Scheduled managerial penalty of %d day(s) for Case %s (Target Payroll Month: %s - Post Appeal Decision).') % (
+                            int(rec.fine_days), rec.name, month_display
+                        )
+                    })
+                    if len(percentage_pens) > 1:
+                        percentage_pens[1:].unlink()
+                else:
                     self.env['discipline.payroll.penalty'].create({
                         'case_id': rec.id,
                         'employee_id': rec.employee_id.id,
@@ -2030,29 +2827,54 @@ class DisciplineCase(models.Model):
                         'effective_date': deduction_date,
                         'payroll_month': target_month,
                         'state': 'pending',
-                        'notes': _('Scheduled managerial penalty of %d day(s) for Case %s (Target Payroll Month: %s - Post Appeal Window).') % (
+                        'notes': _('Scheduled managerial penalty of %d day(s) for Case %s (Target Payroll Month: %s - Post Appeal Decision).') % (
                             int(rec.fine_days), rec.name, month_display
                         )
                     })
+            elif rec.penalty_percentage == 0.0 and rec.fine_days == 0.0:
+                percentage_pens.write({
+                    'penalty_percentage': 0.0,
+                    'managerial_days': 0,
+                    'state': 'cancelled',
+                    'notes': _('Penalty cancelled / waived following appeal exoneration for Case %s.') % rec.name
+                })
 
-                # 3. Unpaid suspension deductions
+            # Check if active appeal in progress or window open for status badge
+            active_appeals = rec.appeal_ids.filtered(lambda a: a.state not in ('decided', 'revoked', 'closed', 'cancelled'))
+            if active_appeals or (rec.state == 'enforced' and rec.appeal_deadline and today <= rec.appeal_deadline and not rec.appeal_ids):
+                rec.deduction_status = 'appeal_pending'
+            else:
+                rec.deduction_status = 'scheduled'
+
+                # 2. Unpaid suspension deductions: Applicable ONLY for Dismissals.
+                # Per Ethiopian Labor Proclamation Art. 27(4), non-dismissed reinstated employees are entitled to remuneration during precautionary suspension.
+                is_dismissal_case = (rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal' or rec.decided_punishment_type == 'dismissal')
                 active_swp = rec.suspension_ids.filtered(
                     lambda s: s.suspension_type == 'without_pay' and s.state in ['active', 'extended', 'completed']
                 )
-                for susp in active_swp:
-                    self.env['discipline.payroll.penalty'].create({
-                        'case_id': rec.id,
-                        'employee_id': rec.employee_id.id,
-                        'penalty_type': 'suspension_without_pay',
-                        'suspension_id': susp.id,
-                        'suspension_days': susp.working_days_count,
-                        'effective_date': deduction_date,
-                        'payroll_month': target_month,
-                        'state': 'pending',
-                        'notes': _('Scheduled without-pay suspension deduction for %d days for Case %s (Target Payroll Month: %s - Post Appeal Window).') % (
-                            susp.working_days_count, rec.name, month_display
-                        )
-                    })
+                existing_swp_pens = self.env['discipline.payroll.penalty'].search([('case_id', '=', rec.id), ('penalty_type', '=', 'suspension_without_pay')])
+                if is_dismissal_case:
+                    for susp in active_swp:
+                        swp_for_susp = existing_swp_pens.filtered(lambda p: p.suspension_id.id == susp.id)
+                        if not swp_for_susp:
+                            self.env['discipline.payroll.penalty'].create({
+                                'case_id': rec.id,
+                                'employee_id': rec.employee_id.id,
+                                'penalty_type': 'suspension_without_pay',
+                                'suspension_id': susp.id,
+                                'suspension_days': susp.working_days_count,
+                                'effective_date': deduction_date,
+                                'payroll_month': target_month,
+                                'state': 'pending',
+                                'notes': _('Scheduled without-pay suspension deduction for %d days for Case %s (Target Payroll Month: %s - Dismissal).') % (
+                                    susp.working_days_count, rec.name, month_display
+                                )
+                            })
+                else:
+                    # Non-dismissal outcome: Precautionary suspension without pay is reinstated. Remove any pending SWP penalty lines to avoid double deduction.
+                    pending_swp = existing_swp_pens.filtered(lambda p: p.state == 'pending')
+                    if pending_swp:
+                        pending_swp.unlink()
 
             rec.deduction_status = 'scheduled'
             rec.message_post(
@@ -2095,11 +2917,6 @@ class DisciplineCase(models.Model):
             'fine_days': 0.0,
         })
         self.message_post(body=_('Attendance disciplinary case exonerated and closed by Direct Coach (%s). Zero penalty applied.') % self.env.user.name)
-
-    def action_print_warning_letter(self):
-        """Direct action to print or download the official disciplinary warning / decision letter."""
-        self.ensure_one()
-        return self.env.ref('discipline_management.action_report_disciplinary_warning_letter').report_action(self)
 
     @api.model
     def get_official_bunna_logo_base64(self):
@@ -2196,48 +3013,73 @@ class DisciplineCase(models.Model):
             lines.append(f"{self.employee_id.name} (Subject Employee)")
         return lines
 
-    def _attach_warning_letter(self):
-        """Generate and auto-attach the official warning letter PDF and send targeted notification to the employee."""
+    def _generate_immediate_payroll_penalty_line(self):
+        """Immediately instantiates discipline.payroll.penalty record upon enforcement with estimated wage deduction."""
         self.ensure_one()
-        report_ref = 'discipline_management.action_report_disciplinary_warning_letter'
-        attachment = False
-        try:
-            report = self.env.ref(report_ref, raise_if_not_found=True)
-            pdf_content, _unused_format = self.env['ir.actions.report']._render_qweb_pdf(
-                report, [self.id]
-            )
-            filename = 'Official_Warning_Letter_%s.pdf' % self.name.replace('/', '_')
-            attachment = self.env['ir.attachment'].create({
-                'name': filename,
-                'type': 'binary',
-                'datas': pdf_content,
-                'res_model': self._name,
-                'res_id': self.id,
-                'mimetype': 'application/pdf',
-            })
-        except Exception:
-            import base64
-            body_text = (
-                'OFFICIAL DISCIPLINARY WARNING NOTICE\n'
-                '====================================\n'
-                'Case Reference : %s\n'
-                'Employee       : %s\n'
-                'Decision Date  : %s\n'
-                'Offense        : %s\n'
-                'Penalty        : %s\n\n'
-                'Please refer to the official signed copy in the personnel file.'
-            ) % (self.name, self.employee_id.name, self.final_decision_date,
-                 self.offense_id.name if self.offense_id else 'N/A', self.punishment_type)
-            attachment = self.env['ir.attachment'].create({
-                'name': 'Official_Warning_Letter_%s.txt' % self.name.replace('/', '_'),
-                'type': 'binary',
-                'datas': base64.b64encode(body_text.encode('utf-8')),
-                'res_model': self._name,
-                'res_id': self.id,
-                'mimetype': 'text/plain',
-            })
+        today = fields.Date.context_today(self)
+        target_month, target_year = self._compute_target_payroll_month(self.appeal_deadline or today)
+        deduction_date = date(target_year, int(target_month), 1)
+        
+        self.payroll_month = target_month
+        self.computed_deduction_month = target_month
+        
+        month_dict = dict(self._fields['payroll_month'].selection) if 'payroll_month' in self._fields else {}
+        month_display = month_dict.get(target_month, str(target_month))
 
-        # Determine issuance track and role
+        PenaltyModel = self.env['discipline.payroll.penalty'].sudo()
+        existing = PenaltyModel.search([('case_id', '=', self.id)])
+        
+        if not existing:
+            if not self.is_managerial and self.penalty_percentage > 0.0:
+                PenaltyModel.create({
+                    'case_id': self.id,
+                    'employee_id': self.employee_id.id,
+                    'penalty_type': 'percentage',
+                    'penalty_percentage': self.penalty_percentage,
+                    'effective_date': deduction_date,
+                    'payroll_month': target_month,
+                    'state': 'pending',
+                    'notes': _('Enforced percentage penalty of %s%% for Case %s (Target Payroll Month: %s - Pending Appeal Window).') % (
+                        self.penalty_percentage, self.name, month_display
+                    )
+                })
+            elif self.is_managerial and self.fine_days > 0.0:
+                PenaltyModel.create({
+                    'case_id': self.id,
+                    'employee_id': self.employee_id.id,
+                    'penalty_type': 'managerial',
+                    'managerial_days': int(self.fine_days),
+                    'effective_date': deduction_date,
+                    'payroll_month': target_month,
+                    'state': 'pending',
+                    'notes': _('Enforced managerial penalty of %d day(s) for Case %s (Target Payroll Month: %s - Pending Appeal Window).') % (
+                        int(self.fine_days), self.name, month_display
+                    )
+                })
+            
+            is_dismissal_case = (self.severity_level == 'level_1' or self.punishment_type == 'dismissal' or self.decided_punishment_type == 'dismissal')
+            if is_dismissal_case:
+                active_swp = self.suspension_ids.filtered(
+                    lambda s: s.suspension_type == 'without_pay' and s.state in ['active', 'extended', 'completed']
+                )
+                for susp in active_swp:
+                    PenaltyModel.create({
+                        'case_id': self.id,
+                        'employee_id': self.employee_id.id,
+                        'penalty_type': 'suspension_without_pay',
+                        'suspension_id': susp.id,
+                        'suspension_days': susp.working_days_count,
+                        'effective_date': deduction_date,
+                        'payroll_month': target_month,
+                        'state': 'pending',
+                        'notes': _('Enforced without-pay suspension deduction for %d days for Case %s (Target Payroll Month: %s - Dismissal).') % (
+                            susp.working_days_count, self.name, month_display
+                        )
+                    })
+
+    def _post_enforcement_notification(self):
+        """Send fast, high-performance structured executive decision notification to case chatter and employee."""
+        self.ensure_one()
         is_direct = self.case_action_track == 'direct_enforce'
         issuer_name = (self.initiator_id.name or self.reported_by_id.name or self.approver_id.name or self.env.user.name) if is_direct else (self.approver_id.name or self.env.user.name)
         issuer_role = _('Line Manager / Coach') if is_direct else _('Disciplinary Committee / Authorized Executive Approver')
@@ -2250,7 +3092,7 @@ class DisciplineCase(models.Model):
             penalty_details.append(_('%d Day(s) Salary Fine') % int(self.fine_days))
         penalty_sub = (' (' + ', '.join(penalty_details) + ')') if penalty_details else ''
 
-        body_html = _(
+        body_html = Markup(_(
             '<p><strong>Official Disciplinary Decision &amp; Warning Notice</strong></p>'
             '<p>A formal disciplinary action has been enforced by <strong>%s</strong> (%s).</p>'
             '<ul>'
@@ -2261,7 +3103,7 @@ class DisciplineCase(models.Model):
             '<li><strong>Decision Date:</strong> %s</li>'
             '<li><strong>Statutory Appeal Deadline:</strong> %s (10-calendar-day window)</li>'
             '</ul>'
-            '<p>The official warning letter has been generated and attached. You can view, download, or print the document directly from this case.</p>'
+            '<p>The official warning letter can be viewed and printed directly using the <strong>Print Disciplinary Notice</strong> button at the top header.</p>'
         ) % (
             issuer_name,
             issuer_role,
@@ -2270,9 +3112,9 @@ class DisciplineCase(models.Model):
             self.offense_id.name if self.offense_id else _('Misconduct Clause'),
             sanction_name,
             penalty_sub,
-            self.final_decision_date or fields.Date.context_today(self),
-            self.appeal_deadline or _('10 days from receipt')
-        )
+            self.final_decision_date.strftime('%B %d, %Y') if self.final_decision_date else fields.Date.today(),
+            self.appeal_deadline.strftime('%B %d, %Y') if self.appeal_deadline else _('10 days from receipt')
+        ))
 
         partner_ids = []
         if self.employee_id.user_id and self.employee_id.user_id.partner_id:
@@ -2283,22 +3125,39 @@ class DisciplineCase(models.Model):
         self.message_post(
             body=body_html,
             partner_ids=list(set(partner_ids)),
-            attachment_ids=[attachment.id] if attachment else [],
             subtype_xmlid='mail.mt_comment'
         )
-        return attachment
 
     def action_apply_demotion(self):
-        """Execute demotion by reassigning job position while preserving basic salary scale."""
+        """Execute demotion by reassigning job position and grade while preserving basic salary scale."""
         for rec in self:
             if rec.new_job_id:
-                rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({'job_id': rec.new_job_id.id})
+                emp_vals = {
+                    'job_id': rec.new_job_id.id,
+                }
+                if 'job_title' in rec.employee_id._fields:
+                    emp_vals['job_title'] = rec.new_job_id.name
+                if 'job_position' in rec.employee_id._fields:
+                    emp_vals['job_position'] = rec.new_job_id.id
+                if 'job_grade_id' in rec.new_job_id._fields and rec.new_job_id.job_grade_id:
+                    if 'job_grade' in rec.employee_id._fields:
+                        emp_vals['job_grade'] = rec.new_job_id.job_grade_id.id
+                    if 'grade_id' in rec.employee_id._fields:
+                        emp_vals['grade_id'] = rec.new_job_id.job_grade_id.id
+                
+                rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write(emp_vals)
+                
                 VersionModel = self.env.get('hr.version')
                 if VersionModel:
                     versions = VersionModel.sudo().search([('employee_id', '=', rec.employee_id.id)])
                     if versions:
-                        versions.write({'job_id': rec.new_job_id.id})
-                rec.message_post(body=_('Demotion enforced: Reassigned to position %s. Basic wage/salary scale preserved.') % rec.new_job_id.name)
+                        v_vals = {'job_id': rec.new_job_id.id}
+                        if 'job_position' in versions._fields:
+                            v_vals['job_position'] = rec.new_job_id.id
+                        if 'job_grade' in versions._fields and 'job_grade_id' in rec.new_job_id._fields and rec.new_job_id.job_grade_id:
+                            v_vals['job_grade'] = rec.new_job_id.job_grade_id.id
+                        versions.write(v_vals)
+                rec.message_post(body=_('Demotion enforced: Reassigned to position %s. Basic wage/salary scale preserved; grade-level allowances mapped to new grade.') % rec.new_job_id.name)
 
     def action_approve_dismissal(self):
         """Execute final approval of Level 1 Dismissal, triggering separation and revoking system access."""

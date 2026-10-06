@@ -93,16 +93,24 @@
         <record id="rule_discipline_case_employee" model="ir.rule">
             <field name="name">Employee and Supervisor Disciplinary Cases</field>
             <field name="model_id" ref="discipline_management.model_discipline_case"/>
-            <field name="domain_force">['|', '|', '|', '|', '|', '|', '|', '|',
+            <field name="domain_force">['|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|',
                 ('employee_id.user_id', '=', user.id),
                 ('create_uid', '=', user.id),
-                ('reported_by_id', '=', user.id),
+                ('reported_by_id.user_id', '=', user.id),
+                ('director_id', '=', user.id),
                 ('chief_id', '=', user.id),
+                ('reviewer_id', '=', user.id),
                 ('employee_id', 'child_of', user.employee_id.id if user.employee_id else -1),
-                ('reported_by_id.employee_id', 'child_of', user.employee_id.id if user.employee_id else -1),
+                ('reported_by_id', 'child_of', user.employee_id.id if user.employee_id else -1),
                 ('employee_id.coach_id.user_id', '=', user.id),
                 ('employee_id.coach_id.coach_id.user_id', '=', user.id),
-                ('employee_id.coach_id.coach_id.coach_id.user_id', '=', user.id)
+                ('employee_id.parent_id.user_id', '=', user.id),
+                ('employee_id.parent_id.parent_id.user_id', '=', user.id),
+                ('reported_by_id.coach_id.user_id', '=', user.id),
+                ('reported_by_id.coach_id.coach_id.user_id', '=', user.id),
+                ('reported_by_id.parent_id.user_id', '=', user.id),
+                ('reported_by_id.parent_id.parent_id.user_id', '=', user.id),
+                ('department_id.manager_id.user_id', '=', user.id)
             ]</field>
             <field name="groups" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
             <field name="perm_read" eval="True"/>
@@ -137,16 +145,24 @@
         <record id="rule_discipline_appeal_employee" model="ir.rule">
             <field name="name">Employee and Supervisor Disciplinary Appeals</field>
             <field name="model_id" ref="discipline_management.model_discipline_appeal"/>
-            <field name="domain_force">['|', '|', '|', '|', '|', '|', '|', '|',
+            <field name="domain_force">['|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|', '|',
                 ('employee_id.user_id', '=', user.id),
                 ('create_uid', '=', user.id),
                 ('reviewer_id', '=', user.id),
                 ('employee_id', 'child_of', user.employee_id.id if user.employee_id else -1),
+                ('case_id.director_id', '=', user.id),
+                ('case_id.chief_id', '=', user.id),
+                ('case_id.reported_by_id.user_id', '=', user.id),
+                ('case_id.reported_by_id', 'child_of', user.employee_id.id if user.employee_id else -1),
                 ('employee_id.coach_id.user_id', '=', user.id),
                 ('employee_id.coach_id.coach_id.user_id', '=', user.id),
-                ('employee_id.coach_id.coach_id.coach_id.user_id', '=', user.id),
-                ('case_id.reported_by_id.employee_id.coach_id.user_id', '=', user.id),
-                ('case_id.reported_by_id.employee_id.coach_id.coach_id.user_id', '=', user.id)
+                ('employee_id.parent_id.user_id', '=', user.id),
+                ('employee_id.parent_id.parent_id.user_id', '=', user.id),
+                ('case_id.reported_by_id.coach_id.user_id', '=', user.id),
+                ('case_id.reported_by_id.coach_id.coach_id.user_id', '=', user.id),
+                ('case_id.reported_by_id.parent_id.user_id', '=', user.id),
+                ('case_id.reported_by_id.parent_id.parent_id.user_id', '=', user.id),
+                ('case_id.department_id.manager_id.user_id', '=', user.id)
             ]</field>
             <field name="groups" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
             <field name="perm_read" eval="True"/>

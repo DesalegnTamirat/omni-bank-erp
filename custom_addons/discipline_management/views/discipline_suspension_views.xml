@@ -1,77 +1,220 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+        <!-- List View -->
         <record id="view_discipline_suspension_tree" model="ir.ui.view">
             <field name="name">discipline.suspension.list</field>
             <field name="model">discipline.suspension</field>
             <field name="arch" type="xml">
-                <list decoration-danger="working_days_count > 25">
+                <list decoration-danger="working_days_count > 25" decoration-warning="state == 'pending_approval'" decoration-info="state == 'draft'" decoration-success="state == 'completed'">
                     <field name="name"/>
                     <field name="case_id"/>
                     <field name="employee_id"/>
+                    <field name="department_id"/>
+                    <field name="suspending_authority"/>
                     <field name="suspension_type"/>
                     <field name="start_date"/>
                     <field name="end_date"/>
                     <field name="working_days_count"/>
                     <field name="days_remaining"/>
-                    <field name="state"/>
+                    <field name="backpay_status" widget="badge"
+                           decoration-warning="backpay_status == 'pending_payroll'"
+                           decoration-success="backpay_status == 'settled'"
+                           decoration-muted="backpay_status == 'not_applicable'"
+                           optional="show"/>
+                    <field name="state" widget="badge" 
+                           decoration-info="state == 'draft'"
+                           decoration-warning="state in ('pending_approval', 'referred_bod')"
+                           decoration-danger="state in ('active', 'extended')"
+                           decoration-success="state in ('completed', 'revoked')"/>
                 </list>
             </field>
         </record>
 
+        <!-- Form View -->
         <record id="view_discipline_suspension_form" model="ir.ui.view">
             <field name="name">discipline.suspension.form</field>
             <field name="model">discipline.suspension</field>
             <field name="arch" type="xml">
-                <form>
+                <form string="Employee Suspension">
                     <header>
-                        <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <!-- Submit for Approval: Only visible in draft when current user is NOT the designated approving authority -->
+                        <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="oe_highlight" 
+                                invisible="state != 'draft' or can_user_approve_suspension"/>
+                        <!-- Activate Suspension: Visible in draft/pending when user IS authorized -->
                         <button name="action_activate_suspension" string="Activate Suspension" type="object" class="btn-warning"
                                 invisible="state not in ('draft', 'pending_approval', 'referred_bod') or not can_user_approve_suspension"/>
+                        <!-- Reinstatement Actions: Visible during active suspension for authorized users -->
                         <button name="action_reinstate_employee" string="Reinstate Employee" type="object" class="btn-success"
-                                invisible="state not in ('active', 'extended')"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
-                        <!-- Convert active/extended suspension to dismissal (Admin only) -->
+                                invisible="state not in ('active', 'extended') or not can_user_approve_suspension"/>
+                        <button name="action_revoke_exonerated" string="Revoke (Exonerated)" type="object" class="btn-outline-success"
+                                invisible="state not in ('active', 'extended') or not can_user_approve_suspension"
+                                confirm="Are you sure you want to revoke this suspension due to employee exoneration? System access will be restored and withheld salary flagged for backpay credit."/>
+                        <!-- Convert active/extended suspension to dismissal (CPCO, CEO, Admin) -->
                         <button name="action_convert_to_dismissal" string="Convert to Dismissal" type="object" class="btn-danger"
                                 invisible="state not in ('active', 'extended')"
-                                groups="discipline_management.group_discipline_admin"
-                                confirm="This will convert the suspension into a DISMISSAL. The employee will be permanently separated. Proceed?"
-                                help="Escalate this suspension to a full dismissal action."/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,pending_approval,active,completed,converted_dismissal"/>
+                                groups="discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"
+                                confirm="This will convert the suspension into a DISMISSAL. The employee will be permanently separated. Proceed?"/>
+                        <!-- Print Suspension Letter PDF -->
+                        <button name="action_print_suspension_letter" string="Print Suspension Letter" type="object" class="btn-secondary" icon="fa-print"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,pending_approval,active,completed"/>
                     </header>
                     <sheet>
                         <field name="can_user_approve_suspension" invisible="1"/>
+                        <field name="is_rmcd_or_iad" invisible="1"/>
+                        <field name="is_managerial" invisible="1"/>
+
+                        <!-- Contextual Status Banners -->
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" invisible="state != 'draft'">
+                            <i class="fa fa-info-circle fa-2x me-3"/>
+                            <div>
+                                <h6 class="alert-heading mb-1 font-weight-bold">Draft Suspension Request</h6>
+                                <span>
+                                    Designated Approval Authority: <strong><field name="suspending_authority" readonly="1" class="oe_inline"/></strong>.
+                                    Review the duration parameters and grounds before formal activation.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="state != 'pending_approval'">
+                            <i class="fa fa-clock-o fa-2x me-3"/>
+                            <div>
+                                <h6 class="alert-heading mb-1 font-weight-bold">Awaiting Authority Approval</h6>
+                                <span>
+                                    This request is pending authorization by <strong><field name="suspending_authority" readonly="1" class="oe_inline"/></strong>.
+                                    Upon activation, the employee's ERP user access will be deactivated.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="state != 'referred_bod'">
+                            <i class="fa fa-university fa-2x me-3"/>
+                            <div>
+                                <h6 class="alert-heading mb-1 font-weight-bold">Referred to Board of Directors (BOD) / Executive Office</h6>
+                                <span>
+                                    Suspension for Internal Audit (IAD) and Risk (RMCD) staff is authorized by the Executive Office (CEO) per Board resolution. Record the BOD Resolution Reference and Meeting Date to activate.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-danger d-flex align-items-center mb-3" role="alert" invisible="state not in ('active', 'extended')">
+                            <i class="fa fa-ban fa-2x me-3"/>
+                            <div>
+                                <h6 class="alert-heading mb-1 font-weight-bold">Active Disciplinary Suspension</h6>
+                                <span>
+                                    Employee is currently on <strong><field name="suspension_type" readonly="1" class="oe_inline"/></strong>. 
+                                    ERP system access is disabled. <strong><field name="days_remaining" readonly="1" class="oe_inline"/></strong> calendar day(s) remaining until scheduled end date (<field name="end_date" readonly="1" class="oe_inline"/>).
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-success d-flex align-items-center mb-3" role="alert" invisible="state != 'completed'">
+                            <i class="fa fa-check-circle fa-2x me-3"/>
+                            <div>
+                                <h6 class="alert-heading mb-1 font-weight-bold">Suspension Completed &amp; Reinstated</h6>
+                                <span>
+                                    The employee has been formally reinstated to active duty on <field name="reinstatement_date" readonly="1" class="oe_inline"/>. System user access is active.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-success d-flex align-items-center mb-3" role="alert" invisible="state != 'revoked'">
+                            <i class="fa fa-shield fa-2x me-3"/>
+                            <div>
+                                <h6 class="alert-heading mb-1 font-weight-bold">Suspension Revoked (Exonerated)</h6>
+                                <span>
+                                    Employee has been fully exonerated. Suspension is revoked, system access restored, and full salary backpay has been queued for payroll processing.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="oe_title mb-3">
+                            <h1 class="d-flex align-items-center justify-content-between">
+                                <field name="name" placeholder="Suspension Reference"/>
+                            </h1>
+                        </div>
+
                         <group>
-                            <group string="Suspension Details &amp; Governance">
-                                <field name="name"/>
+                            <group string="Suspension Governance &amp; Employee Profile">
                                 <field name="case_id" readonly="1"/>
                                 <field name="employee_id"/>
                                 <field name="department_id"/>
+                                <field name="job_title"/>
                                 <field name="initiating_unit" readonly="1"/>
-                                <field name="is_rmcd_or_iad" invisible="1"/>
                                 <field name="suspending_authority"/>
                             </group>
-                            <group string="Type &amp; Duration Rules">
+                            <group string="Duration &amp; Statutory Rules">
                                 <field name="suspension_type" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
                                 <field name="start_date" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
                                 <field name="end_date" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
+                                <field name="calendar_days_count"/>
                                 <field name="working_days_count"/>
                                 <field name="days_remaining"/>
                             </group>
                         </group>
-                        <group string="Board of Directors (BOD) Referral" invisible="not is_rmcd_or_iad">
-                            <group>
-                                <field name="bod_resolution_number" required="is_rmcd_or_iad and state == 'referred_bod'" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
-                                <field name="bod_meeting_date" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
-                            </group>
-                            <group>
-                                <field name="bod_resolution_file" filename="bod_resolution_filename" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
-                                <field name="bod_resolution_filename" invisible="1"/>
-                            </group>
-                        </group>
+
                         <notebook>
-                            <page string="Reason &amp; Conditions">
-                                <field name="reason" readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')" placeholder="Detailed reason for suspension pending investigation..."/>
+                            <!-- Tab 1: Grounds & Case Briefing -->
+                            <page string="Grounds &amp; Case Briefing" name="grounds_briefing">
+                                <div class="mt-2">
+                                    <separator string="Misconduct Incident Fact &amp; Description (from Case)"/>
+                                    <field name="case_description" class="w-100 mb-3" style="min-height: 80px; width: 100%;" readonly="1"/>
+
+                                    <separator string="CEO Assignment Directive" invisible="not ceo_assignment_notes"/>
+                                    <field name="ceo_assignment_notes" class="w-100 mb-3" style="min-height: 60px; width: 100%;" readonly="1" invisible="not ceo_assignment_notes"/>
+
+                                    <separator string="Specific Grounds for Precautionary Suspension"/>
+                                    <field name="reason" class="w-100" style="min-height: 100px; width: 100%;"
+                                           readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')" 
+                                           placeholder="Detail the specific rationale, operational risk, or investigation integrity grounds requiring precautionary suspension..."/>
+                                </div>
+                            </page>
+
+                            <!-- Tab 2: Official Notice -->
+                            <page string="Official Notice" name="official_notice">
+                                <group>
+                                    <group string="Official Signed Notice Attachment">
+                                        <field name="notice_letter_file" filename="notice_letter_filename" 
+                                               readonly="state in ('completed', 'converted_dismissal', 'revoked')"/>
+                                        <field name="notice_letter_filename" invisible="1"/>
+                                        <field name="notice_served_date" 
+                                               readonly="state in ('completed', 'converted_dismissal', 'revoked')"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <!-- Tab 3: Board of Directors (BOD) Referral -->
+                            <page string="Board of Directors (BOD) Referral" name="bod_referral" invisible="not is_rmcd_or_iad">
+                                <group string="Board Resolution &amp; Governance Details">
+                                    <group>
+                                        <field name="bod_resolution_number" 
+                                               required="is_rmcd_or_iad and state in ('referred_bod', 'active')" 
+                                               readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
+                                        <field name="bod_meeting_date" 
+                                               readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
+                                    </group>
+                                    <group>
+                                        <field name="bod_resolution_file" filename="bod_resolution_filename" 
+                                               readonly="state in ('active', 'extended', 'completed', 'converted_dismissal', 'revoked')"/>
+                                        <field name="bod_resolution_filename" invisible="1"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <!-- Tab 4: Reinstatement & Payroll Resolution -->
+                            <page string="Reinstatement &amp; Payroll Resolution" name="reinstatement_resolution" 
+                                  invisible="state not in ('completed', 'revoked', 'converted_dismissal')">
+                                <group string="Reinstatement &amp; Post-Case Payroll Settlement">
+                                    <group>
+                                        <field name="reinstatement_date" readonly="1"/>
+                                        <field name="backpay_status" readonly="not can_user_approve_suspension"/>
+                                        <field name="backpay_days_count" readonly="1" invisible="backpay_status == 'not_applicable'"/>
+                                    </group>
+                                    <group>
+                                        <field name="reinstatement_notes" 
+                                               placeholder="Notes regarding reinstatement terms, return to duty instructions, or payroll backpay adjustment reference..."/>
+                                    </group>
+                                </group>
                             </page>
                         </notebook>
                     </sheet>
@@ -80,10 +223,19 @@
             </field>
         </record>
 
+        <!-- Action -->
         <record id="action_discipline_suspension" model="ir.actions.act_window">
             <field name="name">Suspension Requests</field>
             <field name="res_model">discipline.suspension</field>
             <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Suspension Records Found
+                </p>
+                <p>
+                    Manage precautionary employee suspensions, duration tracking, and statutory approval workflows.
+                </p>
+            </field>
         </record>
     </data>
 </odoo>
