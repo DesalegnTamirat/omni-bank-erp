@@ -16,10 +16,30 @@ class EdsBudget(models.Model):
         ('international', 'International Training'),
         ('sponsorship', 'Certification Sponsorship'),
         ('education_assistance', 'Staff Education Assistance'),
+        ('bod', "BoD's Team (Executive/Governance)"),
+        ('summit', 'Annual Summit & Strategic Conferences'),
+        ('below_mlm', 'All Staff Below MLM'),
+        ('in_house_class', 'Local In-house (Classroom)'),
+        ('in_house_elearning', 'Local In-house E-Learning / Virtual'),
+        ('bank_level', 'Bank Level Programs'),
     ], string='Budget Category', required=True, tracking=True, default='internal')
     currency_id = fields.Many2one('res.currency', string='Currency', default=lambda self: self.env.company.currency_id)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company, index=True)
-    allocated = fields.Monetary(string='Allocated Budget', currency_field='currency_id', required=True, tracking=True)
+    allocated = fields.Monetary(string='Approved Budget (ETB)', currency_field='currency_id', required=True, tracking=True)
+
+    # Quarterly Breakdown Structure (aligned with Budget_Year_Plan template)
+    q1_allocated = fields.Monetary(string='Q1 (Jul–Sep)', currency_field='currency_id', tracking=True)
+    q2_allocated = fields.Monetary(string='Q2 (Oct–Dec)', currency_field='currency_id', tracking=True)
+    q3_allocated = fields.Monetary(string='Q3 (Jan–Mar)', currency_field='currency_id', tracking=True)
+    q4_allocated = fields.Monetary(string='Q4 (Apr–Jun)', currency_field='currency_id', tracking=True)
+    unallocated = fields.Monetary(string='Q1-Q4 / TBD (Unallocated)', currency_field='currency_id', tracking=True)
+    total_estimated = fields.Monetary(
+        string='Total Estimated Budget (ETB)', currency_field='currency_id',
+        compute='_compute_quarterly_totals', store=True)
+    budget_variance = fields.Monetary(
+        string='Variance (Approved − Estimated)', currency_field='currency_id',
+        compute='_compute_quarterly_totals', store=True)
+
     committed = fields.Monetary(string='Committed Amount', compute='_compute_amounts', currency_field='currency_id', store=True)
     spent = fields.Monetary(string='Spent Amount', compute='_compute_amounts', currency_field='currency_id', store=True)
     remaining = fields.Monetary(string='Remaining Balance', compute='_compute_amounts', currency_field='currency_id', store=True)
@@ -37,6 +57,18 @@ class EdsBudget(models.Model):
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('eds.budget') or _('New')
         return super(EdsBudget, self).create(vals_list)
+
+    @api.depends('q1_allocated', 'q2_allocated', 'q3_allocated', 'q4_allocated', 'unallocated', 'allocated')
+    def _compute_quarterly_totals(self):
+        for rec in self:
+            rec.total_estimated = (
+                (rec.q1_allocated or 0.0) +
+                (rec.q2_allocated or 0.0) +
+                (rec.q3_allocated or 0.0) +
+                (rec.q4_allocated or 0.0) +
+                (rec.unallocated or 0.0)
+            )
+            rec.budget_variance = rec.allocated - rec.total_estimated
 
     @api.depends('allocated', 'line_ids.amount', 'line_ids.status')
     def _compute_amounts(self):
@@ -76,6 +108,13 @@ class EdsBudgetLine(models.Model):
     budget_id = fields.Many2one('eds.budget', string='Parent Budget', ondelete='cascade', required=True)
     course_id = fields.Many2one('eds.course', string='Program / Course')
     session_id = fields.Many2one('eds.session', string='Training Session')
+    quarter = fields.Selection([
+        ('q1', 'Q1 (Jul–Sep)'),
+        ('q2', 'Q2 (Oct–Dec)'),
+        ('q3', 'Q3 (Jan–Mar)'),
+        ('q4', 'Q4 (Apr–Jun)'),
+        ('unallocated', 'Q1–Q4 / TBD (Unallocated)'),
+    ], string='Quarter', default='q1')
     cost_type = fields.Selection([
         ('venue', 'Venue & Facilities'),
         ('trainer', 'Trainer Fees / Honorarium'),

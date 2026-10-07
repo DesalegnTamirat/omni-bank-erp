@@ -23,9 +23,11 @@
         <field name="arch" type="xml">
             <form string="Post-Training Knowledge Sharing (EDS-F-12)">
                 <header>
-                    <button name="action_schedule" string="Schedule Debrief" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_schedule" string="Schedule Debrief" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_complete" string="Complete &amp; Verify" type="object" class="oe_highlight" groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin" invisible="state != 'scheduled'"/>
-                    <button name="action_print_form" string="Print Knowledge Sharing Form (EDS-F-12)" type="object" icon="fa-print"/>
+                    <button name="action_print_form" string="Print Knowledge Sharing Form (EDS-F-12)" type="object" icon="fa-print"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,completed"/>
                 </header>
                 <sheet>

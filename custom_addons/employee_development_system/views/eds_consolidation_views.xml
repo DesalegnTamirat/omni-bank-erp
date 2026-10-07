@@ -137,7 +137,7 @@
                                 <field name="approval_date"/>
                             </group>
                         </group>
-                        <group string="Segregation of Duties ()">
+                        <group string="Segregation of Duties">
                             <group>
                                 <field name="validator_id" groups="employee_development_system.group_eds_officer"/>
                                 <field name="reviewer_id"/>

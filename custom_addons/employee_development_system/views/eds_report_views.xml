@@ -29,9 +29,15 @@
         <field name="arch" type="xml">
             <list string="Annual L&amp;D Plan Variance Report" create="false" edit="false">
                 <field name="annual_plan_id"/>
-                <field name="course_id"/>
-                <field name="scheduled_month"/>
-                <field name="budget_allocated"/>
+                <field name="program_name"/>
+                <field name="quarter"/>
+                <field name="planned_participants"/>
+                <field name="actual_participants"/>
+                <field name="participant_variance"/>
+                <field name="budget_allocated" sum="Planned Budget"/>
+                <field name="actual_cost" sum="Actual Cost"/>
+                <field name="cost_variance" sum="Variance"/>
+                <field name="cost_utilization_pct" widget="progressbar"/>
                 <field name="status" widget="badge"/>
             </list>
         </field>

@@ -60,11 +60,6 @@ class CompetencyAssessmentCycle(models.Model):
         for rec in self:
             rec.is_open_or_latest = rec.id in target_ids
 
-    def write(self, vals):
-        res = super().write(vals)
-        if 'state' in vals or 'active' in vals:
-            self._recompute_is_open_or_latest_sql()
-        return res
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -850,6 +845,8 @@ class CompetencyAssessmentCycle(models.Model):
                 UPDATE competency_assessment_line SET active = %s WHERE cycle_id IN %s;
             """, (is_act, cycle_ids, is_act, cycle_ids))
             self.invalidate_model()
+        if 'state' in vals or 'active' in vals:
+            self._recompute_is_open_or_latest_sql()
         return res
 
     def unlink(self):
@@ -861,6 +858,7 @@ class CompetencyAssessmentCycle(models.Model):
                 UPDATE competency_assessment_line SET active = FALSE WHERE cycle_id = %s;
             """, (cycle.id, cycle.id))
         self.invalidate_model()
+        self._recompute_is_open_or_latest_sql()
         return True
 
 

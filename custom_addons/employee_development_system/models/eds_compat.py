@@ -14,7 +14,7 @@ class EdsHrCompat(models.AbstractModel):
             return self.env['hr.employee'].browse()
 
         identifier = str(identifier).strip()
-        Employee = self.env['hr.employee']
+        Employee = self.env['hr.employee'].sudo()
         emp_fields = Employee._fields
 
         domain_parts = []
@@ -40,9 +40,10 @@ class EdsHrCompat(models.AbstractModel):
         """Safely retrieve employee operating unit without hardcoding specific custom module names."""
         if not employee:
             return False
+        employee_sudo = employee.sudo()
         for field_name in ('default_operating_unit_id', 'operating_unit_id'):
-            if hasattr(employee, field_name):
-                val = getattr(employee, field_name)
+            if hasattr(employee_sudo, field_name):
+                val = getattr(employee_sudo, field_name)
                 if val:
                     return val
         return False
@@ -52,9 +53,10 @@ class EdsHrCompat(models.AbstractModel):
         """Safely retrieve job position (job_id or job_position)."""
         if not employee:
             return False
+        employee_sudo = employee.sudo()
         for field_name in ('job_id', 'job_position'):
-            if hasattr(employee, field_name):
-                val = getattr(employee, field_name)
+            if hasattr(employee_sudo, field_name):
+                val = getattr(employee_sudo, field_name)
                 if val:
                     return val
         return False
@@ -64,12 +66,13 @@ class EdsHrCompat(models.AbstractModel):
         """Safely retrieve employment start date."""
         if not employee:
             return False
+        employee_sudo = employee.sudo()
         for field_name in ('first_contract_date', 'service_start_date', 'service_hire_date', 'joined_date', 'employment_date', 'hire_date', 'join_date'):
-            if hasattr(employee, field_name):
-                val = getattr(employee, field_name)
+            if hasattr(employee_sudo, field_name):
+                val = getattr(employee_sudo, field_name)
                 if val:
                     return val
-        return employee.create_date.date() if employee.create_date else False
+        return employee_sudo.create_date.date() if employee_sudo.create_date else False
 
     @api.model
     def get_operating_unit_domain(self, departments=None):

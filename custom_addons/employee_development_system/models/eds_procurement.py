@@ -6,7 +6,7 @@ from odoo.exceptions import UserError
 
 
 class EdsVenueRequirement(models.Model):
-    """Standardized Venue Requirement Specification (VRS) ().
+    """Standardized Venue Requirement Specification (VRS).
 
     Prepared by the L&D officer, approved by the Director - PPDD, and only then may
     an RFP for venue procurement be initiated.
@@ -124,9 +124,9 @@ class EdsVenueRequirement(models.Model):
                 raise UserError(_('Only draft VRS documents can be submitted.'))
             if not rec.vrs_document and not rec.facilities_required:
                 raise UserError(_('Attach the VRS document or specify the required facilities '
-                                  'before submitting ().'))
+                                  'before submitting.'))
             rec.state = 'submitted'
-            rec.message_post(body=_('VRS %s submitted for Director PPDD approval ().')
+            rec.message_post(body=_('VRS %s submitted for Director PPDD approval.')
                              % rec.name)
 
     def action_director_approve(self):
@@ -174,14 +174,14 @@ class EdsRfp(models.Model):
     venue_requirement_id = fields.Many2one(
         'eds.venue.requirement', string='Venue Requirement',
         domain=[('state', '=', 'director_approved')],
-        help='For venue procurement: the approved VRS ().')
+        help='For venue procurement: the approved VRS.')
     objectives = fields.Text(string='Training Objectives')
     scope_of_work = fields.Text(string='Scope of Work', required=True)
     technical_specifications = fields.Text(string='Technical Specifications')
     venue_accommodation_requirements = fields.Text(string='Venue & Accommodation Requirements')
     evaluation_criteria_ids = fields.One2many(
         'eds.rfp.criteria.line', 'rfp_id', string='Evaluation Criteria',
-        help='Criteria published in the RFP ().')
+        help='Criteria published in the RFP.')
     submission_deadline = fields.Date(string='Submission Deadline', required=True, tracking=True)
     min_providers = fields.Integer(
         string='Minimum Providers', compute='_compute_min_providers', store=True,
@@ -245,18 +245,18 @@ class EdsRfp(models.Model):
                 raise UserError(_('Only draft RFPs can be issued.'))
             if rec.venue_requirement_id and rec.venue_requirement_id.state != 'director_approved':
                 raise UserError(_('The venue requirement must be approved by the Director PPDD '
-                                  'before the RFP is issued ().'))
+                                  'before the RFP is issued.'))
             if not rec.provider_ids:
                 raise UserError(_('Select at least one qualified provider to issue the RFP to.'))
             if len(rec.provider_ids) < rec.min_providers:
                 raise UserError(_('The RFP must be issued to at least %s qualified providers '
                                   '().') % rec.min_providers)
             rec.write({'state': 'issued', 'issuance_date': date.today()})
-            rec.message_post(body=_('RFP %s issued to %s qualified providers ().')
+            rec.message_post(body=_('RFP %s issued to %s qualified providers.')
                              % (rec.name, len(rec.provider_ids)))
 
     def action_receive_proposals(self):
-        """Issued -> Receiving: open the submission window ()."""
+        """Issued -> Receiving: open the submission window."""
         for rec in self:
             rec._require_group('group_eds_officer')
             if rec.state != 'issued':
@@ -285,9 +285,9 @@ class EdsRfp(models.Model):
             if rec.state != 'evaluation':
                 raise UserError(_('Only RFPs under evaluation can be awarded.'))
             if not rec.awarded_proposal_id:
-                raise UserError(_('Select the awarded proposal first ().'))
+                raise UserError(_('Select the awarded proposal first.'))
             rec.state = 'awarded'
-            rec.message_post(body=_('RFP %s awarded to %s ().')
+            rec.message_post(body=_('RFP %s awarded to %s.')
                              % (rec.name, rec.awarded_proposal_id.provider_id.name))
             last_contract = self.env['eds.training.contract'].create({
                 'rfp_id': rec.id,
@@ -313,7 +313,7 @@ class EdsRfp(models.Model):
 
 
 class EdsRfpCriteriaLine(models.Model):
-    """Published evaluation criteria line on an RFP ()."""
+    """Published evaluation criteria line on an RFP."""
     _name = 'eds.rfp.criteria.line'
     _description = 'RFP Evaluation Criteria Line'
     _order = 'sequence, id'
@@ -325,11 +325,11 @@ class EdsRfpCriteriaLine(models.Model):
 
 
 class EdsVendorProposal(models.Model):
-    """Two-envelope proposal registration ().
+    """Two-envelope proposal registration.
 
     Technical and financial envelopes are registered separately; the financial
     envelope is only opened after the technical evaluation passes the configured
-    minimum threshold ().
+    minimum threshold.
     """
     _name = 'eds.vendor.proposal'
     _description = 'Vendor Proposal (Two-Envelope)'
@@ -361,7 +361,7 @@ class EdsVendorProposal(models.Model):
         string='Technical Threshold Met', related='technical_score_id.threshold_met')
     combined_score = fields.Float(
         string='Combined Score', compute='_compute_combined_score', store=True,
-        help='Weighted blend of technical and financial scores ().')
+        help='Weighted blend of technical and financial scores.')
     state = fields.Selection([
         ('registered', 'Registered'),
         ('technical_opened', 'Technical Opened'),
@@ -397,24 +397,24 @@ class EdsVendorProposal(models.Model):
         return super().create(vals_list)
 
     def action_open_technical(self):
-        """Open the technical envelope and log the event ()."""
+        """Open the technical envelope and log the event."""
         for rec in self:
             if rec.state != 'registered':
                 raise UserError(_('Only registered proposals can have their technical envelope opened.'))
             rec.write({'state': 'technical_opened', 'technical_opened_date': datetime.now()})
-            rec.message_post(body=_('Technical envelope of %s opened and registered ().')
+            rec.message_post(body=_('Technical envelope of %s opened and registered.')
                              % rec.name)
 
     def action_open_financial(self):
-        """Open the financial envelope - gated on the technical threshold ()."""
+        """Open the financial envelope - gated on the technical threshold."""
         for rec in self:
             if rec.state != 'technical_opened':
                 raise UserError(_('Open the technical envelope before the financial envelope.'))
             if not rec.technical_score_id or rec.technical_score_id.state != 'approved':
-                raise UserError(_('Complete and approve the technical evaluation first ().'))
+                raise UserError(_('Complete and approve the technical evaluation first.'))
             if not rec.technical_score_id.threshold_met:
                 raise UserError(_('The technical score of %s is below the minimum qualification '
-                                  'threshold - the financial envelope must not be opened ().')
+                                  'threshold - the financial envelope must not be opened.')
                                 % rec.technical_score)
             rec.write({'state': 'financial_opened', 'financial_opened_date': datetime.now()})
             rec.message_post(body=_('Financial envelope of %s opened - technical threshold met '
@@ -425,7 +425,7 @@ class EdsVendorProposal(models.Model):
             if rec.state != 'financial_opened':
                 raise UserError(_('Only proposals with both envelopes opened can be marked evaluated.'))
             rec.state = 'evaluated'
-            rec.message_post(body=_('Proposal %s fully evaluated ().') % rec.name)
+            rec.message_post(body=_('Proposal %s fully evaluated.') % rec.name)
 
 
 class EdsEvaluationCriteria(models.Model):
@@ -449,9 +449,9 @@ class EdsVendorEvaluation(models.Model):
     """Weighted evaluation of a vendor proposal (/033).
 
     Technical and financial evaluations are separate records; a technical evaluation
-    below the configured minimum threshold blocks financial evaluation ().
+    below the configured minimum threshold blocks financial evaluation.
     International provider + host-country evaluations use their own criteria set
-    () and generate ranked recommendations for Director PPDD / CPCO review.
+    and generate ranked recommendations for Director PPDD / CPCO review.
     """
     _name = 'eds.vendor.evaluation'
     _description = 'Vendor Evaluation'
@@ -477,7 +477,7 @@ class EdsVendorEvaluation(models.Model):
     threshold_met = fields.Boolean(
         string='Minimum Threshold Met', compute='_compute_threshold_met', store=True,
         help='Technical evaluations must meet the configurable minimum threshold '
-             'before the financial evaluation is permitted ().')
+             'before the financial evaluation is permitted.')
     evaluator_id = fields.Many2one('res.users', string='Evaluator',
                                    default=lambda self: self.env.user)
     state = fields.Selection([
@@ -538,7 +538,7 @@ class EdsVendorEvaluation(models.Model):
             if not rec.line_ids:
                 raise UserError(_('Add criteria scores before submitting the evaluation.'))
             rec.state = 'submitted'
-            rec.message_post(body=_('Evaluation %s submitted for approval ().') % rec.name)
+            rec.message_post(body=_('Evaluation %s submitted for approval.') % rec.name)
 
     def action_approve(self):
         for rec in self:
@@ -546,13 +546,13 @@ class EdsVendorEvaluation(models.Model):
             if rec.state != 'submitted':
                 raise UserError(_('Only submitted evaluations can be approved.'))
             rec.state = 'approved'
-            rec.message_post(body=_('Evaluation %s approved - total score %s%% ().')
+            rec.message_post(body=_('Evaluation %s approved - total score %s%%.')
                              % (rec.name, rec.total_score))
 
     def _require_evaluation_approver(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('Evaluation approval requires L&D Manager authority ().'))
+            raise UserError(_('Evaluation approval requires L&D Manager authority.'))
 
 
 class EdsVendorEvaluationLine(models.Model):
@@ -578,7 +578,7 @@ class EdsVendorEvaluationLine(models.Model):
 
 
 class EdsTrainingContract(models.Model):
-    """Training contract / service agreement ().
+    """Training contract / service agreement.
 
     Auto-generated from the awarded RFP and evaluation data, routed to the Legal
     Directorate for review, with legal comments/amendments, version history and
@@ -598,7 +598,7 @@ class EdsTrainingContract(models.Model):
                                   tracking=True)
     course_id = fields.Many2one('eds.course', string='Training Program', tracking=True)
     combined_score = fields.Float(string='Combined Score (%)', readonly=True,
-                                  help='Snapshot of the winning proposal score ().')
+                                  help='Snapshot of the winning proposal score.')
     contract_amount = fields.Monetary(string='Contract Amount', tracking=True)
     currency_id = fields.Many2one('res.currency', string='Currency',
                                   default=lambda self: self.env.company.currency_id)
@@ -635,7 +635,7 @@ class EdsTrainingContract(models.Model):
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
             raise UserError(_('You do not have the required authority for this step.'))
 
-    # ── Workflow () ──────────────────────────────────────────────────
+    # ── Workflow ──────────────────────────────────────────────────
     def action_send_legal(self):
         """Draft -> Legal Review: route the draft agreement to the Legal Directorate."""
         for rec in self:
@@ -656,7 +656,7 @@ class EdsTrainingContract(models.Model):
                 raise UserError(_('Record the amended contract version before approving '
                                   '().'))
             rec.write({'state': 'approved', 'legal_reviewer_id': self.env.user.id})
-            rec.message_post(body=_('Contract %s approved by Legal ().') % rec.name)
+            rec.message_post(body=_('Contract %s approved by Legal.') % rec.name)
 
     def action_request_revision(self):
         """Legal Review -> Revision: capture legal comments and bump the version."""
@@ -683,7 +683,7 @@ class EdsTrainingContract(models.Model):
             if rec.state != 'revision':
                 raise UserError(_('Only contracts under revision can be resubmitted.'))
             rec.state = 'legal_review'
-            rec.message_post(body=_('Revised contract %s resubmitted to Legal ().') % rec.name)
+            rec.message_post(body=_('Revised contract %s resubmitted to Legal.') % rec.name)
 
     def action_record_signature(self):
         """Approved -> Signed: record the authorized signature."""
@@ -694,7 +694,7 @@ class EdsTrainingContract(models.Model):
             if not rec.signature and not rec.signed_by:
                 raise UserError(_('Attach the signed document or record the signatory.'))
             rec.write({'state': 'signed', 'signature_date': date.today()})
-            rec.message_post(body=_('Contract %s signed by %s ().')
+            rec.message_post(body=_('Contract %s signed by %s.')
                              % (rec.name, rec.signed_by or 'authorized signatory'))
 
     def action_activate(self):
@@ -704,12 +704,12 @@ class EdsTrainingContract(models.Model):
                 raise UserError(_('Only signed contracts can be activated.'))
             rec.state = 'active'
             rec.message_post(body=_('Contract %s activated - vendor performance monitoring '
-                                    'enabled ().') % rec.name)
+                                    'enabled.') % rec.name)
 
     def _require_legal_authority(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('Legal review handling requires L&D Manager authority ().'))
+            raise UserError(_('Legal review handling requires L&D Manager authority.'))
 
     @staticmethod
     def _bump_version(version):
@@ -721,7 +721,7 @@ class EdsTrainingContract(models.Model):
 
 
 class EdsTrainingContractVersion(models.Model):
-    """Version history entry of a training contract ()."""
+    """Version history entry of a training contract."""
     _name = 'eds.training.contract.version'
     _description = 'Training Contract Version'
     _order = 'id desc'

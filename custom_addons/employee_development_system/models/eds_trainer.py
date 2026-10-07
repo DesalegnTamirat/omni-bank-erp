@@ -10,7 +10,7 @@ class EdsTrainer(models.Model):
 
     A centralized internal trainer pool: profiles, competencies, ToT certification
     status, periodic review cycles (default every 2 years), participant feedback,
-    quarterly performance reviews and availability (used by Task 5 conflict checks).
+    quarterly performance reviews and availability (used by conflict checks).
     """
     _name = 'eds.trainer'
     _description = 'Trainer Profile'
@@ -25,13 +25,13 @@ class EdsTrainer(models.Model):
     ], string='Trainer Type', default='internal', required=True, tracking=True)
     employee_id = fields.Many2one(
         'hr.employee', string='Internal Employee',
-        help='Set for internal trainers ().')
+        help='Set for internal trainers.')
     external_partner_id = fields.Many2one(
         'res.partner', string='External Trainer (Partner)',
         help='Set for external trainers.')
     external_provider_id = fields.Many2one(
         'eds.external.provider', string='External Provider',
-        help='The registered provider this external trainer belongs to ().')
+        help='The registered provider this external trainer belongs to.')
     job_title = fields.Char(string='Job Title / Specialization')
     phone = fields.Char(string='Phone')
     email = fields.Char(string='Email')
@@ -73,16 +73,15 @@ class EdsTrainer(models.Model):
         return self.env.ref('employee_development_system.action_report_eds_trainer_profile').report_action(self)
     competency_ids = fields.Many2many(
         'competency.competency', string='Competencies',
-        help='Competencies the trainer is qualified to deliver (Task 5 uses this to '
-             'constrain session trainer selection).')
+        help='Competencies the trainer is qualified to deliver .')
     tot_certified = fields.Boolean(
         string='ToT Certified', tracking=True,
-        help='Training-of-Trainers certification status ().')
+        help='Training-of-Trainers certification status.')
     tot_certificate_ids = fields.One2many(
         'eds.trainer.certification', 'trainer_id', string='ToT Certificates')
     review_cycle_months = fields.Integer(
         string='Review Cycle (Months)', default=24, tracking=True,
-        help='Periodic review cycle - default every 2 years ().')
+        help='Periodic review cycle - default every 2 years.')
     last_review_date = fields.Date(string='Last Review Date', tracking=True)
     next_review_date = fields.Date(
         string='Next Review Date', compute='_compute_next_review')
@@ -90,7 +89,7 @@ class EdsTrainer(models.Model):
         string='Review Overdue', compute='_compute_next_review', search=True)
     availability_ids = fields.One2many(
         'eds.trainer.availability', 'trainer_id', string='Availability',
-        help='Trainer availability slots used for session conflict checks (Task 5).')
+        help='Trainer availability slots used for session conflict checks .')
     quarterly_review_ids = fields.One2many(
         'eds.trainer.quarterly.review', 'trainer_id', string='Quarterly Reviews')
     feedback_ids = fields.One2many(
@@ -99,7 +98,7 @@ class EdsTrainer(models.Model):
         string='Average Rating', compute='_compute_avg_rating', store=True,
         digits=(3, 2),
         help='Computed from Level-1/Level-3 participant feedback and quarterly '
-             'reviews ().')
+             'reviews.')
     rating_count = fields.Integer(string='Rating Count', compute='_compute_avg_rating', store=True)
     state = fields.Selection([
         ('active', 'Active'),
@@ -165,11 +164,11 @@ class EdsTrainer(models.Model):
         for rec in self:
             rec.last_review_date = date.today()
             rec.next_review_date = date.today() + timedelta(days=rec.review_cycle_months * 30)
-            rec.message_post(body=_('Periodic review completed for trainer %s ().') % rec.name)
+            rec.message_post(body=_('Periodic review completed for trainer %s.') % rec.name)
 
     @api.model
     def _get_qualified_trainers(self, competency_ids=None, date_start=None, date_end=None):
-        """Helper for Task 5: trainers matching competencies and available in a period.
+        """Helper for : trainers matching competencies and available in a period.
 
         Returns a recordset of `eds.trainer` whose competency set intersects the
         requested competencies and who have no blocking availability record in the
@@ -191,7 +190,7 @@ class EdsTrainer(models.Model):
 
 
 class EdsTrainerCertification(models.Model):
-    """Training-of-Trainers (ToT) certification record ()."""
+    """Training-of-Trainers (ToT) certification record."""
     _name = 'eds.trainer.certification'
     _description = 'Trainer ToT Certification'
     _order = 'issued_date desc'
@@ -222,7 +221,7 @@ class EdsTrainerCertification(models.Model):
 
 
 class EdsTrainerAvailability(models.Model):
-    """Trainer availability slot (; consumed by Task 5 conflict checks)."""
+    """Trainer availability slot (; consumed by conflict checks)."""
     _name = 'eds.trainer.availability'
     _description = 'Trainer Availability'
     _order = 'date_start'
@@ -243,7 +242,7 @@ class EdsTrainerAvailability(models.Model):
 
 
 class EdsTrainerQuarterlyReview(models.Model):
-    """Quarterly performance review of a trainer ()."""
+    """Quarterly performance review of a trainer."""
     _name = 'eds.trainer.quarterly.review'
     _description = 'Trainer Quarterly Review'
     _order = 'period desc'
@@ -285,7 +284,7 @@ class EdsTrainerFeedback(models.Model):
         ('level_1', 'Level 1 - Reaction'),
         ('level_3', 'Level 3 - Behaviour'),
     ], string='Evaluation Level', default='level_1', required=True)
-    # session_id is linked to eds.session in Task 5 (session scheduling).
+    # session_id is linked to eds.session in  (session scheduling).
     participant_id = fields.Many2one('hr.employee', string='Participant')
     rating = fields.Selection([
         ('1', '1 - Poor'),

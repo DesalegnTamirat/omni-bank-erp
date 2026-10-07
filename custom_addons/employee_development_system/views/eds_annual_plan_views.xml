@@ -50,7 +50,7 @@
                         <button name="action_generate_calendar" string="Generate Calendar"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"
-                                confirm="Generate the draft calendar from the approved TNA and curricula? ()"/>
+                                confirm="Generate the draft calendar from the approved TNA and curricula?"/>
                         <button name="action_submit_director" string="Submit to Director PPDD"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
@@ -93,7 +93,7 @@
                             </div>
                             <div class="o_stat_info">
                                 <field name="amendment_count" widget="statinfo" string="Amendments"/>
-                                <span class="o_stat_text">Unscheduled addenda ()</span>
+                                <span class="o_stat_text">Unscheduled addenda</span>
                             </div>
                         </div>
                         <group>
@@ -104,7 +104,7 @@
                                 <field name="calendar_sla_deadline" readonly="1"/>
                                 <field name="sla_breached"/>
                             </group>
-                            <group string="Approval ()">
+                            <group string="Approval">
                                 <field name="reviewer_id" readonly="state not in ('director_review','cpco_endorsement','smc_approval','published','amended')"/>
                                 <field name="endorser_id" readonly="state not in ('cpco_endorsement','smc_approval','published','amended')"/>
                                 <field name="approver_id" readonly="state not in ('smc_approval','published','amended')"/>
@@ -134,10 +134,31 @@
                                         <field name="est_venue_cost_per_pax_day" optional="hide"/>
                                         <field name="total_venue_cost" sum="Total Venue Cost" optional="show"/>
                                         <field name="budget_allocated" sum="Budget"/>
+                                        <field name="actual_participants" optional="hide"/>
+                                        <field name="actual_cost" optional="hide"/>
                                         <field name="session_count"/>
                                         <field name="planned_vs_actual" widget="progressbar"/>
                                         <field name="status" widget="badge"/>
                                         <field name="is_addendum" optional="hide"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Plan vs Actual Tracker" name="plan_vs_actual_tracker">
+                                <field name="line_ids" readonly="1">
+                                    <list>
+                                        <field name="program_name"/>
+                                        <field name="quarter"/>
+                                        <field name="planned_participants"/>
+                                        <field name="actual_participants"/>
+                                        <field name="participant_variance"/>
+                                        <field name="budget_allocated" sum="Total Planned"/>
+                                        <field name="actual_cost" sum="Total Actual"/>
+                                        <field name="cost_variance" sum="Total Variance"/>
+                                        <field name="cost_utilization_pct" widget="progressbar"/>
+                                        <field name="status" widget="badge"/>
+                                        <field name="actual_start_date"/>
+                                        <field name="actual_end_date"/>
+                                        <field name="remark"/>
                                     </list>
                                 </field>
                             </page>

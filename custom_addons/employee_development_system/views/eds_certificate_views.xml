@@ -128,9 +128,11 @@
                     <button name="action_issue" string="Issue Official Certificate" type="object" class="oe_highlight" invisible="state != 'pending'"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_download_image" string="Download Image (.png)" type="object" class="btn-primary" icon="fa-picture-o"
-                            invisible="state != 'issued' or not certificate_image"/>
+                            invisible="state != 'issued' or not certificate_image"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_download_pdf" string="Download PDF (.pdf)" type="object" class="btn-info" icon="fa-file-pdf-o"
-                            invisible="state != 'issued' or not file"/>
+                            invisible="state != 'issued' or not file"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_regenerate_assets" string="Regenerate Certificate Assets" type="object" class="btn-secondary" icon="fa-refresh"
                             invisible="state != 'issued'" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_admin"/>
                     <button name="action_void" string="Void Certificate" type="object" invisible="state == 'void'"

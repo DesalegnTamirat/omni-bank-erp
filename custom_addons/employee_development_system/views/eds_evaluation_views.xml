@@ -92,8 +92,10 @@
         <field name="arch" type="xml">
             <form string="Level 1 Participant Feedback">
                 <header>
-                    <button name="action_submit_feedback" string="Submit Feedback" type="object" class="oe_highlight" invisible="state != 'distributed'"/>
-                    <button name="action_print_form" string="Print Reaction Survey (EDS-F-02)" type="object" icon="fa-print"/>
+                    <button name="action_submit_feedback" string="Submit Feedback" type="object" class="oe_highlight" invisible="state != 'distributed'"
+                            groups="employee_development_system.group_eds_employee"/>
+                    <button name="action_print_form" string="Print Reaction Survey (EDS-F-02)" type="object" icon="fa-print"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="distributed,submitted,consolidated"/>
                 </header>
                 <sheet>
@@ -181,7 +183,8 @@
                 <header>
                     <button name="action_evaluate" string="Complete Evaluation" type="object" class="oe_highlight" invisible="state != 'draft'"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_print_form" string="Print Assessment Sheet (EDS-F-03)" type="object" icon="fa-print"/>
+                    <button name="action_print_form" string="Print Assessment Sheet (EDS-F-03)" type="object" icon="fa-print"
+                            groups="employee_development_system.group_eds_trainer,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
                 </header>
                 <sheet>
@@ -260,7 +263,8 @@
                 <header>
                     <button name="action_submit_level3" string="Submit Manager Assessment" type="object" class="oe_highlight" invisible="status == 'completed'"
                             groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_print_form" string="Print Impact Form (EDS-F-04)" type="object" icon="fa-print"/>
+                    <button name="action_print_form" string="Print Impact Form (EDS-F-04)" type="object" icon="fa-print"
+                            groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="status" widget="statusbar" statusbar_visible="pending,in_progress,completed,overdue"/>
                 </header>
                 <sheet>
@@ -352,7 +356,8 @@
                 <header>
                     <button name="action_evaluate" string="Publish Impact Assessment" type="object" class="oe_highlight" invisible="state != 'draft'"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_print_form" string="Print Level 4 Report (EDS-F-11)" type="object" icon="fa-print"/>
+                    <button name="action_print_form" string="Print Level 4 Report (EDS-F-11)" type="object" icon="fa-print"
+                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
                 </header>
                 <sheet>

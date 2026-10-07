@@ -176,3 +176,26 @@ class TestTemplateAlignment(TransactionCase):
         tna = self.env['eds.tna.entry'].search([('proposed_program', '=', 'Customer Service Mastery'), ('cycle_id', '=', self.cycle.id)])
         self.assertTrue(tna)
         self.assertEqual(tna.target_participant_count, 40)
+
+    def test_06_eds_dashboard_role_adaptation(self):
+        """Test eds.dashboard persona and KPI metrics."""
+        dashboard = self.env['eds.dashboard'].create({'name': 'Test Overview'})
+        # Default with admin/test context
+        self.assertIn(dashboard.role_persona, ('admin', 'manager', 'employee'))
+        self.assertGreaterEqual(dashboard.total_tna_entries, 0)
+        self.assertGreaterEqual(dashboard.budget_utilization_pct, 0.0)
+        # Test navigation action helpers
+        act_tna = dashboard.action_open_tna_entries()
+        self.assertEqual(act_tna['res_model'], 'eds.tna.entry')
+        act_sess = dashboard.action_open_sessions()
+        self.assertEqual(act_sess['res_model'], 'eds.session')
+        act_plan = dashboard.action_open_annual_plans()
+        self.assertEqual(act_plan['res_model'], 'eds.annual.plan')
+        act_cert = dashboard.action_open_certificates()
+        self.assertEqual(act_cert['res_model'], 'eds.certificate')
+        act_nom = dashboard.action_open_nominations()
+        self.assertEqual(act_nom['res_model'], 'eds.nomination')
+        act_idp = dashboard.action_open_idps()
+        self.assertEqual(act_idp['res_model'], 'eds.idp')
+        act_spons = dashboard.action_open_sponsorships()
+        self.assertEqual(act_spons['res_model'], 'eds.sponsorship')

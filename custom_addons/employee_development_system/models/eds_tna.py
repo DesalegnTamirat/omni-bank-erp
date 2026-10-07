@@ -61,7 +61,7 @@ class EdsTnaCycle(models.Model):
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    # Task 2: consolidations per cycle (-010)
+    # consolidations per cycle (-010)
     consolidation_ids = fields.One2many(
         'eds.tna.consolidation', 'cycle_id', string='Consolidations')
     consolidation_count = fields.Integer(
@@ -322,7 +322,7 @@ class EdsTnaCycle(models.Model):
                              % (rec.name, rec.start_date, rec.submission_end_date))
 
     def action_finish_collection(self):
-        """Collecting -> Consolidating ()."""
+        """Collecting -> Consolidating."""
         for rec in self:
             if not rec.entry_ids:
                 raise UserError(_('No training needs were submitted for this cycle.'))
@@ -531,14 +531,14 @@ class EdsTnaEntry(models.Model):
     company_currency_id = fields.Many2one('res.currency', related='company_id.currency_id', readonly=True)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    # ── Task 2: Consolidation & Prioritization (/007) ────────────────
+    # ── Consolidation & Prioritization (/007) ──
     consolidation_id = fields.Many2one(
         'eds.tna.consolidation', string='Consolidation',
         ondelete='set null', index=True, copy=False, tracking=True)
     is_duplicate = fields.Boolean(
         string='Duplicate Need', default=False, tracking=True,
         help='Auto-flagged during consolidation when the same employee+competency need appears '
-             'from multiple sources ().')
+             'from multiple sources.')
     duplicate_of_id = fields.Many2one('eds.tna.entry', string='Duplicate Of', ondelete='set null')
     exclusion_type = fields.Selection([
         ('duplicate', 'Duplicate Need'),
@@ -549,7 +549,7 @@ class EdsTnaEntry(models.Model):
     ], string='Non-Training / Exclusion Type', tracking=True,
         help='Flagged as a non-training item (process/system/structural) or duplicate for review & exclusion.')
 
-    # Priority scoring criteria () - each scored 0-100, weighted by eds.tna.priority.rule
+    # Priority scoring criteria - each scored 0-100, weighted by eds.tna.priority.rule
     score_strategic_alignment = fields.Float(string='Strategic Alignment Score', default=50.0)
     score_tom_impact = fields.Float(string='TOM Impact Score', default=50.0)
     score_gap_severity = fields.Float(
@@ -561,7 +561,7 @@ class EdsTnaEntry(models.Model):
 
     @api.depends('gap_severity')
     def _compute_score_gap_severity(self):
-        """Map the gap severity selection onto the 0-100 scoring scale ()."""
+        """Map the gap severity selection onto the 0-100 scoring scale."""
         weights = {'critical': 100.0, 'high': 75.0, 'medium': 50.0, 'low': 25.0}
         for rec in self:
             rec.score_gap_severity = weights.get(rec.gap_severity, 50.0)
@@ -573,7 +573,7 @@ class EdsTnaEntry(models.Model):
             rec.score_regulatory = 100.0 if rec.source == 'regulatory' else 0.0
 
     def _criterion_score(self, criteria):
-        """Return the 0-100 score for a priority criterion code ()."""
+        """Return the 0-100 score for a priority criterion code."""
         mapping = {
             'strategic_alignment': 'score_strategic_alignment',
             'tom_impact': 'score_tom_impact',
@@ -732,7 +732,7 @@ class EdsTnaEntry(models.Model):
     @api.depends('score_strategic_alignment', 'score_tom_impact', 'score_gap_severity',
                  'score_risk_level', 'score_regulatory', 'score_future_capability')
     def _compute_priority_score(self):
-        """Weighted priority engine (): weighted average of the active rule weights.
+        """Weighted priority engine: weighted average of the active rule weights.
 
         score = sum(weight_i * score_i) / sum(weight_i), capped at 100.
         """
@@ -740,7 +740,7 @@ class EdsTnaEntry(models.Model):
             rec.priority_score = rec._get_weighted_priority_score()
 
     def _get_weighted_priority_score(self):
-        """Pure weighted-score computation () - shared by the ORM compute and by the
+        """Pure weighted-score computation - shared by the ORM compute and by the
         priority-rule model so changing a rule weight re-scores every consolidated entry."""
         rules = self.env['eds.tna.priority.rule'].search([('active', '=', True)])
         total_weight = sum(rules.mapped('weight'))
@@ -864,7 +864,7 @@ class EdsTnaEntry(models.Model):
             if rec.consolidation_id and rec.consolidation_id.state == 'locked':
                 raise UserError(_(
                     'Training need %s belongs to the locked consolidation %s. Unlock the '
-                    'consolidation with a documented change request before editing ().')
+                    'consolidation with a documented change request before editing.')
                     % (rec.name, rec.consolidation_id.name))
         return super().write(vals)
 
@@ -895,7 +895,7 @@ class EdsTnaEntry(models.Model):
             rec.message_post(body=_('Training need %s validated.') % rec.name)
 
     def action_exclude(self):
-        """Flag duplicate/invalid/non-training items for exclusion ()."""
+        """Flag duplicate/invalid/non-training items for exclusion."""
         if len(self) == 1 and not self.excluded_reason:
             self._require_group('group_eds_officer')
             return {
@@ -956,7 +956,7 @@ class EdsTnaEntry(models.Model):
         self.ensure_one()
         if self.state not in ('approved', 'converted'):
             raise UserError(_('Only approved training needs can be converted to a course '
-                              'development request ().'))
+                              'development request.'))
         existing = self.env['eds.course.development.request'].search(
             [('tna_entry_ids', 'in', [self.id])], limit=1)
         if existing:

@@ -23,7 +23,7 @@ class EdsIntegrationLog(models.Model):
         ('failed', 'Failed'),
         ('retry', 'Retry Queued'),
     ], string='Status', required=True, default='success')
-    error_message = fields.Text(string='Error Details')
+    details = fields.Text(string='Transaction Details / Message')
     timestamp = fields.Datetime(string='Timestamp', default=fields.Datetime.now)
 
 class EdsLmsRouting(models.Model):
@@ -48,7 +48,7 @@ class EdsLmsRouting(models.Model):
 
     def action_sync_to_lms(self):
         for rec in self:
-            # Stubs/Contract for LMS Sync
+            # Contract/Interface stub for LMS Sync
             rec.sync_state = 'synced'
             rec.last_sync_date = fields.Datetime.now()
             self.env['eds.integration.log'].create({
@@ -56,7 +56,7 @@ class EdsLmsRouting(models.Model):
                 'system': 'lms',
                 'direction': 'outbound',
                 'status': 'success',
-                'error_message': f"Course {rec.course_id.name} payload dispatched to LMS shell API.",
+                'details': f"Course {rec.course_id.name} payload queued for LMS sync dispatch.",
             })
 
 class EdsPayrollPayload(models.Model):
@@ -96,5 +96,5 @@ class EdsPayrollPayload(models.Model):
                 'system': 'payroll',
                 'direction': 'outbound',
                 'status': 'success',
-                'error_message': f"Cost recovery payload {rec.name} for {rec.employee_id.name} ({rec.amount}) transferred to Payroll queue.",
+                'details': f"Cost recovery payload {rec.name} for {rec.employee_id.name} ({rec.amount}) transferred to Payroll queue.",
             })

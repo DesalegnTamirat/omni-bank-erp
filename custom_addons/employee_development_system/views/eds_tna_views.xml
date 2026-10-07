@@ -174,7 +174,8 @@
                 <form>
                     <header>
                         <button name="action_submit" string="Submit"
-                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_validate" string="Validate"
                                 type="object" class="oe_highlight" invisible="state not in ('submitted','validated')"
                                 groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>

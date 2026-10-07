@@ -9,7 +9,7 @@ class EdsUnscheduledRequest(models.Model):
     Classroom training must originate from the approved TNA; any unscheduled request
     is the documented exception - it requires a mandatory justification and L&D
     approval. Once approved, the request is appended to the target annual plan as an
-    authorized addendum line (), creating a session for delivery.
+    authorized addendum line, creating a session for delivery.
     """
     _name = 'eds.unscheduled.request'
     _description = 'Unscheduled Training Request'
@@ -225,7 +225,7 @@ class EdsUnscheduledRequest(models.Model):
                 raise UserError(_('Only draft requests can be submitted.'))
             if not rec.justification:
                 raise UserError(_('A justification is mandatory for unscheduled training '
-                                  'requests ().'))
+                                  'requests.'))
             rec.state = 'submitted'
             rec.message_post(body=_('Unscheduled request %s submitted for L&D approval '
                                     '().') % rec.name)
@@ -263,7 +263,7 @@ class EdsUnscheduledRequest(models.Model):
             })
             rec._append_addendum()
             rec.message_post(body=_('Unscheduled request %s approved - appended to the annual '
-                                    'plan as an addendum ().') % rec.name)
+                                    'plan as an addendum.') % rec.name)
 
     def _append_addendum(self):
         """Create an addendum plan line (and its session) on the target annual plan."""
@@ -289,7 +289,7 @@ class EdsUnscheduledRequest(models.Model):
             if rec.state not in ('submitted', 'lnd_approved', 'director_approved'):
                 raise UserError(_('Only pending requests can be rejected.'))
             if not rec.rejected_reason:
-                raise UserError(_('A rejection reason is required ().'))
+                raise UserError(_('A rejection reason is required.'))
             rec.state = 'rejected'
             rec.message_post(body=_('Unscheduled request %s rejected: %s')
                              % (rec.name, rec.rejected_reason))
@@ -297,4 +297,4 @@ class EdsUnscheduledRequest(models.Model):
     def _require_manager(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('This approval step requires L&D Manager authority ().'))
+            raise UserError(_('This approval step requires L&D Manager authority.'))

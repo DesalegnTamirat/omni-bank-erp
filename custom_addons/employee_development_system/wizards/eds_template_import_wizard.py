@@ -26,6 +26,8 @@ class EdsTemplateImportWizard(models.TransientModel):
         ('curriculum', 'Curriculum & Courses (Curriculum Sheet)'),
         ('calendar', 'Bank-level Calendar (Cal_BankLevel Sheet)'),
         ('providers', 'External Providers (Provider_Register Sheet)'),
+        ('budget', 'Year Budget Plan (Budget_Year_Plan Sheet)'),
+        ('variance', 'Plan vs Actual Tracker (Plan_vs_Actual Sheet)'),
     ], string='Template / Sheet Type', default='auto', required=True)
 
     fiscal_year = fields.Char(string='Fiscal Year', default='2026', required=True)
@@ -110,6 +112,24 @@ class EdsTemplateImportWizard(models.TransientModel):
             elif self.template_type == 'providers':
                 res = self._import_provider_sheet(wb.active)
                 summary_lines.append(f"Active Sheet (Providers): {res.get('created', 0)} external providers registered/updated.")
+
+        if self.template_type in ('auto', 'budget'):
+            budget_sheet_name = next((s for s in wb.sheetnames if 'budget' in s.lower()), None)
+            if budget_sheet_name:
+                res = self._import_budget_sheet(wb[budget_sheet_name])
+                summary_lines.append(f"Budget Sheet: {res.get('created', 0)} budget plans updated/created.")
+            elif self.template_type == 'budget':
+                res = self._import_budget_sheet(wb.active)
+                summary_lines.append(f"Active Sheet (Budget): {res.get('created', 0)} budget plans updated/created.")
+
+        if self.template_type in ('auto', 'variance'):
+            var_sheet_name = next((s for s in wb.sheetnames if 'actual' in s.lower() or 'variance' in s.lower()), None)
+            if var_sheet_name:
+                res = self._import_plan_vs_actual_sheet(wb[var_sheet_name])
+                summary_lines.append(f"Plan vs Actual Sheet: {res.get('updated', 0)} plan lines tracked/updated.")
+            elif self.template_type == 'variance':
+                res = self._import_plan_vs_actual_sheet(wb.active)
+                summary_lines.append(f"Active Sheet (Plan vs Actual): {res.get('updated', 0)} plan lines tracked/updated.")
 
         if not summary_lines:
             summary_lines.append("No matching template sheets found in the uploaded workbook. Available sheets: " + ", ".join(wb.sheetnames))
@@ -508,3 +528,129 @@ class EdsTemplateImportWizard(models.TransientModel):
             created += 1
 
         return {'created': created}
+
+    def _import_budget_sheet(self, ws):
+        """Parse Budget_Year_Plan sheet and create/update annual budget records."""
+        Budget = self.env['eds.budget']
+        created = 0
+        cat_map = {
+            "bod's team": 'bod',
+            'annual summit': 'summit',
+            'all staff below mlm': 'below_mlm',
+            'local in-house (classroom)': 'in_house_class',
+            'local in-house e-learning / virtual': 'in_house_elearning',
+            'bank level': 'bank_level',
+        }
+        key_patterns = {
+            'prog_cal': ['program calendar', 'calendar', 'category'],
+            'q1': ['q1', 'jul–sep'],
+            'q2': ['q2', 'oct–dec'],
+            'q3': ['q3', 'jan–mar'],
+            'q4': ['q4', 'apr–jun'],
+            'unallocated': ['unallocated', 'tbd'],
+            'total_est': ['total estimated', 'estimated budget'],
+            'approved': ['approved budget', 'approved'],
+        }
+        default_cols = {
+            'prog_cal': 2, 'q1': 5, 'q2': 6, 'q3': 7, 'q4': 8, 'unallocated': 9,
+            'total_est': 10, 'approved': 12
+        }
+        start_row, cols = self._find_header_and_cols(ws, key_patterns, 5, default_cols)
+
+        for r in range(start_row, ws.max_row + 1):
+            name_val = str(ws.cell(r, cols.get('prog_cal', 2)).value or '').strip()
+            if not name_val or 'grand total' in name_val.lower() or 'total' == name_val.lower():
+                continue
+
+            # Resolve category key
+            cat_key = next((v for k, v in cat_map.items() if k in name_val.lower()), 'internal')
+
+            def _flt(c_name, def_col):
+                v = ws.cell(r, cols.get(c_name, def_col)).value
+                if isinstance(v, str) and (v.startswith('=') or '#REF' in v):
+                    return 0.0
+                try:
+                    return float(v or 0.0)
+                except (ValueError, TypeError):
+                    return 0.0
+
+            q1 = _flt('q1', 5)
+            q2 = _flt('q2', 6)
+            q3 = _flt('q3', 7)
+            q4 = _flt('q4', 8)
+            unalloc = _flt('unallocated', 9)
+            approved = _flt('approved', 12)
+
+            # Look up or create budget for this category and fiscal year
+            b_rec = Budget.search([
+                ('category', '=', cat_key),
+                ('fiscal_year', '=', self.fiscal_year),
+            ], limit=1)
+
+            vals = {
+                'fiscal_year': self.fiscal_year,
+                'category': cat_key,
+                'q1_allocated': q1,
+                'q2_allocated': q2,
+                'q3_allocated': q3,
+                'q4_allocated': q4,
+                'unallocated': unalloc,
+                'allocated': approved if approved > 0 else (q1 + q2 + q3 + q4 + unalloc),
+            }
+
+            if b_rec:
+                b_rec.write(vals)
+            else:
+                Budget.create(vals)
+            created += 1
+
+        return {'created': created}
+
+    def _import_plan_vs_actual_sheet(self, ws):
+        """Parse Plan_vs_Actual sheet and update matching annual plan lines."""
+        PlanLine = self.env['eds.annual.plan.line']
+        updated = 0
+        key_patterns = {
+            'prog_name': ['program name', 'program', 'course'],
+            'actual_pax': ['actual participants', 'actual pax'],
+            'actual_cost': ['actual cost', 'spent', 'cost'],
+            'remark': ['remark', 'notes', 'comment'],
+        }
+        default_cols = {
+            'prog_name': 2, 'actual_pax': 6, 'actual_cost': 8, 'remark': 14
+        }
+        start_row, cols = self._find_header_and_cols(ws, key_patterns, 5, default_cols)
+
+        for r in range(start_row, ws.max_row + 1):
+            prog = str(ws.cell(r, cols.get('prog_name', 2)).value or '').strip()
+            if not prog:
+                continue
+
+            actual_pax = ws.cell(r, cols.get('actual_pax', 6)).value
+            actual_cost = ws.cell(r, cols.get('actual_cost', 8)).value
+            remark = str(ws.cell(r, cols.get('remark', 14)).value or '').strip()
+
+            line_domain = [('program_name', '=ilike', prog)]
+            if self.annual_plan_id:
+                line_domain.append(('plan_id', '=', self.annual_plan_id.id))
+
+            line = PlanLine.search(line_domain, limit=1)
+            if line:
+                write_vals = {}
+                if remark:
+                    write_vals['remark'] = remark
+                if actual_pax is not None and not str(actual_pax).startswith('='):
+                    try:
+                        write_vals['actual_participants'] = int(actual_pax)
+                    except (ValueError, TypeError):
+                        pass
+                if actual_cost is not None and not str(actual_cost).startswith('='):
+                    try:
+                        write_vals['actual_cost'] = float(actual_cost)
+                    except (ValueError, TypeError):
+                        pass
+                if write_vals:
+                    line.write(write_vals)
+                    updated += 1
+
+        return {'updated': updated}

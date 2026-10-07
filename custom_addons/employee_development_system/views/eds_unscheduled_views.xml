@@ -57,7 +57,8 @@
                 <form string="Unscheduled Training Request">
                     <header>
                         <button name="action_submit" string="Submit for Approval" type="object"
-                                class="oe_highlight" invisible="state != 'draft'"/>
+                                class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_lnd_approve" string="L&amp;D Approve" type="object"
                                 class="oe_highlight" invisible="state != 'submitted'"
                                 groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
@@ -70,7 +71,8 @@
                         <button name="action_reject" string="Reject" type="object"
                                 invisible="state not in ('submitted','lnd_approved','director_approved')"
                                 groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_print_form" string="Print Request Form (EDS-F-09)" type="object" icon="fa-print"/>
+                        <button name="action_print_form" string="Print Request Form (EDS-F-09)" type="object" icon="fa-print"
+                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>

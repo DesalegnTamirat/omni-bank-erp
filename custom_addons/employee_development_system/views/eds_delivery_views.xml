@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Session Attendance () ══════════════ -->
+        <!-- ══════════════ Session Attendance ══════════════ -->
 
         <record id="view_eds_session_attendance_list" model="ir.ui.view">
             <field name="name">eds.session.attendance.list</field>
@@ -59,7 +59,7 @@
                                 <field name="hours_attended" widget="float_time"/>
                             </group>
                         </group>
-                        <group string="Program Attendance ()">
+                        <group string="Program Attendance">
                             <field name="attendance_percentage" widget="progressbar"/>
                             <field name="meets_min_attendance"/>
                         </group>
@@ -80,7 +80,7 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_session_attendance_search"/>
         </record>
 
-        <!-- ══════════════ Training Materials () ══════════════ -->
+        <!-- ══════════════ Training Materials ══════════════ -->
 
         <record id="view_eds_material_list" model="ir.ui.view">
             <field name="name">eds.material.list</field>
@@ -147,7 +147,7 @@
                                 <field name="material_type"/>
                                 <field name="version"/>
                             </group>
-                            <group string="Approval ()">
+                            <group string="Approval">
                                 <field name="quality_state" widget="badge"/>
                                 <field name="approval_state" widget="badge"/>
                                 <field name="is_approved"/>
@@ -183,7 +183,7 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_material_search"/>
         </record>
 
-        <!-- ══════════════ Daily Feedback () ══════════════ -->
+        <!-- ══════════════ Daily Feedback ══════════════ -->
 
         <record id="view_eds_feedback_list" model="ir.ui.view">
             <field name="name">eds.feedback.list</field>
@@ -307,7 +307,7 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_assessment_search"/>
         </record>
 
-        <!-- ══════════════ International Training () ══════════════ -->
+        <!-- ══════════════ International Training ══════════════ -->
 
         <record id="view_eds_international_training_list" model="ir.ui.view">
             <field name="name">eds.international.training.list</field>
@@ -333,11 +333,14 @@
                 <form string="International Training">
                     <header>
                         <button name="action_submit" string="Submit for Approval" type="object"
-                                class="oe_highlight" invisible="approval_state != 'draft'"/>
+                                class="oe_highlight" invisible="approval_state != 'draft'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_approve" string="Approve" type="object"
-                                class="oe_highlight" invisible="approval_state != 'submitted'"/>
+                                class="oe_highlight" invisible="approval_state != 'submitted'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_complete" string="Complete" type="object"
-                                invisible="approval_state != 'approved'"/>
+                                invisible="approval_state != 'approved'"
+                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="approval_state" widget="statusbar"/>
                     </header>
                     <sheet>

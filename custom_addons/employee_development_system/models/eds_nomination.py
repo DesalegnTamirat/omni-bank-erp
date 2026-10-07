@@ -29,7 +29,7 @@ class EdsNomination(models.Model):
     session_id = fields.Many2one('eds.session', string='Session', required=True,
                                  ondelete='cascade', index=True, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True,
-                                  tracking=True)
+                                  index=True, tracking=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position', related='employee_id.job_position',
                                       readonly=True)
     department_id = fields.Many2one('hr.department', string='Department',
@@ -198,7 +198,7 @@ class EdsNomination(models.Model):
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Only draft nominations can be submitted.'))
-            rec._check_submission_rules()
+            rec._check_submission_rules
             rec.state = 'submitted'
             rec._notify(_('Nomination %s submitted for approval .') % rec.name)
             manager_user = rec.employee_id.parent_id.user_id if rec.employee_id.parent_id else False
@@ -434,7 +434,7 @@ class EdsEnrollment(models.Model):
                        default=lambda self: _('New'))
     session_id = fields.Many2one('eds.session', string='Session', required=True,
                                  ondelete='cascade', index=True)
-    employee_id = fields.Many2one('hr.employee', string='Employee', required=True)
+    employee_id = fields.Many2one('hr.employee', string='Employee', required=True, index=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position',
                                       related='employee_id.job_position', readonly=True)
     department_id = fields.Many2one('hr.department', string='Department',

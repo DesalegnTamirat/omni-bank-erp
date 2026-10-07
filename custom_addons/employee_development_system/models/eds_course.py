@@ -8,7 +8,7 @@ from odoo.exceptions import UserError, ValidationError
 class EdsCourse(models.Model):
     """Training program / course catalog entry (-013, ...013, ).
 
-    A course links to the approved competency framework () with a required
+    A course links to the approved competency framework with a required
     proficiency level per competency, and carries its curriculum version(s).
     """
     _name = 'eds.course'
@@ -73,7 +73,7 @@ class EdsCourse(models.Model):
 
     competency_line_ids = fields.One2many(
         'eds.course.competency.line', 'course_id', string='Competency Mapping',
-        help='Course-to-competency mapping with required proficiency ().')
+        help='Course-to-competency mapping with required proficiency.')
     curriculum_ids = fields.One2many('eds.curriculum', 'course_id', string='Curriculum Versions')
     current_curriculum_id = fields.Many2one(
         'eds.curriculum', string='Current Curriculum', compute='_compute_current_curriculum')
@@ -122,7 +122,7 @@ class EdsCourse(models.Model):
         string='Development Requests', compute='_compute_counts')
     curriculum_count = fields.Integer(string='Curriculums', compute='_compute_counts')
 
-    # Task 7: training materials with approval gate ()
+    # training materials with approval gate
     material_ids = fields.One2many('eds.material', 'course_id', string='Training Materials')
     material_count = fields.Integer(string='Materials', compute='_compute_counts')
 
@@ -133,16 +133,16 @@ class EdsCourse(models.Model):
         string='Expected Learning Outcomes & Behavioral Objectives',
         help='Auto-compiled from mapped competencies and their proficiency level behavioral indicators.')
 
-    # ── Training delivery sourcing recommendation () ─────────────────
+    # ── Training delivery sourcing recommendation ─────────────────
     recommended_source = fields.Selection([
         ('internal', 'Internal Delivery'),
         ('local_external', 'External Local Provider'),
         ('international', 'External International Provider'),
     ], string='Recommended Delivery Source', tracking=True,
-        help='Recommended by the L&D officer with justification ().')
+        help='Recommended by the L&D officer with justification.')
     sourcing_justification = fields.Text(
         string='Sourcing Justification',
-        help='Why this delivery source is recommended ().')
+        help='Why this delivery source is recommended.')
     sourcing_state = fields.Selection([
         ('draft', 'Not Recommended'),
         ('director_review', 'Director PPDD Review'),
@@ -163,9 +163,9 @@ class EdsCourse(models.Model):
             if rec.sourcing_state != 'draft':
                 raise UserError(_('The sourcing recommendation was already submitted.'))
             if not rec.recommended_source:
-                raise UserError(_('Select the recommended delivery source first ().'))
+                raise UserError(_('Select the recommended delivery source first.'))
             if not rec.sourcing_justification:
-                raise UserError(_('Enter the sourcing justification before submission ().'))
+                raise UserError(_('Enter the sourcing justification before submission.'))
             rec.sourcing_state = 'director_review'
             rec.message_post(body=_('Sourcing recommendation %s submitted for Director PPDD review '
                                     '().') % rec.recommended_source)
@@ -177,11 +177,11 @@ class EdsCourse(models.Model):
             if rec.sourcing_state != 'director_review':
                 raise UserError(_('Only recommendations under Director review can be decided.'))
             if not rec.sourcing_decision:
-                raise UserError(_('Record the Director PPDD decision first ().'))
+                raise UserError(_('Record the Director PPDD decision first.'))
             rec.write({'sourcing_state': 'decided',
                        'sourcing_decision_date': date.today(),
                        'sourcing_decided_by_id': self.env.user.id})
-            rec.message_post(body=_('Director PPDD decision for %s: %s ().')
+            rec.message_post(body=_('Director PPDD decision for %s: %s.')
                              % (rec.name, rec.sourcing_decision))
 
     @api.depends('curriculum_ids', 'curriculum_ids.state')
@@ -355,7 +355,7 @@ class EdsCourse(models.Model):
     def _require_manager(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('This step requires L&D Manager authority ().'))
+            raise UserError(_('This step requires L&D Manager authority.'))
 
 
 class EdsCourseCompetencyLine(models.Model):
@@ -429,7 +429,7 @@ class EdsCourseDevelopmentRequest(models.Model):
 
     Converted from approved TNA entries; carries an SLA deadline computed from the
     configurable working-day SLA (default 10 working days, ). On approval the
-    request converts to an `eds.course` with competency mapping lines ().
+    request converts to an `eds.course` with competency mapping lines.
     """
     _name = 'eds.course.development.request'
     _description = 'Course Development Request'
@@ -445,13 +445,13 @@ class EdsCourseDevelopmentRequest(models.Model):
         domain=[('state', 'in', ('approved', 'converted'))])
     course_id = fields.Many2one(
         'eds.course', string='Course', readonly=True,
-        help='Created when the request is approved and converted ().')
+        help='Created when the request is approved and converted.')
     assigned_officer_id = fields.Many2one(
         'res.users', string='Assigned Officer',
         default=lambda self: self.env.user, tracking=True)
     competency_gap_ids = fields.Many2many(
         'competency.competency', string='Competency Gaps',
-        help='Competencies to be covered, derived from the TNA needs ().')
+        help='Competencies to be covered, derived from the TNA needs.')
     target_job_ids = fields.Many2many('hr.job', string='Target Job Positions')
     required_proficiency = fields.Selection([
         ('1', 'Level 1 - Basic'),
@@ -526,7 +526,7 @@ class EdsCourseDevelopmentRequest(models.Model):
             if rec.state != 'draft':
                 raise UserError(_('Only draft requests can start development.'))
             rec.state = 'in_development'
-            rec.message_post(body=_('Development of %s started. SLA deadline: %s ().')
+            rec.message_post(body=_('Development of %s started. SLA deadline: %s.')
                              % (rec.name, rec.sla_deadline))
 
     def action_submit(self):
@@ -536,7 +536,7 @@ class EdsCourseDevelopmentRequest(models.Model):
             if not rec.expected_outcomes:
                 raise UserError(_('Expected learning outcomes are required before submission.'))
             rec.state = 'submitted'
-            rec.message_post(body=_('Development request %s submitted for approval ().')
+            rec.message_post(body=_('Development request %s submitted for approval.')
                              % rec.name)
 
     def action_approve(self):
@@ -573,7 +573,7 @@ class EdsCourseDevelopmentRequest(models.Model):
         for entry in self.tna_entry_ids:
             entry.write({'state': 'converted', 'converted_course_ref': course.code})
         self.message_post(
-            body=_('Course %s created from development request %s ().') % (course.code, self.name))
+            body=_('Course %s created from development request %s.') % (course.code, self.name))
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'eds.course',
@@ -581,7 +581,7 @@ class EdsCourseDevelopmentRequest(models.Model):
             'view_mode': 'form',
         }
 
-    # ── SLA escalation () ────────────────────────────────────────────
+    # ── SLA escalation ────────────────────────────────────────────
     @api.model
     def _cron_course_sla_check(self):
         """Daily: notify the L&D Team Leader when a development request breaches its SLA.
@@ -602,7 +602,7 @@ class EdsCourseDevelopmentRequest(models.Model):
             if req.last_reminder_date and (today - req.last_reminder_date).days < 7:
                 continue
             req.message_post(
-                body=_('SLA BREACHED (): Development request %s missed its SLA deadline of %s. '
+                body=_('SLA BREACHED: Development request %s missed its SLA deadline of %s. '
                        'Notify the L&D Team Leader for escalation.') % (req.name, req.sla_deadline),
                 partner_ids=partner_ids)
             req.last_reminder_date = today
@@ -611,4 +611,4 @@ class EdsCourseDevelopmentRequest(models.Model):
     def _require_manager(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('This step requires L&D Manager authority ().'))
+            raise UserError(_('This step requires L&D Manager authority.'))

@@ -58,7 +58,8 @@
                 <form string="Training Nomination">
                     <header>
                         <button name="action_submit" string="Submit for Approval" type="object"
-                                class="oe_highlight" invisible="state != 'draft'"/>
+                                class="oe_highlight" invisible="state != 'draft'"
+                                groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_line_manager_approve" string="Approve as Line Manager"
                                 type="object" invisible="state != 'submitted'"
                                 groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
@@ -75,12 +76,15 @@
                                 invisible="state not in ('submitted','line_manager_approved','lnd_approved')"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_withdraw" string="Withdraw" type="object"
-                                invisible="state not in ('draft','submitted','line_manager_approved','lnd_approved','approved')"/>
+                                invisible="state not in ('draft','submitted','line_manager_approved','lnd_approved','approved')"
+                                groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_employee_accept" string="Accept Nomination" type="object"
                                 class="oe_highlight"
-                                invisible="state != 'approved' or employee_id.user_id != uid or employee_confirmed != 'pending'"/>
+                                invisible="state != 'approved' or employee_id.user_id != uid or employee_confirmed != 'pending'"
+                                groups="employee_development_system.group_eds_employee"/>
                         <button name="action_employee_decline" string="Decline Nomination" type="object"
-                                invisible="state != 'approved' or employee_id.user_id != uid or employee_confirmed != 'pending'"/>
+                                invisible="state != 'approved' or employee_id.user_id != uid or employee_confirmed != 'pending'"
+                                groups="employee_development_system.group_eds_employee"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,line_manager_approved,lnd_approved,approved"/>
                     </header>
                     <sheet>
@@ -218,7 +222,8 @@
                 <form string="Session Enrollment">
                     <header>
                         <button name="action_cancel" string="Cancel Enrollment" type="object"
-                                invisible="state not in ('enrolled','waitlisted')"/>
+                                invisible="state not in ('enrolled','waitlisted')"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>

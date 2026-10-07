@@ -9,7 +9,9 @@
                 <field name="name"/>
                 <field name="fiscal_year"/>
                 <field name="category"/>
-                <field name="allocated"/>
+                <field name="total_estimated" sum="Total Estimated"/>
+                <field name="allocated" sum="Total Approved"/>
+                <field name="budget_variance" sum="Variance"/>
                 <field name="committed"/>
                 <field name="spent"/>
                 <field name="remaining"/>
@@ -36,17 +38,30 @@
                         <h1><field name="name" readonly="1" invisible="name == 'New'"/></h1>
                     </div>
                     <group>
-                        <group>
+                        <group string="Budget Classification">
                             <field name="fiscal_year"/>
                             <field name="category"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
-                        <group>
-                            <field name="allocated"/>
+                        <group string="Budget Allocation &amp; Variance">
+                            <field name="allocated" string="Approved Budget (ETB)"/>
+                            <field name="total_estimated" string="Estimated Total (Q1–Q4)"/>
+                            <field name="budget_variance" string="Variance (Approved − Estimated)"/>
                             <field name="committed"/>
                             <field name="spent"/>
                             <field name="remaining"/>
                             <field name="utilization_pct" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <group string="Quarterly Allocation Plan (July – June)">
+                        <group>
+                            <field name="q1_allocated"/>
+                            <field name="q2_allocated"/>
+                        </group>
+                        <group>
+                            <field name="q3_allocated"/>
+                            <field name="q4_allocated"/>
+                            <field name="unallocated"/>
                         </group>
                     </group>
                     <notebook>
@@ -55,8 +70,9 @@
                                 <list editable="bottom">
                                     <field name="course_id"/>
                                     <field name="session_id"/>
+                                    <field name="quarter"/>
                                     <field name="cost_type"/>
-                                    <field name="amount"/>
+                                    <field name="amount" sum="Total"/>
                                     <field name="status" widget="badge"/>
                                 </list>
                             </field>

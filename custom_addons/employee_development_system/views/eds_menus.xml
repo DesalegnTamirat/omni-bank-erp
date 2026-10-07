@@ -9,6 +9,16 @@
                   sequence="65"/>
 
         <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- 0. DASHBOARD                                                  -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <menuitem id="menu_eds_dashboard"
+                  name="Dashboard"
+                  parent="menu_eds_root"
+                  action="action_eds_dashboard"
+                  sequence="1"
+                  groups="employee_development_system.group_eds_employee"/>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
         <!-- 1. PLANNING & TNA                                             -->
         <!-- ══════════════════════════════════════════════════════════════ -->
         <menuitem id="menu_eds_planning"

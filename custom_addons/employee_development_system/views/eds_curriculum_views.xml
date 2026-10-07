@@ -54,7 +54,7 @@
                                 <field name="course_id" readonly="state != 'draft'"/>
                                 <field name="version" readonly="1"/>
                             </group>
-                            <group string="Approval SLA ()">
+                            <group string="Approval SLA">
                                 <field name="review_sla_deadline" readonly="1"/>
                                 <field name="sla_breached"/>
                                 <field name="approved_by_id"/>

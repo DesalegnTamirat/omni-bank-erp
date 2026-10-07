@@ -137,7 +137,7 @@ class EdsVenueBooking(models.Model):
 
 
 class EdsBatch(models.Model):
-    """Cohort / batch grouping sessions of a course ()."""
+    """Cohort / batch grouping sessions of a course."""
     _name = 'eds.batch'
     _description = 'Training Batch / Cohort'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -199,10 +199,10 @@ class EdsSession(models.Model):
     """A scheduled delivery of a course (-023, ...022).
 
     Carries the venue, trainers (constrained to the trainer register with matching
-    competencies and availability - Task 4) and dates; enforces venue and trainer
+    competencies and availability - ) and dates; enforces venue and trainer
     conflict checks (/020), and notifies participants on reschedule or
     cancellation . Sessions are created from annual-plan lines on
-    publication () and feed the planned-vs-actual variance ().
+    publication and feed the planned-vs-actual variance.
     """
     _name = 'eds.session'
     _description = 'Training Session'
@@ -218,7 +218,7 @@ class EdsSession(models.Model):
     plan_line_id = fields.Many2one('eds.annual.plan.line', string='Annual Plan Line',
                                    ondelete='set null', index=True,
                                    help='Links the session to the annual plan for variance '
-                                        'monitoring ().')
+                                        'monitoring.')
     batch_id = fields.Many2one('eds.batch', string='Batch / Cohort', ondelete='set null')
     date_start = fields.Datetime(string='Start Date', required=True, tracking=True)
     date_end = fields.Datetime(string='End Date', required=True, tracking=True)
@@ -230,7 +230,7 @@ class EdsSession(models.Model):
     trainer_ids = fields.Many2many(
         'eds.trainer', 'eds_session_trainer_rel', 'session_id', 'trainer_id',
         string='Trainers', tracking=True,
-        help='Only active trainers from the register may be assigned (Task 4 register).')
+        help='Only active trainers from the register may be assigned .')
     trainer_count = fields.Integer(string='Trainers', compute='_compute_trainer_count', store=True)
     capacity = fields.Integer(
         string='Capacity', default=lambda self: self._get_default_capacity(),
@@ -294,14 +294,14 @@ class EdsSession(models.Model):
     booking_id = fields.Many2one('eds.venue.booking', string='Current Booking',
                                  compute='_compute_booking_id')
 
-    # ── Task 7: attendance & delivery tracking (/041/045) ─────────────
+    # ── attendance & delivery tracking (/041/045) ──
     attendance_ids = fields.One2many(
         'eds.session.attendance', 'session_id', string='Attendance Records')
     attendance_count = fields.Integer(string='Attendance', compute='_compute_delivery_counts')
     attendance_rate = fields.Float(
         string='Session Attendance %', compute='_compute_attendance_rate', store=True,
         digits=(5, 2),
-        help='Attended / recorded participants for this session ().')
+        help='Attended / recorded participants for this session.')
     feedback_ids = fields.One2many('eds.feedback', 'session_id', string='Daily Feedback')
     feedback_count = fields.Integer(string='Feedback', compute='_compute_delivery_counts')
     assessment_ids = fields.One2many('eds.assessment', 'session_id', string='Assessments')
@@ -328,7 +328,7 @@ class EdsSession(models.Model):
 
     @api.model
     def _get_default_capacity(self):
-        """Default class size from EDS settings (BRD: 25-30, )."""
+        """Default class size from EDS settings (BRD §4.2: 25–30 per cohort)."""
         return self._get_int_param('eds.default_class_capacity', 30)
 
     @api.depends('date_start', 'date_end', 'venue_id', 'trainer_ids', 'status')
@@ -354,7 +354,7 @@ class EdsSession(models.Model):
         elif operator in ('!=', 'not ilike', 'not like'):
             matched = [s.id for s in sessions if s.conflict_flag != target]
         else:
-            raise NotImplementedError(_('Operator %s is not supported on conflict_flag.') % operator)
+            raise UserError(_('Operator %s is not supported on conflict_flag.') % operator)
         return [('id', 'in', matched)]
 
     @api.depends('booking_ids', 'booking_ids.state')
@@ -398,7 +398,7 @@ class EdsSession(models.Model):
 
     @api.depends('attendance_ids', 'attendance_ids.attended')
     def _compute_attendance_rate(self):
-        """Session-level attendance % ()."""
+        """Session-level attendance %."""
         for rec in self:
             total = len(rec.attendance_ids)
             rec.attendance_rate = (
@@ -550,7 +550,7 @@ class EdsSession(models.Model):
         return conflicting_sessions.mapped('trainer_ids')
 
     def _get_blocked_trainer_availability(self):
-        """Trainers whose availability register blocks this window (Task 4 availability)."""
+        """Trainers whose availability register blocks this window ."""
         self.ensure_one()
         if not self.trainer_ids or not self.date_start or not self.date_end:
             return self.env['eds.trainer']
@@ -633,7 +633,7 @@ class EdsSession(models.Model):
                     'date_end': rec.date_end,
                     'state': 'confirmed',
                 })
-            rec.message_post(body=_('Session %s confirmed and scheduled ().') % rec.name)
+            rec.message_post(body=_('Session %s confirmed and scheduled.') % rec.name)
 
     def action_start(self):
         """Scheduled -> Ongoing: delivery has begun.
@@ -795,7 +795,7 @@ class EdsSession(models.Model):
         }
 
     def action_nominate(self):
-        """Open the "Nominate for Session" wizard pre-filled with this session ()."""
+        """Open the "Nominate for Session" wizard pre-filled with this session."""
         self.ensure_one()
         return {
             'name': _('Nominate for Session'),
@@ -820,7 +820,7 @@ class EdsSession(models.Model):
             'context': {'default_session_id': self.id},
         }
 
-    # ── Task 7: attendance & delivery helpers (/041/045) ─────────────
+    # ── attendance & delivery helpers (/041/045) ──
     def _check_material_approval(self):
         """a session whose course has materials cannot be confirmed until
         at least one material version is approved (quality + Director PPDD)."""
@@ -834,7 +834,7 @@ class EdsSession(models.Model):
                 % self.course_id.name)
 
     def _ensure_attendance_records(self):
-        """Auto-create the attendance sheet for all enrolled participants ()."""
+        """Auto-create the attendance sheet for all enrolled participants."""
         self.ensure_one()
         existing = self.attendance_ids.mapped('employee_id')
         enrolled = self.enrollment_ids.filtered(lambda e: e.state == 'enrolled')

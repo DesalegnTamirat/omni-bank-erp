@@ -56,7 +56,7 @@ class EdsAttendanceImport(models.TransientModel):
             raise ValidationError(_("Failed to open Excel workbook: %s") % str(e))
 
         AttendanceModel = self.env['eds.session.attendance']
-        EmployeeModel = self.env['hr.employee']
+        EmployeeModel = self.env['hr.employee'].sudo()
         SessionModel = self.env['eds.session']
 
         success_count = 0
@@ -217,7 +217,7 @@ class EdsAttendanceImport(models.TransientModel):
         skipped_count = 0
         errors = []
         AttendanceModel = self.env['eds.session.attendance']
-        EmployeeModel = self.env['hr.employee']
+        EmployeeModel = self.env['hr.employee'].sudo()
         SessionModel = self.env['eds.session']
 
         rows = list(reader)

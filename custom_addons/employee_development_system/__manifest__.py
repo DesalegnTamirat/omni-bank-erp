@@ -10,26 +10,19 @@
     'website': 'https://www.bunnabanksc.com',
     'license': 'LGPL-3',
     'description': """
-Employee Development System (EDS) - Classroom Training Management
-=================================================================
-Bunna Bank ERP HR Upgrade - Requirement2 Part 2.
-
-Complete implementation of all 15 weighted delivery tasks:
-  - [DONE] Task 1 - TNA Capture & Configuration (cycle + entries)
-  - [DONE] Task 2 - TNA Consolidation, Prioritization & Approval Workflow
-  - [DONE] Task 3 - Training Program & Course Catalog Setup
-  - [DONE] Task 4 - Trainer Profile & Qualification Management
-  - [DONE] Task 5 - Session Scheduling & Venue/Resource Booking
-  - [DONE] Task 6 - Nomination, Approval & Enrollment Workflow
-  - [DONE] Task 7 - Attendance & Delivery Tracking
-  - [DONE] Task 8 - Evaluation Engine - Level 1 & 2
-  - [DONE] Task 9 - Evaluation Engine - Level 3 & 4
-  - [DONE] Task 10 - Completion & Certification Engine
-  - [DONE] Task 11 - Budget & Cost Tracking
-  - [DONE] Task 12 - Reporting & Dashboards
-  - [DONE] Task 13 - System Integrations (LMS, PMS, Payroll, Finance)
-  - [DONE] Task 14 - Staff Education & Sponsorship Module
-  - [DONE] Task 15 - Internship Facilitation Module
+Employee Development System (EDS) - Enterprise L&D Management
+==============================================================
+Comprehensive banking Learning & Development management suite for Bunna Bank:
+  - Training Needs Analysis (TNA) capture, consolidation, and weighted prioritization
+  - Annual L&D Plan & Calendar creation, quarterly budgeting, and plan-vs-actual variance tracking
+  - Course catalog, modular curriculum architecture, and external provider register
+  - Trainer profile, qualification scoring, and venue resource scheduling
+  - Session scheduling, nomination workflows, automated rosters, and QR attendance
+  - Kirkpatrick 4-Level evaluation engine (Reaction, Learning, Behavior, ROI)
+  - Dynamic completion certificate generation with bank watermark, portal downloads, and verification
+  - External training provider performance appraisals and strategic learning partnerships
+  - Employee sponsorship programs, higher education assistance, and internship clearance
+  - Seamless system integrations with LMS, PMS, Payroll, and General Ledger
     """,
     'depends': [
         'base',
@@ -49,6 +42,7 @@ Complete implementation of all 15 weighted delivery tasks:
         'data/eds_cron.xml',
         'data/eds_audit_rules.xml',
         'views/res_config_settings_views.xml',
+        'views/eds_dashboard_views.xml',
         'views/eds_consolidation_views.xml',
         'wizards/eds_consolidation_wizard_views.xml',
         'views/eds_curriculum_views.xml',

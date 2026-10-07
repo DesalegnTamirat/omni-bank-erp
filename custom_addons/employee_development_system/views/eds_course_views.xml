@@ -350,7 +350,7 @@
                                 <field name="assigned_officer_id"/>
                                 <field name="course_id" readonly="1"/>
                             </group>
-                            <group string="SLA ()">
+                            <group string="SLA">
                                 <field name="sla_deadline" readonly="1"/>
                                 <field name="sla_breached"/>
                             </group>

@@ -29,7 +29,8 @@
                     <button name="action_approve" string="Approve Sponsorship" type="object" class="oe_highlight" invisible="state != 'eligibility_check'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_activate_bond" string="Activate Bond Agreement" type="object" class="oe_highlight" invisible="state != 'approved'" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_mark_breached" string="Mark Bond Breached" type="object" class="btn-danger" invisible="state != 'active'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_print_application_form" string="Print Application &amp; Matrix (EDS-F-15)" type="object" icon="fa-print"/>
+                    <button name="action_print_application_form" string="Print Application &amp; Matrix (EDS-F-15)" type="object" icon="fa-print"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,eligibility_check,approved,active,completed"/>
                 </header>
                 <sheet>
@@ -131,7 +132,8 @@
         <field name="arch" type="xml">
             <form string="Staff Education Assistance Request">
                 <header>
-                    <button name="action_submit" string="Submit Request" type="object" class="oe_highlight" invisible="approval_state != 'draft'"/>
+                    <button name="action_submit" string="Submit Request" type="object" class="oe_highlight" invisible="approval_state != 'draft'"
+                            groups="employee_development_system.group_eds_employee"/>
                     <button name="action_dept_approve" string="Dept Head Approve" type="object" class="oe_highlight" invisible="approval_state != 'submitted'" groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_ppdd_validate" string="PPDD Validate" type="object" class="oe_highlight" invisible="approval_state != 'dept_approved'" groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_cpco_approve" string="CPCO Approve" type="object" class="oe_highlight" invisible="approval_state != 'ppdd_validated'" groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>

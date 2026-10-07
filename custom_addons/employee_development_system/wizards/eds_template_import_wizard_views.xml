@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <form string="Import EDS Business Templates (2026/27)">
                 <div class="alert alert-info mb-3" role="alert">
-                    Upload the official <strong>EDS_LD_Templates_2026-27.xlsx</strong> workbook or individual sheet data. The system will auto-import TNA entries, Curriculum &amp; Courses, Annual Plan Calendar lines, and Provider Registers.
+                    Upload the official <strong>EDS_LD_Templates_2026-27.xlsx</strong> workbook or individual sheet data. The system will auto-import TNA entries, Curriculum &amp; Courses, Annual Plan Calendar lines, Provider Registers, Annual Budgets, and Plan vs Actual tracking.
                 </div>
                 <group>
                     <group>
@@ -16,7 +16,7 @@
                         <field name="fiscal_year"/>
                     </group>
                     <group>
-                        <field name="annual_plan_id" options="{'no_create': True}" invisible="template_type not in ('auto', 'calendar')"/>
+                        <field name="annual_plan_id" options="{'no_create': True}" invisible="template_type not in ('auto', 'calendar', 'variance')"/>
                         <field name="tna_cycle_id" options="{'no_create': True}" invisible="template_type not in ('auto', 'tna')"/>
                     </group>
                 </group>

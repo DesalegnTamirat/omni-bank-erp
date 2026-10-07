@@ -35,7 +35,7 @@ class TestEdsSponsorship(TransactionCase):
             'bond_start_date': start,
             'bond_end_date': end,
             'recovery_policy': policy,
-            'bond_agreement': base64.b64encode(b'Dummy agreement content'),
+            'bond_agreement': base64.b64encode(b'Sample bond agreement content for unit testing'),
             'bond_filename': 'agreement.pdf',
         })
         sponsorship.write({'state': 'active'})

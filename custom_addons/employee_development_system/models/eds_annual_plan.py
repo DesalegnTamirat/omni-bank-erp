@@ -10,11 +10,11 @@ class EdsAnnualPlan(models.Model):
 
     The approved TNA needs and approved curricula are assembled into a draft annual
     plan (/) within the calendar SLA, routed through the
-    Director PPDD -> CPCO -> SMC approval chain and published (). Publishing
+    Director PPDD -> CPCO -> SMC approval chain and published. Publishing
     auto-activates the downstream sessions so nominations can start. Approved
     unscheduled training requests amend the published plan as addenda
     (, /076). Delivery is monitored with planned-vs-actual variance
-    per line ().
+    per line.
     """
     _name = 'eds.annual.plan'
     _description = 'Annual L&D Plan & Calendar'
@@ -36,7 +36,7 @@ class EdsAnnualPlan(models.Model):
                                          readonly=True)
     execution_rate = fields.Float(
         string='Execution Rate (%)', compute='_compute_execution_rate', store=True,
-        help='Share of plan lines whose sessions have been delivered ().')
+        help='Share of plan lines whose sessions have been delivered.')
     calendar_generation_date = fields.Date(string='Calendar Generated On', readonly=True)
     calendar_sla_deadline = fields.Date(
         string='Calendar SLA Deadline', compute='_compute_calendar_sla', store=True,
@@ -52,7 +52,7 @@ class EdsAnnualPlan(models.Model):
         ('amended', 'Amended'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    # Segregation of duties (): reviewer != endorser != approver
+    # Segregation of duties: reviewer != endorser != approver
     reviewer_id = fields.Many2one('res.users', string='Reviewer (Director PPDD)', tracking=True)
     endorser_id = fields.Many2one('res.users', string='Endorser (CPCO)', tracking=True)
     approver_id = fields.Many2one('res.users', string='Approver (SMC)', tracking=True)
@@ -192,7 +192,7 @@ class EdsAnnualPlan(models.Model):
         created = len(new_lines)
         self.calendar_generation_date = date.today()
         self.message_post(
-            body=_('Calendar generated for %s - %d programs added. SLA deadline: %s ().')
+            body=_('Calendar generated for %s - %d programs added. SLA deadline: %s.')
             % (self.name, created, self.calendar_sla_deadline))
         return {
             'type': 'ir.actions.act_window',
@@ -222,15 +222,15 @@ class EdsAnnualPlan(models.Model):
             })]})
         return plan
 
-    # ── Approval chain with segregation of duties () ─────────────────
+    # ── Approval chain with segregation of duties ─────────────────
     def _check_segregation(self):
-        """Reviewer != Endorser != Approver ()."""
+        """Reviewer != Endorser != Approver."""
         self.ensure_one()
         users = [self.reviewer_id.id, self.endorser_id.id, self.approver_id.id]
         present = [u for u in users if u]
         if len(present) != len(set(present)):
             raise ValidationError(_(
-                'Segregation of Duties Violation (): Reviewer, Endorser and '
+                'Segregation of Duties Violation: Reviewer, Endorser and '
                 'Approver must all be different individuals.'))
 
     def _log_approval_step(self, state_from, state_to, comment=''):
@@ -244,7 +244,7 @@ class EdsAnnualPlan(models.Model):
     def _require_manager(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('This approval step requires L&D Manager authority ().'))
+            raise UserError(_('This approval step requires L&D Manager authority.'))
 
     def action_submit_director(self):
         """Draft -> Director PPDD Review."""
@@ -308,7 +308,7 @@ class EdsAnnualPlan(models.Model):
             line._create_default_session()
 
     def action_amend(self):
-        """Published -> Amended: reopens the plan for authorized addenda ()."""
+        """Published -> Amended: reopens the plan for authorized addenda."""
         for rec in self:
             rec._require_manager()
             if rec.state != 'published':
@@ -316,7 +316,7 @@ class EdsAnnualPlan(models.Model):
             rec.state = 'amended'
             rec._log_approval_step('published', 'amended', _('Plan reopened for addenda'))
             rec.message_post(body=_('Annual plan %s reopened for amendments - approved unscheduled '
-                                    'requests will be appended as addenda ().') % rec.name)
+                                    'requests will be appended as addenda.') % rec.name)
 
     def action_re_publish(self):
         """Amended -> Published: closes the amendment window again."""
@@ -344,7 +344,7 @@ class EdsAnnualPlan(models.Model):
     def unlink(self):
         for rec in self:
             if rec.state in ('published', 'amended'):
-                raise UserError(_('Published/amended annual plans cannot be deleted ().'))
+                raise UserError(_('Published/amended annual plans cannot be deleted.'))
             if rec.approval_history_ids:
                 rec.approval_history_ids.with_context(eds_bypass_history_guard=True).unlink()
         return super().unlink()
@@ -442,11 +442,30 @@ class EdsAnnualPlanLine(models.Model):
     session_count = fields.Integer(string='Sessions', compute='_compute_session_count')
     planned_vs_actual = fields.Float(
         string='Planned vs Actual (%)', compute='_compute_planned_vs_actual', store=True,
-        help='Percentage of this program’s sessions that have actually been delivered '
-             '().')
+        help='Percentage of this program’s sessions that have actually been delivered.')
+
+    # Plan vs Actual Performance Tracking (aligned with Plan_vs_Actual template)
+    actual_participants = fields.Integer(
+        string='Actual Participants', compute='_compute_actual_metrics', store=True)
+    participant_variance = fields.Integer(
+        string='Participant Variance (Planned − Actual)', compute='_compute_actual_metrics', store=True)
+    actual_cost = fields.Monetary(
+        string='Actual Cost (ETB)', currency_field='budget_currency_id',
+        compute='_compute_actual_metrics', store=True)
+    cost_variance = fields.Monetary(
+        string='Cost Variance (Planned − Actual)', currency_field='budget_currency_id',
+        compute='_compute_actual_metrics', store=True)
+    cost_utilization_pct = fields.Float(
+        string='Cost Utilisation %', compute='_compute_actual_metrics', store=True)
+    actual_start_date = fields.Date(
+        string='Actual Start Date', compute='_compute_actual_metrics', store=True)
+    actual_end_date = fields.Date(
+        string='Actual End Date', compute='_compute_actual_metrics', store=True)
+    remark = fields.Char(string='Remark')
+
     is_addendum = fields.Boolean(
         string='Addendum', default=False,
-        help='Added through an approved unscheduled training request (/076).')
+        help='Added through an approved unscheduled training request.')
     notes = fields.Text(string='Notes')
 
     @api.depends('scheduled_date', 'scheduled_month')
@@ -515,6 +534,41 @@ class EdsAnnualPlanLine(models.Model):
             rec.planned_vs_actual = round(
                 len(rec.session_ids.filtered(lambda s: s.status == 'completed')) * 100.0
                 / len(rec.session_ids), 2) if rec.session_ids else 0.0
+
+    @api.depends('session_ids', 'session_ids.enrollment_ids', 'session_ids.enrollment_ids.state',
+                 'session_ids.date_start', 'session_ids.date_end', 'planned_participants', 'budget_allocated')
+    def _compute_actual_metrics(self):
+        EdsCost = self.env['eds.cost']
+        for rec in self:
+            sessions = rec.session_ids
+            # Calculate actual participants across sessions
+            actual_pax = 0
+            start_dates = []
+            end_dates = []
+            for s in sessions:
+                # count attended or confirmed enrollments
+                pax_count = len(s.enrollment_ids.filtered(lambda e: e.state in ('attended', 'confirmed')))
+                actual_pax += pax_count
+                if s.date_start:
+                    start_dates.append(s.date_start.date())
+                if s.date_end:
+                    end_dates.append(s.date_end.date())
+
+            rec.actual_participants = actual_pax
+            rec.participant_variance = (rec.planned_participants or 0) - actual_pax
+
+            # Aggregate actual session costs from eds.cost
+            actual_spent = 0.0
+            if sessions:
+                costs = EdsCost.search([('session_id', 'in', sessions.ids), ('payment_state', 'in', ('committed', 'paid'))])
+                actual_spent = sum(costs.mapped('amount'))
+
+            rec.actual_cost = actual_spent
+            rec.cost_variance = (rec.budget_allocated or 0.0) - actual_spent
+            rec.cost_utilization_pct = (actual_spent / rec.budget_allocated * 100.0) if rec.budget_allocated > 0 else 0.0
+
+            rec.actual_start_date = min(start_dates) if start_dates else False
+            rec.actual_end_date = max(end_dates) if end_dates else False
 
     @api.onchange('course_id')
     def _onchange_course_id(self):

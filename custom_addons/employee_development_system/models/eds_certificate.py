@@ -155,6 +155,32 @@ class EdsCertificate(models.Model):
         return super(EdsCertificate, self).create(vals_list)
 
     def _compute_eligibility(self):
+        # Pre-fetch rules in batch
+        all_rules = self.env['eds.certificate.rule'].sudo().search([('active', '=', True)])
+        rules_by_category = {r.category: r for r in all_rules}
+
+        # Pre-fetch attendance and level2 evaluations for all records in batch
+        session_emp_pairs = [(rec.session_id.id, rec.employee_id.id) for rec in self if rec.session_id and rec.employee_id]
+        attendance_map = {}
+        l2_map = {}
+
+        if session_emp_pairs:
+            session_ids = list({s_id for s_id, _ in session_emp_pairs})
+            emp_ids = list({e_id for _, e_id in session_emp_pairs})
+            attendances = self.env['eds.session.attendance'].sudo().search([
+                ('session_id', 'in', session_ids),
+                ('employee_id', 'in', emp_ids),
+            ])
+            for att in attendances:
+                attendance_map[(att.session_id.id, att.employee_id.id)] = att
+
+            l2_evals = self.env['eds.evaluation.level2'].sudo().search([
+                ('session_id', 'in', session_ids),
+                ('employee_id', 'in', emp_ids),
+            ])
+            for l2 in l2_evals:
+                l2_map[(l2.session_id.id, l2.employee_id.id)] = l2
+
         for rec in self:
             if not rec.session_id or not rec.employee_id:
                 rec.is_eligible = False
@@ -162,21 +188,15 @@ class EdsCertificate(models.Model):
                 continue
 
             category = rec.course_id.category if rec.course_id else 'developmental'
-            rule = self.env['eds.certificate.rule'].sudo().search([('category', '=', category), ('active', '=', True)], limit=1)
+            rule = rules_by_category.get(category)
             min_att = rule.min_attendance_pct if rule else 80.0
             req_l2 = rule.require_level2_pass if rule else True
             min_l2 = rule.min_level2_score if rule else 60.0
 
-            attendance = self.env['eds.session.attendance'].sudo().search([
-                ('session_id', '=', rec.session_id.id),
-                ('employee_id', '=', rec.employee_id.id)
-            ], limit=1)
-            att_pct = attendance.attendance_percentage if attendance else (100.0 if attendance and attendance.attended else 0.0)
+            attendance = attendance_map.get((rec.session_id.id, rec.employee_id.id))
+            att_pct = attendance.attendance_percentage if attendance else 0.0
 
-            l2_eval = self.env['eds.evaluation.level2'].sudo().search([
-                ('session_id', '=', rec.session_id.id),
-                ('employee_id', '=', rec.employee_id.id)
-            ], limit=1)
+            l2_eval = l2_map.get((rec.session_id.id, rec.employee_id.id))
             post_score = l2_eval.post_score if l2_eval else 0.0
             l2_is_pass = (l2_eval.passed if l2_eval else False) or (post_score >= min_l2)
 

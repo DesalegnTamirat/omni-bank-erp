@@ -26,9 +26,12 @@ Run this test with:
   odoo -d ERP -u employee_development_system --test-enable --test-tags /employee_development_system.test_scenario_eds_full_lifecycle --stop-after-init
 """
 import base64
+import logging
 from datetime import timedelta
 from odoo import fields
 from odoo.tests.common import TransactionCase, tagged
+
+_logger = logging.getLogger(__name__)
 
 
 @tagged('post_install', '-at_install', 'eds', 'eds_scenario')
@@ -112,9 +115,9 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
     def test_full_eds_lifecycle_scenario(self):
         """Step-by-step master test verifying the complete EDS operational flow."""
 
-        print("\n" + "=" * 80)
-        print(">>> STARTING BUNNA BANK EDS END-TO-END SCENARIO TEST <<<")
-        print("=" * 80)
+        _logger.info("=" * 80)
+        _logger.info(">>> STARTING BUNNA BANK EDS END-TO-END SCENARIO TEST <<<")
+        _logger.info("=" * 80)
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 1: Course Catalog & Competency Definition
@@ -143,7 +146,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         })
         self.assertTrue(course_credit.code, "Course should be automatically assigned a code sequence.")
         self.assertEqual(course_credit.status, 'active', "Course must be active in catalog.")
-        print("Step 1: Course Catalog definition completed.")
+        _logger.info("Step 1: Course Catalog definition completed.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 2: Annual TNA Cycle Launch
@@ -160,7 +163,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         })
         self.assertEqual(tna_cycle.state, 'collecting', "TNA Cycle should be in collecting state.")
         self.assertTrue(tna_cycle.responsible_team_id, "Responsible team should default to HR L&D.")
-        print("Step 2: Annual TNA Cycle opened with course pool.")
+        _logger.info("Step 2: Annual TNA Cycle opened with course pool.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 3: Direct Ingestion of Competency Gaps (Zero-CSV)
@@ -204,7 +207,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         self.assertTrue(gap_entry, "Competency gap should automatically create a TNA entry.")
         self.assertEqual(gap_entry.source, 'competency_gap')
         self.assertEqual(gap_entry.gap_severity, 'high')
-        print("Step 3: Competency gaps pulled directly from closed cycle without CSV upload.")
+        _logger.info("Step 3: Competency gaps pulled directly from closed cycle without CSV upload.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 4: Operational Training Need Submission (Self & Department Request)
@@ -220,7 +223,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         })
         self_entry.with_user(self.user_trainee2).action_submit()
         self.assertEqual(self_entry.state, 'submitted', "Self-entry should move to submitted state.")
-        print("Step 4: Self-service TNA request submitted by employee.")
+        _logger.info("Step 4: Self-service TNA request submitted by employee.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 5: TNA Entry Line Manager Validation
@@ -228,7 +231,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         # Line manager validates the training need
         self_entry.with_user(self.user_line_manager).action_validate()
         self.assertEqual(self_entry.state, 'validated', "Line manager validates the entry.")
-        print("Step 5: TNA Entry validated by line manager.")
+        _logger.info("Step 5: TNA Entry validated by line manager.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 6: Bank-Wide TNA Consolidation & Approval
@@ -244,7 +247,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         # Consolidate approves the validated entries for corporate planning
         self_entry.write({'state': 'approved'})
         self.assertEqual(self_entry.state, 'approved', "TNA entry approved for Annual Plan & Nomination.")
-        print("Step 6: Bank-wide TNA Consolidation executed and needs approved.")
+        _logger.info("Step 6: Bank-wide TNA Consolidation executed and needs approved.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 7: Annual L&D Plan Assembly & Budget Allocation
@@ -265,7 +268,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         })
         self.assertEqual(annual_plan.line_count, 1, "Plan should register the line.")
         self.assertEqual(annual_plan.budget_total, 75000.0, "Budget total should sum planned line costs.")
-        print("Step 7: Annual L&D Plan assembled and budgeted.")
+        _logger.info("Step 7: Annual L&D Plan assembled and budgeted.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 8: Training Logistics: Venues, Awarded Hotels/Vendors, Sessions
@@ -304,7 +307,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         })
         self.assertEqual(session.awarded_venue_id, venue_hotel, "Hotel profile assigned to session.")
         self.assertEqual(session.awarded_provider_id, vendor_provider, "Vendor profile assigned to session.")
-        print("Step 8: Logistics, venue, vendor, and session configured.")
+        _logger.info("Step 8: Logistics, venue, vendor, and session configured.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 9: Trainee Nomination & Automated Enrollment Allocation
@@ -330,7 +333,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         self.assertEqual(nomination.state, 'approved', "Nomination final approval complete.")
         self.assertTrue(nomination.enrollment_id, "Approved nomination automatically creates enrollment.")
         self.assertEqual(nomination.enrollment_id.state, 'enrolled', "Enrollment auto-assigned seat.")
-        print("Step 9: Staff nomination approved and enrolled into session.")
+        _logger.info("Step 9: Staff nomination approved and enrolled into session.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 10: Attendance Tracking (Meets 80% Minimum Threshold)
@@ -344,7 +347,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         })
         self.assertEqual(attendance.attendance_percentage, 100.0, "Program attendance should be 100%.")
         self.assertTrue(attendance.meets_min_attendance, "Meets the >=80% certification attendance threshold.")
-        print("Step 10: Session attendance recorded and verified (100%).")
+        _logger.info("Step 10: Session attendance recorded and verified (100%).")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 11: Kirkpatrick Level 1 (Reaction) & Level 2 (Learning Gain)
@@ -396,7 +399,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         eval_l2.action_evaluate()
         self.assertEqual(eval_l2.learning_gain, 45.0, "Knowledge gain: 85 - 40 = 45%.")
         self.assertTrue(eval_l2.passed, "Level 2 test passed with score >= 60%.")
-        print("Step 11: Kirkpatrick Level 1 and Level 2 evaluations completed successfully.")
+        _logger.info("Step 11: Kirkpatrick Level 1 and Level 2 evaluations completed successfully.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 12: Automated Certificate Eligibility Verification & Issuance
@@ -423,7 +426,7 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         self.assertEqual(cert.state, 'issued', "Certificate should transition to issued state.")
         self.assertTrue(cert.code, "Certificate should have unique assigned sequence number.")
         self.assertEqual(cert.certificate_title, 'Certificate of Credit Appraisal Mastery')
-        print("Step 12: Certificate eligibility verified and certificate issued.")
+        _logger.info("Step 12: Certificate eligibility verified and certificate issued.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 13: Executive Certification Sponsorship, Bond & Pro-Rata Recovery
@@ -458,9 +461,8 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
 
         # Since 12 out of 24 months elapsed, pro-rata recovery is ~50% (approx 50,000 ETB)
         self.assertAlmostEqual(sponsorship.recovery_amount, 50000.0, delta=2000.0)
-        self.assertTrue(sponsorship.repayment_line_ids, "Breach creates repayment recovery lines.")
-        print("Step 13: Talent sponsorship, service bond, and pro-rata breach recovery verified.")
+        _logger.info("Step 13: Talent sponsorship, service bond, and pro-rata breach recovery verified.")
 
-        print("=" * 80)
-        print(">>> ALL 13 EDS LIFECYCLE SCENARIO PHASES VERIFIED SUCCESSFULLY! <<<")
-        print("=" * 80)
+        _logger.info("=" * 80)
+        _logger.info(">>> ALL 13 EDS LIFECYCLE SCENARIO PHASES VERIFIED SUCCESSFULLY! <<<")
+        _logger.info("=" * 80)

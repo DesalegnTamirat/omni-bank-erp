@@ -44,7 +44,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Venue Requirement Specification () ══════════════ -->
+        <!-- ══════════════ Venue Requirement Specification ══════════════ -->
 
         <record id="view_eds_venue_requirement_list" model="ir.ui.view">
             <field name="name">eds.venue.requirement.list</field>
@@ -76,7 +76,8 @@
                         <button name="action_return_draft" string="Return to Draft" type="object"
                                 invisible="state != 'submitted'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_print_vrs" string="Print VRS Form (EDS-F-05)" type="object" icon="fa-print"/>
+                        <button name="action_print_vrs" string="Print VRS Form (EDS-F-05)" type="object" icon="fa-print"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,submitted,director_approved,rfp_initiated"/>
                     </header>
@@ -225,7 +226,7 @@
                     </header>
                     <sheet>
                         <group>
-                            <group string="Registration ()">
+                            <group string="Registration">
                                 <field name="name" readonly="1"/>
                                 <field name="rfp_id"/>
                                 <field name="provider_id"/>
@@ -411,7 +412,7 @@
                                 <field name="venue_requirement_id"/>
                                 <field name="submission_deadline"/>
                             </group>
-                            <group string="Distribution ()">
+                            <group string="Distribution">
                                 <field name="provider_ids" widget="many2many_tags"/>
                                 <field name="min_providers" readonly="1"/>
                                 <field name="min_providers_met"/>
@@ -450,7 +451,7 @@
                                 </field>
                             </page>
                         </notebook>
-                        <group string="Award ()" invisible="state != 'evaluation'">
+                        <group string="Award" invisible="state != 'evaluation'">
                             <field name="awarded_proposal_id"
                                    domain="[('rfp_id', '=', id), ('state', '=', 'evaluated')]"/>
                         </group>
@@ -467,7 +468,7 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_rfp_search"/>
         </record>
 
-        <!-- ══════════════ Training Contract () ══════════════ -->
+        <!-- ══════════════ Training Contract ══════════════ -->
 
         <record id="view_eds_training_contract_list" model="ir.ui.view">
             <field name="name">eds.training.contract.list</field>
@@ -530,7 +531,7 @@
                                 <field name="end_date"/>
                             </group>
                         </group>
-                        <group string="Legal Review ()">
+                        <group string="Legal Review">
                             <field name="legal_comments"/>
                             <field name="legal_reviewer_id" readonly="1"/>
                             <field name="version" readonly="1"/>
@@ -590,7 +591,8 @@
             <field name="arch" type="xml">
                 <form string="Provider Performance Appraisal (EDS-F-13)">
                     <header>
-                        <button name="action_print_appraisal" string="Print Appraisal Form (EDS-F-13)" type="object" icon="fa-print"/>
+                        <button name="action_print_appraisal" string="Print Appraisal Form (EDS-F-13)" type="object" icon="fa-print"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     </header>
                     <sheet>
                         <group>

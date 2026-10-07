@@ -3,7 +3,7 @@ from odoo import api, fields, models, _
 
 
 class EdsExternalProvider(models.Model):
-    """Approved database of local / international training providers ().
+    """Approved database of local / international training providers.
 
     Carries accreditation, service offerings, pre-qualification, historical
     performance rating (computed from post-training evaluations, ),
@@ -40,10 +40,10 @@ class EdsExternalProvider(models.Model):
     service_offerings = fields.Text(string='Service Offerings')
     pre_qualified = fields.Boolean(
         string='Pre-Qualified', tracking=True,
-        help='Pre-qualified vendors are eligible for RFP distribution ().')
+        help='Pre-qualified vendors are eligible for RFP distribution.')
     rating = fields.Float(
         string='Average Rating', compute='_compute_rating', store=True, digits=(3, 2),
-        help='Computed from the post-training performance history ().')
+        help='Computed from the post-training performance history.')
     rating_count = fields.Integer(string='Evaluations', compute='_compute_rating', store=True)
     performance_history_ids = fields.One2many(
         'eds.provider.performance.history', 'provider_id',
@@ -93,7 +93,7 @@ class EdsExternalProvider(models.Model):
 
 
 class EdsProviderPerformanceHistory(models.Model):
-    """Post-training evaluation of a provider or venue ().
+    """Post-training evaluation of a provider or venue.
 
     Feeds the provider's historical performance profile automatically.
     """
@@ -103,9 +103,9 @@ class EdsProviderPerformanceHistory(models.Model):
 
     provider_id = fields.Many2one('eds.external.provider', string='Provider',
                                   ondelete='cascade')
-    # Venues are registered in Task 5 (eds.venue); this optional free-text keeps
-    #  usable before then. session_id links in Task 5.
-    venue_name = fields.Char(string='Venue', help='Venue evaluated (free text until Task 5).')
+    # Venues are registered in  (eds.venue); this optional free-text keeps
+    #  usable before then. session_id links in .
+    venue_name = fields.Char(string='Venue', help='Venue evaluated (free text until ).')
     course_id = fields.Many2one('eds.course', string='Training Program')
     evaluation_date = fields.Date(string='Evaluation Date', default=fields.Date.context_today)
     service_quality = fields.Selection([

@@ -38,7 +38,7 @@
             <field name="active" eval="True"/>
         </record>
 
-        <!-- Task 13: Nightly LMS sync job -->
+        <!-- Nightly LMS sync job -->
         <record id="cron_eds_lms_sync" model="ir.cron">
             <field name="name">EDS: LMS Course &amp; Completion Sync</field>
             <field name="model_id" ref="employee_development_system.model_eds_lms_routing"/>
@@ -47,7 +47,7 @@
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
             <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=3, minute=0, second=0)"/>
-            <field name="active" eval="True"/>
+            <field name="active" eval="False"/>
         </record>
 
     </data>

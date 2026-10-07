@@ -83,7 +83,7 @@ class EdsLevel1Import(models.TransientModel):
                 continue
 
             # Resolve employee
-            employee = EmployeeModel.search([
+            employee = EmployeeModel.sudo().search([
                 '|', '|',
                 ('identification_id', '=', badge),
                 ('barcode', '=', badge),

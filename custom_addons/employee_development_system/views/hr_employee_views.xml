@@ -9,17 +9,20 @@
             <field name="arch" type="xml">
                 <xpath expr="//div[@name='button_box']" position="inside">
                     <button name="action_view_eds_tna_entries" type="object"
-                            class="oe_stat_button" icon="fa-graduation-cap">
+                            class="oe_stat_button" icon="fa-graduation-cap"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                         <field name="eds_tna_entry_count" widget="statinfo"
                                string="Training Needs"/>
                     </button>
                     <button name="action_view_eds_certificates" type="object"
-                            class="oe_stat_button" icon="fa-certificate">
+                            class="oe_stat_button" icon="fa-certificate"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                         <field name="eds_certificate_count" widget="statinfo"
                                string="Certificates"/>
                     </button>
                     <button name="action_view_eds_sponsorships" type="object"
-                            class="oe_stat_button" icon="fa-file-text-o">
+                            class="oe_stat_button" icon="fa-file-text-o"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                         <field name="active_sponsorship_count" widget="statinfo"
                                string="Active Bonds"/>
                     </button>

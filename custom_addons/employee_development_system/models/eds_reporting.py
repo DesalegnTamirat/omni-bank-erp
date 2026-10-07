@@ -46,8 +46,22 @@ class EdsReportAnnualPlan(models.Model):
 
     annual_plan_id = fields.Many2one('eds.annual.plan', string='Annual Plan', readonly=True)
     course_id = fields.Many2one('eds.course', string='Course', readonly=True)
+    program_name = fields.Char(string='Program Name', readonly=True)
+    quarter = fields.Selection([
+        ('q1', 'Q1 (Jul–Sep)'),
+        ('q2', 'Q2 (Oct–Dec)'),
+        ('q3', 'Q3 (Jan–Mar)'),
+        ('q4', 'Q4 (Apr–Jun)'),
+        ('unallocated', 'Q1–Q4 / TBD (Unallocated)'),
+    ], string='Quarter', readonly=True)
     scheduled_month = fields.Char(string='Scheduled Month', readonly=True)
-    budget_allocated = fields.Float(string='BudgetAllocated', readonly=True)
+    planned_participants = fields.Integer(string='Planned Participants', readonly=True)
+    actual_participants = fields.Integer(string='Actual Participants', readonly=True)
+    participant_variance = fields.Integer(string='Participant Variance', readonly=True)
+    budget_allocated = fields.Float(string='Planned Budget (ETB)', readonly=True)
+    actual_cost = fields.Float(string='Actual Cost (ETB)', readonly=True)
+    cost_variance = fields.Float(string='Cost Variance (ETB)', readonly=True)
+    cost_utilization_pct = fields.Float(string='Cost Utilisation %', readonly=True)
     status = fields.Selection([
         ('planned', 'Planned'),
         ('scheduled', 'Scheduled'),
@@ -65,8 +79,16 @@ class EdsReportAnnualPlan(models.Model):
                     l.id as id,
                     l.plan_id as annual_plan_id,
                     l.course_id,
+                    l.program_name,
+                    l.quarter,
                     l.scheduled_month,
+                    l.planned_participants,
+                    l.actual_participants,
+                    l.participant_variance,
                     l.budget_allocated,
+                    l.actual_cost,
+                    l.cost_variance,
+                    l.cost_utilization_pct,
                     l.status,
                     1 as total_lines
                 FROM eds_annual_plan_line l
@@ -117,7 +139,7 @@ class EdsReportEvaluation(models.Model):
         self._cr.execute("""
             CREATE OR REPLACE VIEW eds_report_evaluation AS (
                 SELECT
-                    row_number() OVER () as id,
+                    row_number() OVER (ORDER BY s.id, e.id) as id,
                     s.id as session_id,
                     s.course_id,
                     e.id as employee_id,
@@ -158,28 +180,3 @@ class EdsReportTranscript(models.Model):
                 WHERE c.state = 'issued'
             );
         """)
-
-class EdsDashboard(models.TransientModel):
-    _name = 'eds.dashboard'
-    _description = 'EDS Executive Dashboard Provider'
-
-    @api.model
-    def get_eds_dashboard_data(self):
-        company_domain = [('company_id', 'in', self.env.companies.ids)]
-        tna_count = self.env['eds.tna.entry'].search_count(company_domain)
-        session_count = self.env['eds.session'].search_count(company_domain)
-        completed_sessions = self.env['eds.session'].search_count(company_domain + [('status', '=', 'completed')])
-        cert_count = self.env['eds.certificate'].search_count(company_domain + [('state', '=', 'issued')])
-        budgets = self.env['eds.budget'].search(company_domain + [('state', '=', 'approved')])
-        total_budget = sum(budgets.mapped('allocated'))
-        spent_budget = sum(budgets.mapped('spent'))
-
-        return {
-            'tna_requests': tna_count,
-            'total_sessions': session_count,
-            'completed_sessions': completed_sessions,
-            'issued_certificates': cert_count,
-            'total_budget': total_budget,
-            'spent_budget': spent_budget,
-            'budget_utilization_pct': (spent_budget / total_budget * 100.0) if total_budget > 0 else 0.0,
-        }

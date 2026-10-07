@@ -33,12 +33,14 @@ class PortalCertificateController(http.Controller):
         if not cert.exists():
             return request.not_found()
 
-        # Security check: User must own the certificate or belong to EDS Officer/Manager/Admin group
+        # Security check: User must own the certificate or belong to EDS Officer/Manager/Admin/Executive group
         is_owner = cert.employee_id and cert.employee_id.user_id and cert.employee_id.user_id.id == user.id
         is_officer = user.has_group('employee_development_system.group_eds_officer')
+        is_manager = user.has_group('employee_development_system.group_eds_manager')
         is_admin = user.has_group('employee_development_system.group_eds_admin')
+        is_executive = user.has_group('employee_development_system.group_eds_executive')
 
-        if not (is_owner or is_officer or is_admin):
+        if not (is_owner or is_officer or is_manager or is_admin or is_executive):
             raise AccessError(_("You are not authorized to download this certificate."))
 
         if file_type == 'image':

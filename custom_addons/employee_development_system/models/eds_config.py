@@ -6,17 +6,17 @@ class ResConfigSettings(models.TransientModel):
     """EDS configuration parameters (BRD Part 2 defaults).
 
     Defaults follow the BRD:
-      - TNA cycle starts 1 April ()
-      - submission window 10 working days ()
-      - approval deadline 31 May ()
-      - minimum 80% attendance for certification ()
-      - default class size 25-30 ()
-      - curriculum SLA 10 working days ()
-      - course-to-competency mapping SLA 5 working days ()
-      - calendar SLA 5 working days ()
-      - Level 1 evaluation report SLA 7 working days ()
-      - sponsorship minimum service 12 months ()
-      - learning partnership minimum score 70% ()
+      - TNA cycle starts 1 April
+      - submission window 10 working days
+      - approval deadline 31 May
+      - minimum 80% attendance for certification
+      - default class size 25-30
+      - curriculum SLA 10 working days
+      - course-to-competency mapping SLA 5 working days
+      - calendar SLA 5 working days
+      - Level 1 evaluation report SLA 7 working days
+      - sponsorship minimum service 12 months
+      - learning partnership minimum score 70%
     """
     _inherit = 'res.config.settings'
 
@@ -30,12 +30,12 @@ class ResConfigSettings(models.TransientModel):
         string='TNA Submission Window (Working Days)',
         default=10,
         config_parameter='eds.tna_submission_days',
-        help='Submission window in working days ().')
+        help='Submission window in working days.')
     eds_tna_approval_deadline_month = fields.Integer(
         string='TNA Approval Deadline Month',
         default=5,
         config_parameter='eds.tna_approval_deadline_month',
-        help='Month when the TNA must be finally approved (). Default: 5 (May).')
+        help='Month when the TNA must be finally approved. Default: 5 (May).')
     eds_tna_approval_deadline_day = fields.Integer(
         string='TNA Approval Deadline Day',
         default=31,
@@ -52,7 +52,7 @@ class ResConfigSettings(models.TransientModel):
         string='Minimum Attendance % for Certification',
         default=80.0,
         config_parameter='eds.min_attendance_pct',
-        help='Minimum attendance percentage required for certificate eligibility ().')
+        help='Minimum attendance percentage required for certificate eligibility.')
 
     # SLAs (/014/020/054)
     eds_course_mapping_sla_days = fields.Integer(
@@ -103,19 +103,19 @@ class ResConfigSettings(models.TransientModel):
         string='Technical Minimum Threshold (%)',
         default=70.0,
         config_parameter='eds.technical_min_threshold',
-        help='Minimum technical qualification threshold before the financial evaluation is permitted ().')
+        help='Minimum technical qualification threshold before the financial evaluation is permitted.')
     eds_technical_financial_blend = fields.Integer(
         string='Technical / Financial Weight (%)',
         default=70,
         config_parameter='eds.technical_financial_blend',
-        help='Weight of the technical score in the combined score; financial is 100 minus this ().')
+        help='Weight of the technical score in the combined score; financial is 100 minus this.')
     eds_sponsorship_min_service_months = fields.Integer(
         string='Sponsorship Minimum Service (Months)',
         default=12,
         config_parameter='eds.sponsorship_min_service_months',
-        help='Minimum continuous service period for certification sponsorship eligibility ().')
+        help='Minimum continuous service period for certification sponsorship eligibility.')
     eds_partnership_min_score = fields.Float(
         string='Learning Partnership Minimum Score',
         default=70.0,
         config_parameter='eds.partnership_min_score',
-        help='Minimum qualification threshold for learning partnership proposals ().')
+        help='Minimum qualification threshold for learning partnership proposals.')

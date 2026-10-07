@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Role-Adaptive Dashboard Form View -->
+        <record id="view_eds_dashboard_form" model="ir.ui.view">
+            <field name="name">eds.dashboard.form</field>
+            <field name="model">eds.dashboard</field>
+            <field name="arch" type="xml">
+                <form string="Employee Development Dashboard" create="false" edit="false" delete="false">
+                    <sheet style="background-color: #f8fafc; padding: 24px;">
+                        
+                        <!-- Top Header Banner -->
+                        <div class="d-flex justify-content-between align-items-center mb-4 p-3 rounded shadow-sm"
+                             style="background: linear-gradient(135deg, #541718 0%, #3b0f10 100%); color: #ffffff;">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded d-flex align-items-center justify-content-center"
+                                     style="width: 44px; height: 44px; background-color: #c17540; color: #ffffff; font-weight: 900; font-size: 22px;">
+                                    B
+                                </div>
+                                <div>
+                                    <h3 class="mb-0 text-white font-weight-bold">Bunna Bank | Learning &amp; Development Dashboard</h3>
+                                    <span class="small text-white-50">Enterprise Talent Development &amp; Training Analytics</span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge px-3 py-2" style="background-color: #c17540; font-size: 13px;">
+                                    <field name="role_persona" readonly="1"/>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Technical Visibility Fields -->
+                        <field name="is_admin" invisible="1"/>
+                        <field name="is_manager" invisible="1"/>
+                        <field name="is_employee" invisible="1"/>
+
+                        <!-- ══════════════════════════════════════════════════════ -->
+                        <!-- 1. BANK-WIDE ADMIN & EXECUTIVE DASHBOARD               -->
+                        <!-- ══════════════════════════════════════════════════════ -->
+                        <div invisible="not is_admin" class="mb-4">
+                            
+                            <!-- Row 1: TNA & Planning Metrics -->
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted small text-uppercase font-weight-bold">Total TNA Needs</span>
+                                            <i class="fa fa-pencil-square-o text-primary fs-4"/>
+                                        </div>
+                                        <h2 class="mb-1 font-weight-bold text-dark"><field name="total_tna_entries"/></h2>
+                                        <div class="small text-muted">
+                                            <span class="text-success font-weight-bold"><field name="approved_tna_entries"/></span> Approved
+                                            (<field name="converted_tna_entries"/> in Plan)
+                                        </div>
+                                        <div class="mt-3">
+                                            <button name="action_open_tna_entries" type="object"
+                                                    string="View Training Needs" class="btn btn-sm btn-outline-primary w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted small text-uppercase font-weight-bold">Budget Utilization</span>
+                                            <i class="fa fa-money text-success fs-4"/>
+                                        </div>
+                                        <h2 class="mb-1 font-weight-bold text-dark"><field name="budget_utilization_pct"/>%</h2>
+                                        <div class="small text-muted">
+                                            Spend: <field name="total_budget_spent" widget="monetary"/> / <field name="total_budget_allocated" widget="monetary"/>
+                                        </div>
+                                        <div class="mt-3">
+                                            <button name="action_open_annual_plans" type="object"
+                                                    string="Annual Plans &amp; Budgets" class="btn btn-sm btn-outline-success w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted small text-uppercase font-weight-bold">Training Throughput</span>
+                                            <i class="fa fa-calendar-check-o text-warning fs-4"/>
+                                        </div>
+                                        <h2 class="mb-1 font-weight-bold text-dark"><field name="active_sessions_count"/></h2>
+                                        <div class="small text-muted">
+                                            Active Sessions (<field name="completed_sessions_count"/> Completed)
+                                        </div>
+                                        <div class="mt-3">
+                                            <button name="action_open_sessions" type="object"
+                                                    string="Manage Sessions" class="btn btn-sm btn-outline-warning w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted small text-uppercase font-weight-bold">Bank Attendance Rate</span>
+                                            <i class="fa fa-check-circle text-info fs-4"/>
+                                        </div>
+                                        <h2 class="mb-1 font-weight-bold text-dark"><field name="bank_avg_attendance_pct"/>%</h2>
+                                        <div class="small text-muted">
+                                            <field name="total_enrolled_participants"/> Enrolled Participants
+                                        </div>
+                                        <div class="mt-3">
+                                            <button name="action_open_nominations" type="object"
+                                                    string="Review Nominations" class="btn btn-sm btn-outline-info w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Quality & Certification Highlights -->
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-3 rounded-circle bg-light text-danger">
+                                                <i class="fa fa-certificate fa-2x" title="Certificates" aria-label="Certificates"/>
+                                            </div>
+                                            <div>
+                                                <span class="text-muted small text-uppercase font-weight-bold">Issued Certificates</span>
+                                                <h3 class="mb-0 font-weight-bold text-dark"><field name="issued_certificates_count"/></h3>
+                                                <span class="small text-success">Verified with QR &amp; Seal</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <button name="action_open_certificates" type="object"
+                                                    string="Certificate Register" class="btn btn-sm btn-outline-danger w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-3 rounded-circle bg-light text-primary">
+                                                <i class="fa fa-smile-o fa-2x" title="Reaction" aria-label="Reaction"/>
+                                            </div>
+                                            <div>
+                                                <span class="text-muted small text-uppercase font-weight-bold">Kirkpatrick Level 1</span>
+                                                <h3 class="mb-0 font-weight-bold text-dark"><field name="avg_level1_satisfaction"/>%</h3>
+                                                <span class="small text-muted">Participant Reaction Average</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <field name="avg_level1_satisfaction" widget="progressbar"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-3 rounded-circle bg-light text-success">
+                                                <i class="fa fa-line-chart fa-2x" title="Learning Gain" aria-label="Learning Gain"/>
+                                            </div>
+                                            <div>
+                                                <span class="text-muted small text-uppercase font-weight-bold">Kirkpatrick Level 2</span>
+                                                <h3 class="mb-0 font-weight-bold text-dark">+<field name="avg_level2_learning_gain"/>%</h3>
+                                                <span class="small text-muted">Pre/Post Learning Gain</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <field name="avg_level2_learning_gain" widget="progressbar"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════════ -->
+                        <!-- 2. LINE MANAGER DASHBOARD (TEAM & UNIT VIEW)           -->
+                        <!-- ══════════════════════════════════════════════════════ -->
+                        <div invisible="not is_manager" class="mb-4">
+                            <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+                                <i class="fa fa-users fa-2x me-3 text-secondary" title="Team" aria-label="Team"/>
+                                <div>
+                                    <strong>Team &amp; Department Development Overview:</strong><br/>
+                                    Monitoring training needs, session readiness, and attendance for your direct reporting unit (<field name="team_members_count"/> team members).
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <span class="text-muted small text-uppercase font-weight-bold">Team Training Needs</span>
+                                        <h2 class="mb-1 font-weight-bold text-primary"><field name="team_tna_submissions"/></h2>
+                                        <span class="small text-muted">Submitted Needs in Cycle</span>
+                                        <div class="mt-3">
+                                            <button name="action_open_tna_entries" type="object"
+                                                    string="Review Team Needs" class="btn btn-sm btn-outline-primary w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <span class="text-muted small text-uppercase font-weight-bold">Pending Nominations</span>
+                                        <h2 class="mb-1 font-weight-bold text-warning"><field name="pending_team_nominations"/></h2>
+                                        <span class="small text-muted">Awaiting Manager Approval</span>
+                                        <div class="mt-3">
+                                            <button name="action_open_nominations" type="object"
+                                                    string="Approve Nominations" class="btn btn-sm btn-outline-warning w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <span class="text-muted small text-uppercase font-weight-bold">Upcoming Sessions</span>
+                                        <h2 class="mb-1 font-weight-bold text-info"><field name="upcoming_team_sessions"/></h2>
+                                        <span class="small text-muted">Enrolled Direct Reports</span>
+                                        <div class="mt-3">
+                                            <button name="action_open_sessions" type="object"
+                                                    string="View Schedules" class="btn btn-sm btn-outline-info w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <span class="text-muted small text-uppercase font-weight-bold">Team Attendance</span>
+                                        <h2 class="mb-1 font-weight-bold text-success"><field name="team_avg_attendance"/>%</h2>
+                                        <span class="small text-muted"><field name="team_certificates_count"/> Certificates Earned</span>
+                                        <div class="mt-3">
+                                            <button name="action_open_idps" type="object"
+                                                    string="Review Team IDP Plans" class="btn btn-sm btn-outline-success w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ══════════════════════════════════════════════════════ -->
+                        <!-- 3. EMPLOYEE SELF-SERVICE (ESS) DASHBOARD               -->
+                        <!-- ══════════════════════════════════════════════════════ -->
+                        <div invisible="not is_employee" class="mb-4">
+                            <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                                <i class="fa fa-graduation-cap fa-2x me-3 text-info" title="Learning" aria-label="Learning"/>
+                                <div>
+                                    <strong>My Learning &amp; Continuous Professional Development:</strong><br/>
+                                    Track your personal training requirements, upcoming classroom sessions, and official certificates.
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <span class="text-muted small text-uppercase font-weight-bold">My Training Needs</span>
+                                        <h2 class="mb-1 font-weight-bold text-dark"><field name="my_tna_needs_count"/></h2>
+                                        <span class="small text-success font-weight-bold"><field name="my_approved_needs_count"/> Approved</span>
+                                        <div class="mt-3">
+                                            <button name="action_open_tna_entries" type="object"
+                                                    string="My Submissions" class="btn btn-sm btn-outline-primary w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <span class="text-muted small text-uppercase font-weight-bold">Enrolled Sessions</span>
+                                        <h2 class="mb-1 font-weight-bold text-dark"><field name="my_enrolled_sessions_count"/></h2>
+                                        <span class="small text-muted"><field name="my_attended_hours"/> Hours Completed</span>
+                                        <div class="mt-3">
+                                            <button name="action_open_sessions" type="object"
+                                                    string="My Sessions" class="btn btn-sm btn-outline-success w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <span class="text-muted small text-uppercase font-weight-bold">My Attendance Rate</span>
+                                        <h2 class="mb-1 font-weight-bold text-dark"><field name="my_attendance_rate"/>%</h2>
+                                        <span class="small text-muted">Minimum 80% Required</span>
+                                        <div class="mt-2">
+                                            <field name="my_attendance_rate" widget="progressbar"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <span class="text-muted small text-uppercase font-weight-bold">My Certificates</span>
+                                        <h2 class="mb-1 font-weight-bold text-danger"><field name="my_certificates_count"/></h2>
+                                        <span class="small text-muted">Official Bank Verified</span>
+                                        <div class="mt-3">
+                                            <button name="action_open_certificates" type="object"
+                                                    string="Download Certificates" class="btn btn-sm btn-outline-danger w-100"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ESS Row 2: Career Development & Sponsorship -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted small text-uppercase font-weight-bold">Individual Development Plan (IDP)</span>
+                                            <i class="fa fa-bullseye text-primary fs-4"/>
+                                        </div>
+                                        <p class="text-muted small mb-3">
+                                            Document target banking competencies, self-study reading lists, and mentor debriefs.
+                                        </p>
+                                        <button name="action_open_idps" type="object"
+                                                string="View / Update My IDP"
+                                                class="btn btn-sm btn-outline-primary"/>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card shadow-sm border-0 h-100 p-3 bg-white">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-muted small text-uppercase font-weight-bold">Education Sponsorships &amp; Assistance</span>
+                                            <i class="fa fa-graduation-cap text-success fs-4"/>
+                                        </div>
+                                        <p class="text-muted small mb-3">
+                                            Check eligibility and active bond amortizations for bank-sponsored higher education.
+                                        </p>
+                                        <button name="action_open_sponsorships" type="object"
+                                                string="My Sponsorship Records"
+                                                class="btn btn-sm btn-outline-success"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Action to open Role-Adaptive Dashboard -->
+        <record id="action_eds_dashboard" model="ir.actions.server">
+            <field name="name">EDS Dashboard</field>
+            <field name="model_id" ref="model_eds_dashboard"/>
+            <field name="state">code</field>
+            <field name="code">
+action = model.action_open_dashboard()
+            </field>
+        </record>
+
+    </data>
+</odoo>

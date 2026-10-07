@@ -21,10 +21,13 @@
         <field name="arch" type="xml">
             <form string="Individual Development Plan (IDP)">
                 <header>
-                    <button name="action_submit" string="Submit for Review" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_submit" string="Submit for Review" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_employee"/>
                     <button name="action_approve" string="Approve IDP" type="object" class="oe_highlight" invisible="state != 'submitted'" groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_start" string="Set In Progress" type="object" invisible="state != 'approved'"/>
-                    <button name="action_complete" string="Mark Completed" type="object" class="oe_highlight" invisible="state != 'in_progress'"/>
+                    <button name="action_start" string="Set In Progress" type="object" invisible="state != 'approved'"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    <button name="action_complete" string="Mark Completed" type="object" class="oe_highlight" invisible="state != 'in_progress'"
+                            groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,in_progress,completed"/>
                 </header>
                 <sheet>
@@ -94,7 +97,8 @@
         <field name="arch" type="xml">
             <form string="Self-Development Activity">
                 <header>
-                    <button name="action_submit" string="Record Activity" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_submit" string="Record Activity" type="object" class="oe_highlight" invisible="state != 'draft'"
+                            groups="employee_development_system.group_eds_employee"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted"/>
                 </header>
                 <sheet>

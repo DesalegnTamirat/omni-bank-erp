@@ -29,7 +29,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 3: course catalog code -->
+        <!-- course catalog code -->
         <record id="seq_eds_course" model="ir.sequence">
             <field name="name">Course Code Sequence</field>
             <field name="code">eds.course</field>
@@ -38,7 +38,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 3: course development request reference -->
+        <!-- course development request reference -->
         <record id="seq_eds_course_development_request" model="ir.sequence">
             <field name="name">Course Development Request Sequence</field>
             <field name="code">eds.course.development.request</field>
@@ -47,7 +47,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 3: curriculum reference -->
+        <!-- curriculum reference -->
         <record id="seq_eds_curriculum" model="ir.sequence">
             <field name="name">Curriculum Sequence</field>
             <field name="code">eds.curriculum</field>
@@ -56,7 +56,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 4: trainer register -->
+        <!-- trainer register -->
         <record id="seq_eds_trainer" model="ir.sequence">
             <field name="name">Trainer Sequence</field>
             <field name="code">eds.trainer</field>
@@ -65,7 +65,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 4: external provider registry -->
+        <!-- external provider registry -->
         <record id="seq_eds_external_provider" model="ir.sequence">
             <field name="name">External Provider Sequence</field>
             <field name="code">eds.external.provider</field>
@@ -74,7 +74,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 4: venue requirement specification -->
+        <!-- venue requirement specification -->
         <record id="seq_eds_venue_requirement" model="ir.sequence">
             <field name="name">Venue Requirement Sequence</field>
             <field name="code">eds.venue.requirement</field>
@@ -83,7 +83,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 4: RFP -->
+        <!-- RFP -->
         <record id="seq_eds_rfp" model="ir.sequence">
             <field name="name">RFP Sequence</field>
             <field name="code">eds.rfp</field>
@@ -92,7 +92,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 4: vendor proposal -->
+        <!-- vendor proposal -->
         <record id="seq_eds_vendor_proposal" model="ir.sequence">
             <field name="name">Vendor Proposal Sequence</field>
             <field name="code">eds.vendor.proposal</field>
@@ -101,7 +101,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 4: vendor evaluation -->
+        <!-- vendor evaluation -->
         <record id="seq_eds_vendor_evaluation" model="ir.sequence">
             <field name="name">Vendor Evaluation Sequence</field>
             <field name="code">eds.vendor.evaluation</field>
@@ -110,7 +110,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 4: training contract -->
+        <!-- training contract -->
         <record id="seq_eds_training_contract" model="ir.sequence">
             <field name="name">Training Contract Sequence</field>
             <field name="code">eds.training.contract</field>
@@ -119,7 +119,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 5: annual L&D plan -->
+        <!-- annual L&D plan -->
         <record id="seq_eds_annual_plan" model="ir.sequence">
             <field name="name">Annual L&amp;D Plan Sequence</field>
             <field name="code">eds.annual.plan</field>
@@ -128,7 +128,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 5: training session -->
+        <!-- training session -->
         <record id="seq_eds_session" model="ir.sequence">
             <field name="name">Session Sequence</field>
             <field name="code">eds.session</field>
@@ -137,7 +137,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 5: training batch / cohort -->
+        <!-- training batch / cohort -->
         <record id="seq_eds_batch" model="ir.sequence">
             <field name="name">Batch Sequence</field>
             <field name="code">eds.batch</field>
@@ -146,7 +146,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 5: venue booking -->
+        <!-- venue booking -->
         <record id="seq_eds_venue_booking" model="ir.sequence">
             <field name="name">Venue Booking Sequence</field>
             <field name="code">eds.venue.booking</field>
@@ -155,7 +155,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 5: unscheduled training request -->
+        <!-- unscheduled training request -->
         <record id="seq_eds_unscheduled_request" model="ir.sequence">
             <field name="name">Unscheduled Training Request Sequence</field>
             <field name="code">eds.unscheduled.request</field>
@@ -164,7 +164,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 6: training nomination -->
+        <!-- training nomination -->
         <record id="seq_eds_nomination" model="ir.sequence">
             <field name="name">Nomination Sequence</field>
             <field name="code">eds.nomination</field>
@@ -173,7 +173,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 6: enrollment -->
+        <!-- enrollment -->
         <record id="seq_eds_enrollment" model="ir.sequence">
             <field name="name">Enrollment Sequence</field>
             <field name="code">eds.enrollment</field>
@@ -182,7 +182,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 7: session attendance record -->
+        <!-- session attendance record -->
         <record id="seq_eds_session_attendance" model="ir.sequence">
             <field name="name">Session Attendance Sequence</field>
             <field name="code">eds.session.attendance</field>
@@ -191,7 +191,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 7: training material -->
+        <!-- training material -->
         <record id="seq_eds_material" model="ir.sequence">
             <field name="name">Training Material Sequence</field>
             <field name="code">eds.material</field>
@@ -200,7 +200,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 7: international training -->
+        <!-- international training -->
         <record id="seq_eds_international_training" model="ir.sequence">
             <field name="name">International Training Sequence</field>
             <field name="code">eds.international.training</field>
@@ -209,7 +209,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 9: Level 4 Evaluation -->
+        <!-- Level 4 Evaluation -->
         <record id="seq_eds_level4_evaluation" model="ir.sequence">
             <field name="name">Level 4 Impact Evaluation Sequence</field>
             <field name="code">eds.level4.evaluation</field>
@@ -218,7 +218,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 10: Completion Certificate -->
+        <!-- Completion Certificate -->
         <record id="seq_eds_certificate" model="ir.sequence">
             <field name="name">Certificate Sequence</field>
             <field name="code">eds.certificate</field>
@@ -227,7 +227,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 11: Budget -->
+        <!-- Budget -->
         <record id="seq_eds_budget" model="ir.sequence">
             <field name="name">Budget Sequence</field>
             <field name="code">eds.budget</field>
@@ -236,7 +236,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 11: Learning Partner -->
+        <!-- Learning Partner -->
         <record id="seq_eds_learning_partner" model="ir.sequence">
             <field name="name">Learning Partner Sequence</field>
             <field name="code">eds.learning.partner</field>
@@ -245,7 +245,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 13: Payroll Payload -->
+        <!-- Payroll Payload -->
         <record id="seq_eds_payroll_payload" model="ir.sequence">
             <field name="name">Payroll Payload Sequence</field>
             <field name="code">eds.payroll.payload</field>
@@ -254,7 +254,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 14: Sponsorship -->
+        <!-- Sponsorship -->
         <record id="seq_eds_sponsorship" model="ir.sequence">
             <field name="name">Sponsorship Sequence</field>
             <field name="code">eds.sponsorship</field>
@@ -263,7 +263,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 14: Staff Education Assistance -->
+        <!-- Staff Education Assistance -->
         <record id="seq_eds_education_assistance" model="ir.sequence">
             <field name="name">Education Assistance Sequence</field>
             <field name="code">eds.education.assistance</field>
@@ -272,7 +272,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 15: Internship Application -->
+        <!-- Internship Application -->
         <record id="seq_eds_internship_application" model="ir.sequence">
             <field name="name">Internship Application Sequence</field>
             <field name="code">eds.internship.application</field>
