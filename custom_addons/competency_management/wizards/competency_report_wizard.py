@@ -1011,7 +1011,7 @@ class CompetencyReportWizard(models.TransientModel):
         meta_text = f"Campaign: {cycle_name}   |   Focus: {focus_label}   |   Exported: {now_str}"
         worksheet.write('D3', meta_text, meta_fmt)
 
-        worksheet.set_header('&L&G&C&12&"Arial,Bold"BUNNA BANK S.C.&R&D')
+        worksheet.set_header('&C&12&"Arial,Bold"BUNNA BANK S.C.&R&D')
         worksheet.set_footer('&LConfidential - Internal Banking Assessment&RPage &P of &N')
         worksheet.repeat_rows(4)
 

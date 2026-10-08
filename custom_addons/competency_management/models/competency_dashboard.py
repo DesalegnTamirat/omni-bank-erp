@@ -20,8 +20,15 @@ class CompetencyDashboard(models.TransientModel):
     # Admin Filter & Role Access Flags
     filter_department_id = fields.Many2one('hr.department', string='Filter Department')
     is_admin_user = fields.Boolean(string='Is Admin User', compute='_compute_user_access')
+    is_hr_admin = fields.Boolean(string='Is HR Admin', compute='_compute_user_access')
     is_supervisor_user = fields.Boolean(string='Is Supervisor User', compute='_compute_user_access')
     is_employee_only = fields.Boolean(string='Is Employee Only', compute='_compute_user_access')
+    persona_role = fields.Selection([
+        ('executive', 'Executive'),
+        ('manager', 'Manager'),
+        ('hrbp', 'HRBP'),
+        ('employee', 'Employee'),
+    ], string='Persona Role', compute='_compute_user_access')
 
     def _default_cycle_id(self):
         cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], limit=1)
