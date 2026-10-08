@@ -55,9 +55,41 @@ class InternalRecruitmentMinuteReport(models.AbstractModel):
             interview_absents = len([c for c in all_cands if not c.interview_score])
             not_selected = len(rejected_cands)
 
+            formatted_selected = []
+            for cand in selected_cands:
+                c_name = cand.emp_name.name if cand.emp_name else "____________"
+                g_str = (cand.emp_gender or (cand.emp_name.gender if cand.emp_name else '') or '').lower()
+                salut = "Ato" if g_str in ('male', 'm') else ("Wy" if g_str in ('female', 'f') else "Ato/Wy")
+                formatted_selected.append(f"{salut} {c_name}")
+
+            if not formatted_selected:
+                selected_cands_str = "____________"
+                emp_word = "the selected employee"
+            elif len(formatted_selected) == 1:
+                selected_cands_str = formatted_selected[0]
+                emp_word = "the top-ranked employee"
+            elif len(formatted_selected) == 2:
+                selected_cands_str = f"{formatted_selected[0]} and {formatted_selected[1]}"
+                emp_word = "the selected employees"
+            else:
+                selected_cands_str = ", ".join(formatted_selected[:-1]) + f", and {formatted_selected[-1]}"
+                emp_word = "the selected employees"
+
+            ref_str = (doc.vacancy_reference or (doc.vacancy_id.reference if hasattr(doc, 'vacancy_id') and getattr(doc.vacancy_id, 'reference', False) else '') or '').upper()
+            action_verb = "transfer" if 'LAT' in ref_str or 'TRANSFER' in ref_str else "promote"
+
             top_cand = selected_cands[0] if selected_cands else False
             top_cand_name = top_cand.emp_name.name if top_cand and top_cand.emp_name else "____________"
-            top_cand_unit = top_cand.preferred_location or top_cand.current_work_unit if top_cand else "____________"
+            
+            vac_obj = self.env['job.vacancy'].browse(doc.vacancy_id) if isinstance(doc.vacancy_id, int) else doc.vacancy_id
+            if doc.job_location:
+                top_cand_unit = doc.job_location
+            elif vac_obj and getattr(vac_obj, 'operating_unit_id', False):
+                top_cand_unit = vac_obj.operating_unit_id.name
+            elif top_cand:
+                top_cand_unit = top_cand.preferred_location or top_cand.current_work_unit or "____________"
+            else:
+                top_cand_unit = "____________"
 
             if top_cand:
                 gender_str = (top_cand.emp_gender or (top_cand.emp_name.gender if top_cand.emp_name else '') or '').lower()
@@ -87,6 +119,9 @@ class InternalRecruitmentMinuteReport(models.AbstractModel):
                 "top_cand_unit": top_cand_unit,
                 "res_rank_start": res_rank_start,
                 "res_rank_end": res_rank_end,
+                "selected_cands_str": selected_cands_str,
+                "emp_word": emp_word,
+                "action_verb": action_verb,
             }
             doc_selected_candidates[doc.id] = selected_cands
             doc_all_candidates[doc.id] = all_cands.sorted(key=lambda c: c.rank or 9999)

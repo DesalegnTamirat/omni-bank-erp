@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_hr_employee_change_field_config_tree" model="ir.ui.view">
+        <field name="name">hr.employee.change.field.config.list</field>
+        <field name="model">hr.employee.change.field.config</field>
+        <field name="arch" type="xml">
+            <list string="Change Field Attachment Rules" editable="bottom">
+                <field name="name"/>
+                <field name="field_id" options="{'no_create': True}"/>
+                <field name="field_name"/>
+                <field name="category"/>
+                <field name="requires_attachment" widget="boolean_toggle"/>
+                <field name="help_text"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_hr_employee_change_field_config_form" model="ir.ui.view">
+        <field name="name">hr.employee.change.field.config.form</field>
+        <field name="model">hr.employee.change.field.config</field>
+        <field name="arch" type="xml">
+            <form string="Change Field Attachment Rule">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="field_id" options="{'no_create': True}"/>
+                            <field name="field_name"/>
+                        </group>
+                        <group>
+                            <field name="category"/>
+                            <field name="requires_attachment" widget="boolean_toggle"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Attachment Instructions for Requester">
+                        <field name="help_text" placeholder="Explain which document proof is mandatory (e.g. Legal Marriage Certificate)..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_hr_employee_change_field_config" model="ir.actions.act_window">
+        <field name="name">Change Field Document Rules</field>
+        <field name="res_model">hr.employee.change.field.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define rules for mandatory supporting document uploads on master data change requests.
+            </p>
+        </field>
+    </record>
+</odoo>

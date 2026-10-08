@@ -219,7 +219,7 @@
                                         <field name="appraisal_date" string="Appraisal Date" readonly="1"/>
                                         <field name="accept_by" string="Accept By Deadline" readonly="state != 'draft' or is_current_employee"/>
                                         <field name="job_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
-                                        <field name="employee_score" widget="progressbar" readonly="1"/>
+                                        <field name="employee_score" readonly="1"/>
                                         <field name="performance_rating" widget="badge"
                                                decoration-success="performance_rating in ('Outstanding', 'outstanding')"
                                                decoration-info="performance_rating in ('Excellent', 'excellent')"
@@ -234,7 +234,7 @@
                     <notebook>
                         <page string="Performance Appraisal Details" name="appraisal_details">
                             <field name="line_ids" nolabel="1" readonly="state != 'draft' or is_current_employee">
-                                <list editable="bottom">
+                                <list editable="bottom" create="false" delete="false">
                                     <field name="sequence" widget="handle"/>
                                     <field name="perspective_name" column_invisible="1"/>
                                     <field name="state" column_invisible="1"/>

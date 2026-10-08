@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!--
+            RESL Record Rules
+            ─────────────────
+            Employee: own loans + loans where they are a guarantor.
+            Managers / approvers: loans of their own work unit only.
+            Head Office roles (HO Approver, HR Officer/Approver, POMD,
+            Head Office), HR Auditor, HR Accountant: all loans.
+        -->
+
+        <!-- Employees see their own loan records -->
+        <record id="rule_resl_loan_employee_own" model="ir.rule">
+            <field name="name">RESL Loan: Employee sees own loans</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_employee'))]"/>
+            <field name="domain_force">[
+                '|',
+                ('employee_id.user_id', '=', user.id),
+                ('guarantor_line_ids.guarantor_id.user_id', '=', user.id)
+            ]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- HEAD OFFICE ONLY sees every loan of the company.
+             The old rule gave this to group_resl_manager, but that group is
+             implied by EVERY approver role (RESL District, Branch Manager /
+             District Director assigned as Loan Manager, ...), so a district
+             approver saw other districts' requests. It is now bound to the
+             Head Office roles only: HO Approver, HR Officer (also implied by
+             HR Approver and POMD) and Head Office (cross-OU exception). -->
+        <record id="rule_resl_loan_manager_all" model="ir.rule">
+            <field name="name">RESL Loan: Head Office roles see all</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(6, 0, [
+                ref('resl.group_resl_ho_approver'),
+                ref('resl.group_resl_hr'),
+                ref('resl.group_resl_hr_senior'),
+                ref('resl.group_resl_pomd'),
+                ref('resl.group_resl_head_office'),
+            ])]"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Managers / approvers (Branch Manager, District Director,
+             Accountant, RESL District, Loan Manager) see ONLY the loans of
+             their own work unit(s). The list of work units comes from
+             res.users.resl_scope_operating_unit_ids (empty for ordinary
+             staff, so this rule never widens access for them). -->
+        <record id="rule_resl_loan_work_unit_reviewer" model="ir.rule">
+            <field name="name">RESL Loan: Managers/approvers see their work unit only</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[('operating_unit_id', 'in', user.resl_scope_operating_unit_ids.ids)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Employees see guarantee lines they are involved in -->
+        <record id="rule_resl_loan_guarantee_employee_own" model="ir.rule">
+            <field name="name">RESL Guarantee: Employee sees own lines</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_employee'))]"/>
+            <field name="domain_force">[
+                '|',
+                ('loan_id.employee_id.user_id', '=', user.id),
+                ('guarantor_id.user_id', '=', user.id)
+            ]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Head Office roles see all guarantee lines -->
+        <record id="rule_resl_loan_guarantee_manager_all" model="ir.rule">
+            <field name="name">RESL Guarantee: Head Office roles see all</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(6, 0, [
+                ref('resl.group_resl_ho_approver'),
+                ref('resl.group_resl_hr'),
+                ref('resl.group_resl_hr_senior'),
+                ref('resl.group_resl_pomd'),
+                ref('resl.group_resl_head_office'),
+            ])]"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Managers / approvers see guarantee lines of their work unit only -->
+        <record id="rule_resl_loan_guarantee_work_unit_reviewer" model="ir.rule">
+            <field name="name">RESL Guarantee: Managers/approvers see their work unit only</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[('loan_id.operating_unit_id', 'in', user.resl_scope_operating_unit_ids.ids)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Designated approver (Branch Manager / District Director /
+             Division Manager / Accountant-as-approver): can see the loans
+             routed to them for review, even if they hold no manually-
+             assigned Loan Manager technical group. -->
+        <record id="rule_resl_loan_designated_approver" model="ir.rule">
+            <field name="name">RESL Loan: Designated approver sees assigned loans</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[('designated_approver_id', '=', user.id)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Disbursement officer (Branch Accountant / District Division
+             Manager): can open and disburse the loans routed to them, even
+             if they hold no other RESL role. -->
+        <record id="rule_resl_loan_disbursement_officer" model="ir.rule">
+            <field name="name">RESL Loan: Disbursement officer sees assigned loans</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_employee'))]"/>
+            <field name="domain_force">[('disbursement_officer_id', '=', user.id)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- HR Auditor: read-only, organization-wide (every loan / guarantee
+             line). Model-level access rights (ir.model.access.csv) already
+             deny write/create/unlink for this group, so these rules only
+             need to widen READ visibility beyond "own loans". -->
+        <record id="rule_resl_loan_auditor_all" model="ir.rule">
+            <field name="name">RESL Loan: HR Auditor sees all (read-only)</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_hr_auditor'))]"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_resl_loan_guarantee_auditor_all" model="ir.rule">
+            <field name="name">RESL Guarantee: HR Auditor sees all (read-only)</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_hr_auditor'))]"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- HR Accountant: organization-wide visibility, with write allowed
+             (needed to record Core Banking disbursement/settlement on any
+             loan, not just their own). -->
+        <record id="rule_resl_loan_accountant_all" model="ir.rule">
+            <field name="name">RESL Loan: HR Accountant sees all</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_hr_accountant'))]"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_resl_loan_guarantee_accountant_all" model="ir.rule">
+            <field name="name">RESL Guarantee: HR Accountant sees all (read-only)</field>
+            <field name="model_id" ref="model_resl_loan_guarantee"/>
+            <field name="groups" eval="[(4, ref('resl.group_resl_hr_accountant'))]"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

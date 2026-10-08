@@ -20,7 +20,7 @@
                         <div class="text-white-50 small">
                             <t t-if="state.currentTab === 'corporate'">Bank-Wide &amp; Unit Operations Radar</t>
                             <t t-elif="state.personal and state.personal.employee_name">
-                                <span class="fw-bold text-white" t-esc="state.personal.employee_name"/> &amp;bull; <span t-esc="state.personal.job_title"/>
+                                <span class="fw-bold text-white" t-esc="state.personal.employee_name"/> • <span t-esc="state.personal.job_title"/>
                             </t>
                             <t t-else="">Personal Attendance History &amp; Performance Radar</t>
                         </div>
@@ -458,7 +458,7 @@
                                         <td t-esc="log.check_out"/>
                                         <td t-esc="log.worked_hours"/>
                                         <td>
-                                            <span t-attf-class="badge #{log.check_in_status === 'Late' ? 'bg-warning text-dark' : 'bg-success'}" t-esc="log.check_in_status"/>
+                                            <span t-attf-class="badge #{log.check_in_status === 'Late' || log.check_in_status === 'Very Late' ? 'bg-warning text-dark' : 'bg-success'}" t-esc="log.check_in_status"/>
                                         </td>
                                     </tr>
                                 </tbody>

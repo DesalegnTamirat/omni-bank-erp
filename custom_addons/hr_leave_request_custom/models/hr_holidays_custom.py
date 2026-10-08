@@ -261,8 +261,9 @@ class HrLeaveInheritCustom(models.Model):
             return employee
         # Priority 4: Fallback to any active Time Off Officer/Manager
         officers = self.env.ref('hr_holidays.group_hr_holidays_user', raise_if_not_found=False)
-        if officers and officers.sudo().users:
-            for u in officers.sudo().users:
+        if officers:
+            officer_users = officers.sudo().all_user_ids if hasattr(officers, 'all_user_ids') else getattr(officers.sudo(), 'user_ids', self.env['res.users'])
+            for u in officer_users:
                 if u.sudo().employee_id and u != self.env.user:
                     return u.sudo().employee_id
         return False
@@ -2629,6 +2630,45 @@ class HrLeaveInheritCustom(models.Model):
                 'accrual_status_label': 'Actively Accruing',
                 'employee_category': '',
             }
+
+    @api.model
+    def _cron_cleanup_abandoned_leave_requests(self):
+        """Clean up uncompleted/abandoned leave drafts older than 24 hours."""
+        threshold = fields.Datetime.now() - timedelta(hours=24)
+        abandoned_leaves = self.sudo().search([
+            ('state', '=', 'draft'),
+            ('custom_saved', '=', False),
+            ('create_date', '<', threshold),
+        ])
+        if abandoned_leaves:
+            _logger.info("Cleaning up %d abandoned leave requests", len(abandoned_leaves))
+            abandoned_leaves.unlink()
+
+    @api.model
+    def _cron_remind_pending_leave_approvals(self):
+        """Remind approvers for pending leave requests that are waiting for more than 3 days."""
+        threshold = fields.Datetime.now() - timedelta(days=3)
+        pending_leaves = self.sudo().search([
+            ('state', '=', 'confirm'),
+            ('leave_request_status', '=', 'notify'),
+            ('write_date', '<', threshold),
+        ])
+        for leave in pending_leaves:
+            try:
+                approver = leave._get_leave_approver()
+                if approver and approver.user_id:
+                    activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+                    if activity_type:
+                        existing = leave.activity_ids.filtered(lambda a: a.activity_type_id == activity_type and a.user_id == approver.user_id)
+                        if not existing:
+                            leave.sudo().activity_schedule(
+                                'mail.mail_activity_data_todo',
+                                summary=_('Pending Leave Approval Reminder: %s') % (leave.employee_id.name or ''),
+                                user_id=approver.user_id.id,
+                            )
+            except Exception as e:
+                _logger.warning("Failed to send pending reminder for leave %s: %s", leave.id, e)
+
 
 
 class ResourceCalendarLeavesCustom(models.Model):

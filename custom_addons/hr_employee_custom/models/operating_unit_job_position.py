@@ -161,15 +161,14 @@ class OperatingUnitJobPosition(models.Model):
         self.ensure_one()
         from datetime import timedelta
 
-        # Revalidate that approved plan is greater than 0 for planned requests
-        if not self.env.context.get('unplanned') and self.approved_plan_count <= 0:
+        # Revalidate that approved plan or vacant position count is greater than 0 for planned requests
+        if not self.env.context.get('unplanned') and self.approved_plan_count <= 0 and self.vacant_position_count <= 0:
             raise UserError(_(
-                "Cannot create vacancy: The approved manpower plan count for '%(job)s' at '%(unit)s' is %(plan)s. "
-                "The number of opening vacancies cannot exceed the approved plan count."
+                "Cannot create vacancy: The approved manpower plan count and vacant position count for '%(job)s' at '%(unit)s' are both 0. "
+                "The number of opening vacancies cannot exceed the available vacant positions or approved plan count."
             ) % {
                 'job': self.job_position_id.name or '',
                 'unit': self.operating_unit_id.name or '',
-                'plan': self.approved_plan_count,
             })
 
         # Check specific sourcing fulfillment
@@ -179,9 +178,9 @@ class OperatingUnitJobPosition(models.Model):
         has_sourcing = (prom_plan > 0 or lat_plan > 0 or ext_plan > 0)
 
         # Determine movement type & sourcing based on fulfillment strategy:
-        # If approved plan is fulfillment_lateral and not promotion -> lateral transfer
+        # If approved plan is fulfillment_lateral and not promotion -> transfer
         if has_sourcing and lat_plan > 0 and prom_plan <= 0:
-            movement_type = 'lateral'
+            movement_type = 'transfer'
             sourcing_type = 'internal'
             recruitment_type = 'Internal'
             target_openings_cap = lat_plan
@@ -204,7 +203,7 @@ class OperatingUnitJobPosition(models.Model):
             movement_type = 'promotion'
             sourcing_type = 'internal'
             recruitment_type = 'Internal'
-            target_openings_cap = self.approved_plan_count
+            target_openings_cap = max(self.approved_plan_count, self.vacant_position_count, 1)
 
         # Calculate number of openings: strictly capped by target_openings_cap
         if self.vacant_position_count > 0:

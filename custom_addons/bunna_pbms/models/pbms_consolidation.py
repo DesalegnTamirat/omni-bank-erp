@@ -30,7 +30,7 @@ class PbmsConsolidationLine(models.Model):
         ],
         readonly=True,
     )
-    cycle_id = fields.Many2one("pbms.planning.cycle", readonly=True)
+    cycle_id = fields.Many2one("pbms.planning.cycle", string="FY(the Planning year)", readonly=True)
     company_id = fields.Many2one("res.company", readonly=True)
     source_model = fields.Selection(
         [
@@ -41,6 +41,10 @@ class PbmsConsolidationLine(models.Model):
             ("general_expense", "General Expense"),
             ("manpower", "Manpower Requirement"),
             ("fixed_asset", "Fixed Asset Requirement"),
+            ("loan_disbursement_collection", "Loan Disbursement & Collection"),
+            ("loan_outstanding", "Loan & Advances Outstanding"),
+            ("credit_portfolio", "Credit Portfolio (BB-APF-15)"),
+            ("initiative_budget", "Initiative Budget"),
         ],
         readonly=True,
     )
@@ -107,6 +111,10 @@ class PbmsConsolidationLine(models.Model):
                             WHEN p.category = 'general_expense' THEN COALESCE(ea.name, 'General Expense')
                             WHEN p.category = 'manpower' THEN 'Manpower'
                             WHEN p.category = 'fixed_asset' THEN 'Fixed Asset'
+                            WHEN p.category = 'loan_disbursement_collection' THEN 'Loan Disbursement & Collection'
+                            WHEN p.category = 'loan_outstanding' THEN 'Loan Outstanding'
+                            WHEN p.category = 'credit_portfolio' THEN 'Credit Portfolio'
+                            WHEN p.category = 'initiative_budget' THEN 'Initiative Budget'
                         END, '') AS account_name,
                     p.state AS state,
                     p.currency_id AS currency_id,
@@ -233,7 +241,7 @@ class PbmsConsolidationLine(models.Model):
 
         headers = [
             "Org Unit", "District", "Unit Type", "Planning Category",
-            "Account Description", "Planning Cycle", "Status",
+            "Account Description", "FY(the Planning year)", "Status",
             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
             "Jan", "Feb", "Mar", "Apr", "May", "Jun",
             "Q1 Total", "Q2 Total", "Q3 Total", "Q4 Total",

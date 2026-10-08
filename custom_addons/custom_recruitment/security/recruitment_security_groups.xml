@@ -45,7 +45,7 @@
 
         <!-- Clear "No" placeholder for Recruitment privilege -->
         <record id="hr_recruitment.res_groups_privilege_recruitment" model="res.groups.privilege">
-            <field name="placeholder"></field>
+            <field name="placeholder" eval="False"/>
         </record>
 
         <!-- Link standard Odoo Recruitment Officer to custom Recruitment Officer -->

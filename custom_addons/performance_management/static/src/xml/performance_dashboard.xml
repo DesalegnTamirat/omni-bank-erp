@@ -13,7 +13,7 @@
                         </div>
                         <div>
                             <h3 class="fw-bold mb-0 text-white" style="font-size: 21px; letter-spacing: 0.5px;">Executive Performance Dashboard</h3>
-                            <p class="text-white-50 small mb-0">Cross-Tier Lifecycle &amp; Governance Monitoring (Planning &amp; HR)</p>
+                            <p class="text-white-50 small mb-0"><t t-esc="state.data and state.data.filters ? state.data.filters.user_role_label : 'Cross-Tier Lifecycle &amp; Governance Monitoring (Planning &amp; HR)'"/></p>
                         </div>
                     </div>
 
@@ -44,22 +44,24 @@
 
                         <!-- Tier Level -->
                         <div class="d-flex flex-column">
-                            <label class="pms-filter-label">Tier Filter</label>
+                            <label class="pms-filter-label">Tier Filter <t t-if="state.data.filters.tier_readonly"><i class="fa fa-lock ms-1 text-white-50" title="Locked for Managers"/></t></label>
                             <select class="form-select form-select-sm pms-filter-select" style="min-width: 130px;"
+                                    t-att-disabled="state.data.filters.tier_readonly ? 'disabled' : undefined"
                                     t-on-change="(ev) => this.onFilterChange('tier', ev)">
-                                <option value="all" t-att-selected="state.filters.tier == 'all'">All Tiers (1-3)</option>
-                                <option value="t1" t-att-selected="state.filters.tier == 't1'">Tier 1 (Corporate)</option>
-                                <option value="t2" t-att-selected="state.filters.tier == 't2'">Tier 2 (Division)</option>
-                                <option value="t3" t-att-selected="state.filters.tier == 't3'">Tier 3 (Employee)</option>
+                                <option value="all" t-att-selected="state.filters.tier == 'all'" t-if="!state.data.filters.tier_readonly">All Tiers (1-3)</option>
+                                <option value="t1" t-att-selected="state.filters.tier == 't1'" t-if="!state.data.filters.tier_readonly || state.filters.tier == 't1'">Tier 1 (Corporate)</option>
+                                <option value="t2" t-att-selected="state.filters.tier == 't2'" t-if="!state.data.filters.tier_readonly || state.filters.tier == 't2'">Tier 2 (Division)</option>
+                                <option value="t3" t-att-selected="state.filters.tier == 't3'" t-if="!state.data.filters.tier_readonly || state.filters.tier == 't3'">Tier 3 (Employee)</option>
                             </select>
                         </div>
 
                         <!-- Operating Unit -->
                         <div class="d-flex flex-column" t-if="state.data.filters.operating_units and state.data.filters.operating_units.length">
-                            <label class="pms-filter-label">Operating Unit</label>
+                            <label class="pms-filter-label">Operating Unit <t t-if="state.data.filters.operating_unit_readonly"><i class="fa fa-lock ms-1 text-white-50" title="Locked for Managers"/></t></label>
                             <select class="form-select form-select-sm pms-filter-select" style="min-width: 140px;"
+                                    t-att-disabled="state.data.filters.operating_unit_readonly ? 'disabled' : undefined"
                                     t-on-change="(ev) => this.onFilterChange('operating_unit_id', ev)">
-                                <option value="all">All Units</option>
+                                <option value="all" t-if="!state.data.filters.operating_unit_readonly">All Units</option>
                                 <t t-foreach="state.data.filters.operating_units" t-as="ou" t-key="ou.id">
                                     <option t-att-value="ou.id" t-att-selected="ou.id == state.filters.operating_unit_id"><t t-esc="ou.name"/></option>
                                 </t>
@@ -67,7 +69,7 @@
                         </div>
 
                         <!-- Department -->
-                        <div class="d-flex flex-column" t-if="state.data.filters.departments and state.data.filters.departments.length">
+                        <div class="d-flex flex-column" t-if="state.data.filters.show_department_filter and state.data.filters.departments and state.data.filters.departments.length">
                             <label class="pms-filter-label">Department</label>
                             <select class="form-select form-select-sm pms-filter-select" style="min-width: 140px;"
                                     t-on-change="(ev) => this.onFilterChange('department_id', ev)">
@@ -466,6 +468,7 @@
                                         <tr>
                                             <th>Employee</th>
                                             <th>Job Position</th>
+                                            <th>Operating Unit</th>
                                             <th>Department</th>
                                             <th class="text-center">Score</th>
                                             <th class="text-center">Rating</th>
@@ -481,6 +484,7 @@
                                                         <t t-esc="tp.employee_name"/>
                                                     </td>
                                                     <td><t t-esc="tp.job_title || '-'"/></td>
+                                                    <td><span class="badge bg-light text-dark border"><t t-esc="tp.operating_unit || '-'"/></span></td>
                                                     <td><t t-esc="tp.department"/></td>
                                                     <td class="text-center fw-bold text-success"><t t-esc="tp.score"/>%</td>
                                                     <td class="text-center">
@@ -497,7 +501,7 @@
                                         </t>
                                         <t t-else="">
                                             <tr>
-                                                <td colspan="6" class="text-center text-muted py-4">No completed appraisal scores found for this period.</td>
+                                                <td colspan="7" class="text-center text-muted py-4">No completed appraisal scores found for this period.</td>
                                             </tr>
                                         </t>
                                     </tbody>
@@ -506,16 +510,76 @@
                         </div>
                     </div>
 
-                    <!-- Rejections Live Watchlist -->
+                    <!-- Action Required Watchlist (Pending Acceptance & Rejections) -->
                     <div class="col-12 col-xl-6">
                         <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                            <div class="card-header py-3 px-4 bg-white border-bottom d-flex align-items-center justify-content-between">
-                                <div class="fw-bold text-danger d-flex align-items-center">
-                                    <i class="fa fa-times-circle me-2"/> Rejections Watchlist &amp; Feedback
+                            <div class="card-header py-2 px-3 bg-white border-bottom d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm px-3 py-1 fw-bold rounded-pill"
+                                            t-att-class="state.watchlist_tab == 'pending' ? 'btn-warning text-dark shadow-sm' : 'btn-light text-muted'"
+                                            t-on-click="() => this.setWatchlistTab('pending')">
+                                        <i class="fa fa-clock-o me-1"/> Pending Acceptance
+                                        <span class="badge bg-white text-dark ms-1 rounded-pill"><t t-esc="state.data.tables.pending ? state.data.tables.pending.length : 0"/></span>
+                                    </button>
+                                    <button class="btn btn-sm px-3 py-1 fw-bold rounded-pill"
+                                            t-att-class="state.watchlist_tab == 'rejections' ? 'btn-danger text-white shadow-sm' : 'btn-light text-muted'"
+                                            t-on-click="() => this.setWatchlistTab('rejections')">
+                                        <i class="fa fa-times-circle me-1"/> Rejections
+                                        <span class="badge bg-white text-danger ms-1 rounded-pill"><t t-esc="state.data.tables.rejections ? state.data.tables.rejections.length : 0"/></span>
+                                    </button>
                                 </div>
-                                <span class="badge bg-danger"><t t-esc="state.data.tables.rejections.length"/> Issues</span>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 11px;"
+                                        t-on-click="() => this.openRejectionsOrPending(state.watchlist_tab == 'pending' ? 'notified' : 'rejected')">
+                                    <i class="fa fa-external-link me-1"/> View List
+                                </button>
                             </div>
-                            <div class="table-responsive">
+
+                            <!-- Tab 1: Pending Acceptance Table -->
+                            <div t-if="state.watchlist_tab == 'pending'" class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Employee</th>
+                                            <th>Work Unit</th>
+                                            <th>Manager</th>
+                                            <th class="text-end">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="state.data.tables.pending and state.data.tables.pending.length">
+                                            <t t-foreach="state.data.tables.pending" t-as="pend" t-key="pend.id">
+                                                <tr>
+                                                    <td>
+                                                        <span class="badge bg-warning text-dark fw-bold" style="font-size: 10.5px;">
+                                                            <t t-esc="pend.tier"/> <t t-esc="pend.type"/>
+                                                        </span>
+                                                    </td>
+                                                    <td class="fw-bold text-dark"><t t-esc="pend.employee_name"/></td>
+                                                    <td><span class="badge bg-light text-dark border"><t t-esc="pend.operating_unit || '-'"/></span></td>
+                                                    <td><t t-esc="pend.manager_name"/></td>
+                                                    <td class="text-end">
+                                                        <button class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;"
+                                                                t-on-click="() => this.openRecord(pend.model, pend.id)">
+                                                            Review
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </t>
+                                        <t t-else="">
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted py-4">
+                                                    <i class="fa fa-check-circle text-success me-1"/> No pending scorecards or appraisals for this period.
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Tab 2: Rejections Table -->
+                            <div t-if="state.watchlist_tab == 'rejections'" class="table-responsive">
                                 <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
                                     <thead class="table-light">
                                         <tr>
@@ -535,7 +599,7 @@
                                                     </td>
                                                     <td class="fw-bold text-dark"><t t-esc="rej.employee_name"/></td>
                                                     <td><t t-esc="rej.manager_name"/></td>
-                                                    <td class="text-truncate" style="max-width: 200px;" t-att-title="rej.rejection_reason">
+                                                    <td class="text-truncate" style="max-width: 180px;" t-att-title="rej.rejection_reason">
                                                         <i class="fa fa-comment-o text-muted me-1"/>
                                                         <t t-esc="rej.rejection_reason"/>
                                                     </td>

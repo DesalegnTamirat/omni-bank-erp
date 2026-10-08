@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sequence for Insurance Notification -->
+    <record id="seq_hr_insurance_notification" model="ir.sequence">
+        <field name="name">Insurance Notification Sequence</field>
+        <field name="code">hr.insurance.notification</field>
+        <field name="prefix">INS/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Reject Wizard Action -->
+    <record id="action_hr_insurance_reject_wizard" model="ir.actions.act_window">
+        <field name="name">Reject Insurance Notification</field>
+        <field name="res_model">hr.insurance.reject.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Reject Wizard Form View -->
+    <record id="view_hr_insurance_reject_wizard_form" model="ir.ui.view">
+        <field name="name">hr.insurance.reject.wizard.form</field>
+        <field name="model">hr.insurance.reject.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reject Insurance Notification">
+                <group>
+                    <field name="notification_id" invisible="1"/>
+                    <field name="rejection_reason" placeholder="Enter mandatory rejection reason explaining why this notification is rejected..."/>
+                </group>
+                <footer>
+                    <button string="Reject Notification" type="object" name="action_confirm_reject" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Return Wizard Action -->
+    <record id="action_hr_insurance_return_wizard" model="ir.actions.act_window">
+        <field name="name">Return for Correction</field>
+        <field name="res_model">hr.insurance.return.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Return Wizard Form View -->
+    <record id="view_hr_insurance_return_wizard_form" model="ir.ui.view">
+        <field name="name">hr.insurance.return.wizard.form</field>
+        <field name="model">hr.insurance.return.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Return for Correction">
+                <group>
+                    <field name="notification_id" invisible="1"/>
+                    <field name="return_reason" placeholder="Enter mandatory details of the corrections required by the employee..."/>
+                </group>
+                <footer>
+                    <button string="Return to Employee" type="object" name="action_confirm_return" class="btn-warning"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Insurance Notification Form View -->
+    <record id="view_hr_insurance_notification_form" model="ir.ui.view">
+        <field name="name">hr.insurance.notification.form</field>
+        <field name="model">hr.insurance.notification</field>
+        <field name="arch" type="xml">
+            <form string="Insurance Incident Notification">
+                <header>
+                    <button name="action_submit" string="Submit Notification" type="object" class="btn-primary" invisible="state not in ['draft', 'returned']"/>
+                    <button name="action_under_review" string="Mark Under Review" type="object" class="btn-secondary" invisible="state != 'submitted'" groups="hr.group_hr_user,hr.group_hr_manager"/>
+                    <button name="action_approve" string="Approve Notification" type="object" class="btn-success" invisible="state not in ['submitted', 'under_review']" groups="hr.group_hr_user,hr.group_hr_manager"/>
+                    
+                    <button name="%(action_hr_insurance_return_wizard)d" string="Return for Correction" type="action" class="btn-warning" invisible="state not in ['submitted', 'under_review']" context="{'default_notification_id': id}" groups="hr.group_hr_user,hr.group_hr_manager"/>
+                    <button name="%(action_hr_insurance_reject_wizard)d" string="Reject" type="action" class="btn-danger" invisible="state not in ['submitted', 'under_review']" context="{'default_notification_id': id}" groups="hr.group_hr_user,hr.group_hr_manager"/>
+                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" class="btn-secondary" invisible="state not in ['returned', 'rejected']"/>
+                    
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,under_review,approved,completed"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Late Submission (>30 Days)" bg_color="bg-danger" invisible="not is_late_submission"/>
+                    <widget name="web_ribbon" title="Approved" bg_color="bg-success" invisible="state != 'approved'"/>
+                    <widget name="web_ribbon" title="Rejected" bg_color="bg-danger" invisible="state != 'rejected'"/>
+                    <widget name="web_ribbon" title="Returned" bg_color="bg-warning" invisible="state != 'returned'"/>
+
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="Employee &amp; Contact Details">
+                            <field name="employee_id" readonly="state != 'draft'"/>
+                            <field name="department_id"/>
+                            <field name="job_id"/>
+                            <field name="operating_unit_id"/>
+                            <field name="contact_number" readonly="state not in ['draft', 'returned']"/>
+                            <field name="requested_by_id"/>
+                        </group>
+                        <group string="Accident &amp; Incident Information">
+                            <field name="accident_date" readonly="state not in ['draft', 'returned']"/>
+                            <field name="accident_time" readonly="state not in ['draft', 'returned']"/>
+                            <field name="accident_place" readonly="state not in ['draft', 'returned']"/>
+                            <field name="hospital_name" readonly="state not in ['draft', 'returned']"/>
+                            <field name="injury_type" readonly="state not in ['draft', 'returned']"/>
+                        </group>
+                    </group>
+
+                    <group string="Policy &amp; Notification Period">
+                        <group>
+                            <field name="submission_date"/>
+                            <field name="working_days_delay"/>
+                            <field name="is_late_submission"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-warning" role="alert" invisible="not is_late_submission">
+                        <strong>Policy Warning:</strong> This insurance notification is submitted after 30 working days from the accident date. A mandatory justification is required below explaining the delay before submission.
+                    </div>
+
+                    <group string="Mandatory Late Justification" invisible="not is_late_submission">
+                        <field name="late_justification" placeholder="Provide clear justification for submitting this insurance notification after 30 working days..." readonly="state not in ['draft', 'returned']" required="is_late_submission"/>
+                    </group>
+
+                    <notebook>
+                        <page string="Incident Description &amp; Review Remarks" name="description">
+                            <group>
+                                <field name="incident_description" placeholder="Provide detailed explanation of the accident or illness incident..." readonly="state not in ['draft', 'returned']"/>
+                            </group>
+                            <group string="POMD Review Comments &amp; Feedback" invisible="state in ['draft', 'submitted']">
+                                <field name="pomd_comments" readonly="state in ['approved', 'rejected', 'completed']"/>
+                                <field name="return_reason" invisible="not return_reason"/>
+                                <field name="rejection_reason" invisible="not rejection_reason"/>
+                            </group>
+                        </page>
+
+                        <page string="Supporting Documents" name="documents">
+                            <field name="document_ids" readonly="state not in ['draft', 'returned']">
+                                <list editable="bottom">
+                                    <field name="document_type"/>
+                                    <field name="name"/>
+                                    <field name="filename" invisible="1"/>
+                                    <field name="file" filename="filename" widget="binary"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Audit Trail &amp; Record Tracking" name="audit">
+                            <group>
+                                <group string="Submission Timestamps">
+                                    <field name="submitted_date"/>
+                                    <field name="reviewed_by_id"/>
+                                    <field name="review_date"/>
+                                </group>
+                                <group string="Decision Timestamps">
+                                    <field name="approved_date"/>
+                                    <field name="returned_date"/>
+                                    <field name="rejected_date"/>
+                                    <field name="insurance_record_id"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Insurance Notification Tree View -->
+    <record id="view_hr_insurance_notification_tree" model="ir.ui.view">
+        <field name="name">hr.insurance.notification.tree</field>
+        <field name="model">hr.insurance.notification</field>
+        <field name="arch" type="xml">
+            <list string="Insurance Incident Notifications" multi_edit="0">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="accident_date"/>
+                <field name="injury_type"/>
+                <field name="hospital_name"/>
+                <field name="working_days_delay"/>
+                <field name="is_late_submission" widget="boolean_toggle"/>
+                <field name="state" widget="badge" decoration-info="state == 'submitted'" decoration-warning="state in ['under_review', 'returned']" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Insurance Notification Search View -->
+    <record id="view_hr_insurance_notification_search" model="ir.ui.view">
+        <field name="name">hr.insurance.notification.search</field>
+        <field name="model">hr.insurance.notification</field>
+        <field name="arch" type="xml">
+            <search string="Search Insurance Notifications">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="hospital_name"/>
+                <field name="injury_type"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Pending Review (Submitted)" name="submitted" domain="[('state', '=', 'submitted')]"/>
+                <filter string="Under Review" name="under_review" domain="[('state', '=', 'under_review')]"/>
+                <filter string="Returned for Correction" name="returned" domain="[('state', '=', 'returned')]"/>
+                <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Rejected" name="rejected" domain="[('state', '=', 'rejected')]"/>
+                <separator/>
+                <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                <filter string="Department" name="group_department" context="{'group_by': 'department_id'}"/>
+                <filter string="Injury Type" name="group_injury_type" context="{'group_by': 'injury_type'}"/>
+                <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                <filter string="Accident Month" name="group_accident_month" context="{'group_by': 'accident_date:month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for ESS Insurance Notifications -->
+    <record id="action_hr_insurance_notification_ess" model="ir.actions.act_window">
+        <field name="name">My Insurance Notifications</field>
+        <field name="res_model">hr.insurance.notification</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="context">{'search_default_draft': 1, 'search_default_submitted': 1, 'search_default_returned': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Submit a new Insurance Incident Notification!
+            </p>
+            <p>
+                Notify the People Operation Management Directorate (POMD) of any accident, injury, or medical incident within 30 working days.
+            </p>
+        </field>
+    </record>
+
+    <!-- Action for POMD / HR Officers Insurance Notifications -->
+    <record id="action_hr_insurance_notification_pomd" model="ir.actions.act_window">
+        <field name="name">POMD Insurance Incident Claims</field>
+        <field name="res_model">hr.insurance.notification</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_submitted': 1, 'search_default_under_review': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No pending insurance incident notifications.
+            </p>
+            <p>
+                Review, approve, return, or reject employee insurance incident notifications.
+            </p>
+        </field>
+    </record>
+
+    <!-- Employee Insurance Record Form View -->
+    <record id="view_hr_insurance_record_form" model="ir.ui.view">
+        <field name="name">hr.insurance.record.form</field>
+        <field name="model">hr.insurance.record</field>
+        <field name="arch" type="xml">
+            <form string="Employee Insurance Approved Record">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Employee Information">
+                            <field name="employee_id"/>
+                            <field name="notification_id"/>
+                            <field name="accident_date"/>
+                            <field name="injury_type"/>
+                            <field name="hospital_name"/>
+                        </group>
+                        <group string="POMD Approval &amp; Underwriter Tracking">
+                            <field name="approval_date"/>
+                            <field name="approved_by_id"/>
+                            <field name="claim_status" widget="badge"/>
+                            <field name="claim_amount"/>
+                            <field name="reimbursed_amount"/>
+                            <field name="reimbursement_date"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Incident Details &amp; Claim Notes">
+                            <group>
+                                <field name="incident_description"/>
+                                <field name="notes"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Employee Insurance Record Tree View -->
+    <record id="view_hr_insurance_record_tree" model="ir.ui.view">
+        <field name="name">hr.insurance.record.tree</field>
+        <field name="model">hr.insurance.record</field>
+        <field name="arch" type="xml">
+            <list string="Employee Insurance Records">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="accident_date"/>
+                <field name="injury_type"/>
+                <field name="hospital_name"/>
+                <field name="claim_status" widget="badge"/>
+                <field name="claim_amount"/>
+                <field name="reimbursed_amount"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action for Employee Insurance Approved Records -->
+    <record id="action_hr_insurance_record" model="ir.actions.act_window">
+        <field name="name">Employee Approved Insurance Ledger</field>
+        <field name="res_model">hr.insurance.record</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Inherited Employee Form View to show Insurance Claims & Records -->
+    <record id="view_employee_form_insurance_custom" model="ir.ui.view">
+        <field name="name">hr.employee.form.insurance.custom</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="priority">110</field>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook/page[@name='more_nested_lists']" position="before">
+                <page string="Insurance" name="insurance_incidents">
+                    <field name="insurance_ids"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

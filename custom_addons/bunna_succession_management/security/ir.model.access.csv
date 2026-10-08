@@ -1,0 +1,23 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_critical_position_ppdd,succession.critical.position PPDD,model_succession_critical_position,group_succession_ppdd,1,1,1,0
+access_critical_position_admin,succession.critical.position Admin,model_succession_critical_position,group_succession_admin,1,1,1,1
+access_talent_pool_ppdd,succession.talent.pool PPDD,model_succession_talent_pool,group_succession_ppdd,1,1,1,0
+access_talent_pool_admin,succession.talent.pool Admin,model_succession_talent_pool,group_succession_admin,1,1,1,1
+access_candidate_ppdd,succession.candidate PPDD,model_succession_candidate,group_succession_ppdd,1,1,1,0
+access_candidate_admin,succession.candidate Admin,model_succession_candidate,group_succession_admin,1,1,1,1
+access_candidate_gap_ppdd,succession.candidate.competency.gap PPDD,model_succession_candidate_competency_gap,group_succession_ppdd,1,1,1,1
+access_dev_plan_ppdd,succession.development.plan PPDD,model_succession_development_plan,group_succession_ppdd,1,1,1,0
+access_dev_plan_admin,succession.development.plan Admin,model_succession_development_plan,group_succession_admin,1,1,1,1
+access_dev_activity_ppdd,succession.development.activity PPDD,model_succession_development_activity,group_succession_ppdd,1,1,1,1
+access_governance_log_ppdd,succession.governance.log PPDD,model_succession_governance_log,group_succession_ppdd,1,0,1,0
+access_governance_log_admin,succession.governance.log Admin,model_succession_governance_log,group_succession_admin,1,1,1,0
+access_succession_auto_match_wizard,succession.auto.match.wizard,model_succession_auto_match_wizard,base.group_user,1,1,1,1
+access_succession_auto_match_line,succession.auto.match.line,model_succession_auto_match_line,base.group_user,1,1,1,1
+access_career_discussion_ppdd,succession.career.discussion PPDD,model_succession_career_discussion,group_succession_ppdd,1,1,1,0
+access_career_discussion_admin,succession.career.discussion Admin,model_succession_career_discussion,group_succession_admin,1,1,1,1
+access_ninebox_cell_ppdd,succession.ninebox.cell PPDD,model_succession_ninebox_cell,group_succession_ppdd,1,1,1,0
+access_ninebox_cell_admin,succession.ninebox.cell Admin,model_succession_ninebox_cell,group_succession_admin,1,1,1,1
+access_hr_career_track_ppdd,hr.career.track.ppdd,hr_employee_custom.model_hr_career_track,group_succession_ppdd,1,1,1,1
+access_hr_career_track_user,hr.career.track.user,hr_employee_custom.model_hr_career_track,base.group_user,1,0,0,0
+access_hr_job_family_ppdd,hr.job.family.ppdd,model_hr_job_family,group_succession_ppdd,1,1,1,1
+access_hr_job_family_user,hr.job.family.user,model_hr_job_family,base.group_user,1,0,0,0

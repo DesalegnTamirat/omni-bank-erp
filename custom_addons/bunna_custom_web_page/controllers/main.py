@@ -1,4 +1,5 @@
 import logging
+import re
 _logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-
 """
@@ -8,7 +9,6 @@ Restored bunna_custom_web_page controller.
 Integrates the Career Opportunities board directly with the External ATS Candidate Profile and CV system.
 """
 
-import urllib.parse
 import odoo
 from odoo import http, _
 from odoo.exceptions import AccessDenied
@@ -56,11 +56,6 @@ class CustomWebController(http.Controller):
             user.has_group('base.group_system') or
             user.has_group('base.group_erp_manager')
         )
-
-        # Verify Electronic CV profile completeness for regular candidates only (Admins bypass)
-        if not is_admin:
-            if not candidate.education_ids or not candidate.experience_ids:
-                return request.redirect("/my/candidate/profile")
 
         today = odoo.fields.Date.today()
         if is_admin:
@@ -116,9 +111,7 @@ class CustomWebController(http.Controller):
     def job_apply_page(self, job_id, **kw):
         """Forces candidate authentication and profile completeness check before applying."""
         vacancy = request.env['job.vacancy'].sudo().browse(job_id)
-        today = odoo.fields.Date.today()
-        is_closed = vacancy.vacancy_status == 'closed' or (vacancy.last_date_to_apply and vacancy.last_date_to_apply < today)
-        if not vacancy.exists() or is_closed or vacancy.sourcing_type not in ('external', 'both'):
+        if not vacancy.exists() or vacancy.vacancy_status == 'closed' or vacancy.sourcing_type not in ('external', 'both'):
             return request.redirect('/jobs')
 
         user = request.env.user
@@ -135,8 +128,10 @@ class CustomWebController(http.Controller):
 
         # Verify Electronic CV profile completeness (must have education and experience entries)
         if not candidate.education_ids or not candidate.experience_ids:
-            error_msg = _("To apply for Career Opportunities, you must first successfully complete your Master CV Profile (including at least one Educational Qualification and one Work Experience entry).")
-            return request.redirect(f"/my/candidate/profile?error={urllib.parse.quote(error_msg)}")
+            return request.render("custom_recruitment.ats_candidate_profile_template", {
+                'candidate': candidate,
+                'error_msg': "To apply for Career Opportunities, you must first successfully complete your Master CV Profile (including at least one Educational Qualification and one Work Experience entry).",
+            })
 
         # Check if already applied
         existing_app = request.env['hr.applicant'].sudo().search([
@@ -157,9 +152,7 @@ class CustomWebController(http.Controller):
     def job_apply_submit(self, **kw):
         vacancy_id = int(kw.get('vacancy_id', 0))
         vacancy = request.env['job.vacancy'].sudo().browse(vacancy_id)
-        today = odoo.fields.Date.today()
-        is_closed = vacancy.vacancy_status == 'closed' or (vacancy.last_date_to_apply and vacancy.last_date_to_apply < today)
-        if not vacancy.exists() or is_closed:
+        if not vacancy.exists() or vacancy.vacancy_status == 'closed':
             return request.redirect('/jobs')
 
         user = request.env.user
@@ -310,6 +303,14 @@ class CustomWebController(http.Controller):
         if '@' not in email or '.' not in email:
             return request.render("bunna_custom_web_page.jobs_register_template", {
                 'error': 'Please enter a valid official email address.',
+                'first_name': first_name, 'middle_name': middle_name, 'last_name': last_name,
+                'email': email, 'phone': phone,
+            })
+
+        phone_cleaned = re.sub(r'[\s\-\(\)]', '', phone)
+        if not re.match(r'^(\+251|00251|251|0)(9|7)\d{8}$', phone_cleaned):
+            return request.render("bunna_custom_web_page.jobs_register_template", {
+                'error': 'Please enter a valid Ethiopian mobile phone number (e.g. 0911223344, 0711223344, or +251911223344).',
                 'first_name': first_name, 'middle_name': middle_name, 'last_name': last_name,
                 'email': email, 'phone': phone,
             })

@@ -78,7 +78,13 @@ class AssessmentWeightProfile(models.Model):
         if "job.vacancy" not in self.env or self.env.context.get('skip_profile_sync'):
             return
         for profile in self:
-            cand_domain = [('sourcing_type', 'in', ['internal', 'both'])] if profile.candidate_type == 'internal' else [('sourcing_type', '=', 'external')]
+            if profile.candidate_type == 'transfer':
+                cand_domain = [('internal_movement_type', 'in', ['lateral', 'transfer'])]
+            elif profile.candidate_type == 'internal':
+                cand_domain = [('sourcing_type', 'in', ['internal', 'both']), ('internal_movement_type', 'not in', ['lateral', 'transfer'])]
+            else:
+                cand_domain = [('sourcing_type', '=', 'external')]
+
             if profile.role_level == 'managerial':
                 role_domain = [('employee_category', '=', 'Managerial')]
             elif profile.role_level == 'junior':
@@ -93,6 +99,7 @@ class AssessmentWeightProfile(models.Model):
                 continue
 
             pms_w, exam_w, int_w = 0.0, 0.0, 0.0
+            app_w, exp_w, loc_w, rec_w = 0.0, 0.0, 0.0, 0.0
             for line in profile.line_ids:
                 if line.component == "pms":
                     pms_w = line.weight_percentage
@@ -100,14 +107,30 @@ class AssessmentWeightProfile(models.Model):
                     exam_w = line.weight_percentage
                 elif line.component == "interview":
                     int_w = line.weight_percentage
+                elif line.component == "app_date":
+                    app_w = line.weight_percentage
+                elif line.component == "experience":
+                    exp_w = line.weight_percentage
+                elif line.component == "service_location":
+                    loc_w = line.weight_percentage
+                elif line.component == "recommendation":
+                    rec_w = line.weight_percentage
 
             has_exam = exam_w > 0
-            vacancies.with_context(skip_profile_sync=True).sudo().write({
+            vals_to_write = {
                 'pms_weight': pms_w,
                 'written_weight': exam_w,
                 'interview_weight': int_w,
                 'has_written_exam': has_exam,
-            })
+            }
+            if profile.candidate_type == 'transfer' or (app_w or exp_w or loc_w or rec_w):
+                vals_to_write.update({
+                    'app_date_weight': app_w or 20.0,
+                    'experience_weight': exp_w or 20.0,
+                    'location_weight': loc_w or 20.0,
+                    'recommendation_weight': rec_w or 10.0,
+                })
+            vacancies.with_context(skip_profile_sync=True).sudo().write(vals_to_write)
 
     @api.constrains("line_ids", "total_weight")
     def _check_total_weight(self):

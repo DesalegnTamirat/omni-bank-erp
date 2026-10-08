@@ -38,3 +38,72 @@ header .navbar .btn-primary,
     --btn-primary-bg: #425727;
     --btn-primary-border: #425727;
 }
+
+/* Vertically & horizontally center all Apps menu grid icons (:::) & brand icons */
+.o_main_navbar {
+    display: flex !important;
+    align-items: center !important;
+
+    .o_navbar_apps_menu,
+    .o_menu_brand,
+    .o_menu_sections,
+    .o_menu_systray {
+        display: flex !important;
+        align-items: center !important;
+        height: 100% !important;
+    }
+
+    .o_navbar_apps_menu {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: 100% !important;
+
+        .dropdown,
+        .o-dropdown,
+        > div,
+        button,
+        .o_menu_toggle,
+        .o_grid_apps_menu__button {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 100% !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin: 0 !important;
+            line-height: 1 !important;
+        }
+
+        i, svg, .oi-apps, .oi, .fa-bars, .o_app_icon {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            vertical-align: middle !important;
+            margin: 0 auto !important;
+            line-height: 1 !important;
+        }
+    }
+
+    .o_menu_brand {
+        display: inline-flex !important;
+        align-items: center !important;
+        height: 100% !important;
+        line-height: 1 !important;
+    }
+}
+
+/* Custom Apps Menu Background - Ethiopian Coffee Ceremony Illustration */
+.app-menu-container,
+.o_grid_apps_menu {
+    background-color: #ffffff !important;
+    background-image: url("/web_responsive/static/img/coffee_bg.jpg") !important;
+    background-position: center center !important;
+    background-size: contain !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+
+    &::before {
+        display: none !important;
+    }
+}

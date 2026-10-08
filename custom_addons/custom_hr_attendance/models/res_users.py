@@ -5,7 +5,7 @@ from odoo.exceptions import ValidationError
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
-    @api.constrains('groups_id')
+    @api.constrains('group_ids')
     def _check_attendance_role_rules(self):
         job_position = self.env.ref(
             'custom_hr_attendance.group_hr_attendance_job_position_Officer',
@@ -25,7 +25,7 @@ class ResUsers(models.Model):
             return
 
         for user in self:
-            groups = user.groups_id
+            groups = user.group_ids
 
             # Mutually exclusive roles
             if job_position in groups and it_driver in groups:
@@ -86,6 +86,7 @@ class ResUsers(models.Model):
         Preserves higher administrative/specialized manager roles if explicitly assigned.
         """
         group_manager = self.env.ref('hr_attendance.group_hr_attendance_user', raise_if_not_found=False)
+        group_auditor = self.env.ref('custom_hr_attendance.group_hr_attendance_auditor', raise_if_not_found=False)
         group_job_pos = self.env.ref('custom_hr_attendance.group_hr_attendance_job_position_user', raise_if_not_found=False)
         group_it_driver = self.env.ref('custom_hr_attendance.group_hr_attendance_it_driver_user', raise_if_not_found=False)
         group_admin = self.env.ref('hr_attendance.group_hr_attendance_manager', raise_if_not_found=False)
@@ -93,7 +94,7 @@ class ResUsers(models.Model):
         if not group_manager:
             return
 
-        higher_groups = [g for g in [group_job_pos, group_it_driver, group_admin] if g]
+        higher_groups = [g for g in [group_auditor, group_job_pos, group_it_driver, group_admin] if g]
 
         for user in self:
             if not user.has_group('base.group_user'):

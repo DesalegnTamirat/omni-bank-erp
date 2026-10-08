@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from markupsafe import Markup
 from odoo import fields, models
 from odoo.exceptions import UserError
+from ..models.performance_notification_helper import send_performance_notification
 
 
 class PerformanceRejectionWizard(models.TransientModel):
@@ -21,77 +21,76 @@ class PerformanceRejectionWizard(models.TransientModel):
         if not self.reason or not self.reason.strip():
             raise UserError('Please provide a valid reason for rejection.')
 
-        record = self.env[self.res_model].browse(self.res_id)
+        record = self.env[self.res_model].sudo().browse(self.res_id)
         if not record.exists():
             raise UserError('The record you are rejecting no longer exists.')
 
         reason_text = self.reason.strip()
-        doc_title = getattr(record, 'name', False) or getattr(record, 'planning_name', '') or 'Performance Document'
+        doc_title = (
+            getattr(record, 'planning_name', False)
+            or getattr(record, 'name', False)
+            or getattr(record, 'display_name', False)
+            or 'Performance Document'
+        )
 
         record.write({
             'state': 'rejected',
             'rejection_reason': reason_text,
         })
 
-        # Locate manager
+        # Clear existing activities for employee
+        try:
+            record.activity_feedback(['mail.mail_activity_data_todo'], feedback=f"Document rejected: {reason_text}")
+        except Exception:
+            pass
+
+        # Locate manager / planning
         manager = (
             getattr(record, 'manager_id', False)
             or (record.employee_id.parent_id if hasattr(record, 'employee_id') and record.employee_id else False)
             or (record.employee_id.coach_id if hasattr(record, 'employee_id') and record.employee_id else False)
         )
-        partner = manager.user_id.partner_id if (manager and manager.user_id) else False
-
-        # Build clean formatted HTML notification
-        body_html = Markup(
-            '<div style="font-family: Arial, sans-serif; font-size: 13px; line-height: 1.5;">'
-            '<div style="padding: 10px 14px; background-color: #fbf0f0; border-left: 4px solid #541718; border-radius: 4px; margin-bottom: 8px;">'
-            '<strong style="color: #541718; font-size: 14px;">⚠️ Performance Document Rejected by Employee</strong><br/>'
-            '<span style="color: #333;"><strong>Document:</strong> %s</span>'
-            '</div>'
-            '<div style="padding: 10px 14px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 8px;">'
-            '<strong style="color: #1d2b32;">Reason for Rejection:</strong>'
-            '<p style="margin: 6px 0 0 0; color: #541718; font-style: italic;">%s</p>'
-            '</div>'
-            '<p style="color: #666; font-size: 12px; margin: 0;">Please review the document, adjust targets or measurements if necessary, and click <b>Notify</b> to re-notify the employee.</p>'
-            '</div>'
-        ) % (doc_title, reason_text)
-
+        mgr_user = manager.user_id if manager else False
+        partner = mgr_user.partner_id if mgr_user else False
         partner_ids = [partner.id] if partner else []
-        if partner:
-            record.message_subscribe(partner_ids=partner_ids)
 
-        record.message_post(
-            body=body_html,
-            message_type='comment',
-            subtype_xmlid='mail.mt_comment',
-            partner_ids=partner_ids,
+        emp = getattr(record, 'employee_id', False)
+        emp_name = emp.name if emp else (getattr(record, 'operating_unit_id', False).name if hasattr(record, 'operating_unit_id') and record.operating_unit_id else 'Employee')
+        manager_name = manager.name if manager else 'Manager / Planning Administrator'
+
+        period = getattr(record, 'appraisal_period_id', False)
+        period_name = period.name if period else ''
+        fy = getattr(record, 'fiscal_year_id', False)
+        fy_name = fy.name if fy else ''
+
+        details = [
+            ("Document Name", f"<strong>{doc_title}</strong>"),
+            ("Rejected By", f"<strong>{emp_name}</strong>"),
+            ("Manager / Planning", manager_name),
+        ]
+        if period_name:
+            details.append(("Appraisal Period", f"{period_name} ({fy_name})"))
+        if hasattr(record, 'operating_unit_id') and record.operating_unit_id:
+            details.append(("Operating Unit", record.operating_unit_id.name))
+        details.extend([
+            ("Rejection Reason", f'<span style="color: #c53030; font-weight: bold; font-style: italic;">{reason_text}</span>'),
+            ("Current Status", '<span style="background-color: #fed7d7; color: #9b2c2c; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">REJECTED</span>'),
+        ])
+
+        send_performance_notification(
+            record=record,
+            title="⚠️ Performance Document Rejected",
+            badge_text="REJECTED",
+            badge_bg="#dc3545",
+            border_color="#dc3545",
+            intro_text=f"Employee <strong>{emp_name}</strong> has <strong>REJECTED</strong> the performance document <strong>{doc_title}</strong>. Please review the reason provided below, adjust targets or measurements if necessary, and re-notify.",
+            details=details,
+            action_btn_text="🎯 Open Performance Record",
+            action_btn_color="#541718",
+            footer_note=f"Please make adjustments to the document and click <b>Notify</b> to re-notify <b>{emp_name}</b>.",
+            recipient_partner_ids=partner_ids,
+            activity_user_id=mgr_user.id if mgr_user else False,
+            activity_summary=f"Rejected: {doc_title} - Reason: {reason_text[:60]}",
         )
-
-        # Notify manager via direct message_notify and schedule activity
-        if partner:
-            try:
-                record.message_notify(
-                    partner_ids=partner_ids,
-                    body=body_html,
-                    subject='Performance Document Rejected: %s' % doc_title,
-                    record_name=doc_title,
-                )
-            except Exception:
-                pass
-
-        if manager and manager.user_id:
-            try:
-                record.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    user_id=manager.user_id.id,
-                    summary='Performance Document Rejected: %s' % doc_title,
-                    note=Markup(
-                        'The employee has rejected this document with reason:<br/>'
-                        '<blockquote style="border-left: 3px solid #541718; margin: 4px 0; padding-left: 8px; color: #541718;">%s</blockquote>'
-                        'Please review, make adjustments if needed, and re-notify the employee.'
-                    ) % reason_text,
-                )
-            except Exception:
-                pass
 
         return {'type': 'ir.actions.act_window_close'}

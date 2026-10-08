@@ -2,27 +2,39 @@
 from odoo import models, fields, api
 import base64
 import logging
+import re
 
 _logger = logging.getLogger(__name__)
 
 
-import re
-
 def _clean_b64(raw):
-    """Normalize raw picture data (bytes/str/base64/data-uri/double-base64) to clean Base64 string for Odoo."""
+    """Normalize raw picture data (bytes/str/base64/data-uri/double-base64/memoryview) to clean Base64 string for Odoo."""
     if not raw:
         return False
     if isinstance(raw, (memoryview, bytearray)):
         raw = bytes(raw)
     try:
         if isinstance(raw, bytes):
+            # Try decoding bytes to utf-8 text first (if stored as base64 ascii text bytes)
+            try:
+                txt = raw.decode('utf-8').strip()
+                if txt.startswith(('/9j/', 'iVBOR', 'R0lG', 'Qk0=', 'UklGR')):
+                    return txt
+                if ',' in txt and 'base64' in txt[:50]:
+                    txt = txt.split(',', 1)[1].strip()
+                txt = re.sub(r'[\r\n\s]+', '', txt)
+                if txt.startswith(('/9j/', 'iVBOR', 'R0lG', 'Qk0=', 'UklGR')):
+                    return txt
+            except Exception:
+                pass
+
             # Raw binary image (JPEG / PNG / GIF / WEBP / BMP)
             if raw.startswith((b'\xff\xd8', b'\x89PNG', b'GIF8', b'RIFF', b'BM')):
                 return base64.b64encode(raw).decode('utf-8')
             try:
-                raw = raw.decode('utf-8')
-            except UnicodeDecodeError:
                 return base64.b64encode(raw).decode('utf-8')
+            except Exception:
+                pass
 
         if isinstance(raw, str):
             txt = raw.strip()
@@ -103,8 +115,13 @@ class HrEmployee(models.Model):
                                             emp_dict['image_1920'] = pic_b64
                                         if 'avatar_128' in emp_dict and not emp_dict['avatar_128']:
                                             emp_dict['avatar_128'] = pic_b64
-                        except Exception:
-                            pass
+
+                                        # Persist image_1920 onto hr.employee record so Kanban & List view avatar URLs (/web/image) load the photo directly
+                                        emp_obj = self.env['hr.employee'].sudo().browse(emp_id)
+                                        if emp_obj.exists() and not emp_obj.image_1920:
+                                            emp_obj.with_context(skip_emp_profile_sync=True).write({'image_1920': pic_b64})
+                        except Exception as e:
+                            _logger.warning("Error loading profile picture in read() for employee %s: %s", emp_id, e)
         return records
 
     @api.model
@@ -177,6 +194,7 @@ class HrEmployee(models.Model):
         """Insert/update photo into employee_profile_photo table as bytea using hr_employee.id."""
         current_uid = self.env.uid
         current_time = fields.Datetime.now()
+        b64_str = _clean_b64(image_base64) or image_base64
 
         self.env.cr.execute(
             "SELECT id FROM employee_profile_photo WHERE employee_id = %s LIMIT 1",
@@ -191,7 +209,7 @@ class HrEmployee(models.Model):
                     write_date = %s
                 WHERE employee_id = %s
             """
-            self.env.cr.execute(query, (image_base64, current_uid, current_time, emp_id))
+            self.env.cr.execute(query, (b64_str, current_uid, current_time, emp_id))
         else:
             query = """
                 INSERT INTO employee_profile_photo (
@@ -203,4 +221,4 @@ class HrEmployee(models.Model):
                     write_date
                 ) VALUES (%s, decode(%s, 'base64'), %s, %s, %s, %s)
             """
-            self.env.cr.execute(query, (emp_id, image_base64, current_uid, current_time, current_uid, current_time))
+            self.env.cr.execute(query, (emp_id, b64_str, current_uid, current_time, current_uid, current_time))

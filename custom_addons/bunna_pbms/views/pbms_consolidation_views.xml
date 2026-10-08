@@ -33,10 +33,10 @@
                 <field name="m12" optional="show" sum="Total" string="Jun" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
 
                 <!-- Quarterly totals -->
-                <field name="quarter1_total" sum="Total" string="Q1 Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
-                <field name="quarter2_total" sum="Total" string="Q2 Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
-                <field name="quarter3_total" sum="Total" string="Q3 Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
-                <field name="quarter4_total" sum="Total" string="Q4 Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="quarter1_total" sum="Total" string="QI Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="quarter2_total" sum="Total" string="QII Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="quarter3_total" sum="Total" string="QIII Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="quarter4_total" sum="Total" string="QIV Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
                 <field name="annual_total" sum="Total" string="Annual Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
 
                 <!-- Itemized category specific fields -->
@@ -166,7 +166,7 @@
                 <filter string="Unit Type" name="group_unit_type" context="{'group_by': 'org_unit_type'}"/>
                 <filter string="Planning Category" name="group_source_model" context="{'group_by': 'source_model'}"/>
                 <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
-                <filter string="Cycle" name="group_cycle" context="{'group_by': 'cycle_id'}"/>
+                <filter string="FY(the Planning year)" name="group_cycle" context="{'group_by': 'cycle_id'}"/>
             </search>
         </field>
     </record>
@@ -175,7 +175,20 @@
     <record id="action_pbms_consolidation" model="ir.actions.act_window">
         <field name="name">Bank-Wide Consolidation</field>
         <field name="res_model">pbms.consolidation.line</field>
-        <field name="view_mode">kanban,list,pivot,graph</field>
+        <field name="view_mode">list,kanban,pivot,graph</field>
+    </record>
+
+    <record id="action_pbms_consolidation_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_consolidation_list"/>
+        <field name="act_window_id" ref="action_pbms_consolidation"/>
+    </record>
+    <record id="action_pbms_consolidation_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_consolidation_kanban"/>
+        <field name="act_window_id" ref="action_pbms_consolidation"/>
     </record>
 
     <!-- Server Action: Export to Excel from Consolidation -->

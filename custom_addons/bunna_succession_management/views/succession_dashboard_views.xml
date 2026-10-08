@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- =====================================================
+             SUCCESSION PIPELINE DASHBOARD
+             Bench Strength overview grouped by succession risk
+        ====================================================== -->
+        <record id="view_succession_dashboard_pivot" model="ir.ui.view">
+            <field name="name">succession.critical.position.pivot</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <pivot string="Succession Risk Matrix">
+                    <field name="department_id" type="row"/>
+                    <field name="succession_risk" type="col"/>
+                    <field name="bench_strength" type="measure"/>
+                    <field name="candidate_count" type="measure"/>
+                    <field name="ready_now_count" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_succession_dashboard_graph" model="ir.ui.view">
+            <field name="name">succession.critical.position.graph</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <graph string="Bench Strength by Department" type="bar">
+                    <field name="department_id"/>
+                    <field name="ready_now_count" type="measure"/>
+                    <field name="candidate_count" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <!-- Actions for Dashboard -->
+        <record id="action_succession_dashboard" model="ir.actions.act_window">
+            <field name="name">Succession Dashboard</field>
+            <field name="res_model">succession.critical.position</field>
+            <field name="view_mode">list,graph,pivot,form</field>
+            <field name="context">{'search_default_approved': 1}</field>
+        </record>
+
+    </data>
+</odoo>

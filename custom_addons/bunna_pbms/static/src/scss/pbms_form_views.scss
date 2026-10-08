@@ -5,7 +5,7 @@
 /* Bunna Bank S.C. Official 6 Brand Colors */
 /* Primary Colors (Image 4 & 6) */
 $bunna-primary-slate: #1D2B32;       /* Swatch 4: C:83 M:67 Y:58 K:62 | R:29 G:43 B:50 */
-$bunna-primary-maroon: #54171820;      /* Swatch 6: C:39 M:89 Y:79 K:60 | R:84 G:24 B:24 */
+$bunna-primary-maroon: #541718;        /* Swatch 6: C:39 M:89 Y:79 K:60 | R:84 G:24 B:24 */
 
 /* Secondary Colors (Image 1, 2, 3, 5) */
 $bunna-secondary-forest: #425727;    /* Swatch 1: C:70 M:44 Y:100 K:39 | R:66 G:87 B:39 */
@@ -167,8 +167,8 @@ $bunna-light: #F4F6F7;
 
                 // Reject & Recommend Rejection - Primary Deep Maroon (#541718)
                 &.btn-danger {
-                    background: linear-gradient(135deg, #541718 0%, #74252620 100%) !important;
-                    border: 1px solid #3E101120 !important;
+                    background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+                    border: 1px solid #3E1011 !important;
                     color: #FFFFFF !important;
                     font-weight: 600;
 
@@ -190,6 +190,30 @@ $bunna-light: #F4F6F7;
                         border-color: #1E2917 !important;
                         color: #FFFFFF !important;
                         box-shadow: 0 2px 6px rgba(30, 41, 23, 0.25);
+                    }
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // Custom Save Button Dynamic Visibility:
+        // Disappears when saved/clean, appears when editing or creating
+        // ---------------------------------------------------------------------
+        .o_statusbar_buttons {
+            .o_pbms_save_btn,
+            button[name="action_save_plan"],
+            button[name="action_save_request"] {
+                display: none !important;
+
+                &.btn-primary {
+                    background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+                    border: 1px solid #3E1011 !important;
+                    color: #FFFFFF !important;
+                    font-weight: 700;
+
+                    &:hover {
+                        background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+                        box-shadow: 0 4px 12px rgba(84, 24, 24, 0.35);
                     }
                 }
             }
@@ -350,6 +374,33 @@ $bunna-light: #F4F6F7;
             margin-top: 0.25rem;
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Section Separators & Group Titles in Forms & Configs
+    // -------------------------------------------------------------------------
+    .o_horizontal_separator,
+    .o_group .o_group_header {
+        color: #541718 !important;
+        font-weight: 700 !important;
+        border-bottom: 2px solid #541718 !important;
+        padding-bottom: 4px;
+        margin-top: 1rem;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        font-size: 0.88rem;
+        letter-spacing: 0.5px;
+    }
+
+    // Form Overview Numbers Contrast
+    .o_field_widget {
+        &.fs-6 {
+            font-size: 0.95rem !important;
+        }
+
+        &.fs-5 {
+            font-size: 1.15rem !important;
+        }
+    }
 }
 
 /* ========================================================================= */
@@ -452,7 +503,7 @@ $bunna-light: #F4F6F7;
             &.btn-primary[name="action_submit"],
             &.btn-primary {
                 background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
-                border: 1px solid #3E101120 !important;
+                border: 1px solid #3E1011 !important;
                 color: #FFFFFF !important;
 
                 &:hover {
@@ -634,34 +685,6 @@ td.text-info {
     }
 }
 
-// -------------------------------------------------------------------------
-// 4. Section Separators & Group Titles in Forms & Configs
-// -------------------------------------------------------------------------
-.o_form_view {
-    .o_horizontal_separator,
-    .o_group .o_group_header {
-        color: #541718 !important;
-        font-weight: 700 !important;
-        border-bottom: 2px solid #541718 !important;
-        padding-bottom: 4px;
-        margin-top: 1rem;
-        margin-bottom: 0.75rem;
-        text-transform: uppercase;
-        font-size: 0.88rem;
-        letter-spacing: 0.5px;
-    }
-
-    // Form Overview Numbers Contrast
-    .o_field_widget {
-        &.fs-6 {
-            font-size: 0.95rem !important;
-        }
-
-        &.fs-5 {
-            font-size: 1.15rem !important;
-        }
-    }
-}
 
 // -------------------------------------------------------------------------
 // 5. List View Table Headers & Aggregation Footers
@@ -671,6 +694,28 @@ td.text-info {
         color: #1D2B32 !important;
         font-weight: 700 !important;
         background-color: #F8FAFC !important;
+
+        // Keep the planning grid readable when the list view is narrower
+        // than the full monthly form table.
+        &[data-name="opening_balance"] {
+            min-width: 175px;
+        }
+
+        &[data-name^="quarter"] {
+            min-width: 105px;
+        }
+    }
+
+    td[name="opening_balance"],
+    td[name^="quarter"] {
+        min-width: 105px;
+    }
+
+    thead th[data-name="opening_balance"],
+    thead th[data-name^="quarter"] {
+        white-space: normal !important;
+        line-height: 1.15;
+        vertical-align: middle;
     }
 
     tfoot {
@@ -1030,6 +1075,73 @@ select.o_input {
     color: #541718 !important;
 }
 
+// Bunna PBMS branding for items inside the opened navigation dropdown.
+.o_main_navbar .o_menu_sections {
+    .o-dropdown--menu [data-menu-xmlid^="bunna_pbms.menu_pbms"],
+    .o_dropdown_menu [data-menu-xmlid^="bunna_pbms.menu_pbms"] {
+        color: #1D2B32 !important;
+        background-color: #FFFFFF !important;
+        border-left: 3px solid transparent !important;
+        font-weight: 600 !important;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .o-dropdown--menu [data-menu-xmlid^="bunna_pbms.menu_pbms"]:hover,
+    .o-dropdown--menu [data-menu-xmlid^="bunna_pbms.menu_pbms"]:focus,
+    .o-dropdown--menu [data-menu-xmlid^="bunna_pbms.menu_pbms"].active,
+    .o_dropdown_menu [data-menu-xmlid^="bunna_pbms.menu_pbms"]:hover,
+    .o_dropdown_menu [data-menu-xmlid^="bunna_pbms.menu_pbms"]:focus,
+    .o_dropdown_menu [data-menu-xmlid^="bunna_pbms.menu_pbms"].active {
+        color: #541718 !important;
+        background-color: #F4E8E8 !important;
+        border-left-color: #541718 !important;
+    }
+}
+
+// Normalize remaining Bootstrap classes used by PBMS list actions.
+.o_list_renderer.o_pbms_list .o_data_row,
+.o_list_renderer.o_pbms_list .o_list_table .o_data_row,
+.o_list_renderer .o_data_row:has(.btn-pbms-submit),
+.o_list_table .o_data_row:has(.btn-pbms-submit),
+.o_pbms_exceptional_list .o_data_row {
+    .btn-primary {
+        @extend %btn-pbms-base;
+        background-color: #541718 !important;
+        border-color: #541718 !important;
+        color: #FFFFFF !important;
+    }
+
+    .btn-success {
+        @extend %btn-pbms-base;
+        background-color: #425727 !important;
+        border-color: #425727 !important;
+        color: #FFFFFF !important;
+    }
+
+    .btn-warning,
+    .btn-outline-warning {
+        @extend %btn-pbms-base;
+        background-color: #C17540 !important;
+        border-color: #C17540 !important;
+        color: #FFFFFF !important;
+    }
+
+    .btn-danger {
+        @extend %btn-pbms-base;
+        background-color: #541718 !important;
+        border-color: #541718 !important;
+        color: #FFFFFF !important;
+    }
+
+    .btn-info,
+    .btn-outline-info {
+        @extend %btn-pbms-base;
+        background-color: #1D2B32 !important;
+        border-color: #1D2B32 !important;
+        color: #FFFFFF !important;
+    }
+}
+
 // -------------------------------------------------------------------------
 // 11. Search View, Filters & Group By Branding (Bunna Bank Palette)
 // -------------------------------------------------------------------------
@@ -1278,7 +1390,7 @@ select.o_input {
 }
 
 // -------------------------------------------------------------------------
-// 13. Kanban Group Columns & Headers (When Grouped in Kanban View)
+// 13. Kanban Group Columns, Headers & Progressbars (Bunna Brand Colors)
 // -------------------------------------------------------------------------
 .o_kanban_view {
     .o_kanban_group {
@@ -1313,6 +1425,184 @@ select.o_input {
             }
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Bunna Bank Brand Progressbars (Strictly replaces all blue/teal with Bunna brand)
+    // ---------------------------------------------------------------------
+    .o_kanban_counter {
+        .o_column_progress,
+        > .o_column_progress {
+            background-color: #E2E8F0 !important;
+            border-radius: 4px !important;
+            overflow: hidden !important;
+            height: 8px !important;
+
+            .progress-bar {
+                border-radius: 3px;
+                transition: width 0.3s ease;
+
+                // People Solutions / Primary -> Bunna Maroon (#541718)
+                &.bg-maroon,
+                &.bg-primary,
+                &.text-bg-primary,
+                &.bg-info,
+                &.text-bg-info {
+                    background-color: #541718 !important;
+                }
+
+                // CPCO Review -> Bunna Bronze Olive (#726732)
+                &.bg-bronze {
+                    background-color: #726732 !important;
+                }
+
+                // CEO Review -> Bunna Terracotta Amber (#C17540)
+                &.bg-warning,
+                &.text-bg-warning,
+                &.bg-terracotta {
+                    background-color: #C17540 !important;
+                }
+
+                // Approved -> Bunna Forest Green (#425727)
+                &.bg-success,
+                &.text-bg-success,
+                &.bg-forest {
+                    background-color: #425727 !important;
+                }
+
+                // Rejected -> Bunna Wine Red (#742526)
+                &.bg-danger,
+                &.text-bg-danger {
+                    background-color: #742526 !important;
+                }
+
+                // Returned -> Bunna Slate (#1D2B32)
+                &.bg-muted,
+                &.bg-secondary,
+                &.bg-dark,
+                &.bg-slate {
+                    background-color: #1D2B32 !important;
+                }
+            }
+        }
+    }
+
+    // Kanban Group Filter Reordering & Highlights (When a bar is clicked)
+    .o_kanban_group {
+        &.o_kanban_group_show_maroon,
+        &.o_kanban_group_show_primary,
+        &.o_kanban_group_show_info {
+            --KanbanGroup-background: #FAF1EB !important;
+            outline: 1px solid #541718 !important;
+            box-shadow: inset 2px 0 0 #541718, inset -2px 0 0 #541718 !important;
+
+            .oe_kanban_card_maroon,
+            .oe_kanban_card_primary,
+            .oe_kanban_card_info {
+                order: 1;
+            }
+        }
+
+        &.o_kanban_group_show_bronze {
+            --KanbanGroup-background: #F6F4EB !important;
+            outline: 1px solid #726732 !important;
+            box-shadow: inset 2px 0 0 #726732, inset -2px 0 0 #726732 !important;
+
+            .oe_kanban_card_bronze {
+                order: 1;
+            }
+        }
+
+        &.o_kanban_group_show_forest,
+        &.o_kanban_group_show_success {
+            --KanbanGroup-background: #EDF3E8 !important;
+            outline: 1px solid #425727 !important;
+            box-shadow: inset 2px 0 0 #425727, inset -2px 0 0 #425727 !important;
+
+            .oe_kanban_card_forest,
+            .oe_kanban_card_success {
+                order: 1;
+            }
+        }
+
+        &.o_kanban_group_show_warning,
+        &.o_kanban_group_show_terracotta {
+            --KanbanGroup-background: #FAF1EB !important;
+            outline: 1px solid #C17540 !important;
+            box-shadow: inset 2px 0 0 #C17540, inset -2px 0 0 #C17540 !important;
+
+            .oe_kanban_card_warning,
+            .oe_kanban_card_terracotta {
+                order: 1;
+            }
+        }
+
+        &.o_kanban_group_show_danger {
+            --KanbanGroup-background: #FDF2F2 !important;
+            outline: 1px solid #742526 !important;
+            box-shadow: inset 2px 0 0 #742526, inset -2px 0 0 #742526 !important;
+
+            .oe_kanban_card_danger {
+                order: 1;
+            }
+        }
+
+        &.o_kanban_group_show_muted,
+        &.o_kanban_group_show_slate {
+            --KanbanGroup-background: #F1F5F9 !important;
+            outline: 1px solid #1D2B32 !important;
+            box-shadow: inset 2px 0 0 #1D2B32, inset -2px 0 0 #1D2B32 !important;
+
+            .oe_kanban_card_muted,
+            .oe_kanban_card_slate {
+                order: 1;
+            }
+        }
+    }
+}
+
+// Global Progress Bar Fallback (No Blue in Any PBMS Progress Bar)
+.progress-bar {
+    &.bg-maroon,
+    &.bg-info,
+    &.text-bg-info {
+        background-color: #541718 !important;
+    }
+    &.bg-bronze {
+        background-color: #726732 !important;
+    }
+    &.bg-forest,
+    &.bg-success {
+        background-color: #425727 !important;
+    }
+    &.bg-terracotta,
+    &.bg-warning {
+        background-color: #C17540 !important;
+    }
+    &.bg-danger {
+        background-color: #742526 !important;
+    }
+    &.bg-slate,
+    &.bg-muted,
+    &.bg-secondary,
+    &.bg-dark {
+        background-color: #1D2B32 !important;
+    }
+}
+
+.bg-primary-subtle {
+    background-color: #FAF1EB !important;
+}
+
+.border-primary-subtle {
+    border-color: #EAD0BC !important;
+}
+
+.bg-info-subtle {
+    background-color: #F6F4EB !important;
+}
+
+.border-info-subtle {
+    border-color: #DCD6B8 !important;
 }
 
 // -------------------------------------------------------------------------
@@ -1552,7 +1842,363 @@ select.o_input {
     }
 }
 
+// =========================================================================
+// Reactive Header Save Button Show/Hide Rules:
+// Appear when editing or creating, disappear when saved or clean
+// =========================================================================
+.o_form_view_container.o_form_is_editing .o_form_statusbar,
+.o_form_view.o_form_is_editing .o_form_statusbar,
+.o_form_view_container:has(.o_form_status_indicator_buttons:not(.invisible)) .o_form_statusbar,
+.o_action_manager:has(.o_form_status_indicator_buttons:not(.invisible)) .o_form_statusbar {
+    .o_statusbar_buttons {
+        .o_pbms_save_btn:not(.d-none),
+        button[name="action_save_plan"]:not(.d-none),
+        button[name="action_save_request"]:not(.d-none) {
+            display: inline-flex !important;
+        }
+    }
+}
 
+/* ========================================================================= */
+/* Bunna Brand List View Row Action Buttons                                   */
+/* Compact, color-coded buttons for the PBMS unified list view                */
+/* ========================================================================= */
 
+// Common base mixin for all PBMS list buttons
+%btn-pbms-base {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    line-height: 1.35 !important;
+    border-radius: 4px !important;
+    white-space: nowrap !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+    cursor: pointer;
+    transition: filter 0.15s ease, box-shadow 0.15s ease;
 
+    &:hover {
+        filter: brightness(0.9);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+    }
+
+    &:active {
+        filter: brightness(0.82);
+    }
+}
+
+// Shared wrapper: applies to every row, list view, and group header within PBMS
+.o_list_renderer,
+.o_list_table,
+.o_group_header,
+.o_pbms_group_actions {
+
+    // ── Submit (Official Bunna Maroon) ───────────────────────────────────────
+    .btn-pbms-submit {
+        @extend %btn-pbms-base;
+        background-color: #541718 !important;
+        border-color:     #541718 !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #3e1011 !important;
+            border-color:     #3e1011 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── District / HO Approve (Bunna Forest Green) ───────────────────────────
+    .btn-pbms-approve {
+        @extend %btn-pbms-base;
+        background-color: #425727 !important;
+        border-color:     #425727 !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #31421c !important;
+            border-color:     #31421c !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Endorse (HO / Operations / Chief - Bunna Forest Green) ───────────────
+    .btn-pbms-endorse {
+        @extend %btn-pbms-base;
+        background-color: #425727 !important;
+        border-color:     #425727 !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #31421c !important;
+            border-color:     #31421c !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Final Approve (CEO / HO Final - Bunna Deep Pine) ─────────────────────
+    .btn-pbms-final-approve {
+        @extend %btn-pbms-base;
+        background-color: #1E2917 !important;
+        border-color:     #1E2917 !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #131a0e !important;
+            border-color:     #131a0e !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Escalate to CPCO (Bunna Primary Slate) ────────────────────────────────
+    .btn-pbms-escalate {
+        @extend %btn-pbms-base;
+        background-color: #1D2B32 !important;
+        border-color:     #1D2B32 !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #131d22 !important;
+            border-color:     #131d22 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Submit to Committee (Bunna Deep Pine) ─────────────────────────────────
+    .btn-pbms-committee {
+        @extend %btn-pbms-base;
+        background-color: #1E2917 !important;
+        border-color:     #1E2917 !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #131a0e !important;
+            border-color:     #131a0e !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Cascade to Branches / Districts ──────────────────────────────────────
+    .btn-pbms-cascade {
+        @extend %btn-pbms-base;
+        background-color: transparent !important;
+        border-color:     #1D2B32   !important;
+        color:            #1D2B32   !important;
+
+        &:hover {
+            background-color: #1D2B32 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Reset to Draft ───────────────────────────────────────────────────────
+    .btn-pbms-reset {
+        @extend %btn-pbms-base;
+        background-color: transparent !important;
+        border-color:     #C17540   !important;
+        color:            #C17540   !important;
+
+        &:hover {
+            background-color: #C17540 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Return for Revision (Bunna Terracotta) ───────────────────────────────
+    .btn-pbms-return {
+        @extend %btn-pbms-base;
+        background-color: #C17540 !important;
+        border-color:     #C17540 !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #9f5b2d !important;
+            border-color:     #9f5b2d !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Reject (Bunna Deep Crimson) ──────────────────────────────────────────
+    .btn-pbms-reject {
+        @extend %btn-pbms-base;
+        background-color: #7A1A1C !important;
+        border-color:     #7A1A1C !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #5c1214 !important;
+            border-color:     #5c1214 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Delete (Bunna Maroon Crimson — same weight as Reject) ────────────────
+    .btn-pbms-delete,
+    .btn-outline-danger {
+        @extend %btn-pbms-base;
+        background-color: transparent !important;
+        border-color:     #7A1A1C   !important;
+        color:            #7A1A1C   !important;
+
+        &:hover {
+            background-color: #7A1A1C !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Already Cascaded (Bunna Forest Green Outline) ─────────────────────────
+    .btn-outline-success {
+        @extend %btn-pbms-base;
+        background-color: transparent !important;
+        border-color:     #425727   !important;
+        color:            #425727   !important;
+
+        &:hover {
+            background-color: #425727 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Request Info (Bunna Bronze Gold) ─────────────────────────────────────
+    .btn-pbms-request-info {
+        @extend %btn-pbms-base;
+        background-color: #726732 !important;
+        border-color:     #726732 !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #594f24 !important;
+            border-color:     #594f24 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Comment (Bunna Bronze Gold Outline) ───────────────────────────────────
+    .btn-pbms-comment {
+        @extend %btn-pbms-base;
+        background-color: transparent !important;
+        border-color:     #726732   !important;
+        color:            #726732   !important;
+
+        &:hover {
+            background-color: #726732 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Import (Bunna Slate Outline) ──────────────────────────────────────────
+    .btn-pbms-import {
+        @extend %btn-pbms-base;
+        background-color: transparent !important;
+        border-color:     #1D2B32   !important;
+        color:            #1D2B32   !important;
+
+        &:hover {
+            background-color: #1D2B32 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── Export (Excel Clean Slate with Green Icon) ────────────────────────────
+    .btn-pbms-export {
+        @extend %btn-pbms-base;
+        background-color: transparent !important;
+        border-color:     #1D2B32   !important;
+        color:            #1D2B32   !important;
+
+        i {
+            color: #217346 !important;
+        }
+
+        &:hover {
+            background-color: #1D2B32 !important;
+            border-color:     #1D2B32 !important;
+            color: #ffffff !important;
+
+            i {
+                color: #ffffff !important;
+            }
+        }
+    }
+
+    // ── Open Form (Bunna Maroon Outline) ─────────────────────────────────────
+    .btn-pbms-open {
+        @extend %btn-pbms-base;
+        background-color: transparent !important;
+        border-color:     #541718   !important;
+        color:            #541718   !important;
+
+        &:hover {
+            background-color: #541718 !important;
+            color: #ffffff !important;
+        }
+    }
+}
+
+// ── Bunna Brand Stage Badges ────────────────────────────────────────────────
+.badge-pbms-approved {
+    background-color: #425727 !important;
+    color: #ffffff !important;
+    border: 1px solid #33441e !important;
+}
+
+.badge-pbms-in-review {
+    background-color: #726732 !important;
+    color: #ffffff !important;
+    border: 1px solid #5b5227 !important;
+}
+
+.badge-pbms-revision {
+    background-color: #C17540 !important;
+    color: #ffffff !important;
+    border: 1px solid #9c5c30 !important;
+}
+
+.badge-pbms-rejected {
+    background-color: #7A1A1C !important;
+    color: #ffffff !important;
+    border: 1px solid #541718 !important;
+}
+
+.badge-pbms-draft {
+    background-color: #1D2B32 !important;
+    color: #ffffff !important;
+    border: 1px solid #141d22 !important;
+}
+
+// ── PBMS Group Header Actions & Badges ──────────────────────────────────────
+.o_group_header .o_group_name {
+    .o_pbms_group_actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-left: 8px;
+
+        .btn {
+            display: inline-flex !important;
+            align-items: center;
+            gap: 4px;
+            padding: 2.5px 8px !important;
+            font-size: 0.72rem !important;
+            line-height: 1.25 !important;
+            font-weight: 600 !important;
+            border-radius: 4px !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            white-space: nowrap;
+            transition: all 0.15s ease-in-out;
+            cursor: pointer;
+
+            &:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+            }
+
+            &:active {
+                transform: translateY(0);
+            }
+        }
+    }
+}
 

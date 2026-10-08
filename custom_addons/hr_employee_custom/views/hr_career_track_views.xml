@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- =====================================================
+             CAREER TRACK VIEWS (JOB FAMILIES)
+        ====================================================== -->
+        
+        <!-- Kanban View for Job Families -->
+        <record id="view_career_track_kanban" model="ir.ui.view">
+            <field name="name">hr.career.track.kanban</field>
+            <field name="model">hr.career.track</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile">
+                    <field name="name"/>
+                    <field name="track_type"/>
+                    <field name="career_path_count"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click" style="border-left: 4px solid #714B67;">
+                                <div class="o_kanban_record_top">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title"><field name="name"/></strong>
+                                    </div>
+                                    <span class="badge rounded-pill text-bg-primary"><field name="career_path_count"/> Paths</span>
+                                </div>
+                                <div class="o_kanban_record_bottom mt-2">
+                                    <div class="oe_kanban_bottom_left">
+                                        <span class="text-muted"><field name="track_type"/></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- List View -->
+        <record id="view_career_track_list" model="ir.ui.view">
+            <field name="name">hr.career.track.list</field>
+            <field name="model">hr.career.track</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Career Track Name"/>
+                    <field name="track_type"/>
+                    <field name="career_path_count" string="Paths"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Form View -->
+        <record id="view_career_track_form" model="ir.ui.view">
+            <field name="name">hr.career.track.form</field>
+            <field name="model">hr.career.track</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active == True"/>
+                        <div class="oe_title">
+                            <label for="name" class="oe_edit_only"/>
+                            <h1><field name="name" placeholder="e.g. Technical Operations"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="track_type"/>
+                            </group>
+                            <group>
+                                <field name="active" invisible="1"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Career Paths" name="paths">
+                                <field name="career_path_ids" mode="list" readonly="1">
+                                    <kanban class="o_kanban_mobile">
+                                        <field name="name"/>
+                                        <field name="anchor_job_id"/>
+                                        <field name="state"/>
+                                        <field name="node_count"/>
+                                        <templates>
+                                            <t t-name="card">
+                                                <div class="oe_kanban_global_click">
+                                                    <div class="o_kanban_record_top">
+                                                        <strong class="o_kanban_record_title"><field name="name"/></strong>
+                                                    </div>
+                                                    <div class="mt-1">
+                                                        <strong>Starting Role:</strong> <field name="anchor_job_id"/>
+                                                    </div>
+                                                    <div class="o_kanban_record_bottom mt-2">
+                                                        <div class="oe_kanban_bottom_left">
+                                                            <span class="badge text-bg-info"><field name="node_count"/> Steps</span>
+                                                        </div>
+                                                        <div class="oe_kanban_bottom_right">
+                                                            <field name="state" widget="label_selection" options="{'classes': {'draft': 'warning', 'approved': 'success', 'archived': 'danger'}}"/>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </templates>
+                                    </kanban>
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="anchor_job_id"/>
+                                        <field name="node_count" string="Steps"/>
+                                        <field name="state" widget="badge" decoration-success="state == 'approved'" decoration-warning="state == 'draft'" decoration-muted="state == 'archived'"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Description" name="description">
+                                <field name="description" widget="html" placeholder="Describe the purpose and scope of this career track..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_career_track" model="ir.actions.act_window">
+            <field name="name">Career Tracks (Job Families)</field>
+            <field name="res_model">hr.career.track</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create the first Career Track
+                </p>
+                <p>
+                    Job Families categorize your organization's roles into broad tracks (e.g. Managerial, Technical).
+                </p>
+            </field>
+        </record>
+
+        <!-- =====================================================
+             CAREER PATH VIEWS
+        ====================================================== -->
+        
+        <!-- Kanban View for Career Paths -->
+        <record id="view_career_path_kanban" model="ir.ui.view">
+            <field name="name">hr.career.path.kanban</field>
+            <field name="model">hr.career.path</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="track_id" class="o_kanban_mobile">
+                    <field name="name"/>
+                    <field name="track_id"/>
+                    <field name="anchor_job_id"/>
+                    <field name="node_count"/>
+                    <field name="state"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click">
+                                <div class="o_kanban_record_top mb-2">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title"><field name="name"/></strong>
+                                    </div>
+                                    <t t-if="record.state.raw_value == 'approved'">
+                                        <span class="badge text-bg-success">Approved</span>
+                                    </t>
+                                    <t t-if="record.state.raw_value == 'draft'">
+                                        <span class="badge text-bg-warning">Draft</span>
+                                    </t>
+                                    <t t-if="record.state.raw_value == 'submitted'">
+                                        <span class="badge text-bg-info">Submitted</span>
+                                    </t>
+                                </div>
+                                <div>
+                                    <strong>Starting Role:</strong> <field name="anchor_job_id"/>
+                                </div>
+                                <div class="o_kanban_record_bottom mt-2">
+                                    <div class="oe_kanban_bottom_left text-muted">
+                                        <i class="fa fa-sitemap"/> <field name="node_count"/> Steps
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- List View -->
+        <record id="view_career_path_list" model="ir.ui.view">
+            <field name="name">hr.career.path.list</field>
+            <field name="model">hr.career.path</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="track_id" string="Career Track"/>
+                    <field name="anchor_job_id"/>
+                    <field name="node_count" string="Steps"/>
+                    <field name="state" widget="badge"
+                           decoration-success="state == 'approved'"
+                           decoration-info="state == 'submitted'"
+                           decoration-warning="state == 'draft'"
+                           decoration-muted="state == 'archived'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Form View -->
+        <record id="view_career_path_form" model="ir.ui.view">
+            <field name="name">hr.career.path.form</field>
+            <field name="model">hr.career.path</field>
+            <field name="arch" type="xml">
+                <form string="Career Path">
+                    <header>
+                        <button name="action_submit" string="Submit for Approval"
+                                type="object" class="oe_highlight"
+                                invisible="not id or state != 'draft'"
+                                groups="hr_employee_custom.group_career_path_manager,hr_employee_custom.group_career_path_admin"/>
+                        <button name="action_approve" string="Approve Path"
+                                type="object" class="oe_highlight"
+                                invisible="not id or state != 'submitted'"
+                                groups="hr_employee_custom.group_career_path_admin"/>
+                        <button name="action_reset_to_draft" string="Reset to Draft"
+                                type="object"
+                                invisible="not id or state not in ('approved', 'submitted')"
+                                groups="hr_employee_custom.group_career_path_admin"/>
+
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submitted,approved"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" class="oe_edit_only"/>
+                            <h1><field name="name" placeholder="e.g. Senior Executive Track" readonly="state in ('approved', 'submitted')"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="track_id" readonly="state in ('approved', 'submitted')" string="Career Track"/>
+                                <field name="anchor_job_id" readonly="state in ('approved', 'submitted')" string="Starting Role"/>
+                            </group>
+                            <group>
+                                <field name="approved_by_id" readonly="1" invisible="not approved_by_id"/>
+                                <field name="approval_date" readonly="1" invisible="not approval_date"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Career Journey (Progression Steps)">
+                                <p class="text-muted mb-3">Define the step-by-step progression starting from the Starting Role.</p>
+                                <field name="node_ids" readonly="state in ('approved', 'submitted')">
+                                    <list>
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="parent_id" string="Previous Role"/>
+                                        <field name="target_job_id" string="Next Role (Target)"/>
+                                        <field name="movement_type" string="Movement"/>
+                                        <field name="min_tenure_years" string="Min. Experience (Yrs)"/>
+                                        <field name="min_pms_score" string="Min. PMS"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="General Description">
+                                <field name="description"
+                                       placeholder="Describe the career path, who it is for, and how it progresses..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Career Path Step Form (Replaces Node Form) -->
+        <record id="view_career_path_node_form" model="ir.ui.view">
+            <field name="name">hr.career.path.node.form</field>
+            <field name="model">hr.career.path.node</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <div class="alert alert-info" role="alert" style="margin-bottom:15px;">
+                            <i class="fa fa-info-circle me-1" title="Info"/>
+                            <strong>Instructions:</strong> This represents the <strong>Next Career Step</strong>. 
+                            Select the target job position and define the minimum performance and experience required to move into it.
+                            <br/><em>Note: Competency requirements are automatically inherited directly from the target Job Profile.</em>
+                        </div>
+                        <notebook>
+                            <page string="Criteria" name="criteria">
+                                <group string="Progression Rules">
+                                    <group>
+                                        <field name="career_path_id" invisible="1"/>
+                                        <field name="sequence" invisible="1"/>
+                                        <field name="previous_job_id" string="Previous Role" readonly="1" force_save="1"/>
+                                        <field name="target_job_id" string="Target Job Position"/>
+                                        <field name="movement_type" string="Movement Type"/>
+                                    </group>
+                                    <group>
+                                        <field name="min_tenure_years" string="Min. Experience (Years)"/>
+                                        <field name="min_pms_score" string="Min. PMS Score"/>
+                                        <field name="required_qualification" readonly="1" force_save="1"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Job Profile Preview" name="profile_preview">
+                                <group>
+                                    <separator string="Job Description" colspan="2"/>
+                                    <field name="job_description" nolabel="1" colspan="2"/>
+                                </group>
+                                <group>
+                                    <separator string="Competencies" colspan="2"/>
+                                    <field name="inherited_competencies_html" nolabel="1" colspan="2" readonly="1"/>
+                                </group>
+                            </page>
+                        </notebook>
+
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_career_path" model="ir.actions.act_window">
+            <field name="name">Career Paths</field>
+            <field name="res_model">hr.career.path</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create the first Career Path
+                </p>
+                <p>
+                    Career Paths map the journey from an entry-level starting role through various progression steps.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>
+
+

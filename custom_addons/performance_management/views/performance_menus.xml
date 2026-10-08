@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- ====================================================== -->
     <!-- Root App Menu -->
+    <!-- Available to all Performance Management users -->
+    <!-- All Internal Users automatically inherit Employee/User -->
+    <!-- ====================================================== -->
+
     <menuitem id="menu_performance_management_root"
               name="Performance Management"
               web_icon="performance_management,static/description/iconpm.png"
+              groups="performance_management.group_performance_user"
               sequence="10"/>
 
-    <!-- Top-level menus (navbar tabs) -->
+
+    <!-- ====================================================== -->
+    <!-- Top-level menus -->
+    <!-- ====================================================== -->
+
     <menuitem id="menu_performance"
               name="Performance"
               parent="menu_performance_management_root"
@@ -30,19 +40,26 @@
               groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="40"/>
 
-    <!-- ================ Menus under Performance ================= -->
+
+    <!-- ====================================================== -->
+    <!-- Menus under Performance -->
+    <!-- ====================================================== -->
+
     <!-- ===================== Tier 1 ===================== -->
+
     <menuitem id="menu_tier1"
               name="Tier 1 (Corporate)"
               parent="menu_performance"
               groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="10"/>
+
     <menuitem id="menu_tier1_populate_corporate_scorecard"
               name="Populate Corporate Score Card"
               parent="menu_tier1"
               action="action_populate_corporate_scorecard_wizard"
               groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="20"/>
+
     <menuitem id="menu_tier1_corporate_scorecard"
               name="Corporate Score Card"
               parent="menu_tier1"
@@ -50,18 +67,22 @@
               groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="30"/>
 
+
     <!-- ===================== Tier 2 ===================== -->
+
     <menuitem id="menu_tier2"
               name="Tier 2 (Division)"
               parent="menu_performance"
               groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="20"/>
+
     <menuitem id="menu_tier2_populate_tier2_wizard"
               name="Populate Tier 2 Scorecard Wizard"
               parent="menu_tier2"
               action="action_populate_t2_scorecard_wizard"
-              groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="30"/>
+
     <menuitem id="menu_t2_scorecard"
               name="Tier 2 Scorecards"
               parent="menu_tier2"
@@ -69,36 +90,52 @@
               groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="40"/>
 
+
     <!-- ===================== Tier 3 ===================== -->
+
+    <!-- Employee/User can access Tier 3 -->
     <menuitem id="menu_tier3"
               name="Tier 3 (Employee)"
               parent="menu_performance"
+              groups="performance_management.group_performance_user"
               sequence="30"/>
+
+    <!-- Only HR/Admin can populate Tier 3 -->
     <menuitem id="menu_tier3_populate_wizard"
               name="Populate Tier 3 Scorecard Wizard"
               parent="menu_tier3"
               action="action_populate_t3_scorecard_wizard"
-              groups="performance_management.group_performance_manager,performance_management.group_performance_hr,performance_management.group_performance_admin"
+              groups="performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="10"/>
+
+    <!-- Employee/User can view their own Tier 3 Scorecards -->
     <menuitem id="menu_tier3_scorecard"
               name="Tier 3 Scorecards"
               parent="menu_tier3"
               action="action_t3_scorecard"
+              groups="performance_management.group_performance_user"
               sequence="20"/>
 
-    <!-- ================ Menus under Appraisal ================= -->
+
+    <!-- ====================================================== -->
+    <!-- Menus under Appraisal -->
+    <!-- ====================================================== -->
+
     <!-- ===================== Tier 1 ===================== -->
+
     <menuitem id="menu_tier1_appraisal"
               name="Tier 1 (Corporate)"
               parent="menu_appraisals"
               groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="10"/>
+
     <menuitem id="menu_corporate_appraisal_wizard"
               name="Corporate Appraisal Wizard"
               parent="menu_tier1_appraisal"
               action="action_populate_corporate_appraisal_wizard"
               groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="20"/>
+
     <menuitem id="menu_corporate_appraisal"
               name="Corporate Appraisal"
               parent="menu_tier1_appraisal"
@@ -106,18 +143,22 @@
               groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="30"/>
 
+
     <!-- ===================== Tier 2 ===================== -->
+
     <menuitem id="menu_tier2_appraisal"
               name="Tier 2 (Division)"
               parent="menu_appraisals"
               groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="20"/>
+
     <menuitem id="menu_tier2_appraisal_wizard"
               name="Populate Tier 2 Appraisal Wizard"
               parent="menu_tier2_appraisal"
               action="action_populate_t2_appraisal_wizard"
-              groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="10"/>
+
     <menuitem id="menu_t2_appraisal"
               name="Tier 2 Appraisals"
               parent="menu_tier2_appraisal"
@@ -125,28 +166,42 @@
               groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="20"/>
 
+
     <!-- ===================== Tier 3 ===================== -->
+
+    <!-- Employee/User can access Tier 3 Appraisal -->
     <menuitem id="menu_tier3_appraisal"
               name="Tier 3 (Employee)"
               parent="menu_appraisals"
+              groups="performance_management.group_performance_user"
               sequence="30"/>
+
+    <!-- Only HR/Admin can populate Tier 3 Appraisal -->
     <menuitem id="menu_tier3_appraisal_wizard"
               name="Populate Tier 3 Appraisal Wizard"
               parent="menu_tier3_appraisal"
               action="action_populate_t3_appraisal_wizard"
-              groups="performance_management.group_performance_manager,performance_management.group_performance_hr,performance_management.group_performance_admin"
+              groups="performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="10"/>
+
+    <!-- Employee/User can view their own Tier 3 Appraisals -->
     <menuitem id="menu_t3_appraisal"
               name="Tier 3 Appraisals"
               parent="menu_tier3_appraisal"
               action="action_t3_appraisal"
+              groups="performance_management.group_performance_user"
               sequence="20"/>
 
-    <!-- ================ Menus under Automation ================= -->
+
+    <!-- ====================================================== -->
+    <!-- Automation -->
+    <!-- ====================================================== -->
+
     <menuitem id="menu_automatic_scorecard_notify_wizard"
               name="Automatic Scorecard Notify"
               parent="menu_automation"
               action="action_automatic_scorecard_notify_wizard"
               groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="10"/>
+
 </odoo>

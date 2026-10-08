@@ -13,13 +13,6 @@
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
 
-            <!-- 1. Save + Archive buttons in header -->
-            <xpath expr="//header" position="inside">
-                <button name="action_save_employee" string="Save Employee" type="object" class="btn-primary" save="1"/>
-                <button name="action_archive_employee" string="Archive Employee" type="object" class="btn-warning" invisible="not id or not active" confirm="Archive this employee? They will no longer appear in active lists."/>
-                <button name="action_archive_employee" string="Unarchive Employee" type="object" class="btn-secondary" invisible="not id or active"/>
-            </xpath>
-
             <!-- 2. Contracts smart button in button_box -->
             <xpath expr="//div[@name='button_box']" position="inside">
                 <field name="contract_warning" invisible="1"/>
@@ -140,20 +133,7 @@
     </record>
 
 
-    <!-- ═══════════════════════════════════════════
-         EMPLOYEE SEARCH — Contract Warning filter
-    ════════════════════════════════════════════ -->
-    <record id="hr_employee_view_search_contract" model="ir.ui.view">
-        <field name="name">hr.employee.view.search.contract</field>
-        <field name="model">hr.employee</field>
-        <field name="inherit_id" ref="hr.view_employee_filter"/>
-        <field name="arch" type="xml">
-            <xpath expr="//filter[@name='message_needaction']" position="after">
-                <separator/>
-                <filter string="Contract Warning" name="with_contract_warning" domain="[('contract_warning','=',True)]" groups="hr_employee_custom.group_hr_contract_manager"/>
-            </xpath>
-        </field>
-    </record>
+    <!-- View clean -->
 
     <!-- ═══════════════════════════════════════════
          SERVER ACTION — Sync Profile Photos
@@ -180,6 +160,41 @@ action = {
     }
 }
         </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         EMPLOYEE KANBAN — Set default pagination limit to 15
+    ════════════════════════════════════════════ -->
+    <record id="hr_kanban_view_employees_limit_15" model="ir.ui.view">
+        <field name="name">hr.employee.kanban.limit.15</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.hr_kanban_view_employees"/>
+        <field name="arch" type="xml">
+            <xpath expr="//kanban" position="attributes">
+                <attribute name="limit">15</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         EMPLOYEE TREE / LIST — Set default pagination limit to 15
+    ════════════════════════════════════════════ -->
+    <record id="hr_view_employee_tree_limit_15" model="ir.ui.view">
+        <field name="name">hr.employee.tree.limit.15</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="limit">15</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         EMPLOYEE ACTION — Set default window action limit to 15
+    ════════════════════════════════════════════ -->
+    <record id="hr.open_view_employee_list_my" model="ir.actions.act_window">
+        <field name="limit">15</field>
     </record>
 
 </odoo>

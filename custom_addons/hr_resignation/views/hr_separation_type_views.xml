@@ -1,69 +1,76 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <record id="view_hr_separation_type_tree" model="ir.ui.view">
+        <field name="name">hr.separation.type.list</field>
+        <field name="model">hr.separation.type</field>
+        <field name="arch" type="xml">
+            <list string="Separation Types">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="is_company_terminated"/>
+                <field name="pays_severance"/>
+                <field name="pays_provident_fund"/>
+            </list>
+        </field>
+    </record>
 
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         SEPARATION TYPE — Form View
-    ═══════════════════════════════════════════════════════════════════════ -->
-
-    <record id="hr_separation_type_view_form" model="ir.ui.view">
+    <record id="view_hr_separation_type_form" model="ir.ui.view">
         <field name="name">hr.separation.type.form</field>
         <field name="model">hr.separation.type</field>
         <field name="arch" type="xml">
             <form string="Separation Type">
                 <sheet>
-                    <widget name="web_ribbon" title="Archived"
-                            bg_color="text-bg-danger" invisible="active"/>
-                    <field name="active" invisible="1"/>
-
                     <div class="oe_title">
-                        <label for="name" string="Separation Type Name"/>
+                        <label for="name" class="oe_edit_only"/>
                         <h1>
-                            <field name="name"
-                                   placeholder="e.g. Voluntary Resignation"/>
+                            <field name="name" placeholder="e.g. Voluntary Resignation"/>
                         </h1>
                     </div>
-
-                    <group>
-<!--                        <group string="Identification">-->
-<!--                            <field name="code"-->
-<!--                                   placeholder="e.g. voluntary"-->
-<!--                                   help="Stable technical key used in business logic. Do not change once in use."/>-->
-<!--                            <field name="sequence"/>-->
-<!--                        </group>-->
-                        <group string="Flags &amp; Defaults">
-                            <field name="is_company_terminated"
-                                   widget="boolean_toggle"
-                                   string="Company-Initiated Termination"
-                                   help="Flag for Provident Fund eligibility logic (FR-15). Company-terminated employees are excluded from PF regardless of tenure."/>
-                            <field name="default_notice_period"/>
-                        </group>
-                    </group>
-
-                    <group>
-                        <group string="Pre-Separation Validations (Enforced before POMD Approval)">
-                            <field name="check_disciplinary" widget="boolean_toggle"/>
-                            <field name="check_investigations" widget="boolean_toggle"/>
-                            <field name="check_commitments" widget="boolean_toggle"/>
-                            <field name="check_probation" widget="boolean_toggle"/>
-                        </group>
-                        <group string="Provident Fund &amp; Severance Thresholds">
-                            <field name="pays_provident_fund" widget="boolean_toggle"/>
-                            <field name="pf_min_service_years" invisible="pays_provident_fund == False"/>
+                    
+                    <div class="row">
+                        <!-- LEFT COLUMN -->
+                        <div class="col-lg-6 col-md-12">
+                            <group string="Flags &amp; Defaults">
+                                <field name="is_company_terminated"
+                                       widget="boolean_toggle"
+                                       string="Company-Initiated Termination"
+                                       help="Flag for Provident Fund eligibility logic (FR-15). Company-terminated employees are excluded from PF regardless of tenure."/>
+                                <field name="default_notice_period"/>
+                            </group>
                             
-                            <hr colspan="2" class="mt8 mb8" invisible="pays_provident_fund == False and pays_severance == False"/>
-                            
-                            <field name="pays_severance" widget="boolean_toggle"/>
-                            <field name="severance_rule_ids" nolabel="1" colspan="2" invisible="pays_severance == False">
-                                <list editable="bottom">
-                                    <field name="employee_category"/>
-                                    <field name="min_service_years"/>
-                                    <field name="first_year_days" column_invisible="True"/>
-                                    <field name="subsequent_year_days" column_invisible="True"/>
-                                    <field name="max_severance_months" column_invisible="True"/>
-                                </list>
-                            </field>
-                        </group>
-                    </group>
+                            <group string="Pre-Separation Validations (Enforced before POMD Approval)">
+                                <field name="check_disciplinary" widget="boolean_toggle"/>
+                                <field name="check_investigations" widget="boolean_toggle"/>
+                                <field name="check_commitments" widget="boolean_toggle"/>
+                                <field name="check_probation" widget="boolean_toggle"/>
+                            </group>
+                        </div>
+
+                        <!-- RIGHT COLUMN -->
+                        <div class="col-lg-6 col-md-12">
+                            <group string="Financial Entitlements &amp; Thresholds">
+                                <field name="allow_salary_payment" widget="boolean_toggle"/>
+                                <field name="allow_leave_encashment" widget="boolean_toggle"/>
+                                
+                                <span colspan="2" class="o_form_label mt-3 mb-1" style="font-weight:bold; border-bottom:1px solid #ccc; width:100%;">Provident Fund</span>
+                                <field name="pays_provident_fund" widget="boolean_toggle" string="Pays Provident Fund (PF)"/>
+                                <field name="pf_min_service_years" invisible="not pays_provident_fund"/>
+                                
+                                <span colspan="2" class="o_form_label mt-3 mb-1" style="font-weight:bold; border-bottom:1px solid #ccc; width:100%;">Severance</span>
+                                <field name="pays_severance" widget="boolean_toggle" string="Pays Severance Pay"/>
+                                <field name="severance_rule_ids" nolabel="1" colspan="2" invisible="not pays_severance">
+                                    <list editable="bottom">
+                                        <field name="employee_category"/>
+                                        <field name="min_service_years"/>
+                                        <field name="first_year_days" column_invisible="1"/>
+                                        <field name="subsequent_year_days" column_invisible="1"/>
+                                        <field name="max_severance_months" column_invisible="1"/>
+                                    </list>
+                                </field>
+                            </group>
+                        </div>
+                    </div>
 
                     <group string="Description">
                         <field name="description" nolabel="1"
@@ -74,69 +81,9 @@
         </field>
     </record>
 
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         SEPARATION TYPE — List View
-         Trimmed to show only the Separation Type name (plus drag handle).
-    ═══════════════════════════════════════════════════════════════════════ -->
-
-    <record id="hr_separation_type_view_list" model="ir.ui.view">
-        <field name="name">hr.separation.type.list</field>
-        <field name="model">hr.separation.type</field>
-        <field name="arch" type="xml">
-            <list string="Separation Types"
-                  decoration-muted="not active">
-                <field name="sequence" widget="handle"/>
-                <field name="name" string="Separation Type"/>
-            </list>
-        </field>
-    </record>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         SEPARATION TYPE — Search View
-    ═══════════════════════════════════════════════════════════════════════ -->
-
-    <record id="hr_separation_type_view_search" model="ir.ui.view">
-        <field name="name">hr.separation.type.search</field>
-        <field name="model">hr.separation.type</field>
-        <field name="arch" type="xml">
-            <search string="Search Separation Types">
-                <field name="name" string="Name"/>
-                <field name="code" string="Technical Code"/>
-                <filter name="filter_company_terminated"
-                        string="Company-Initiated"
-                        domain="[('is_company_terminated', '=', True)]"/>
-                <separator/>
-                <filter name="filter_active"
-                        string="Active"
-                        domain="[('active', '=', True)]"/>
-                <filter name="filter_archived"
-                        string="Archived"
-                        domain="[('active', '=', False)]"/>
-            </search>
-        </field>
-    </record>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         SEPARATION TYPE — Window Action
-    ═══════════════════════════════════════════════════════════════════════ -->
-
     <record id="action_separation_type" model="ir.actions.act_window">
         <field name="name">Separation Types</field>
         <field name="res_model">hr.separation.type</field>
         <field name="view_mode">list,form</field>
-        <field name="search_view_id" ref="hr_separation_type_view_search"/>
-        <field name="context">{'search_default_filter_active': 1}</field>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                No separation types configured yet.
-            </p>
-            <p>
-                Add the separation types that apply to your organization
-                (e.g. Voluntary Resignation, Retirement, Termination).
-                These types are used on resignation requests and to control
-                which clearance work units apply to each case.
-            </p>
-        </field>
     </record>
-
 </odoo>

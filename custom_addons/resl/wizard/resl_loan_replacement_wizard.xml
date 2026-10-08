@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- resl_loan_replacement_wizard.xml
+     Wizard action is defined in resl_loan_views.xml (action_resl_loan_replacement_wizard).
+     This file keeps the manifest entry satisfied; the view record lives in resl_loan_views.xml.
+     If you prefer, you can move the wizard view record here. -->
+<odoo>
+    <data/>
+</odoo>

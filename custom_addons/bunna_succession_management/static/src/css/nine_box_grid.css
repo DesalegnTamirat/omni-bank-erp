@@ -1,0 +1,109 @@
+.o_nine_box_dashboard {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+.o_nine_box_dashboard .cursor-pointer {
+    cursor: pointer;
+}
+
+.o_nine_box_dashboard .tracking-wide {
+    letter-spacing: 0.05em;
+}
+
+.o_nine_box_dashboard .o_9box_cell {
+    transition: all 0.2s ease-in-out;
+}
+
+.o_nine_box_dashboard .o_9box_cell:hover {
+    box-shadow: 0 8px 12px rgba(0,0,0,0.05) !important;
+    transform: translateY(-2px);
+}
+
+.o_nine_box_dashboard .o_9box_cell.tier-gold { background-color: #f0fdf4 !important; border: 1.5px solid rgba(66, 87, 39, 0.4) !important; }
+.o_nine_box_dashboard .o_9box_cell.tier-teal { background-color: #f8fafc !important; border: 1.5px solid rgba(114, 103, 50, 0.3) !important; }
+.o_nine_box_dashboard .o_9box_cell.tier-brick { background-color: #fef2f2 !important; border: 1.5px solid rgba(84, 23, 24, 0.3) !important; }
+
+/* Custom Scrollbar for Grid Cells */
+.o_nine_box_dashboard .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+.o_nine_box_dashboard .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.o_nine_box_dashboard .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 10px;
+}
+.o_nine_box_dashboard .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,0.2);
+}
+
+.o_nine_box_dashboard .o_9box_avatar_wrap {
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+    width: 38px;
+    height: 38px;
+}
+.o_nine_box_dashboard .o_9box_avatar_wrap:hover {
+    transform: translateY(-3px) scale(1.15);
+    z-index: 10;
+}
+.o_nine_box_dashboard .o_9box_avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #e2e8f0;
+}
+.o_nine_box_dashboard .o_9box_avatar.selected {
+    box-shadow: 0 0 0 3px #1d2b32; /* Odoo brand color */
+    transform: scale(1.1);
+}
+
+.o_nine_box_dashboard .o_9box_flag {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    background: #f59e0b;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    border: 1px solid white;
+}
+
+.o_nine_box_dashboard .r-now { border: 2.5px solid #10b981; }
+.o_nine_box_dashboard .r-soon { border: 2.5px dashed #f59e0b; }
+.o_nine_box_dashboard .r-later { border: 2.5px dotted #64748b; }
+
+.o_nine_box_dashboard .o_ring_sample {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+}
+
+.o_nine_box_dashboard .btn-group .btn.active {
+    background-color: #1d2b32;
+    color: white;
+    border-color: #1d2b32;
+}
+
+.o_nine_box_dashboard .card-header .badge {
+    background-color: #1d2b32 !important;
+}
+
+
+.o_nine_box_dashboard .calib-gold-border {
+    border-left: 4px solid #726732 !important;
+    background-color: rgba(114, 103, 50, 0.05) !important;
+}
+.o_nine_box_dashboard .bg-success {
+    background-color: #726732 !important;
+}
+.o_nine_box_dashboard .bg-danger {
+    background-color: #541718 !important;
+}

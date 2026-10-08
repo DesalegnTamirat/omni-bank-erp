@@ -2,97 +2,123 @@
 <odoo>
     <data>
 
-        <!-- Root Menu -->
+        <!-- Root Menu (Landing Page & Main Action directly loads Dashboard) -->
         <menuitem id="menu_discipline_root"
-                  name="Discipline &amp; Governance"
+                  name="Discipline"
+                  action="action_discipline_dashboard"
                   web_icon="discipline_management,static/description/icon.png"
                   groups="discipline_management.group_discipline_user"
                   sequence="75"/>
 
-        <!-- Executive & HR Dashboard (Adaptive for Employees and Officers) -->
-        <menuitem id="menu_discipline_dashboard"
-                  name="Dashboard"
+        <!-- 1. Operations / Cases Group -->
+        <menuitem id="menu_discipline_operations_root"
+                  name="Discipline Operations"
                   parent="menu_discipline_root"
-                  action="action_discipline_dashboard"
-                  sequence="5"/>
-
-        <!-- Main Operations Submenus -->
-        <menuitem id="menu_discipline_cases"
-                  name="Disciplinary Cases"
-                  parent="menu_discipline_root"
-                  action="action_discipline_case"
                   sequence="10"/>
 
-        <record id="menu_discipline_investigations" model="ir.ui.menu">
-            <field name="name">Investigations</field>
-            <field name="parent_id" ref="menu_discipline_root"/>
-            <field name="action" ref="action_discipline_investigation"/>
-            <field name="sequence">20</field>
-            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_auditor'), ref('discipline_management.group_discipline_admin')])]"/>
-        </record>
+        <menuitem id="menu_discipline_cases"
+                  name="Disciplinary Cases"
+                  parent="menu_discipline_operations_root"
+                  action="action_discipline_case"
+                  sequence="1"/>
 
-        <record id="menu_discipline_committees" model="ir.ui.menu">
-            <field name="name">Committee Meetings</field>
-            <field name="parent_id" ref="menu_discipline_root"/>
-            <field name="action" ref="action_discipline_committee_meeting"/>
-            <field name="sequence">30</field>
-            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_committee_secretary'), ref('discipline_management.group_discipline_cpco'), ref('discipline_management.group_discipline_admin')])]"/>
-        </record>
+        <menuitem id="menu_discipline_suspensions"
+                  name="Suspensions"
+                  parent="menu_discipline_operations_root"
+                  action="action_discipline_suspension"
+                  groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"
+                  sequence="2"/>
 
-        <record id="menu_discipline_suspensions" model="ir.ui.menu">
-            <field name="name">Suspensions</field>
-            <field name="parent_id" ref="menu_discipline_root"/>
-            <field name="action" ref="action_discipline_suspension"/>
-            <field name="sequence">40</field>
-            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_pomd'), ref('discipline_management.group_discipline_cpco'), ref('discipline_management.group_discipline_ceo'), ref('discipline_management.group_discipline_auditor'), ref('discipline_management.group_discipline_admin')])]"/>
-        </record>
+        <menuitem id="menu_discipline_appeals"
+                  name="Appeals &amp; Reviews"
+                  parent="menu_discipline_operations_root"
+                  action="action_discipline_appeal"
+                  sequence="3"/>
 
-        <record id="menu_discipline_appeals" model="ir.ui.menu">
-            <field name="name">Appeals &amp; Reviews</field>
-            <field name="parent_id" ref="menu_discipline_root"/>
-            <field name="action" ref="action_discipline_appeal"/>
-            <field name="sequence">50</field>
-        </record>
+        <menuitem id="menu_discipline_payroll_penalties"
+                  name="Payroll Deductions"
+                  parent="menu_discipline_operations_root"
+                  action="action_discipline_payroll_penalty"
+                  groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
+                  sequence="4"/>
 
-        <!-- Configuration Menu: Strictly restricted to HR Administrator (hidden from managers, directors, etc.) -->
-        <record id="menu_discipline_config" model="ir.ui.menu">
-            <field name="name">Configuration</field>
-            <field name="parent_id" ref="menu_discipline_root"/>
-            <field name="sequence">100</field>
-            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_admin')])]"/>
-        </record>
+        <menuitem id="menu_discipline_attendance_scan"
+                  name="Scan Attendance Violations"
+                  parent="menu_discipline_operations_root"
+                  action="action_discipline_attendance_scan_wizard"
+                  groups="discipline_management.group_discipline_user"
+                  sequence="5"/>
 
-        <record id="menu_discipline_severity_levels" model="ir.ui.menu">
-            <field name="name">Severity Levels</field>
-            <field name="parent_id" ref="menu_discipline_config"/>
-            <field name="action" ref="action_discipline_severity_level"/>
-            <field name="sequence">5</field>
-            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_admin')])]"/>
-        </record>
+        <!-- 3. Hearings & Investigations Group -->
+        <menuitem id="menu_discipline_hearings_root"
+                  name="Hearings &amp; Investigations"
+                  parent="menu_discipline_root"
+                  groups="discipline_management.group_discipline_user"
+                  sequence="20"/>
 
-        <record id="menu_discipline_offenses" model="ir.ui.menu">
-            <field name="name">Offense Rules &amp; Penalties</field>
-            <field name="parent_id" ref="menu_discipline_config"/>
-            <field name="action" ref="action_discipline_offense"/>
-            <field name="sequence">10</field>
-            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_admin')])]"/>
-        </record>
+        <menuitem id="menu_discipline_investigations"
+                  name="Investigations"
+                  parent="menu_discipline_hearings_root"
+                  action="action_discipline_investigation"
+                  groups="discipline_management.group_discipline_ceo,discipline_management.group_discipline_cpco,discipline_management.group_discipline_auditor,discipline_management.group_discipline_pomd,discipline_management.group_discipline_legal,discipline_management.group_discipline_admin"
+                  sequence="1"/>
 
-        <record id="menu_discipline_offense_categories" model="ir.ui.menu">
-            <field name="name">Offense Categories</field>
-            <field name="parent_id" ref="menu_discipline_config"/>
-            <field name="action" ref="action_discipline_offense_category"/>
-            <field name="sequence">20</field>
-            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_admin')])]"/>
-        </record>
+        <menuitem id="menu_discipline_committees"
+                  name="Committee Meetings"
+                  parent="menu_discipline_hearings_root"
+                  action="action_discipline_committee_meeting"
+                  groups="discipline_management.group_discipline_user"
+                  sequence="2"/>
 
-        <record id="menu_discipline_policy_versions" model="ir.ui.menu">
-            <field name="name">Policy Versions</field>
-            <field name="parent_id" ref="menu_discipline_config"/>
-            <field name="action" ref="action_discipline_policy_version"/>
-            <field name="sequence">30</field>
-            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_admin')])]"/>
-        </record>
+        <!-- 4. Regulatory Catalog & Reference (All Policy & Regulatory Master Data) -->
+        <menuitem id="menu_discipline_reference_root"
+                  name="Regulatory Catalog"
+                  parent="menu_discipline_root"
+                  sequence="30"/>
+
+        <menuitem id="menu_discipline_policy_versions_ref"
+                  name="Regulation Documents &amp; Policies"
+                  parent="menu_discipline_reference_root"
+                  action="action_discipline_policy_version"
+                  sequence="1"/>
+
+        <menuitem id="menu_discipline_articles_ref"
+                  name="Regulatory Articles &amp; Clauses"
+                  parent="menu_discipline_reference_root"
+                  action="action_discipline_article"
+                  sequence="2"/>
+
+        <menuitem id="menu_discipline_offenses_ref"
+                  name="Misconduct &amp; Penalty Index"
+                  parent="menu_discipline_reference_root"
+                  action="action_discipline_offense"
+                  sequence="3"/>
+
+        <menuitem id="menu_discipline_offense_categories"
+                  name="Offense Categories"
+                  parent="menu_discipline_reference_root"
+                  action="action_discipline_offense_category"
+                  sequence="4"/>
+
+        <menuitem id="menu_discipline_severity_levels"
+                  name="Severity Levels"
+                  parent="menu_discipline_reference_root"
+                  action="action_discipline_severity_level"
+                  sequence="5"/>
+
+        <!-- 5. Configuration Menu Group (Admin Settings & Engine Parameters) -->
+        <menuitem id="menu_discipline_config"
+                  name="Configuration"
+                  parent="menu_discipline_root"
+                  groups="discipline_management.group_discipline_admin"
+                  sequence="100"/>
+
+        <menuitem id="menu_discipline_settings"
+                  name="Settings"
+                  parent="menu_discipline_config"
+                  action="action_discipline_config_settings"
+                  groups="discipline_management.group_discipline_admin"
+                  sequence="1"/>
 
     </data>
 </odoo>

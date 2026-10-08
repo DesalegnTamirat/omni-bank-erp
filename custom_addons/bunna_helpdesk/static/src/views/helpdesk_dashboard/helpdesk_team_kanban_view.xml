@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+    <t
+        t-name="bunna_helpdesk.HelpdeskKanbanView"
+        t-inherit="web.KanbanRenderer"
+        t-inherit-mode="primary"
+    >
+        <xpath expr="//div[hasclass('o_kanban_renderer')]" position="replace">
+            <div class="o_kanban_renderer o_renderer w-100 p-0" t-ref="root">
+                <HelpdeskDashboard />
+            </div>
+        </xpath>
+    </t>
+</templates>

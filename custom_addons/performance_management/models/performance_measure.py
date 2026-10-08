@@ -52,3 +52,23 @@ class PerformanceMeasure(models.Model):
         for rec in self:
             if rec.weight <= 0 or rec.weight > 100:
                 raise ValidationError('Weight must be greater than 0 and no more than 100.')
+
+    def unlink(self):
+        T2Line = self.env['t2.scorecard.line'].sudo()
+        T2AppraisalLine = self.env['t2.appraisal.line'].sudo()
+        TemplateLine = self.env['performance.job.template.line'].sudo()
+
+        to_unlink = self.browse()
+        for rec in self:
+            is_used = (
+                T2Line.search_count([('measure_id', '=', rec.id)]) > 0
+                or T2AppraisalLine.search_count([('measure_id', '=', rec.id)]) > 0
+                or TemplateLine.search_count([('measure_id', '=', rec.id)]) > 0
+            )
+            if is_used:
+                rec.write({'active': False})
+            else:
+                to_unlink |= rec
+        if to_unlink:
+            return super(PerformanceMeasure, to_unlink).unlink()
+        return True

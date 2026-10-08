@@ -4,6 +4,7 @@ from datetime import datetime, time, timedelta
 from math import fabs
 from dateutil.relativedelta import relativedelta
 from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
 
 
 class HrEmployee(models.Model):
@@ -22,6 +23,129 @@ class HrEmployee(models.Model):
         store=True,
         readonly=False,
     )
+    national_id = fields.Char(string="National Identification Number")
+    employee_tin = fields.Char(string="Tax Identification Number (TIN)")
+
+    work_permit_status = fields.Selection([
+        ('none', 'Not Applicable'),
+        ('valid', 'Valid'),
+        ('expiring_soon', 'Expiring Soon'),
+        ('expired', 'Expired'),
+    ], string='Work Permit Status', compute='_compute_work_permit_status', store=True)
+
+    age_group = fields.Selection([
+        ('under_25', '< 25 Years'),
+        ('25_34', '25 - 34 Years'),
+        ('35_44', '35 - 44 Years'),
+        ('45_54', '45 - 54 Years'),
+        ('55_plus', '55+ Years'),
+    ], string='Age Group', compute='_compute_demographic_groups', store=True)
+
+    tenure_group = fields.Selection([
+        ('under_1', '< 1 Year'),
+        ('1_3', '1 - 3 Years'),
+        ('3_5', '3 - 5 Years'),
+        ('5_10', '5 - 10 Years'),
+        ('10_plus', '10+ Years'),
+    ], string='Length of Service Group', compute='_compute_demographic_groups', store=True)
+
+    @api.depends('work_permit_expiration_date')
+    def _compute_work_permit_status(self):
+        today = fields.Date.today()
+        for rec in self:
+            if not rec.work_permit_expiration_date:
+                rec.work_permit_status = 'none'
+            elif rec.work_permit_expiration_date < today:
+                rec.work_permit_status = 'expired'
+            elif (rec.work_permit_expiration_date - today).days <= 30:
+                rec.work_permit_status = 'expiring_soon'
+            else:
+                rec.work_permit_status = 'valid'
+
+    @api.depends('birthday', 'start_date', 'service_start_date', 'first_contract_date', 'age')
+    def _compute_demographic_groups(self):
+        today = fields.Date.today()
+        for rec in self:
+            # Age Group
+            age_val = False
+            if rec.age:
+                try:
+                    age_val = int(str(rec.age).strip())
+                except (ValueError, TypeError):
+                    age_val = False
+            if not age_val and rec.birthday:
+                age_val = relativedelta(today, rec.birthday).years
+
+            if not age_val:
+                rec.age_group = False
+            elif age_val < 25:
+                rec.age_group = 'under_25'
+            elif 25 <= age_val <= 34:
+                rec.age_group = '25_34'
+            elif 35 <= age_val <= 44:
+                rec.age_group = '35_44'
+            elif 45 <= age_val <= 54:
+                rec.age_group = '45_54'
+            else:
+                rec.age_group = '55_plus'
+
+            # Tenure Group
+            join_date = rec.service_start_date or rec.start_date or rec.first_contract_date
+            if not join_date:
+                rec.tenure_group = False
+            else:
+                years = relativedelta(today, join_date).years
+                if years < 1:
+                    rec.tenure_group = 'under_1'
+                elif 1 <= years < 3:
+                    rec.tenure_group = '1_3'
+                elif 3 <= years < 5:
+                    rec.tenure_group = '3_5'
+                elif 5 <= years < 10:
+                    rec.tenure_group = '5_10'
+                else:
+                    rec.tenure_group = '10_plus'
+
+    @api.constrains('identification_id', 'employee_identification', 'national_id', 'employee_tin')
+    def _check_unique_identifications(self):
+        for record in self:
+            # Enforce unique Employee ID
+            emp_id = (record.identification_id or record.employee_identification or '').strip()
+            if emp_id:
+                duplicate = self.search([
+                    ('id', '!=', record.id),
+                    '|',
+                    ('identification_id', '=', emp_id),
+                    ('employee_identification', '=', emp_id),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_(
+                        "Employee Identification '%s' is already registered for employee '%s'."
+                    ) % (emp_id, duplicate.name))
+
+            # Enforce unique National ID Number
+            nat_id = (record.national_id or '').strip()
+            if nat_id:
+                duplicate = self.search([
+                    ('id', '!=', record.id),
+                    ('national_id', '=', nat_id),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_(
+                        "National Identification Number '%s' is already registered for employee '%s'."
+                    ) % (nat_id, duplicate.name))
+
+            # Enforce unique Tax Identification Number (TIN)
+            tin = (record.employee_tin or '').strip()
+            if tin:
+                duplicate = self.search([
+                    ('id', '!=', record.id),
+                    ('employee_tin', '=', tin),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_(
+                        "Tax Identification Number (TIN) '%s' is already registered for employee '%s'."
+                    ) % (tin, duplicate.name))
 
     @api.depends('identification_id')
     def _compute_employee_identification(self):
@@ -63,13 +187,14 @@ class HrEmployee(models.Model):
     mobile_phone = fields.Char(string="Work Mobile")
     work_phone = fields.Char(string="Work Phone")
     work_email = fields.Char(string="Work Email")
-    private_email = fields.Char(string="Personal Email")
+    private_email = fields.Char(string="Personal Email", groups=False)
     personal_email = fields.Char(string="Personal Email")
     phone_num = fields.Char(string="Personal Phone")
     personal_phone = fields.Char(string="Personal Phone")
     alternative_mobile = fields.Char(string='Alternate Mobile')
     emergency_contact_2_name = fields.Char(string="Emergency Contact 2 Name", help="Emergency Contact 2 Name")
     emergency_contact_2_phone = fields.Char(string="Emergency Contact 2 Phone", help="Emergency Contact 2 Phone")
+    emergency_contact_relation = fields.Char(string="Emergency Contact Relationship")
     gender = fields.Selection(
         selection=[
             ('male', 'Male'),
@@ -81,6 +206,7 @@ class HrEmployee(models.Model):
     # ------------------------------------------------------------------
     # Address / locality
     # ------------------------------------------------------------------
+    nationality = fields.Many2one('res.country', string="Nationality")
     house_number = fields.Char(string="House Number", help="House Number")
     city = fields.Char(string="City", help="City")
     sub_city = fields.Char(string="Sub City", help="Sub City")
@@ -88,9 +214,24 @@ class HrEmployee(models.Model):
     woreda = fields.Char(string="Woreda", help="Woreda")
     kebele = fields.Char(string="Kebele", help="Kebele")
 
-    # ------------------------------------------------------------------
-    # Family / personal
-    # ------------------------------------------------------------------
+    # Marital & Spouse Details
+    marital = fields.Selection([
+        ('single', 'Single'),
+        ('married', 'Married'),
+        ('divorced', 'Divorced'),
+    ], string='Marital Status')
+    marital_status_date = fields.Date(string="Effective Date of Status Change")
+    former_spouse_name = fields.Char(string="Former Spouse Full Name")
+    divorce_certificate = fields.Binary(string="Divorce Certificate/Document", attachment=True)
+    divorce_certificate_filename = fields.Char(string="Divorce Certificate Filename")
+
+    @api.onchange('marital')
+    def _onchange_marital_status(self):
+        if self.marital and self.marital != 'single':
+            self.marital_status_date = fields.Date.today()
+        else:
+            self.marital_status_date = False
+
     short_name = fields.Char(string="Short  Name", related='resource_id.name', required=False, store=True,
                              readonly=False)
     father_name = fields.Char(string='Father Name')
@@ -103,17 +244,48 @@ class HrEmployee(models.Model):
     religion = fields.Char(string='Religion', required=False)
     blood_group = fields.Char(string="Blood Group", help="Blood Group")
     any_disabilities = fields.Boolean("Any Disabilities")
-    details = fields.Char("Details")
-    any_health_ssues = fields.Boolean("Any Health Issues")
-    health_issue = fields.Char("Health Issue")
-    details1 = fields.Char("Details")
-    clinic_name = fields.Char("Clinic Name")
-    doctor_name = fields.Char("Doctor Name")
-    contact = fields.Char("Contact")
-    conviction_of_crime = fields.Boolean("Conviction of crime")
-    crime_no = fields.Char("Crime No")
-    age = fields.Char(string="Age")
+    disability_category = fields.Selection([
+        ('physical', 'Physical'),
+        ('visual', 'Visual'),
+        ('hearing', 'Hearing'),
+        ('other', 'Other'),
+    ], string="Disability Category")
+    disability_level = fields.Selection([
+        ('mild', 'Mild'),
+        ('moderate', 'Moderate'),
+        ('severe', 'Severe'),
+    ], string="Disability Level")
+    disability_details = fields.Char("Disability Details")
 
+    @api.onchange('any_disabilities')
+    def _onchange_any_disabilities(self):
+        if not self.any_disabilities:
+            self.disability_category = False
+            self.disability_level = False
+            self.disability_details = False
+    contact = fields.Char("Contact")
+    age = fields.Char(string="Age")
+    citizenship_attachment = fields.Binary(string="Citizenship / ID Document", attachment=True)
+    citizenship_attachment_filename = fields.Char(string="Citizenship Attachment Filename")
+
+    @api.onchange('birthday')
+    def _onchange_birthday_compute_age(self):
+        if self.birthday:
+            today = fields.Date.today()
+            age_years = relativedelta(today, self.birthday).years
+            self.age = str(max(0, age_years))
+
+    @api.onchange('age')
+    def _onchange_age_compute_birthday(self):
+        if self.age and str(self.age).strip().isdigit():
+            today = fields.Date.today()
+            age_years = int(str(self.age).strip())
+            estimated_birth_year = today.year - age_years
+            if not self.birthday or self.birthday.year != estimated_birth_year:
+                # Maintain month/day if set, otherwise default to Jan 1st
+                month = self.birthday.month if self.birthday else 1
+                day = min(self.birthday.day if self.birthday else 1, 28)
+                self.birthday = fields.Date.to_date(f"{estimated_birth_year:04d}-{month:02d}-{day:02d}")
     # ------------------------------------------------------------------
     # Languages
     # ------------------------------------------------------------------
@@ -468,20 +640,48 @@ class HrEmployee(models.Model):
                 if exp_cmds:
                     employee.experiance_id = exp_cmds
 
-            # 3. Competencies from Job Position
+            # 3. Competencies from Job Position (combining direct job competencies & Competency Management Module matrix)
             if job:
                 existing_comp_ids = set(employee.competencies_id.mapped('competencies.id'))
                 comp_cmds = []
+
+                # 3a. Direct competencies on job position (hr_competencies_info_job)
                 for c in job.competencies_id:
                     if c.competencies and (force or c.competencies.id not in existing_comp_ids):
                         if c.competencies.id in existing_comp_ids and force:
                             continue
+                        existing_comp_ids.add(c.competencies.id)
                         comp_cmds.append((0, 0, {
                             'competencies': c.competencies.id,
-                            'requirement': c.requirement,
+                            'required_level': getattr(c, 'required_level', 'intermediate') or 'intermediate',
+                            'requirement': c.requirement or (c.required_level.capitalize() if getattr(c, 'required_level', False) else 'Intermediate'),
                             'response': c.response,
                             'smart_search': c.smart_search or 'yes',
                         }))
+
+                # 3b. Competencies from Competency Management Module (competency.role.mapping)
+                if hasattr(job, 'get_required_competencies'):
+                    try:
+                        req_comps = job.get_required_competencies()
+                        level_map = {'1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert'}
+                        for comp_data in req_comps:
+                            comp_id = comp_data.get('competency_id')
+                            if comp_id and (force or comp_id not in existing_comp_ids):
+                                if comp_id in existing_comp_ids and force:
+                                    continue
+                                existing_comp_ids.add(comp_id)
+                                prof_lvl = str(comp_data.get('required_proficiency', '2'))
+                                req_lvl_key = level_map.get(prof_lvl, 'intermediate')
+                                req_lvl_name = comp_data.get('required_level_name') or req_lvl_key.capitalize()
+                                comp_cmds.append((0, 0, {
+                                    'competencies': comp_id,
+                                    'required_level': req_lvl_key,
+                                    'requirement': req_lvl_name,
+                                    'smart_search': 'yes',
+                                }))
+                    except Exception:
+                        pass
+
                 if comp_cmds:
                     employee.competencies_id = comp_cmds
 
@@ -538,7 +738,6 @@ class HrEmployee(models.Model):
 
     service_hire_date = fields.Date(
         string="Hire Date",
-        groups="hr.group_hr_user",
         tracking=True,
         compute="_compute_service_hire_date",
         store=True,
@@ -549,7 +748,6 @@ class HrEmployee(models.Model):
     )
     service_start_date = fields.Date(
         string="Start Date",
-        groups="hr.group_hr_user",
         tracking=True,readonly=True,
         help=(
             "Start date is the first day the employee actually works and"
@@ -566,26 +764,22 @@ class HrEmployee(models.Model):
     )
     service_duration = fields.Integer(
         string="Service Duration",
-        groups="hr.group_hr_user",
         readonly=True,
         compute="_compute_service_duration",
         help="Service duration in days",
     )
     service_duration_years = fields.Integer(
         string="Service Duration (years)",
-        groups="hr.group_hr_user",
         readonly=True,
         compute="_compute_service_duration_display",
     )
     service_duration_months = fields.Integer(
         string="Service Duration (months)",
-        groups="hr.group_hr_user",
         readonly=True,
         compute="_compute_service_duration_display",
     )
     service_duration_days = fields.Integer(
         string="Service Duration (days)",
-        groups="hr.group_hr_user",
         readonly=True,
         compute="_compute_service_duration_display",
     )

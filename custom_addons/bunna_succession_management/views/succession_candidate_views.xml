@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- CANDIDATE LIST -->
+        <record id="view_succession_candidate_list" model="ir.ui.view">
+            <field name="name">succession.candidate.list</field>
+            <field name="model">succession.candidate</field>
+            <field name="priority">1</field>
+            <field name="arch" type="xml">
+                <list sample="1" decoration-success="readiness_level == 'ready_now'"
+                      decoration-warning="readiness_level == 'ready_1_2_yrs'"
+                      decoration-muted="state in ('rejected','waitlisted')">
+                    <field name="employee_id"/>
+                    <field name="critical_position_id"/>
+                    <field name="talent_pool_id"/>
+                    <field name="readiness_level" widget="badge"
+                           decoration-success="readiness_level == 'ready_now'"
+                           decoration-warning="readiness_level == 'ready_1_2_yrs'"
+                           decoration-danger="readiness_level == 'ready_3_5_yrs'"/>
+                    <field name="system_readiness_suggestion"/>
+                    <field name="competency_match_percent" widget="progressbar"/>
+                    <field name="latest_pms_score"/>
+                    <field name="current_tenure_months"/>
+                    <field name="state" widget="badge"
+                           decoration-success="state == 'approved'"
+                           decoration-info="state == 'assessed'"
+                           decoration-warning="state == 'nominated'"
+                           decoration-muted="state in ('rejected','waitlisted')"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- CANDIDATE FORM -->
+        <record id="view_succession_candidate_form" model="ir.ui.view">
+            <field name="name">succession.candidate.form</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_compute_gap_analysis"
+                                string="🔄 Run Gap Analysis"
+                                type="object" class="btn-secondary"
+                                invisible="state in ('approved','rejected')"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <button name="action_assess"
+                                string="Mark as Assessed"
+                                type="object" class="oe_highlight"
+                                invisible="state != 'nominated'"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <button name="action_spmc_approve"
+                                string="✓ SPMC Approve"
+                                type="object" class="btn-success"
+                                invisible="state != 'assessed'"
+                                groups="bunna_succession_management.group_succession_spmc"/>
+                        <button name="action_waitlist"
+                                string="Waitlist"
+                                type="object"
+                                invisible="state not in ('nominated','assessed')"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <button name="action_reject"
+                                string="Reject"
+                                type="object"
+                                invisible="state in ('approved','rejected', 'placed')"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                                
+                        <!-- Deployment Workflow Buttons -->
+                        <button name="action_initiate_deployment"
+                                string="Initiate Deployment"
+                                type="object" class="oe_highlight"
+                                invisible="state != 'approved'"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <button name="action_deployment_lm_approve"
+                                string="Line Manager Approve"
+                                type="object" class="oe_highlight"
+                                invisible="state != 'deployment_lm'"/>
+                        <button name="action_deployment_po_approve"
+                                string="Principal Officer Approve"
+                                type="object" class="oe_highlight"
+                                invisible="state != 'deployment_po'"/>
+                        <button name="action_deployment_ppdd_approve"
+                                string="PPDD Approve"
+                                type="object" class="oe_highlight"
+                                invisible="state != 'deployment_ppdd'"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <button name="action_execute_placement"
+                                string="Final SPMC Placement"
+                                type="object" class="btn-success"
+                                invisible="state != 'deployment_spmc'"
+                                groups="bunna_succession_management.group_succession_spmc"/>
+
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="nominated,assessed,approved,placed"/>
+                    </header>
+                    <sheet>
+                        <!-- Readiness Banner -->
+                        <div class="alert alert-success" role="alert"
+                             invisible="readiness_level != 'ready_now'">
+                            <strong>✅ READY NOW:</strong>
+                            This candidate is assessed as ready to step into the critical role immediately.
+                        </div>
+                        <div class="alert alert-warning" role="alert"
+                             invisible="readiness_level != 'ready_1_2_yrs'">
+                            <strong>⚠️ READY IN 1-2 YEARS:</strong>
+                            Targeted development required. Active development plan recommended.
+                        </div>
+                        <div class="alert alert-danger" role="alert"
+                             invisible="readiness_level != 'ready_3_5_yrs'">
+                            <strong>🕐 READY IN 3-5 YEARS:</strong>
+                            Significant gaps identified. Long-term development investment needed.
+                        </div>
+
+                        <group>
+                            <group string="Nomination">
+                                <field name="employee_id" readonly="state != 'nominated'"/>
+                                <field name="critical_position_id" readonly="state != 'nominated'"/>
+                                <field name="talent_pool_id"/>
+                                <field name="nominated_by_id" readonly="1"/>
+                                <field name="nomination_date" readonly="1"/>
+                            </group>
+                            <group string="Readiness Assessment">
+                                <field name="readiness_level"/>
+                                <field name="competency_match_percent" widget="progressbar"/>
+                                <field name="latest_pms_score" readonly="1"/>
+                                <field name="current_tenure_months" readonly="1"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <!-- TAB 1: Competency Gap Analysis -->
+                            <page string="🔬 Competency Gap Analysis" name="gaps">
+                                <p class="text-muted" invisible="competency_gap_ids">
+                                    No gap analysis computed yet.
+                                    Click <strong>"🔄 Run Gap Analysis"</strong> to compute.
+                                </p>
+                                <field name="competency_gap_ids" readonly="1">
+                                    <list decoration-success="achievement_status in ('meets','exceeds')"
+                                          decoration-danger="achievement_status == 'below'">
+                                        <field name="competency_id"/>
+                                        <field name="competency_pillar"/>
+                                        <field name="weight"/>
+                                        <field name="current_score"/>
+                                        <field name="required_score"/>
+                                        <field name="variance_display" string="Gap Size" class="text-end fw-bold"/>
+                                        <field name="achievement_status" widget="badge"
+                                               decoration-success="achievement_status in ('meets','exceeds')"
+                                               decoration-danger="achievement_status == 'below'"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <!-- TAB 2: Justification -->
+                            <page string="📝 Justification &amp; Notes" name="notes">
+                                <group>
+                                    <field name="manager_justification"
+                                           placeholder="Explain why this employee is a strong successor..."/>
+                                    <field name="ppdd_notes" string="PPDD Assessment Notes"
+                                           placeholder="PPDD assessment observations..."
+                                           groups="bunna_succession_management.group_succession_ppdd"/>
+                                    <field name="spmc_decision_notes" string="SPMC Decision Notes"
+                                           placeholder="SPMC rationale for approval/rejection..."
+                                           groups="bunna_succession_management.group_succession_spmc"/>
+                                </group>
+                            </page>
+
+                            <!-- TAB 3: Approval Info -->
+                            <page string="Approval" name="approval">
+                                <group>
+                                    <field name="approved_by_id" readonly="1"/>
+                                    <field name="approval_date" readonly="1"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- CANDIDATE SEARCH -->
+        <record id="view_succession_candidate_search" model="ir.ui.view">
+            <field name="name">succession.candidate.search</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="employee_id"/>
+                    <field name="critical_position_id"/>
+                    <field name="department_id"/>
+                    
+                    <filter string="Ready Now" name="ready_now"
+                            domain="[('readiness_level','=','ready_now')]"/>
+                    <filter string="Approved" name="approved"
+                            domain="[('state','=','approved')]"/>
+                    <filter string="Pending Assessment" name="pending"
+                            domain="[('state','=','nominated')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Critical Position" name="group_position"
+                                context="{'group_by':'critical_position_id'}"/>
+                        <filter string="Readiness" name="group_readiness"
+                                context="{'group_by':'readiness_level'}"/>
+                        <filter string="Department" name="group_dept"
+                                context="{'group_by':'department_id'}"/>
+                        <filter string="Status" name="group_state"
+                                context="{'group_by':'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- CANDIDATE KANBAN (Pipeline View) -->
+        <record id="view_succession_candidate_kanban" model="ir.ui.view">
+            <field name="name">succession.candidate.kanban</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="readiness_level" class="o_kanban_small_column">
+                    <field name="employee_id"/>
+                    <field name="critical_position_id"/>
+                    <field name="competency_match_percent"/>
+                    <field name="latest_pms_score"/>
+                    <field name="readiness_level"/>
+                    <field name="state"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click">
+                                <div class="o_kanban_record_top">
+                                    <strong><field name="employee_id"/></strong>
+                                </div>
+                                <div class="o_kanban_record_body">
+                                    <div><b>Target: </b><field name="critical_position_id"/></div>
+                                    <div><b>Match: </b><field name="competency_match_percent"/>%</div>
+                                    <div><b>PMS: </b><field name="latest_pms_score"/></div>
+                                    <div><field name="state" widget="badge"/></div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- 9-BOX GRID KANBAN VIEW (FR-TAL-005) -->
+        <record id="view_succession_candidate_9box" model="ir.ui.view">
+            <field name="name">succession.candidate.9box</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="performance_rating" class="o_kanban_small_column" create="0">
+                    <field name="employee_id"/>
+                    <field name="critical_position_id"/>
+                    <field name="competency_match_percent"/>
+                    <field name="latest_pms_score"/>
+                    <field name="performance_rating"/>
+                    <field name="potential_rating"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click">
+                                <div class="o_kanban_record_top">
+                                    <strong><field name="employee_id"/></strong>
+                                </div>
+                                <div class="o_kanban_record_body">
+                                    <div><b>Target: </b><field name="critical_position_id"/></div>
+                                    <div><b>Pot.: </b><field name="potential_rating"/></div>
+                                    <div><b>Perf.: </b><field name="performance_rating"/></div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ACTION -->
+        <record id="action_succession_candidate" model="ir.actions.act_window">
+            <field name="name">Succession Pipeline</field>
+            <field name="res_model">succession.candidate</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="search_view_id" ref="view_succession_candidate_search"/>
+        </record>
+
+        <record id="action_succession_pipeline" model="ir.actions.act_window">
+            <field name="name">Approved Candidates</field>
+            <field name="res_model">succession.candidate</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_succession_candidate_search"/>
+            <field name="context">{'search_default_approved': 1}</field>
+        </record>
+
+        <record id="view_succession_candidate_9box_pivot" model="ir.ui.view">
+            <field name="name">succession.candidate.9box.pivot</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <pivot string="9-Box Grid" disable_linking="True" display_quantity="True">
+                    <!-- Potential on the Y-axis (Rows) -->
+                    <field name="potential_rating" type="row"/>
+                    <!-- Performance on the X-axis (Columns) -->
+                    <field name="performance_rating" type="col"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="action_succession_9box_client" model="ir.actions.client">
+            <field name="name">9-Box Grid</field>
+            <field name="tag">bunna_succession_management.nine_box_action</field>
+        </record>
+
+    </data>
+</odoo>

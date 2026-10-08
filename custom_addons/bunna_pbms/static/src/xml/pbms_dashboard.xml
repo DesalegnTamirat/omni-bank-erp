@@ -53,7 +53,7 @@
                         <ul t-if="state.planTypeDropdownOpen"
                             class="dropdown-menu show shadow-lg pbms-dropdown-menu mt-1"
                             style="position: absolute; top: 100%; left: 0; z-index: 1050; min-width: 230px; max-height: 350px; overflow-y: auto;">
-                            <t t-foreach="PLAN_TYPES" t-as="plan" t-key="plan.id">
+                            <t t-foreach="state.planTypes" t-as="plan" t-key="plan.id">
                                 <li>
                                     <button type="button"
                                             class="dropdown-item d-flex align-items-center justify-content-between"

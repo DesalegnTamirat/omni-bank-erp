@@ -40,32 +40,32 @@ class PbmsPlanLineMixin(models.AbstractModel):
     _description = "PBMS Monthly Planning Line (abstract)"
     _inherit = "pbms.workflow.mixin"
 
-    m01 = fields.Monetary(string="Jul")
-    m02 = fields.Monetary(string="Aug")
-    m03 = fields.Monetary(string="Sep")
-    m04 = fields.Monetary(string="Oct")
-    m05 = fields.Monetary(string="Nov")
-    m06 = fields.Monetary(string="Dec")
-    m07 = fields.Monetary(string="Jan")
-    m08 = fields.Monetary(string="Feb")
-    m09 = fields.Monetary(string="Mar")
-    m10 = fields.Monetary(string="Apr")
-    m11 = fields.Monetary(string="May")
-    m12 = fields.Monetary(string="Jun")
+    m01 = fields.Float(string="Jul")
+    m02 = fields.Float(string="Aug")
+    m03 = fields.Float(string="Sep")
+    m04 = fields.Float(string="Oct")
+    m05 = fields.Float(string="Nov")
+    m06 = fields.Float(string="Dec")
+    m07 = fields.Float(string="Jan")
+    m08 = fields.Float(string="Feb")
+    m09 = fields.Float(string="Mar")
+    m10 = fields.Float(string="Apr")
+    m11 = fields.Float(string="May")
+    m12 = fields.Float(string="Jun")
 
-    quarter1_total = fields.Monetary(string="Q1 (Jul-Sep)", compute="_compute_totals", store=True)
-    quarter2_total = fields.Monetary(string="Q2 (Oct-Dec)", compute="_compute_totals", store=True)
-    quarter3_total = fields.Monetary(string="Q3 (Jan-Mar)", compute="_compute_totals", store=True)
-    quarter4_total = fields.Monetary(string="Q4 (Apr-Jun)", compute="_compute_totals", store=True)
-    annual_total = fields.Monetary(string="Annual Total", compute="_compute_totals", store=True, index=True)
+    quarter1_total = fields.Float(string="QI", compute="_compute_totals", store=True)
+    quarter2_total = fields.Float(string="QII", compute="_compute_totals", store=True)
+    quarter3_total = fields.Float(string="QIII", compute="_compute_totals", store=True)
+    quarter4_total = fields.Float(string="QIV", compute="_compute_totals", store=True)
+    annual_total = fields.Float(string="Annual Total", compute="_compute_totals", store=True, index=True)
 
     display_quarter = fields.Selection(
         [
-            ("all", "All Quarters (Full Year)"),
-            ("q1", "Q1 Only (Jul - Sep)"),
-            ("q2", "Q2 Only (Oct - Dec)"),
-            ("q3", "Q3 Only (Jan - Mar)"),
-            ("q4", "Q4 Only (Apr - Jun)"),
+            ("all", "All Quarters"),
+            ("q1", "QI"),
+            ("q2", "QII"),
+            ("q3", "QIII"),
+            ("q4", "QIV"),
         ],
         string="Display Quarter",
         default="all",

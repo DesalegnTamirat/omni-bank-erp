@@ -14,9 +14,13 @@
                 <field name="enable_customer_base" widget="boolean_toggle"/>
                 <field name="enable_fx" widget="boolean_toggle"/>
                 <field name="enable_digital_banking" widget="boolean_toggle"/>
+                <field name="enable_loan_disbursement_collection" widget="boolean_toggle"/>
+                <field name="enable_loan_outstanding" widget="boolean_toggle"/>
                 <field name="enable_expense" widget="boolean_toggle"/>
                 <field name="enable_manpower" widget="boolean_toggle"/>
                 <field name="enable_fixed_asset" widget="boolean_toggle"/>
+                <field name="enable_credit_portfolio" widget="boolean_toggle"/>
+                <field name="enable_initiative_budget" widget="boolean_toggle"/>
             </list>
         </field>
     </record>
@@ -53,12 +57,16 @@
                                     <field name="enable_customer_base" widget="boolean_toggle" options="{'autosave': False}"/>
                                     <field name="enable_fx" widget="boolean_toggle" options="{'autosave': False}"/>
                                     <field name="enable_digital_banking" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_loan_disbursement_collection" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_loan_outstanding" widget="boolean_toggle" options="{'autosave': False}"/>
                                 </group>
                                 <group string="Measurement Types">
                                     <field name="deposit_measurement_type" invisible="not enable_deposit"/>
                                     <field name="customer_base_measurement_type" invisible="not enable_customer_base"/>
                                     <field name="fx_measurement_type" invisible="not enable_fx"/>
                                     <field name="digital_banking_measurement_type" invisible="not enable_digital_banking"/>
+                                    <field name="loan_disbursement_measurement_type" invisible="not enable_loan_disbursement_collection"/>
+                                    <field name="loan_outstanding_measurement_type" invisible="not enable_loan_outstanding"/>
                                 </group>
                             </group>
                             <group string="Budgets &amp; Resources">
@@ -66,11 +74,15 @@
                                     <field name="enable_expense" widget="boolean_toggle" options="{'autosave': False}"/>
                                     <field name="enable_manpower" widget="boolean_toggle" options="{'autosave': False}"/>
                                     <field name="enable_fixed_asset" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_credit_portfolio" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_initiative_budget" widget="boolean_toggle" options="{'autosave': False}"/>
                                 </group>
                                 <group string="Measurement Types">
                                     <field name="expense_measurement_type" invisible="not enable_expense"/>
                                     <field name="manpower_measurement_type" invisible="not enable_manpower"/>
                                     <field name="fixed_asset_measurement_type" invisible="not enable_fixed_asset"/>
+                                    <field name="credit_portfolio_measurement_type" invisible="not enable_credit_portfolio"/>
+                                    <field name="initiative_budget_measurement_type" invisible="not enable_initiative_budget"/>
                                 </group>
                             </group>
                         </page>
@@ -111,6 +123,14 @@
                                            invisible="not enable_fixed_asset"
                                            domain="[('work_unit_type', '=', work_unit_type)]"
                                            placeholder="Select units not eligible for Fixed Asset..."/>
+                                    <field name="credit_portfolio_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_credit_portfolio"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for Credit Portfolio..."/>
+                                    <field name="initiative_budget_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_initiative_budget"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for Initiative Budget..."/>
                                 </group>
                             </group>
                         </page>
@@ -131,6 +151,11 @@
                                        string="Available Digital Channels"
                                        help="Select which digital channels are available for this configuration."/>
                             </group>
+                            <group string="Loan &amp; Advances Products" invisible="not enable_loan_disbursement_collection and not enable_loan_outstanding">
+                                <field name="loan_product_ids" widget="many2many_tags"
+                                       string="Available Loan Products"
+                                       help="Select which loan products (Term Loan, Overdraft, Advances, etc.) are available for this configuration."/>
+                            </group>
                             <group string="General Expense Accounts" invisible="not enable_expense">
                                 <field name="expense_account_ids" widget="many2many_tags"
                                        string="Available Expense Accounts"
@@ -150,6 +175,11 @@
                                 <field name="position_type_ids" widget="many2many_tags"
                                        string="Available Position Types"
                                        help="Select which request types (New Position, Additional Position, Replacement, Position Transfer, Position Upgrade) are available for this configuration."/>
+                            </group>
+                            <group string="Credit Portfolio Items" invisible="not enable_credit_portfolio">
+                                <field name="credit_portfolio_item_ids" widget="many2many_tags"
+                                       string="Available Credit Portfolio Items"
+                                       help="Select which Credit Portfolio items are available for this configuration."/>
                             </group>
                         </page>
 
@@ -175,56 +205,6 @@
                             </group>
                         </page>
 
-                        <page string="Functional Reviewers &amp; Department Routing" name="page_functional_routing">
-                            <p class="text-muted">
-                                Configure the responsible Head Office Operating Unit, Department, and Designated Reviewer users for each planning category.
-                            </p>
-                            <group string="Core &amp; Mobilization Categories">
-                                <group string="Deposit Mobilization">
-                                    <field name="deposit_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="deposit_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="deposit_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                                <group string="Customer Base">
-                                    <field name="customer_base_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="customer_base_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="customer_base_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                            </group>
-                            <group string="International &amp; Digital Channels">
-                                <group string="FX Mobilization">
-                                    <field name="fx_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="fx_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="fx_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                                <group string="Digital Banking Channels">
-                                    <field name="digital_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="digital_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="digital_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                            </group>
-                            <group string="Resources &amp; Operating Expenses">
-                                <group string="Workforce Requirement">
-                                    <field name="manpower_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="manpower_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="manpower_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                    <field name="budget_hiring_committee_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                    <field name="ceo_user_id" options="{'no_create': True}"/>
-                                </group>
-                                <group string="General Expense Budget">
-                                    <field name="expense_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="expense_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="expense_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                            </group>
-                            <group string="Fixed Assets &amp; Facilities">
-                                <group string="Fixed Asset Requirement">
-                                    <field name="fixed_asset_reviewer_ou_id" options="{'no_create': True}"/>
-                                    <field name="fixed_asset_reviewer_dept_id" options="{'no_create': True}"/>
-                                    <field name="fixed_asset_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
-                                </group>
-                            </group>
-                        </page>
                     </notebook>
                 </sheet>
             </form>
@@ -258,7 +238,7 @@
         <field name="search_view_id" ref="view_pbms_planning_config_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Configure eligible planning categories and category reviewers per Work Unit Type or specific Operating Unit.
+                Configure eligible planning categories and dropdown options per Work Unit Type or specific Operating Unit.
             </p>
             <p>
                 Configure defaults for Work Unit Types (Branch, District Office, Head Office, ...)

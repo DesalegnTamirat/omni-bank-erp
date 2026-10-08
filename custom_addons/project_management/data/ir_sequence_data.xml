@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Initiative Sequence -->
+    <record id="seq_pm_initiative" model="ir.sequence">
+        <field name="name">Strategic Initiative Sequence</field>
+        <field name="code">pm.initiative</field>
+        <field name="prefix">INIT/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Project Sequence -->
+    <record id="seq_pm_project" model="ir.sequence">
+        <field name="name">Project Sequence</field>
+        <field name="code">pm.project</field>
+        <field name="prefix">PRJ/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Deliverable Sequence -->
+    <record id="seq_pm_deliverable" model="ir.sequence">
+        <field name="name">Deliverable Sequence</field>
+        <field name="code">pm.deliverable</field>
+        <field name="prefix">DEL/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Task Sequence -->
+    <record id="seq_pm_task" model="ir.sequence">
+        <field name="name">Task Sequence</field>
+        <field name="code">pm.task</field>
+        <field name="prefix">TSK/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Strategic Source Sequence -->
+    <record id="seq_pm_strategic_source" model="ir.sequence">
+        <field name="name">Strategic Source Sequence</field>
+        <field name="code">pm.strategic.source</field>
+        <field name="prefix">SRC/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Strategic Objective Sequence -->
+    <record id="seq_pm_strategic_objective" model="ir.sequence">
+        <field name="name">Strategic Objective Sequence</field>
+        <field name="code">pm.strategic.objective</field>
+        <field name="prefix">OBJ/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Milestone Sequence -->
+    <record id="seq_pm_milestone" model="ir.sequence">
+        <field name="name">Milestone Sequence</field>
+        <field name="code">pm.milestone</field>
+        <field name="prefix">MLS/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>

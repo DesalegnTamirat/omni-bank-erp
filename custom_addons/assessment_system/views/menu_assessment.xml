@@ -4,10 +4,13 @@
     <!-- ============================================ -->
     <!-- ROOT APP MENU: ASSESSMENT SYSTEM             -->
     <!-- ============================================ -->
+    <!-- ============================================ -->
+    <!-- ROOT APP MENU: ASSESSMENT SYSTEM             -->
+    <!-- ============================================ -->
     <menuitem id="menu_assessment_root"
               name="Assessment System Management"
               web_icon="assessment_system,static/description/icon.png"
-              groups="group_assessment_user,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_user,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,base.group_user"
+              groups="group_assessment_user,group_assessment_panel_member,group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_user,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,base.group_user"
               sequence="100"/>
 
     <!-- ============================================ -->
@@ -26,7 +29,7 @@
     <menuitem id="menu_exm_root"
               name="Written Exam System"
               parent="menu_assessment_root"
-              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
               sequence="2"/>
 
     <menuitem id="menu_exam_sessions"
@@ -61,7 +64,7 @@
               name="Question Bank"
               parent="menu_exm_root"
               action="action_exam_question_bank"
-              groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
               sequence="3"/>
 
     <menuitem id="menu_exam_question_approval_queue"
@@ -75,7 +78,7 @@
               name="Import Questions (Word / PDF)"
               parent="menu_exm_root"
               action="action_exam_pdf_import_wizard"
-              groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
               sequence="1"/>
 
     <menuitem id="menu_exam_disqualifications"
@@ -117,6 +120,7 @@
               groups="group_assessment_panel_member,group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator"
               sequence="3"/>
 
+
     <menuitem id="menu_cbis_interview_sessions"
               name="Interview Sessions"
               parent="menu_cbis_root"
@@ -146,7 +150,7 @@
               name="Transfer Assessments"
               parent="menu_assessment_root"
               action="action_transfer_assessment_records"
-              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="base.group_user,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
               sequence="30"/>
 
     <!-- ============================================ -->

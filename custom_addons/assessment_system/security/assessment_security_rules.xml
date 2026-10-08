@@ -85,7 +85,55 @@
             <field name="name">Assessment: Officers &amp; Managers - All Panel Invitations</field>
             <field name="model_id" ref="custom_recruitment.model_new_internal_recruitment_panel"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(6, 0, [ref('group_assessment_officer'), ref('group_assessment_manager'), ref('group_assessment_administrator')])]"/>
+            <field name="groups" eval="[(4, ref('group_assessment_officer')), (4, ref('group_assessment_manager')), (4, ref('group_assessment_administrator'))]"/>
+        </record>
+
+        <!-- ==================================================== -->
+        <!-- CBIS INTERVIEW EVALUATION ISOLATION                 -->
+        <!-- ==================================================== -->
+
+        <!-- Panel Member: Can view and manage ONLY their own assigned interview evaluations -->
+        <record id="rule_cbis_interviewer_evaluation_panel_member" model="ir.rule">
+            <field name="name">CBIS Evaluation: Panel Member - Own Assigned Evaluations Only</field>
+            <field name="model_id" ref="model_cbis_interviewer_evaluation"/>
+            <field name="domain_force">[('interviewer_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_panel_member')), (4, ref('group_assessment_workunit_manager'))]"/>
+        </record>
+
+        <record id="rule_cbis_interviewer_evaluation_line_panel_member" model="ir.rule">
+            <field name="name">CBIS Evaluation Line: Panel Member - Own Assigned Evaluation Lines Only</field>
+            <field name="model_id" ref="model_cbis_interviewer_evaluation_line"/>
+            <field name="domain_force">[('evaluation_id.interviewer_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_panel_member')), (4, ref('group_assessment_workunit_manager'))]"/>
+        </record>
+
+        <!-- HR Officers, Managers & Admin: Full Access to all CBIS Interviewer Evaluations -->
+        <record id="rule_cbis_interviewer_evaluation_officer_manager_all" model="ir.rule">
+            <field name="name">CBIS Evaluation: Officers &amp; Managers - All Evaluations</field>
+            <field name="model_id" ref="model_cbis_interviewer_evaluation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
+        </record>
+
+        <record id="rule_cbis_interviewer_evaluation_line_officer_manager_all" model="ir.rule">
+            <field name="name">CBIS Evaluation Line: Officers &amp; Managers - All Lines</field>
+            <field name="model_id" ref="model_cbis_interviewer_evaluation_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
         </record>
 
         <!-- ==================================================== -->
@@ -112,20 +160,33 @@
         <!-- WORK UNIT ISOLATION: MANUAL GRADING (EXAM.GRADING.TASK) -->
         <!-- ==================================================== -->
 
-        <!-- Work Unit Grader / Officer: Can only see grading tasks assigned to them or in their Work Unit (operating.unit) -->
-        <record id="rule_exam_grading_task_work_unit_officer" model="ir.rule">
-            <field name="name">Manual Grading: Work Unit Grader - Own Assigned / Work Unit Tasks</field>
+        <!-- Work Unit Manager: Can ONLY see manual grading tasks assigned to them or matching their hiring Work Unit -->
+        <record id="rule_exam_grading_task_work_unit_manager" model="ir.rule">
+            <field name="name">Manual Grading: Work Unit Manager - Own Work Unit Tasks</field>
             <field name="model_id" ref="model_exam_grading_task"/>
-            <field name="domain_force">['|', '|', ('assigned_grader_id', '=', user.id), ('operating_unit_id', '=', user.employee_id.operating_unit_id.id), ('question_id.operating_unit_id', '=', user.employee_id.operating_unit_id.id)]</field>
-            <field name="groups" eval="[(4, ref('group_assessment_workunit_manager')), (4, ref('group_assessment_officer')), (4, ref('custom_recruitment.group_recruitment_officer'))]"/>
+            <field name="domain_force">['|', '|', '|', '|',
+                ('assigned_grader_id', '=', user.id),
+                ('operating_unit_id', '=', user.employee_id.operating_unit_id.id),
+                ('operating_unit_id', '=', user.employee_id.default_operating_unit_id.id),
+                ('attempt_id.session_id.vacancy_id.operating_unit_id', '=', user.employee_id.operating_unit_id.id),
+                ('attempt_id.session_id.vacancy_id.operating_unit_id', '=', user.employee_id.default_operating_unit_id.id)
+            ]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_workunit_manager'))]"/>
         </record>
 
-        <!-- HR Manager & Administrator: Full Access to all Grading Tasks across all Work Units -->
+        <!-- HR Officers, Managers & Administrator: Full Access to all Grading Tasks across all Work Units -->
         <record id="rule_exam_grading_task_manager_admin_all" model="ir.rule">
-            <field name="name">Manual Grading: Manager &amp; Admin - All Work Unit Tasks</field>
+            <field name="name">Manual Grading: HR Officers, Managers &amp; Admin - All Work Unit Tasks</field>
             <field name="model_id" ref="model_exam_grading_task"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_assessment_manager')), (4, ref('group_assessment_administrator')), (4, ref('custom_recruitment.group_recruitment_manager')), (4, ref('custom_recruitment.group_recruitment_administrator'))]"/>
+            <field name="groups" eval="[
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
         </record>
 
         <!-- ==================================================== -->
@@ -146,6 +207,7 @@
             <field name="model_id" ref="model_exam_candidate_attempt"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[
+                (4, ref('group_assessment_workunit_manager')),
                 (4, ref('group_assessment_officer')),
                 (4, ref('group_assessment_manager')),
                 (4, ref('group_assessment_administrator')),
@@ -167,11 +229,11 @@
         <!-- RESULT PUBLICATIONS ISOLATION (FR-EXM-071)           -->
         <!-- ==================================================== -->
 
-        <!-- Employee: Can ONLY see their own published result line -->
+        <!-- Employee / Candidate: Can ONLY see their own published result line -->
         <record id="rule_assessment_result_publication_line_user_own" model="ir.rule">
             <field name="name">Assessment Result Publication Line: Employee - Own Results Only</field>
             <field name="model_id" ref="model_assessment_result_publication_line"/>
-            <field name="domain_force">['|', '|', '|', ('user_id', '=', user.id), ('employee_id.user_id', '=', user.id), ('candidate_email', '=ilike', user.login), ('candidate_code', 'in', [user.employee_id.identification_id or '___none___', user.employee_id.barcode or '___none___', user.login or '___none___'])]</field>
+            <field name="domain_force">['|', '|', '|', '|', ('user_id', '=', user.id), ('employee_id.user_id', '=', user.id), ('candidate_email', '=ilike', user.login), ('candidate_code', 'in', [user.employee_id.identification_id or '___none___', user.employee_id.barcode or '___none___', user.login or '___none___', user.name or '___none___']), ('candidate_name_private', '=ilike', user.name)]</field>
             <field name="groups" eval="[(4, ref('base.group_user'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -194,11 +256,11 @@
             ]"/>
         </record>
 
-        <!-- Employee: Can view published result batches -->
+        <!-- Employee / Candidate: Can view published result batches containing their own record line -->
         <record id="rule_assessment_result_publication_user" model="ir.rule">
             <field name="name">Assessment Result Publication: Employee - Published Batches Only</field>
             <field name="model_id" ref="model_assessment_result_publication"/>
-            <field name="domain_force">[('state', '=', 'published')]</field>
+            <field name="domain_force">['&amp;', ('state', '=', 'published'), '|', '|', '|', '|', ('line_ids.user_id', '=', user.id), ('line_ids.employee_id.user_id', '=', user.id), ('line_ids.candidate_email', '=ilike', user.login), ('line_ids.candidate_code', 'in', [user.employee_id.identification_id or '___none___', user.employee_id.barcode or '___none___', user.login or '___none___', user.name or '___none___']), ('line_ids.candidate_name_private', '=ilike', user.name)]</field>
             <field name="groups" eval="[(4, ref('base.group_user'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>

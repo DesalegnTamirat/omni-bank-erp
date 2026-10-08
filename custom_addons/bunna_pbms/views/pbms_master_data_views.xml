@@ -117,4 +117,93 @@
         <field name="res_model">pbms.position.type</field>
         <field name="view_mode">list</field>
     </record>
+
+    <!-- Loan Product -->
+    <record id="view_pbms_loan_product_list" model="ir.ui.view">
+        <field name="name">pbms.loan.product.list</field>
+        <field name="model">pbms.loan.product</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="category_type"/>
+                <field name="applies_to"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_pbms_loan_product" model="ir.actions.act_window">
+        <field name="name">Loan Products</field>
+        <field name="res_model">pbms.loan.product</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Credit Portfolio Item -->
+    <record id="view_pbms_credit_portfolio_item_list" model="ir.ui.view">
+        <field name="name">pbms.credit.portfolio.item.list</field>
+        <field name="model">pbms.credit.portfolio.item</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="section"/>
+                <field name="totals_basis"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pbms_credit_portfolio_item_form" model="ir.ui.view">
+        <field name="name">pbms.credit.portfolio.item.form</field>
+        <field name="model">pbms.credit.portfolio.item</field>
+        <field name="arch" type="xml">
+            <form string="Credit Portfolio Item">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="section"/>
+                            <field name="totals_basis"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Description / Guidance">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pbms_credit_portfolio_item_search" model="ir.ui.view">
+        <field name="name">pbms.credit.portfolio.item.search</field>
+        <field name="model">pbms.credit.portfolio.item</field>
+        <field name="arch" type="xml">
+            <search string="Search Credit Portfolio Items">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="section"/>
+                <separator/>
+                <filter string="Balance Sheet" name="filter_balance_sheet" domain="[('section', '=', 'balance_sheet')]"/>
+                <filter string="Income Statement" name="filter_income_statement" domain="[('section', '=', 'income_statement')]"/>
+                <separator/>
+                <separator/>
+                <filter string="Section" name="group_by_section" context="{'group_by': 'section'}"/>
+                <filter string="Totals Basis" name="group_by_totals_basis" context="{'group_by': 'totals_basis'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pbms_credit_portfolio_item" model="ir.actions.act_window">
+        <field name="name">Credit Portfolio Items</field>
+        <field name="res_model">pbms.credit.portfolio.item</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_pbms_credit_portfolio_item_search"/>
+    </record>
 </odoo>

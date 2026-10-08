@@ -25,6 +25,7 @@ export class MyAttendance extends Component {
     setup() {
         this.notification = useService("notification");
         this.action = useService("action");
+        this.menu = useService("menu");
         this.formatFloatTime = registry.category("formatters").get("float_time");
 
         this.state = useState({
@@ -38,12 +39,19 @@ export class MyAttendance extends Component {
             departmentName: "",
             hoursToday: "00:00",
             weeklyHoursFormatted: "00h 00m",
+            weeklyTargetHoursFormatted: "40h 00m",
             monthlyHoursFormatted: "00h 00m",
             dailyBreakdown: [],
+            currentWeekOffset: 0,
+            weekRangeLabel: "",
+            isCurrentWeek: true,
+            isLoadingWeek: false,
             todaySessions: [],
             checkInTimeStr: "",
             checkInStatus: "",
             checkInRaw: false,
+            shiftEndRaw: false,
+            isShiftEnded: false,
             hoursCompletedToday: 0.0,   // float hours of closed sessions today
             hoursCompletedWeek: 0.0,    // float hours of closed sessions this week
             hoursCompletedMonth: 0.0,   // float hours of closed sessions this month
@@ -105,7 +113,21 @@ export class MyAttendance extends Component {
                 const checkInDt = DateTime.fromISO(this.state.checkInRaw);
 
                 if (checkInDt && checkInDt.isValid) {
-                    const diffSecs = Math.max(0, Math.floor(now.diff(checkInDt, 'seconds').seconds));
+                    let effectiveNow = now;
+                    // Cap live counter at scheduled shift end time
+                    if (this.state.shiftEndRaw) {
+                        const shiftEndDt = DateTime.fromISO(this.state.shiftEndRaw);
+                        if (shiftEndDt && shiftEndDt.isValid && now > shiftEndDt) {
+                            effectiveNow = shiftEndDt;
+                            this.state.isShiftEnded = true;
+                        } else {
+                            this.state.isShiftEnded = false;
+                        }
+                    } else {
+                        this.state.isShiftEnded = false;
+                    }
+
+                    const diffSecs = Math.max(0, Math.floor(effectiveNow.diff(checkInDt, 'seconds').seconds));
                     if (!isNaN(diffSecs)) {
                         const hrs = Math.floor(diffSecs / 3600);
                         const mins = Math.floor((diffSecs % 3600) / 60);
@@ -131,12 +153,14 @@ export class MyAttendance extends Component {
                             String(tMins).padStart(2, '0') + "m";
 
                         // Synchronize today's row in weekly breakdown live
-                        if (this.state.dailyBreakdown && this.state.dailyBreakdown.length) {
+                        if (this.state.dailyBreakdown && this.state.dailyBreakdown.length && this.state.isCurrentWeek) {
                             const todayRow = this.state.dailyBreakdown.find(d => d.is_today);
                             if (todayRow) {
                                 todayRow.hours_formatted = this.state.hoursToday;
                                 todayRow.hours = totalSecsToday / 3600.0;
-                                todayRow.percentage = Math.min(100, Math.round((todayRow.hours / 8.0) * 100));
+                                const expHrs = todayRow.expected_hours || 8.0;
+                                todayRow.percentage = Math.min(100, Math.round((todayRow.hours / expHrs) * 100));
+                                todayRow.is_completed = (todayRow.hours >= expHrs && expHrs > 0);
                             }
                         }
 
@@ -171,6 +195,7 @@ export class MyAttendance extends Component {
             }
         } else {
             this.state.liveWorkedTimer = "00:00:00";
+            this.state.isShiftEnded = false;
             const completedSecsToday = Math.round((this.state.hoursCompletedToday || 0) * 3600);
             const tHrs = Math.floor(completedSecsToday / 3600);
             const tMins = Math.floor((completedSecsToday % 3600) / 60);
@@ -206,18 +231,66 @@ export class MyAttendance extends Component {
         this.state.hoursToday = String(hHrs).padStart(2, '0') + "h " + String(hMins).padStart(2, '0') + "m";
 
         this.state.weeklyHoursFormatted = data.weekly_hours_formatted || "00h 00m";
+        this.state.weeklyTargetHoursFormatted = data.weekly_target_hours_formatted || "40h 00m";
+        this.state.weekRangeLabel = data.week_range_label || "";
+        this.state.isCurrentWeek = data.is_current_week !== undefined ? data.is_current_week : true;
+        this.state.currentWeekOffset = 0;
         this.state.monthlyHoursFormatted = data.monthly_hours_formatted || "00h 00m";
         this.state.dailyBreakdown = data.daily_breakdown || [];
         this.state.todaySessions = data.today_sessions || [];
         this.state.checkInTimeStr = data.check_in_time_str || "";
         this.state.checkInStatus = data.check_in_status || "";
         this.state.checkInRaw = data.check_in_raw || false;
+        this.state.shiftEndRaw = data.shift_end_raw || false;
         this.state.hoursCompletedToday = data.hours_today_completed || 0.0;
         this.state.hoursCompletedWeek = data.hours_weekly_completed || 0.0;
         this.state.hoursCompletedMonth = data.hours_monthly_completed || 0.0;
         this.state.shiftInfo = data.shift_info || null;
 
         this.updateClock();
+    }
+
+    async onPrevWeek() {
+        this.state.currentWeekOffset -= 1;
+        await this._fetchWeeklyBreakdown();
+    }
+
+    async onNextWeek() {
+        if (this.state.currentWeekOffset < 0) {
+            this.state.currentWeekOffset += 1;
+            await this._fetchWeeklyBreakdown();
+        }
+    }
+
+    async onCurrentWeek() {
+        if (this.state.currentWeekOffset !== 0) {
+            this.state.currentWeekOffset = 0;
+            await this._fetchWeeklyBreakdown();
+        }
+    }
+
+    async _fetchWeeklyBreakdown() {
+        this.state.isLoadingWeek = true;
+        try {
+            const res = await rpc("/custom_hr_attendance/get_weekly_breakdown", {
+                week_offset: this.state.currentWeekOffset
+            });
+            if (res && res.daily_breakdown) {
+                this.state.dailyBreakdown = res.daily_breakdown;
+                this.state.weeklyHoursFormatted = res.weekly_hours_formatted || "00h 00m";
+                this.state.weeklyTargetHoursFormatted = res.weekly_target_hours_formatted || "40h 00m";
+                this.state.weekRangeLabel = res.week_range_label || "";
+                this.state.isCurrentWeek = !!res.is_current_week;
+                if (this.state.isCurrentWeek) {
+                    this.state.hoursCompletedWeek = res.hours_weekly_completed || 0.0;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load weekly breakdown:", e);
+        } finally {
+            this.state.isLoadingWeek = false;
+            this.updateClock();
+        }
     }
 
     async _toggle(latitude = false, longitude = false) {
@@ -227,6 +300,15 @@ export class MyAttendance extends Component {
                 longitude,
             });
             this._fill(data);
+            if (this.menu) {
+                this.menu.reload();
+            }
+            if (data && data.notification) {
+                this.notification.add(data.notification.message, {
+                    title: data.notification.title,
+                    type: data.notification.type || "success",
+                });
+            }
         } catch (error) {
             if (error instanceof ConnectionLostError) {
                 this.notification.add(
@@ -285,6 +367,31 @@ export class MyAttendance extends Component {
                 lateness_hours_violation_threshold: this.timeStrToFloat(s.lateness_hours_violation_threshold_str !== undefined ? s.lateness_hours_violation_threshold_str : s.lateness_hours_violation_threshold),
             };
 
+            // Client-side quick check
+            if (payload.morning_time >= payload.exit_time) {
+                this.notification.add(
+                    _t("Morning Start Time must be earlier than Shift Exit Time."),
+                    { title: _t("Validation Error"), type: "danger" }
+                );
+                return;
+            }
+            if (payload.enable_lunch_break) {
+                if (payload.lunch_out_time <= payload.morning_time) {
+                    this.notification.add(
+                        _t("Lunch Start Time must be strictly after Morning Start Time."),
+                        { title: _t("Validation Error"), type: "danger" }
+                    );
+                    return;
+                }
+                if (payload.lunch_out_time + payload.lunch_duration >= payload.exit_time) {
+                    this.notification.add(
+                        _t("Lunch break must end before the Shift Exit Time."),
+                        { title: _t("Validation Error"), type: "danger" }
+                    );
+                    return;
+                }
+            }
+
             const res = await rpc("/custom_hr_attendance/save_settings", {
                 settings: payload,
             });
@@ -296,11 +403,12 @@ export class MyAttendance extends Component {
                 Object.assign(this.state.settings, payload);
                 this.state.showSettings = false;
             } else {
-                throw new Error(res ? res.error : "Failed to save settings");
+                const errMsg = (res && res.error) ? res.error : _t("Failed to save settings.");
+                this.notification.add(errMsg, { title: _t("Invalid Configuration"), type: "danger" });
             }
         } catch (e) {
             this.notification.add(
-                _t("Failed to save settings. Check your permissions."),
+                e.message || _t("Failed to save settings. Check your permissions."),
                 { title: _t("Error"), type: "danger" }
             );
         } finally {

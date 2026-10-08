@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import api, fields, models, tools, _
 from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 from .planing_categories import WORK_UNIT_TYPES
 
@@ -13,6 +16,10 @@ CATEGORY_TOGGLE_MAP = [
     ("general_expense", "enable_expense", "General Expense"),
     ("manpower", "enable_manpower", "Work Force"),
     ("fixed_asset", "enable_fixed_asset", "Fixed Asset Requirement"),
+    ("loan_disbursement_collection", "enable_loan_disbursement_collection", "Loan Disbursement & Collection"),
+    ("loan_outstanding", "enable_loan_outstanding", "Loan & Advances Outstanding"),
+    ("credit_portfolio", "enable_credit_portfolio", "Credit Portfolio"),
+    ("initiative_budget", "enable_initiative_budget", "Initiative Budget"),
 ]
 
 # Measurement types per planning category
@@ -24,6 +31,10 @@ CATEGORY_MEASUREMENT_TYPES = {
     "general_expense": "monetary",
     "manpower": "integer",
     "fixed_asset": "integer",
+    "loan_disbursement_collection": "monetary",
+    "loan_outstanding": "monetary",
+    "credit_portfolio": "monetary",
+    "initiative_budget": "monetary",
 }
 
 # Default currency per category (company currency)
@@ -138,6 +149,42 @@ class PbmsPlanningConfig(models.Model):
         default=True,
         help="Enable Fixed Asset Requirement planning for this Work Unit Type / Operating Unit.",
     )
+    enable_loan_disbursement_collection = fields.Boolean(
+        string="Loan Disbursement & Collection (BB-APF-8)",
+        default=True,
+        help="Enable Loan Disbursement & Collection planning for this Work Unit Type / Operating Unit.",
+    )
+    enable_loan_outstanding = fields.Boolean(
+        string="Loan & Advances Outstanding (BB-APF-7)",
+        default=True,
+        help="Enable Loan & Advances Outstanding planning for this Work Unit Type / Operating Unit.",
+    )
+    enable_credit_portfolio = fields.Boolean(
+        string="Credit Portfolio (BB-APF-15)",
+        default=False,
+        help="Enable Credit Portfolio planning for this Work Unit Type / Operating Unit.",
+    )
+    enable_initiative_budget = fields.Boolean(
+        string="Initiative Budget",
+        default=False,
+        help="Enable Initiative Budget planning for this Work Unit Type / Operating Unit.",
+    )
+    credit_portfolio_item_ids = fields.Many2many(
+        "pbms.credit.portfolio.item",
+        "pbms_planning_config_credit_port_item_rel",
+        "config_id",
+        "item_id",
+        string="Available Credit Portfolio Items",
+        help="Select which Credit Portfolio items are available for this configuration.",
+    )
+    loan_product_ids = fields.Many2many(
+        "pbms.loan.product",
+        "pbms_planning_config_loan_product_rel",
+        "config_id",
+        "product_id",
+        string="Allowed Loan Products",
+        help="Select allowable conventional loan products (Term Loan, Overdraft, Advances, etc.).",
+    )
 
     # Measurement type per category (monetary, integer, count)
     deposit_measurement_type = fields.Selection(
@@ -181,6 +228,30 @@ class PbmsPlanningConfig(models.Model):
         string="Fixed Asset Measurement",
         default="integer",
         help="Measurement type for Fixed Asset Requirement targets.",
+    )
+    loan_disbursement_measurement_type = fields.Selection(
+        [("monetary", "Monetary"), ("integer", "Integer"), ("count", "Count")],
+        string="Loan Disbursement Measurement",
+        default="monetary",
+        help="Measurement type for Loan Disbursement & Collection targets.",
+    )
+    loan_outstanding_measurement_type = fields.Selection(
+        [("monetary", "Monetary"), ("integer", "Integer"), ("count", "Count")],
+        string="Loan Outstanding Measurement",
+        default="monetary",
+        help="Measurement type for Loan & Advances Outstanding targets.",
+    )
+    credit_portfolio_measurement_type = fields.Selection(
+        [("monetary", "Monetary"), ("integer", "Integer"), ("count", "Count")],
+        string="Credit Portfolio Measurement",
+        default="monetary",
+        help="Measurement type for Credit Portfolio targets.",
+    )
+    initiative_budget_measurement_type = fields.Selection(
+        [("monetary", "Monetary"), ("integer", "Integer"), ("count", "Count")],
+        string="Initiative Budget Measurement",
+        default="monetary",
+        help="Measurement type for Initiative Budget targets.",
     )
 
     # Category-specific excluded operating units under this work unit type
@@ -239,6 +310,22 @@ class PbmsPlanningConfig(models.Model):
         "org_unit_id",
         string="Excluded Units for Fixed Asset",
         help="Specific operating units under this work unit type where Fixed Asset is not eligible.",
+    )
+    credit_portfolio_excluded_org_unit_ids = fields.Many2many(
+        "operating.unit",
+        "pbms_config_credit_port_excluded_ou_rel",
+        "config_id",
+        "org_unit_id",
+        string="Excluded Units for Credit Portfolio",
+        help="Specific operating units under this work unit type where Credit Portfolio is not eligible.",
+    )
+    initiative_budget_excluded_org_unit_ids = fields.Many2many(
+        "operating.unit",
+        "pbms_config_init_budget_excluded_ou_rel",
+        "config_id",
+        "org_unit_id",
+        string="Excluded Units for Initiative Budget",
+        help="Specific operating units under this work unit type where Initiative Budget is not eligible.",
     )
 
     # Configurable dropdown selections per category
@@ -451,115 +538,13 @@ class PbmsPlanningConfig(models.Model):
 
     @api.model
     def get_category_review_info(cls, category, org_unit=None):
-        """Lookup responsible Operating Unit, Department, and Reviewer users for a category.
-        Follows a strict hierarchy to locate the configuration where this category is defined:
-        1. Specific Operating Unit override
-        2. Parent / Ancestor Operating Unit (e.g. parent District Office)
-        3. Work Unit Type default (e.g. branch)
-        4. Parent Work Unit Type default (e.g. district_office)
-        5. Global fallback to any config that defined this category
-        """
-        Config = cls.env["pbms.planning.config"]
-        prefix_map = {
-            "deposit": "deposit",
-            "customer_base": "customer_base",
-            "fx": "fx",
-            "digital_banking": "digital",
-            "general_expense": "expense",
-            "manpower": "manpower",
-            "fixed_asset": "fixed_asset",
-        }
-        prefix = prefix_map.get(category, category)
-
-        def _is_configured(cfg_rec):
-            if not cfg_rec:
-                return False
-            users = getattr(cfg_rec, f"{prefix}_reviewer_user_ids", False)
-            ou = getattr(cfg_rec, f"{prefix}_reviewer_ou_id", False)
-            dept = getattr(cfg_rec, f"{prefix}_reviewer_dept_id", False)
-            return bool(users or ou or dept)
-
-        cfg = False
-        if org_unit:
-            # 1. Direct operating unit config
-            c1 = Config.search([("config_type", "=", "operating_unit"), ("org_unit_id", "=", org_unit.id)], limit=1)
-            if _is_configured(c1):
-                cfg = c1
-
-            # 2. Check parent/ancestor operating units (e.g. parent district)
-            if not cfg:
-                curr_ou = org_unit
-                for _ in range(5):
-                    parent = getattr(curr_ou, "parent_unit", False) or getattr(curr_ou, "parent_id", False)
-                    if not parent:
-                        break
-                    c_parent = Config.search([("config_type", "=", "operating_unit"), ("org_unit_id", "=", parent.id)], limit=1)
-                    if _is_configured(c_parent):
-                        cfg = c_parent
-                        break
-                    curr_ou = parent
-
-            # 3. Work unit type config for this unit
-            if not cfg and org_unit.work_unit_type:
-                c_type = Config.search([("config_type", "=", "work_unit_type"), ("work_unit_type", "=", org_unit.work_unit_type)], limit=1)
-                if _is_configured(c_type):
-                    cfg = c_type
-
-            # 4. Parent work unit type config (e.g. district_office)
-            if not cfg:
-                parent = getattr(org_unit, "parent_unit", False) or getattr(org_unit, "parent_id", False)
-                if parent and parent.work_unit_type:
-                    c_ptype = Config.search([("config_type", "=", "work_unit_type"), ("work_unit_type", "=", parent.work_unit_type)], limit=1)
-                    if _is_configured(c_ptype):
-                        cfg = c_ptype
-
-        # 5. Global fallback to any config that defined this category
-        if not cfg:
-            all_cfgs = Config.search([], order="config_type desc, id asc")
-            for c_cand in all_cfgs:
-                if _is_configured(c_cand):
-                    cfg = c_cand
-                    break
-
-        if cfg:
-            users = getattr(cfg, f"{prefix}_reviewer_user_ids", cls.env["res.users"])
-            ou = getattr(cfg, f"{prefix}_reviewer_ou_id", False)
-            dept = getattr(cfg, f"{prefix}_reviewer_dept_id", False)
-            return {"users": users, "ou": ou, "dept": dept}
+        """Deprecated: Functional Reviewers are no longer configured or determined via Planning Configuration."""
         return {"users": cls.env["res.users"], "ou": False, "dept": False}
 
     @api.model
     def get_user_authorized_categories(cls, user):
-        """Check all Planning Configurations to determine which categories the user is designated to review."""
-        Config = cls.env["pbms.planning.config"]
-        configs = Config.search([])
-        cats = set()
-        user_unit_ids = set(user._pbms_operating_unit_ids())
-        user_dept_id = user.employee_id.department_id.id if (user.employee_id and user.employee_id.department_id) else False
-
-        prefix_map = [
-            ("deposit", "deposit"),
-            ("customer_base", "customer_base"),
-            ("fx", "fx"),
-            ("digital_banking", "digital"),
-            ("general_expense", "expense"),
-            ("manpower", "manpower"),
-            ("fixed_asset", "fixed_asset"),
-        ]
-
-        for cfg in configs:
-            for cat, prefix in prefix_map:
-                user_ids = getattr(cfg, f"{prefix}_reviewer_user_ids", cls.env["res.users"]).ids
-                ou_id = getattr(cfg, f"{prefix}_reviewer_ou_id", False)
-                dept_id = getattr(cfg, f"{prefix}_reviewer_dept_id", False)
-                if user.id in user_ids:
-                    cats.add(cat)
-                elif ou_id and ou_id.id in user_unit_ids:
-                    cats.add(cat)
-                elif dept_id and user_dept_id and dept_id.id == user_dept_id:
-                    cats.add(cat)
-
-        return list(cats)
+        """Deprecated: Functional Reviewers are no longer configured or determined via Planning Configuration."""
+        return []
 
 
     def action_save(self):
@@ -659,6 +644,17 @@ class PbmsPlanningConfig(models.Model):
         """Default all active FX source types."""
         return self.env["pbms.fx.source.type"].search([("active", "=", True)]).ids
 
+    @api.model
+    def _default_loan_products(self):
+        """Default all active loan products."""
+        return self.env["pbms.loan.product"].search([("active", "=", True)]).ids
+
+    @api.model
+    def _default_credit_portfolio_items(self):
+        """Default all active credit portfolio items."""
+        Item = self.env.get("pbms.credit.portfolio.item")
+        return Item.search([("active", "=", True)]).ids if Item is not None else []
+
     def init(self):
         super().init()
         # 1. Backfill config_type to 'work_unit_type' where NULL
@@ -698,6 +694,26 @@ class PbmsPlanningConfig(models.Model):
             UPDATE pbms_planning_config
             SET customer_base_measurement_type = 'integer'
             WHERE customer_base_measurement_type IS NULL OR customer_base_measurement_type = 'monetary';
+        """)
+        # 5. Ensure branch work_unit_type defaults to all categories enabled only if NULL
+        self.env.cr.execute("""
+            UPDATE pbms_planning_config
+            SET enable_deposit = COALESCE(enable_deposit, TRUE),
+                enable_customer_base = COALESCE(enable_customer_base, TRUE),
+                enable_fx = COALESCE(enable_fx, TRUE),
+                enable_digital_banking = COALESCE(enable_digital_banking, TRUE),
+                enable_expense = COALESCE(enable_expense, TRUE),
+                enable_manpower = COALESCE(enable_manpower, TRUE),
+                enable_fixed_asset = COALESCE(enable_fixed_asset, TRUE)
+            WHERE work_unit_type = 'branch' AND config_type = 'work_unit_type'
+              AND enable_deposit IS NULL;
+        """)
+        # 6. Ensure Head Office config has credit_portfolio and initiative_budget enabled
+        self.env.cr.execute("""
+            UPDATE pbms_planning_config
+            SET enable_credit_portfolio = TRUE,
+                enable_initiative_budget = TRUE
+            WHERE work_unit_type = 'head_office';
         """)
 
     @api.model_create_multi
@@ -743,6 +759,10 @@ class PbmsPlanningConfig(models.Model):
                     vals["justification_category_ids"] = [(6, 0, self._default_justification_categories())]
                 if not vals.get("fx_source_type_ids"):
                     vals["fx_source_type_ids"] = [(6, 0, self._default_fx_source_types())]
+                if not vals.get("loan_product_ids"):
+                    vals["loan_product_ids"] = [(6, 0, self._default_loan_products())]
+                if not vals.get("credit_portfolio_item_ids"):
+                    vals["credit_portfolio_item_ids"] = [(6, 0, self._default_credit_portfolio_items())]
                 new_rec = super(PbmsPlanningConfig, self).create([vals])
                 created_records |= new_rec
         created_records._sync_reviewer_groups()
@@ -751,26 +771,57 @@ class PbmsPlanningConfig(models.Model):
         return created_records
 
     def _sync_reviewer_groups(self):
-        ho_group = self.env.ref("bunna_pbms.group_pbms_ho_reviewer", raise_if_not_found=False)
-        branch_group = self.env.ref("bunna_pbms.group_pbms_branch_user", raise_if_not_found=False)
-        if not ho_group:
-            return
-        all_rev_users = self.mapped("expense_reviewer_user_ids") | self.mapped("fixed_asset_reviewer_user_ids") | self.mapped("manpower_reviewer_user_ids")
-        for u in all_rev_users:
-            if not u.has_group("bunna_pbms.group_pbms_ho_reviewer"):
-                u.sudo().write({"group_ids": [(4, ho_group.id)]})
-            if branch_group and not u.has_group("bunna_pbms.group_pbms_branch_user"):
-                u.sudo().write({"group_ids": [(4, branch_group.id)]})
+        pass
 
     def write(self, vals):
         self.env.registry.clear_cache()
         res = super(PbmsPlanningConfig, self).write(vals)
-        reviewer_keys = {"expense_reviewer_user_ids", "fixed_asset_reviewer_user_ids", "manpower_reviewer_user_ids"}
-        if reviewer_keys & set(vals.keys()):
-            self._sync_reviewer_groups()
         if "budget_hiring_committee_user_ids" in vals or "ceo_user_id" in vals:
             self._sync_committee_and_ceo_roles()
+
+        # When a planning category is disabled in config, deactivate any draft/returned plans
+        mobilization_toggles = {
+            "enable_deposit": "deposit",
+            "enable_customer_base": "customer_base",
+            "enable_fx": "fx",
+            "enable_digital_banking": "digital_banking",
+            "enable_loan_disbursement_collection": "loan_disbursement_collection",
+            "enable_loan_outstanding": "loan_outstanding",
+            "enable_credit_portfolio": "credit_portfolio",
+            "enable_initiative_budget": "initiative_budget",
+        }
+        for field_name, cat in mobilization_toggles.items():
+            if field_name in vals and not vals[field_name]:
+                for cfg in self:
+                    if cfg.config_type == "operating_unit" and cfg.org_unit_id:
+                        ous = cfg.org_unit_id
+                    elif cfg.work_unit_type:
+                        ous = self.env["operating.unit"].search([("work_unit_type", "=", cfg.work_unit_type)])
+                    else:
+                        ous = self.env["operating.unit"]
+                    if ous:
+                        draft_plans = self.env["pbms.planning.category"].sudo().search([
+                            ("category", "=", cat),
+                            ("org_unit_id", "in", ous.ids),
+                            ("state", "in", ("draft", "returned", "info_requested")),
+                        ])
+                        if draft_plans:
+                            draft_plans.write({"active": False})
         return res
+
+    @tools.ormcache("category")
+    def _get_disabled_unit_ids_for_category(self, category):
+        if not category:
+            return ()
+        ous = self.env["operating.unit"].sudo().search([])
+        return tuple(ou.id for ou in ous if not self._is_category_enabled_cached(category, ou.id))
+
+    @api.model
+    def get_disabled_unit_ids_for_category(self, category):
+        """Return list of operating unit IDs for which the specified category is disabled."""
+        if not category:
+            return []
+        return list(self._get_disabled_unit_ids_for_category(category))
 
     def unlink(self):
         self.env.registry.clear_cache()
@@ -781,7 +832,7 @@ class PbmsPlanningConfig(models.Model):
         ou_rec = self.env["operating.unit"].browse(ou_id)
         if not ou_rec or not ou_rec.exists():
             return False
-        config = self.search([
+        config = self.sudo().search([
             ("config_type", "=", "operating_unit"),
             ("org_unit_id", "=", ou_rec.id),
         ], limit=1)
@@ -793,20 +844,69 @@ class PbmsPlanningConfig(models.Model):
 
     @tools.ormcache("work_unit_type")
     def _get_config_id_for_type(self, work_unit_type):
-        config = self.search([
+        if not work_unit_type:
+            return False
+        try:
+            valid_types = dict(self._fields["work_unit_type"]._description_selection(self.env))
+        except Exception:
+            valid_types = dict(WORK_UNIT_TYPES)
+
+        if work_unit_type in valid_types:
+            target_type = work_unit_type
+        elif work_unit_type == "area_office" and "district_office" in valid_types:
+            target_type = "district_office"
+        elif "other" in valid_types:
+            target_type = "other"
+        else:
+            target_type = next(iter(valid_types.keys()), False)
+
+        if not target_type:
+            return False
+
+        config = self.sudo().search([
             ("config_type", "=", "work_unit_type"),
-            ("work_unit_type", "=", work_unit_type),
+            ("work_unit_type", "=", target_type),
         ], limit=1)
         if not config:
-            config = self.search([
-                ("work_unit_type", "=", work_unit_type),
+            config = self.sudo().search([
+                ("work_unit_type", "=", target_type),
                 ("org_unit_id", "=", False),
             ], limit=1)
-        if not config:
-            config = self.create({
-                "config_type": "work_unit_type",
-                "work_unit_type": work_unit_type,
-            })
+        if not config and target_type:
+            try:
+                vals = {
+                    "config_type": "work_unit_type",
+                    "work_unit_type": target_type,
+                }
+                if target_type in ("district_office", "head_office", "regional_office", "area_office"):
+                    vals.update({
+                        "enable_deposit": True,
+                        "enable_customer_base": True,
+                        "enable_fx": True,
+                        "enable_digital_banking": True,
+                        "enable_expense": True,
+                        "enable_manpower": True,
+                        "enable_fixed_asset": True,
+                    })
+                    if target_type == "head_office":
+                        vals.update({
+                            "enable_credit_portfolio": True,
+                            "enable_initiative_budget": True,
+                        })
+                elif target_type in ("branch", "sub_branch", "service_center", "other"):
+                    vals.update({
+                        "enable_deposit": True,
+                        "enable_customer_base": True,
+                        "enable_fx": True,
+                        "enable_digital_banking": True,
+                        "enable_expense": True,
+                        "enable_manpower": True,
+                        "enable_fixed_asset": True,
+                    })
+                with self.env.cr.savepoint():
+                    config = self.sudo().create(vals)
+            except Exception:
+                config = False
         return config.id if config else False
 
     @api.model
@@ -826,16 +926,14 @@ class PbmsPlanningConfig(models.Model):
         cfg_id = self._get_config_id_for_type(work_unit_type)
         return self.browse(cfg_id) if cfg_id else False
 
-    @api.model
-    def is_category_enabled(self, category, org_unit):
-        """Determine if a planning category is eligible for a specific operating unit."""
+    @tools.ormcache("category", "ou_id")
+    def _is_category_enabled_cached(self, category, ou_id):
         if not category:
             return False
-        if not org_unit:
+        if not ou_id:
             return True
-        ou_id = org_unit.id if isinstance(org_unit, models.Model) else org_unit
-        ou_rec = self.env["operating.unit"].browse(ou_id) if isinstance(ou_id, int) else org_unit
-        if not ou_rec or not ou_rec.exists():
+        ou_rec = self.env["operating.unit"].browse(ou_id)
+        if not ou_rec.exists():
             return True
 
         toggle_map = {
@@ -847,6 +945,10 @@ class PbmsPlanningConfig(models.Model):
             "expense": "enable_expense",
             "manpower": "enable_manpower",
             "fixed_asset": "enable_fixed_asset",
+            "loan_disbursement_collection": "enable_loan_disbursement_collection",
+            "loan_outstanding": "enable_loan_outstanding",
+            "credit_portfolio": "enable_credit_portfolio",
+            "initiative_budget": "enable_initiative_budget",
         }
         toggle_field = toggle_map.get(category, f"enable_{category}")
 
@@ -854,18 +956,31 @@ class PbmsPlanningConfig(models.Model):
         if not config:
             return True
 
-        if not getattr(config, toggle_field, True):
+        default_val = False if category in ("credit_portfolio", "initiative_budget") else True
+        if not getattr(config, toggle_field, default_val):
             return False
 
         # Check if this operating unit is explicitly excluded for this category
-        cat_key = "expense" if category == "general_expense" else category
-        excluded_field = f"{cat_key}_excluded_org_unit_ids"
+        cat_key = "expense" if category == "general_expense" else ("credit_port" if category == "credit_portfolio" else ("init_budget" if category == "initiative_budget" else category))
+        excluded_field = f"{category}_excluded_org_unit_ids" if category in ("credit_portfolio", "initiative_budget") else f"{cat_key}_excluded_org_unit_ids"
         if hasattr(config, excluded_field):
             excluded_units = getattr(config, excluded_field)
             if ou_rec.id in excluded_units.ids:
                 return False
 
         return True
+
+    @api.model
+    def is_category_enabled(self, category, org_unit):
+        """Determine if a planning category is eligible for a specific operating unit."""
+        if not category:
+            return False
+        if not org_unit:
+            return True
+        ou_id = org_unit.id if isinstance(org_unit, models.Model) else org_unit
+        if not ou_id:
+            return True
+        return self._is_category_enabled_cached(category, ou_id)
 
     @api.model
     def get_default_category_for_unit(self, org_unit):
@@ -916,6 +1031,10 @@ class PbmsPlanningConfig(models.Model):
             "general_expense": "fa-chart-line",
             "manpower": "fa-user-tie",
             "fixed_asset": "fa-building",
+            "loan_disbursement_collection": "fa-hand-holding-usd",
+            "loan_outstanding": "fa-credit-card",
+            "credit_portfolio": "fa-balance-scale",
+            "initiative_budget": "fa-lightbulb-o",
         }
         for category_id, toggle, name in CATEGORY_TOGGLE_MAP:
             enabled = self.is_category_enabled(category_id, unit) if unit else (getattr(config, toggle) if config else True)
@@ -958,6 +1077,9 @@ class PbmsPlanningConfig(models.Model):
         elif category == "manpower":
             options["justification_categories"] = config.justification_category_ids if config and config.justification_category_ids else self.env["pbms.justification.category"].search([("active", "=", True)])
             options["position_types"] = config.position_type_ids if config and config.position_type_ids else self.env["pbms.position.type"].search([("active", "=", True)])
+        elif category == "credit_portfolio":
+            Item = self.env.get("pbms.credit.portfolio.item")
+            options["credit_portfolio_items"] = config.credit_portfolio_item_ids if config and config.credit_portfolio_item_ids else (Item.search([("active", "=", True)]) if Item is not None else self.env["pbms.credit.portfolio.item"])
         elif category == "fx":
             options["fx_sources"] = config.fx_source_type_ids if config and config.fx_source_type_ids else self.env["pbms.fx.source.type"].search([("active", "=", True)])
         return options
@@ -973,7 +1095,12 @@ class PbmsPlanningConfig(models.Model):
         else:
             wut = self._get_user_work_unit_type()
             config = self.get_config_for_type(wut) if wut else False
-        cat_key = "expense" if category == "general_expense" else category
+        if category == "general_expense":
+            cat_key = "expense"
+        elif category == "loan_disbursement_collection":
+            cat_key = "loan_disbursement"
+        else:
+            cat_key = category
         if config and hasattr(config, f"{cat_key}_measurement_type"):
             return getattr(config, f"{cat_key}_measurement_type") or CATEGORY_MEASUREMENT_TYPES.get(category, "monetary")
         return CATEGORY_MEASUREMENT_TYPES.get(category, "monetary")

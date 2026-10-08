@@ -37,6 +37,48 @@ class EmployeeTransferRequest(models.Model):
         return True
 
     _order = "request_date desc"
+    def _auto_init(self):
+        res = super()._auto_init()
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    UPDATE employee_transfer_request 
+                    SET state = CASE 
+                            WHEN state ILIKE 'draft' THEN 'draft'
+                            WHEN state ILIKE 'submitted' THEN 'submitted'
+                            WHEN state ILIKE '%under%' THEN 'under_review'
+                            WHEN state ILIKE 'approved' THEN 'approved'
+                            WHEN state ILIKE 'transferred' THEN 'transferred'
+                            WHEN state ILIKE 'rejected' THEN 'rejected'
+                            WHEN state ILIKE 'withdrawn' THEN 'withdrawn'
+                            WHEN state ILIKE 'refused' THEN 'refused'
+                            ELSE 'draft'
+                        END,
+                        acceptance_status = CASE 
+                            WHEN acceptance_status ILIKE 'accepted' THEN 'accepted'
+                            WHEN acceptance_status ILIKE 'rejected' OR acceptance_status ILIKE 'refused' OR acceptance_status ILIKE 'declined' THEN 'rejected'
+                            ELSE 'pending'
+                        END,
+                        eligibility_status = CASE 
+                            WHEN eligibility_status ILIKE 'ineligible' THEN 'ineligible'
+                            ELSE 'eligible'
+                        END,
+                        current_job_category = CASE 
+                            WHEN current_job_category ILIKE '%non%' THEN 'Non Managerial'
+                            WHEN current_job_category ILIKE '%manag%' THEN 'Managerial'
+                            ELSE 'Non Managerial'
+                        END,
+                        disciplinary_status = CASE 
+                            WHEN disciplinary_status ILIKE '%last%' THEN 'last_written_warning'
+                            WHEN disciplinary_status ILIKE '%second%' THEN 'second_warning'
+                            WHEN disciplinary_status ILIKE '%first%' THEN 'first_warning'
+                            ELSE 'none'
+                        END;
+                """)
+        except Exception as e:
+            pass
+        return res
+
 
     name = fields.Char(string="Reference", copy=False, readonly=True, default=lambda self: _("New"))
 
@@ -230,6 +272,67 @@ class EmployeeTransferRequest(models.Model):
     is_flagged_for_hr = fields.Boolean(string="Flagged for HR", default=False, readonly=True, copy=False)
     refusal_reason = fields.Text(string="Refusal Reason")
     hr_notified_on_refusal = fields.Datetime(string="HR Notified On", readonly=True, copy=False)
+
+    acceptance_status = fields.Selection([
+        ('pending', 'Pending Acceptance'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Refused / Declined'),
+    ], string="Transfer Acceptance Status", default='pending')
+    acceptance_date = fields.Datetime(string="Acceptance / Response Date", readonly=True)
+
+    def action_accept_transfer(self):
+        """Requesting employee or HR accepts the transfer offer."""
+        for rec in self:
+            now = fields.Datetime.now()
+            rec.write({
+                'acceptance_status': 'accepted',
+                'acceptance_date': now,
+            })
+            rec.message_post(
+                body=_("Employee transfer offer ACCEPTED on %s.") % fields.Date.today()
+            )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Transfer Accepted'),
+                'message': _('Transfer offer has been marked as ACCEPTED.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    def action_decline_transfer(self):
+        """Opens the decline wizard to capture refusal reason for transfer."""
+        self.ensure_one()
+        return {
+            'name': _('Decline / Refuse Transfer Offer'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'internal.selection.decline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_transfer_request_id': self.id,
+            }
+        }
+
+    def confirm_decline_transfer(self, reason):
+        """Executed by decline wizard to refuse transfer."""
+        for rec in self:
+            now = fields.Datetime.now()
+            rec.write({
+                'acceptance_status': 'rejected',
+                'acceptance_date': now,
+                'state': 'refused',
+                'refusal_reason': reason,
+                'is_flagged_for_hr': True,
+                'hr_notified_on_refusal': now,
+            })
+            rec.message_post(
+                body=_("Employee DECLINED / REFUSED transfer offer.<br/><b>Reason:</b> %s") % reason
+            )
+        return True
 
     submitted_by_user_id = fields.Many2one("res.users", string="Submitted By User", readonly=True, copy=False)
     reviewed_by_user_id = fields.Many2one("res.users", string="Reviewer User (Started Review)", readonly=True, copy=False, tracking=True)

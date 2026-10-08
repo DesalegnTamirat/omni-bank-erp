@@ -20,7 +20,7 @@
     </record>
 
     <record id="shift_branch_2" model="job.shift">
-        <field name="name">Branch Shift 2 (Branch)</field>
+        <field name="name">Branch Shift 2</field>
         <field name="code">BMS</field>
         <field name="start_time">9.0</field>
         <field name="end_time">18.0</field>

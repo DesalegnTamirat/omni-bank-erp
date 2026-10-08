@@ -179,15 +179,41 @@ class PerformanceObjective(models.Model):
                 continue
             siblings = self.search([
                 ('employee_operating_unit_id', '=', rec.employee_operating_unit_id.id),
+                ('active', '=', True),
             ])
             rec.unit_total_weight = sum(siblings.mapped('total_weight'))
 
-    @api.depends('measure_ids.weight')
+    @api.depends('measure_ids.weight', 'measure_ids.active')
     def _compute_total_weight(self):
         for rec in self:
-            rec.total_weight = sum(rec.measure_ids.mapped('weight'))
+            active_measures = rec.measure_ids.filtered(lambda m: m.active)
+            rec.total_weight = sum(active_measures.mapped('weight'))
 
     active = fields.Boolean(default=True)
+
+    def unlink(self):
+        T2Line = self.env['t2.scorecard.line'].sudo()
+        T2AppraisalLine = self.env['t2.appraisal.line'].sudo()
+        TemplateLine = self.env['performance.job.template.line'].sudo()
+
+        to_unlink = self.browse()
+        for rec in self:
+            measure_ids = rec.measure_ids.ids
+            is_used = False
+            if measure_ids:
+                is_used = (
+                    T2Line.search_count([('measure_id', 'in', measure_ids)]) > 0
+                    or T2AppraisalLine.search_count([('measure_id', 'in', measure_ids)]) > 0
+                    or TemplateLine.search_count([('measure_id', 'in', measure_ids)]) > 0
+                )
+            if is_used:
+                rec.write({'active': False})
+                rec.measure_ids.write({'active': False})
+            else:
+                to_unlink |= rec
+        if to_unlink:
+            return super(PerformanceObjective, to_unlink).unlink()
+        return True
 
     # @api.onchange('parent_measure_id')
     # def _onchange_parent_measure_id(self):

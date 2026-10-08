@@ -85,7 +85,7 @@
                                 <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="'%.2f' % (doc.service_years or 0.0)"/> Years</td>
                                 <td>&amp;nbsp;</td>
                                 <td style="padding: 5px 0; font-weight: bold; color: #666666;">PF Service Period:</td>
-                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="'%.2f' % (doc.pf_service_years or 0.0)"/> Years</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="'%.2f' % (doc.service_years or 0.0)"/> Years</td>
                             </tr>
                         </table>
 

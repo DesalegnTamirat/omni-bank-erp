@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app
+                    data-string="Helpdesk"
+                    string="Helpdesk"
+                    name="bunna_helpdesk"
+                    groups="bunna_helpdesk.group_helpdesk_manager"
+                >
+                    <!-- ── Portal form fields ──────────────────────────────── -->
+                    <block
+                        title="New ticket form (portal)"
+                        name="helpdesk_mgmt_portal_new_ticket_fields"
+                    >
+                        <setting
+                            id="helpdesk_mgmt_portal_new_ticket_fields"
+                            company_dependent="1"
+                            string="Additional fields"
+                            help="Whether to display additional fields in the portal form"
+                        >
+                            <div
+                                class="content-group"
+                                name="helpdesk_mgmt_portal_new_ticket_fields"
+                            >
+                                <div class="mt8">
+                                    <field
+                                        name="helpdesk_mgmt_portal_select_category"
+                                    />
+                                    <label
+                                        for="helpdesk_mgmt_portal_select_category"
+                                        string="Category"
+                                    />
+                                </div>
+                                <div class="mt8">
+                                    <field name="helpdesk_mgmt_portal_select_team" />
+                                    <label
+                                        for="helpdesk_mgmt_portal_select_team"
+                                        string="Team"
+                                    />
+                                </div>
+                            </div>
+                        </setting>
+                        <setting
+                            id="helpdesk_mgmt_portal_new_ticket_required_fields"
+                            company_dependent="1"
+                            string="Required fields"
+                            help="Choose which fields are required in the portal form"
+                        >
+                            <div
+                                class="content-group"
+                                name="helpdesk_mgmt_portal_new_ticket_required_fields"
+                            >
+                                <div
+                                    class="mt8"
+                                    invisible="not helpdesk_mgmt_portal_select_category"
+                                >
+                                    <field
+                                        name="helpdesk_mgmt_portal_category_id_required"
+                                    />
+                                    <label
+                                        for="helpdesk_mgmt_portal_category_id_required"
+                                        string="Category"
+                                    />
+                                </div>
+                                <div
+                                    class="mt8"
+                                    invisible="not helpdesk_mgmt_portal_select_team"
+                                >
+                                    <field
+                                        name="helpdesk_mgmt_portal_team_id_required"
+                                    />
+                                    <label
+                                        for="helpdesk_mgmt_portal_team_id_required"
+                                        string="Team"
+                                    />
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+
+                    <!-- ── Duplicate tracking ──────────────────────────────── -->
+                    <block title="Duplicate Tracking">
+                        <setting>
+                            <field
+                                name="helpdesk_mgmt_duplicate_tracking"
+                                string="Enable duplicate tracking"
+                            />
+                        </setting>
+                        <setting
+                            help="When marked as duplicate, tickets will be moved to this stage"
+                            invisible="not helpdesk_mgmt_duplicate_tracking"
+                        >
+                            <field
+                                name="helpdesk_mgmt_duplicate_ticket_stage_id"
+                                string="Duplicate stage"
+                            />
+                        </setting>
+                    </block>
+
+                    <!-- ── Ticket Assignment & Team Notifications ────────────── -->
+                    <block title="Ticket Assignment &amp; Team Notifications" name="helpdesk_team_assignment_block">
+                        <setting
+                            string="Default Helpdesk Team"
+                            help="Fallback team automatically assigned to incoming tickets when no channel-specific team is set."
+                        >
+                            <field name="helpdesk_default_team_id" options="{'no_create': True}" />
+                        </setting>
+                        <setting
+                            string="Notify Team &amp; Members"
+                            help="Automatically dispatch Discuss inbox notifications, real-time alerts, and activities to the team leader and members when a new ticket is received."
+                        >
+                            <field
+                                name="helpdesk_notify_team_members"
+                                string="Notify Team on Ticket Arrival"
+                            />
+                        </setting>
+                        <setting
+                            string="Auto-assign (manual-mode fallback)"
+                            help="Automatically assign newly created tickets to the creator when they belong to the team (used only when the team's assignment method is Manual)."
+                        >
+                            <field
+                                name="helpdesk_mgmt_ticket_auto_assign"
+                                string="Auto assign to creator"
+                            />
+                        </setting>
+                    </block>
+
+                    <!-- ── Bunna SMS Notifications ────────────────────────────── -->
+                    <block title="Bunna SMS Notifications" name="bunna_sms_notifications_block">
+                        <setting
+                            string="Acceptance SMS Template"
+                            help="SMS text sent to customer when 'Acceptance SMS' button is clicked. Placeholders: {partner_name}, {number}, {name}, {team_name}, {bank_hotline}"
+                        >
+                            <field name="bunna_sms_acceptance_template" placeholder="Dear {partner_name}, your Bunna Bank request {number} ('{name}') has been accepted by {team_name}..." />
+                        </setting>
+                        <setting
+                            string="Done SMS Template"
+                            help="SMS text sent to customer when 'Done SMS' button is clicked. Placeholders: {partner_name}, {number}, {name}, {team_name}, {bank_hotline}"
+                        >
+                            <field name="bunna_sms_done_template" placeholder="Dear {partner_name}, your Bunna Bank ticket {number} ('{name}') has been successfully resolved..." />
+                        </setting>
+                    </block>
+
+                    <!-- ── SLA & Hierarchical Escalation ───────────────────── -->
+                    <block title="SLA Policies &amp; Hierarchical Escalation">
+                        <setting
+                            string="SLA"
+                            help="Enable Service Level Agreement policies to track deadlines and breach rates."
+                        >
+                            <field
+                                name="helpdesk_mgmt_sla_active"
+                                string="Enable SLA Policies"
+                            />
+                        </setting>
+                        <setting
+                            string="CEO / Executive Authority"
+                            help="Top executive authority for final SLA escalation. If not set, automatically determined from the top of the employee reporting hierarchy."
+                        >
+                            <field name="helpdesk_ceo_user_id" options="{'no_create': True}" />
+                        </setting>
+                    </block>
+
+                    <!-- ── Core Banking System (CBS) Integration ──────────── -->
+                    <block title="Core Banking System (Finacle CBS)" name="cbs_integration_block">
+                        <setting
+                            string="CBS Customer Endpoint"
+                            help="HTTP API endpoint URL for querying Finacle Core Banking customer profiles."
+                        >
+                            <field name="cbs_endpoint" placeholder="https://cbs-host:port/customer" />
+                        </setting>
+                    </block>
+
+                    <!-- ── Case & Customer Classifications ──────────────────── -->
+                    <block title="Case &amp; Customer Classifications" name="helpdesk_case_customer_types">
+                        <setting
+                            id="helpdesk_case_types_setting"
+                            string="Case Types"
+                            help="Configure ticket case types such as Complaints, Inquiries, Service Requests, and NBE compliance tracking."
+                        >
+                            <div class="mt8">
+                                <button
+                                    name="%(bunna_helpdesk.action_helpdesk_ticket_case_type)d"
+                                    string="Manage Case Types"
+                                    type="action"
+                                    class="btn-link"
+                                    icon="oi-arrow-right"
+                                />
+                            </div>
+                        </setting>
+                        <setting
+                            id="helpdesk_customer_types_setting"
+                            string="Customer Types"
+                            help="Configure customer profile classifications (e.g. Bunna Account Holder, Staff / Internal Work Unit, VIP)."
+                        >
+                            <div class="mt8">
+                                <button
+                                    name="%(bunna_helpdesk.action_helpdesk_ticket_customer_type)d"
+                                    string="Manage Customer Types"
+                                    type="action"
+                                    class="btn-link"
+                                    icon="oi-arrow-right"
+                                />
+                            </div>
+                        </setting>
+                    </block>
+
+                    <!-- ── Social Media & Omnichannel Integration ──────────── -->
+                    <block title="Social Media &amp; Omnichannel Channels" name="helpdesk_social_channels">
+                        <!-- Telegram Bot -->
+                        <setting
+                            id="helpdesk_telegram_bot_setting"
+                            string="Telegram Bot Integration"
+                            help="Automatically convert Telegram chats and issue reports into helpdesk tickets."
+                        >
+                            <field name="telegram_bot_active" string="Enable Telegram Bot" />
+                            <div class="content-group" invisible="not telegram_bot_active">
+                                <div class="mt8">
+                                    <label for="telegram_bot_token" string="Bot API Token" class="col-lg-4 o_light_label" />
+                                    <field name="telegram_bot_token" password="True" placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="telegram_team_id" string="Default Team" class="col-lg-4 o_light_label" />
+                                    <field name="telegram_team_id" options="{'no_create': True}" class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="telegram_default_case_type_id" string="Default Case Type" class="col-lg-4 o_light_label" />
+                                    <field name="telegram_default_case_type_id" options="{'no_create': True}" class="oe_inline" />
+                                </div>
+                                <div class="text-muted mt8 small">
+                                    <i class="fa fa-info-circle text-info" /> Webhook URL: <code>/helpdesk/telegram/webhook</code>
+                                </div>
+                                <div class="mt8 d-flex gap-2">
+                                    <button
+                                        name="action_fetch_telegram_messages"
+                                        type="object"
+                                        string="Fetch Telegram Messages Now"
+                                        class="btn btn-secondary btn-sm"
+                                        icon="fa-refresh"
+                                    />
+                                    <button
+                                        name="action_register_telegram_webhook"
+                                        type="object"
+                                        string="Register Webhook"
+                                        class="btn btn-link btn-sm"
+                                        icon="fa-globe"
+                                    />
+                                </div>
+                            </div>
+                        </setting>
+
+                        <!-- WhatsApp Business Cloud API (Meta) -->
+                        <setting
+                            id="helpdesk_whatsapp_setting"
+                            string="WhatsApp Business (Meta Cloud API)"
+                            help="Receive inbound WhatsApp messages and auto-create helpdesk tickets with CBS profile resolution."
+                        >
+                            <field name="whatsapp_active" string="Enable WhatsApp Business API" />
+                            <div class="content-group" invisible="not whatsapp_active">
+                                <div class="mt8">
+                                    <label for="whatsapp_phone_number_id" string="Phone Number ID" class="col-lg-4 o_light_label" />
+                                    <field name="whatsapp_phone_number_id" placeholder="e.g. 109876543210987" class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="whatsapp_access_token" string="System Access Token" class="col-lg-4 o_light_label" />
+                                    <field name="whatsapp_access_token" password="True" placeholder="EAAB..." class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="whatsapp_verify_token" string="Webhook Verify Token" class="col-lg-4 o_light_label" />
+                                    <field name="whatsapp_verify_token" class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="whatsapp_team_id" string="Default Team" class="col-lg-4 o_light_label" />
+                                    <field name="whatsapp_team_id" options="{'no_create': True}" class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="whatsapp_default_case_type_id" string="Default Case Type" class="col-lg-4 o_light_label" />
+                                    <field name="whatsapp_default_case_type_id" options="{'no_create': True}" class="oe_inline" />
+                                </div>
+                                <div class="text-muted mt8 small">
+                                    <i class="fa fa-info-circle text-info" /> Webhook Callback URL: <code>/helpdesk/whatsapp/webhook</code>
+                                </div>
+                                <div class="mt8">
+                                    <button
+                                        name="action_simulate_whatsapp_ticket"
+                                        type="object"
+                                        string="Test: Simulate Inbound WhatsApp Message"
+                                        class="btn btn-secondary btn-sm"
+                                        icon="fa-whatsapp"
+                                    />
+                                </div>
+                            </div>
+                        </setting>
+
+                        <!-- Facebook Messenger / Page (Meta) -->
+                        <setting
+                            id="helpdesk_facebook_setting"
+                            string="Facebook Messenger Integration"
+                            help="Automatically convert Facebook Page direct messages into helpdesk tickets."
+                        >
+                            <field name="facebook_active" string="Enable Facebook Messenger" />
+                            <div class="content-group" invisible="not facebook_active">
+                                <div class="mt8">
+                                    <label for="facebook_page_id" string="Facebook Page ID" class="col-lg-4 o_light_label" />
+                                    <field name="facebook_page_id" placeholder="e.g. 1029384756" class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="facebook_page_access_token" string="Page Access Token" class="col-lg-4 o_light_label" />
+                                    <field name="facebook_page_access_token" password="True" placeholder="EAAB..." class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="facebook_verify_token" string="Webhook Verify Token" class="col-lg-4 o_light_label" />
+                                    <field name="facebook_verify_token" class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="facebook_team_id" string="Default Team" class="col-lg-4 o_light_label" />
+                                    <field name="facebook_team_id" options="{'no_create': True}" class="oe_inline" />
+                                </div>
+                                <div class="mt8">
+                                    <label for="facebook_default_case_type_id" string="Default Case Type" class="col-lg-4 o_light_label" />
+                                    <field name="facebook_default_case_type_id" options="{'no_create': True}" class="oe_inline" />
+                                </div>
+                                <div class="text-muted mt8 small">
+                                    <i class="fa fa-info-circle text-info" /> Webhook Callback URL: <code>/helpdesk/facebook/webhook</code>
+                                </div>
+                                <div class="mt8">
+                                    <button
+                                        name="action_simulate_facebook_ticket"
+                                        type="object"
+                                        string="Test: Simulate Inbound Facebook Message"
+                                        class="btn btn-secondary btn-sm"
+                                        icon="fa-facebook"
+                                    />
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+
+                    <!-- ── Auto-close ──────────────────────────────────────── -->
+                    <block title="Auto-close">
+                        <setting
+                            string="Auto-close Inactive Tickets"
+                            help="A scheduled job will automatically close tickets that have had no stage update for the configured number of days."
+                        >
+                            <field name="helpdesk_mgmt_auto_close_active" />
+                        </setting>
+                        <setting
+                            invisible="not helpdesk_mgmt_auto_close_active"
+                            string="Close after"
+                        >
+                            <field name="helpdesk_mgmt_auto_close_days" string="Days of inactivity" />
+                        </setting>
+                        <setting
+                            invisible="not helpdesk_mgmt_auto_close_active"
+                            string="Target stage"
+                        >
+                            <field name="helpdesk_mgmt_auto_close_stage_id" string="Move to stage" />
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_mgmt_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module' : 'bunna_helpdesk', 'bin_size': False}</field>
+    </record>
+</odoo>

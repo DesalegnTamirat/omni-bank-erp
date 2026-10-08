@@ -277,11 +277,45 @@ class ResConfigSettings(models.TransientModel):
 
     def set_values(self):
         """ Override to ensure proper float precision and explicit boolean string storage """
-        self.ensure_one()
+        def _fmt_time(flt):
+            h = int(flt)
+            m = int(round((flt - h) * 60))
+            if m >= 60:
+                h += 1
+                m = 0
+            am_pm = 'AM' if (h % 24) < 12 else 'PM'
+            h12 = (h % 24) % 12
+            if h12 == 0:
+                h12 = 12
+            return f"{h12:02d}:{m:02d} {am_pm}"
+
         if self.morning_time >= self.exit_time:
-            raise ValidationError(_("Default Morning Check-in Time must be earlier than Default Exit Time."))
-        if self.lunch_duration < 0 or self.lunch_grace_time < 0 or self.checkin_buffer < 0:
-            raise ValidationError(_("Duration and buffer values cannot be negative."))
+            raise ValidationError(_("Default Morning Check-in Time (%s) must be earlier than Default Exit Time (%s).") % (_fmt_time(self.morning_time), _fmt_time(self.exit_time)))
+        if self.lunch_duration < 0 or self.lunch_grace_time < 0 or self.checkin_buffer < 0 or self.dead_time < 0 or self.checkin_grace_period < 0:
+            raise ValidationError(_("Duration, grace period, dead time, and buffer values cannot be negative."))
+
+        # Validate that Morning Check-in + Grace + Dead Time does not exceed Exit Times
+        grace = self.checkin_grace_period if self.enable_checkin_grace else 0.0
+        dead = self.dead_time if self.enable_checkin_restriction else 0.0
+        late_cutoff = self.morning_time + grace + dead
+
+        if late_cutoff >= self.exit_time:
+            raise ValidationError(_(
+                "Invalid Shift Window Configuration:\n\n"
+                "The Check-in Cutoff window (Morning Time %s + Grace + Dead Time = %s) cannot be equal to or greater than Default Exit Time (%s)."
+            ) % (_fmt_time(self.morning_time), _fmt_time(late_cutoff), _fmt_time(self.exit_time)))
+
+        if self.enable_saturday_halfday and late_cutoff >= self.saturday_exit_time:
+            raise ValidationError(_(
+                "Invalid Saturday Shift Configuration:\n\n"
+                "The Check-in Cutoff window (Morning Time %s + Grace + Dead Time = %s) cannot be equal to or greater than Saturday Exit Time (%s)."
+            ) % (_fmt_time(self.morning_time), _fmt_time(late_cutoff), _fmt_time(self.saturday_exit_time)))
+
+        if self.enable_lunch_break and late_cutoff >= self.lunch_out_time:
+            raise ValidationError(_(
+                "Invalid Lunch Shift Configuration:\n\n"
+                "The Morning Check-in Cutoff window (Morning Time %s + Grace + Dead Time = %s) cannot be equal to or greater than Lunch Start Time (%s)."
+            ) % (_fmt_time(self.morning_time), _fmt_time(late_cutoff), _fmt_time(self.lunch_out_time)))
 
         # Round floats to 2 decimal places
         self.morning_time = round(self.morning_time, 2)
@@ -303,5 +337,7 @@ class ResConfigSettings(models.TransientModel):
         params.set_param('hr_attendance.enable_auto_absence', str(self.enable_auto_absence))
         params.set_param('hr_attendance.enable_ip_tracking', str(self.enable_ip_tracking))
         params.set_param('hr_attendance.enable_checkin_gate', str(self.enable_checkin_gate))
+        # Invalidate ORM parameter cache immediately
+        self.env.registry.clear_cache()
 
 

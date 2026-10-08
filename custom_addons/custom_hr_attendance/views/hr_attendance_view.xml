@@ -26,11 +26,11 @@
                 <attribute name="readonly">1</attribute>
             </xpath>
 
-            <!-- Header buttons for Approve Overtime for Payroll -->
+            <!-- Header buttons for Approve Overtime for Payroll (Hidden per requirement) -->
             <sheet position="before">
                 <header>
                     <button name="action_approve_overtime_for_payroll" string="Approve Overtime for Payroll" type="object" class="btn-success"
-                            invisible="over_time_hour &lt;= 0 or overtime_approved_for_payroll"
+                            invisible="1"
                             groups="hr_attendance.group_hr_attendance_manager"
                             help="Approve overtime and transmit payload to payroll."/>
                 </header>
@@ -46,7 +46,7 @@
                 <field name="check_in_status" widget="badge" 
                        decoration-success="check_in_status in ('Normal', 'On-Time', 'On Time', 'Acknowledged Check-In')" 
                        decoration-warning="check_in_status == 'Late'" 
-                       decoration-danger="check_in_status in ('Technical Failure', 'Window Closed (Missed)')" 
+                       decoration-danger="check_in_status in ('Very Late', 'Technical Failure', 'Window Closed (Missed)')" 
                        readonly="1"/>
                 <field name="late_time_hour" widget="float_time" invisible="late_time_hour &lt;= 0" readonly="1"/>
                 <field name="in_mode" widget="badge" readonly="1"/>
@@ -61,7 +61,7 @@
                        invisible="not check_out" 
                        readonly="1"/>
                 <field name="early_exit_hour" widget="float_time" invisible="early_exit_hour &lt;= 0" readonly="1"/>
-                <field name="over_time_hour" widget="float_time" invisible="over_time_hour &lt;= 0" readonly="1"/>
+                <field name="over_time_hour" widget="float_time" invisible="1" readonly="1"/>
                 <field name="out_mode" widget="badge" invisible="not check_out" readonly="1"/>
             </xpath>
 
@@ -95,7 +95,7 @@
                                 <field name="shift_end_float" widget="float_time" readonly="1"/>
                             </group>
                             <group string="Payroll &amp; Technical Flags">
-                                <field name="overtime_approved_for_payroll" readonly="1"/>
+                                <field name="overtime_approved_for_payroll" invisible="1" readonly="1"/>
                                 <field name="active" readonly="1"/>
                             </group>
                         </group>
@@ -136,12 +136,12 @@
                 <field name="actual_check_in" string="Actual Punch Time" readonly="1" optional="show"/>
             </xpath>
 
-            <!-- Insert Check-in Status, Late By, Acknowledged Late, Over Time Hour right after Check In -->
+            <!-- Insert Check-in Status, Late By, Acknowledged Late right after Check In -->
             <xpath expr="//field[@name='check_in']" position="after">
                 <field name="check_in_status" string="Check-in Status" readonly="1"/>
                 <field name="late_time_hour" string="Late By" readonly="1" widget="float_time"/>
                 <field name="acknowledged_late" string="Acknowledged Late" readonly="1" widget="float_time"/>
-                <field name="over_time_hour" string="Over Time Hour" readonly="1" widget="float_time"/>
+                <field name="over_time_hour" string="Over Time Hour" readonly="1" widget="float_time" column_invisible="1"/>
             </xpath>
 
             <!-- Insert Check-Out Status, Early Exit Hour, Acknowledged Exit right after Check Out -->
@@ -161,7 +161,7 @@
                 <!-- Configurable Optional Columns (Manager can enable/disable via column picker) -->
                 <field name="attendance_reason_ids" string="Reasons" widget="many2many_tags" optional="hide"/>
                 <field name="is_force_checkout" string="Force Checkout" optional="hide"/>
-                <field name="overtime_approved_for_payroll" string="Overtime Approved for Payroll" optional="hide"/>
+                <field name="overtime_approved_for_payroll" string="Overtime Approved for Payroll" column_invisible="1"/>
                 <field name="check_in_ip" string="Check-in IP" optional="hide"/>
                 <field name="check_in_device_info" string="Check-in Device" optional="hide"/>
                 <field name="check_out_ip" string="Check-out IP" optional="hide"/>

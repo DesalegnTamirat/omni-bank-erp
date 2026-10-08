@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- =====================================================
+             EMPLOYEE FORM - Smart Button for Career Path
+             Inherits the employee form to add the "My Career Path"
+             smart button visible directly from the Employee Master.
+        ====================================================== -->
+        <record id="view_employee_career_path_button" model="ir.ui.view">
+            <field name="name">hr.employee.career.path.button</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[@name='button_box']" position="inside">
+                    <!-- Career Path Smart Button -->
+                    <button name="action_view_career_path"
+                            type="object"
+                            class="oe_stat_button"
+                            icon="fa-road"
+                            groups="hr_employee_custom.group_career_path_employee">
+                        <div class="o_field_widget o_stat_info">
+                            <span class="o_stat_text">Career Path</span>
+                        </div>
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- =====================================================
+             EMPLOYEE SELF SERVICE FORM - Career Path Button
+             Also inherit the public employee self-service view
+             so employees can access their career path from
+             their personal profile page.
+        ====================================================== -->
+        <record id="view_employee_public_career_path_button" model="ir.ui.view">
+            <field name="name">hr.employee.public.career.path.button</field>
+            <field name="model">hr.employee.public</field>
+            <field name="inherit_id" ref="hr.hr_employee_public_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[@name='button_box']" position="inside">
+                    <!-- Career Path Smart Button -->
+                    <button name="action_view_career_path"
+                            type="object"
+                            class="oe_stat_button"
+                            icon="fa-road"
+                            groups="hr_employee_custom.group_career_path_employee">
+                        <div class="o_field_widget o_stat_info">
+                            <span class="o_stat_text">Career Path</span>
+                        </div>
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>
+

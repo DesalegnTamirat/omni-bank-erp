@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_supervisor_recommendation_wizard_form" model="ir.ui.view">
+        <field name="name">supervisor.recommendation.wizard.form</field>
+        <field name="model">supervisor.recommendation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Grant Supervisor Recommendation Marks">
+                <field name="is_batch" invisible="1"/>
+                <field name="candidate_id" invisible="1"/>
+
+                <!-- Single Candidate Evaluation Form -->
+                <div invisible="is_batch == True">
+                    <div class="alert alert-info py-2" role="status">
+                        <strong><i class="fa fa-info-circle me-1"/> Supervisor Recommendation:</strong>
+                        Please evaluate the candidate below and assign their recommendation score (0 - 100%) and comments.
+                    </div>
+
+                    <group>
+                        <group string="Candidate Information">
+                            <field name="employee_id"/>
+                            <field name="current_position"/>
+                            <field name="current_grade"/>
+                            <field name="current_work_unit"/>
+                            <field name="current_department"/>
+                        </group>
+                        <group string="Track Record &amp; Vacancy">
+                            <field name="job_position"/>
+                            <field name="service_in_company"/>
+                            <field name="pms_score"/>
+                            <field name="supervisor_id"/>
+                            <field name="evaluator_user_id"/>
+                            <field name="evaluation_date"/>
+                        </group>
+                    </group>
+
+                    <group string="Supervisor Evaluation Marks">
+                        <field name="recommendation_score" widget="float" class="oe_inline fw-bold text-primary fs-5"/>
+                        <field name="recommendation_remarks" placeholder="Provide candidate recommendation assessment, key strengths, performance history, and justification..."/>
+                    </group>
+                </div>
+
+                <!-- Batch Evaluation Form -->
+                <div invisible="is_batch == False">
+                    <div class="alert alert-info py-2" role="status">
+                        <strong><i class="fa fa-users me-1"/> Batch Supervisor Recommendation:</strong>
+                        Evaluate candidate marks (0 - 100%) and comments for all eligible subordinates below.
+                    </div>
+                    <field name="line_ids">
+                        <list editable="bottom" create="0" delete="0">
+                            <field name="employee_id"/>
+                            <field name="current_position"/>
+                            <field name="current_work_unit"/>
+                            <field name="service_in_company"/>
+                            <field name="pms_score"/>
+                            <field name="recommendation_score" widget="float"/>
+                            <field name="recommendation_remarks" placeholder="Remarks..."/>
+                        </list>
+                    </field>
+                </div>
+
+                <footer>
+                    <button name="action_submit_recommendation"
+                            string="Save &amp; Submit Marks"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-check-circle"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_supervisor_recommendation_wizard" model="ir.actions.act_window">
+        <field name="name">Grant Supervisor Recommendation Marks</field>
+        <field name="res_model">supervisor.recommendation.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

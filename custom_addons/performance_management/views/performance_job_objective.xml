@@ -31,22 +31,37 @@
                         </h1>
                     </div>
 
-                    <div class="card-body rounded-3 mb-3" style="background-color:#eceef0; border-left: 5px solid #1d2b32; padding: 12px 14px;">
-                        <div class="row">
-                            <div class="col-6">
-                                <field name="operating_unit_id" options="{'no_create': True}"/>
-                                <field name="job_id" options="{'no_create': True}"/>
+                    <div class="row g-3 mb-3">
+                        <div class="col-lg-6">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body" style="border-left: 4px solid #1d2b32; background-color:#f4f6f8; padding: 14px 18px;">
+                                    <h6 class="mb-3 font-weight-bold" style="color:#1d2b32;">
+                                        <i class="fa fa-briefcase me-2"/>Position &amp; Work Unit
+                                    </h6>
+                                    <group>
+                                        <field name="operating_unit_id" string="Work Unit" options="{'no_create': True}" required="1"/>
+                                        <field name="job_id" string="Job Position" options="{'no_create': True}" required="1"/>
+                                        <field name="active"/>
+                                    </group>
+                                </div>
                             </div>
-                            <div class="col-6">
-                                <field name="parent_measure_id" options="{'no_create': True}"/>
-                                <field name="parent_objective_id" readonly="1"/>
-                                <field name="perspective_id" readonly="1"/>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body" style="border-left: 4px solid #c17540; background-color:#fbf3ee; padding: 14px 18px;">
+                                    <h6 class="mb-3 font-weight-bold" style="color:#c17540;">
+                                        <i class="fa fa-sitemap me-2"/>Cascaded From (Work Unit)
+                                    </h6>
+                                    <group>
+                                        <field name="parent_measure_id" string="Work Unit KPI" options="{'no_create': True}" required="1"/>
+                                        <field name="parent_objective_id" string="Strategic Objective" readonly="1"/>
+                                        <field name="perspective_id" string="Perspective" readonly="1"/>
+                                    </group>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <group>
-                        <field name="active"/>
-                    </group>
 
                     <notebook>
                         <page string="Measurements" name="measures_page">

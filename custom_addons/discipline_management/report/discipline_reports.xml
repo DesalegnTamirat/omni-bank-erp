@@ -14,14 +14,38 @@
             <field name="binding_type">report</field>
         </record>
 
-        <!-- Official Committee Meeting Minutes Report Action (FR-DIS-020) -->
-        <record id="action_report_disciplinary_committee_minute" model="ir.actions.report">
-            <field name="name">Disciplinary Committee Meeting Minutes</field>
+        <!-- Official Exoneration & Clearance Certificate PDF Report Action -->
+        <record id="action_report_exoneration_certificate" model="ir.actions.report">
+            <field name="name">Official Exoneration &amp; Clearance Certificate</field>
+            <field name="model">discipline.case</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">discipline_management.report_exoneration_certificate_template</field>
+            <field name="report_file">Exoneration_Clearance_Certificate</field>
+            <field name="print_report_name">'Exoneration_Clearance_%s' % (object.name)</field>
+            <field name="binding_model_id" ref="model_discipline_case"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- Official Suspension Letter PDF Report Action -->
+        <record id="action_report_suspension_letter" model="ir.actions.report">
+            <field name="name">Official Suspension Letter</field>
+            <field name="model">discipline.suspension</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">discipline_management.report_suspension_letter_template</field>
+            <field name="report_file">Suspension_Letter</field>
+            <field name="print_report_name">'Suspension_Letter_%s' % (object.name)</field>
+            <field name="binding_model_id" ref="model_discipline_suspension"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- Official Disciplinary Committee Hearing Minutes & Resolution PDF Report Action -->
+        <record id="action_report_committee_resolution" model="ir.actions.report">
+            <field name="name">Disciplinary Committee Hearing Minutes &amp; Resolution</field>
             <field name="model">discipline.committee.meeting</field>
             <field name="report_type">qweb-pdf</field>
-            <field name="report_name">discipline_management.report_disciplinary_committee_minute_template</field>
-            <field name="report_file">Disciplinary_Committee_Minute</field>
-            <field name="print_report_name">'Disciplinary_Minute_%s' % (object.name)</field>
+            <field name="report_name">discipline_management.report_committee_resolution_template</field>
+            <field name="report_file">Committee_Hearing_Resolution</field>
+            <field name="print_report_name">'Committee_Resolution_%s' % (object.name)</field>
             <field name="binding_model_id" ref="model_discipline_committee_meeting"/>
             <field name="binding_type">report</field>
         </record>

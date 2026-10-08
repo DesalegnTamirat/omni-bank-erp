@@ -37,4 +37,11 @@
               sequence="10"
               groups="audit_trail.group_audit_manager"/>
 
+    <menuitem id="menu_audit_settings"
+              name="Settings"
+              parent="menu_audit_config"
+              action="action_audit_config"
+              sequence="20"
+              groups="audit_trail.group_audit_manager"/>
+
 </odoo>

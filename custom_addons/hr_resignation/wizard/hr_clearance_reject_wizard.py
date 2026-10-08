@@ -43,7 +43,7 @@ class HrClearanceRejectWizard(models.TransientModel):
         if emp_user and emp_user.active:
             notify_partners.add(emp_user.partner_id.id)
 
-        manager_user = resignation.manager_id.sudo().user_id
+        manager_user = resignation.coach_id.sudo().user_id
         if manager_user and manager_user.active:
             notify_partners.add(manager_user.partner_id.id)
 

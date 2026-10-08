@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+
+
+
+        <!-- ============================================================
+             MANAGER CAREER DISCUSSION VIEWS (FR-MHT-003)
+        ============================================================ -->
+
+        <record id="view_career_discussion_list" model="ir.ui.view">
+            <field name="name">succession.career.discussion.list</field>
+            <field name="model">succession.career.discussion</field>
+            <field name="arch" type="xml">
+                <list string="Career Discussions"
+                      decoration-success="state == 'confirmed'"
+                      decoration-muted="state == 'draft'">
+                    <field name="employee_id"/>
+                    <field name="manager_id"/>
+                    <field name="discussion_date"/>
+                    <field name="discussion_type"/>
+                    <field name="outcome" widget="badge"
+                           decoration-success="outcome == 'ready_for_promotion'"
+                           decoration-warning="outcome == 'needs_development'"
+                           decoration-info="outcome == 'on_track'"/>
+                    <field name="follow_up_date"/>
+                    <field name="state" widget="badge"
+                           decoration-success="state == 'confirmed'"
+                           decoration-muted="state == 'draft'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_career_discussion_form" model="ir.ui.view">
+            <field name="name">succession.career.discussion.form</field>
+            <field name="model">succession.career.discussion</field>
+            <field name="arch" type="xml">
+                <form string="Career Discussion Record">
+                    <header>
+                        <button name="action_confirm" string="Confirm &amp; Sign Off"
+                                type="object" class="btn-primary"
+                                invisible="state == 'confirmed'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,confirmed"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="display_name" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group string="Participants">
+                                <field name="employee_id"/>
+                                <field name="manager_id"/>
+                                <field name="discussion_date"/>
+                                <field name="discussion_type"/>
+                            </group>
+                            <group string="Outcome">
+                                <field name="outcome"/>
+                                <field name="follow_up_date"/>
+                                <field name="employee_acknowledgement"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Discussion Content" name="content">
+                                <group>
+                                    <field name="career_interests"
+                                           placeholder="Employee's stated career interests and aspirations..."/>
+                                    <field name="strengths_discussed"
+                                           placeholder="Key strengths discussed..."/>
+                                    <field name="development_areas"
+                                           placeholder="Development areas identified..."/>
+                                    <field name="manager_guidance"
+                                           placeholder="Manager's guidance and expectations..."/>
+                                </group>
+                            </page>
+                            <page string="Agreed Actions" name="actions">
+                                <field name="agreed_actions"
+                                       placeholder="List the agreed development actions and commitments..."/>
+                                <field name="follow_up_notes"
+                                       placeholder="Notes from follow-up review..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_career_discussion" model="ir.actions.act_window">
+            <field name="name">Career Discussions</field>
+            <field name="res_model">succession.career.discussion</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Manager view: only their team's discussions -->
+        <record id="action_my_team_career_discussions" model="ir.actions.act_window">
+            <field name="name">My Team Career Discussions</field>
+            <field name="res_model">succession.career.discussion</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('manager_id.user_id', '=', uid)]</field>
+            <field name="context">{'default_manager_id': uid}</field>
+        </record>
+
+        <!-- ============================================================
+             BENCH STRENGTH REPORT (FR-RPT-003) - LIST VIEW
+        ============================================================ -->
+
+        <record id="view_bench_strength_list" model="ir.ui.view">
+            <field name="name">succession.bench.strength.list</field>
+            <field name="model">succession.candidate</field>
+            <field name="priority">99</field>
+            <field name="arch" type="xml">
+                <list string="Bench Strength Analysis"
+                      create="0"
+                      decoration-success="readiness_level == 'ready_now'"
+                      decoration-warning="readiness_level == 'ready_1_2_yrs'"
+                      decoration-muted="state in ('rejected','waitlisted')">
+
+                    <!-- Employee: clicking the row opens the full candidate form -->
+                    <field name="employee_id" string="Employee"/>
+                    <field name="department_id" string="Department"/>
+                    <field name="critical_position_id" string="Critical Position"
+                           groups="bunna_succession_management.group_succession_ppdd"/>
+
+                    <field name="nine_box_label" string="9-Box Category" widget="badge"
+                           decoration-success="nine_box_label in ('Star','High Potential')"
+                           decoration-warning="nine_box_label == 'Core Performer'"
+                           decoration-muted="nine_box_label == 'Under Performer'"/>
+
+                    <field name="readiness_level" string="Readiness" widget="badge"
+                           decoration-success="readiness_level == 'ready_now'"
+                           decoration-warning="readiness_level == 'ready_1_2_yrs'"
+                           decoration-danger="readiness_level == 'ready_3_5_yrs'"/>
+
+                    <field name="competency_match_percent" string="Competency Match (%)"
+                           widget="progressbar"/>
+
+                    <field name="latest_pms_score" string="PMS Score"
+                           decoration-success="latest_pms_score >= 80"
+                           decoration-warning="latest_pms_score >= 60 and latest_pms_score &lt; 80"
+                           decoration-danger="latest_pms_score &lt; 60"/>
+
+                    <field name="current_tenure_months" string="Tenure (Months)"
+                           optional="show"/>
+
+                    <field name="state" string="Status" widget="badge"
+                           decoration-success="state == 'approved'"
+                           decoration-info="state == 'assessed'"
+                           decoration-warning="state == 'nominated'"
+                           decoration-muted="state in ('rejected','waitlisted')"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_bench_strength_report" model="ir.actions.act_window">
+            <field name="name">Bench Strength Analysis</field>
+            <field name="res_model">succession.candidate</field>
+            <field name="view_mode">list,form,graph,pivot</field>
+            <field name="view_id" ref="view_bench_strength_list"/>
+            <field name="search_view_id" ref="view_succession_candidate_search"/>
+            <field name="domain">[('state', 'in', ['assessed', 'approved', 'placed', 'nominated'])]</field>
+            <field name="context">{'search_default_group_position': 1}</field>
+        </record>
+
+        <!-- ============================================================
+             COMPETENCY GAP ANALYTICS (FR-RPT-004)
+        ============================================================ -->
+
+        <record id="view_competency_gap_pivot" model="ir.ui.view">
+            <field name="name">succession.candidate.gap.pivot</field>
+            <field name="model">succession.candidate.competency.gap</field>
+            <field name="arch" type="xml">
+                <pivot string="Competency Gap Analytics" disable_linking="True">
+                    <field name="competency_id" type="row"/>
+                    <field name="competency_pillar" type="row"/>
+                    <field name="achievement_status" type="col"/>
+                    <field name="candidate_id" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_competency_gap_graph" model="ir.ui.view">
+            <field name="name">succession.candidate.gap.graph</field>
+            <field name="model">succession.candidate.competency.gap</field>
+            <field name="arch" type="xml">
+                <graph string="Competency Gaps Across Candidates" type="bar" disable_linking="True">
+                    <field name="competency_id"/>
+                    <field name="achievement_status" type="col"/>
+                    <field name="candidate_id" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="view_succession_candidate_gap_search" model="ir.ui.view">
+            <field name="name">succession.candidate.gap.search</field>
+            <field name="model">succession.candidate.competency.gap</field>
+            <field name="arch" type="xml">
+                <search string="Competency Gap Analytics">
+                    <field name="candidate_id"/>
+                    <field name="competency_id"/>
+                    <field name="critical_position_id"/>
+                    <field name="department_id"/>
+                    
+                    <filter string="Below Required (Gap)" name="gap" domain="[('achievement_status', '=', 'below')]"/>
+                    <filter string="Meets Required" name="meets" domain="[('achievement_status', '=', 'meets')]"/>
+                    
+                    <group name="group_by">
+                        <filter string="Competency" name="group_competency" domain="[]" context="{'group_by': 'competency_id'}"/>
+                        <filter string="Pillar" name="group_pillar" domain="[]" context="{'group_by': 'competency_pillar'}"/>
+                        <filter string="Candidate" name="group_candidate" domain="[]" context="{'group_by': 'candidate_id'}"/>
+                        <filter string="Department" name="group_dept" domain="[]" context="{'group_by': 'department_id'}"/>
+                    </group>
+                    
+                    <searchpanel>
+                        <field name="department_id" icon="fa-building" enable_counters="1"/>
+                        <field name="critical_position_id" icon="fa-briefcase" enable_counters="1"/>
+                        <field name="competency_pillar" icon="fa-tags" enable_counters="1" select="multi"/>
+                    </searchpanel>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_competency_gap_list" model="ir.ui.view">
+            <field name="name">succession.candidate.gap.list</field>
+            <field name="model">succession.candidate.competency.gap</field>
+            <field name="arch" type="xml">
+                <list string="Competency Gaps" create="0" edit="0" delete="0" expand="1">
+                    <field name="candidate_id"/>
+                    <field name="critical_position_id"/>
+                    <field name="competency_id"/>
+                    <field name="competency_pillar"/>
+                    <field name="required_score"/>
+                    <field name="current_score"/>
+                    <field name="variance_display" string="Gap Size" class="text-end fw-bold"/>
+                    <field name="achievement_status" widget="badge" decoration-danger="achievement_status == 'below'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_competency_gap_analytics" model="ir.actions.act_window">
+            <field name="name">Competency Gap Analytics</field>
+            <field name="res_model">succession.candidate.competency.gap</field>
+            <field name="view_mode">list,graph,pivot</field>
+            <field name="view_id" ref="view_competency_gap_list"/>
+            <field name="search_view_id" ref="view_succession_candidate_gap_search"/>
+            <field name="context">{'search_default_gap': 1, 'search_default_group_candidate': 1}</field>
+        </record>
+
+    </data>
+</odoo>

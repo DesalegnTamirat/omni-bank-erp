@@ -1,0 +1,928 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<odoo>
+    <record
+        id="action_helpdesk_ticket_kanban_from_dashboard"
+        model="ir.actions.act_window"
+    >
+        <field name="name">Helpdesk Ticket</field>
+        <field name="res_model">helpdesk.ticket</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">
+            {'default_team_id': active_id}
+        </field>
+        <field name="domain">[('team_id', '=', active_id)]</field>
+    </record>
+    <record id="helpdesk_ticket_action_unassigned" model="ir.actions.act_window">
+        <field name="name">Helpdesk Ticket</field>
+        <field name="res_model">helpdesk.ticket</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field
+            name="domain"
+        >[('team_id', '=', False), ("stage_id.closed", "=", False)]</field>
+    </record>
+    <record id="helpdesk_ticket_action_opened" model="ir.actions.act_window">
+        <field name="name">Helpdesk Ticket</field>
+        <field name="res_model">helpdesk.ticket</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[("stage_id.closed", "=", False)]</field>
+    </record>
+
+    <!-- Timesheet action for stat button -->
+    <record id="action_helpdesk_timesheet" model="ir.actions.act_window">
+        <field name="name">Timesheets</field>
+        <field name="res_model">account.analytic.line</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('helpdesk_ticket_id', '=', active_id)]</field>
+        <field name="context">{'default_helpdesk_ticket_id': active_id}</field>
+    </record>
+
+    <!-- ── Search view ──────────────────────────────────────────────────────── -->
+    <record id="helpdesk_ticket_view_search" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.view.search</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <search>
+                <field
+                    string="Ticket"
+                    name="number"
+                    filter_domain="['|',('number', 'ilike', self),('name', 'ilike', self)]"
+                />
+                <field name="partner_id" />
+                <field name="commercial_partner_id" />
+                <field name="partner_email" />
+                <field name="user_id" />
+                <field name="name" />
+                <field name="category_id" />
+                <field name="account_number" string="Account Number" />
+                <field name="cif_number" string="CIF Number" />
+                <field name="fayda_number" string="Fayda / National ID" />
+                <field name="partner_phone" string="Phone / Mobile" />
+                <field name="service_family_id" />
+                <field name="service_id" />
+                <field name="service_sub_category_id" />
+                <field name="case_type_id" />
+                <field name="case_type" />
+                <field name="operation_id" string="Operation / Case" />
+                <field name="customer_type_id" />
+                <field name="channel_type" />
+                <field name="nbe_reference_number" />
+                <field name="tag_ids" />
+                <field name="stage_id" />
+                <field name="description" />
+                <filter
+                    string="Unassigned"
+                    name="unassigned"
+                    domain="[('user_id','=',False)]"
+                />
+                <filter string="Open" name="open" domain="[('closed', '=', False )]" />
+                <filter
+                    string="Unattended"
+                    name="unattended"
+                    domain="[('unattended', '=', True )]"
+                />
+                <filter
+                    string="High Priority"
+                    name="high_priority"
+                    domain="[('priority','=','3')]"
+                />
+                <filter
+                    string="SLA Failing"
+                    name="sla_failing"
+                    domain="[('sla_status', '=', 'failed')]"
+                />
+                <separator />
+                <filter
+                    string="Complaints (NBE)"
+                    name="filter_nbe_complaints"
+                    domain="[('case_type', '=', 'complaint')]"
+                />
+                <filter
+                    string="Fraud Alerts"
+                    name="filter_fraud_alerts"
+                    domain="[('case_type', '=', 'fraud_alert')]"
+                />
+                <filter
+                    string="Inquiries"
+                    name="filter_inquiries"
+                    domain="[('case_type', '=', 'inquiry')]"
+                />
+                <filter
+                    string="Service Requests"
+                    name="filter_service_requests"
+                    domain="[('case_type', '=', 'service_request')]"
+                />
+                <separator />
+                <filter
+                    string="Escalated (2nd Level)"
+                    name="filter_escalated"
+                    domain="[('is_escalated', '=', True)]"
+                />
+                <filter
+                    string="Internal Customer"
+                    name="filter_internal_customer"
+                    domain="[('customer_type', '=', 'internal')]"
+                />
+                <filter
+                    string="External Customer"
+                    name="filter_external_customer"
+                    domain="[('customer_type', '!=', 'internal')]"
+                />
+                <separator />
+                <filter
+                    string="Archived"
+                    name="archived"
+                    domain="[('active','=',False)]"
+                />
+                <separator />
+                <filter
+                    string="My Tickets"
+                    name="mytickets"
+                    domain="[('user_id','=',uid)]"
+                />
+                <filter
+                    string="My Followed Tickets"
+                    name="my_followed_tickets"
+                    domain="[('message_is_follower', '=', True)]"
+                />
+                <separator />
+                <filter
+                    name="last_week"
+                    string="Last Week"
+                    domain="[('create_date','&gt;', (context_today() - datetime.timedelta(weeks=1)).strftime('%%Y-%%m-%%d') )]"
+                />
+                <separator />
+                <filter
+                    string="My Activities"
+                    name="activities_my"
+                    domain="[('activity_ids.user_id', '=', uid)]"
+                />
+                <filter
+                    string="Late Activities"
+                    name="activities_overdue"
+                    domain="[('my_activity_date_deadline', '&lt;', context_today().strftime('%Y-%m-%d'))]"
+                    help="Show all records which has next action date is before today"
+                />
+                <filter
+                    string="Today Activities"
+                    name="activities_today"
+                    domain="[('my_activity_date_deadline', '=', context_today().strftime('%Y-%m-%d'))]"
+                />
+                <filter
+                    string="Future Activities"
+                    name="activities_upcoming_all"
+                    domain="[('my_activity_date_deadline', '&gt;', context_today().strftime('%Y-%m-%d'))
+                  ]"
+                />
+                <group name="group_by">
+                    <filter
+                        string="Partner"
+                        name="group_partner"
+                        domain="[]"
+                        context="{'group_by':'partner_id'}"
+                    />
+                    <filter
+                        string="Commercial Entity"
+                        name="group_commercial_partner"
+                        domain="[]"
+                        context="{'group_by':'commercial_partner_id'}"
+                    />
+                    <filter
+                        string="Team"
+                        name="group_team"
+                        domain="[]"
+                        context="{'group_by':'team_id'}"
+                    />
+                    <filter
+                        string="User"
+                        name="group_user"
+                        domain="[]"
+                        context="{'group_by':'user_id'}"
+                    />
+                    <filter
+                        string="Case Type"
+                        name="group_case_type"
+                        domain="[]"
+                        context="{'group_by':'case_type'}"
+                    />
+                    <filter
+                        string="Operation / Case"
+                        name="group_operation"
+                        domain="[]"
+                        context="{'group_by':'operation_id'}"
+                    />
+                    <filter
+                        string="Customer Type"
+                        name="group_customer_type"
+                        domain="[]"
+                        context="{'group_by':'customer_type'}"
+                    />
+                    <filter
+                        string="Service Family"
+                        name="group_service_family"
+                        domain="[]"
+                        context="{'group_by':'service_family_id'}"
+                    />
+                    <filter
+                        string="Service"
+                        name="group_service"
+                        domain="[]"
+                        context="{'group_by':'service_id'}"
+                    />
+                    <filter
+                        string="Subservice Category / Issues"
+                        name="group_service_sub_category"
+                        domain="[]"
+                        context="{'group_by':'service_sub_category_id'}"
+                    />
+                    <filter
+                        string="Escalation Level"
+                        name="group_escalation_level"
+                        domain="[]"
+                        context="{'group_by':'escalation_level'}"
+                    />
+                    <filter
+                        string="Channel"
+                        name="group_channel_type"
+                        domain="[]"
+                        context="{'group_by':'channel_type'}"
+                    />
+                    <filter
+                        string="Originating Unit / Branch"
+                        name="group_internal_unit"
+                        domain="[]"
+                        context="{'group_by':'internal_unit_id'}"
+                    />
+                    <filter
+                        string="Stage"
+                        name="group_stage"
+                        domain="[]"
+                        context="{'group_by':'stage_id'}"
+                    />
+                    <filter
+                        string="Category"
+                        name="group_category"
+                        domain="[]"
+                        context="{'group_by':'category_id'}"
+                    />
+                    <filter
+                        string="Tag"
+                        name="group_tag"
+                        domain="[]"
+                        context="{'group_by':'tag_ids'}"
+                    />
+                    <filter
+                        string="SLA Status"
+                        name="group_sla_status"
+                        domain="[]"
+                        context="{'group_by':'sla_status'}"
+                    />
+                    <filter
+                        string="OLA Status"
+                        name="group_ola_status"
+                        domain="[]"
+                        context="{'group_by':'ola_status'}"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Form view ────────────────────────────────────────────────────────── -->
+    <record id="ticket_view_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.view.form</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <form string="Helpdesk Ticket">
+                <header>
+                    <button
+                        string="Escalate to 2nd Level"
+                        name="action_open_escalate_wizard"
+                        type="object"
+                        class="btn-primary"
+                        invisible="closed or escalation_level &gt;= 2"
+                        groups="bunna_helpdesk.group_helpdesk_user"
+                    />
+                    <button
+                        string="Escalate to 3rd Level"
+                        name="action_open_escalate_level_3_wizard"
+                        type="object"
+                        class="btn-warning"
+                        invisible="closed or escalation_level &gt;= 3"
+                        groups="bunna_helpdesk.group_helpdesk_user"
+                    />
+                    <button
+                        string="Assign to me"
+                        name="assign_to_me"
+                        type="object"
+                        invisible="user_id"
+                    />
+                    <button
+                        string="Mark as Duplicate"
+                        name="action_open_duplicate_wizard"
+                        type="object"
+                        invisible="duplicate_id or duplicate_ids or not duplicate_tracking_enabled"
+                    />
+                    <button
+                        string="Merge"
+                        name="action_open_merge_wizard"
+                        type="object"
+                        groups="bunna_helpdesk.group_helpdesk_user"
+                    />
+                    <button
+                        string="Convert"
+                        name="action_open_convert_wizard"
+                        type="object"
+                        groups="bunna_helpdesk.group_helpdesk_user"
+                    />
+                    <button
+                        string="Acceptance SMS"
+                        name="action_send_acceptance_sms"
+                        type="object"
+                        class="btn-primary"
+                        icon="fa-paper-plane"
+                        invisible="closed"
+                        groups="bunna_helpdesk.group_helpdesk_user"
+                        help="Notify customer of ticket acceptance via SMS and update stage to In Progress"
+                    />
+                    <button
+                        string="Done SMS"
+                        name="action_send_done_sms"
+                        type="object"
+                        class="btn-success"
+                        icon="fa-check-circle"
+                        groups="bunna_helpdesk.group_helpdesk_user"
+                        help="Notify customer of ticket resolution via SMS and mark ticket as Done"
+                    />
+                    <field
+                        name="stage_id"
+                        widget="statusbar_duration"
+                        options="{'clickable': '1', 'fold_field': 'fold'}"
+                    />
+                </header>
+                <sheet>
+                    <widget
+                        name="web_ribbon"
+                        title="Archived"
+                        bg_color="bg-danger"
+                        invisible="active"
+                    />
+                    <widget
+                        name="web_ribbon"
+                        title="Duplicate"
+                        bg_color="bg-danger"
+                        invisible="not duplicate_id"
+                    />
+                    <widget
+                        name="web_ribbon"
+                        title="Escalated (2nd Level)"
+                        bg_color="bg-warning"
+                        invisible="not is_escalated or is_level_3_escalated"
+                    />
+                    <widget
+                        name="web_ribbon"
+                        title="Escalated (3rd Level Executive)"
+                        bg_color="bg-danger"
+                        invisible="not is_level_3_escalated"
+                    />
+                    <div class="oe_button_box" name="button_box">
+                        <!-- Duplicates -->
+                        <button
+                            class="oe_stat_button"
+                            type="object"
+                            name="action_view_duplicates"
+                            icon="fa-clone"
+                            invisible="duplicate_count == 0"
+                        >
+                            <field
+                                string="Duplicates"
+                                name="duplicate_count"
+                                widget="statinfo"
+                            />
+                        </button>
+                        <!-- Ratings -->
+                        <button
+                            class="oe_stat_button"
+                            type="object"
+                            name="action_view_rating"
+                            icon="fa-smile-o"
+                            invisible="rating_count == 0"
+                        >
+                            <field
+                                string="Ratings"
+                                name="rating_count"
+                                widget="statinfo"
+                            />
+                        </button>
+                        <!-- Timesheets -->
+                        <button
+                            class="oe_stat_button"
+                            type="action"
+                            name="%(bunna_helpdesk.action_helpdesk_timesheet)d"
+                            icon="fa-clock-o"
+                            groups="bunna_helpdesk.group_helpdesk_user"
+                        >
+                            <field
+                                string="Hours"
+                                name="total_hours_spent"
+                                widget="statinfo"
+                                options="{'label_field': 'Hours Spent'}"
+                            />
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <div
+                            class="alert alert-info oe_edit_only"
+                            role="alert"
+                            name="warning_duplicate"
+                            invisible="not duplicate_id"
+                        > This ticket is a
+                            duplicate of <field
+                            name="duplicate_id"
+                            readonly="stage_id.closed"
+                        />
+                        </div>
+                        <!-- SLA banner -->
+                        <div
+                            class="alert alert-danger"
+                            role="alert"
+                            invisible="sla_status != 'failed'"
+                        >
+                            <i class="fa fa-exclamation-triangle" /> SLA Breached — Deadline was
+                            <field name="sla_deadline" readonly="1" widget="datetime" />
+                        </div>
+                        <div
+                            class="alert alert-warning"
+                            role="alert"
+                            invisible="sla_status != 'in_progress' or not sla_deadline"
+                        >
+                            <i class="fa fa-clock-o" /> SLA Deadline:
+                            <field name="sla_deadline" readonly="1" widget="remaining_days" />
+                        </div>
+                        <!-- OLA banner -->
+                        <div
+                            class="alert alert-danger"
+                            role="alert"
+                            invisible="ola_status != 'failed'"
+                        >
+                            <i class="fa fa-exclamation-triangle" /> <strong>OLA Breached!</strong> Escalation Service Delivery Time deadline exceeded:
+                            <field name="ola_deadline" readonly="1" widget="datetime" />
+                        </div>
+                        <div
+                            class="alert alert-info"
+                            role="alert"
+                            invisible="ola_status != 'in_progress' or not ola_deadline"
+                        >
+                            <i class="fa fa-clock-o" /> <strong>2nd Level OLA Active:</strong> Target Deadline:
+                            <field name="ola_deadline" readonly="1" widget="remaining_days" />
+                        </div>
+                        <div
+                            class="alert alert-danger"
+                            role="alert"
+                            invisible="not is_nbe_complaint"
+                        >
+                            <i class="fa fa-shield" title="NBE Regulated" /> <strong>NBE Regulated Complaint:</strong> Mandatory regulatory tracking &amp; root cause documentation required under National Bank of Ethiopia directives.
+                        </div>
+                        <h1 class="oe_title">
+                            <field name="number" />
+                        </h1>
+                        <h2 class="o_row" invisible="not name or name in ('/', 'New')">
+                            <field name="name" readonly="1" />
+                        </h2>
+                    </div>
+                    <group name="main">
+                        <group string="Ticket Information">
+                            <field name="active" invisible="1" />
+                            <field name="duplicate_tracking_enabled" invisible="1" />
+                            <field name="sla_status" invisible="1" />
+                            <field name="is_nbe_complaint" invisible="1" />
+                            <field name="is_escalated" invisible="1" />
+                            <field name="ola_status" invisible="1" />
+                            <field name="has_crm" invisible="1" />
+                            <field name="has_repair" invisible="1" />
+                            <field name="has_loyalty" invisible="1" />
+                            <field name="service_family_id" options="{'no_create': True}" placeholder="Select Service Family..." />
+                            <field name="service_id" options="{'no_create': True}" domain="[('family_id', '=', service_family_id)] if service_family_id else []" placeholder="Select Service..." />
+                            <field name="service_sub_category_id" options="{'no_create': True}" domain="[('service_id', '=', service_id)] if service_id else []" placeholder="Select Subservice Category / Issue..." />
+                            <field name="channel_type" />
+                            <field name="social_chat_id" invisible="channel_type not in ('telegram', 'whatsapp', 'facebook')" readonly="1" string="Channel User / Chat ID" />
+                            <field name="team_id" options='{"always_reload": True}' />
+                            <field name="user_ids" invisible="1" readonly="1" />
+                            <field
+                                name="user_id"
+                                options='{"always_reload": True}'
+                                widget="many2one_avatar_user"
+                            />
+                            <field name="priority" widget="priority" />
+                            <field
+                                name="company_id"
+                                options="{'no_create': True}"
+                                groups="base.group_multi_company"
+                            />
+                            <field name="create_date" readonly="1" />
+                            <field name="category_id" />
+                            <field
+                                name="tag_ids"
+                                widget="many2many_tags"
+                                options="{'no_create_edit': True, 'color_field': 'color',}"
+                            />
+                        </group>
+                        <group string="Bunna Customer Profile">
+                            <label for="account_number" string="Account Number" />
+                            <div class="o_row">
+                                <field name="account_number" placeholder="e.g. 10000235467" class="oe_inline" />
+                                <button
+                                    name="action_lookup_cbs_account"
+                                    type="object"
+                                    class="btn btn-sm btn-outline-secondary ms-1"
+                                    style="border-color: #541718; color: #541718;"
+                                    title="Query Finacle Core Banking System"
+                                    icon="fa-search"
+                                />
+                            </div>
+                            <field name="cif_number" string="CIF Number" placeholder="e.g. CIF1000235" />
+                            <field name="fayda_number" string="Fayda / National ID" placeholder="e.g. FAN-2024-102938" />
+                            <field name="partner_phone" string="Phone / Mobile" placeholder="e.g. +251 91 123 4567" />
+                            <field
+                                name="partner_id"
+                                string="Customer Name"
+                                placeholder="Select customer or auto-populated from CBS..."
+                                context="{'default_name': partner_name, 'default_email': partner_email, 'show_vat': True}"
+                            />
+                            <field name="partner_name" invisible="partner_id" />
+                            <field name="partner_email" string="Customer Email" placeholder="customer@example.com" />
+                            <field name="customer_type_name" string="Customer Type" placeholder="Auto-populated from CBS..." />
+                            <field name="customer_age" string="Age" readonly="1" invisible="not customer_age" />
+                            <field name="customer_district" string="District Name" readonly="1" invisible="not customer_district" />
+                            <field name="account_branch_name" string="Branch Name" readonly="1" invisible="not account_branch_name" />
+                        </group>
+                    </group>
+                    <group string="CBS Customer Banking Details" invisible="not account_number and not cif_number and not fayda_number and not partner_id">
+                        <group>
+                            <field name="cbs_lookup_status" widget="badge"
+                                decoration-success="cbs_lookup_status == 'verified'"
+                                decoration-warning="cbs_lookup_status == 'not_found'"
+                                decoration-info="cbs_lookup_status == 'pending'"
+                            />
+                            <field name="account_type" readonly="1" />
+                            <field name="account_status" widget="badge"
+                                decoration-success="account_status == 'active'"
+                                decoration-danger="account_status in ('frozen', 'closed')"
+                                decoration-warning="account_status == 'dormant'"
+                                readonly="1"
+                            />
+                        </group>
+                        <group>
+                            <field name="account_branch_id" readonly="1" options="{'no_open': False}" />
+                            <field name="customer_segment" />
+                            <field name="preferred_language" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description" name="description">
+                            <field name="description" widget="html" />
+                        </page>
+                        <page string="Contact Center Assistant / Notes" name="inquiry_helper">
+                            <group>
+                                <group string="Caller Summary &amp; KB Selection">
+                                    <field name="inquiry_summary" placeholder="Brief one-line customer request or issue..." />
+                                    <field name="customer_request_details" placeholder="Detailed caller inquiry / context / transaction details..." />
+                                    <field name="kb_article_id" options="{'no_create': True}" placeholder="Select Knowledge Base SOP / Article..." />
+                                </group>
+                                <group string="Agent Action &amp; Resolution">
+                                    <field name="agent_action_taken" placeholder="Action taken by agent / advice given / steps completed..." />
+                                    <div class="mt-2 d-flex flex-wrap gap-2">
+                                        <button name="action_format_inquiry_description" string="Format &amp; Append to Ticket Description" type="object" class="btn btn-sm btn-secondary" icon="fa-magic" />
+                                        <button name="action_lookup_cbs_account" string="Lookup CBS (Finacle)" type="object" class="btn btn-sm btn-outline-primary" icon="fa-search" />
+                                        <button name="action_load_kb_sop_to_notes" string="Load KB / SOP to Notes" type="object" class="btn btn-sm btn-outline-info" icon="fa-download" help="Pull Knowledge Base SOP steps into Action Taken notes" />
+                                        <button name="action_publish_notes_to_kb" string="Save to Knowledge Base" type="object" class="btn btn-sm btn-outline-success" icon="fa-book" help="Publish these resolution notes as a reusable Knowledge Base Article" />
+                                    </div>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Service SOP &amp; Guidance" name="service_sop" invisible="not service_sop">
+                            <field name="service_sop" widget="html" readonly="1" />
+                        </page>
+                        <page string="NBE Regulatory Complaint &amp; Ethics" name="nbe_complaint" invisible="not is_nbe_complaint">
+                            <group>
+                                <group string="Regulatory Details">
+                                    <field name="nbe_reference_number" placeholder="e.g. NBE/BSD/2026/..." />
+                                    <field name="ethics_officer_id" options="{'no_create': True}" />
+                                </group>
+                                <group string="Root Cause &amp; CAPA">
+                                    <field name="complaint_root_cause" placeholder="Identified root cause..." />
+                                    <field name="corrective_action_plan" placeholder="Immediate corrective actions..." />
+                                    <field name="preventive_action_plan" placeholder="Preventive measures to prevent recurrence..." />
+                                </group>
+                            </group>
+                        </page>
+                        <page string="2nd Level Escalation &amp; OLA" name="escalation_ola" invisible="not is_escalated and not ola_id">
+                            <group>
+                                <group string="OLA Policy">
+                                    <field name="ola_id" readonly="1" />
+                                    <field name="ola_sdt_hours" readonly="1" widget="float_time" />
+                                    <field name="ola_deadline" readonly="1" />
+                                    <field name="ola_status" readonly="1" widget="badge" decoration-danger="ola_status == 'failed'" decoration-warning="ola_status == 'in_progress'" decoration-success="ola_status == 'reached'" />
+                                </group>
+                                <group string="Escalation Details">
+                                    <field name="is_escalated" readonly="1" />
+                                    <field name="escalated_to_team_id" readonly="1" />
+                                    <field name="escalated_to_user_id" readonly="1" />
+                                    <field name="escalation_date" readonly="1" />
+                                    <field name="escalation_reason" readonly="1" />
+                                </group>
+                            </group>
+                        </page>
+                        <!-- Timesheets tab -->
+                        <page
+                            string="Timesheets"
+                            name="timesheets"
+                            groups="bunna_helpdesk.group_helpdesk_user_own"
+                        >
+                            <field
+                                name="timesheet_ids"
+                                widget="one2many"
+                                context="{'default_helpdesk_ticket_id': id}"
+                            >
+                                <list editable="bottom">
+                                    <field name="date" />
+                                    <field name="user_id" string="User" />
+                                    <field name="name" string="Description" />
+                                    <field name="unit_amount" string="Hours" />
+                                </list>
+                            </field>
+                            <group>
+                                <field name="total_hours_spent" readonly="1" />
+                            </group>
+                        </page>
+                        <!-- SLA tab -->
+                        <page string="SLA" name="sla" invisible="not sla_status_ids">
+                            <field
+                                name="sla_status_ids"
+                                widget="one2many"
+                                readonly="1"
+                                nolabel="1"
+                            />
+                        </page>
+                        <!-- Rating tab -->
+                        <page
+                            string="Rating"
+                            name="rating"
+                            invisible="rating_count == 0"
+                        >
+                            <field name="rating_ids">
+                                <list create="false" delete="false">
+                                    <field name="create_date" string="Date" />
+                                    <field name="partner_id" string="Customer" />
+                                    <field name="rating" string="Rating" />
+                                    <field name="feedback" string="Feedback" />
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Escalation History" name="escalation_history" invisible="not escalation_history_ids">
+                            <field name="escalation_history_ids" readonly="1">
+                                <list default_order="escalation_datetime desc">
+                                    <field name="escalation_level" string="Level" widget="badge" />
+                                    <field name="previous_user_id" string="Previous Assignee" />
+                                    <field name="new_user_id" string="Escalated To (Manager)" widget="many2one_avatar_user" />
+                                    <field name="escalation_datetime" string="Escalated On" />
+                                    <field name="sla_deadline" string="Breached Deadline" />
+                                    <field name="new_sla_deadline" string="Target Deadline" />
+                                    <field name="is_ceo_level" string="CEO Level" widget="boolean" />
+                                    <field name="reason" string="Reason" />
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Other Information" name="other_info">
+                            <group>
+                                <field name="last_stage_update" readonly="1" />
+                                <field name="assigned_date" readonly="1" />
+                                <field name="closed_date" readonly="1" />
+                                <field name="sla_deadline" readonly="1" invisible="not sla_deadline" />
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter />
+            </form>
+        </field>
+    </record>
+
+    <!-- ── List view ────────────────────────────────────────────────────────── -->
+    <record id="ticket_view_tree" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.view.list</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="priority" widget="priority" />
+                <field name="sequence" widget="handle" />
+                <field name="number" decoration-bf="1" />
+                <field name="name" />
+                <field name="service_family_id" optional="show" />
+                <field name="service_id" optional="show" />
+                <field name="service_sub_category_id" optional="show" />
+                <field name="case_type_id" optional="hide" />
+                <field name="operation_id" optional="hide" />
+                <field name="partner_id" optional="hide" widget="many2one_avatar" />
+                <field name="partner_name" optional="show" />
+                <field name="account_number" optional="hide" />
+                <field name="customer_type_name" optional="hide" string="Customer Type" />
+                <field name="customer_age" optional="hide" string="Age" />
+                <field name="customer_district" optional="hide" string="District" />
+                <field name="channel_type" optional="hide" />
+                <field name="user_id" optional="show" widget="many2one_avatar_user" />
+                <field name="escalation_level" optional="show" widget="badge" decoration-warning="escalation_level &gt; 0" decoration-danger="is_ceo_escalated" string="Escalation" />
+                <field name="category_id" optional="hide" />
+                <field name="is_escalated" optional="hide" widget="boolean" string="Escalated" />
+                <field
+                    name="ola_status"
+                    optional="hide"
+                    widget="badge"
+                    decoration-danger="ola_status == 'failed'"
+                    decoration-warning="ola_status == 'in_progress'"
+                    decoration-success="ola_status == 'reached'"
+                />
+                <field name="sla_deadline" optional="show" widget="remaining_days" />
+                <field
+                    name="sla_status"
+                    optional="show"
+                    widget="badge"
+                    decoration-success="sla_status == 'reached'"
+                    decoration-warning="sla_status == 'in_progress'"
+                    decoration-danger="sla_status == 'failed'"
+                />
+                <field name="unattended" column_invisible="1" />
+                <field name="closed" column_invisible="1" />
+                <field
+                    name="tag_ids"
+                    widget="many2many_tags"
+                    options="{'color_field': 'color'}"
+                    optional="show"
+                />
+                <field
+                    name="create_date"
+                    widget="remaining_days"
+                    readonly="1"
+                    optional="show"
+                />
+                <field
+                    name="last_stage_update"
+                    widget="remaining_days"
+                    optional="show"
+                />
+                <field name="activity_ids" widget="list_activity" optional="hide" />
+                <field
+                    name="stage_id"
+                    widget="badge"
+                    decoration-success="not unattended and not closed"
+                    decoration-info="unattended == True"
+                    decoration-muted="closed == True"
+                />
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Kanban view ───────────────────────────────────────────────────────── -->
+    <record id="view_helpdesk_ticket_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.kanban</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="priority" eval="100" />
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_group_by="stage_id">
+                <field name="number" />
+                <field name="active" />
+                <field name="name" />
+                <field name="partner_name" />
+                <field name="user_id" />
+                <field name="user_ids" />
+                <field name="team_id" />
+                <field name="sequence" />
+                <field name="color" />
+                <field name="stage_id" />
+                <field name="priority" widget="priority" />
+                <field name="assigned_date" />
+                <field name="sla_deadline" />
+                <field name="sla_status" />
+                <progressbar
+                    field="activity_state"
+                    colors="{&quot;planned&quot;: &quot;success&quot;, &quot;today&quot;: &quot;warning&quot;, &quot;overdue&quot;: &quot;danger&quot;}"
+                />
+                <templates>
+                    <t t-name="menu">
+                        <t t-if="widget.editable">
+                            <a
+                                role="menuitem"
+                                type="open"
+                                class="dropdown-item"
+                            >Edit</a>
+                        </t>
+                        <t t-if="widget.deletable">
+                            <a
+                                role="menuitem"
+                                type="delete"
+                                class="dropdown-item"
+                            >Delete</a>
+                        </t>
+                        <field name="color" widget="kanban_color_picker" />
+                    </t>
+                    <t t-name="card">
+                        <field class="fw-bold fs-5" name="name" />
+                        <field name="category_id" class="text-muted" />
+                        <field name="number" class="text-truncate" />
+                        <!-- SLA indicator -->
+                        <span
+                            t-if="record.sla_status.raw_value == 'failed'"
+                            class="badge text-bg-danger"
+                        >SLA Failed</span>
+                        <small class="o_kanban_record_subtitle text-muted">
+                            <field name="partner_id" />
+                        </small>
+                        <field
+                            name="tag_ids"
+                            widget="many2many_tags"
+                            options="{'color_field': 'color'}"
+                        />
+
+                        <footer class="pt-1">
+                            <div class="d-flex mt-auto align-items-center">
+                                <field
+                                    name="priority"
+                                    widget="priority"
+                                    groups="base.group_user"
+                                    class="me-2"
+                                />
+                                <field name="activity_ids" widget="kanban_activity" />
+                            </div>
+                            <field name="kanban_state" widget="state_selection" />
+                            <field
+                                name="user_id"
+                                widget="many2one_avatar_user"
+                                class="ms-auto"
+                            />
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ── Pivot view (enriched) ─────────────────────────────────────────────── -->
+    <record id="helpdesk_ticket_views_pivot" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.view.pivot</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <pivot string="Pivot Analysis" disable_linking="True">
+                <field name="team_id" type="row" />
+                <field name="stage_id" type="col" />
+                <field name="priority" type="col" />
+            </pivot>
+        </field>
+    </record>
+
+    <!-- ── Graph view ────────────────────────────────────────────────────────── -->
+    <record id="helpdesk_ticket_view_graph_main" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.view.graph.main</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <graph string="Tickets Analysis" type="bar">
+                <field name="team_id" type="row" />
+                <field name="stage_id" type="col" />
+            </graph>
+        </field>
+    </record>
+
+    <!-- ── Server actions ───────────────────────────────────────────────────── -->
+    <record id="action_duplicate_ticket" model="ir.actions.server">
+        <field name="name">Duplicate</field>
+        <field name="model_id" ref="model_helpdesk_ticket" />
+        <field name="binding_model_id" ref="bunna_helpdesk.model_helpdesk_ticket" />
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = model.action_duplicate_tickets()
+        </field>
+    </record>
+    <record id="model_helpdesk_ticket_action_share" model="ir.actions.server">
+        <field name="name">Share</field>
+        <field name="model_id" ref="bunna_helpdesk.model_helpdesk_ticket" />
+        <field name="binding_model_id" ref="bunna_helpdesk.model_helpdesk_ticket" />
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_share()</field>
+    </record>
+    <record id="action_merge_ticket" model="ir.actions.server">
+        <field name="name">Merge</field>
+        <field name="model_id" ref="bunna_helpdesk.model_helpdesk_ticket" />
+        <field name="binding_model_id" ref="bunna_helpdesk.model_helpdesk_ticket" />
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records[0].action_open_merge_wizard()</field>
+    </record>
+    <record id="action_helpdesk_ticket_export_excel" model="ir.actions.server">
+        <field name="name">Export to Excel (Bunna Branded)</field>
+        <field name="model_id" ref="bunna_helpdesk.model_helpdesk_ticket" />
+        <field name="binding_model_id" ref="bunna_helpdesk.model_helpdesk_ticket" />
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_export_bunna_excel()</field>
+    </record>
+</odoo>

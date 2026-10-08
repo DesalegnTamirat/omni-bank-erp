@@ -5,9 +5,25 @@
             <t t-foreach="docs" t-as="o">
                 <t t-call="web.external_layout">
                     <div class="page">
-                        <h5 class="text-center"><strong>Transfer Committee Minutes</strong></h5>
-                        <h6 class="text-center"><span t-field="o.name"/></h6>
-                        <br/>
+                        <!-- Official Header with Bunna Bank Logo -->
+                        <table style="width: 100%; margin-bottom: 16px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 25%; vertical-align: middle; text-align: left;">
+                                    <t t-if="o.get_official_bunna_logo_base64()">
+                                        <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 80px; max-width: 150px; height: auto;" alt="Bunna Bank S.C."/>
+                                    </t>
+                                    <t t-else="">
+                                        <img src="/custom_recruitment/static/src/img/bunna_bank_official_logo.png" style="max-height: 80px; max-width: 150px; height: auto;" alt="Bunna Bank S.C."/>
+                                    </t>
+                                </td>
+                                <td style="width: 75%; vertical-align: middle; text-align: center; padding-right: 80px;">
+                                    <h4 style="font-weight: bold; color: #541718; margin: 0;">BUNNA BANK S.C.</h4>
+                                    <h5 style="margin: 4px 0;"><strong>Transfer Committee Minutes</strong></h5>
+                                    <h6 style="color: #666; margin: 0;"><span t-field="o.name"/></h6>
+                                </td>
+                            </tr>
+                        </table>
+                        <div style="background-color: #541718; height: 3px; width: 100%; margin-bottom: 16px;"></div>
                         <div class="row mt32">
                             <div class="col-6">
                                 <strong>Target Vacancy:</strong>

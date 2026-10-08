@@ -87,8 +87,8 @@
                             <field name="distribution_line_ids">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
-<!--                                    <field name="eligible_competency_ids" invisible="True"/>-->
-                                    <field name="competency_id" domain="[('id', 'in', eligible_competency_ids)]" context="{'show_pillar_only': 1}"/>
+                                    <field name="eligible_competency_ids" column_invisible="1"/>
+                                    <field name="competency_id" domain="[('id', 'in', eligible_competency_ids)]" options="{'no_create': True}"/>
                                     <field name="difficulty"/>
                                     <field name="question_type"/>
                                     <field name="number_of_questions"/>

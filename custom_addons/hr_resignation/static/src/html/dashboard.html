@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Exit Interview Analytics & Report</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#14212b;--mut:#5d6b78;--line:#e2e7ec;--acc:#0f766e;--acc2:#b45309;--soft:#e6f3f1;
+--c1:#b91c1c;--c2:#ea580c;--c3:#ca8a04;--c4:#65a30d;--c5:#15803d;--pos:#15803d;--neu:#94a3b8;--neg:#b91c1c;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e161d;--card:#16212b;--ink:#e8eef3;--mut:#93a3b1;--line:#263442;--acc:#2dd4bf;--acc2:#fbbf24;--soft:#12302e}}
+:root[data-theme="dark"]{--bg:#0e161d;--card:#16212b;--ink:#e8eef3;--mut:#93a3b1;--line:#263442;--acc:#2dd4bf;--acc2:#fbbf24;--soft:#12302e}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 20px}
+.top h1{font-size:16px;margin:0 auto 0 0}.tabs{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:9px}
+.tabs button,.btn{font:inherit;border:0;background:none;color:var(--mut);padding:7px 14px;border-radius:7px;cursor:pointer;font-weight:600}
+.tabs button.on{background:var(--card);color:var(--acc);box-shadow:0 1px 3px #0002}
+.btn{background:var(--acc);color:#fff}
+main{max-width:1180px;margin:0 auto;padding:18px 20px 40px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+.filters select{font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.lock{margin-left:auto;font-size:12px;color:var(--mut);background:var(--soft);padding:5px 10px;border-radius:99px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h3{margin:0 0 2px;font-size:14px}.tag{font-size:11px;color:var(--acc);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.sub{color:var(--mut);font-size:12px;margin:0 0 12px}.w2{grid-column:span 2}@media(max-width:720px){.w2{grid-column:auto}}
+.kpi b{display:block;font-size:26px}.kpi span{color:var(--mut);font-size:12px}.up{color:var(--pos)}.dn{color:var(--neg)}
+.br{display:grid;grid-template-columns:38% 1fr 40px;gap:8px;align-items:center;margin:6px 0;font-size:13px}
+.br i{height:9px;background:var(--line);border-radius:9px;overflow:hidden}.br b{display:block;height:100%;background:var(--acc)}
+.br.a b{background:var(--acc2)}.br em{font-style:normal;text-align:right;color:var(--mut)}
+.donut{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.ring{width:120px;height:120px;border-radius:50%;flex:none;-webkit-mask:radial-gradient(circle 38px,#0000 98%,#000);mask:radial-gradient(circle 38px,#0000 98%,#000)}
+.lg div{display:flex;gap:6px;align-items:center;font-size:12px;margin:3px 0}.lg s{width:10px;height:10px;border-radius:3px;display:inline-block}
+.lk{display:grid;grid-template-columns:34% 1fr 34px;gap:8px;align-items:center;margin:8px 0;font-size:13px}
+.st{display:flex;height:14px;border-radius:5px;overflow:hidden}.st u{display:block}
+.yn{display:grid;grid-template-columns:1fr 130px 40px;gap:8px;align-items:center;margin:8px 0}.yn i{display:flex;height:9px;border-radius:9px;overflow:hidden;background:var(--neg)}.yn b{background:var(--pos)}
+table{border-collapse:collapse;width:100%;font-size:12px}th{font-weight:600;color:var(--mut);text-align:center;padding:4px}td{padding:3px}td:first-child{text-align:left;font-size:13px}
+td.h{text-align:center;color:#fff;font-weight:700;border:2px solid var(--card);border-radius:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chips span{background:var(--soft);color:var(--acc);border-radius:99px;padding:3px 10px;font-size:12px}
+.chips span small{color:var(--mut);margin-left:4px}
+.q{border-left:3px solid var(--acc2);padding:2px 10px;margin:8px 0;color:var(--mut);font-style:italic;font-size:13px}
+svg text{fill:var(--mut);font-size:10px}
+/* ---------- report ---------- */
+.paper{background:#fff;color:#111;max-width:794px;margin:0 auto;padding:36px 40px;border:1px solid #ccd;border-radius:4px;box-shadow:0 4px 20px #0002}
+.paper h1{font-size:20px;margin:0}.paper h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:3px;margin:20px 0 8px}
+.rh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #ccd;padding-bottom:12px}
+.rh small{color:#555}.stamp{border:1.5px solid #b91c1c;color:#b91c1c;padding:3px 8px;font-size:10px;font-weight:700;border-radius:4px;letter-spacing:.06em}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px;margin:12px 0}.meta div{font-size:12px}.meta span{display:block;color:#666;font-size:10px;text-transform:uppercase}
+.qq{margin:10px 0;break-inside:avoid;font-size:12.5px}.qq p{margin:0 0 4px;font-weight:600}.qq p em{font-style:normal;font-weight:400;color:#777;font-size:10px;margin-left:6px;border:1px solid #ccd;border-radius:4px;padding:0 5px}
+.opt{display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0}.opt s{width:12px;height:12px;border:1.5px solid #555;border-radius:50%;display:inline-block}.opt.sq s{border-radius:3px}.opt.on s{background:#0f766e;border-color:#0f766e;box-shadow:inset 0 0 0 2px #fff}.opt.on{font-weight:700}
+.opt.sq.on s{box-shadow:none}
+.scale{display:flex;gap:6px;align-items:center}.scale s{width:22px;height:22px;border-radius:50%;border:1.5px solid #aaa;display:inline-grid;place-items:center;font-size:10px;color:#777}.scale s.on{background:#0f766e;color:#fff;border-color:#0f766e;font-weight:700}
+.paper table th,.paper table td{border:1px solid #dde;padding:4px 6px;font-size:11px;color:#111}.paper table th{background:#f1f5f7}.paper td.c{text-align:center}
+.ans{border:1px solid #ccd;background:#fafbfc;border-radius:5px;padding:8px 10px;min-height:34px;font-size:12px}
+.sig{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:30px}.sig div{border-top:1px solid #333;padding-top:4px;font-size:11px;color:#555}
+.foot{margin-top:20px;font-size:10px;color:#777;border-top:1px solid #ccd;padding-top:6px;display:flex;justify-content:space-between}
+.hide{display:none}.tb{display:flex;gap:10px;align-items:center;max-width:794px;margin:0 auto 12px}.tb select{font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 10px}.tb .btn{margin-left:auto}.lt tr.r{cursor:pointer}.lt tr.r:hover td{background:var(--soft)}.lt th{text-align:left;padding:8px;border-bottom:1px solid var(--line)}.lt td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}.pill{padding:2px 9px;border-radius:99px;font-size:11px;font-weight:600}.pill.y{background:#fde8e8;color:#b91c1c}.pill.n{background:var(--soft);color:var(--acc)}.ic{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}.ic:hover{border-color:var(--acc);color:var(--acc)}
+@media print{@page{size:A4;margin:14mm}:root{--bg:#fff}body{background:#fff}.top,.filters,.noprint{display:none!important}main{padding:0;max-width:none}
+.paper{border:0;box-shadow:none;padding:0;max-width:none}#dash,#list{display:none!important}}
+</style></head><body>
+<div class="top"><h1>Exit Interview · POMD</h1>
+<div class="tabs"><button class="on" data-v="dash">Analytics dashboard</button><button data-v="list">Interviews</button><button data-v="rep">Employee report</button></div></div>
+<main>
+<!-- ============ DASHBOARD ============ -->
+<section id="dash">
+<div class="filters"><select><option>Last 12 months</option><option>Q3 2026</option><option>Custom…</option></select>
+<select><option>All business units</option><option>Retail Banking</option><option>Credit</option><option>IT</option><option>Finance</option></select>
+<select><option>All districts</option></select><select><option>All branches</option></select><select><option>All positions</option></select><select><option>All separation types</option><option>Resignation</option><option>Retirement</option></select>
+<span class="lock">🔒 Anonymized · min. 5 responses per segment</span></div>
+<div class="kpis" id="kpis"></div>
+<div class="grid" id="cards"></div>
+</section>
+<!-- ============ REPORT ============ -->
+<section id="list" class="hide"></section>
+<section id="rep" class="hide"></section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const bars=(r,c='')=>r.map(([l,v])=>`<div class="br ${c}"><span>${l}</span><i><b style="width:${v}%"></b></i><em>${v}%</em></div>`).join('');
+const cols=['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)'];
+const card=(t,type,sub,body,w='')=>`<div class="card ${w}"><div class="tag">${type}</div><h3>${t}</h3><p class="sub">${sub}</p>${body}</div>`;
+// KPIs
+$('#kpis').innerHTML=[['Interviews completed','214','92% completion · <span class=up>▲ 6%</span>'],['Avg. satisfaction','3.6 / 5','<span class=dn>▼ 0.2</span> vs last period'],['Would recommend bank','61%','Yes/No · <span class=up>▲ 4 pts</span>'],['Regrettable exits','38%','Rated high performers'],['Avg. tenure at exit','4.3 yrs','Median 3.1']].map(k=>`<div class="card kpi"><span>${k[0]}</span><b>${k[1]}</b><span>${k[2]}</span></div>`).join('');
+// Donut
+const dd=[['Private bank',34,'#0f766e'],['Other sector',27,'#b45309'],['Further study',16,'#6366f1'],['Self-employed',13,'#ca8a04'],['Abroad',10,'#94a3b8']];
+let a=0;const cg=dd.map(d=>{const s=`${d[2]} ${a}% ${a+d[1]}%`;a+=d[1];return s}).join(',');
+// Likert
+const lk=[['Career growth',[18,22,25,22,13],2.9],['Compensation & benefits',[20,24,26,20,10],2.8],['Management support',[6,12,22,34,26],3.6],['Work-life balance',[8,14,24,32,22],3.5],['Team & culture',[3,7,18,38,34],3.9]];
+// Trend
+const tr=[14,16,12,19,22,18,15,24,26,21,17,20],pts=tr.map((v,i)=>`${20+i*28},${90-v*2.8}`).join(' ');
+const mo='JFMAMJJASOND'.split('');
+$('#cards').innerHTML=[
+card('Primary reason for leaving','Multiple choice · single answer','Share of respondents',bars([['Better pay',31],['Career growth',24],['Management',14],['Relocation',11],['Work-life balance',9],['Other',11]]),''),
+card('What would have kept you?','Multiple choice · multiple answers','Respondents could tick several',bars([['Higher salary',52],['Clear promotion path',44],['Flexible work',31],['Training budget',27],['Better manager',22]],'a')),
+card('Where are you going next?','Dropdown','Destination sector',`<div class="donut"><div class="ring" style="background:conic-gradient(${cg})"></div><div class="lg">${dd.map(d=>`<div><s style="background:${d[2]}"></s>${d[0]} <b>${d[1]}%</b></div>`).join('')}</div></div>`),
+card('Satisfaction ratings','Rating scale · Likert 1–5','Distribution + mean · 1 = very low, 5 = very high',lk.map(l=>`<div class="lk"><span>${l[0]}</span><div class="st">${l[1].map((v,i)=>`<u style="width:${v}%;background:${cols[i]}"></u>`).join('')}</div><b>${l[2]}</b></div>`).join(''),'w2'),
+card('Would you…','Yes / No','Green = Yes',[['Recommend us as an employer',61],['Consider returning',48],['Handover was well supported',72],['Felt heard by your manager',57]].map(y=>`<div class="yn"><span>${y[0]}</span><i><b style="width:${y[1]}%"></b></i><b>${y[1]}%</b></div>`).join('')),
+card('Turnover trend','Time series','Exits per month, last 12 months',`<svg viewBox="0 0 350 110" width="100%"><polyline points="20,100 ${pts} ${20+11*28},100" fill="var(--soft)" stroke="none"/><polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2.5"/>${mo.map((m,i)=>`<text x="${20+i*28}" y="107" text-anchor="middle">${m}</text>`).join('')}</svg>`),
+card('Top themes','Short answer','Auto-tagged keywords · count',`<div class="chips">${[['salary',48],['promotion',41],['workload',29],['leadership',24],['training',19],['transfer',16],['culture',12],['commute',9]].map(c=>`<span>${c[0]}<small>${c[1]}</small></span>`).join('')}</div>`),
+card('Comments & sentiment','Paragraph · open-ended','Sentiment analysis + anonymized excerpts',`<div class="st" style="height:16px;margin-bottom:8px"><u style="width:38%;background:var(--pos)"></u><u style="width:24%;background:var(--neu)"></u><u style="width:38%;background:var(--neg)"></u></div><p class="sub">38% positive · 24% neutral · 38% negative</p><div class="q">“Good team, but no visible path to the next grade.”</div><div class="q">“Workload in peak season is not sustainable.”</div>`,'w2')
+].join('');
+// ---------- DATA ----------
+const E=[
+{n:'Abebe K. Tesfaye',id:'EMP-004821',pos:'Senior Credit Officer',u:'Credit',br:'Bole · Addis 2',t:'Resignation',ten:'5 y 2 m',lwd:'30 Oct 2026',st:'Completed',reason:'Career growth',keep:['Clear promotion path','Training budget'],dest:'Private bank',sat:3,gr:2,rec:'Yes',ret:'Yes',mx:[2,3,1,4],sh:'Credit Manager, private bank',p1:'Loved the team and mentoring from my manager. Least: no visible path beyond my grade and workload during year-end closing.',p2:'Publish promotion criteria and review them every year.',avg:'2.5',sent:'Mixed',th:'Promotion, workload',reg:'Yes'},
+{n:'Selam T. Bekele',id:'EMP-003377',pos:'Teller',u:'Retail Banking',br:'Merkato · Addis 1',t:'Resignation',ten:'2 y 8 m',lwd:'15 Nov 2026',st:'Completed',reason:'Better pay',keep:['Higher salary','Flexible work'],dest:'Other sector',sat:2,gr:2,rec:'No',ret:'No',mx:[1,2,2,3],sh:'Sales coordinator',p1:'Friendly colleagues. Pay does not match the workload at the counter.',p2:'Review entry-level salary scale.',avg:'2.0',sent:'Negative',th:'Salary, workload',reg:'No'},
+{n:'Dawit M. Haile',id:'EMP-002190',pos:'IT Support Engineer',u:'IT',br:'Head Office',t:'Resignation',ten:'6 y 1 m',lwd:'01 Nov 2026',st:'Draft',reason:'Relocation',keep:['Flexible work'],dest:'Abroad',sat:4,gr:3,rec:'Yes',ret:'Yes',mx:[3,4,3,4],sh:'Systems engineer',p1:'Great learning environment. Leaving because of family relocation.',p2:'Offer remote work options for technical roles.',avg:'3.6',sent:'Positive',th:'Relocation',reg:'Yes'},
+{n:'Hanna G. Desta',id:'EMP-005012',pos:'Finance Analyst',u:'Finance',br:'Head Office',t:'Resignation',ten:'3 y 4 m',lwd:'20 Nov 2026',st:'Pending',reason:'Management',keep:['Better manager','Clear promotion path'],dest:'Further study',sat:3,gr:3,rec:'No',ret:'Yes',mx:[3,3,2,2],sh:'Full-time MBA',p1:'',p2:'',avg:'-',sent:'-',th:'-',reg:'-'}];
+let cur=0;
+const rad=(o,s)=>o.map(x=>`<span class="opt ${x==s?'on':''}"><s></s>${x}</span>`).join('');
+const chk=(o,s)=>o.map(x=>`<span class="opt sq ${s.includes(x)?'on':''}"><s></s>${x}</span>`).join('');
+const sc=n=>`<div class="scale">${[1,2,3,4,5].map(i=>`<s class="${i==n?'on':''}">${i}</s>`).join('')}<span style="font-size:10px;color:#777;margin-left:6px">1 = very low · 5 = very high</span></div>`;
+const rn=['Fair pay','Training','Promotion clarity','Manager feedback'],hd=['Strongly disagree','Disagree','Neutral','Agree','Strongly agree'];
+function report(e){return `<div class="paper">
+<div class="rh"><div><h1>Exit Interview Report</h1><small>Separation & Off-boarding · Confidential</small></div><span class="stamp">RESTRICTED · POMD ONLY</span></div>
+<div class="meta"><div><span>Employee</span>${e.n}</div><div><span>Employee ID</span>${e.id}</div><div><span>Position</span>${e.pos}</div><div><span>Business unit</span>${e.u}</div>
+<div><span>Branch / District</span>${e.br}</div><div><span>Separation type</span>${e.t}</div><div><span>Tenure</span>${e.ten}</div><div><span>Last working day</span>${e.lwd}</div></div>
+<h2>1 · Reason for leaving</h2>
+<div class="qq"><p>What is your primary reason for leaving? <em>Single choice</em></p>${rad(['Better pay','Career growth','Management','Relocation','Work-life balance','Other'],e.reason)}</div>
+<div class="qq"><p>What would have kept you? <em>Multiple choice</em></p>${chk(['Higher salary','Clear promotion path','Flexible work','Training budget','Better manager'],e.keep)}</div>
+<div class="qq"><p>Where are you going next? <em>Dropdown</em></p><div class="ans" style="min-height:0;width:50%">${e.dest} ▾</div></div>
+<h2>2 · Experience ratings</h2>
+<div class="qq"><p>Overall satisfaction with your role <em>Rating 1–5</em></p>${sc(e.sat)}</div>
+<div class="qq"><p>Career growth opportunities <em>Rating 1–5</em></p>${sc(e.gr)}</div>
+<div class="qq"><p>Would you recommend the bank as an employer? <em>Yes / No</em></p>${rad(['Yes','No'],e.rec)}</div>
+<div class="qq"><p>Would you consider returning? <em>Yes / No</em></p>${rad(['Yes','No'],e.ret)}</div>
+<div class="qq"><p>Rate your agreement <em>Matrix</em></p><table><tr><th></th>${hd.map(h=>`<th>${h}</th>`).join('')}</tr>${rn.map((r,k)=>`<tr><td>${r}</td>${hd.map((h,i)=>`<td class="c">${i+1==e.mx[k]?'●':'○'}</td>`).join('')}</tr>`).join('')}</table></div>
+<h2>3 · In your own words</h2>
+<div class="qq"><p>Your new employer / role title <em>Short answer</em></p><div class="ans">${e.sh}</div></div>
+<div class="qq"><p>What did you value most and least about working here? <em>Paragraph</em></p><div class="ans">${e.p1||'—'}</div></div>
+<div class="qq"><p>What one change would improve retention? <em>Paragraph</em></p><div class="ans">${e.p2||'—'}</div></div>
+<h2>4 · POMD summary</h2>
+<table><tr><th>Avg. rating</th><th>Sentiment</th><th>Key themes</th><th>Regrettable exit?</th></tr><tr><td class="c">${e.avg}</td><td class="c">${e.sent}</td><td class="c">${e.th}</td><td class="c">${e.reg}</td></tr></table>
+<div class="sig"><div>Employee signature · date</div><div>POMD interviewer · date</div></div>
+<div class="foot"><span>Generated from ERP · ${e.id}</span><span>Page 1 of 1</span></div></div>`}
+function show(v){document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x.dataset.v==v));
+['dash','list','rep'].forEach(k=>$('#'+k).classList.toggle('hide',k!=v));}
+function open_(i,print){cur=i;$('#rep').innerHTML=`<div class="tb noprint"><button class="ic" onclick="show('list')">← All interviews</button><select onchange="open_(+this.value)">${E.map((x,k)=>`<option value="${k}" ${k==i?'selected':''}>${x.n}</option>`).join('')}</select><button class="btn" onclick="window.print()">🖨 Print / Save PDF</button></div>`+report(E[i]);show('rep');window.scrollTo(0,0);if(print)setTimeout(()=>window.print(),250)}
+$('#list').innerHTML=`<div class="card"><div class="tag">Exit interviews</div><h3>Click an employee to open their report</h3><p class="sub">Only POMD can see this list. Use the print icon to print one employee straight away.</p><div style="overflow-x:auto"><table class="lt"><tr><th>Employee</th><th>Position</th><th>Business unit</th><th>Last day</th><th>Status</th><th>Regrettable</th><th></th></tr>${E.map((e,i)=>`<tr class="r" onclick="open_(${i})"><td><b>${e.n}</b><br><small style="color:var(--mut)">${e.id}</small></td><td>${e.pos}</td><td>${e.u}</td><td>${e.lwd}</td><td>${e.st}</td><td><span class="pill ${e.reg=='Yes'?'y':'n'}">${e.reg}</span></td><td><button class="ic" title="Print this employee" onclick="event.stopPropagation();open_(${i},true)">🖨 Print</button></td></tr>`).join('')}</table></div></div>`;
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>b.dataset.v=='rep'?open_(cur):show(b.dataset.v));
+</script></body></html>

@@ -64,6 +64,18 @@ class RecruitmentProcessInternal(models.Model):
         p_id = self.id
         self.env.cr.execute('SELECT populate_months_since_promotion(%s)', (p_id,))
 
+    def action_select_all_candidates(self):
+        """ Select all internal candidates at once """
+        for rec in self:
+            if rec.eligible_emp:
+                rec.eligible_emp.write({'select_flag': True})
+
+    def action_deselect_all_candidates(self):
+        """ Deselect all internal candidates at once """
+        for rec in self:
+            if rec.eligible_emp:
+                rec.eligible_emp.write({'select_flag': False})
+
     def notify(self):
         p_id = self.id
         _logger.info("Starting notification process for Internal Recruitment ID: %s", self.id)
@@ -164,19 +176,26 @@ class RecruitmentProcessInternal(models.Model):
                     avail_rec.write({'employee_vacancy_ids': vac_lines})
 
                 if emp_user and emp_user.partner_id:
-                    self.mail_channel_msgs(emp_user.partner_id.id, self.job_position.name if self.job_position else '', self.last_date_to_apply, work_units_str)
+                    self.mail_channel_msgs(
+                        emp_user.partner_id.id,
+                        self.job_position.name if self.job_position else '',
+                        self.last_date_to_apply,
+                        work_units_str,
+                        candidate_name=val.emp_name.name if val.emp_name else False
+                    )
 
         self.status = 'notify'
         return self.status
 
-    def mail_channel_msgs(self, rec_id, ref, arg1, arg2):
+    def mail_channel_msgs(self, rec_id, ref, arg1, arg2, candidate_name=False):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        c_name = candidate_name or _("Candidate")
         message = (
-            f"Dear Candidate,\n\n"
+            f"Dear {c_name},\n\n"
             f"You have been shortlisted for an Internal Recruitment position:\n\n"
             f"• Position: {ref}\n"
-            f"• Application Deadline: {arg1}\n"
-            f"• Place of Assignment: {arg2}\n\n"
+            f"• Application Deadline: {arg1 or 'N/A'}\n"
+            f"• Place of Assignment: {arg2 or 'N/A'}\n\n"
             f"If you are interested, please submit your application before the deadline.\n\n"
             f"Best regards,\n"
             f"Bunna Bank HR Department"

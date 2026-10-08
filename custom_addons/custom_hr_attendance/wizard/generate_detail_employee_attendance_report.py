@@ -23,7 +23,6 @@ class GenerateDetailEmployeeAttendanceReport(models.TransientModel):
         ('attendance_preapproval', 'PreDefined Attendance'),
         ('acknowledged_attendance', 'Acknowledged Attendance'),
         ('job_position_exception', 'Job Position Exception'),
-        ('over_time', 'Over Time'),
     ], required=True, default='attendance_summary')
 
     @api.constrains('date_from', 'date_to')
@@ -40,8 +39,8 @@ class GenerateDetailEmployeeAttendanceReport(models.TransientModel):
 
         # Execute high-performance PostgreSQL function registered by model init()
         self.env.cr.execute(
-            "SELECT generate_daily_employee_attendance_detail_report(%s::date, %s::date, %s::varchar)",
-            (p_from, p_to, report_type)
+            "SELECT generate_daily_employee_attendance_detail_report(%s::date, %s::date, %s::varchar, %s::integer)",
+            (p_from, p_to, report_type, self.env.uid)
         )
 
         action_map = {
@@ -51,6 +50,7 @@ class GenerateDetailEmployeeAttendanceReport(models.TransientModel):
                 'res_model': 'generate.employee.attendance.details',
                 'view_mode': 'list,search',
                 'views': [(self.env.ref('custom_hr_attendance.view_employee_attendance_summary_tree').id, 'list')],
+                'domain': [('create_uid', '=', self.env.uid)],
                 'target': 'current',
             },
             'attendance_preapproval': {

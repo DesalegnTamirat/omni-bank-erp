@@ -53,6 +53,7 @@
                             <group>
                                 <field name="highest_education"/>
                                 <field name="latest_cgpa"/>
+                                <field name="profile_completeness" widget="progressbar"/>
                             </group>
                             <group>
                                 <field name="total_experience_years"/>

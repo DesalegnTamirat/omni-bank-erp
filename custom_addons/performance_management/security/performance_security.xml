@@ -1,207 +1,364 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Module Category -->
+    <!-- ========================================================== -->
+    <!-- MODULE CATEGORY                                            -->
+    <!-- ========================================================== -->
+
     <record id="module_category_performance_management" model="ir.module.category">
         <field name="name">Performance Management</field>
-        <field name="description">Manage scorecards, objectives, measures, and appraisals with multi-tier role access.</field>
+        <field name="description">
+            Manage scorecards, objectives, measures, and appraisals with multi-tier role access.
+        </field>
         <field name="sequence">25</field>
     </record>
 
-    <!-- Group Privilege -->
+
+    <!-- ========================================================== -->
+    <!-- GROUP PRIVILEGE                                             -->
+    <!-- ========================================================== -->
+
     <record id="res_groups_privilege_performance" model="res.groups.privilege">
         <field name="name">Performance Management</field>
         <field name="sequence">1</field>
         <field name="category_id" ref="module_category_performance_management"/>
     </record>
 
-    <!-- Groups -->
+
+
+
     <record id="group_performance_user" model="res.groups">
         <field name="name">Employee / User</field>
         <field name="sequence">10</field>
         <field name="privilege_id" ref="res_groups_privilege_performance"/>
     </record>
 
-    <!-- Make Employee / User role default for all internal users and new user creation -->
-    <record id="base.group_user" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('group_performance_user'))]"/>
-    </record>
-    <record id="base.default_user_group" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('group_performance_user'))]"/>
-    </record>
+
+    <!-- ========================================================== -->
+    <!-- MANAGER                                                      -->
+    <!-- ========================================================== -->
 
     <record id="group_performance_manager" model="res.groups">
         <field name="name">Manager</field>
         <field name="sequence">20</field>
         <field name="privilege_id" ref="res_groups_privilege_performance"/>
-        <field name="implied_ids" eval="[(4, ref('group_performance_user'))]"/>
+
+        <!-- Manager automatically inherits Employee / User -->
+        <field name="implied_ids"
+               eval="[(4, ref('group_performance_user'))]"/>
     </record>
+
+
+    <!-- ========================================================== -->
+    <!-- PLANNING ROLE - TIER 2                                      -->
+    <!-- ========================================================== -->
 
     <record id="group_performance_planning" model="res.groups">
         <field name="name">Planning Role (Tier 2)</field>
         <field name="sequence">30</field>
         <field name="privilege_id" ref="res_groups_privilege_performance"/>
-        <field name="implied_ids" eval="[(4, ref('group_performance_manager'))]"/>
+
+        <!-- Planning automatically inherits Manager -->
+        <field name="implied_ids"
+               eval="[(4, ref('group_performance_manager'))]"/>
     </record>
+
+
+    <!-- ========================================================== -->
+    <!-- HR ROLE - TIER 3                                            -->
+    <!-- ========================================================== -->
 
     <record id="group_performance_hr" model="res.groups">
         <field name="name">HR Role (Tier 3)</field>
         <field name="sequence">40</field>
         <field name="privilege_id" ref="res_groups_privilege_performance"/>
-        <field name="implied_ids" eval="[(4, ref('group_performance_manager'))]"/>
+
+        <!-- HR automatically inherits Manager -->
+        <field name="implied_ids"
+               eval="[(4, ref('group_performance_manager'))]"/>
     </record>
+
+
+    <!-- ========================================================== -->
+    <!-- ADMINISTRATOR                                                -->
+    <!-- ========================================================== -->
 
     <record id="group_performance_admin" model="res.groups">
         <field name="name">Administrator</field>
         <field name="sequence">50</field>
         <field name="privilege_id" ref="res_groups_privilege_performance"/>
-        <field name="implied_ids" eval="[(4, ref('group_performance_planning')), (4, ref('group_performance_hr'))]"/>
+
+        <!-- Administrator automatically inherits Planning and HR -->
+        <field name="implied_ids"
+               eval="[
+                   (4, ref('group_performance_planning')),
+                   (4, ref('group_performance_hr'))
+               ]"/>
     </record>
 
-    <!-- Make Performance Administrator default for System Administrators -->
+
+    <!-- ========================================================== -->
+    <!-- INTERNAL USERS DEFAULT ACCESS                               -->
+    <!-- Every internal user automatically gets Employee/User role   -->
+    <!-- ========================================================== -->
+
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids"
+               eval="[(4, ref('group_performance_user'))]"/>
+    </record>
+
+    <record id="base.default_user_group" model="res.groups">
+        <field name="implied_ids"
+               eval="[(4, ref('group_performance_user'))]"/>
+    </record>
+
+
+    <!-- ========================================================== -->
+    <!-- SYSTEM ADMINISTRATORS                                       -->
+    <!-- ========================================================== -->
+
     <record id="base.group_system" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('group_performance_admin'))]"/>
+        <field name="implied_ids"
+               eval="[(4, ref('group_performance_admin'))]"/>
     </record>
+
     <record id="base.group_erp_manager" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('group_performance_admin'))]"/>
+        <field name="implied_ids"
+               eval="[(4, ref('group_performance_admin'))]"/>
     </record>
 
-    <!-- ========================================== -->
-    <!-- RECORD RULES: TIER 2 SCORECARD & APPRAISAL -->
-    <!-- ========================================== -->
 
-    <!-- Tier 2 Scorecard: Employee Rule (visible only after notification) -->
+    <!-- ========================================================== -->
+    <!-- RECORD RULES: TIER 2 SCORECARD & APPRAISAL                  -->
+    <!-- ========================================================== -->
+
+    <!-- Tier 2 Scorecard: Employee -->
     <record id="rule_t2_scorecard_user" model="ir.rule">
         <field name="name">Tier 2 Scorecard: Employee (Notified+)</field>
         <field name="model_id" ref="model_t2_scorecard"/>
-        <field name="domain_force">[('employee_id.user_id', '=', user.id), ('state', '!=', 'draft')]</field>
-        <field name="groups" eval="[(4, ref('group_performance_user'))]"/>
+        <field name="domain_force">
+            ['&amp;', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id', '=', user.employee_id.id), ('employee_id', 'in', user.employee_ids.ids), ('state', '!=', 'draft')]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_user'))]"/>
     </record>
 
-    <!-- Tier 2 Scorecard: Manager Rule (Subordinates in any state) -->
+
+    <!-- Tier 2 Scorecard: Manager -->
     <record id="rule_t2_scorecard_manager" model="ir.rule">
         <field name="name">Tier 2 Scorecard: Manager</field>
         <field name="model_id" ref="model_t2_scorecard"/>
-        <field name="domain_force">['|', '|', ('manager_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id), ('employee_id.user_id', '=', user.id)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_manager'))]"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|',
+                ('manager_id.user_id', '=', user.id),
+                ('manager_id', '=', user.employee_id.id),
+                ('employee_id.coach_id.user_id', '=', user.id),
+                ('employee_id.user_id', '=', user.id),
+                ('employee_id', 'in', user.employee_ids.ids)
+            ]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_manager'))]"/>
     </record>
 
-    <!-- Tier 2 Scorecard: Planning & Admin (All records) -->
+
+    <!-- Tier 2 Scorecard: Planning & Admin -->
     <record id="rule_t2_scorecard_planning_admin" model="ir.rule">
         <field name="name">Tier 2 Scorecard: Planning &amp; Admin (All)</field>
         <field name="model_id" ref="model_t2_scorecard"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_planning')), (4, ref('group_performance_admin'))]"/>
+        <field name="groups"
+               eval="[
+                   (4, ref('group_performance_planning')),
+                   (4, ref('group_performance_admin'))
+               ]"/>
     </record>
 
-    <!-- Tier 2 Appraisal: Employee Rule (visible only after notification) -->
+
+    <!-- Tier 2 Appraisal: Employee -->
     <record id="rule_t2_appraisal_user" model="ir.rule">
         <field name="name">Tier 2 Appraisal: Employee (Notified+)</field>
         <field name="model_id" ref="model_t2_appraisal"/>
-        <field name="domain_force">[('employee_id.user_id', '=', user.id), ('state', '!=', 'draft')]</field>
-        <field name="groups" eval="[(4, ref('group_performance_user'))]"/>
+        <field name="domain_force">
+            ['&amp;', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id', '=', user.employee_id.id), ('employee_id', 'in', user.employee_ids.ids), ('state', '!=', 'draft')]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_user'))]"/>
     </record>
 
-    <!-- Tier 2 Appraisal: Manager Rule (Subordinates in any state) -->
+
+    <!-- Tier 2 Appraisal: Manager -->
     <record id="rule_t2_appraisal_manager" model="ir.rule">
         <field name="name">Tier 2 Appraisal: Manager</field>
         <field name="model_id" ref="model_t2_appraisal"/>
-        <field name="domain_force">['|', '|', ('manager_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id), ('employee_id.user_id', '=', user.id)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_manager'))]"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|',
+                ('manager_id.user_id', '=', user.id),
+                ('manager_id', '=', user.employee_id.id),
+                ('employee_id.coach_id.user_id', '=', user.id),
+                ('employee_id.user_id', '=', user.id),
+                ('employee_id', 'in', user.employee_ids.ids)
+            ]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_manager'))]"/>
     </record>
 
-    <!-- Tier 2 Appraisal: Planning & Admin (All records) -->
+
+    <!-- Tier 2 Appraisal: Planning & Admin -->
     <record id="rule_t2_appraisal_planning_admin" model="ir.rule">
         <field name="name">Tier 2 Appraisal: Planning &amp; Admin (All)</field>
         <field name="model_id" ref="model_t2_appraisal"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_planning')), (4, ref('group_performance_admin'))]"/>
+        <field name="groups"
+               eval="[
+                   (4, ref('group_performance_planning')),
+                   (4, ref('group_performance_admin'))
+               ]"/>
     </record>
 
-    <!-- ========================================== -->
-    <!-- RECORD RULES: TIER 3 SCORECARD & APPRAISAL -->
-    <!-- ========================================== -->
 
-    <!-- Tier 3 Scorecard: Employee Rule (visible only after notification) -->
+    <!-- ========================================================== -->
+    <!-- RECORD RULES: TIER 3 SCORECARD & APPRAISAL                  -->
+    <!-- ========================================================== -->
+
+    <!-- Tier 3 Scorecard: Employee -->
     <record id="rule_t3_scorecard_user" model="ir.rule">
         <field name="name">Tier 3 Scorecard: Employee (Notified+)</field>
         <field name="model_id" ref="model_t3_scorecard"/>
-        <field name="domain_force">[('employee_id.user_id', '=', user.id), ('state', '!=', 'draft')]</field>
-        <field name="groups" eval="[(4, ref('group_performance_user'))]"/>
+        <field name="domain_force">
+            ['&amp;', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id', '=', user.employee_id.id), ('employee_id', 'in', user.employee_ids.ids), ('state', '!=', 'draft')]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_user'))]"/>
     </record>
 
-    <!-- Tier 3 Scorecard: Manager Rule (Subordinates in any state) -->
+
+    <!-- Tier 3 Scorecard: Manager -->
     <record id="rule_t3_scorecard_manager" model="ir.rule">
         <field name="name">Tier 3 Scorecard: Manager</field>
         <field name="model_id" ref="model_t3_scorecard"/>
-        <field name="domain_force">['|', '|', ('manager_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id), ('employee_id.user_id', '=', user.id)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_manager'))]"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|',
+                ('manager_id.user_id', '=', user.id),
+                ('manager_id', '=', user.employee_id.id),
+                ('employee_id.coach_id.user_id', '=', user.id),
+                ('employee_id.user_id', '=', user.id),
+                ('employee_id', 'in', user.employee_ids.ids)
+            ]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_manager'))]"/>
     </record>
 
-    <!-- Tier 3 Scorecard: HR & Admin (All records) -->
+
+    <!-- Tier 3 Scorecard: HR & Admin -->
     <record id="rule_t3_scorecard_hr_admin" model="ir.rule">
         <field name="name">Tier 3 Scorecard: HR &amp; Admin (All)</field>
         <field name="model_id" ref="model_t3_scorecard"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_hr')), (4, ref('group_performance_admin'))]"/>
+        <field name="groups"
+               eval="[
+                   (4, ref('group_performance_hr')),
+                   (4, ref('group_performance_admin'))
+               ]"/>
     </record>
 
-    <!-- Tier 3 Appraisal: Employee Rule (visible only after notification) -->
+
+    <!-- Tier 3 Appraisal: Employee -->
     <record id="rule_t3_appraisal_user" model="ir.rule">
         <field name="name">Tier 3 Appraisal: Employee (Notified+)</field>
         <field name="model_id" ref="model_t3_appraisal"/>
-        <field name="domain_force">[('employee_id.user_id', '=', user.id), ('state', '!=', 'draft')]</field>
-        <field name="groups" eval="[(4, ref('group_performance_user'))]"/>
+        <field name="domain_force">
+            ['&amp;', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id', '=', user.employee_id.id), ('employee_id', 'in', user.employee_ids.ids), ('state', '!=', 'draft')]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_user'))]"/>
     </record>
 
-    <!-- Tier 3 Appraisal: Manager Rule (Subordinates in any state) -->
+
+    <!-- Tier 3 Appraisal: Manager -->
     <record id="rule_t3_appraisal_manager" model="ir.rule">
         <field name="name">Tier 3 Appraisal: Manager</field>
         <field name="model_id" ref="model_t3_appraisal"/>
-        <field name="domain_force">['|', '|', ('manager_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id), ('employee_id.user_id', '=', user.id)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_manager'))]"/>
+        <field name="domain_force">
+            ['|', '|', '|', '|',
+                ('manager_id.user_id', '=', user.id),
+                ('manager_id', '=', user.employee_id.id),
+                ('employee_id.coach_id.user_id', '=', user.id),
+                ('employee_id.user_id', '=', user.id),
+                ('employee_id', 'in', user.employee_ids.ids)
+            ]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_manager'))]"/>
     </record>
 
-    <!-- Tier 3 Appraisal: HR & Admin (All records) -->
+
+    <!-- Tier 3 Appraisal: HR & Admin -->
     <record id="rule_t3_appraisal_hr_admin" model="ir.rule">
         <field name="name">Tier 3 Appraisal: HR &amp; Admin (All)</field>
         <field name="model_id" ref="model_t3_appraisal"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_hr')), (4, ref('group_performance_admin'))]"/>
+        <field name="groups"
+               eval="[
+                   (4, ref('group_performance_hr')),
+                   (4, ref('group_performance_admin'))
+               ]"/>
     </record>
 
-    <!-- ============================================== -->
-    <!-- RECORD RULES: CORPORATE SCORECARD & APPRAISAL  -->
-    <!-- ============================================== -->
 
-    <!-- Corporate Scorecard: Employee Rule (visible only after notification) -->
+    <!-- ========================================================== -->
+    <!-- RECORD RULES: CORPORATE SCORECARD & APPRAISAL              -->
+    <!-- ========================================================== -->
+
+    <!-- Corporate Scorecard: Employee -->
     <record id="rule_corporate_scorecard_user" model="ir.rule">
         <field name="name">Corporate Scorecard: Employee (Notified+)</field>
         <field name="model_id" ref="model_corporate_scorecard"/>
-        <field name="domain_force">[('employee_id.user_id', '=', user.id), ('state', '!=', 'draft')]</field>
-        <field name="groups" eval="[(4, ref('group_performance_user'))]"/>
+        <field name="domain_force">
+            ['&amp;', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id', '=', user.employee_id.id), ('employee_id', 'in', user.employee_ids.ids), ('state', '!=', 'draft')]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_user'))]"/>
     </record>
 
+
+    <!-- Corporate Scorecard: Planning & Admin -->
     <record id="rule_corporate_scorecard_planning_admin" model="ir.rule">
         <field name="name">Corporate Scorecard: Planning &amp; Admin (All)</field>
         <field name="model_id" ref="model_corporate_scorecard"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_planning')), (4, ref('group_performance_admin'))]"/>
+        <field name="groups"
+               eval="[
+                   (4, ref('group_performance_planning')),
+                   (4, ref('group_performance_admin'))
+               ]"/>
     </record>
 
-    <!-- Corporate Appraisal: Employee Rule (visible only after notification) -->
+
+    <!-- Corporate Appraisal: Employee -->
     <record id="rule_corporate_appraisal_user" model="ir.rule">
         <field name="name">Corporate Appraisal: Employee (Notified+)</field>
         <field name="model_id" ref="model_corporate_appraisal"/>
-        <field name="domain_force">[('employee_id.user_id', '=', user.id), ('state', '!=', 'draft')]</field>
-        <field name="groups" eval="[(4, ref('group_performance_user'))]"/>
+        <field name="domain_force">
+            ['&amp;', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id', '=', user.employee_id.id), ('employee_id', 'in', user.employee_ids.ids), ('state', '!=', 'draft')]
+        </field>
+        <field name="groups"
+               eval="[(4, ref('group_performance_user'))]"/>
     </record>
 
+
+    <!-- Corporate Appraisal: Planning & Admin -->
     <record id="rule_corporate_appraisal_planning_admin" model="ir.rule">
         <field name="name">Corporate Appraisal: Planning &amp; Admin (All)</field>
         <field name="model_id" ref="model_corporate_appraisal"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('group_performance_planning')), (4, ref('group_performance_admin'))]"/>
+        <field name="groups"
+               eval="[
+                   (4, ref('group_performance_planning')),
+                   (4, ref('group_performance_admin'))
+               ]"/>
     </record>
 
 </odoo>

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pm_initiative_tree" model="ir.ui.view">
+        <field name="name">pm.initiative.list</field>
+        <field name="model">pm.initiative</field>
+        <field name="arch" type="xml">
+            <list string="Strategic Issues">
+                <field name="code" string="ID"/>
+                <field name="name" string="Strategic Issues"/>
+                <field name="description" string="Description" optional="show"/>
+                <field name="strategic_objective_id" string="Strategic Objectives"/>
+                <field name="strategic_source_id" string="Strategic Sources"/>
+                <field name="sponsor_unit" string="Sponsor"/>
+                <field name="owner_unit" string="Owner"/>
+                <field name="lead_office_id" string="Lead Office"/>
+                <field name="date_start" string="Start"/>
+                <field name="date_end" string="End"/>
+                <field name="state" string="Status" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-success="state == 'achieved'"/>
+                <field name="progress_rate" widget="progressbar" optional="show"/>
+                <field name="project_count" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_initiative_form" model="ir.ui.view">
+        <field name="name">pm.initiative.form</field>
+        <field name="model">pm.initiative</field>
+        <field name="arch" type="xml">
+            <form string="Strategic Issue">
+                <header>
+                    <field name="state" widget="statusbar" options="{'clickable': '1'}"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Strategic Issues"/>
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Identification &amp; Governance">
+                            <field name="code" string="ID"/>
+                            <field name="lead_office_id" options="{'no_create_edit': False}"/>
+                            <field name="sponsor_unit"/>
+                            <field name="owner_unit"/>
+                            <field name="owner_id" string="Assigned PMO Coordinator"/>
+                        </group>
+                        <group string="Alignment &amp; Timeline">
+                            <field name="strategic_source_id" options="{'no_create_edit': False}"/>
+                            <field name="strategic_objective_id" options="{'no_create_edit': False}"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="progress_rate" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description" name="description">
+                            <field name="description"/>
+                        </page>
+                        <page string="Aligned Projects" name="projects">
+                            <field name="project_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="manager_id"/>
+                                    <field name="date_start"/>
+                                    <field name="date_end"/>
+                                    <field name="status" widget="badge"/>
+                                    <field name="health_state" widget="badge"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pm_initiative" model="ir.actions.act_window">
+        <field name="name">Strategic Issues</field>
+        <field name="res_model">pm.initiative</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Register top-level enterprise Strategic Issues aligning corporate objectives with bank projects!
+            </p>
+        </field>
+    </record>
+    <record id="view_pm_initiative_search" model="ir.ui.view">
+        <field name="name">pm.initiative.search</field>
+        <field name="model">pm.initiative</field>
+        <field name="arch" type="xml">
+            <search string="Strategic Issues">
+                <field name="name" string="Strategic Issue"/>
+                <field name="code" string="ID"/>
+                <field name="strategic_source_id" string="Strategic Source"/>
+                <field name="strategic_objective_id" string="Strategic Objective"/>
+                <field name="lead_office_id" string="Lead Office"/>
+                <field name="owner_id" string="PMO Coordinator"/>
+                <separator/>
+                <filter name="filter_in_progress" string="In Progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter name="filter_achieved" string="Achieved" domain="[('state', '=', 'achieved')]"/>
+                <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <group>
+                    <filter name="group_strategic_source" string="Strategic Source" context="{'group_by': 'strategic_source_id'}"/>
+                    <filter name="group_strategic_objective" string="Strategic Objective" context="{'group_by': 'strategic_objective_id'}"/>
+                    <filter name="group_lead_office" string="Lead Office" context="{'group_by': 'lead_office_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

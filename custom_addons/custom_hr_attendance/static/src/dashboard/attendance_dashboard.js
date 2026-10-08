@@ -40,7 +40,7 @@ export class AttendanceDashboard extends Component {
             hasCorporateAccess: false,
             accessLevel: "employee",
             userRoleLabel: "Employee",
-            currentTab: "corporate", // "corporate" | "personal"
+            currentTab: "personal", // "personal" | "corporate"
             filter: "today",
             specificDate: todayStr,
             personalPeriod: "this_month",

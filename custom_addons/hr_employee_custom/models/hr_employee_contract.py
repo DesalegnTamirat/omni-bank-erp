@@ -31,15 +31,6 @@ class HrEmployee(models.Model):
         string='Contract Warning',
         compute='_compute_contract_warning',
         search='_search_contract_warning')
-
-    def _search_contract_warning(self, operator, value):
-        employees_with_open = self.env['hr.version'].sudo().search([
-            ('state', 'in', ('open', 'probation')),
-            ('employee_id', '!=', False)
-        ]).mapped('employee_id.id')
-        if (operator == '=' and value) or (operator == '!=' and not value):
-            return ['|', ('id', 'not in', employees_with_open), ('contract_id', '=', False)]
-        return [('id', 'in', employees_with_open)]
     first_contract_date = fields.Date(
         compute='_compute_first_contract_date')
     calendar_mismatch = fields.Boolean(
@@ -76,6 +67,19 @@ class HrEmployee(models.Model):
                 or employee.contract_id.kanban_state == 'blocked'
                 or employee.contract_id.state not in ('open', 'probation')
             )
+
+    def _search_contract_warning(self, operator, value):
+        positive = (operator == '=') if value else (operator == '!=')
+        model_name = 'hr.version' if 'hr.version' in self.env else 'hr.contract'
+        valid_contracts = self.env[model_name].sudo().search([
+            ('state', 'in', ('open', 'probation')),
+            ('kanban_state', '!=', 'blocked'),
+        ])
+        valid_emp_ids = valid_contracts.mapped('employee_id').ids
+        if positive:
+            return [('id', 'not in', valid_emp_ids)]
+        else:
+            return [('id', 'in', valid_emp_ids)]
 
     def _compute_contracts_count(self):
         contract_groups = self.env['hr.version'].sudo()._read_group(

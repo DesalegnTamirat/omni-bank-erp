@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- TALENT POOL LIST -->
+        <record id="view_succession_talent_pool_list" model="ir.ui.view">
+            <field name="name">succession.talent.pool.list</field>
+            <field name="model">succession.talent.pool</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="critical_position_id"/>
+                    <field name="candidate_count"/>
+                    <field name="ready_now_count"/>
+                    <field name="state" widget="badge"
+                           decoration-success="state == 'active'"
+                           decoration-muted="state == 'closed'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- TALENT POOL FORM -->
+        <record id="view_succession_talent_pool_form" model="ir.ui.view">
+            <field name="name">succession.talent.pool.form</field>
+            <field name="model">succession.talent.pool</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_close" string="Close Pool" type="object"
+                                invisible="state != 'active'"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <button name="action_reopen" string="Reopen Pool" type="object"
+                                invisible="state != 'closed'"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <field name="state" widget="statusbar" statusbar_visible="active,closed"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button class="oe_stat_button" icon="fa-users" type="object" name="">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="candidate_count"/></span>
+                                    <span class="o_stat_text">Candidates</span>
+                                </div>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-check" type="object" name="">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="ready_now_count"/></span>
+                                    <span class="o_stat_text">Ready Now</span>
+                                </div>
+                            </button>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="critical_position_id"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Description">
+                                <field name="description" placeholder="Purpose of this talent pool..."/>
+                            </page>
+                            <page string="Candidates">
+                                <field name="candidate_ids" readonly="1">
+                                    <list decoration-success="readiness_level == 'ready_now'"
+                                          decoration-warning="readiness_level == 'ready_1_2_yrs'">
+                                        <field name="employee_id"/>
+                                        <field name="readiness_level" widget="badge"/>
+                                        <field name="competency_match_percent"/>
+                                        <field name="latest_pms_score"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_succession_talent_pool" model="ir.actions.act_window">
+            <field name="name">Talent Pools</field>
+            <field name="res_model">succession.talent.pool</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

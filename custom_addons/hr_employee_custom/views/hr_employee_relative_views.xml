@@ -12,21 +12,25 @@
             <field name="name">employee.relative.form</field>
             <field name="model">employee.relative</field>
             <field name="arch" type="xml">
-                <form string="Relative">
+                <form string="Relative / Dependent">
                     <sheet>
                         <group col="2">
                             <!-- Left column -->
                             <group>
-                                <field name="relative_type"  string="Relative Type"/>
+                                <field name="relative_type"  string="Relationship"/>
+                                <field name="name"           string="Full Name"/>
+                                <field name="gender"         string="Gender"/>
                                 <field name="birthday"       string="Date of Birth"/>
-                                <field name="occupation"     string="Occupation"/>
-                                <field name="employee_id"    string="Employee"/>
+                                <field name="place_of_birth" string="Place of Birth"/>
+                                <field name="is_dependent"   string="Is Dependent"/>
                             </group>
                             <!-- Right column -->
                             <group>
-                                <field name="name"           string="Name"/>
-                                <field name="place_of_birth" string="Place of Birth"/>
-                                <field name="gender"         string="Gender"/>
+                                <field name="occupation"     string="Occupation"/>
+                                <field name="employee_id"    string="Employee"/>
+                                <field name="birth_certificate_no" string="Birth Certificate Number"/>
+                                <field name="birth_certificate_doc" filename="birth_certificate_filename" string="Birth Cert. / Supporting Doc" widget="binary"/>
+                                <field name="birth_certificate_filename" invisible="1"/>
                                 <field name="active"         string="Active"/>
                             </group>
                         </group>
@@ -34,7 +38,7 @@
                         <!-- Contact & Identity -->
                         <group string="Contact &amp; Identity">
                             <group>
-                                <field name="reletive_phone"      string="Phone"/>
+                                <field name="reletive_phone"      string="Phone Number"/>
                                 <field name="relative_email_id"   string="Email"/>
                             </group>
                             <group>
@@ -47,21 +51,23 @@
         </record>
 
         <!-- ============================================================
-             LIST VIEW — matches Image 1 columns exactly
-             Relative Type | Name | Date of Birth | Place of Birth |
-             Occupation | Gender
+             LIST VIEW
         ============================================================ -->
         <record id="employee_relative_list_view" model="ir.ui.view">
             <field name="name">employee.relative.list</field>
             <field name="model">employee.relative</field>
             <field name="arch" type="xml">
-                <list string="Relatives">
-                    <field name="relative_type"  string="Relative Type"/>
-                    <field name="name"           string="Name"/>
+                <list string="Relatives &amp; Dependents" editable="bottom">
+                    <field name="name"           string="Full Name"/>
+                    <field name="relative_type"  string="Relationship"/>
+                    <field name="gender"         string="Gender"/>
                     <field name="birthday"       string="Date of Birth"/>
                     <field name="place_of_birth" string="Place of Birth"/>
-                    <field name="occupation"     string="Occupation"/>
-                    <field name="gender"         string="Gender"/>
+                    <field name="is_dependent"   string="Is Dependent"/>
+                    <field name="birth_certificate_no" string="Birth Cert. No"/>
+                    <field name="birth_certificate_doc" filename="birth_certificate_filename" string="Birth Cert. Document" widget="binary"/>
+                    <field name="birth_certificate_filename" column_invisible="1"/>
+                    <field name="reletive_phone" string="Phone"/>
                 </list>
             </field>
         </record>

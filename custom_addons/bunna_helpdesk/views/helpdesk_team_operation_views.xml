@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- ── Tree / List View ────────────────────────────────────────────────── -->
+    <record id="view_helpdesk_team_operation_list" model="ir.ui.view">
+        <field name="name">helpdesk.team.operation.list</field>
+        <field name="model">helpdesk.team.operation</field>
+        <field name="arch" type="xml">
+            <list string="Services" editable="bottom">
+                <field name="sequence" widget="handle" />
+                <field name="name" string="Operation / Case" placeholder="e.g. A2A Transaction/Incoming" />
+                <field name="code" string="Code" placeholder="e.g. A2A_IN" />
+                <field name="team_id" string="Assigned Team" options="{'no_create': True}" />
+                <field name="default_priority" widget="priority" />
+                <field name="case_type_id" string="Default Case Type" options="{'no_create': True}" />
+                <field name="service_family_id" string="Service Family" options="{'no_create': True}" />
+                <field
+                    name="service_id"
+                    string="Service"
+                    options="{'no_create': True}"
+                    domain="[('family_id', '=', service_family_id)] if service_family_id else []"
+                />
+                <field name="target_hours" string="SLA Target (Hours)" />
+                <field name="ticket_count" string="Tickets" />
+                <field name="active" widget="boolean_toggle" />
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Form View ───────────────────────────────────────────────────────── -->
+    <record id="view_helpdesk_team_operation_form" model="ir.ui.view">
+        <field name="name">helpdesk.team.operation.form</field>
+        <field name="model">helpdesk.team.operation</field>
+        <field name="arch" type="xml">
+            <form string="Service / Operation">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Operation / Case Name" />
+                        <h1>
+                            <field name="name" placeholder="e.g. A2A Transaction/Incoming" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Team Routing &amp; Classification">
+                            <field name="team_id" options="{'no_create': True}" />
+                            <field name="code" placeholder="e.g. A2A_IN" />
+                            <field name="case_type_id" options="{'no_create': True}" />
+                            <field name="default_priority" widget="priority" />
+                            <field name="sequence" />
+                            <field name="active" widget="boolean_toggle" />
+                        </group>
+                        <group string="Service Catalogue &amp; SLA">
+                            <field name="service_family_id" options="{'no_create': True}" />
+                            <field
+                                name="service_id"
+                                options="{'no_create': True}"
+                                domain="[('family_id', '=', service_family_id)] if service_family_id else []"
+                            />
+                            <field
+                                name="service_sub_category_id"
+                                options="{'no_create': True}"
+                                domain="[('service_id', '=', service_id)] if service_id else []"
+                            />
+                            <field name="target_hours" />
+                            <field name="ticket_count" readonly="1" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="description" string="Operation Notes / Guidance">
+                            <field name="description" placeholder="Standard guidance, handling procedures, or keywords for this case..." />
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Search View ─────────────────────────────────────────────────────── -->
+    <record id="view_helpdesk_team_operation_search" model="ir.ui.view">
+        <field name="name">helpdesk.team.operation.search</field>
+        <field name="model">helpdesk.team.operation</field>
+        <field name="arch" type="xml">
+            <search string="Search Services">
+                <field name="name" string="Operation / Case" />
+                <field name="code" />
+                <field name="team_id" />
+                <field name="service_family_id" string="Service Family" />
+                <field name="service_id" string="Service" />
+                <field name="case_type_id" />
+                <separator />
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
+                <group name="group_by">
+                    <filter string="Assigned Team" name="group_by_team" domain="[]" context="{'group_by': 'team_id'}" />
+                    <filter string="Service Family" name="group_by_family" domain="[]" context="{'group_by': 'service_family_id'}" />
+                    <filter string="Service" name="group_by_service" domain="[]" context="{'group_by': 'service_id'}" />
+                    <filter string="Case Type" name="group_by_case_type" domain="[]" context="{'group_by': 'case_type_id'}" />
+                    <filter string="Priority" name="group_by_priority" domain="[]" context="{'group_by': 'default_priority'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Kanban View ────────────────────────────────────────────────────── -->
+    <record id="view_helpdesk_team_operation_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.team.operation.kanban</field>
+        <field name="model">helpdesk.team.operation</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_group_by="team_id">
+                <field name="name" />
+                <field name="code" />
+                <field name="team_id" />
+                <field name="service_family_id" />
+                <field name="case_type_id" />
+                <field name="service_id" />
+                <field name="default_priority" />
+                <field name="target_hours" />
+                <field name="ticket_count" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-secondary font-monospace" t-if="record.code.value">
+                                <field name="code" />
+                            </span>
+                            <span class="badge text-bg-info" t-if="record.case_type_id.value">
+                                <field name="case_type_id" />
+                            </span>
+                        </div>
+                        <field class="fw-bold fs-5 text-truncate" name="name" />
+                        <div class="text-muted small mt-1" t-if="record.service_family_id.value">
+                            <i class="fa fa-folder-open me-1" />
+                            <field name="service_family_id" />
+                        </div>
+                        <div class="text-muted small mt-1" t-if="record.service_id.value">
+                            <i class="fa fa-cogs me-1" />
+                            <field name="service_id" />
+                        </div>
+                        <div class="d-flex gap-2 mt-2">
+                            <span class="badge text-bg-light border" t-if="record.target_hours.value">
+                                <i class="fa fa-clock-o me-1" />
+                                <field name="target_hours" /> hrs SLA
+                            </span>
+                            <span class="badge text-bg-light border" t-if="record.ticket_count.raw_value">
+                                <i class="fa fa-ticket me-1" />
+                                <field name="ticket_count" /> tickets
+                            </span>
+                        </div>
+                        <footer class="pt-2 d-flex justify-content-between align-items-center">
+                            <field name="default_priority" widget="priority" />
+                            <span class="text-muted small">
+                                <i class="fa fa-users me-1" />
+                                <field name="team_id" />
+                            </span>
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ── Action Window ───────────────────────────────────────────────────── -->
+    <record id="action_helpdesk_team_operation" model="ir.actions.act_window">
+        <field name="name">Services</field>
+        <field name="res_model">helpdesk.team.operation</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_helpdesk_team_operation_search" />
+        <field name="context">{'search_default_group_by_team': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create service entries and operations for your teams!
+            </p>
+            <p>
+                Each service entry links a team to a Service Family and Service from the
+                3-tier catalogue, so tickets route automatically to the right team.
+            </p>
+        </field>
+    </record>
+</odoo>

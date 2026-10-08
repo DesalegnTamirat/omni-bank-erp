@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="role_project_manager" model="pm.project.role">
+            <field name="name">Project Manager</field>
+            <field name="code">PM</field>
+            <field name="sequence">10</field>
+            <field name="description">Leads project delivery, baselining, scope, schedule, and reporting.</field>
+        </record>
+
+        <record id="role_program_manager" model="pm.project.role">
+            <field name="name">Program Manager</field>
+            <field name="code">PGM</field>
+            <field name="sequence">20</field>
+            <field name="description">Oversees multi-project programs and cross-initiative alignment.</field>
+        </record>
+
+        <record id="role_project_champion" model="pm.project.role">
+            <field name="name">Project Champion</field>
+            <field name="code">CHP</field>
+            <field name="sequence">30</field>
+            <field name="description">Executive advocate and strategic stakeholder champion.</field>
+        </record>
+
+        <record id="role_technical_lead" model="pm.project.role">
+            <field name="name">Technical Lead</field>
+            <field name="code">TL</field>
+            <field name="sequence">40</field>
+            <field name="description">Technical architecture, solution design, and technical governance.</field>
+        </record>
+
+        <record id="role_business_analyst" model="pm.project.role">
+            <field name="name">Business Analyst</field>
+            <field name="code">BA</field>
+            <field name="sequence">50</field>
+            <field name="description">Requirements elicitation, workflow design, and acceptance criteria.</field>
+        </record>
+
+        <record id="role_qa_lead" model="pm.project.role">
+            <field name="name">QA / Test Lead</field>
+            <field name="code">QA</field>
+            <field name="sequence">60</field>
+            <field name="description">Quality assurance, testing cycles, and defect tracking.</field>
+        </record>
+
+        <record id="role_project_member" model="pm.project.role">
+            <field name="name">Project Member</field>
+            <field name="code">MBR</field>
+            <field name="sequence">70</field>
+            <field name="description">Core execution team member delivering assigned deliverables and tasks.</field>
+        </record>
+
+        <record id="role_other" model="pm.project.role">
+            <field name="name">Other Specialist</field>
+            <field name="code">SPEC</field>
+            <field name="sequence">80</field>
+            <field name="description">Specialized subject matter expert or consultant.</field>
+        </record>
+    </data>
+</odoo>

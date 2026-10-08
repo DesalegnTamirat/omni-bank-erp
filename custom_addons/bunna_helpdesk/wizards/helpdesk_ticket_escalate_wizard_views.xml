@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_escalate_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.escalate.wizard.form</field>
+        <field name="model">helpdesk.ticket.escalate.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Escalate Ticket to Higher Level Work Unit">
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="escalation_target_level != 'level_2'">
+                        <i class="fa fa-exclamation-circle me-1" />
+                        Escalating to <strong>2nd-level Work Unit / Directorate</strong> transfers resolution responsibility and activates the <strong>Operational Level Agreement (OLA)</strong> clock.
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="escalation_target_level != 'level_3'">
+                        <i class="fa fa-shield me-1" />
+                        Escalating to <strong>3rd-level Executive / External Vendor Unit</strong> escalates to top-tier executive authority, vendor taskforce, or compliance.
+                    </div>
+                    <group>
+                        <field name="ticket_id" invisible="1" />
+                        <field name="escalation_target_level" widget="radio" />
+                        <field name="target_team_id" options="{'no_create': True}" placeholder="Select target team or directorate..." />
+                        <field name="target_user_id" options="{'no_create': True}" placeholder="Optional: direct specialist or executive user..." />
+                    </group>
+                    <group string="Escalation Reason &amp; Findings">
+                        <field name="reason" placeholder="Describe why this case requires higher-level intervention and detailed findings..." nolabel="1" />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        name="action_escalate"
+                        string="Confirm Escalation"
+                        type="object"
+                        class="btn-danger"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_escalate_wizard" model="ir.actions.act_window">
+        <field name="name">Escalate Ticket</field>
+        <field name="res_model">helpdesk.ticket.escalate.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

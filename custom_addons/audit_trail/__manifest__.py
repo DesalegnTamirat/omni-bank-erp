@@ -24,8 +24,8 @@
         'views/audit_log_views.xml',
         'views/audit_rule_views.xml',
         'views/audit_dashboard_views.xml',
+        'views/audit_config_views.xml',
         'views/audit_menu.xml',
-
     ],
 
      'assets': {

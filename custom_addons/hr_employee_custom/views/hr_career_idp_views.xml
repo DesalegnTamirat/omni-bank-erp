@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- hr.career.idp Form View -->
+    <record id="view_hr_career_idp_form" model="ir.ui.view">
+        <field name="name">hr.career.idp.form</field>
+        <field name="model">hr.career.idp</field>
+        <field name="arch" type="xml">
+            <form string="Individual Career Development Plan (ICDP)">
+                <header>
+                    <!-- Employee actions -->
+                    <button name="action_submit" string="Submit to Manager" type="object" class="oe_highlight" invisible="state != 'draft' or not is_owner"/>
+                    <!-- Manager/HR actions -->
+                    <button name="action_activate" string="Approve &amp; Activate" type="object" class="oe_highlight" invisible="state != 'submitted' or not is_manager_user" groups="hr_employee_custom.group_career_path_manager"/>
+                    <button name="action_complete" string="Mark as Completed" type="object" class="oe_highlight" invisible="state != 'active' or not is_manager_user" groups="hr_employee_custom.group_career_path_manager"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('completed', 'cancelled') or not is_manager_user" groups="hr_employee_custom.group_career_path_manager"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,active,completed"/>
+                </header>
+                <sheet>
+                    <field name="is_owner" invisible="1"/>
+                    <field name="is_manager_user" invisible="1"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="employee_id" readonly="state != 'draft' or not is_owner"/>
+                            <field name="aspiration_id" domain="[('employee_id', '=', employee_id)]" readonly="state != 'draft' or not is_owner"/>
+                            <field name="target_job_id" readonly="state != 'draft' or not is_owner"/>
+                            <field name="manager_id"/>
+                        </group>
+                        <group>
+                            <field name="start_date" readonly="state != 'draft' or not is_owner"/>
+                            <field name="target_completion_date" readonly="state != 'draft' or not is_owner"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Overview" name="overview">
+                            <group string="Competency Gap Analysis">
+                                <field name="competency_gap_html" nolabel="1"/>
+                            </group>
+                            <button name="action_generate_gaps" string="Refresh Gap Analysis &amp; Suggest Activities" type="object" class="btn-secondary mt-2"/>
+                        </page>
+                        <page string="Development Activities" name="activities">
+                            <field name="line_ids">
+                                <form string="Development Activity">
+                                    <group>
+                                        <group>
+                                            <field name="competency_id" string="Goal / Competency" options="{'no_create': True}"/>
+                                            <field name="activity_type" string="Development Method"/>
+                                            <field name="name" string="Milestone / Activity"/>
+                                        </group>
+                                        <group>
+                                            <field name="target_outcome" string="Target"/>
+                                            <field name="target_date" string="Timeline"/>
+                                        </group>
+                                    </group>
+                                    <group>
+                                        <group>
+                                            <field name="status" string="Progress / Status" widget="badge" decoration-info="status == 'in_progress'" decoration-success="status == 'completed'"/>
+                                            <field name="completion_date"/>
+                                        </group>
+                                    </group>
+                                    <group>
+                                        <field name="is_manager" invisible="1"/>
+                                        <field name="idp_state" invisible="1"/>
+                                        <!-- <field name="employee_comment" readonly="is_manager or idp_state in ('completed', 'cancelled')" placeholder="Employee's thoughts and self-evaluation..."/> -->
+                                        <field name="supervisor_feedback" invisible="idp_state == 'draft'" readonly="not is_manager or idp_state in ('completed', 'cancelled')" placeholder="Manager's evaluation and feedback..."/>
+                                        <field name="notes"/>
+                                    </group>
+                                </form>
+                                <list string="Development Activities">
+                                    <field name="competency_id" string="Goal / Competency"/>
+                                    <field name="activity_type" string="Development Method"/>
+                                    <field name="name" string="Milestone / Activity"/>
+                                    <field name="target_date" string="Timeline"/>
+                                    <field name="status" string="Progress / Status" widget="badge" decoration-info="status == 'in_progress'" decoration-success="status == 'completed'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" placeholder="General feedback or comments on the overall development plan..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- hr.career.idp List View -->
+    <record id="view_hr_career_idp_list" model="ir.ui.view">
+        <field name="name">hr.career.idp.list</field>
+        <field name="model">hr.career.idp</field>
+        <field name="arch" type="xml">
+            <list string="Career Development Plans" decoration-muted="state == 'cancelled'" decoration-success="state == 'completed'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="target_job_id"/>
+                <field name="start_date"/>
+                <field name="target_completion_date" optional="show"/>
+                <field name="state" widget="badge" decoration-info="state == 'active'" decoration-success="state == 'completed'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- 1. My IDPs -->
+    <record id="action_my_career_idp" model="ir.actions.act_window">
+        <field name="name">My Development Plans</field>
+        <field name="res_model">hr.career.idp</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No Development Plans found.</p>
+        </field>
+    </record>
+
+    <!-- 2. Team IDPs (read-only, approval only) -->
+    <record id="action_team_career_idp" model="ir.actions.act_window">
+        <field name="name">Team Development Plans</field>
+        <field name="res_model">hr.career.idp</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">['|', ('employee_id.parent_id.user_id', '=', uid), ('employee_id.coach_id.user_id', '=', uid)]</field>
+        <field name="context">{'create': False, 'edit': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No Team Development Plans found.</p>
+        </field>
+    </record>
+
+    <!-- 3. All IDPs (Admin) -->
+    <record id="action_all_career_idp" model="ir.actions.act_window">
+        <field name="name">All Development Plans</field>
+        <field name="res_model">hr.career.idp</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[]</field>
+        <field name="context">{'create': False, 'edit': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No Development Plans found.</p>
+        </field>
+    </record>
+
+
+    <!-- Read-only List View for IDP (Team / All) -->
+    <record id="view_hr_career_idp_list_readonly" model="ir.ui.view">
+        <field name="name">hr.career.idp.list.readonly</field>
+        <field name="model">hr.career.idp</field>
+        <field name="inherit_id" ref="hr_employee_custom.view_hr_career_idp_list"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <list position="attributes">
+                <attribute name="create">0</attribute>
+            </list>
+        </field>
+    </record>
+
+    <!-- Read-only Form View for IDP (Team / All) -->
+    <record id="view_hr_career_idp_form_readonly" model="ir.ui.view">
+        <field name="name">hr.career.idp.form.readonly</field>
+        <field name="model">hr.career.idp</field>
+        <field name="inherit_id" ref="hr_employee_custom.view_hr_career_idp_form"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <form position="attributes">
+                <attribute name="create">0</attribute>
+            </form>
+            <xpath expr="//button[@name='action_submit']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Bindings for Team IDP -->
+    <record id="action_team_career_idp_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_hr_career_idp_list_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_team_career_idp"/>
+    </record>
+    <record id="action_team_career_idp_view_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_hr_career_idp_form_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_team_career_idp"/>
+    </record>
+
+    <!-- Bindings for All IDP -->
+    <record id="action_all_career_idp_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_hr_career_idp_list_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_all_career_idp"/>
+    </record>
+    <record id="action_all_career_idp_view_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_hr_career_idp_form_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_all_career_idp"/>
+    </record>
+
+</odoo>

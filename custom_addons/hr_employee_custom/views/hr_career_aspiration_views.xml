@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- =====================================================
+             CAREER ASPIRATION - LIST VIEW
+        ====================================================== -->
+        <record id="view_career_aspiration_list" model="ir.ui.view">
+            <field name="name">hr.career.aspiration.list</field>
+            <field name="model">hr.career.aspiration</field>
+            <field name="arch" type="xml">
+                <list decoration-success="overall_eligible == 'eligible'"
+                      decoration-warning="overall_eligible == 'conditionally_eligible'"
+                      decoration-muted="state in ('withdrawn','achieved')">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                                        <field name="target_job_id"/>
+                    <field name="submission_date"/>
+                    <field name="overall_eligible" widget="badge"
+                           decoration-success="overall_eligible == 'eligible'"
+                           decoration-warning="overall_eligible == 'conditionally_eligible'"
+                           decoration-danger="overall_eligible == 'not_eligible'"/>
+                    <field name="state" widget="badge"
+                           decoration-success="state == 'approved'"
+                           decoration-info="state in ('submitted','manager_review')"
+                           decoration-muted="state in ('withdrawn','achieved')"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- =====================================================
+             CAREER ASPIRATION - FORM VIEW (Main Gap Analysis UI)
+        ====================================================== -->
+        <record id="view_career_aspiration_form" model="ir.ui.view">
+            <field name="name">hr.career.aspiration.form</field>
+            <field name="model">hr.career.aspiration</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <!-- Employee actions -->
+                        <button name="action_submit" string="Submit for Review"
+                                type="object" class="oe_highlight"
+                                invisible="state != 'draft' or not is_owner"/>
+                        <button name="action_withdraw" string="Withdraw"
+                                type="object"
+                                invisible="state in ('withdrawn','achieved','draft') or not is_owner"/>
+
+                        <!-- Manager actions -->
+                        <button name="action_manager_review" string="Start Review"
+                                type="object"
+                                invisible="state != 'submitted' or not is_manager_user"
+                                groups="hr_employee_custom.group_career_path_manager"/>
+                        <button name="action_approve" string="Approve Aspiration"
+                                type="object" class="oe_highlight"
+                                invisible="state != 'manager_review' or not is_manager_user"
+                                groups="hr_employee_custom.group_career_path_manager"/>
+                        <button name="action_put_on_hold" string="Put On Hold"
+                                type="object"
+                                invisible="state not in ('submitted','manager_review','approved') or not is_manager_user"
+                                groups="hr_employee_custom.group_career_path_manager"/>
+                        <button name="action_mark_achieved" string="Mark as Achieved"
+                                type="object" class="btn-success"
+                                invisible="state != 'approved' or not is_manager_user"
+                                groups="hr_employee_custom.group_career_path_admin"/>
+
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submitted,manager_review,approved,achieved"/>
+                    </header>
+
+                    <sheet>
+                        <field name="is_owner" invisible="1"/>
+                        <field name="is_manager_user" invisible="1"/>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_idp" type="object" class="oe_stat_button" icon="fa-tasks">
+                                <field name="idp_count" widget="statinfo" string="IDP Plans"/>
+                            </button>
+                        </div>
+                        
+                        <!-- Overall Eligibility Banner -->
+                        <div class="alert alert-success" role="alert"
+                             invisible="overall_eligible != 'eligible' or not target_job_id">
+                            <strong>✅ ELIGIBLE:</strong>
+                            <field name="eligibility_summary" readonly="1" class="d-inline"/>
+                        </div>
+                        <div class="alert alert-warning" role="alert"
+                             invisible="overall_eligible != 'conditionally_eligible' or not target_job_id">
+                            <strong>⚠️ CONDITIONALLY ELIGIBLE:</strong>
+                            <field name="eligibility_summary" readonly="1" class="d-inline"/>
+                        </div>
+                        <div class="alert alert-danger" role="alert"
+                             invisible="overall_eligible != 'not_eligible' or not target_job_id">
+                            <strong>❌ NOT YET ELIGIBLE:</strong>
+                            <field name="eligibility_summary" readonly="1" class="d-inline"/>
+                        </div>
+
+                        <!-- Reference and Status -->
+                        <div class="oe_title">
+                            <h1><field name="name" readonly="1"/></h1>
+                        </div>
+
+                        <!-- Core Fields -->
+                        <group>
+                            <group string="Career Aspiration">
+                                <field name="employee_id" readonly="state != 'draft' or not is_owner"/>
+                                <field name="target_job_id" readonly="state != 'draft' or not is_owner"/>
+                            </group>
+                            <group string="Workflow">
+                                <field name="submission_date" readonly="1"/>
+                                <field name="manager_id" readonly="1"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+
+                            <!-- ===== TAB 1: ELIGIBILITY DASHBOARD ===== -->
+                            <page string="📊 Eligibility Dashboard" name="eligibility">
+                                <group string="Eligibility Criteria Status">
+
+                                    <!-- Experience -->
+                                    <group string="🕐 Experience &amp; Service" col="4">
+                                        <field name="current_tenure_years" string="Current Experience (Years)"/>
+                                        <field name="required_tenure_years" string="Required Experience (Years)"/>
+                                        <field name="tenure_gap" string="Experience Gap (Years)" invisible="tenure_gap &lt;= 0"/>
+                                        <field name="tenure_eligible" widget="badge" 
+                                               decoration-success="tenure_eligible == 'yes'"
+                                               decoration-danger="tenure_eligible == 'no'"
+                                               string="Experience Meets Requirement"
+                                               invisible="not target_job_id"/>
+                                    </group>
+
+                                    <!-- Performance (PMS) -->
+                                    <group string="📈 Performance (PMS Score)" col="4">
+                                        <field name="latest_pms_score" string="My Latest PMS Score"/>
+                                        <field name="required_pms_score" string="Required PMS Score"/>
+                                        <field name="pms_eligible" widget="badge" 
+                                               decoration-success="pms_eligible == 'yes'"
+                                               decoration-danger="pms_eligible == 'no'"
+                                               string="PMS Meets Requirement"
+                                               invisible="not target_job_id"/>
+                                    </group>
+
+                                    <!-- Qualification -->
+                                    <group string="🎓 Qualification" col="4" invisible="not required_qualification">
+                                        <field name="required_qualification"/>
+                                        <field name="employee_qualification" string="My Qualification"/>
+                                        <field name="qualification_eligible" widget="badge" 
+                                               decoration-success="qualification_eligible == 'yes'"
+                                               decoration-danger="qualification_eligible == 'no'"
+                                               string="Qualification Status"/>
+                                    </group>
+
+
+
+                                    <!-- Competency Summary (Disabled due to missing competency module) -->
+                                    <!--
+                                    <group string="🎯 Competency Summary" col="4">
+                                        <field name="competency_gap_count"/>
+                                        <field name="competency_match_percent" widget="percentage"/>
+                                        <field name="competency_eligible" widget="boolean_toggle"/>
+                                    </group>
+                                    -->
+
+                                </group>
+
+                                <!-- Overall Result -->
+                                <separator string="Overall Career Eligibility Decision"/>
+                                <group>
+                                    <field name="overall_eligible" widget="badge"
+                                           decoration-info="overall_eligible == 'pending'"
+                                           decoration-success="overall_eligible == 'eligible'"
+                                           decoration-warning="overall_eligible == 'conditionally_eligible'"
+                                           decoration-danger="overall_eligible == 'not_eligible'"
+                                           string="Overall Eligibility Status"/>
+                                    <field name="eligibility_summary" readonly="1" string="Summary"/>
+                                </group>
+                            </page>
+
+                            <!-- ===== TAB 2: COMPETENCY GAP ANALYSIS ===== -->
+                            <!-- (Disabled due to missing competency module)
+                            <page string="📊 Competency Gap Analysis" name="competency_gaps">
+                                <button name="action_compute_gap_analysis" string="Recalculate Gaps"
+                                        type="object" class="btn-secondary mb-3"/>
+                                
+                                <field name="competency_gap_ids" readonly="1">
+                                    <list decoration-danger="achievement_status == 'below'"
+                                          decoration-success="achievement_status == 'exceeds'"
+                                          decoration-muted="achievement_status == 'meets'">
+                                        <field name="competency_id"/>
+                                        <field name="competency_pillar" optional="show"/>
+                                        <field name="required_score"/>
+                                        <field name="current_score"/>
+                                        <field name="gap_score" optional="hide"/>
+                                        <field name="achievement_badge" string="Status"/>
+                                        <field name="achievement_status" column_invisible="1"/>
+                                    </list>
+                                </field>
+                            </page>
+                            -->
+
+
+
+                            <!-- ===== TAB 3: NOTES & MOTIVATION ===== -->
+                            <page string="📝 Notes &amp; Motivation" name="notes">
+                                <group>
+                                    <field name="notes" string="My Career Motivation &amp; Notes"
+                                           placeholder="Describe why you are interested in this role, your career goals, and any relevant experience you want to highlight..."/>
+                                    <field name="manager_notes" string="Manager Feedback"
+                                           readonly="not context.get('is_manager') and state not in ('manager_review','approved')"
+                                           placeholder="Manager's assessment and feedback on this career aspiration..."/>
+                                </group>
+                            </page>
+                            
+                            <!-- Career Discussion tab removed -->
+
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- =====================================================
+             CAREER ASPIRATION - SEARCH VIEW
+        ====================================================== -->
+        <record id="view_career_aspiration_search" model="ir.ui.view">
+            <field name="name">hr.career.aspiration.search</field>
+            <field name="model">hr.career.aspiration</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                                        <field name="target_job_id"/>
+                    <filter string="My Aspirations" name="my_aspirations"
+                            domain="[('employee_id.user_id', '=', uid)]"/>
+                    <filter string="My Team" name="my_team"
+                            domain="[('employee_id.parent_id.user_id', '=', uid)]"/>
+                    <filter string="Active" name="active"
+                            domain="[('state', 'in', ['submitted','manager_review','approved'])]"/>
+                    <filter string="Eligible" name="eligible"
+                            domain="[('overall_eligible', '=', 'eligible')]"/>
+                    <filter string="Pending Review" name="pending_review"
+                            domain="[('state', '=', 'submitted')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                        <filter string="Eligibility" name="group_eligible" context="{'group_by': 'overall_eligible'}"/>
+                                                <filter string="Target Role" name="group_target" context="{'group_by': 'target_job_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- =====================================================
+             CAREER ASPIRATION - KANBAN VIEW
+        ====================================================== -->
+        <record id="view_career_aspiration_kanban" model="ir.ui.view">
+            <field name="name">hr.career.aspiration.kanban</field>
+            <field name="model">hr.career.aspiration</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="state" class="o_kanban_small_column">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="target_job_id"/>
+                    <field name="overall_eligible"/>
+                    <field name="state"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click">
+                                <div class="o_kanban_record_top">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title">
+                                            <field name="employee_id"/>
+                                        </strong>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_body">
+                                    <div>
+                                        <b>Target: </b><field name="target_job_id"/>
+                                    </div>
+                                    <div>
+                                    </div>
+                                    <div>
+                                        <field name="overall_eligible" widget="badge"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- =====================================================
+             ACTIONS
+        ====================================================== -->
+        <record id="action_career_aspiration_all" model="ir.actions.act_window">
+            <field name="name">All Career Aspirations</field>
+            <field name="res_model">hr.career.aspiration</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="search_view_id" ref="view_career_aspiration_search"/>
+            <field name="context">{'search_default_active': 1, 'create': False, 'edit': False}</field>
+        </record>
+
+        <record id="action_my_career_aspiration" model="ir.actions.act_window">
+            <field name="name">My Aspirations</field>
+            <field name="res_model">hr.career.aspiration</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+            <field name="context">{'search_default_my_aspirations': 1}</field>
+            <field name="search_view_id" ref="view_career_aspiration_search"/>
+        </record>
+
+        <record id="action_team_career_aspiration" model="ir.actions.act_window">
+            <field name="name">My Team Career Paths</field>
+            <field name="res_model">hr.career.aspiration</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="domain">['|', ('employee_id.parent_id.user_id', '=', uid), ('employee_id.coach_id.user_id', '=', uid)]</field>
+            <field name="context">{'search_default_my_team': 1, 'create': False, 'edit': False}</field>
+            <field name="search_view_id" ref="view_career_aspiration_search"/>
+        </record>
+
+
+    <!-- Read-only List View for Aspiration (Team / All) -->
+    <record id="view_career_aspiration_list_readonly" model="ir.ui.view">
+        <field name="name">hr.career.aspiration.list.readonly</field>
+        <field name="model">hr.career.aspiration</field>
+        <field name="inherit_id" ref="hr_employee_custom.view_career_aspiration_list"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <list position="attributes">
+                <attribute name="create">0</attribute>
+            </list>
+        </field>
+    </record>
+
+    <!-- Read-only Form View for Aspiration (Team / All) -->
+    <record id="view_career_aspiration_form_readonly" model="ir.ui.view">
+        <field name="name">hr.career.aspiration.form.readonly</field>
+        <field name="model">hr.career.aspiration</field>
+        <field name="inherit_id" ref="hr_employee_custom.view_career_aspiration_form"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <form position="attributes">
+                <attribute name="create">0</attribute>
+            </form>
+            <xpath expr="//button[@name='action_submit']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_withdraw']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Read-only Kanban View for Aspiration (Team / All) -->
+    <record id="view_career_aspiration_kanban_readonly" model="ir.ui.view">
+        <field name="name">hr.career.aspiration.kanban.readonly</field>
+        <field name="model">hr.career.aspiration</field>
+        <field name="inherit_id" ref="hr_employee_custom.view_career_aspiration_kanban"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <kanban position="attributes">
+                <attribute name="create">0</attribute>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Bindings for Team Aspiration -->
+    <record id="action_team_career_aspiration_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_career_aspiration_list_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_team_career_aspiration"/>
+    </record>
+    <record id="action_team_career_aspiration_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_career_aspiration_kanban_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_team_career_aspiration"/>
+    </record>
+    <record id="action_team_career_aspiration_view_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="3"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_career_aspiration_form_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_team_career_aspiration"/>
+    </record>
+
+    <!-- Bindings for All Aspiration -->
+    <record id="action_career_aspiration_all_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_career_aspiration_list_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_career_aspiration_all"/>
+    </record>
+    <record id="action_career_aspiration_all_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_career_aspiration_kanban_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_career_aspiration_all"/>
+    </record>
+    <record id="action_career_aspiration_all_view_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="3"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_career_aspiration_form_readonly"/>
+        <field name="act_window_id" ref="hr_employee_custom.action_career_aspiration_all"/>
+    </record>
+
+    </data>
+</odoo>
+
+

@@ -1,0 +1,189 @@
+/* Color Palette variables */
+:root {
+    --succ-green: #425727;
+    --succ-olive: #726732;
+    --succ-orange: #c17540;
+    --succ-slate: #1d2b32;
+    --succ-dark-green: #1e2917;
+    --succ-maroon: #541718;
+    --succ-light-bg: #f8f9fa;
+}
+
+.o_succ_dash_container {
+    padding: 2rem;
+    background-color: var(--succ-light-bg);
+    height: 100%;
+    overflow-y: auto;
+    font-family: 'Inter', 'Roboto', sans-serif;
+    color: var(--succ-slate);
+}
+
+.o_succ_header {
+    margin-bottom: 2rem;
+    border-bottom: 3px solid var(--succ-slate);
+    padding-bottom: 1rem;
+}
+
+.o_succ_header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--succ-slate);
+    margin: 0;
+}
+
+.o_succ_header p {
+    font-size: 1.1rem;
+    color: var(--succ-olive);
+    margin: 0;
+}
+
+/* KPI Cards */
+.o_succ_kpi_card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border-left: 6px solid;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+}
+
+.o_succ_kpi_card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.o_card_primary { border-color: var(--succ-slate); }
+.o_card_primary .o_kpi_icon { color: var(--succ-slate); }
+
+.o_card_danger { border-color: var(--succ-maroon); }
+.o_card_danger .o_kpi_icon { color: var(--succ-maroon); }
+
+.o_card_success { border-color: var(--succ-green); }
+.o_card_success .o_kpi_icon { color: var(--succ-green); }
+
+.o_card_warning { border-color: var(--succ-orange); }
+.o_card_warning .o_kpi_icon { color: var(--succ-orange); }
+
+.o_kpi_icon {
+    font-size: 2.5rem;
+    margin-right: 1.5rem;
+    opacity: 0.8;
+}
+
+.o_kpi_info h3 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--succ-slate);
+}
+
+.o_kpi_info span {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--succ-olive);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Panels */
+.o_succ_panel {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    height: 100%;
+}
+
+.o_succ_panel h4 {
+    color: var(--succ-slate);
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--succ-light-bg);
+    padding-bottom: 0.5rem;
+}
+
+/* Pipeline Bars */
+.o_succ_pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.o_pipeline_bar {
+    display: flex;
+    align-items: center;
+}
+
+.o_bar_label {
+    width: 150px;
+    font-weight: 600;
+    color: var(--succ-dark-green);
+    font-size: 0.9rem;
+}
+
+.o_bar_track {
+    flex-grow: 1;
+    height: 14px;
+    background-color: var(--succ-light-bg);
+    border-radius: 7px;
+    overflow: hidden;
+    margin: 0 1rem;
+}
+
+.o_bar_fill {
+    height: 100%;
+    border-radius: 7px;
+    transition: width 1s ease-out;
+}
+
+.o_bar_value {
+    width: 40px;
+    text-align: right;
+    font-weight: 700;
+    color: var(--succ-slate);
+}
+
+/* Utility Colors */
+.bg_succ_green { background-color: var(--succ-green) !important; color: white; }
+.bg_succ_olive { background-color: var(--succ-olive) !important; color: white; }
+.bg_succ_orange { background-color: var(--succ-orange) !important; color: white; }
+.bg_succ_maroon { background-color: var(--succ-maroon) !important; color: white; }
+.text_succ_slate { color: var(--succ-slate) !important; }
+
+/* Table */
+.o_succ_table th {
+    color: var(--succ-olive);
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--succ-light-bg);
+}
+
+.o_succ_table td {
+    vertical-align: middle;
+}
+
+.o_bench_pill {
+    background-color: var(--succ-light-bg);
+    color: var(--succ-dark-green);
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    font-size: 0.85rem;
+    border: 1px solid #e0e0e0;
+}
+
+.o_succ_loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 50vh;
+    color: var(--succ-olive);
+}

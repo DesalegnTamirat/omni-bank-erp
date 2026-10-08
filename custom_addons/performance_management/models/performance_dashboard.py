@@ -16,7 +16,42 @@ class PerformanceDashboard(models.Model):
         operating_unit_id = filters.get('operating_unit_id')
         department_id = filters.get('department_id')
 
-        # 1. Fetch available filter options
+        # 1. Fetch available filter options and user role
+        user = self.env.user
+        emp = user.employee_id
+        is_admin = user.has_group('performance_management.group_performance_admin') or user.has_group('base.group_system') or self.env.is_admin()
+        is_planning = user.has_group('performance_management.group_performance_planning')
+        is_hr = user.has_group('performance_management.group_performance_hr')
+
+        is_t2_manager = False
+        is_t3_manager = False
+        tier_readonly = False
+        operating_unit_readonly = False
+        user_role_label = 'Enterprise Monitoring (Planning & HR)'
+        ou_rec = None
+
+        if not (is_admin or is_planning or is_hr):
+            # Check if user is a Tier 2 Manager (manages an operating unit or holds a T2 scorecard)
+            managed_ous = self.env['operating.unit'].search([('manager_id', '=', emp.id)]) if emp else self.env['operating.unit']
+            is_t2_sc_holder = self.env['t2.scorecard'].search_count([('employee_id', '=', emp.id)]) > 0 if emp else False
+            
+            if managed_ous or is_t2_sc_holder:
+                is_t2_manager = True
+                tier = 't2'
+                tier_readonly = True
+                operating_unit_readonly = True
+                user_role_label = 'Work Unit Monitoring (Tier 2 Manager)'
+                ou_rec = managed_ous[0] if managed_ous else (emp.default_operating_unit_id or (emp.operating_unit_ids and emp.operating_unit_ids[0]))
+                operating_unit_id = ou_rec.id if ou_rec else None
+            else:
+                is_t3_manager = True
+                tier = 't3'
+                tier_readonly = True
+                operating_unit_readonly = True
+                user_role_label = 'Team Monitoring (Tier 3 Manager)'
+                ou_rec = emp.default_operating_unit_id if (emp and emp.default_operating_unit_id) else (emp.operating_unit_ids[0] if (emp and emp.operating_unit_ids) else False)
+                operating_unit_id = ou_rec.id if ou_rec else None
+
         FiscalYear = self.env['performance.fiscal.year']
         Period = self.env['appraisal.period']
         OperatingUnit = self.env['operating.unit']
@@ -24,11 +59,34 @@ class PerformanceDashboard(models.Model):
 
         all_fy = FiscalYear.search([], order='id desc')
         all_periods = Period.search([], order='id asc')
-        all_ou = OperatingUnit.search([], order='name asc')
+        if operating_unit_readonly and ou_rec:
+            all_ou = ou_rec
+        else:
+            all_ou = OperatingUnit.search([], order='name asc')
         all_dept = Department.search([], order='name asc')
 
         if not fiscal_year_id and all_fy:
             fiscal_year_id = all_fy[0].id
+
+        # Determine if Department Filter should be displayed:
+        # 1. Managers (Tier 2 and Tier 3) monitor work units/teams, so department filter is not applicable.
+        # 2. When a Branch operating unit is selected, department filter is not applicable.
+        is_manager = is_t2_manager or is_t3_manager
+
+        current_ou = None
+        if operating_unit_id and operating_unit_id != 'all':
+            try:
+                current_ou = OperatingUnit.browse(int(operating_unit_id))
+            except (ValueError, TypeError):
+                pass
+        elif ou_rec:
+            current_ou = ou_rec
+
+        is_branch = bool(current_ou and getattr(current_ou, 'work_unit_type', False) in ('branch', 'sub_branch', 'service_center'))
+        show_department_filter = not is_manager and not is_branch
+
+        if not show_department_filter:
+            department_id = None
 
         # 2. Build domain helper
         def build_domain(model_name):
@@ -49,12 +107,22 @@ class PerformanceDashboard(models.Model):
                         domain.append(('operating_unit_id', '=', int(operating_unit_id)))
                     except (ValueError, TypeError):
                         pass
-            if department_id and department_id != 'all':
+            if show_department_filter and department_id and department_id != 'all':
                 if 'department_id' in self.env[model_name]._fields:
                     try:
                         domain.append(('department_id', '=', int(department_id)))
                     except (ValueError, TypeError):
                         pass
+
+            # Manager specific filtering:
+            if is_t3_manager and emp:
+                if model_name in ('t3.scorecard', 't3.appraisal'):
+                    domain.extend(['|', '|', ('manager_id', '=', emp.id), ('employee_id.parent_id', '=', emp.id), ('employee_id.coach_id', '=', emp.id)])
+            elif is_t2_manager and emp:
+                if model_name in ('t2.scorecard', 't2.appraisal'):
+                    if not operating_unit_id:
+                        domain.append(('employee_id', '=', emp.id))
+
             return domain
 
         # Helper to compute status counts
@@ -78,23 +146,26 @@ class PerformanceDashboard(models.Model):
         t3_sc_records = []
         t3_app_records = []
 
-        try:
-            t1_sc_records = self.env['corporate.scorecard'].search(build_domain('corporate.scorecard'))
-            t1_app_records = self.env['corporate.appraisal'].search(build_domain('corporate.appraisal'))
-        except Exception:
-            pass
+        if not is_t2_manager and not is_t3_manager:
+            try:
+                t1_sc_records = self.env['corporate.scorecard'].search(build_domain('corporate.scorecard'))
+                t1_app_records = self.env['corporate.appraisal'].search(build_domain('corporate.appraisal'))
+            except Exception:
+                pass
 
-        try:
-            t2_sc_records = self.env['t2.scorecard'].search(build_domain('t2.scorecard'))
-            t2_app_records = self.env['t2.appraisal'].search(build_domain('t2.appraisal'))
-        except Exception:
-            pass
+        if not is_t3_manager:
+            try:
+                t2_sc_records = self.env['t2.scorecard'].search(build_domain('t2.scorecard'))
+                t2_app_records = self.env['t2.appraisal'].search(build_domain('t2.appraisal'))
+            except Exception:
+                pass
 
-        try:
-            t3_sc_records = self.env['t3.scorecard'].search(build_domain('t3.scorecard'))
-            t3_app_records = self.env['t3.appraisal'].search(build_domain('t3.appraisal'))
-        except Exception:
-            pass
+        if not is_t2_manager:
+            try:
+                t3_sc_records = self.env['t3.scorecard'].search(build_domain('t3.scorecard'))
+                t3_app_records = self.env['t3.appraisal'].search(build_domain('t3.appraisal'))
+            except Exception:
+                pass
 
         # Build Tier Governance Breakdown Data
         tier_governance = {
@@ -185,7 +256,17 @@ class PerformanceDashboard(models.Model):
                 dept_scores[dept_name]['sum'] += score
                 dept_scores[dept_name]['count'] += 1
 
-                ou_name = app.operating_unit_id.name if 'operating_unit_id' in app._fields and app.operating_unit_id else 'Head Office'
+                ou_name = ''
+                if 'operating_unit_id' in app._fields and app.operating_unit_id:
+                    ou_name = app.operating_unit_id.name
+                elif app.employee_id:
+                    if hasattr(app.employee_id, 'default_operating_unit_id') and app.employee_id.default_operating_unit_id:
+                        ou_name = app.employee_id.default_operating_unit_id.name
+                    elif hasattr(app.employee_id, 'operating_unit_ids') and app.employee_id.operating_unit_ids:
+                        ou_name = app.employee_id.operating_unit_ids[0].name
+                if not ou_name:
+                    ou_name = 'Head Office'
+
                 ou_scores[ou_name]['sum'] += score
                 ou_scores[ou_name]['count'] += 1
 
@@ -196,6 +277,7 @@ class PerformanceDashboard(models.Model):
                     'name': getattr(app, 'name', 'Appraisal'),
                     'employee_name': app.employee_id.name if app.employee_id else 'N/A',
                     'job_title': app.job_id.name if 'job_id' in app._fields and app.job_id else '',
+                    'operating_unit': ou_name,
                     'department': dept_name,
                     'score': round(score, 2),
                     'rating': rating,
@@ -204,6 +286,9 @@ class PerformanceDashboard(models.Model):
 
             # Rejections
             if state == 'rejected':
+                ou_name = app.operating_unit_id.name if 'operating_unit_id' in app._fields and app.operating_unit_id else ''
+                if not ou_name and app.employee_id and hasattr(app.employee_id, 'default_operating_unit_id') and app.employee_id.default_operating_unit_id:
+                    ou_name = app.employee_id.default_operating_unit_id.name
                 rejections_list.append({
                     'id': app.id,
                     'model': model_name,
@@ -211,24 +296,34 @@ class PerformanceDashboard(models.Model):
                     'type': 'Appraisal',
                     'name': getattr(app, 'name', 'Appraisal'),
                     'employee_name': app.employee_id.name if app.employee_id else 'N/A',
-                    'manager_name': app.manager_id.name if 'manager_id' in app._fields and app.manager_id else 'N/A',
+                    'manager_name': app.manager_id.name if 'manager_id' in app._fields and app.manager_id else (app.employee_id.coach_id.name if app.employee_id and app.employee_id.coach_id else 'N/A'),
+                    'operating_unit': ou_name or 'N/A',
                     'rejection_reason': app.rejection_reason or 'No reason provided',
                 })
 
             # Pending acceptance
             if state == 'notified':
+                ou_name = app.operating_unit_id.name if 'operating_unit_id' in app._fields and app.operating_unit_id else ''
+                if not ou_name and app.employee_id and hasattr(app.employee_id, 'default_operating_unit_id') and app.employee_id.default_operating_unit_id:
+                    ou_name = app.employee_id.default_operating_unit_id.name
                 pending_list.append({
                     'id': app.id,
                     'model': model_name,
                     'tier': tier_name,
+                    'type': 'Appraisal',
                     'name': getattr(app, 'name', 'Appraisal'),
                     'employee_name': app.employee_id.name if app.employee_id else 'N/A',
+                    'manager_name': app.manager_id.name if 'manager_id' in app._fields and app.manager_id else (app.employee_id.coach_id.name if app.employee_id and app.employee_id.coach_id else 'N/A'),
+                    'operating_unit': ou_name or 'N/A',
                     'accept_by': str(app.accept_by) if 'accept_by' in app._fields and app.accept_by else 'N/A',
                     'score': round(score, 2),
                 })
 
         # Also collect scorecard rejections & pending
         for model_name, tier_name, sc in all_scorecards:
+            ou_name = sc.operating_unit_id.name if 'operating_unit_id' in sc._fields and sc.operating_unit_id else ''
+            if not ou_name and sc.employee_id and hasattr(sc.employee_id, 'default_operating_unit_id') and sc.employee_id.default_operating_unit_id:
+                ou_name = sc.employee_id.default_operating_unit_id.name
             if sc.state == 'rejected':
                 rejections_list.append({
                     'id': sc.id,
@@ -237,7 +332,8 @@ class PerformanceDashboard(models.Model):
                     'type': 'Scorecard',
                     'name': getattr(sc, 'planning_name', getattr(sc, 'name', 'Scorecard')),
                     'employee_name': sc.employee_id.name if sc.employee_id else 'N/A',
-                    'manager_name': sc.manager_id.name if 'manager_id' in sc._fields and sc.manager_id else 'N/A',
+                    'manager_name': sc.manager_id.name if 'manager_id' in sc._fields and sc.manager_id else (sc.employee_id.coach_id.name if sc.employee_id and sc.employee_id.coach_id else 'N/A'),
+                    'operating_unit': ou_name or 'N/A',
                     'rejection_reason': sc.rejection_reason or 'No reason provided',
                 })
             elif sc.state == 'notified':
@@ -245,9 +341,12 @@ class PerformanceDashboard(models.Model):
                     'id': sc.id,
                     'model': model_name,
                     'tier': tier_name,
+                    'type': 'Scorecard',
                     'name': getattr(sc, 'planning_name', getattr(sc, 'name', 'Scorecard')),
                     'employee_name': sc.employee_id.name if sc.employee_id else 'N/A',
-                    'accept_by': 'N/A',
+                    'manager_name': sc.manager_id.name if 'manager_id' in sc._fields and sc.manager_id else (sc.employee_id.coach_id.name if sc.employee_id and sc.employee_id.coach_id else 'N/A'),
+                    'operating_unit': ou_name or 'N/A',
+                    'accept_by': str(sc.accept_by) if 'accept_by' in sc._fields and sc.accept_by else 'N/A',
                     'score': 0.0,
                 })
 
@@ -310,6 +409,11 @@ class PerformanceDashboard(models.Model):
                 'selected_tier': tier,
                 'selected_operating_unit_id': operating_unit_id,
                 'selected_department_id': department_id,
+                'tier_readonly': tier_readonly,
+                'operating_unit_readonly': operating_unit_readonly,
+                'user_role_label': user_role_label,
+                'is_manager': is_manager,
+                'show_department_filter': show_department_filter,
             },
             'kpis': {
                 'total_scorecards': total_sc_count,

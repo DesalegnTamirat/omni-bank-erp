@@ -81,7 +81,7 @@ class ExamPortalController(http.Controller):
             "answers": attempt.answer_ids.sorted(key=lambda a: a.sequence),
         })
 
-    @http.route("/exam/session/<string:token>/start", type="jsonrpc", auth="public", methods=["POST"])
+    @http.route("/exam/session/<string:token>/start", type="json", auth="public", methods=["POST"])
     def start_exam(self, token, **kwargs):
         attempt = request.env["exam.candidate.attempt"].sudo().search([("access_token", "=", token)], limit=1)
         if not attempt:
@@ -92,7 +92,7 @@ class ExamPortalController(http.Controller):
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    @http.route("/exam/session/<string:token>/save", type="jsonrpc", auth="public", methods=["POST"])
+    @http.route("/exam/session/<string:token>/save", type="json", auth="public", methods=["POST"])
     def auto_save_answers(self, token, **kwargs):
         """Auto-save endpoint called every 30s and before final submission (FR-EXM-027)"""
         attempt = request.env["exam.candidate.attempt"].sudo().search([("access_token", "=", token)], limit=1)
@@ -121,7 +121,7 @@ class ExamPortalController(http.Controller):
 
         return {"status": "saved", "saved_at": str(fields.Datetime.now())}
 
-    @http.route("/exam/session/<string:token>/event", type="jsonrpc", auth="public", methods=["POST"])
+    @http.route("/exam/session/<string:token>/event", type="json", auth="public", methods=["POST"])
     def record_proctor_event(self, token, **kwargs):
         """Receives anti-cheating violation signals from client agent (FR-EXM-021 - FR-EXM-023)"""
         attempt = request.env["exam.candidate.attempt"].sudo().search([("access_token", "=", token)], limit=1)
@@ -133,7 +133,7 @@ class ExamPortalController(http.Controller):
         res = attempt.record_proctor_event(event_type, details)
         return res
 
-    @http.route("/exam/session/<string:token>/submit", type="jsonrpc", auth="public", methods=["POST"])
+    @http.route("/exam/session/<string:token>/submit", type="json", auth="public", methods=["POST"])
     def submit_exam(self, token, **kwargs):
         """Final submission triggered by candidate or timer auto-submit (FR-EXM-024)"""
         attempt = request.env["exam.candidate.attempt"].sudo().search([("access_token", "=", token)], limit=1)

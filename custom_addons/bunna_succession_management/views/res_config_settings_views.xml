@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="succession_custom_settings_view_form" model="ir.ui.view">
+            <field name="name">succession.custom.settings.form</field>
+            <field name="model">res.config.settings</field>
+            <field name="arch" type="xml">
+                <form string="Succession Settings" create="false" delete="false">
+                    <header>
+                        <button string="Save" type="object" name="execute" class="oe_highlight"/>
+                        <button string="Discard" type="object" name="cancel"/>
+                    </header>
+                    <sheet>
+                        <h1>Succession Management Configurations</h1>
+                        <notebook>
+                            
+                            <!-- TAB 1: SCORING & PIPELINE -->
+                            <page string="Scoring &amp; Pipeline Rules">
+                                <group>
+                                    <group string="9-Box Grid Thresholds">
+                                        <field name="succ_high_perf_threshold" string="High Performance Score (≥)"/>
+                                        <field name="succ_med_perf_threshold" string="Medium Performance Score (≥)"/>
+                                        <field name="succ_high_pot_threshold" string="High Potential Match (≥ %)"/>
+                                        <field name="succ_med_pot_threshold" string="Medium Potential Match (≥ %)"/>
+                                    </group>
+                                    <group string="Auto-Suggest Thresholds">
+                                        <field name="succ_auto_match_min_score" string="Auto-Match Eligibility (%)"/>
+                                        <field name="succ_ready_now_min_match" string="Ready Now Threshold (%)"/>
+                                        <field name="succ_ready_soon_min_match" string="Ready Soon Threshold (%)"/>
+                                    </group>
+                                </group>
+                                <group>
+                                    <group string="Scoring Weights">
+                                        <field name="succ_score_weight_competency" string="Competency Weight (%)"/>
+                                        <field name="succ_score_weight_pms" string="PMS Weight (%)"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                            <!-- TAB 2: 9-BOX DESIGNER -->
+                            <page string="9-Box Matrix Designer">
+                                <p class="text-muted">
+                                    Configure the 9-Box Grid Categories. You can edit the labels, colors, and priorities directly here.
+                                </p>
+                                <field name="ninebox_cell_ids" widget="one2many" mode="list">
+                                    <list editable="bottom" create="false" delete="false">
+                                        <field name="performance_rating" readonly="1" widget="badge" decoration-success="performance_rating == 'high'" decoration-warning="performance_rating == 'medium'" decoration-danger="performance_rating == 'low'"/>
+                                        <field name="potential_rating" readonly="1" widget="badge" decoration-success="potential_rating == 'high'" decoration-warning="potential_rating == 'medium'" decoration-danger="potential_rating == 'low'"/>
+                                        <field name="name" string="Cell Label (Editable)"/>
+                                        <field name="tier_color" widget="badge" decoration-success="tier_color == 'gold'" decoration-info="tier_color == 'teal'" decoration-danger="tier_color == 'brick'"/>
+                                        <field name="priority" widget="badge" decoration-success="priority in ('critical', 'high')" decoration-warning="priority == 'medium'" decoration-muted="priority == 'low'" decoration-danger="priority == 'urgent'"/>
+                                        <field name="description" string="HR Action" optional="show"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <!-- TAB 3: GOVERNANCE & ALERTS -->
+                            <page string="Governance &amp; Controls">
+                                <group>
+                                    <group string="Policy Rules">
+                                        <field name="succ_min_successors_global" string="Required Minimum Successors"/>
+                                        <field name="succ_require_spmc_approval" string="Require SPMC Approval"/>
+                                        <field name="succ_idp_mandatory" string="Mandatory Development Plans"/>
+                                    </group>
+                                    <group string="Alerts">
+                                        <field name="succ_alert_idp_overdue" string="Alert: Overdue IDP Activities"/>
+                                        <field name="succ_alert_critical_no_successors" string="Alert: Empty Talent Pipeline"/>
+                                    </group>
+                                </group>
+                            </page>
+
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+    </data>
+</odoo>

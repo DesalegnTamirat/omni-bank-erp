@@ -63,7 +63,7 @@
                 <field name="promotion_type"/>
                 <field name="promotion_status" widget="badge" decoration-info="promotion_status == 'draft'" decoration-warning="promotion_status == 'pending_release'" decoration-success="promotion_status in ('promoted', 'released')"/>
                 <field name="release_date"/>
-                <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="promotion_status in ('promoted', 'released')"/>
+                <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="promotion_type != 'diff_unit' or promotion_status in ('promoted', 'released')"/>
             </list>
         </field>
     </record>
@@ -75,7 +75,7 @@
         <field name="arch" type="xml">
             <form string="Candidate Release Form" create="0" delete="0">
                 <header>
-                    <button name="action_open_release_wizard" string="📋 Complete Release Form" type="object" class="btn-warning" invisible="promotion_status in ('promoted', 'released')"/>
+                    <button name="action_open_release_wizard" string="📋 Complete Release Form" type="object" class="btn-warning" invisible="promotion_type != 'diff_unit' or promotion_status in ('promoted', 'released')"/>
                     <field name="promotion_status" widget="statusbar"/>
                 </header>
                 <sheet>
@@ -120,7 +120,7 @@
         <field name="name">Release Form</field>
         <field name="res_model">new.internal.recruitment.selected.candidates</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('selection_type', '=', 'selected'), ('promotion_type', '=', 'diff_unit')]</field>
+        <field name="domain">[('selection_type', 'in', ['selected', 'Selected']), ('promotion_type', '=', 'diff_unit')]</field>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_candidate_release_form_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('view_candidate_release_form_view')})]"/>

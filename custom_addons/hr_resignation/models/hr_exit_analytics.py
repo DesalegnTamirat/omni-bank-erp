@@ -9,7 +9,7 @@ class HrExitAnalytics(models.Model):
 
     resignation_type_id = fields.Many2one('hr.separation.type', string='Separation Type', readonly=True)
     department_id = fields.Many2one('hr.department', string='Department', readonly=True)
-    question_name = fields.Char(string='Question', readonly=True)
+    question_name = fields.Char(string='Question', readonly=True, translate=True)
     question_type = fields.Selection([
         ('rating',       'Rating'),
         ('satisfaction', 'Satisfaction'),
@@ -39,6 +39,6 @@ class HrExitAnalytics(models.Model):
                 JOIN hr_exit_interview i ON i.id = l.interview_id
                 JOIN hr_resignation r ON r.id = i.resignation_id
                 JOIN hr_employee e ON e.id = r.employee_id
-                WHERE i.state = 'done'
+                WHERE i.state = 'completed'
             )
         """ % self._table)

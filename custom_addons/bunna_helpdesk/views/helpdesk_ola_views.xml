@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ola_tree" model="ir.ui.view">
+        <field name="name">helpdesk.ola.list</field>
+        <field name="model">helpdesk.ola</field>
+        <field name="arch" type="xml">
+            <list string="Operational Level Agreements (OLA)">
+                <field name="name" />
+                <field name="service_id" />
+                <field name="sub_category_id" />
+                <field name="requesting_team_id" />
+                <field name="providing_team_id" />
+                <field name="operating_unit_id" />
+                <field name="delivery_time_value" />
+                <field name="delivery_time_unit" />
+                <field name="target_hours" string="Target (Hours)" />
+                <field name="active" widget="boolean_toggle" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_ola_form" model="ir.ui.view">
+        <field name="name">helpdesk.ola.form</field>
+        <field name="model">helpdesk.ola</field>
+        <field name="arch" type="xml">
+            <form string="Operational Level Agreement (OLA)">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="OLA Policy Name" />
+                        <h1>
+                            <field name="name" placeholder="e.g. CC to Digital Banking Ops - ATM Dispute OLA" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Service Mapping">
+                            <field name="service_id" options="{'no_create': True}" />
+                            <field name="sub_category_id" options="{'no_create': True}" />
+                            <field name="active" widget="boolean_toggle" />
+                        </group>
+                        <group string="Responsible Parties">
+                            <field name="requesting_team_id" options="{'no_create': True}" />
+                            <field name="providing_team_id" options="{'no_create': True}" />
+                            <field name="operating_unit_id" options="{'no_create': True}" />
+                        </group>
+                    </group>
+                    <group string="Service Delivery Time (SDT) Target">
+                        <group>
+                            <label for="delivery_time_value" string="Service Delivery Time (SDT)" />
+                            <div class="o_row">
+                                <field name="delivery_time_value" class="oe_inline" />
+                                <field name="delivery_time_unit" class="oe_inline" />
+                            </div>
+                        </group>
+                        <group>
+                            <field name="target_hours" readonly="1" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Terms &amp; Responsibilities" name="responsibilities">
+                            <field name="notes" placeholder="Specify escalation rules, handoff procedures, and resolution milestones..." />
+                        </page>
+                        <page string="Signed OLA Document(s)" name="documents">
+                            <field name="ola_attachment_ids" widget="many2many_binary" />
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_ola_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.ola.kanban</field>
+        <field name="model">helpdesk.ola</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_group_by="providing_team_id">
+                <field name="name" />
+                <field name="service_id" />
+                <field name="sub_category_id" />
+                <field name="requesting_team_id" />
+                <field name="providing_team_id" />
+                <field name="target_hours" />
+                <field name="delivery_time_value" />
+                <field name="delivery_time_unit" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-primary" t-if="record.service_id.value">
+                                <field name="service_id" />
+                            </span>
+                            <span class="badge text-bg-warning" t-if="record.target_hours.value">
+                                <i class="fa fa-clock-o me-1" />
+                                <field name="target_hours" /> hrs Target
+                            </span>
+                        </div>
+                        <field class="fw-bold fs-5 text-truncate" name="name" />
+                        <div class="text-muted small mt-1">
+                            <i class="fa fa-exchange me-1" />
+                            <field name="requesting_team_id" /> &amp;rarr; <field name="providing_team_id" />
+                        </div>
+                        <footer class="pt-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted small" t-if="record.sub_category_id.value">
+                                <field name="sub_category_id" />
+                            </span>
+                            <span class="badge text-bg-light border" t-if="record.delivery_time_value.value">
+                                SDT: <field name="delivery_time_value" /> <field name="delivery_time_unit" />
+                            </span>
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ola" model="ir.actions.act_window">
+        <field name="name">OLA Policies</field>
+        <field name="res_model">helpdesk.ola</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+</odoo>

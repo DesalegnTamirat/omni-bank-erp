@@ -199,6 +199,11 @@
                                             <span t-if="state.checkInStatus"
                                                   t-attf-class="badge rounded-pill ms-2 {{ state.checkInStatus === 'Late' ? 'bg-warning text-dark' : 'bg-success text-white' }}"
                                                   t-esc="state.checkInStatus"/>
+                                            <span t-if="state.isShiftEnded"
+                                                  class="badge rounded-pill ms-2 bg-secondary text-white"
+                                                  title="Live timer capped at scheduled shift end">
+                                                <i class="fa fa-flag-checkered me-1"/> Shift Ended
+                                            </span>
                                         </div>
 
                                         <!-- Integrated compact session breakdown -->
@@ -328,61 +333,89 @@
                             </div>
                         </div>
 
-                            <!-- DAILY ATTENDANCE BREAKDOWN CHART CARD -->
+                        <!-- DAILY ATTENDANCE BREAKDOWN CHART CARD -->
                         <div class="premium-card p-4 p-xl-5">
-                            <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom" style="border-color: rgba(0,0,0,0.05) !important;">
-                                <h5 class="fw-bold mb-0" style="color: #0f172a; font-size: 1.15rem;">
-                                    <i class="fa fa-bar-chart text-primary me-2"/> Weekly Attendance Breakdown
-                                </h5>
-                                <span class="badge rounded-pill px-3 py-2" style="background: #f1f5f9; color: #334155; font-weight: 600; border: 1px solid #e2e8f0;">
-                                    Weekly Total: <t t-esc="state.weeklyHoursFormatted"/>
-                                </span>
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style="border-color: rgba(0,0,0,0.05) !important;">
+                                <div>
+                                    <h5 class="fw-bold mb-1" style="color: #0f172a; font-size: 1.15rem;">
+                                        <i class="fa fa-bar-chart text-primary me-2"/> Weekly Attendance Breakdown
+                                    </h5>
+                                    <span class="text-muted small" t-esc="state.weekRangeLabel"/>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <!-- Week Navigation Controls -->
+                                    <div class="btn-group btn-group-sm rounded-pill overflow-hidden border bg-white shadow-sm" role="group">
+                                        <button type="button" class="btn btn-light px-2.5 py-1 text-secondary" t-on-click="() => this.onPrevWeek()" title="Previous Week" t-att-disabled="state.isLoadingWeek">
+                                            <i class="fa fa-chevron-left fa-xs"/>
+                                        </button>
+                                        <button type="button" t-attf-class="btn px-2.5 py-1 fw-semibold {{ state.isCurrentWeek ? 'text-white' : 'btn-light text-secondary' }}" t-attf-style="{{ state.isCurrentWeek ? 'background: #425727;' : '' }}" t-on-click="() => this.onCurrentWeek()" title="Jump to Current Week" t-att-disabled="state.isLoadingWeek">
+                                            This Week
+                                        </button>
+                                        <button type="button" class="btn btn-light px-2.5 py-1 text-secondary" t-on-click="() => this.onNextWeek()" title="Next Week" t-att-disabled="state.isCurrentWeek || state.isLoadingWeek">
+                                            <i class="fa fa-chevron-right fa-xs"/>
+                                        </button>
+                                    </div>
+                                    <span class="badge rounded-pill px-3 py-2 shadow-sm" style="background: #f1f5f9; color: #334155; font-weight: 600; border: 1px solid #e2e8f0;">
+                                        Weekly Total: <t t-esc="state.weeklyHoursFormatted"/>
+                                    </span>
+                                </div>
                             </div>
 
                             <div class="o_daily_breakdown_list">
-                                <t t-foreach="state.dailyBreakdown" t-as="day" t-key="day.day_name">
-                                    <div t-attf-class="o_daily_row d-flex align-items-center gap-3 {{ day.is_today ? 'is-today' : '' }}">
-                                            <!-- DAY & DATE -->
-                                        <div style="width: 80px;">
-                                            <div class="day-name" t-esc="day.day_name"/>
-                                            <div class="day-date" t-esc="day.date_str"/>
-                                        </div>
+                                <t t-if="state.isLoadingWeek">
+                                    <div class="text-center py-4 text-muted">
+                                        <i class="fa fa-circle-o-notch fa-spin fa-2x mb-2 d-block text-primary"/>
+                                        <span>Loading weekly breakdown...</span>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <t t-foreach="state.dailyBreakdown" t-as="day" t-key="day.day_name">
+                                        <div t-attf-class="o_daily_row d-flex align-items-center gap-3 {{ day.is_today ? 'is-today' : '' }}">
+                                            <!-- DAY & DATE (Fixed Width) -->
+                                            <div style="width: 75px; flex-shrink: 0;">
+                                                <div class="day-name" t-esc="day.day_name"/>
+                                                <div class="day-date" t-esc="day.date_str"/>
+                                            </div>
 
-                                            <!-- PROGRESS BAR -->
-                                        <div class="flex-grow-1">
-                                            <div class="progress">
-                                                <div t-attf-class="progress-bar {{ day.is_today ? 'bar-today' : (day.hours > 0 ? 'bar-past' : 'bar-empty') }}"
-                                                     role="progressbar"
-                                                     t-att-style="'width: ' + day.percentage + '%;'"
-                                                     t-att-aria-valuenow="day.percentage"
-                                                     aria-valuemin="0"
-                                                     aria-valuemax="100"/>
+                                            <!-- PROGRESS BAR (Equal Flex Track) -->
+                                            <div class="flex-grow-1 mx-1" style="min-width: 120px;">
+                                                <div class="progress">
+                                                    <div t-attf-class="progress-bar {{ day.is_completed ? 'bar-completed' : (day.is_today ? 'bar-today' : (day.hours > 0 ? 'bar-past' : 'bar-empty')) }}"
+                                                         role="progressbar"
+                                                         t-att-style="'width: ' + day.percentage + '%;'"
+                                                         t-att-aria-valuenow="day.percentage"
+                                                         aria-valuemin="0"
+                                                         aria-valuemax="100"/>
+                                                </div>
+                                            </div>
+
+                                            <!-- HOURS VALUE (Fixed Width, Tabular Numeric) -->
+                                            <div style="width: 95px; flex-shrink: 0;" class="text-end hours-val">
+                                                <t t-if="day.is_on_leave &amp;&amp; day.hours == 0">
+                                                    <span class="badge rounded-pill px-2 py-1" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 0.725rem; font-weight: 600;" t-att-title="day.leave_name">
+                                                        🌴 TIME OFF
+                                                    </span>
+                                                </t>
+                                                <t t-elif="day.is_day_off &amp;&amp; day.hours == 0">
+                                                    <span class="badge rounded-pill px-2 py-1" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.725rem; font-weight: 600;">
+                                                        🌴 DAY OFF
+                                                    </span>
+                                                </t>
+                                                <t t-else="">
+                                                    <t t-esc="day.hours_formatted"/>
+                                                </t>
+                                            </div>
+
+                                            <!-- STATUS / COMPLETION BADGE (Fixed Width) -->
+                                            <div style="width: 75px; flex-shrink: 0;" class="text-end">
+                                                <span t-if="day.is_today &amp;&amp; state.checkedIn" class="onduty-badge">On Duty</span>
+                                                <span t-elif="day.is_today" class="today-badge">Today</span>
+                                                <span t-elif="day.is_completed" class="badge rounded-pill px-2 py-1 text-success bg-success-subtle border border-success-subtle fw-semibold" style="font-size: 0.725rem;" title="Scheduled Target Completed">
+                                                    <i class="fa fa-check me-1"/>Done
+                                                </span>
                                             </div>
                                         </div>
-
-                                            <!-- HOURS VALUE -->
-                                        <div style="width: 100px;" class="text-end hours-val">
-                                            <t t-if="day.is_on_leave &amp;&amp; day.hours == 0">
-                                                <span class="badge rounded-pill px-2.5 py-1" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 0.725rem; font-weight: 600;" t-att-title="day.leave_name">
-                                                    🌴 TIME OFF
-                                                </span>
-                                            </t>
-                                            <t t-elif="day.is_day_off &amp;&amp; day.hours == 0">
-                                                <span class="badge rounded-pill px-2.5 py-1" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.725rem; font-weight: 600;">
-                                                    🌴 DAY OFF
-                                                </span>
-                                            </t>
-                                            <t t-else="">
-                                                <t t-esc="day.hours_formatted"/>
-                                            </t>
-                                        </div>
-
-                                            <!-- TODAY BADGE -->
-                                        <div style="width: 80px;" class="text-end">
-                                            <span t-if="day.is_today &amp;&amp; day.checkedIn" class="onduty-badge">On Duty</span>
-                                            <span t-elif="day.is_today" class="today-badge">Today</span>
-                                        </div>
-                                    </div>
+                                    </t>
                                 </t>
                             </div>
                         </div>
@@ -444,22 +477,6 @@
                         </div>
                     </div>
                     <div class="settings-toggle-row">
-                        <div class="settings-toggle-label">Saturday Half-Day (Head Office)</div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="s_saturday"
-                                   t-att-checked="state.settings.enable_saturday_halfday"
-                                   t-on-change="onToggleSaturdayHalfday"/>
-                        </div>
-                    </div>
-                    <div class="settings-toggle-row" t-if="state.settings.enable_saturday_halfday">
-                        <div class="settings-toggle-label">Saturday Half-Day (District Offices)</div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="s_saturday_district"
-                                   t-att-checked="state.settings.saturday_halfday_district"
-                                   t-on-change="onToggleSaturdayDistrict"/>
-                        </div>
-                    </div>
-                    <div class="settings-toggle-row">
                         <div class="settings-toggle-label">Lunch Break Flow</div>
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="s_lunch"
@@ -474,6 +491,29 @@
                                    t-att-checked="state.settings.enable_checkin_gate"
                                    t-on-change="onToggleCheckinGate"/>
                         </div>
+                    </div>
+                </div>
+
+                <!-- SHIFT TIME SCHEDULES -->
+                <div class="settings-section mb-4">
+                    <div class="settings-section-title">Shift Time Schedules</div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Morning Start Time</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.morning_time_str"
+                               t-on-input="onInputMorningTime"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Shift Exit Time</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.exit_time_str"
+                               t-on-input="onInputExitTime"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Saturday Exit Time</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.saturday_exit_time_str"
+                               t-on-input="onInputSaturdayExitTime"/>
                     </div>
                 </div>
 
@@ -503,6 +543,12 @@
                 <!-- LUNCH BREAK PARAMETERS (CONDITIONAL) -->
                 <div t-if="state.settings.enable_lunch_break" class="settings-section mb-4">
                     <div class="settings-section-title">Lunch Break Policy</div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Lunch Start Time</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.lunch_out_time_str"
+                               t-on-input="onInputLunchOutTime"/>
+                    </div>
                     <div class="settings-input-row">
                         <label class="settings-input-label">Lunch Duration</label>
                         <input type="text" class="settings-input" placeholder="HH:MM"

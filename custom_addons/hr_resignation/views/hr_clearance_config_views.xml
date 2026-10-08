@@ -25,6 +25,15 @@
                             bg_color="text-bg-danger" invisible="active"/>
                     <field name="active" invisible="1"/>
 
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_archived_items" type="object" class="oe_stat_button" icon="fa-archive">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Archived</span>
+                                <span class="o_stat_text">Tasks</span>
+                            </div>
+                        </button>
+                    </div>
+
                     <group>
                         <group>
                             <field name="work_unit_id"
@@ -53,7 +62,7 @@
                                 this work unit can be marked Cleared.
                             </p>
                             <field name="checklist_item_ids" nolabel="1">
-                                <list editable="bottom" string="Checklist Items" delete="false">
+                                <list editable="bottom" string="Checklist Items">
                                     <field name="sequence" widget="handle"/>
                                     <field name="name" string="Task"
                                            placeholder="e.g. Return company laptop"/>
@@ -78,9 +87,7 @@
         <field name="name">hr.resignation.clearance.template.list</field>
         <field name="model">hr.resignation.clearance.template</field>
         <field name="arch" type="xml">
-            <list string="Clearance Work Units"
-                  decoration-muted="not active"
-                  decoration-warning="not is_mandatory">
+            <list string="Clearance Work Units">
                 <field name="sequence" widget="handle"/>
                 <field name="work_unit_id" string="Operating Unit"/>
                 <field name="responsible_user" string="Responsible User"/>

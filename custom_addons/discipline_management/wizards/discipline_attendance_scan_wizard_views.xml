@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Attendance & Absence Scan Wizard Form -->
+        <record id="view_discipline_attendance_scan_wizard_form" model="ir.ui.view">
+            <field name="name">discipline.attendance.scan.wizard.form</field>
+            <field name="model">discipline.attendance.scan.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Scan Attendance &amp; Absence Violations">
+                    <field name="is_hr_admin" invisible="1"/>
+                    <field name="is_supervisor" invisible="1"/>
+
+                    <!-- Mandate Status Banner -->
+                    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                        <i class="fa fa-shield me-2 fs-4 text-primary"/>
+                        <div>
+                            <strong>Mandate &amp; Scope:</strong>
+                            <field name="mandate_notice" readonly="1" class="d-inline ms-1"/>
+                        </div>
+                    </div>
+
+                    <p class="text-muted small">
+                        This scanner evaluates attendance punch logs and absence records against statutory banking policies.
+                        Cases for chronic tardiness (cumulative late time) and unexcused absences (1–2 days, 3+ days, or 5+ days abandonment) will be auto-initiated and routed appropriately.
+                    </p>
+
+                    <group>
+                        <group string="1. Target Scope &amp; Mandate">
+                            <field name="scan_scope" widget="radio"/>
+                            <field name="department_id" 
+                                   options="{'no_create': True}"
+                                   invisible="scan_scope != 'department'"
+                                   required="scan_scope == 'department'"/>
+                            <field name="employee_ids" 
+                                   widget="many2many_tags" 
+                                   options="{'no_create': True}"
+                                   invisible="scan_scope != 'specific_employees'"
+                                   required="scan_scope == 'specific_employees'"/>
+                            <field name="violation_type"/>
+                        </group>
+
+                        <group string="2. Evaluation Period &amp; Thresholds">
+                            <field name="period_preset"/>
+                            <field name="date_from" readonly="period_preset != 'custom'"/>
+                            <field name="date_to" readonly="period_preset != 'custom'"/>
+                            <field name="late_minutes_threshold" invisible="violation_type not in ('all', 'late')"/>
+                            <field name="absence_cumulative_threshold" invisible="violation_type not in ('all', 'absence')"/>
+                            <field name="enable_force_checkout" invisible="violation_type not in ('all', 'force_checkout')"/>
+                            <field name="force_threshold" invisible="not enable_force_checkout or violation_type not in ('all', 'force_checkout')"/>
+                            <field name="skip_existing_active_cases"/>
+                        </group>
+                    </group>
+
+                    <footer>
+                        <button name="action_scan_and_initiate" 
+                                string="Scan &amp; Initiate Disciplinary Cases" 
+                                type="object" 
+                                class="btn-primary"
+                                icon="fa-bolt"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- Action to open wizard -->
+        <record id="action_discipline_attendance_scan_wizard" model="ir.actions.act_window">
+            <field name="name">Scan Attendance Violations</field>
+            <field name="res_model">discipline.attendance.scan.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

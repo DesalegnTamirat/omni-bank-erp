@@ -41,7 +41,7 @@
                 <i class="fa fa-spinner fa-spin fa-2x" style="color:#1d2632;"/>
             </div>
 
-            <div t-else="" class="px-4 pb-4">
+            <div t-else="" class="px-4 pb-5 mb-5">
 
                 <!-- ── SECTION 1: Vacancy Stat Cards ── -->
                 <div class="o_dashboard_section_title mb-2">Job Vacancies</div>

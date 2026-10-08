@@ -11,14 +11,17 @@ sql = """
 CREATE OR REPLACE FUNCTION generate_daily_employee_attendance_detail_report(
     p_from DATE,
     p_to DATE,
-    p_report_type VARCHAR
+    p_report_type VARCHAR,
+    p_user_id INTEGER DEFAULT 1
 ) RETURNS VOID AS $$
 BEGIN
-    -- Clear previous results for clean report generation
-    TRUNCATE TABLE generate_employee_attendance_details;
+    -- Clear previous results for this user/session to avoid multi-user collision
+    DELETE FROM generate_employee_attendance_details WHERE create_uid = p_user_id;
 
     IF p_report_type = 'attendance_summary' THEN
         INSERT INTO generate_employee_attendance_details (
+            create_uid,
+            write_uid,
             employee_id,
             employee_identification,
             employee_name,
@@ -43,6 +46,8 @@ BEGIN
             write_date
         )
         SELECT 
+            p_user_id AS create_uid,
+            p_user_id AS write_uid,
             emp.id AS employee_id,
             COALESCE(emp.employee_identification, '') AS employee_identification,
             COALESCE(emp.name, '') AS employee_name,
@@ -167,7 +172,7 @@ BEGIN
                     ),
                     CASE 
                         WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
-                        WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'district') THEN 4.0 ELSE 8.0 END)
+                        WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'head_offices', 'ho', 'district', 'district_office', 'regional_office') THEN 4.0 ELSE 8.0 END)
                         ELSE 0.0
                     END
                 )
@@ -180,6 +185,8 @@ BEGIN
     ELSE
         -- Daily Employee Attendance Detail mode (per-attendance row)
         INSERT INTO generate_employee_attendance_details (
+            create_uid,
+            write_uid,
             employee_id,
             employee_identification,
             employee_name,
@@ -208,6 +215,8 @@ BEGIN
             write_date
         )
         SELECT 
+            p_user_id AS create_uid,
+            p_user_id AS write_uid,
             emp.id AS employee_id,
             COALESCE(emp.employee_identification, '') AS employee_identification,
             COALESCE(emp.name, '') AS employee_name,
@@ -260,36 +269,26 @@ env.cr.execute(sql)
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="state">code</field>
             <field name="code"><![CDATA[
-# Shift-Aware High Performance Auto-Checkout PostgreSQL Function (3-Hour Grace Period & Shift End Capping)
+# Shift-Aware High Performance Auto-Checkout PostgreSQL Function
 sql = """
 CREATE OR REPLACE FUNCTION auto_checkout_all_employees()
 RETURNS void
 LANGUAGE plpgsql
 AS $$
-DECLARE
-    v_grace_hours NUMERIC := 3.0;
 BEGIN
-    /* Read dynamic post-shift grace period from ir_config_parameter, defaulting to 3.0 hours if unconfigured */
-    SELECT COALESCE(value::numeric, 3.0) INTO v_grace_hours
-    FROM ir_config_parameter
-    WHERE key = 'hr_attendance.post_shift_grace_hours'
-    LIMIT 1;
-
-    IF v_grace_hours IS NULL OR v_grace_hours <= 0 THEN
-        v_grace_hours := 3.0;
-    END IF;
-
     WITH resolved_shifts AS (
         SELECT 
             ha.id AS att_id,
             ha.check_in,
             COALESCE(
+                ha.shift_start_float,
                 js_roster.start_time,
                 js_static.start_time,
                 lbe.start_time,
                 8.0
             ) AS resolved_start_time,
             COALESCE(
+                ha.shift_end_float,
                 js_roster.end_time,
                 js_static.end_time,
                 lbe.end_time,
@@ -298,13 +297,19 @@ BEGIN
             (
                 (
                     date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                    + (COALESCE(js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
+                    + (COALESCE(ha.shift_start_float, js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
                 ) AT TIME ZONE 'Africa/Addis_Ababa'
             ) AT TIME ZONE 'UTC' AS shift_start_utc,
             (
                 (
                     date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                    + (COALESCE(js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                    + (COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                    + CASE 
+                        WHEN COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0) <= 
+                             COALESCE(ha.shift_start_float, js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)
+                        THEN INTERVAL '1 day'
+                        ELSE INTERVAL '0 day'
+                      END
                 ) AT TIME ZONE 'Africa/Addis_Ababa'
             ) AT TIME ZONE 'UTC' AS shift_end_utc
         FROM hr_attendance ha
@@ -354,8 +359,8 @@ BEGIN
         write_date = NOW()
     FROM resolved_shifts rs
     WHERE ha.id = rs.att_id
-      /* Dynamic Grace Period Verification: Current time must be past shift_end + v_grace_hours */
-      AND NOW() >= (rs.shift_end_utc + (v_grace_hours || ' hours')::interval);
+      /* Midnight Verification: Close all open shifts that ended on or before midnight to unblock next-day check-in */
+      AND NOW() >= rs.shift_end_utc;
 
 END;
 $$ LANGUAGE plpgsql;
@@ -377,15 +382,18 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     p_date DATE := (NOW() AT TIME ZONE 'Africa/Addis_Ababa')::date - INTERVAL '1 day';
+    v_isodow INTEGER := EXTRACT(ISODOW FROM p_date);
 BEGIN
     /*
     =========================================================
     Function: detect_daily_employee_absences()
     Purpose: Detects active employees who had no check-in and no approved leave.
              Inserts absence records into attendance_payroll_payload for payroll deduction.
+             Full awareness of Saturday Half-Day (HO/District = 4h), leaves, and partial sessions.
     Execution: Triggered via Odoo 19 Scheduled Action daily at 09:30 AM (Addis Ababa time).
     =========================================================
     */
+    -- 1. IDENTIFY FULL-DAY ABSENCES & RECORD APPROPRIATE PAYROLL PAYLOAD
     INSERT INTO attendance_payroll_payload (
         employee_id,
         effective_date,
@@ -401,15 +409,23 @@ BEGIN
     SELECT 
         emp.id AS employee_id,
         p_date AS effective_date,
-        8.0 AS hours,
+        CASE 
+            WHEN v_isodow = 6 AND (ou.work_unit_type IN ('head_office', 'district_office') OR ou.work_unit_type IS NULL) THEN 4.0
+            ELSE 8.0
+        END AS hours,
         'absence' AS payload_type,
         'draft' AS state,
-        'Absence Deduction - ' || emp.name || ' (' || p_date::text || ')' AS display_name,
+        CASE 
+            WHEN v_isodow = 6 AND (ou.work_unit_type IN ('head_office', 'district_office') OR ou.work_unit_type IS NULL)
+                THEN 'Saturday Half-Day Absence - ' || emp.name || ' (' || p_date::text || ')'
+            ELSE 'Full Day Absence - ' || emp.name || ' (' || p_date::text || ')'
+        END AS display_name,
         1 AS create_uid,
         1 AS write_uid,
         NOW() AS create_date,
         NOW() AS write_date
     FROM hr_employee emp
+    LEFT JOIN operating_unit ou ON ou.id = emp.default_operating_unit_id
     WHERE emp.active = TRUE
       AND NOT EXISTS (
           SELECT 1 FROM hr_attendance att
@@ -423,6 +439,7 @@ BEGIN
             AND l.state = 'validate'
             AND l.date_from::date <= p_date
             AND l.date_to::date >= p_date
+            AND (l.request_unit_half IS NOT TRUE AND COALESCE(l.number_of_days, 1.0) >= 1.0)
       )
       AND NOT EXISTS (
           SELECT 1 FROM attendance_payroll_payload app
@@ -449,10 +466,10 @@ BEGIN
                 SELECT 1 FROM job_position_roster_exception r2
                 WHERE r2.employee_id = emp.id AND r2.active = TRUE AND r2.status = 'active' AND r2.start_date <= p_date AND r2.end_date >= p_date
             )
-            AND (EXTRACT(ISODOW FROM p_date) = 7 OR jpe.day_off = p_date)
+            AND (v_isodow = 7 OR jpe.day_off = p_date)
       )
       AND NOT (
-          EXTRACT(ISODOW FROM p_date) = 7
+          v_isodow = 7
           AND NOT EXISTS (
               SELECT 1 FROM job_position_roster_exception r3 WHERE r3.employee_id = emp.id AND r3.active = TRUE AND r3.status = 'active' AND r3.start_date <= p_date AND r3.end_date >= p_date
           )
@@ -460,6 +477,69 @@ BEGIN
               SELECT 1 FROM job_position_exception jpe2 WHERE jpe2.employee_id = emp.id AND jpe2.active = TRUE AND jpe2.status = 'active'
           )
       );
+
+    -- 2. IDENTIFY PARTIAL ABSENCES (MISSING HALF-DAY SESSION ON WEEKDAYS)
+    IF v_isodow BETWEEN 1 AND 5 THEN
+        INSERT INTO attendance_payroll_payload (
+            employee_id,
+            effective_date,
+            hours,
+            payload_type,
+            state,
+            display_name,
+            create_uid,
+            write_uid,
+            create_date,
+            write_date
+        )
+        SELECT 
+            emp.id AS employee_id,
+            p_date AS effective_date,
+            4.0 AS hours,
+            'absence' AS payload_type,
+            'draft' AS state,
+            'Half Day Absence (Missing Session) - ' || emp.name || ' (' || p_date::text || ')',
+            1 AS create_uid,
+            1 AS write_uid,
+            NOW() AS create_date,
+            NOW() AS write_date
+        FROM hr_employee emp
+        JOIN (
+            SELECT 
+                att.employee_id,
+                COUNT(att.id) AS session_count,
+                COALESCE(SUM(att.worked_hours), 0.0) AS total_worked
+            FROM hr_attendance att
+            WHERE (att.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date = p_date
+              AND (att.active = TRUE OR att.active IS NULL)
+            GROUP BY att.employee_id
+        ) att_summary ON att_summary.employee_id = emp.id
+        WHERE emp.active = TRUE
+          AND att_summary.session_count = 1
+          AND att_summary.total_worked <= 4.5
+          AND NOT EXISTS (
+              SELECT 1 FROM hr_leave l
+              WHERE l.employee_id = emp.id
+                AND l.state = 'validate'
+                AND l.date_from::date <= p_date
+                AND l.date_to::date >= p_date
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM attendance_payroll_payload app
+              WHERE app.employee_id = emp.id
+                AND app.effective_date = p_date
+                AND app.payload_type = 'absence'
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM job_position_roster_exception_line rl
+              JOIN job_position_roster_exception r ON rl.roster_id = r.id
+              WHERE rl.employee_id = emp.id
+                AND r.active = TRUE
+                AND r.status = 'active'
+                AND rl.date = p_date
+                AND rl.schedule_type = 'day_off'
+          );
+    END IF;
 
 END;
 $$ LANGUAGE plpgsql;

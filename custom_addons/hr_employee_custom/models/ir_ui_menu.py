@@ -22,7 +22,7 @@ class IrUiMenu(models.Model):
             if emp_menu and emp_menu.id not in res:
                 res.append(emp_menu.id)
 
-        # Blacklist Delegation Request menu for anyone who is not an active coach/manager of staff
+        # Blacklist Delegation & Supplementary menus for anyone who is not an active coach of staff (and not HR Admin)
         is_hr_admin = (
             user.has_group('hr.group_hr_manager')
             or user.has_group('base.group_system')
@@ -33,16 +33,20 @@ class IrUiMenu(models.Model):
             is_coach = False
             if emp:
                 count = self.env['hr.employee'].sudo().search_count([
-                    '|',
-                    ('coach_id', '=', emp.id),
-                    ('parent_id', '=', emp.id)
+                    ('coach_id', '=', emp.id)
                 ])
                 is_coach = bool(count > 0)
 
             if not is_coach:
-                del_menu = self.env.ref('hr_employee_custom.menu_employee_delegation', raise_if_not_found=False)
-                if del_menu and del_menu.id not in res:
-                    res.append(del_menu.id)
+                restricted_menus = [
+                    'hr_employee_custom.menu_employee_delegation',
+                    'hr_employee_custom.menu_delegated_approvals',
+                    'hr_employee_custom.menu_supplementary_role_list',
+                ]
+                for xml_id in restricted_menus:
+                    menu = self.env.ref(xml_id, raise_if_not_found=False)
+                    if menu and menu.id not in res:
+                        res.append(menu.id)
 
         # Allow Departments (hr.menu_hr_department_kanban) for standard users (group_hr_employee_user)
         # Standard Odoo blacklists Departments for non-officers who are not department managers.

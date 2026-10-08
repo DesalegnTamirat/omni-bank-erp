@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data noupdate="1">
+        <!-- Initialize default operations for Digital Banking Directorate and related teams -->
+        <function model="helpdesk.team.operation" name="_init_default_operations" />
+    </data>
+</odoo>

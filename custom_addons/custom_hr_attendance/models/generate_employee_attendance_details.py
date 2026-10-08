@@ -86,14 +86,17 @@ class GenerateEmployeeAttendanceDetails(models.Model):
         CREATE OR REPLACE FUNCTION generate_daily_employee_attendance_detail_report(
             p_from DATE,
             p_to DATE,
-            p_report_type VARCHAR
+            p_report_type VARCHAR,
+            p_user_id INTEGER DEFAULT 1
         ) RETURNS VOID AS $$
         BEGIN
-            -- Clear previous results for clean report generation
-            TRUNCATE TABLE generate_employee_attendance_details;
+            -- Clear previous results for this user/session to avoid multi-user collision
+            DELETE FROM generate_employee_attendance_details WHERE create_uid = p_user_id;
 
             IF p_report_type = 'attendance_summary' THEN
                 INSERT INTO generate_employee_attendance_details (
+                    create_uid,
+                    write_uid,
                     employee_id,
                     employee_identification,
                     employee_name,
@@ -118,6 +121,8 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     write_date
                 )
                 SELECT 
+                    p_user_id AS create_uid,
+                    p_user_id AS write_uid,
                     emp.id AS employee_id,
                     COALESCE(emp.employee_identification, '') AS employee_identification,
                     COALESCE(emp.name, '') AS employee_name,
@@ -247,7 +252,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                             -- 5. Default Global Working Calendar
                             CASE 
                                 WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
-                                WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'district') THEN 4.0 ELSE 8.0 END)
+                                WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'head_offices', 'ho', 'district', 'district_office', 'regional_office') THEN 4.0 ELSE 8.0 END)
                                 ELSE 0.0
                             END
                         )
@@ -260,6 +265,8 @@ class GenerateEmployeeAttendanceDetails(models.Model):
             ELSE
                 -- Daily Employee Attendance Detail mode (per-attendance row)
                 INSERT INTO generate_employee_attendance_details (
+                    create_uid,
+                    write_uid,
                     employee_id,
                     employee_identification,
                     employee_name,
@@ -288,6 +295,8 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     write_date
                 )
                 SELECT 
+                    p_user_id AS create_uid,
+                    p_user_id AS write_uid,
                     emp.id AS employee_id,
                     COALESCE(emp.employee_identification, '') AS employee_identification,
                     COALESCE(emp.name, '') AS employee_name,

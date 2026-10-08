@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- =====================================================
+             MODULE CATEGORY
+        ====================================================== -->
+        <record id="module_category_succession" model="ir.module.category">
+            <field name="name">Succession Management</field>
+            <field name="description">Confidential Succession Management Access Control</field>
+            <field name="sequence">28</field>
+        </record>
+
+        <record id="res_groups_privilege_succession" model="res.groups.privilege">
+            <field name="name">Succession Management</field>
+            <field name="sequence">10</field>
+            <field name="category_id" ref="bunna_succession_management.module_category_succession"/>
+        </record>
+
+        <!-- =====================================================
+             SECURITY GROUPS
+             NOTE: Standard employees have NO access to any group here.
+             This module is strictly confidential.
+        ====================================================== -->
+
+        <!-- Group 1: PPDD Officer -->
+        <record id="group_succession_ppdd" model="res.groups">
+            <field name="name">PPDD Officer</field>
+            <field name="sequence">10</field>
+            <field name="privilege_id" ref="bunna_succession_management.res_groups_privilege_succession"/>
+            <field name="comment">
+                PPDD Officers can manage critical positions, talent pools,
+                nominate candidates, and run gap analyses. Cannot grant final SPMC approval.
+            </field>
+        </record>
+
+        <!-- Group 2: SPMC / Senior Management -->
+        <record id="group_succession_spmc" model="res.groups">
+            <field name="name">SPMC / Senior Management</field>
+            <field name="sequence">20</field>
+            <field name="privilege_id" ref="bunna_succession_management.res_groups_privilege_succession"/>
+            <field name="implied_ids" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+            <field name="comment">
+                SPMC members can approve critical positions and final candidate approvals.
+                Inherits all PPDD permissions.
+            </field>
+        </record>
+
+        <!-- Group 3: Succession Administrator -->
+        <record id="group_succession_admin" model="res.groups">
+            <field name="name">Succession Administrator</field>
+            <field name="sequence">30</field>
+            <field name="privilege_id" ref="bunna_succession_management.res_groups_privilege_succession"/>
+            <field name="implied_ids" eval="[(4, ref('bunna_succession_management.group_succession_spmc'))]"/>
+            <field name="comment">Full admin access including delete and configuration.</field>
+            <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        </record>
+
+
+    </data>
+
+    <!-- =====================================================
+         RECORD RULES
+         All rules are strictly restricted to the succession groups.
+         Standard employees (base.group_user) have NO rules defined here,
+         which means they cannot read any succession records.
+    ====================================================== -->
+    <data noupdate="0">
+
+        <!-- Bypass base HR strict hierarchy: PPDD must see all employees to plan successions -->
+        <record id="rule_succession_hr_employee_ppdd" model="ir.rule">
+            <field name="name">PPDD: Read All HR Employees</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Critical Positions: PPDD+ can read all -->
+        <record id="rule_succession_critical_position_ppdd" model="ir.rule">
+            <field name="name">PPDD: All Critical Positions</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_critical_position"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+        </record>
+
+        <!-- Candidates: PPDD+ can read all -->
+        <record id="rule_succession_candidate_ppdd" model="ir.rule">
+            <field name="name">PPDD: All Candidates</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+        </record>
+
+        <!-- Candidate Gap Lines: PPDD+ -->
+        <record id="rule_succession_candidate_gap_ppdd" model="ir.rule">
+            <field name="name">PPDD: All Candidate Gap Lines</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_competency_gap"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+        </record>
+
+        <!-- Talent Pool: PPDD+ -->
+        <record id="rule_succession_talent_pool_ppdd" model="ir.rule">
+            <field name="name">PPDD: All Talent Pools</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_talent_pool"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+        </record>
+
+        <!-- Development Plans: PPDD+ -->
+        <record id="rule_succession_dev_plan_ppdd" model="ir.rule">
+            <field name="name">PPDD: All Development Plans</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_plan"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+        </record>
+
+        <!-- Governance Log: PPDD+ -->
+        <record id="rule_succession_gov_log_ppdd" model="ir.rule">
+            <field name="name">PPDD: All Governance Logs</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_governance_log"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+        </record>
+
+    </data>
+</odoo>

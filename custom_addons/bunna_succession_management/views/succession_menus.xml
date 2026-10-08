@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- =====================================================
+             ROOT APPLICATION MENU
+        ====================================================== -->
+        <menuitem id="menu_succession_root"
+                  name="Succession Management"
+                  sequence="90"
+                  web_icon="bunna_succession_management,static/description/icon.png"
+                  groups="base.group_user"/>
+
+        <!-- =====================================================
+             1. DASHBOARD
+        ====================================================== -->
+        <menuitem id="menu_succession_dashboard"
+                  name="Dashboard"
+                  parent="menu_succession_root"
+                  sequence="10"
+                  action="bunna_succession_management.action_succession_dashboard_client"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <!-- =====================================================
+             2. SUCCESSION PIPELINE
+        ====================================================== -->
+        <menuitem id="menu_succession_pipeline_root"
+                  name="Succession Pipeline"
+                  parent="menu_succession_root"
+                  sequence="20"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <menuitem id="menu_succession_critical_positions"
+                  name="Critical Positions"
+                  parent="menu_succession_pipeline_root"
+                  sequence="10"
+                  action="bunna_succession_management.action_succession_critical_position"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <menuitem id="menu_succession_talent_pools"
+                  name="Talent Pools"
+                  parent="menu_succession_pipeline_root"
+                  sequence="20"
+                  action="bunna_succession_management.action_succession_talent_pool"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <menuitem id="menu_succession_candidates_list"
+                  name="Succession Pipeline"
+                  parent="menu_succession_pipeline_root"
+                  sequence="30"
+                  action="bunna_succession_management.action_succession_candidate"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <menuitem id="menu_succession_9box"
+                  name="9-Box Talent Grid"
+                  parent="menu_succession_pipeline_root"
+                  sequence="50"
+                  action="bunna_succession_management.action_succession_9box_client"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <!-- =====================================================
+             3. SUCCESSOR DEVELOPMENT
+        ====================================================== -->
+        <menuitem id="menu_succession_development_root"
+                  name="Successor Development"
+                  parent="menu_succession_root"
+                  sequence="30"
+                  groups="base.group_user"/>
+
+        <menuitem id="menu_succession_career_discussions"
+                  name="Career Discussions"
+                  parent="menu_succession_development_root"
+                  sequence="20"
+                  action="bunna_succession_management.action_career_discussion"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <menuitem id="menu_succession_development_plans"
+                  name="Successor Development Plans (IDP)"
+                  parent="menu_succession_development_root"
+                  sequence="30"
+                  action="bunna_succession_management.action_succession_dev_plan"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+
+        <!-- =====================================================
+             4. REPORTS & ANALYTICS
+        ====================================================== -->
+        <menuitem id="menu_succession_reporting_root"
+                  name="Reports &amp; Analytics"
+                  parent="menu_succession_root"
+                  sequence="40"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <menuitem id="menu_succession_bench_strength"
+                  name="Bench Strength Analysis"
+                  parent="menu_succession_reporting_root"
+                  sequence="10"
+                  action="bunna_succession_management.action_bench_strength_report"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <menuitem id="menu_succession_competency_gap_analytics"
+                  name="Competency Gap Analytics"
+                  parent="menu_succession_reporting_root"
+                  sequence="20"
+                  action="bunna_succession_management.action_competency_gap_analytics"
+                  groups="bunna_succession_management.group_succession_ppdd"/>
+
+        <!-- =====================================================
+             5. CONFIGURATION
+        ====================================================== -->
+        <menuitem id="menu_succession_configuration_root"
+                  name="Configuration"
+                  parent="menu_succession_root"
+                  sequence="100"
+                  groups="bunna_succession_management.group_succession_spmc,bunna_succession_management.group_succession_ppdd"/>
+
+        <record id="succession_config_settings_action" model="ir.actions.act_window">
+            <field name="name">Settings</field>
+            <field name="res_model">res.config.settings</field>
+            <field name="view_id" ref="bunna_succession_management.succession_custom_settings_view_form"/>
+            <field name="view_mode">form</field>
+            <field name="target">current</field>
+            <field name="context">{'module' : 'bunna_succession_management', 'bin_size': False}</field>
+        </record>
+
+        <menuitem id="menu_succession_settings"
+                  name="Settings"
+                  parent="menu_succession_configuration_root"
+                  sequence="10"
+                  action="succession_config_settings_action"
+                  groups="bunna_succession_management.group_succession_spmc,bunna_succession_management.group_succession_ppdd"/>
+
+        
+
+    </data>
+</odoo>
+
+
+

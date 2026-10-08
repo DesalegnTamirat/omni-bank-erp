@@ -2,6 +2,7 @@
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from .t2_appraisal import detect_period_type
+from .performance_notification_helper import send_performance_notification
 
 
 class CorporateScorecard(models.Model):
@@ -36,7 +37,7 @@ class CorporateScorecard(models.Model):
         'appraisal.period',
         string='Appraisal Period',
         required=True,
-        readonly=False,
+        readonly=True,
     )
     appraisal_period_code = fields.Selection(
         selection=[
@@ -56,15 +57,20 @@ class CorporateScorecard(models.Model):
     employee_image_128 = fields.Image(
         string='Employee Photo',
         related='employee_id.image_128',
+        compute_sudo=True,
         max_width=128,
         max_height=128,
         store=True,
     )
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True, default=lambda self: self.env.user.employee_id)
     manager_id = fields.Many2one('hr.employee', string='Manager', readonly=True)
-    job_id = fields.Many2one('hr.job', string='Job Position', related='employee_id.job_id', store=True, readonly=True)
+    job_id = fields.Many2one('hr.job', string='Job Position', related='employee_id.job_id', compute_sudo=True, store=True, readonly=True)
     operating_unit_id = fields.Many2one('operating.unit', string='Operating Unit', readonly=True)
-    department_id = fields.Many2one('hr.department', string='Department', related='employee_id.department_id', store=True, readonly=True)
+    department_id = fields.Many2one('hr.department', string='Department', related='employee_id.department_id', compute_sudo=True, store=True, readonly=True)
+    accept_by = fields.Date(
+        string='Accept By',
+        help='Date before which the employee should review and accept or reject the scorecard.',
+    )
     accepted_by = fields.Many2one('hr.employee', string='Accepted By')
 
     date_start = fields.Date(
@@ -105,6 +111,22 @@ class CorporateScorecard(models.Model):
     ], string='Status', default='draft', required=True, tracking=True, copy=False)
     rejection_reason = fields.Text(string='Rejection Reason', copy=False)
 
+    @api.constrains('fiscal_year_id', 'appraisal_period_id')
+    def _check_unique_scorecard(self):
+        for rec in self:
+            if rec.fiscal_year_id and rec.appraisal_period_id:
+                duplicate = self.sudo().search([
+                    ('id', '!=', rec.id),
+                    ('fiscal_year_id', '=', rec.fiscal_year_id.id),
+                    ('appraisal_period_id', '=', rec.appraisal_period_id.id),
+                ], limit=1)
+                if duplicate:
+                    state_label = dict(duplicate._fields['state'].selection).get(duplicate.state, duplicate.state)
+                    raise ValidationError(
+                        f"A Corporate Scorecard already exists for Fiscal Year '{rec.fiscal_year_id.name}' "
+                        f"and Period '{rec.appraisal_period_id.name}' (Status: {state_label})."
+                    )
+
     is_current_employee = fields.Boolean(
         compute='_compute_current_user_roles',
         string='Is Current Employee',
@@ -131,15 +153,16 @@ class CorporateScorecard(models.Model):
         is_planning = user.has_group('performance_management.group_performance_planning') or user.has_group('base.group_system')
         is_hr = user.has_group('performance_management.group_performance_hr') or user.has_group('base.group_system')
         is_admin = user.has_group('performance_management.group_performance_admin') or user.has_group('base.group_system')
-        user_emp_ids = user.employee_ids.ids
+        user_emp_ids = user.sudo().employee_ids.ids
 
         for rec in self:
             rec.is_planning_role = is_planning
             rec.is_hr_role = is_hr
             rec.is_admin_role = is_admin
 
-            emp_user = rec.employee_id.user_id.id if rec.employee_id else False
-            emp_id = rec.employee_id.id if rec.employee_id else False
+            emp_sudo = rec.sudo().employee_id
+            emp_user = emp_sudo.user_id.id if emp_sudo else False
+            emp_id = emp_sudo.id if emp_sudo else False
             rec.is_current_employee = bool(
                 (emp_user and emp_user == user.id) or
                 (emp_id and emp_id in user_emp_ids)
@@ -155,7 +178,9 @@ class CorporateScorecard(models.Model):
     )
     total_weight = fields.Float(
         string='Total Weight (%)',
+        digits=(16, 2),
         compute='_compute_total_weight',
+        store=True,
     )
 
     @api.depends('appraisal_period_id', 'date_start', 'date_end', 'name')
@@ -254,22 +279,133 @@ class CorporateScorecard(models.Model):
                 self.date_start = line.date_start
                 self.date_end = line.date_end
 
+    def _validate_period_targets_for_notify(self):
+        period_target_map = {
+            'Q1': ('q1_target', 'Q1 Target'),
+            'H1': ('h1_target', 'H1 Target'),
+            'Q2': ('h1_target', 'H1 Target'),
+            'Q3': ('q3_target', 'Q3 Target'),
+            'H2': ('h2_target', 'H2 Target'),
+            'Q4': ('h2_target', 'H2 Target'),
+            'ANNUAL': ('annual_target', 'Annual Target'),
+        }
+        for rec in self:
+            if not rec.line_ids:
+                raise UserError(
+                    f"Corporate Scorecard '{rec.name or ''}' cannot be notified because it has no scorecard lines."
+                )
+            code = rec.appraisal_period_code or detect_period_type(
+                period_rec=rec.appraisal_period_id,
+                start_date=rec.date_start,
+                end_date=rec.date_end,
+                fiscal_year=rec.fiscal_year_id,
+            ) or 'H1'
+            target_field, target_label = period_target_map.get(code, ('h1_target', 'H1 Target'))
+
+            invalid_measures = []
+            for line in rec.line_ids:
+                target_val = getattr(line, target_field, 0.0) or 0.0
+                if target_val <= 0.0:
+                    measure_name = line.measure_id.name if line.measure_id else 'KPI Measure'
+                    invalid_measures.append(f"{measure_name} (Current {target_label}: {target_val})")
+
+            if invalid_measures:
+                period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else code
+                raise UserError(
+                    f"Corporate Scorecard cannot be notified for appraisal period '{period_name}'. "
+                    f"All scorecard lines must have a valid non-zero {target_label} set.\n\n"
+                    f"Missing or zero targets found for:\n- " + "\n- ".join(invalid_measures)
+                )
+
     def action_notify(self):
         for rec in self:
             if not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Only the Planning administrator can notify the employee.')
+            if not rec.accept_by:
+                raise UserError(f"Please provide an 'Accept By' deadline before notifying the employee for corporate scorecard '{rec.name or rec.display_name}'.")
+        self._validate_period_targets_for_notify()
+        for rec in self:
             rec.write({'state': 'notified'})
-            rec.message_post(body='Corporate Scorecard has been notified to the employee for review.')
+            emp = rec.employee_id
+            emp_user = emp.user_id if emp else False
+            emp_partner = emp_user.partner_id if emp_user else False
+            partner_ids = [emp_partner.id] if emp_partner else []
+
+            period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else ''
+            fy_name = rec.fiscal_year_id.name if rec.fiscal_year_id else ''
+            accept_by_str = str(rec.accept_by) if rec.accept_by else 'N/A'
+            manager_name = self.env.user.name or 'Planning Administrator'
+            emp_name = emp.name if emp else 'Assigned Executive'
+            doc_name = rec.name or f"Corporate Scorecard - {fy_name}"
+
+            details = [
+                ("Document Name", f"<strong>{doc_name}</strong>"),
+                ("Executive / Assignee", f"<strong>{emp_name}</strong>"),
+                ("Planning Admin", manager_name),
+                ("Appraisal Period", f"{period_name} ({fy_name})"),
+                ("Accept By Deadline", f'<span style="color: #c53030; font-weight: bold;">{accept_by_str}</span>'),
+                ("Total Weight", f"{rec.total_weight:.2f}%"),
+                ("Current Status", '<span style="background-color: #feebc8; color: #7b341e; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">NOTIFIED</span>'),
+            ]
+
+            send_performance_notification(
+                record=rec,
+                title="📋 Corporate Scorecard Notified: Review & Accept",
+                badge_text="NOTIFIED",
+                badge_bg="#c17540",
+                border_color="#c17540",
+                intro_text=f"Planning Administrator <strong>{manager_name}</strong> has notified the Corporate Scorecard for <strong>{emp_name}</strong> for period <strong>{period_name}</strong> ({fy_name}). Please review strategic targets and accept or reject before the deadline.",
+                details=details,
+                action_btn_text="🎯 Review & Accept Corporate Scorecard",
+                action_btn_color="#541718",
+                footer_note=f"Notified to <b>{emp_name}</b> for review and acceptance before <b>{accept_by_str}</b>.",
+                recipient_partner_ids=partner_ids,
+                activity_user_id=emp_user.id if emp_user else False,
+                activity_summary=f"Review Corporate Scorecard ({period_name}) - Deadline: {accept_by_str}",
+                activity_deadline=rec.accept_by,
+            )
 
     def action_accept(self):
         for rec in self:
             if not (rec.is_current_employee or self.env.is_admin()):
                 raise UserError('Only the assigned employee can accept this Corporate Scorecard.')
-            rec.write({
+            user_emp_id = self.env.user.sudo().employee_id.id or rec.sudo().employee_id.id
+            rec.sudo().write({
                 'state': 'accepted',
-                'accepted_by': self.env.user.employee_id.id or rec.employee_id.id,
+                'accepted_by': user_emp_id,
             })
-            rec.message_post(body='Corporate Scorecard has been accepted by the employee.')
+            
+            period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else ''
+            fy_name = rec.fiscal_year_id.name if rec.fiscal_year_id else ''
+            emp_name = rec.employee_id.name if rec.employee_id else 'Assigned Executive'
+            doc_name = rec.name or f"Corporate Scorecard - {fy_name}"
+
+            try:
+                rec.activity_feedback(['mail.mail_activity_data_todo'], feedback="Corporate Scorecard accepted.")
+            except Exception:
+                pass
+
+            details = [
+                ("Document Name", f"<strong>{doc_name}</strong>"),
+                ("Executive / Assignee", f"<strong>{emp_name}</strong>"),
+                ("Appraisal Period", f"{period_name} ({fy_name})"),
+                ("Total Weight", f"{rec.total_weight:.2f}%"),
+                ("Accepted By", f"<strong>{rec.accepted_by.name or emp_name}</strong>"),
+                ("Current Status", '<span style="background-color: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">ACCEPTED</span>'),
+            ]
+
+            send_performance_notification(
+                record=rec,
+                title="✅ Corporate Scorecard Accepted",
+                badge_text="ACCEPTED",
+                badge_bg="#28a745",
+                border_color="#28a745",
+                intro_text=f"Executive <strong>{emp_name}</strong> has reviewed and <strong>ACCEPTED</strong> the Corporate Scorecard for period <strong>{period_name}</strong> ({fy_name}).",
+                details=details,
+                action_btn_text="🎯 Open & Confirm Corporate Scorecard",
+                action_btn_color="#166534",
+                footer_note="Planning Administrator, please confirm this corporate scorecard to finalize targets.",
+            )
 
     def action_reject(self):
         for rec in self:
@@ -292,7 +428,45 @@ class CorporateScorecard(models.Model):
             if not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Only the Planning administrator can confirm this Corporate Scorecard.')
             rec.write({'state': 'confirmed'})
-            rec.message_post(body='Corporate Scorecard has been confirmed.')
+            
+            emp = rec.employee_id
+            emp_user = emp.user_id if emp else False
+            emp_partner = emp_user.partner_id if emp_user else False
+            partner_ids = [emp_partner.id] if emp_partner else []
+
+            period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else ''
+            fy_name = rec.fiscal_year_id.name if rec.fiscal_year_id else ''
+            emp_name = emp.name if emp else 'Assigned Executive'
+            manager_name = self.env.user.name or 'Planning Administrator'
+            doc_name = rec.name or f"Corporate Scorecard - {fy_name}"
+
+            try:
+                rec.activity_feedback(['mail.mail_activity_data_todo'], feedback="Corporate Scorecard confirmed.")
+            except Exception:
+                pass
+
+            details = [
+                ("Document Name", f"<strong>{doc_name}</strong>"),
+                ("Executive / Assignee", f"<strong>{emp_name}</strong>"),
+                ("Planning Admin", manager_name),
+                ("Appraisal Period", f"{period_name} ({fy_name})"),
+                ("Total Weight", f"{rec.total_weight:.2f}%"),
+                ("Current Status", '<span style="background-color: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">CONFIRMED</span>'),
+            ]
+
+            send_performance_notification(
+                record=rec,
+                title="🔒 Corporate Scorecard Confirmed & Finalized",
+                badge_text="CONFIRMED",
+                badge_bg="#425727",
+                border_color="#425727",
+                intro_text=f"Planning Administrator <strong>{manager_name}</strong> has <strong>CONFIRMED</strong> the Corporate Scorecard for <strong>{emp_name}</strong> for period <strong>{period_name}</strong> ({fy_name}).",
+                details=details,
+                action_btn_text="🎯 View Confirmed Corporate Scorecard",
+                action_btn_color="#425727",
+                footer_note="Corporate Scorecard targets are finalized and active for strategic appraisal evaluation.",
+                recipient_partner_ids=partner_ids,
+            )
 
     def action_complete(self):
         self.write({'state': 'completed'})
@@ -342,7 +516,11 @@ class CorporateScorecard(models.Model):
         Measure = self.env['performance.measure']
         Line = self.env['corporate.scorecard.line']
 
-        root_measures = Measure.search([('objective_id.parent_objective_id', '=', False)])
+        root_measures = Measure.search([
+            ('objective_id.parent_objective_id', '=', False),
+            ('objective_id.active', '=', True),
+            ('active', '=', True),
+        ])
 
         vals_list = [
             {'scorecard_id': self.id, 'measure_id': measure.id}
@@ -433,7 +611,7 @@ class CorporateScorecardLine(models.Model):
         readonly=True,
     )
     weight = fields.Float(
-        related='measure_id.weight', store=True, readonly=True, string='Weight (%)',
+        related='measure_id.weight', store=True, readonly=True, digits=(16, 2), string='Weight (%)',
     )
     target_type = fields.Selection(
         related='measure_id.target_type', store=True, readonly=True,
@@ -444,20 +622,14 @@ class CorporateScorecardLine(models.Model):
     h1_target = fields.Float(string='H1 Target')
     q3_target = fields.Float(string='Q3 Target')
     h2_target = fields.Float(string='H2 Target')
-    annual_target = fields.Float(
-        string='Annual Target', compute='_compute_annual_target', store=True, readonly=True,
-    )
+    annual_target = fields.Float(string='Annual Target')
     target_description = fields.Text(string='Target Description')
 
-    @api.depends('q1_target', 'h1_target', 'q3_target', 'h2_target')
-    def _compute_annual_target(self):
-        for line in self:
-            line.annual_target = (
-                (line.q1_target or 0.0) + (line.h1_target or 0.0)
-                + (line.q3_target or 0.0) + (line.h2_target or 0.0)
-            )
-
     def write(self, vals):
+        allowed_target_fields = {
+            'baseline', 'q1_target', 'h1_target', 'q3_target', 'h2_target',
+            'annual_target', 'target_description', 'sequence'
+        }
         for rec in self:
             sc = rec.scorecard_id
             if sc:
@@ -465,6 +637,12 @@ class CorporateScorecardLine(models.Model):
                     raise UserError('Employees are not permitted to edit scorecard lines.')
                 if sc.state != 'draft':
                     raise UserError('Scorecard lines and targets can only be edited when the Scorecard is in Draft state.')
+                disallowed = set(vals.keys()) - allowed_target_fields
+                if disallowed and not (sc.is_admin_role or self.env.is_admin()):
+                    raise UserError(
+                        f"Editing measurement definitions or weights is not allowed on scorecard lines. "
+                        f"Only targets may be adjusted during draft."
+                    )
         return super().write(vals)
 
     def unlink(self):
@@ -475,4 +653,6 @@ class CorporateScorecardLine(models.Model):
                     raise UserError('Employees are not permitted to delete scorecard lines.')
                 if sc.state != 'draft':
                     raise UserError('Scorecard lines can only be deleted when the Scorecard is in Draft state.')
+                if not (sc.is_admin_role or self.env.is_admin()):
+                    raise UserError('Manual deletion of scorecard lines is restricted. Scorecard lines are populated automatically.')
         return super().unlink()

@@ -33,6 +33,65 @@ class TransferLetter(models.Model):
         ('cancelled', 'Cancelled'),
     ], string='Status', default='draft', tracking=True)
 
+    acceptance_status = fields.Selection([
+        ('pending', 'Pending Acceptance'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Refused / Declined'),
+    ], string="Transfer Acceptance Status", default='pending')
+    acceptance_date = fields.Datetime(string="Acceptance / Response Date", readonly=True)
+    rejection_reason = fields.Text(string="Refusal / Decline Reason")
+
+    def action_accept_transfer(self):
+        """Employee accepts transfer letter."""
+        for rec in self:
+            now = fields.Datetime.now()
+            rec.write({
+                'acceptance_status': 'accepted',
+                'acceptance_date': now,
+            })
+            if rec.transfer_request_id:
+                rec.transfer_request_id.action_accept_transfer()
+            rec.message_post(body=_("Lateral transfer letter ACCEPTED by employee on %s.") % fields.Date.today())
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Transfer Accepted'),
+                'message': _('Lateral transfer letter has been marked as ACCEPTED.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    def action_decline_transfer(self):
+        """Opens decline wizard to capture refusal reason."""
+        self.ensure_one()
+        return {
+            'name': _('Decline / Refuse Transfer Letter'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'internal.selection.decline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_transfer_letter_id': self.id,
+            }
+        }
+
+    def confirm_decline_transfer(self, reason):
+        """Executed by decline wizard when employee declines transfer letter."""
+        for rec in self:
+            now = fields.Datetime.now()
+            rec.write({
+                'acceptance_status': 'rejected',
+                'acceptance_date': now,
+                'rejection_reason': reason,
+            })
+            if rec.transfer_request_id:
+                rec.transfer_request_id.confirm_decline_transfer(reason)
+            rec.message_post(body=_("Lateral transfer letter DECLINED / REFUSED by employee.<br/><b>Reason:</b> %s") % reason)
+        return True
+
     # ── Linked Records ────────────────────────────────────────────────
     transfer_request_id = fields.Many2one(
         'employee.transfer.request', string='Transfer Request', tracking=True

@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="1">
+    <data noupdate="0">
         <!-- Sequence for Disciplinary Case -->
         <record id="seq_discipline_case" model="ir.sequence">
             <field name="name">Disciplinary Case Sequence</field>
             <field name="code">discipline.case</field>
             <field name="prefix">DISC/%(year)s/</field>
-            <field name="padding">5</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
             <field name="company_id" eval="False"/>
         </record>
 
@@ -15,7 +16,8 @@
             <field name="name">Disciplinary Committee Meeting Sequence</field>
             <field name="code">discipline.committee.meeting</field>
             <field name="prefix">DCM/%(year)s/</field>
-            <field name="padding">5</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
             <field name="company_id" eval="False"/>
         </record>
 
@@ -24,7 +26,8 @@
             <field name="name">Disciplinary Suspension Sequence</field>
             <field name="code">discipline.suspension</field>
             <field name="prefix">SUSP/%(year)s/</field>
-            <field name="padding">5</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
             <field name="company_id" eval="False"/>
         </record>
 
@@ -33,7 +36,28 @@
             <field name="name">Disciplinary Appeal Sequence</field>
             <field name="code">discipline.appeal</field>
             <field name="prefix">APP/%(year)s/</field>
-            <field name="padding">5</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Sequence for Discipline Investigation -->
+        <record id="seq_discipline_investigation" model="ir.sequence">
+            <field name="name">Disciplinary Investigation Sequence</field>
+            <field name="code">discipline.investigation</field>
+            <field name="prefix">INV/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Sequence for Payroll Penalty Deduction -->
+        <record id="seq_discipline_payroll_penalty" model="ir.sequence">
+            <field name="name">Disciplinary Payroll Penalty Sequence</field>
+            <field name="code">discipline.payroll.penalty</field>
+            <field name="prefix">PEN/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">no_gap</field>
             <field name="company_id" eval="False"/>
         </record>
     </data>

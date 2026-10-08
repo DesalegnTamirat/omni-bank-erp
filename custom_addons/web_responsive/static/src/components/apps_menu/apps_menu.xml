@@ -49,7 +49,15 @@
                 <i class="oi oi-apps fs-4" />
             </button>
             <div t-if="state.open" class="app-menu-container">
-                <t t-slot="search_bar" />
+                <div class="position-relative d-flex justify-content-center align-items-center w-100 px-4 pt-3 pb-3 border-bottom mb-4">
+                    <div class="o_app_menu_search_wrapper w-100 d-flex justify-content-center" style="max-width: 500px;">
+                        <t t-slot="search_bar" />
+                    </div>
+                    <a href="/web/session/logout?redirect=/web/login" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-2 shadow-sm px-3 py-1 position-absolute end-0 me-4" style="font-weight: 600; border-radius: 20px; font-size: 13px; z-index: 10;" title="Log out from Odoo">
+                        <i class="fa fa-sign-out fs-6"/>
+                        <span>Log out</span>
+                    </a>
+                </div>
                 <div class="o-app-menu-list">
                     <t t-slot="default" />
                 </div>

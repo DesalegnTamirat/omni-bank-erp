@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- LIST VIEW -->
+        <record id="view_succession_ninebox_cell_tree" model="ir.ui.view">
+            <field name="name">succession.ninebox.cell.list</field>
+            <field name="model">succession.ninebox.cell</field>
+            <field name="arch" type="xml">
+                <list string="9-Box Grid Cell Definitions" editable="bottom">
+                    <field name="potential_rating"/>
+                    <field name="performance_rating"/>
+                    <field name="criteria_display" class="fw-bold text-primary"/>
+                    <field name="name" string="Cell Label"/>
+                    <field name="tier_color" widget="badge"
+                           decoration-success="tier_color == 'gold'"
+                           decoration-info="tier_color == 'teal'"
+                           decoration-danger="tier_color == 'brick'"/>
+                    <field name="priority" widget="badge"
+                           decoration-danger="priority in ('critical','urgent')"
+                           decoration-warning="priority == 'high'"
+                           decoration-muted="priority == 'low'"/>
+                    <field name="is_high_potential"/>
+                    <field name="is_watchlist"/>
+                    <field name="description" string="Recommended HR Action"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- FORM VIEW -->
+        <record id="view_succession_ninebox_cell_form" model="ir.ui.view">
+            <field name="name">succession.ninebox.cell.form</field>
+            <field name="model">succession.ninebox.cell</field>
+            <field name="arch" type="xml">
+                <form string="9-Box Cell Definition">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" class="oe_edit_only"/>
+                            <h1><field name="name" placeholder="e.g. Star Performer"/></h1>
+                        </div>
+                        <group>
+                            <group string="Grid Position">
+                                <field name="performance_rating"/>
+                                <field name="potential_rating"/>
+                            </group>
+                            <group string="Classification &amp; Formatting">
+                                <field name="tier_color"/>
+                                <field name="priority"/>
+                                <field name="is_high_potential"/>
+                                <field name="is_watchlist"/>
+                            </group>
+                        </group>
+                        <group string="Recommended HR Intervention / Action">
+                            <field name="description" placeholder="Describe recommended development interventions or HR actions for candidates falling in this box..."/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ACTION -->
+        <record id="action_succession_ninebox_cell" model="ir.actions.act_window">
+            <field name="name">9-Box Grid Cell Definitions</field>
+            <field name="res_model">succession.ninebox.cell</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Configure the 9-Box Grid Cell Definitions
+                </p>
+                <p>
+                    Define custom labels, color tiers, priority, and recommended HR actions for each of the 9 matrix intersections.
+                </p>
+            </field>
+        </record>
+    </data>
+</odoo>

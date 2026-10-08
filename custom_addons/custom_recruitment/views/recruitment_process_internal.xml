@@ -67,6 +67,10 @@
                     </group>
                     <notebook>
                         <page string="Eligible Employees">
+                            <div class="mb-2">
+                                <button name="action_select_all_candidates" string="Select All" type="object" class="btn btn-secondary btn-sm me-2" icon="fa-check-square-o"/>
+                                <button name="action_deselect_all_candidates" string="Deselect All" type="object" class="btn btn-secondary btn-sm" icon="fa-square-o"/>
+                            </div>
                             <field name="eligible_emp">
                                 <list string="Eligible Employees" editable="top">
                                     <field name="emp_name"/>

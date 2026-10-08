@@ -24,7 +24,14 @@ class ExamGradingTask(models.Model):
     department_id = fields.Many2one("hr.department", string="Department", compute="_compute_department_id", store=True, index=True)
     operating_unit_id = fields.Many2one("operating.unit", string="Submitting Work Unit", compute="_compute_department_id", store=True, index=True)
 
-    candidate_name = fields.Char(string="Candidate Name", readonly=True)
+    candidate_name_private = fields.Char(string="Real Candidate Name", readonly=True)
+    candidate_name = fields.Char(
+        string="Candidate Name",
+        compute="_compute_candidate_name_display",
+        search="_search_candidate_name",
+        readonly=True
+    )
+
     question_type = fields.Selection(related="question_id.question_type", string="Question Type", readonly=True)
     question_text = fields.Text(related="question_id.name", string="Question Prompt", readonly=True)
     rubric_guidelines = fields.Text(related="question_id.rubric_guidelines", string="Scoring Rubric", readonly=True)
@@ -53,18 +60,100 @@ class ExamGradingTask(models.Model):
         ("verified", "Verified & Score Finalized"),
     ], string="Grading Status", default="pending", tracking=True, required=True)
 
+    @api.depends_context("uid")
+    def _compute_candidate_name_display(self):
+        user = self.env.user
+        # Workunit managers / line managers have candidate names masked as '##' for blind/fair grading.
+        # HR Officers, HR Managers, Assessment Administrators, Recruitment Officers/Managers, and System Admins can view real candidate names.
+        is_hr_or_admin = (
+            user.has_group("assessment_system.group_assessment_officer") or
+            user.has_group("assessment_system.group_assessment_manager") or
+            user.has_group("assessment_system.group_assessment_administrator") or
+            user.has_group("custom_recruitment.group_recruitment_officer") or
+            user.has_group("custom_recruitment.group_recruitment_manager") or
+            user.has_group("custom_recruitment.group_recruitment_administrator") or
+            user._is_admin() or
+            self.env.is_superuser()
+        )
+        for rec in self:
+            if is_hr_or_admin:
+                real_name = rec.candidate_name_private or (rec.attempt_id.candidate_name if rec.attempt_id else False)
+                rec.candidate_name = real_name or _("Candidate")
+            else:
+                rec.candidate_name = "##"
+
+    def _search_candidate_name(self, operator, value):
+        user = self.env.user
+        is_hr_or_admin = (
+            user.has_group("assessment_system.group_assessment_officer") or
+            user.has_group("assessment_system.group_assessment_manager") or
+            user.has_group("assessment_system.group_assessment_administrator") or
+            user.has_group("custom_recruitment.group_recruitment_officer") or
+            user.has_group("custom_recruitment.group_recruitment_manager") or
+            user.has_group("custom_recruitment.group_recruitment_administrator") or
+            user._is_admin() or
+            self.env.is_superuser()
+        )
+        if is_hr_or_admin:
+            return ["|", ("candidate_name_private", operator, value), ("attempt_id.candidate_name", operator, value)]
+        return [("name", operator, value)]
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get("candidate_name") and not vals.get("candidate_name_private"):
+                vals["candidate_name_private"] = vals["candidate_name"]
             if vals.get("name", _("New")) == _("New"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("exam.grading.task") or _("GRADE/%06d") % self.search_count([])
         return super().create(vals_list)
 
-    @api.depends("question_id.department_id", "question_id.operating_unit_id", "job_id.department_id", "attempt_id.employee_id.operating_unit_id")
+    @api.depends(
+        "question_id.department_id",
+        "question_id.operating_unit_id",
+        "job_id.department_id",
+        "attempt_id.employee_id.operating_unit_id",
+        "attempt_id.employee_id.department_id.operating_unit_id",
+        "attempt_id.applicant_id",
+        "attempt_id.candidate_type",
+        "attempt_id.session_id.vacancy_id.sourcing_type",
+        "attempt_id.session_id.vacancy_id.reference"
+    )
     def _compute_department_id(self):
         for rec in self:
             rec.department_id = rec.question_id.department_id or (rec.job_id.department_id if rec.job_id else False)
-            rec.operating_unit_id = rec.question_id.operating_unit_id or (rec.attempt_id.employee_id.operating_unit_id if rec.attempt_id and rec.attempt_id.employee_id else False) or (getattr(rec.job_id.department_id, "operating_unit_id", False) if rec.job_id and rec.job_id.department_id else False)
+
+            # Determine candidate's default operating unit (work unit)
+            cand_ou = False
+            if rec.attempt_id:
+                emp = rec.attempt_id.employee_id
+                if not emp and rec.attempt_id.applicant_id:
+                    emp = getattr(rec.attempt_id.applicant_id, 'emp_id', False) or getattr(rec.attempt_id.applicant_id, 'employee_id', False)
+                
+                if emp:
+                    cand_ou = emp.operating_unit_id or (emp.department_id.operating_unit_id if emp.department_id else False)
+                elif rec.attempt_id.applicant_id:
+                    cand_ou = getattr(rec.attempt_id.applicant_id, 'operating_unit_id', False) or (getattr(rec.attempt_id.applicant_id.department_id, 'operating_unit_id', False) if getattr(rec.attempt_id.applicant_id, 'department_id', False) else False)
+
+            # Determine if candidate or vacancy is internal
+            target_vac = rec.attempt_id.session_id.vacancy_id if (rec.attempt_id and rec.attempt_id.session_id) else False
+            sourcing_type = getattr(target_vac, 'sourcing_type', '') or ''
+            ref_upper = (getattr(target_vac, 'reference', '') or '').upper()
+
+            is_internal_vacancy = (
+                sourcing_type == 'internal' or
+                'INT' in ref_upper or 'TRA' in ref_upper or 'LAT' in ref_upper
+            )
+            is_internal_cand = (rec.attempt_id.candidate_type == 'internal' if rec.attempt_id else False) or is_internal_vacancy
+
+            # For internal vacancies / candidates, submitted work unit MUST be the candidate's default operating unit
+            if (is_internal_cand or is_internal_vacancy) and cand_ou:
+                rec.operating_unit_id = cand_ou
+            else:
+                rec.operating_unit_id = (
+                    cand_ou or
+                    rec.question_id.operating_unit_id or
+                    (getattr(rec.job_id.department_id, "operating_unit_id", False) if rec.job_id and rec.job_id.department_id else False)
+                )
 
     @api.depends("create_date")
     def _compute_sla_deadline(self):
@@ -129,8 +218,8 @@ class ExamGradingTask(models.Model):
             for task in self.filtered(lambda t: t.attempt_id == att):
                 if task.marks_awarded < 0 or task.marks_awarded > task.marks_available:
                     raise ValidationError(_("Marks awarded for '%s' must be between 0 and %s.") % ((task.question_text or "Question")[:40], task.marks_available))
-                task.answer_id.marks_awarded = task.marks_awarded
-            att.action_submit_essay_evaluation()
+                task.answer_id.sudo().marks_awarded = task.marks_awarded
+            att.sudo().action_submit_essay_evaluation()
 
     def action_verify_grade(self):
         """Supervisor verification step (FR-EXM-036)"""
@@ -147,14 +236,14 @@ class ExamGradingTask(models.Model):
             })
             
             # Update the candidate's answer record and attempt manual score
-            rec.answer_id.write({
+            rec.answer_id.sudo().write({
                 "marks_awarded": rec.marks_awarded,
                 "is_correct": (rec.marks_awarded > 0),
             })
             
             # Recalculate total manual score on attempt
             attempt = rec.attempt_id
-            attempt.action_submit_essay_evaluation()
+            attempt.sudo().action_submit_essay_evaluation()
 
     @api.model
     def check_overdue_grading_tasks_cron(self):
@@ -192,7 +281,7 @@ class ExamManualScoreOverride(models.Model):
 
     name = fields.Char(string="Override Reference", readonly=True, default=lambda self: _("New"))
     attempt_id = fields.Many2one("exam.candidate.attempt", string="Candidate Attempt", required=True, index=True)
-    candidate_name = fields.Char(related="attempt_id.candidate_name", string="Candidate", readonly=True)
+    candidate_name = fields.Char(string="Candidate", compute="_compute_candidate_name_display", readonly=True)
     
     original_objective_score = fields.Float(string="Original Objective Score", readonly=True)
     original_manual_score = fields.Float(string="Original Manual Score", readonly=True)
@@ -210,6 +299,26 @@ class ExamManualScoreOverride(models.Model):
         ("verified", "Verified & Applied"),
         ("rejected", "Rejected"),
     ], string="Status", default="draft", tracking=True, required=True)
+
+    @api.depends_context("uid")
+    def _compute_candidate_name_display(self):
+        user = self.env.user
+        is_hr_or_admin = (
+            user.has_group("assessment_system.group_assessment_officer") or
+            user.has_group("assessment_system.group_assessment_manager") or
+            user.has_group("assessment_system.group_assessment_administrator") or
+            user.has_group("custom_recruitment.group_recruitment_officer") or
+            user.has_group("custom_recruitment.group_recruitment_manager") or
+            user.has_group("custom_recruitment.group_recruitment_administrator") or
+            user._is_admin() or
+            self.env.is_superuser()
+        )
+        for rec in self:
+            if is_hr_or_admin:
+                real_name = rec.attempt_id.candidate_name if rec.attempt_id else False
+                rec.candidate_name = real_name or _("Candidate")
+            else:
+                rec.candidate_name = "##"
 
     @api.model_create_multi
     def create(self, vals_list):

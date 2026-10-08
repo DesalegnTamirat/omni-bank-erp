@@ -20,7 +20,7 @@
                     <group>
                         <group>
                             <field name="candidate_name"/>
-                            <field name="attempt_id"/>
+                            <field name="attempt_id" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
                             <field name="job_id"/>
                             <field name="operating_unit_id"/>
                         </group>

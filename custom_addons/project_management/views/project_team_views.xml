@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Project Team Members -->
+    <record id="view_pm_project_team_tree" model="ir.ui.view">
+        <field name="name">pm.project.team.list</field>
+        <field name="model">pm.project.team</field>
+        <field name="arch" type="xml">
+            <list string="Project Teams &amp; Roles" editable="bottom">
+                <field name="project_id" options="{'no_create_edit': True}"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="role_id" options="{'no_create_edit': False, 'no_quick_create': False}"/>
+                <field name="notes" placeholder="Responsibilities / Notes"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_project_team_form" model="ir.ui.view">
+        <field name="name">pm.project.team.form</field>
+        <field name="model">pm.project.team</field>
+        <field name="arch" type="xml">
+            <form string="Project Team Member">
+                <sheet>
+                    <group>
+                        <group string="Project &amp; Member">
+                            <field name="project_id"/>
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                        </group>
+                        <group string="Governance Role">
+                            <field name="role_id" options="{'no_create_edit': False, 'no_quick_create': False}"/>
+                        </group>
+                    </group>
+                    <group string="Responsibilities &amp; Scope">
+                        <field name="notes"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pm_project_team" model="ir.actions.act_window">
+        <field name="name">Project Teams &amp; Roles</field>
+        <field name="res_model">pm.project.team</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Register project team members and assign governance roles.
+            </p>
+        </field>
+    </record>
+
+    <!-- Project Roles Catalog -->
+    <record id="view_pm_project_role_tree" model="ir.ui.view">
+        <field name="name">pm.project.role.list</field>
+        <field name="model">pm.project.role</field>
+        <field name="arch" type="xml">
+            <list string="Project Roles" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="description"/>
+                <field name="member_count" string="Assigned Members"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_project_role_form" model="ir.ui.view">
+        <field name="name">pm.project.role.form</field>
+        <field name="model">pm.project.role</field>
+        <field name="arch" type="xml">
+            <form string="Project Role">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Role Title"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Scrum Master, Solution Architect"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="member_count"/>
+                        </group>
+                    </group>
+                    <group string="Role Description &amp; Responsibilities">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pm_project_role" model="ir.actions.act_window">
+        <field name="name">Project Roles</field>
+        <field name="res_model">pm.project.role</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create and manage governance roles for project teams.
+            </p>
+        </field>
+    </record>
+</odoo>

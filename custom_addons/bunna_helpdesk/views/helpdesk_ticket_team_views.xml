@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_team_search" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.team.search</field>
+        <field name="model">helpdesk.ticket.team</field>
+        <field name="arch" type="xml">
+            <search string="Helpdesk Team Search">
+                <filter
+                    string="Archived"
+                    name="inactive"
+                    domain="[('active','=',False)]"
+                />
+                <separator />
+                <field name="name" filter_domain="[('name', 'ilike', self)]" />
+                <field
+                    name="user_ids"
+                    string="User"
+                    filter_domain="[('user_ids', 'ilike', self)]"
+                />
+                <field name="company_id" groups="base.group_multi_company" />
+                <group>
+                    <filter
+                        string="Company"
+                        name="company"
+                        context="{'group_by': 'company_id'}"
+                        groups="base.group_multi_company"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_team_form" model="ir.ui.view">
+        <field name="name">view.helpdesk_team.form</field>
+        <field name="model">helpdesk.ticket.team</field>
+        <field name="arch" type="xml">
+            <form string="Helpdesk Team">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button
+                            class="oe_stat_button"
+                            type="action"
+                            name="%(bunna_helpdesk.action_helpdesk_team_operation)d"
+                            context="{'search_default_team_id': id, 'default_team_id': id}"
+                            icon="fa-list"
+                        >
+                            <field string="Services" name="operation_count" widget="statinfo" />
+                        </button>
+                    </div>
+                    <widget
+                        name="web_ribbon"
+                        title="Archived"
+                        bg_color="bg-danger"
+                        invisible="active"
+                    />
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only" string="Helpdesk Team" />
+                        <h1>
+                            <field name="name" placeholder="Helpdesk Team name..." />
+                        </h1>
+                        <div name="options_active" />
+                        <label
+                            for="parent_id"
+                            class="oe_edit_only"
+                            string="Parent Team"
+                        />
+                        <h4>
+                            <field name="parent_id" placeholder="Parent Team name..." />
+                        </h4>
+                        <div name="options_active" />
+                    </div>
+                    <group>
+                        <group name="left" string="General">
+                            <field name="active" invisible="1" />
+                            <field name="user_id" domain="[('share', '=', False)]" />
+                            <label for="alias_name" string="Email Alias" />
+                            <div class="oe_inline" name="alias_def">
+                                <field
+                                    name="alias_id"
+                                    class="oe_read_only oe_inline"
+                                    string="Email Alias"
+                                    required="0"
+                                />
+                                <div
+                                    class="oe_inline"
+                                    name="edit_alias"
+                                    style="display: inline;"
+                                >
+                                    <div class="oe_edit_only" dir="ltr">
+                                        <field
+                                        name="alias_name"
+                                        placeholder="alias"
+                                        class="oe_inline"
+                                    />@
+                                        <field
+                                        name="alias_domain_id"
+                                        class="oe_inline"
+                                        placeholder="e.g. mycompany.com"
+                                        options="{'no_create': True, 'no_open': True}"
+                                    />
+                                    </div>
+                                    <button
+                                        icon="oi-arrow-right"
+                                        type="action"
+                                        name="%(base_setup.action_general_configuration)d"
+                                        string="Choose or configure a custom domain"
+                                        class="p-0 btn-link"
+                                        invisible="alias_domain_id"
+                                    />
+                                </div>
+                            </div>
+                            <field
+                                name="alias_contact"
+                                class="oe_inline"
+                                string="Accept Emails From"
+                            />
+                            <field
+                                name="company_id"
+                                options="{'no_create': True}"
+                                groups="base.group_multi_company"
+                            />
+                            <field name="category_ids" widget="many2many_tags" />
+                        </group>
+                        <group name="right" string="Settings">
+                            <!-- Team Tier / Escalation Level -->
+                            <field name="team_tier" />
+                            <!-- Visibility (3-tier) -->
+                            <field name="visibility" widget="radio" />
+                            <!-- Auto-assignment -->
+                            <field name="assignment_method" widget="radio" />
+                            <!-- Customer ratings -->
+                            <field name="use_rating" />
+                            <field
+                                name="rating_template_id"
+                                invisible="not use_rating"
+                            />
+                            <!-- Timesheets -->
+                            <field name="use_timesheets" groups="bunna_helpdesk.group_helpdesk_user" />
+                            <field
+                                name="analytic_account_id"
+                                invisible="not use_timesheets"
+                                groups="bunna_helpdesk.group_helpdesk_user"
+                            />
+                        </group>
+                    </group>
+
+                    <!-- SLA Policies tab -->
+                    <notebook>
+                        <page name="members" string="Team Members">
+                            <field
+                                name="user_ids"
+                                widget="many2many"
+                                options="{'not_delete': True}"
+                            >
+                                <kanban
+                                    quick_create="false"
+                                    create="true"
+                                    delete="true"
+                                >
+                                    <field name="id" />
+                                    <field name="name" />
+                                    <field name="agent_duty_status" />
+                                    <field name="agent_duty_status_reason" />
+                                    <templates>
+                                        <t t-name="card" class="flex-row">
+                                            <aside class="o_kanban_aside_full">
+                                                <field
+                                                    name="avatar_128"
+                                                    class="o_kanban_image_fill w-100"
+                                                    widget="image"
+                                                    options="{'img_class': 'object-fit-cover'}"
+                                                    alt="Avatar"
+                                                />
+                                            </aside>
+
+                                            <main class="ps-2 ps-md-0 d-flex flex-column justify-content-center">
+                                                <field name="name" class="fw-bold" />
+                                                <div class="mt-1">
+                                                    <field name="agent_duty_status" widget="badge"
+                                                        decoration-success="agent_duty_status == 'available'"
+                                                        decoration-warning="agent_duty_status in ('busy', 'on_break')"
+                                                        decoration-danger="agent_duty_status == 'offline'"
+                                                    />
+                                                </div>
+                                                <span class="small text-muted mt-1" t-if="record.agent_duty_status_reason and record.agent_duty_status_reason.raw_value">
+                                                    <field name="agent_duty_status_reason" />
+                                                </span>
+                                            </main>
+                                        </t>
+                                    </templates>
+                                </kanban>
+                            </field>
+                        </page>
+                        <page name="sla_policies" string="SLA Policies">
+                            <field name="sla_ids">
+                                <list editable="bottom">
+                                    <field name="name" />
+                                    <field name="priority" />
+                                    <field name="tag_ids" widget="many2many_tags" />
+                                    <field name="stage_id" />
+                                    <field name="time_days" string="Days" />
+                                    <field name="time_hours" string="Hours" />
+                                </list>
+                            </field>
+                        </page>
+                        <page name="operations_list" string="Services">
+                            <field name="operation_ids" context="{'default_team_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle" />
+                                    <field name="name" string="Operation / Case" placeholder="e.g. A2A Transaction/Incoming" />
+                                    <field name="code" string="Code" placeholder="e.g. A2A_IN" />
+                                    <field name="default_priority" widget="priority" />
+                                    <field name="case_type_id" string="Case Type" options="{'no_create': True}" />
+                                    <field name="service_family_id" string="Service Family" options="{'no_create': True}" />
+                                    <field
+                                        name="service_id"
+                                        string="Service"
+                                        options="{'no_create': True}"
+                                        domain="[('family_id', '=', service_family_id)] if service_family_id else []"
+                                    />
+                                    <field name="target_hours" string="SLA (Hours)" />
+                                    <field name="active" widget="boolean_toggle" />
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter />
+            </form>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_team_tree" model="ir.ui.view">
+        <field name="name">view.helpdesk_team.list</field>
+        <field name="model">helpdesk.ticket.team</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="visibility" />
+                <field name="assignment_method" />
+                <field name="category_ids" widget="many2many_tags" />
+                <field name="todo_ticket_count" string="Active tickets" />
+                <field
+                    name="todo_ticket_count_unassigned"
+                    string="Unassigned tickets"
+                />
+                <field
+                    name="todo_ticket_count_unattended"
+                    string="Unattended tickets"
+                />
+                <field
+                    name="todo_ticket_count_high_priority"
+                    string="Priority tickets"
+                />
+                <field
+                    name="company_id"
+                    optional="hide"
+                    groups="base.group_multi_company"
+                />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_team_kanban_config" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.team.kanban.config</field>
+        <field name="model">helpdesk.ticket.team</field>
+        <field name="priority">16</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile">
+                <field name="name" />
+                <field name="user_id" />
+                <field name="user_ids" />
+                <field name="category_ids" />
+                <field name="todo_ticket_count" />
+                <field name="todo_ticket_count_high_priority" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-primary">
+                                <i class="fa fa-ticket me-1" />
+                                <field name="todo_ticket_count" /> Active
+                            </span>
+                            <span class="badge text-bg-danger" t-if="record.todo_ticket_count_high_priority.raw_value">
+                                <field name="todo_ticket_count_high_priority" /> Priority
+                            </span>
+                        </div>
+                        <field class="fw-bold fs-5 text-truncate" name="name" />
+                        <div class="text-muted small mt-1" t-if="record.user_id.value">
+                            <i class="fa fa-user me-1" />
+                            Lead: <field name="user_id" />
+                        </div>
+                        <div class="mt-2" t-if="record.category_ids.raw_value and record.category_ids.raw_value.length">
+                            <field name="category_ids" widget="many2many_tags" />
+                        </div>
+                        <footer class="pt-2 d-flex justify-content-between align-items-center">
+                            <field name="user_ids" widget="many2many_tags_avatar" />
+                            <field name="user_id" widget="many2one_avatar_user" />
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+</odoo>

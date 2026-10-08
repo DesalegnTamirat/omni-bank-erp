@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data noupdate="1">
+        <!-- ── Service Family 1: CBS Services ───────────────────────────────── -->
+        <record id="service_family_cbs" model="helpdesk.service.family">
+            <field name="name">CBS Services</field>
+            <field name="code">CBS</field>
+            <field name="sequence">1</field>
+            <field name="description">Core Banking System (Finacle) branch &amp; conventional banking operations</field>
+        </record>
+
+        <record id="service_cbs_conventional" model="helpdesk.service">
+            <field name="name">Conventional Banking Products</field>
+            <field name="family_id" ref="service_family_cbs" />
+            <field name="default_sdt_hours">24.0</field>
+            <field name="sequence">1</field>
+        </record>
+
+        <record id="sub_cat_account_opening" model="helpdesk.service.sub.category">
+            <field name="name">Account Opening Case</field>
+            <field name="service_id" ref="service_cbs_conventional" />
+            <field name="default_priority">1</field>
+            <field name="resolution_sop">&lt;p&gt;Verify customer KYC in Finacle, check NBE blacklisting and branch SOL code.&lt;/p&gt;</field>
+        </record>
+
+        <record id="sub_cat_fayda_link" model="helpdesk.service.sub.category">
+            <field name="name">Fayda Link Case (National ID)</field>
+            <field name="service_id" ref="service_cbs_conventional" />
+            <field name="default_priority">2</field>
+            <field name="resolution_sop">&lt;p&gt;Validate customer Fayda identification in Core Banking database and link with CIF.&lt;/p&gt;</field>
+        </record>
+
+        <record id="sub_cat_account_maintenance" model="helpdesk.service.sub.category">
+            <field name="name">Account Name / Profile Maintenance</field>
+            <field name="service_id" ref="service_cbs_conventional" />
+            <field name="default_priority">1</field>
+        </record>
+
+        <!-- ── Service Family 2: Digital Products ───────────────────────────── -->
+        <record id="service_family_digital_products" model="helpdesk.service.family">
+            <field name="name">Digital Products</field>
+            <field name="code">DIG_PROD</field>
+            <field name="sequence">2</field>
+            <field name="description">Digital Financial Services (DFS), Cards, Mobile Money</field>
+        </record>
+
+        <record id="service_dfs" model="helpdesk.service">
+            <field name="name">Digital Financial Services (DFS)</field>
+            <field name="family_id" ref="service_family_digital_products" />
+            <field name="default_sdt_hours">12.0</field>
+            <field name="sequence">1</field>
+        </record>
+
+        <record id="sub_cat_telebirr_case" model="helpdesk.service.sub.category">
+            <field name="name">Telebirr Integration Case</field>
+            <field name="service_id" ref="service_dfs" />
+            <field name="default_priority">2</field>
+            <field name="resolution_sop">&lt;p&gt;Check Telebirr payment gateway transaction log, reconcile with Core Banking GL.&lt;/p&gt;</field>
+        </record>
+
+        <record id="sub_cat_dfs_loan_disbursement" model="helpdesk.service.sub.category">
+            <field name="name">DFS Loan Disbursement Case</field>
+            <field name="service_id" ref="service_dfs" />
+            <field name="default_priority">3</field>
+        </record>
+
+        <record id="sub_cat_dfs_repayment" model="helpdesk.service.sub.category">
+            <field name="name">DFS Repayment Case</field>
+            <field name="service_id" ref="service_dfs" />
+            <field name="default_priority">2</field>
+        </record>
+
+        <!-- ── Service Family 3: Digital Transactions & Disputes ────────────── -->
+        <record id="service_family_disputes" model="helpdesk.service.family">
+            <field name="name">Digital Transaction / Dispute Services</field>
+            <field name="code">DISPUTE</field>
+            <field name="sequence">3</field>
+            <field name="description">ATM, POS, A2A, Mobile &amp; USSD Transaction Disputes</field>
+        </record>
+
+        <record id="service_atm_disputes" model="helpdesk.service">
+            <field name="name">ATM &amp; Card Dispute Service</field>
+            <field name="family_id" ref="service_family_disputes" />
+            <field name="default_sdt_hours">48.0</field>
+            <field name="sequence">1</field>
+        </record>
+
+        <record id="sub_cat_on_us_atm" model="helpdesk.service.sub.category">
+            <field name="name">On-Us ATM Dispute (Cash Not Dispensed)</field>
+            <field name="service_id" ref="service_atm_disputes" />
+            <field name="default_priority">3</field>
+            <field name="resolution_sop">&lt;p&gt;1. Verify EJ log from Bunna Bank ATM switch.&lt;br/&gt;2. Verify physical cash balance audit from branch custodian.&lt;br/&gt;3. Initiate credit reversal if overage confirmed.&lt;/p&gt;</field>
+        </record>
+
+        <record id="sub_cat_off_us_atm" model="helpdesk.service.sub.category">
+            <field name="name">Off-Us ATM Dispute (EthSwitch Inter-bank)</field>
+            <field name="service_id" ref="service_atm_disputes" />
+            <field name="default_priority">2</field>
+            <field name="resolution_sop">&lt;p&gt;Submit EthSwitch dispute claim to issuing bank with terminal ID and settlement date.&lt;/p&gt;</field>
+        </record>
+
+        <record id="service_transfer_disputes" model="helpdesk.service">
+            <field name="name">Account-to-Account (A2A) &amp; Mobile Transfer Service</field>
+            <field name="family_id" ref="service_family_disputes" />
+            <field name="default_sdt_hours">24.0</field>
+            <field name="sequence">2</field>
+        </record>
+
+        <record id="sub_cat_a2a_transfer" model="helpdesk.service.sub.category">
+            <field name="name">A2A Transfer Case (Debited Not Credited)</field>
+            <field name="service_id" ref="service_transfer_disputes" />
+            <field name="default_priority">3</field>
+        </record>
+
+        <record id="sub_cat_mobile_transfer" model="helpdesk.service.sub.category">
+            <field name="name">Mobile App Transfer Dispute</field>
+            <field name="service_id" ref="service_transfer_disputes" />
+            <field name="default_priority">2</field>
+        </record>
+
+        <record id="sub_cat_ussd_transfer" model="helpdesk.service.sub.category">
+            <field name="name">USSD (*969#) Transfer Dispute</field>
+            <field name="service_id" ref="service_transfer_disputes" />
+            <field name="default_priority">2</field>
+        </record>
+
+        <!-- ── Seed OLA Policy ──────────────────────────────────────────────── -->
+        <record id="ola_atm_dispute" model="helpdesk.ola">
+            <field name="name">Contact Center to Digital Banking - ATM Dispute OLA</field>
+            <field name="service_id" ref="service_atm_disputes" />
+            <field name="sub_category_id" ref="sub_cat_on_us_atm" />
+            <field name="delivery_time_value">48.0</field>
+            <field name="delivery_time_unit">hours</field>
+            <field name="target_hours">48.0</field>
+            <field name="notes">Standard OLA between Level-1 Contact Center and Digital Banking Ops for ATM cash retraction/journal dispute settlement.</field>
+        </record>
+
+        <!-- ── Seed Knowledge Base Article ──────────────────────────────────── -->
+        <record id="kb_article_atm_dispute" model="helpdesk.knowledge.article">
+            <field name="name">SOP: Investigating ATM Cash Not Dispensed Complaints</field>
+            <field name="service_family_id" ref="service_family_disputes" />
+            <field name="service_id" ref="service_atm_disputes" />
+            <field name="sub_category_id" ref="sub_cat_on_us_atm" />
+            <field name="state">published</field>
+            <field name="content">&lt;h3&gt;Bunna Bank Contact Center SOP: ATM Cash Not Dispensed&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;1. Verification:&lt;/strong&gt; Inquire customer account number, card sequence, and transaction timestamp.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;2. Finacle CBS Check:&lt;/strong&gt; Verify whether transaction is debited and whether automated reversal occurred.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;3. Escalation:&lt;/strong&gt; Escalate ticket to Digital Banking Operations under 48-Hour OLA.&lt;/p&gt;</field>
+        </record>
+        <!-- ── Seed Case Types ──────────────────────────────────────────────── -->
+        <record id="case_type_complaint" model="helpdesk.ticket.case.type">
+            <field name="name">Complaint</field>
+            <field name="code">complaint</field>
+            <field name="is_nbe_complaint">True</field>
+            <field name="default_priority">2</field>
+            <field name="sequence">1</field>
+            <field name="description">Customer grievance requiring investigation and NBE compliance adherence.</field>
+        </record>
+
+        <record id="case_type_inquiry" model="helpdesk.ticket.case.type">
+            <field name="name">Inquiry</field>
+            <field name="code">inquiry</field>
+            <field name="is_nbe_complaint">False</field>
+            <field name="default_priority">1</field>
+            <field name="sequence">2</field>
+            <field name="description">Customer questions about products, services, exchange rates, or account balance.</field>
+        </record>
+
+        <record id="case_type_service_request" model="helpdesk.ticket.case.type">
+            <field name="name">Service Request</field>
+            <field name="code">service_request</field>
+            <field name="is_nbe_complaint">False</field>
+            <field name="default_priority">1</field>
+            <field name="sequence">3</field>
+            <field name="description">Requests for bank services (e.g. PIN reset, statement request, SMS banking activation).</field>
+        </record>
+
+        <record id="case_type_incident" model="helpdesk.ticket.case.type">
+            <field name="name">Incident / Outage</field>
+            <field name="code">incident</field>
+            <field name="is_nbe_complaint">False</field>
+            <field name="default_priority">3</field>
+            <field name="sequence">4</field>
+            <field name="description">System disruptions, channel downtime, or network failures impacting customers.</field>
+        </record>
+
+        <record id="case_type_fraud_alert" model="helpdesk.ticket.case.type">
+            <field name="name">Fraud Alert / Security</field>
+            <field name="code">fraud_alert</field>
+            <field name="is_nbe_complaint">True</field>
+            <field name="default_priority">3</field>
+            <field name="sequence">5</field>
+            <field name="description">Suspicious transactions, card skimming, SIM swap, or unauthorized access reports.</field>
+        </record>
+
+        <record id="case_type_feedback" model="helpdesk.ticket.case.type">
+            <field name="name">Feedback / Suggestion</field>
+            <field name="code">feedback</field>
+            <field name="is_nbe_complaint">False</field>
+            <field name="default_priority">0</field>
+            <field name="sequence">6</field>
+            <field name="description">Customer feedback, branch compliments, or service recommendations.</field>
+        </record>
+
+        <!-- ── Seed Customer Types ──────────────────────────────────────────── -->
+        <record id="customer_type_existing" model="helpdesk.ticket.customer.type">
+            <field name="name">Bunna Account Holder</field>
+            <field name="code">external_existing</field>
+            <field name="is_internal">False</field>
+            <field name="sequence">1</field>
+            <field name="description">Active Bunna Bank account holder verified against CBS / Finacle.</field>
+        </record>
+
+        <record id="customer_type_prospective" model="helpdesk.ticket.customer.type">
+            <field name="name">Prospective / Non-Account Holder</field>
+            <field name="code">external_prospective</field>
+            <field name="is_internal">False</field>
+            <field name="sequence">2</field>
+            <field name="description">Prospective customer or non-account holder inquiring about services.</field>
+        </record>
+
+        <record id="customer_type_internal" model="helpdesk.ticket.customer.type">
+            <field name="name">Bunna Staff / Internal Work Unit</field>
+            <field name="code">internal</field>
+            <field name="is_internal">True</field>
+            <field name="sequence">3</field>
+            <field name="description">Internal Bunna Bank branches, departments, or staff members submitting internal requests.</field>
+        </record>
+
+        <record id="customer_type_corporate" model="helpdesk.ticket.customer.type">
+            <field name="name">Corporate / Institutional Client</field>
+            <field name="code">corporate</field>
+            <field name="is_internal">False</field>
+            <field name="sequence">4</field>
+            <field name="description">Corporate, commercial, SME, or institutional banking customer.</field>
+        </record>
+    </data>
+</odoo>

@@ -14,3 +14,5 @@ from . import t3_scorecard
 from . import t3_appraisal
 from . import performance_dashboard
 from . import res_users
+from . import performance_job_template
+from . import performance_notification_helper

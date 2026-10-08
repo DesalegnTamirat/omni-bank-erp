@@ -106,18 +106,17 @@ class CBISInterviewSession(models.Model):
 
         # 2. Auto-populate Candidates
         candidate_vals_list = self._fetch_vacancy_interview_candidates()
-        if candidate_vals_list:
-            lines = []
-            for vals in candidate_vals_list:
-                lines.append((0, 0, {
-                    "candidate_type": vals["candidate_type"],
-                    "employee_id": vals["employee_id"],
-                    "applicant_id": vals["applicant_id"],
-                    "exam_score_percentage": vals["exam_score_percentage"],
-                    "passed_written_exam": vals["passed_written_exam"],
-                    "documents_verified": vals["documents_verified"],
-                }))
-            self.candidate_line_ids = [(5, 0, 0)] + lines
+        lines = []
+        for vals in candidate_vals_list:
+            lines.append((0, 0, {
+                "candidate_type": vals["candidate_type"],
+                "employee_id": vals["employee_id"],
+                "applicant_id": vals["applicant_id"],
+                "exam_score_percentage": vals["exam_score_percentage"],
+                "passed_written_exam": vals["passed_written_exam"],
+                "documents_verified": vals["documents_verified"],
+            }))
+        self.candidate_line_ids = [(5, 0, 0)] + lines
 
         # 3. Auto-populate Competencies from Job Position Profile
         target_job = self.vacancy_id.job_position
@@ -223,103 +222,91 @@ class CBISInterviewSession(models.Model):
         return self.env["res.users"].browse(list(user_ids))
 
     def _fetch_vacancy_interview_candidates(self):
-        """Helper to fetch qualifying interview candidates (Written Exam >= 50% and select_flag is True)."""
+        """Helper to fetch qualifying interview candidates (Written Exam >= 50% and select_flag is True, matching vacancy sourcing type)."""
         self.ensure_one()
         if not self.vacancy_id:
             return []
 
         vac = self.vacancy_id
         target_job = vac.job_position
+        sourcing_type = getattr(vac, "sourcing_type", False) or "both"
         candidate_dict = {}
 
         disqualified_emp_ids = set()
         disqualified_app_ids = set()
 
         # 1. Check Internal Candidates from new.internal.recruitment.selected
-        int_sel_records = self.env["new.internal.recruitment.selected"].sudo().search([
-            "|", ("vacancy_id", "=", vac.id), ("vacancy_reference", "=", vac.reference)
-        ])
-        for sel in int_sel_records:
-            if hasattr(sel, "new_int_rec_sel"):
-                has_exam = getattr(sel, 'exam_scores_fetched', False) or (getattr(sel, 'written_weight', 0.0) or 0.0) > 0.0
-                for cand in sel.new_int_rec_sel:
-                    emp_id = cand.emp_name.id if cand.emp_name else False
-                    if not emp_id:
-                        continue
-                    exam_score = cand.written_exam_score or 0.0
-                    is_disqualified = False
-                    if cand.select_flag is False:
-                        is_disqualified = True
-                    elif cand.selection_type == 'rejected':
-                        is_disqualified = True
-                    elif has_exam and exam_score < 50.0:
-                        is_disqualified = True
+        int_sel_records = self.env["new.internal.recruitment.selected"]
+        if sourcing_type in ("internal", "both"):
+            int_sel_records = self.env["new.internal.recruitment.selected"].sudo().search([
+                "|", ("vacancy_id", "=", vac.id), ("vacancy_reference", "=", vac.reference)
+            ])
+            for sel in int_sel_records:
+                if hasattr(sel, "new_int_rec_sel"):
+                    has_exam = getattr(sel, 'exam_scores_fetched', False) or (getattr(sel, 'written_weight', 0.0) or 0.0) > 0.0
+                    for cand in sel.new_int_rec_sel:
+                        emp_id = cand.emp_name.id if cand.emp_name else False
+                        if not emp_id:
+                            continue
+                        exam_score = cand.written_exam_score or 0.0
+                        is_disqualified = False
+                        if (cand.select_flag is False) or (getattr(cand, 'selection_type', False) == 'rejected') or (has_exam and exam_score < 50.0):
+                            is_disqualified = True
 
-                    if is_disqualified:
-                        disqualified_emp_ids.add(emp_id)
-                    else:
-                        key = ("internal", emp_id)
-                        candidate_dict[key] = {
-                            "candidate_type": "internal",
-                            "employee_id": emp_id,
-                            "applicant_id": False,
-                            "exam_score_percentage": exam_score if exam_score > 0 else 100.0,
-                            "passed_written_exam": True,
-                            "documents_verified": True,
-                        }
+                        if is_disqualified:
+                            disqualified_emp_ids.add(emp_id)
+                        else:
+                            key = ("internal", emp_id)
+                            candidate_dict[key] = {
+                                "candidate_type": "internal",
+                                "employee_id": emp_id,
+                                "applicant_id": False,
+                                "exam_score_percentage": exam_score if exam_score > 0 else 100.0,
+                                "passed_written_exam": True,
+                                "documents_verified": True,
+                            }
 
         # 2. Check External Candidates from external.recruitment.selected
-        ext_sel_records = self.env["external.recruitment.selected"].sudo().search([
-            "|", ("vacancy_id", "=", vac.id), ("vacancy_reference", "=", vac.reference)
-        ])
-        for sel in ext_sel_records:
-            if hasattr(sel, "ext_rec_sel"):
-                has_exam = getattr(sel, 'exam_scores_fetched', False) or (getattr(sel, 'written_weight', 0.0) or 0.0) > 0.0
-                for cand in sel.ext_rec_sel:
-                    app_id = cand.applicant_name.id if cand.applicant_name else False
-                    if not app_id:
-                        continue
-                    exam_score = cand.written_exam_score or 0.0
-                    is_disqualified = False
-                    if cand.select_flag is False:
-                        is_disqualified = True
-                    elif cand.selection_type == 'rejected':
-                        is_disqualified = True
-                    elif has_exam and exam_score < 50.0:
-                        is_disqualified = True
+        ext_sel_records = self.env["external.recruitment.selected"]
+        if sourcing_type in ("external", "both"):
+            ext_sel_records = self.env["external.recruitment.selected"].sudo().search([
+                "|", ("vacancy_id", "=", vac.id), ("vacancy_reference", "=", vac.reference)
+            ])
+            for sel in ext_sel_records:
+                if hasattr(sel, "ext_rec_sel"):
+                    has_exam = getattr(sel, 'exam_scores_fetched', False) or (getattr(sel, 'written_weight', 0.0) or 0.0) > 0.0
+                    for cand in sel.ext_rec_sel:
+                        app_id = cand.applicant_name.id if cand.applicant_name else False
+                        if not app_id:
+                            continue
+                        exam_score = cand.written_exam_score or 0.0
+                        is_disqualified = False
+                        if (cand.select_flag is False) or (getattr(cand, 'selection_type', False) == 'rejected') or (has_exam and exam_score < 50.0):
+                            is_disqualified = True
 
-                    if is_disqualified:
-                        disqualified_app_ids.add(app_id)
-                    else:
-                        key = ("external", app_id)
-                        candidate_dict[key] = {
-                            "candidate_type": "external",
-                            "employee_id": False,
-                            "applicant_id": app_id,
-                            "exam_score_percentage": exam_score if exam_score > 0 else 100.0,
-                            "passed_written_exam": True,
-                            "documents_verified": True,
-                        }
+                        if is_disqualified:
+                            disqualified_app_ids.add(app_id)
+                        else:
+                            key = ("external", app_id)
+                            candidate_dict[key] = {
+                                "candidate_type": "external",
+                                "employee_id": False,
+                                "applicant_id": app_id,
+                                "exam_score_percentage": exam_score if exam_score > 0 else 100.0,
+                                "passed_written_exam": True,
+                                "documents_verified": True,
+                            }
 
-        # 3. Written Exam attempts from Assessment System (exam.candidate.attempt)
+        # 3. Written Exam attempts from Assessment System strictly for THIS vacancy (exam.candidate.attempt)
         domain = [
             ("state", "=", "completed"),
             ("score_percentage", ">=", 50.0),
+            "|", ("session_id.vacancy_id", "=", vac.id), ("exam_id.vacancy_id", "=", vac.id),
         ]
-        or_conditions = [("session_id.vacancy_id", "=", vac.id), ("exam_id.vacancy_id", "=", vac.id)]
-        if target_job:
-            or_conditions.append(("job_id", "=", target_job.id))
-
-        if len(or_conditions) == 3:
-            domain.extend(["|", "|", or_conditions[0], or_conditions[1], or_conditions[2]])
-        elif len(or_conditions) == 2:
-            domain.extend(["|", or_conditions[0], or_conditions[1]])
-        else:
-            domain.append(or_conditions[0])
 
         exam_attempts = self.env["exam.candidate.attempt"].sudo().search(domain)
         for att in exam_attempts:
-            if att.employee_id and att.employee_id.id not in disqualified_emp_ids:
+            if sourcing_type in ("internal", "both") and att.employee_id and att.employee_id.id not in disqualified_emp_ids:
                 key = ("internal", att.employee_id.id)
                 if key not in candidate_dict:
                     candidate_dict[key] = {
@@ -330,7 +317,7 @@ class CBISInterviewSession(models.Model):
                         "passed_written_exam": True,
                         "documents_verified": True,
                     }
-            elif att.applicant_id and att.applicant_id.id not in disqualified_app_ids:
+            elif sourcing_type in ("external", "both") and att.applicant_id and att.applicant_id.id not in disqualified_app_ids:
                 key = ("external", att.applicant_id.id)
                 if key not in candidate_dict:
                     candidate_dict[key] = {
@@ -348,11 +335,11 @@ class CBISInterviewSession(models.Model):
         for app_id in disqualified_app_ids:
             candidate_dict.pop(("external", app_id), None)
 
-        # 4. Fallback: Applicants for Vacancy only if no specific selection list
-        if not candidate_dict and not int_sel_records and not ext_sel_records and target_job:
+        # 4. Fallback: Applicants ONLY for THIS Vacancy if no specific selection list exists yet
+        if not candidate_dict and not int_sel_records and not ext_sel_records and sourcing_type in ("external", "both"):
             applicants = self.env["hr.applicant"].sudo().search([
                 ("active", "=", True),
-                "|", ("job_vacancy_id", "=", vac.id), ("job_id", "=", target_job.id)
+                ("job_vacancy_id", "=", vac.id)
             ])
             for app in applicants:
                 if app.id not in disqualified_app_ids:
@@ -374,6 +361,8 @@ class CBISInterviewSession(models.Model):
             if not rec.vacancy_id:
                 raise UserError(_("Please select a Job Vacancy first."))
 
+            sourcing_type = getattr(rec.vacancy_id, "sourcing_type", False) or "both"
+
             # Load Panel Users
             panel_users = rec._fetch_vacancy_panel_users()
             if panel_users:
@@ -384,11 +373,14 @@ class CBISInterviewSession(models.Model):
             valid_emp_ids = {vals["employee_id"] for vals in candidate_vals_list if vals["employee_id"]}
             valid_app_ids = {vals["applicant_id"] for vals in candidate_vals_list if vals["applicant_id"]}
 
-            # 1. Unlink candidates who no longer qualify / failed written exam (<50%) and have no submitted evaluations
+            # 1. Unlink candidates who no longer qualify, don't match sourcing type, or failed written exam (<50%) and have no submitted evaluations
             invalid_lines = rec.candidate_line_ids.filtered(
-                lambda l: ((l.employee_id and l.employee_id.id not in valid_emp_ids) or
-                           (l.applicant_id and l.applicant_id.id not in valid_app_ids)) and
-                          (not l.submitted_eval_count or l.submitted_eval_count == 0)
+                lambda l, v_emp=valid_emp_ids, v_app=valid_app_ids, st=sourcing_type: (
+                    (l.candidate_type == 'external' and st == 'internal') or
+                    (l.candidate_type == 'internal' and st == 'external') or
+                    (l.employee_id and l.employee_id.id not in v_emp) or
+                    (l.applicant_id and l.applicant_id.id not in v_app)
+                ) and (not l.submitted_eval_count or l.submitted_eval_count == 0)
             )
             if invalid_lines:
                 invalid_lines.unlink()
@@ -435,11 +427,19 @@ class CBISInterviewSession(models.Model):
 
     def action_confirm_session(self):
         """Dispatches panel assignments and auto-provisions access (FR-CBIS-009, FR-AMS-NOT-07)"""
+        group_panel = self.env.ref("assessment_system.group_assessment_panel_member", raise_if_not_found=False)
         for rec in self:
             if not rec.candidate_line_ids:
                 raise UserError(_("Please assign at least one candidate before confirming the interview session."))
             if not rec.panel_member_ids:
                 raise UserError(_("Please assign at least one panel member to conduct the interview evaluations."))
+
+            if group_panel:
+                for member in rec.panel_member_ids:
+                    m_groups = getattr(member, 'group_ids', False) or getattr(member, 'groups_id', False)
+                    if m_groups is not False and group_panel not in m_groups:
+                        field_name = 'group_ids' if 'group_ids' in member._fields else 'groups_id'
+                        member.sudo().write({field_name: [(4, group_panel.id)]})
 
             for candidate in rec.candidate_line_ids:
                 candidate._initialize_evaluations_for_panel()

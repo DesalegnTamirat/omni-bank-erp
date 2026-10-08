@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Root Menu -->
+    <menuitem id="menu_pm_root"
+              name="Project Management"
+              sequence="10"
+              web_icon="project_management,static/description/icon.png"/>
+
+    <!-- 1. Executive Dashboard (Landing View) -->
+    <menuitem id="menu_pm_dashboard"
+              name="Dashboard"
+              parent="menu_pm_root"
+              action="action_pm_executive_dashboard"
+              sequence="5"/>
+
+    <!-- 2. Projects Menu (Execution Hub) -->
+    <menuitem id="menu_pm_projects_root"
+              name="Projects"
+              parent="menu_pm_root"
+              sequence="10"/>
+
+    <menuitem id="menu_pm_projects"
+              name="Projects"
+              parent="menu_pm_projects_root"
+              action="action_pm_project"
+              sequence="10"/>
+
+    <menuitem id="menu_pm_milestones"
+              name="Milestones"
+              parent="menu_pm_projects_root"
+              action="action_pm_milestone"
+              sequence="20"/>
+
+    <menuitem id="menu_pm_deliverables"
+              name="Deliverables / Major Activities"
+              parent="menu_pm_projects_root"
+              action="action_pm_deliverable"
+              sequence="30"/>
+
+    <menuitem id="menu_pm_project_tasks_under_projects"
+              name="Project Tasks"
+              parent="menu_pm_projects_root"
+              action="action_pm_project_tasks"
+              sequence="40"/>
+
+    <!-- 3. Tasks Menu (Operational Execution) -->
+    <menuitem id="menu_pm_tasks_root"
+              name="Tasks"
+              parent="menu_pm_root"
+              sequence="20"/>
+
+    <menuitem id="menu_pm_my_tasks"
+              name="My Tasks"
+              parent="menu_pm_tasks_root"
+              action="action_pm_my_tasks"
+              sequence="10"/>
+
+    <menuitem id="menu_pm_project_tasks"
+              name="Project Tasks"
+              parent="menu_pm_tasks_root"
+              action="action_pm_project_tasks"
+              sequence="20"/>
+
+    <menuitem id="menu_pm_non_project_tasks"
+              name="Non-Project Tasks"
+              parent="menu_pm_tasks_root"
+              action="action_pm_non_project_tasks"
+              sequence="30"/>
+
+    <!-- 4. Reporting Menu (NEW: Task Analytics & Progress Updates) -->
+    <menuitem id="menu_pm_reporting_root"
+              name="Reporting"
+              parent="menu_pm_root"
+              sequence="30"/>
+
+    <menuitem id="menu_pm_task_analytics"
+              name="Task Analytics"
+              parent="menu_pm_reporting_root"
+              action="action_pm_task_analytics"
+              sequence="10"/>
+
+    <menuitem id="menu_pm_progress_updates"
+              name="Progress Updates"
+              parent="menu_pm_reporting_root"
+              action="action_pm_project_progress_update"
+              sequence="20"/>
+
+    <!-- 5. Configuration Menu (Strategic Alignment & Governance Catalogs) -->
+    <menuitem id="menu_pm_config"
+              name="Configuration"
+              parent="menu_pm_root"
+              groups="group_pm_manager"
+              sequence="100"/>
+
+    <menuitem id="menu_pm_config_strategic_sources"
+              name="Strategic Sources"
+              parent="menu_pm_config"
+              action="action_pm_strategic_source"
+              sequence="10"/>
+
+    <menuitem id="menu_pm_config_strategic_objectives"
+              name="Strategic Objectives"
+              parent="menu_pm_config"
+              action="action_pm_strategic_objective"
+              sequence="15"/>
+
+    <menuitem id="menu_pm_initiatives"
+              name="Strategic Issues"
+              parent="menu_pm_config"
+              action="action_pm_initiative"
+              sequence="20"/>
+
+    <menuitem id="menu_pm_config_lead_offices"
+              name="Project Lead Offices"
+              parent="menu_pm_config"
+              action="action_pm_lead_office"
+              sequence="25"/>
+
+    <menuitem id="menu_pm_config_project_teams"
+              name="Project Teams &amp; Roles"
+              parent="menu_pm_config"
+              action="action_pm_project_team"
+              sequence="30"/>
+
+    <menuitem id="menu_pm_config_project_roles"
+              name="Project Roles"
+              parent="menu_pm_config"
+              action="action_pm_project_role"
+              sequence="32"/>
+
+    <menuitem id="menu_pm_config_stages"
+              name="Stages"
+              parent="menu_pm_config"
+              action="action_pm_stage"
+              sequence="35"/>
+
+    <menuitem id="menu_pm_config_tags"
+              name="Project Types"
+              parent="menu_pm_config"
+              action="action_pm_tag"
+              sequence="40"/>
+</odoo>

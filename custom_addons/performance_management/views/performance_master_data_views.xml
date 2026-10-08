@@ -460,18 +460,13 @@
               action="action_performance_measure"
               groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="60"/>
-    <menuitem id="menu_tier3_job_objective"
-              name="Job Position Measures"
+    <menuitem id="menu_performance_job_template"
+              name="Position Scorecard Templates"
               parent="menu_scorecard_config"
-              action="action_performance_job_objective"
+              action="action_performance_job_template"
               groups="performance_management.group_performance_manager,performance_management.group_performance_hr,performance_management.group_performance_admin"
-              sequence="70"/>
-    <menuitem id="menu_job_measure_bulk"
-              name="Job KPI Bulk Entry"
-              parent="menu_configuration"
-              action="action_performance_job_measure_bulk"
-              groups="performance_management.group_performance_manager,performance_management.group_performance_hr,performance_management.group_performance_admin"
-              sequence="80"/>
+              sequence="65"/>
+
     <!-- Appraisal Configurations-->
     <menuitem id="menu_appraisal_config"
               name="Appraisal Configurations"

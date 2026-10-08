@@ -4,6 +4,7 @@
 
         <!-- Grant Employees menu access to User/Officer/Administrator and all Internal Users (base.group_user). -->
         <record id="hr.menu_hr_employee_payroll" model="ir.ui.menu">
+            <field name="name">Employee Service</field>
             <field name="group_ids" eval="[(6, 0, [ref('base.group_user'), ref('hr_employee_custom.group_hr_employee_user')])]"/>
         </record>
 
@@ -89,9 +90,9 @@
         <menuitem id="menu_guarentees_details_list" name="Guarantees Details" parent="hr.menu_hr_employee_payroll"
                   action="employee_guarentees_details_tree_action" sequence="13"/>
         <menuitem id="menu_supplementary_role_list" name="Supplementary Role" parent="hr.menu_hr_employee_payroll"
-                  action="employee_supplementary_role_tree" sequence="14"/>
-        <menuitem id="menu_hr_employee_custom_re_instating" name="Re-Instating" parent="hr.menu_hr_employee_payroll"
-                  action="employee_re_instating_tree" sequence="15"/>
+                  action="employee_supplementary_role_tree" sequence="14" groups="hr.group_hr_user,hr.group_hr_manager"/>
+        <!-- <menuitem id="menu_hr_employee_custom_re_instating" name="Re-Instating" parent="hr.menu_hr_employee_payroll"
+                  action="employee_re_instating_tree" sequence="15"/> -->
         <!--        <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"-->
         <!--                  action="employee_transfer_form_tree" sequence="16"/>-->
         <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
@@ -103,8 +104,8 @@
                   action="action_hr_employee_document_all" sequence="18"/>
         <menuitem id="menu_hr_employee_custom_demotion" name="Employee Demotion" parent="hr.menu_hr_employee_payroll"
                   action="employee_demotion_action" sequence="19"/>
-        <menuitem id="menu_hr_employee_custom_part_time_employment" name="Part Time Employment"
-                  parent="hr.menu_hr_employee_payroll" action="part_time_employment_action" sequence="20"/>
+<!--        <menuitem id="menu_hr_employee_custom_part_time_employment" name="Part Time Employment"-->
+<!--                  parent="hr.menu_hr_employee_payroll" action="part_time_employment_action" sequence="20"/>-->
         <menuitem id="menu_job_form_list" name="Job History" parent="hr.menu_hr_employee_payroll"
                   action="employee_job_form_tree" sequence="21"/>
 
@@ -116,12 +117,28 @@
             <field name="context">{'search_default_group_hr_presence_state': 1}</field>
             <field name="search_view_id" ref="hr.view_employee_filter"/>
         </record>
+        <menuitem id="menu_hr_reporting_wizard" name="HR Reporting &amp; Analytics Generator" parent="hr.hr_menu_hr_reports"
+                  action="action_hr_reporting_wizard" sequence="1"/>
         <menuitem id="menu_print_employee_report" name="Print Employee Report" parent="hr.hr_menu_hr_reports"
                   action="action_print_employee_report" sequence="2"/>
         <menuitem id="menu_print_employee_experience_report" name="Print Employee Experience Report"
                   parent="hr.hr_menu_hr_reports" action="action_print_employee_experience_report" sequence="3"/>
         <menuitem id="menu_employee_presence_custom" name="Employee Presence" parent="hr.hr_menu_hr_reports"
                   action="action_employee_presence_reporting" sequence="4"/>
+
+        <!-- EM-088 Reporting Submenus -->
+        <menuitem id="menu_report_headcount_dept" name="Headcount by Department" parent="hr.hr_menu_hr_reports"
+                  action="action_report_headcount_dept" sequence="10"/>
+        <menuitem id="menu_report_headcount_branch" name="Headcount by Branch" parent="hr.hr_menu_hr_reports"
+                  action="action_report_headcount_branch" sequence="11"/>
+        <menuitem id="menu_report_headcount_grade" name="Headcount by Grade" parent="hr.hr_menu_hr_reports"
+                  action="action_report_headcount_grade" sequence="12"/>
+        <menuitem id="menu_report_headcount_position" name="Headcount by Position" parent="hr.hr_menu_hr_reports"
+                  action="action_report_headcount_position" sequence="13"/>
+        <menuitem id="menu_report_gender" name="Gender Profile Report" parent="hr.hr_menu_hr_reports"
+                  action="action_report_gender" sequence="14"/>
+        <menuitem id="menu_report_work_permit_expiry" name="Work Permit Expiry Report" parent="hr.hr_menu_hr_reports"
+                  action="action_report_work_permit_expiry" sequence="15"/>
         <menuitem id="menu_employee_category" name="Employee category" parent="hr.menu_human_resources_configuration"
                   action="employee_category" sequence="17"/>
 
@@ -138,8 +155,54 @@
                   action="action_hr_payroll_structure_view" parent="hr.menu_human_resources_configuration"
                   sequence="20"/>
         <menuitem id="menu_employee_delegation" name="Delegation Request"
-                  parent="hr.menu_hr_employee_payroll" action="action_hr_employee_delegation" sequence="13"/>
+                  parent="hr.menu_hr_employee_payroll" action="action_hr_employee_delegation" sequence="13" groups="hr.group_hr_user,hr.group_hr_manager"/>
         <menuitem id="menu_delegated_approvals" name="Delegated Approvals"
-                  parent="hr.menu_hr_employee_payroll" action="action_hr_delegated_approvals_server" sequence="14"/>
-    </data>
+                  parent="hr.menu_hr_employee_payroll" action="action_hr_delegated_approvals_server" sequence="14" groups="hr.group_hr_user,hr.group_hr_manager"/>
+        <menuitem id="menu_hr_employee_change_request" name="Master Data Change Requests"
+                 parent="hr.menu_hr_root" sequence="25"/>
+          <menuitem id="menu_hr_employee_change_request_data" name="Data Change Requests"
+                 parent="menu_hr_employee_change_request" action="action_hr_employee_change_request" sequence="9"/>
+
+        <menuitem id="menu_hr_employee_change_history" name="Data Change Audit Log"
+                  parent="menu_hr_employee_change_request" action="action_hr_employee_change_history" sequence="25" groups="hr.group_hr_manager"/>
+        <menuitem id="menu_hr_employee_change_field_config" name="Change Field Document Rules and Config"
+                  parent="menu_hr_employee_change_request" action="action_hr_employee_change_field_config" sequence="10" groups="hr.group_hr_manager"/>
+
+
+
+<!--   Career Path inside the Employees app   -->
+<menuitem id="menu_career_path_root" name="Career Path" parent="hr.menu_hr_root" sequence="4" groups="hr_employee_custom.group_career_path_employee"/>
+<!--   =====================================================
+             1. Career Architecture (Configuration)
+        ======================================================   -->
+<menuitem id="menu_career_architecture_category" name="Career Architecture" parent="menu_career_path_root" sequence="10" groups="hr_employee_custom.group_career_path_admin"/>
+<menuitem id="menu_career_track_config" name="Career Tracks" parent="menu_career_architecture_category" action="hr_employee_custom.action_career_track" sequence="10" groups="hr_employee_custom.group_career_path_admin"/>
+<menuitem id="menu_career_path_config" name="Career Paths" parent="menu_career_architecture_category" action="hr_employee_custom.action_career_path" sequence="20" groups="hr_employee_custom.group_career_path_admin"/>
+<!--   =====================================================
+             2. My Career  (all employees can see this)
+        ======================================================   -->
+<menuitem id="menu_my_career_category" name="My Career" parent="menu_career_path_root" sequence="20" groups="hr_employee_custom.group_career_path_employee"/>
+<menuitem id="menu_my_career_map_owl" name="My Career Map" parent="menu_my_career_category" action="hr_employee_custom.action_career_path_visualizer" sequence="10" groups="hr_employee_custom.group_career_path_employee"/>
+<menuitem id="menu_my_career_aspirations" name="My Aspirations" parent="menu_my_career_category" action="hr_employee_custom.action_my_career_aspiration" sequence="20" groups="hr_employee_custom.group_career_path_employee"/>
+<menuitem id="menu_my_career_idps" name="My Development Plans" parent="menu_my_career_category" action="hr_employee_custom.action_my_career_idp" sequence="30" groups="hr_employee_custom.group_career_path_employee"/>
+<!--   =====================================================
+             3. Team  (managers only)
+        ======================================================   -->
+<menuitem id="menu_team_career_category" name="Team Career Paths" parent="menu_career_path_root" sequence="30" groups="hr_employee_custom.group_career_path_manager"/>
+<menuitem id="menu_team_career_paths" name="Team Aspirations" parent="menu_team_career_category" action="hr_employee_custom.action_team_career_aspiration" sequence="10" groups="hr_employee_custom.group_career_path_manager"/>
+<menuitem id="menu_team_career_idps" name="Team Development Plans" parent="menu_team_career_category" action="hr_employee_custom.action_team_career_idp" sequence="20" groups="hr_employee_custom.group_career_path_manager"/>
+<!--   =====================================================
+             4. Career Management (HR admins only - Operational Data)
+        ======================================================   -->
+<menuitem id="menu_career_management_category" name="Career Management" parent="menu_career_path_root" sequence="40" groups="hr_employee_custom.group_career_path_admin"/>
+<menuitem id="menu_all_career_aspirations" name="All Aspirations" parent="menu_career_management_category" action="hr_employee_custom.action_career_aspiration_all" sequence="10" groups="hr_employee_custom.group_career_path_admin"/>
+<menuitem id="menu_all_career_idps" name="All Development Plans" parent="menu_career_management_category" action="hr_employee_custom.action_all_career_idp" sequence="20" groups="hr_employee_custom.group_career_path_admin"/>
+
+<!-- Insurance Notification System Menus () -->
+<menuitem id="menu_hr_insurance_root" name="Insurance Request" parent="hr.menu_hr_root" sequence="26"/>
+<menuitem id="menu_hr_insurance_ess" name="My Insurance Request" parent="menu_hr_insurance_root" action="action_hr_insurance_notification_ess" sequence="1"/>
+<menuitem id="menu_hr_insurance_pomd" name="POMD Insurance Claims Review" parent="menu_hr_insurance_root" action="action_hr_insurance_notification_pomd" sequence="2" groups="hr.group_hr_user,hr.group_hr_manager"/>
+<menuitem id="menu_hr_insurance_record" name="Approved Insurance Ledger" parent="menu_hr_insurance_root" action="action_hr_insurance_record" sequence="3" groups="hr.group_hr_user,hr.group_hr_manager"/>
+</data>
+
 </odoo>

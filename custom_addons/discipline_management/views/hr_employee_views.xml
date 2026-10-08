@@ -25,16 +25,13 @@
                     <page string="Disciplinary Record" groups="discipline_management.group_discipline_user">
                         <group>
                             <group string="Disciplinary Summary Status">
-                                <field name="disciplinary_clearance_status" widget="badge" readonly="1"/>
                                 <field name="active_disciplinary_action" readonly="1"/>
-                                <field name="latest_discipline_sanction" readonly="1"/>
                                 <field name="disciplinary_warning_count" readonly="1"/>
                                 <field name="last_disciplinary_date" readonly="1"/>
                             </group>
-                            <group string="Suspension &amp; Mobility Status">
+                            <group string="Suspension Status">
                                 <field name="is_suspended" readonly="1"/>
                                 <field name="suspension_type" readonly="1"/>
-                                <field name="is_ineligible_for_promotion_transfer" readonly="1"/>
                             </group>
                         </group>
                         <group string="Complete Disciplinary History">

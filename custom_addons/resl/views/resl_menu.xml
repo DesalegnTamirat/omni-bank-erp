@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <menuitem id="menu_resl_root" name="RESL" sequence="10"
+            web_icon="resl,static/description/capital.png"/>
+
+        <menuitem id="menu_resl_loans_root" name="Loans"
+            parent="menu_resl_root" sequence="10"/>
+
+        <menuitem id="menu_resl_loans_all" name="All Loans"
+            parent="menu_resl_loans_root"
+            action="resl.action_resl_loan_tree" sequence="10"/>
+
+        <menuitem id="menu_resl_loans_guarantees" name="My Pending Guarantees"
+            parent="menu_resl_loans_root"
+            action="resl.action_resl_my_guarantees" sequence="20"/>
+
+        <menuitem id="menu_resl_loans_reviews" name="My Reviews"
+            parent="menu_resl_loans_root"
+            action="resl.action_resl_my_reviews"
+            sequence="30"/>
+
+        <menuitem id="menu_resl_loans_replacement" name="Loans Needing Replacement"
+            parent="menu_resl_loans_root"
+            action="resl.action_resl_loans_replacement_needed"
+            groups="resl.group_resl_hr" sequence="40"/>
+
+        <!-- FR-RESL-020: HR Accountant's queue of approved loans still to be
+             disbursed; HR Auditor/HR Officer can see it too since they're
+             the ones who flag a loan as ready via "Request Disbursement". -->
+        <menuitem id="menu_resl_loans_pending_disbursements" name="Pending Disbursements"
+            parent="menu_resl_loans_root"
+            action="resl.action_resl_pending_disbursements"
+            groups="resl.group_resl_hr_accountant,resl.group_resl_hr_auditor,resl.group_resl_hr"
+            sequence="45"/>
+
+        <!-- No hard group requirement: visibility is already fully
+             controlled by rule_resl_loan_disbursement_officer (each user
+             only ever sees loans routed to THEM as disbursement_officer_id),
+             the same fix applied to "My Reviews". A Branch Accountant or
+             Division Manager needs no manual technical-group assignment
+             for this to work. -->
+        <menuitem id="menu_resl_loans_my_disbursements" name="My Disbursements"
+            parent="menu_resl_loans_root"
+            action="resl.action_resl_my_disbursements"
+            sequence="46"/>
+
+        <menuitem id="menu_resl_replacement_logs" name="Replacement Logs"
+            parent="menu_resl_root"
+            action="resl.action_resl_loan_replacement_logs"
+            groups="resl.group_resl_hr" sequence="50"/>
+
+        <!-- ── Reporting Menu (FR-RESL-017 & FR-RESL-018) ──────────────────── -->
+        <menuitem id="menu_resl_reporting_root" name="Reporting"
+            parent="menu_resl_root"
+            groups="resl.group_resl_manager,resl.group_resl_hr,resl.group_resl_pomd,resl.group_resl_hr_auditor,resl.group_resl_hr_accountant"
+            sequence="20"/>
+
+        <menuitem id="menu_resl_report_analysis" name="RSSA Loans Analysis"
+            parent="menu_resl_reporting_root"
+            action="resl.action_resl_loan_reporting"
+            sequence="10"/>
+
+        <menuitem id="menu_resl_report_active" name="Active Loans"
+            parent="menu_resl_reporting_root"
+            action="resl.action_resl_active_loans"
+            sequence="20"/>
+
+        <menuitem id="menu_resl_report_settlement" name="Clearance &amp; Settlements"
+            parent="menu_resl_reporting_root"
+            action="resl.action_resl_settlement_pending"
+            sequence="30"/>
+
+        <menuitem id="menu_resl_report_rejected" name="Rejected Requests"
+            parent="menu_resl_reporting_root"
+            action="resl.action_resl_rejected_loans"
+            sequence="40"/>
+
+        <menuitem id="menu_resl_report_guarantees" name="Guarantor Commitments"
+            parent="menu_resl_reporting_root"
+            action="resl.action_resl_employee_guarantee_lines"
+            sequence="50"/>
+    </data>
+</odoo>

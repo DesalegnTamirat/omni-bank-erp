@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="web.ListRenderer.GroupRow" t-inherit-mode="extension">
+        <xpath expr="//span[contains(@t-attf-class, 'o_group_caret')]" position="after">
+            <t t-if="hasPbmsGroupSelector(group)">
+                <span class="d-inline-flex align-items-center m-0 me-2" t-on-click.stop="">
+                    <CheckBox
+                        value="isGroupSelected(group)"
+                        indeterminate="isGroupIndeterminate(group)"
+                        onChange.alike="() => this.toggleGroupSelection(group)"
+                    />
+                </span>
+            </t>
+        </xpath>
+        <xpath expr="//div[contains(@class, 'd-flex align-items-center')]" position="inside">
+            <t t-if="isPbmsOperatingUnitGroup(group)">
+                <t t-set="pbmsPlan" t-value="getPbmsGroupPlanInfo(group)"/>
+                <t t-if="pbmsPlan">
+                    <span t-if="pbmsPlan.isDistrictUnit" class="badge rounded-pill ms-2 bg-info text-dark" style="font-size: 0.72rem; font-weight: 600; padding: 2px 7px;">
+                        District Overview
+                    </span>
+                    <span t-if="pbmsPlan.state" t-attf-class="badge rounded-pill ms-2 {{getPbmsStateBadgeClass(pbmsPlan.state)}}" style="font-size: 0.75rem; font-weight: 600; padding: 3px 8px;">
+                        <t t-esc="getPbmsStateLabel(pbmsPlan.state)"/>
+                    </span>
+                    <div class="o_pbms_group_actions d-inline-flex align-items-center gap-1 ms-2" t-on-click.stop="">
+                        <t t-foreach="getPbmsGroupButtons(group, pbmsPlan)" t-as="btn" t-key="btn.id">
+                            <button
+                                type="button"
+                                t-att-class="btn.className"
+                                t-att-title="btn.title"
+                                t-on-click="() => this.onPbmsGroupButtonClick(group, pbmsPlan, btn)"
+                            >
+                                <i t-if="btn.icon" t-attf-class="fa {{btn.icon}} me-1"/>
+                                <t t-esc="btn.label"/>
+                            </button>
+                        </t>
+                    </div>
+                </t>
+            </t>
+        </xpath>
+    </t>
+</templates>

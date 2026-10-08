@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- ── Convert Wizard ───────────────────────────────────────────────────── -->
+    <record id="helpdesk_ticket_convert_wizard_view_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.convert.wizard.form</field>
+        <field name="model">helpdesk.ticket.convert.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Convert Ticket">
+                <sheet>
+                    <group>
+                        <field name="ticket_id" readonly="1" />
+                        <field name="action_type" widget="radio" />
+                    </group>
+                    <!-- CRM Lead fields -->
+                    <group string="Lead Details" invisible="action_type != 'crm_lead'">
+                        <field name="crm_name" />
+                        <field name="crm_partner_id" />
+                        <field name="crm_description" />
+                    </group>
+                    <!-- Repair Order fields -->
+                    <group string="Repair Details" invisible="action_type != 'repair_order'">
+                        <field name="repair_name" />
+                        <field name="repair_partner_id" />
+                        <field name="repair_product_name" />
+                    </group>
+                    <!-- Coupon fields -->
+                    <group string="Coupon Details" invisible="action_type != 'coupon'">
+                        <field name="coupon_program_name" />
+                        <field name="coupon_partner_id" />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        string="Convert"
+                        name="action_convert"
+                        type="object"
+                        class="btn-primary"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

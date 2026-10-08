@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- ── 1. Service Family Views ───────────────────────────────────────── -->
+    <record id="view_helpdesk_service_family_tree" model="ir.ui.view">
+        <field name="name">helpdesk.service.family.list</field>
+        <field name="model">helpdesk.service.family</field>
+        <field name="arch" type="xml">
+            <list string="Service Families">
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="code" />
+                <field name="service_count" string="Services" />
+                <field name="active" widget="boolean_toggle" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_service_family_form" model="ir.ui.view">
+        <field name="name">helpdesk.service.family.form</field>
+        <field name="model">helpdesk.service.family</field>
+        <field name="arch" type="xml">
+            <form string="Service Family">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Service Family Name" />
+                        <h1>
+                            <field name="name" placeholder="e.g. Digital Products, CBS Services..." />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="e.g. DIG_PROD" />
+                            <field name="sequence" />
+                        </group>
+                        <group>
+                            <field name="active" widget="boolean_toggle" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Services" name="services">
+                            <field name="service_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle" />
+                                    <field name="name" />
+                                    <field name="responsible_team_id" />
+                                    <field name="operating_unit_id" />
+                                    <field name="default_sdt_hours" />
+                                    <field name="sub_category_count" string="Sub-Categories" />
+                                    <field name="active" widget="boolean_toggle" />
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Description" name="description">
+                            <field name="description" placeholder="Family description and banking operational scope..." />
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_service_family_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.service.family.kanban</field>
+        <field name="model">helpdesk.service.family</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile">
+                <field name="name" />
+                <field name="code" />
+                <field name="service_count" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-secondary font-monospace" t-if="record.code.value">
+                                <field name="code" />
+                            </span>
+                            <span class="badge text-bg-info">
+                                <i class="fa fa-cubes me-1" />
+                                <field name="service_count" /> Services
+                            </span>
+                        </div>
+                        <field class="fw-bold fs-5" name="name" />
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_service_family" model="ir.actions.act_window">
+        <field name="name">Service Families</field>
+        <field name="res_model">helpdesk.service.family</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+
+    <!-- ── 2. Service Views ──────────────────────────────────────────────── -->
+    <record id="view_helpdesk_service_tree" model="ir.ui.view">
+        <field name="name">helpdesk.service.list</field>
+        <field name="model">helpdesk.service</field>
+        <field name="arch" type="xml">
+            <list string="Services">
+                <field name="sequence" widget="handle" />
+                <field name="family_id" />
+                <field name="name" />
+                <field name="responsible_team_id" />
+                <field name="operating_unit_id" />
+                <field name="default_sdt_hours" string="SDT (Hours)" />
+                <field name="sub_category_count" string="Sub-Categories" />
+                <field name="active" widget="boolean_toggle" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_service_form" model="ir.ui.view">
+        <field name="name">helpdesk.service.form</field>
+        <field name="model">helpdesk.service</field>
+        <field name="arch" type="xml">
+            <form string="Service">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Service Name" />
+                        <h1>
+                            <field name="name" placeholder="e.g. Digital Financial Services, ATM Dispute..." />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="family_id" options="{'no_create': True}" />
+                            <field name="code" />
+                            <field name="sequence" />
+                        </group>
+                        <group>
+                            <field name="responsible_team_id" options="{'no_create': True}" />
+                            <field name="operating_unit_id" options="{'no_create': True}" />
+                            <field name="default_sdt_hours" />
+                            <field name="active" widget="boolean_toggle" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Sub-Categories / Issue Types" name="sub_categories">
+                            <field name="sub_category_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle" />
+                                    <field name="name" />
+                                    <field name="default_priority" widget="priority" />
+                                    <field name="active" widget="boolean_toggle" />
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_service_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.service.kanban</field>
+        <field name="model">helpdesk.service</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_group_by="family_id">
+                <field name="name" />
+                <field name="code" />
+                <field name="family_id" />
+                <field name="responsible_team_id" />
+                <field name="default_sdt_hours" />
+                <field name="sub_category_count" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-primary" t-if="record.family_id.value">
+                                <field name="family_id" />
+                            </span>
+                            <span class="badge text-bg-light border" t-if="record.default_sdt_hours.value">
+                                <i class="fa fa-clock-o me-1" />
+                                <field name="default_sdt_hours" /> hrs SDT
+                            </span>
+                        </div>
+                        <field class="fw-bold fs-5 text-truncate" name="name" />
+                        <div class="text-muted small mt-1" t-if="record.responsible_team_id.value">
+                            <i class="fa fa-users me-1" />
+                            <field name="responsible_team_id" />
+                        </div>
+                        <footer class="pt-2 d-flex justify-content-between align-items-center">
+                            <span class="badge text-bg-secondary font-monospace" t-if="record.code.value">
+                                <field name="code" />
+                            </span>
+                            <span class="text-muted small">
+                                <field name="sub_category_count" /> Sub-categories
+                            </span>
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_service" model="ir.actions.act_window">
+        <field name="name">Services</field>
+        <field name="res_model">helpdesk.service</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+
+    <!-- ── 3. Service Sub-Category Views ─────────────────────────────────── -->
+    <record id="view_helpdesk_service_sub_category_tree" model="ir.ui.view">
+        <field name="name">helpdesk.service.sub.category.list</field>
+        <field name="model">helpdesk.service.sub.category</field>
+        <field name="arch" type="xml">
+            <list string="Service Sub-Categories">
+                <field name="sequence" widget="handle" />
+                <field name="family_id" />
+                <field name="service_id" />
+                <field name="name" />
+                <field name="default_priority" widget="priority" />
+                <field name="active" widget="boolean_toggle" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_service_sub_category_form" model="ir.ui.view">
+        <field name="name">helpdesk.service.sub.category.form</field>
+        <field name="model">helpdesk.service.sub.category</field>
+        <field name="arch" type="xml">
+            <form string="Service Sub-Category / Issue Type">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Sub-Category Name" />
+                        <h1>
+                            <field name="name" placeholder="e.g. On-Us ATM Dispute, Telebirr Reversal..." />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="service_id" options="{'no_create': True}" />
+                            <field name="family_id" readonly="1" />
+                            <field name="code" />
+                        </group>
+                        <group>
+                            <field name="default_priority" widget="priority" />
+                            <field name="sequence" />
+                            <field name="active" widget="boolean_toggle" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Standard Resolution Guide (SOP)" name="sop">
+                            <field name="resolution_sop" placeholder="Document step-by-step resolution process for agents..." />
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_service_sub_category_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.service.sub.category.kanban</field>
+        <field name="model">helpdesk.service.sub.category</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_group_by="service_id">
+                <field name="name" />
+                <field name="code" />
+                <field name="service_id" />
+                <field name="family_id" />
+                <field name="default_priority" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-primary" t-if="record.service_id.value">
+                                <field name="service_id" />
+                            </span>
+                            <span class="badge text-bg-secondary font-monospace" t-if="record.code.value">
+                                <field name="code" />
+                            </span>
+                        </div>
+                        <field class="fw-bold fs-5 text-truncate" name="name" />
+                        <footer class="pt-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted small" t-if="record.family_id.value">
+                                <field name="family_id" />
+                            </span>
+                            <field name="default_priority" widget="priority" />
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_service_sub_category" model="ir.actions.act_window">
+        <field name="name">Sub-Categories / Issue Types</field>
+        <field name="res_model">helpdesk.service.sub.category</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+</odoo>

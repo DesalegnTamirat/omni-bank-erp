@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_knowledge_article_tree" model="ir.ui.view">
+        <field name="name">helpdesk.knowledge.article.list</field>
+        <field name="model">helpdesk.knowledge.article</field>
+        <field name="arch" type="xml">
+            <list string="Knowledge Base Articles &amp; SOPs">
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="service_family_id" />
+                <field name="service_id" />
+                <field name="sub_category_id" />
+                <field name="operating_unit_id" />
+                <field name="author_id" />
+                <field name="state" widget="badge" decoration-success="state == 'published'" decoration-warning="state == 'draft'" decoration-muted="state == 'archived'" />
+                <field name="active" widget="boolean_toggle" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_knowledge_article_form" model="ir.ui.view">
+        <field name="name">helpdesk.knowledge.article.form</field>
+        <field name="model">helpdesk.knowledge.article</field>
+        <field name="arch" type="xml">
+            <form string="Knowledge Base Article">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,published,archived" />
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Article / SOP Title" />
+                        <h1>
+                            <field name="name" placeholder="e.g. How to Resolve ATM Cash Not Dispensed Dispute" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Service Mapping">
+                            <field name="service_family_id" options="{'no_create': True}" />
+                            <field name="service_id" options="{'no_create': True}" />
+                            <field name="sub_category_id" options="{'no_create': True}" />
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" />
+                        </group>
+                        <group string="Author &amp; Responsibility">
+                            <field name="operating_unit_id" options="{'no_create': True}" />
+                            <field name="author_id" options="{'no_create': True}" />
+                            <field name="approver_id" options="{'no_create': True}" />
+                            <field name="active" widget="boolean_toggle" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Article / SOP Content" name="content">
+                            <field name="content" widget="html" placeholder="Write step-by-step resolution SOP, troubleshooting steps, and screenshots..." />
+                        </page>
+                        <page string="Attachments &amp; Manuals" name="attachments">
+                            <field name="attachment_ids" widget="many2many_binary" />
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_knowledge_article_search" model="ir.ui.view">
+        <field name="name">helpdesk.knowledge.article.search</field>
+        <field name="model">helpdesk.knowledge.article</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Article" filter_domain="['|', ('name', 'ilike', self), ('content', 'ilike', self)]" />
+                <field name="service_id" />
+                <field name="sub_category_id" />
+                <field name="tag_ids" />
+                <filter string="Published" name="filter_published" domain="[('state', '=', 'published')]" />
+                <filter string="Draft" name="filter_draft" domain="[('state', '=', 'draft')]" />
+                <group name="group_by">
+                    <filter string="Service Family" name="group_family" domain="[]" context="{'group_by': 'service_family_id'}" />
+                    <filter string="Service" name="group_service" domain="[]" context="{'group_by': 'service_id'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_knowledge_article_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.knowledge.article.kanban</field>
+        <field name="model">helpdesk.knowledge.article</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_group_by="service_family_id">
+                <field name="name" />
+                <field name="state" />
+                <field name="service_family_id" />
+                <field name="service_id" />
+                <field name="sub_category_id" />
+                <field name="author_id" />
+                <field name="operating_unit_id" />
+                <field name="tag_ids" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge rounded-pill text-bg-primary" t-if="record.service_family_id.value">
+                                <field name="service_family_id" />
+                            </span>
+                            <field name="state" widget="badge" decoration-success="state == 'published'" decoration-warning="state == 'draft'" decoration-muted="state == 'archived'" />
+                        </div>
+                        <field class="fw-bold fs-5 text-truncate" name="name" />
+                        <div class="text-muted small mt-1" t-if="record.service_id.value">
+                            <i class="fa fa-cube me-1" />
+                            <field name="service_id" />
+                            <t t-if="record.sub_category_id.value">
+                                <span class="mx-1">/</span>
+                                <field name="sub_category_id" />
+                            </t>
+                        </div>
+                        <div class="mt-2" t-if="record.tag_ids.raw_value and record.tag_ids.raw_value.length">
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" />
+                        </div>
+                        <footer class="pt-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">
+                                <i class="fa fa-building-o me-1" />
+                                <field name="operating_unit_id" />
+                            </span>
+                            <field name="author_id" widget="many2one_avatar_user" />
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_knowledge_article" model="ir.actions.act_window">
+        <field name="name">Knowledge Base</field>
+        <field name="res_model">helpdesk.knowledge.article</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_helpdesk_knowledge_article_search" />
+        <field name="context">{'search_default_filter_published': 1}</field>
+    </record>
+</odoo>

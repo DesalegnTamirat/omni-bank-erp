@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError, ValidationError
 from datetime import timedelta
 
 
@@ -8,6 +7,14 @@ class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
     # Disciplinary History Smart Fields
+    executive_level = fields.Selection([
+        ('ceo', 'Chief Executive Officer (CEO)'),
+        ('chief', 'Chief Officer / CPCO'),
+        ('director', 'Directorate Director'),
+        ('manager', 'Division / Branch Manager'),
+        ('employee', 'Non-Managerial / Specialist Employee'),
+    ], string='Organizational Tier Level', compute='_compute_executive_level', store=True)
+
     is_managerial = fields.Boolean(
         string='Is Managerial Staff',
         compute='_compute_is_managerial',
@@ -60,156 +67,247 @@ class HrEmployee(models.Model):
         compute='_compute_discipline_case_count'
     )
 
-    # -------------------------------------------------------------
-    # Cross-Module Integration Fields
-    # Consumable by assessment_system, custom_recruitment, EDS, etc.
-    # -------------------------------------------------------------
-    active_discipline_case_count = fields.Integer(
-        string='Active Cases', compute='_compute_discipline_summary', store=True
-    )
-    has_active_disciplinary_action = fields.Boolean(
-        string='Has Active Discipline Sanction', compute='_compute_discipline_summary', store=True,
-        help="True if the employee has an ongoing investigation, active suspension, or active sanction."
-    )
-    is_discipline_suspended = fields.Boolean(
-        string='Suspended by Discipline', compute='_compute_discipline_summary', store=True
-    )
-    latest_discipline_sanction = fields.Char(
-        string='Latest Disciplinary Sanction', compute='_compute_discipline_summary', store=True
-    )
-    disciplinary_clearance_status = fields.Selection([
-        ('cleared', 'Cleared / Good Standing'),
-        ('under_investigation', 'Under Active Disciplinary Investigation'),
-        ('suspended', 'Currently Suspended'),
-        ('sanctioned', 'Active Sanction in Effect'),
-        ('dismissed', 'Dismissed for Cause'),
-    ], string='Disciplinary Clearance Status', compute='_compute_discipline_summary', store=True)
-
-    @api.depends('discipline_case_ids', 'discipline_case_ids.state', 'discipline_case_ids.punishment_type', 'is_suspended')
-    def _compute_discipline_summary(self):
-        cutoff_date = fields.Date.context_today(self) - timedelta(days=365)
-        for emp in self:
-            cases = emp.discipline_case_ids
-            active_cases = cases.filtered(lambda c: c.state not in ('draft', 'closed', 'cancelled', 'enforced'))
-            emp.active_discipline_case_count = len(active_cases)
-
-            is_suspended = emp.is_suspended or bool(cases.filtered(lambda c: getattr(c, 'is_suspended_action', False) and c.state == 'enforced'))
-            emp.is_discipline_suspended = is_suspended
-
-            is_dismissed = bool(cases.filtered(lambda c: c.punishment_type == 'dismissal' and c.state == 'enforced'))
-            recent_sanctions = cases.filtered(
-                lambda c: c.state == 'enforced' and c.punishment_type not in (False, 'dismissal') and (not c.final_decision_date or c.final_decision_date >= cutoff_date)
-            )
-
-            if is_dismissed:
-                emp.disciplinary_clearance_status = 'dismissed'
-                emp.has_active_disciplinary_action = True
-            elif is_suspended:
-                emp.disciplinary_clearance_status = 'suspended'
-                emp.has_active_disciplinary_action = True
-            elif active_cases:
-                emp.disciplinary_clearance_status = 'under_investigation'
-                emp.has_active_disciplinary_action = True
-            elif recent_sanctions:
-                emp.disciplinary_clearance_status = 'sanctioned'
-                emp.has_active_disciplinary_action = True
-            else:
-                emp.disciplinary_clearance_status = 'cleared'
-                emp.has_active_disciplinary_action = False
-
-            last_case = cases.filtered(lambda c: c.state == 'enforced').sorted(key=lambda c: c.final_decision_date or fields.Date.today(), reverse=True)
-            emp.latest_discipline_sanction = last_case[0].punishment_type if last_case else False
-
     @api.depends('discipline_case_ids')
     def _compute_discipline_case_count(self):
         for emp in self:
             emp.discipline_case_count = len(emp.discipline_case_ids)
 
-    # -------------------------------------------------------------
-    # Public Integration APIs for other modules
-    # -------------------------------------------------------------
-    def get_disciplinary_clearance(self):
-        """Public API for assessment_system, promotion, and clearance workflows."""
+    def check_discipline_eligibility(self, action_type='promotion', is_forced=False):
+        """
+        Check if employee is eligible for promotion, transfer, or internal recruitment.
+        :param action_type: 'promotion', 'transfer', or 'recruitment'
+        :param is_forced: Boolean - True if HR/Management is executing an administrative/forced transfer
+        :return: (is_eligible: bool, reason: str)
+        """
         self.ensure_one()
-        eligible, reason = self.check_discipline_eligibility()
-        return {
-            'is_cleared': eligible,
-            'status': self.disciplinary_clearance_status or 'cleared',
-            'active_cases_count': self.active_discipline_case_count,
-            'latest_sanction': self.latest_discipline_sanction or False,
-            'is_suspended': self.is_suspended or self.is_discipline_suspended,
-            'is_ineligible_for_promotion_transfer': self.is_ineligible_for_promotion_transfer,
-            'reason': reason,
-        }
+        if self.is_suspended:
+            return (False, _('Employee is currently under active disciplinary suspension (%s).') % (self.suspension_type or 'Standard'))
+        
+        # Administrative / forced transfer initiated by HR/Management is always permitted
+        if action_type == 'transfer' and is_forced:
+            return (True, _('Administrative transfer permitted for operational or disciplinary reassignment.'))
 
-    @api.model
-    def check_applicant_disciplinary_history(self, name=None, email=None, phone=None, national_id=None):
-        """Public API for custom_recruitment: screen applicants against past dismissals and severe sanctions."""
-        domain = [('state', '=', 'enforced')]
-        sub_domain = []
-        if email:
-            sub_domain.append(('employee_id.work_email', '=ilike', email))
-        if phone:
-            sub_domain.append(('employee_id.mobile_phone', '=', phone))
-        if national_id:
-            sub_domain.append(('employee_id.barcode', '=', national_id))
-        if name:
-            sub_domain.append(('employee_id.name', '=ilike', name))
-
-        if not sub_domain:
-            return {'has_record': False, 'records': []}
-
-        final_domain = domain + ['|'] * (len(sub_domain) - 1) + sub_domain
-        matched_cases = self.env['discipline.case'].search(final_domain)
-        is_dismissed = any(c.punishment_type == 'dismissal' for c in matched_cases)
-        return {
-            'has_record': bool(matched_cases),
-            'record_count': len(matched_cases),
-            'is_dismissed': is_dismissed,
-            'cases': [{
-                'case_reference': c.name,
-                'offense': c.offense_id.name if c.offense_id else False,
-                'punishment_type': c.punishment_type,
-                'decision_date': c.final_decision_date,
-            } for c in matched_cases]
-        }
-
-    def check_discipline_eligibility(self):
-        """Check if employee is eligible for promotion, transfer, or internal recruitment."""
-        self.ensure_one()
-        if self.is_suspended or self.is_discipline_suspended:
-            return (False, _('Employee is currently under active disciplinary suspension (%s).') % (self.suspension_type or 'without pay'))
         if self.is_ineligible_for_promotion_transfer:
-            return (False, _('Employee is currently flagged as ineligible for promotion/transfer due to active disciplinary action.'))
-
-        cutoff_date = fields.Date.context_today(self) - timedelta(days=365)
+            return (False, _('Candidate is currently ineligible for promotion/transfer due to an active disciplinary penalty.'))
+        
+        today = fields.Date.context_today(self)
         active_cases = self.discipline_case_ids.filtered(
-            lambda c: c.state == 'enforced' and c.final_decision_date and c.final_decision_date >= cutoff_date
+            lambda c: c.state == 'enforced' and (
+                (c.active_penalty_end_date and c.active_penalty_end_date >= today) or
+                (not c.active_penalty_end_date and c.final_decision_date and c.final_decision_date >= (today - timedelta(days=365)))
+            ) and (c.severity_level in ['level_1', 'level_2'] or c.punishment_type in ['dismissal', 'demotion', 'final_warning_penalty'])
         )
         if active_cases:
             case_names = ", ".join(active_cases.mapped('name'))
-            return (False, _('Ineligible for promotion/recruitment due to active disciplinary record within 12 months (Cases: %s).') % case_names)
-
+            return (False, _('Candidate is currently ineligible for promotion due to an active disciplinary penalty (Cases: %s).') % case_names)
+        
         return (True, _('Employee is eligible.'))
 
     @api.model
     def _cron_revert_ineligibility(self):
-        """Cron job: automatically revert ineligibility flag once legal active penalty period (365 days) expires."""
+        """Cron job: automatically revert ineligibility flag once legal active penalty period expires."""
         today = fields.Date.context_today(self)
-        cutoff_date = today - timedelta(days=365)
         ineligible_employees = self.search([
             ('is_ineligible_for_promotion_transfer', '=', True),
             ('is_suspended', '=', False),
         ])
         for emp in ineligible_employees:
             active_recent_cases = emp.discipline_case_ids.filtered(
-                lambda c: c.state == 'enforced' and c.final_decision_date and c.final_decision_date >= cutoff_date
+                lambda c: c.state == 'enforced' and (
+                    (c.active_penalty_end_date and c.active_penalty_end_date >= today) or
+                    (not c.active_penalty_end_date and c.final_decision_date and c.final_decision_date >= (today - timedelta(days=365)))
+                ) and (c.severity_level in ['level_1', 'level_2'] or c.punishment_type in ['dismissal', 'demotion', 'final_warning_penalty'])
             )
             if not active_recent_cases:
                 emp.with_context(no_leave_resource_calendar_update=True).write({
                     'is_ineligible_for_promotion_transfer': False,
                     'active_disciplinary_action': False,
                 })
+
+    @api.depends('job_id', 'job_id.name', 'is_managerial')
+    def _compute_executive_level(self):
+        for emp in self:
+            job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+            if any(kw in job_name for kw in ['ceo', 'chief executive officer', 'president']):
+                emp.executive_level = 'ceo'
+            elif any(kw in job_name for kw in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+                emp.executive_level = 'chief'
+            elif any(kw in job_name for kw in ['director', 'directorate']):
+                emp.executive_level = 'director'
+            elif emp.is_managerial or any(kw in job_name for kw in ['manager', 'head', 'supervisor', 'division', 'branch manager']):
+                emp.executive_level = 'manager'
+            else:
+                emp.executive_level = 'employee'
+
+    def get_supervisor_chain(self):
+        """Return ordered list of supervisor hr.employee records from direct coach/manager up to CEO."""
+        self.ensure_one()
+        chain = []
+        current = self.coach_id or self.parent_id
+        visited = set()
+        while current and current.id not in visited:
+            visited.add(current.id)
+            chain.append(current)
+            current = current.coach_id or current.parent_id
+        return chain
+
+    def is_supervisor_of(self, target_employee):
+        """Return True if self is in the supervisory chain of target_employee."""
+        if not target_employee:
+            return False
+        return self in target_employee.get_supervisor_chain()
+
+    @api.model
+    def get_cpco_user(self):
+        """
+        Unified CPCO Resolution Engine:
+        1. Explicit UI Setting in Discipline & Governance Settings (discipline.cpco_user_id)
+        2. Security Group Membership (group_discipline_cpco)
+        3. Job Position / Employee matching CPCO / Chief People
+        4. Fallback to System Administrator
+        """
+        ICP = self.env['ir.config_parameter'].sudo()
+        cpco_user_id_param = ICP.get_param('discipline.cpco_user_id')
+        if cpco_user_id_param:
+            try:
+                cpco_user = self.env['res.users'].browse(int(cpco_user_id_param)).exists()
+                if cpco_user:
+                    return cpco_user
+            except (ValueError, TypeError):
+                pass
+
+        # 2. Check Security Group
+        cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+        if cpco_group:
+            cpco_users = cpco_group.all_user_ids or cpco_group.user_ids
+            if cpco_users:
+                return cpco_users[0]
+
+        # 3. Check Job Title
+        cpco_emp = self.search([
+            '|', ('job_id.name', 'ilike', 'Chief People'),
+            ('job_id.name', 'ilike', 'CPCO')
+        ], limit=1)
+        if cpco_emp and cpco_emp.user_id:
+            return cpco_emp.user_id
+
+        # 4. Fallback Admin
+        return self.env.ref('base.user_admin', raise_if_not_found=False) or self.env.user
+
+    @api.model
+    def get_secretary_user(self):
+        """Resolve Disciplinary Committee Secretary (POMD Director)."""
+        ICP = self.env['ir.config_parameter'].sudo()
+        sec_id_param = ICP.get_param('discipline.secretary_user_id')
+        if sec_id_param:
+            try:
+                sec_user = self.env['res.users'].browse(int(sec_id_param)).exists()
+                if sec_user:
+                    return sec_user
+            except (ValueError, TypeError):
+                pass
+
+        pomd_emp = self.search([
+            '|', ('job_id.name', 'ilike', 'People Operations Management Director'),
+            ('job_id.name', 'ilike', 'People Operation')
+        ], limit=1)
+        if pomd_emp and pomd_emp.user_id:
+            return pomd_emp.user_id
+
+        pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
+        if pomd_group:
+            pomd_users = pomd_group.all_user_ids or pomd_group.user_ids
+            if pomd_users:
+                return pomd_users[0]
+
+        return self.env.ref('base.user_admin', raise_if_not_found=False) or self.env.user
+
+    @api.model
+    def get_legal_user(self):
+        """Resolve Legal Directorate Representative."""
+        ICP = self.env['ir.config_parameter'].sudo()
+        legal_id_param = ICP.get_param('discipline.legal_user_id')
+        if legal_id_param:
+            try:
+                legal_user = self.env['res.users'].browse(int(legal_id_param)).exists()
+                if legal_user:
+                    return legal_user
+            except (ValueError, TypeError):
+                pass
+
+        legal_emp = self.search([
+            '|', ('job_id.name', 'ilike', 'Legal Director'),
+            ('job_id.name', 'ilike', 'Legal Services Director')
+        ], limit=1)
+        if not legal_emp:
+            legal_emp = self.search([('job_id.name', 'ilike', 'Legal')], limit=1)
+        if legal_emp and legal_emp.user_id:
+            return legal_emp.user_id
+
+        legal_group = self.env.ref('discipline_management.group_discipline_legal', raise_if_not_found=False)
+        if legal_group:
+            legal_users = legal_group.all_user_ids or legal_group.user_ids
+            if legal_users:
+                return legal_users[0]
+
+        return False
+
+    @api.model
+    def get_union_user(self):
+        """Resolve Labour Union Representative for Disciplinary Committee meetings."""
+        ICP = self.env['ir.config_parameter'].sudo()
+        union_id_param = ICP.get_param('discipline.union_user_id')
+        if union_id_param:
+            try:
+                union_user = self.env['res.users'].browse(int(union_id_param)).exists()
+                if union_user:
+                    return union_user
+            except (ValueError, TypeError):
+                pass
+        return False
+
+    @api.model
+    def get_audit_director_user(self):
+        """Resolve Internal Audit Directorate Director."""
+        ICP = self.env['ir.config_parameter'].sudo()
+        audit_id_param = ICP.get_param('discipline.audit_user_id')
+        if audit_id_param:
+            try:
+                audit_user = self.env['res.users'].browse(int(audit_id_param)).exists()
+                if audit_user:
+                    return audit_user
+            except (ValueError, TypeError):
+                pass
+
+        audit_emp = self.search([
+            '|', ('job_id.name', 'ilike', 'Internal Audit Director'),
+            ('job_id.name', 'ilike', 'Audit Director')
+        ], limit=1)
+        if audit_emp and audit_emp.user_id:
+            return audit_emp.user_id
+
+        audit_group = self.env.ref('discipline_management.group_discipline_auditor', raise_if_not_found=False)
+        if audit_group:
+            audit_users = audit_group.all_user_ids or audit_group.user_ids
+            if audit_users:
+                return audit_users[0]
+
+        return False
+
+    @api.model
+    def get_ceo_user(self):
+        """Resolve Chief Executive Officer (CEO)."""
+        ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+        if ceo_group:
+            ceo_users = ceo_group.all_user_ids or ceo_group.user_ids
+            if ceo_users:
+                return ceo_users[0]
+
+        ceo_emp = self.search([('executive_level', '=', 'ceo')], limit=1)
+        if ceo_emp and ceo_emp.user_id:
+            return ceo_emp.user_id
+
+        return False
 
     @api.depends('job_id', 'job_id.name')
     def _compute_is_managerial(self):
@@ -221,57 +319,6 @@ class HrEmployee(models.Model):
                 emp.is_managerial = True
             else:
                 emp.is_managerial = False
-
-    def action_request_transfer(self):
-        """FR-DIS-021.3: Self-Initiated Transfer Request must be blocked while the employee
-        has an active disciplinary penalty. This is the method the employee-portal
-        "Request Transfer" button should call; it either proceeds (returning an act_window
-        to the standard transfer wizard/request, if installed) or raises the required
-        blocking error message.
-        """
-        self.ensure_one()
-        eligible, reason = self.check_discipline_eligibility()
-        if not eligible:
-            raise UserError(_(
-                'Candidate is currently ineligible for transfer due to an active disciplinary penalty. %s'
-            ) % reason)
-        return True
-
-    def action_forced_transfer(self, new_department_id=False, new_job_id=False, reason=None):
-        """FR-DIS-021.4: HR/Management-initiated Forced / Administrative Transfer."""
-        for emp in self:
-            if not self.env.user.has_group('discipline_management.group_discipline_manager'):
-                raise UserError(_('Only HR or Management can process a Forced / Administrative Transfer.'))
-            vals = {}
-            if new_department_id:
-                vals['department_id'] = new_department_id
-            if new_job_id:
-                vals['job_id'] = new_job_id
-            if vals:
-                emp.sudo().with_context(no_leave_resource_calendar_update=True).write(vals)
-            emp.message_post(body=_('Forced / Administrative Transfer processed by %s. %s') % (
-                self.env.user.name, reason or ''
-            ))
-        return True
-
-    @api.model
-    def _get_promotion_ineligible_domain(self):
-        """Domain fragment recruiters/hiring managers can AND into a candidate search to
-        automatically filter out disciplinarily-ineligible employees (FR-DIS-021.2)."""
-        return [('is_ineligible_for_promotion_transfer', '=', False), ('is_suspended', '=', False)]
-
-    def write(self, vals):
-        """FR-DIS-021.2: if an HR user manually attempts to promote (change job_id on) an
-        ineligible employee, block it with the required error message."""
-        if 'job_id' in vals and not self.env.context.get('discipline_demotion_in_progress'):
-            for emp in self:
-                new_job_id = vals.get('job_id')
-                if emp.is_ineligible_for_promotion_transfer and new_job_id and new_job_id != emp.job_id.id:
-                    raise ValidationError(_(
-                        'Candidate is currently ineligible for promotion due to an active disciplinary '
-                        'penalty. (Employee: %s)'
-                    ) % emp.name)
-        return super().write(vals)
 
     def action_view_discipline_cases(self):
         self.ensure_one()
@@ -293,3 +340,4 @@ class HrJob(models.Model):
         default=False,
         help='Check if this job position belongs to Managerial Staff'
     )
+

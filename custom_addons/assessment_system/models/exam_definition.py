@@ -175,11 +175,23 @@ class ExamDefinition(models.Model):
                 raise ValidationError(_("Exam '%s' must have at least one question configured.") % rec.name)
             if rec.passing_score_percentage < 50.0:
                 raise ValidationError(_("Passing score must be at least 50.0%% per Bank Policy "))
+            if rec.selection_mode == "auto_distribution":
+                if not rec.distribution_line_ids:
+                    raise ValidationError(_("Please configure at least one Question Distribution Rule for exam '%s'.") % rec.name)
+                missing_comps = rec.distribution_line_ids.filtered(lambda d: not d.competency_id)
+                if missing_comps:
+                    raise ValidationError(_("Every Question Distribution Rule line on exam '%s' must specify a Competency Area.") % rec.name)
+                # Sample questions FIRST to validate question bank availability BEFORE confirming!
+                q_pool = rec.generate_question_pool_for_candidate()
+                if q_pool:
+                    rec.manual_question_ids = [(6, 0, [q.id for q in q_pool])]
             rec.state = "confirmed"
 
     def action_reset_draft(self):
         for rec in self:
             rec.state = "draft"
+            if rec.selection_mode == "auto_distribution" and not rec.is_version_paper:
+                rec.manual_question_ids = [(5, 0, 0)]
 
     def action_view_sessions(self):
         self.ensure_one()
@@ -249,21 +261,31 @@ class ExamDefinition(models.Model):
                 if sess.exam_id and sess.exam_id.manual_question_ids:
                     used_question_ids.update(sess.exam_id.manual_question_ids.ids)
 
+        base_questions = []
+
         for i in range(version_count):
             letter_idx = start_idx + i
             letter = alphabet[letter_idx] if letter_idx < len(alphabet) else str(letter_idx + 1)
             v_code = f"Version {letter}"
             v_title = f"{self.name} - {v_code}"
 
-            # Sample questions, prioritizing fresh questions not yet used in previous versions
-            sampled_questions = self.generate_question_pool_for_candidate(
-                seed=f"{self.id}_{letter}_{random.random()}",
-                exclude_question_ids=list(used_question_ids)
-            )
+            # Ensure all versions use the EXACT SAME base question pool (same questions & question types),
+            # but randomly shuffled in order for each version paper.
+            if i == 0 or not base_questions:
+                if self.manual_question_ids and self.selection_mode == "auto_distribution":
+                    base_questions = list(self.manual_question_ids)
+                else:
+                    base_questions = self.generate_question_pool_for_candidate(
+                        seed=f"master_{self.id}_{random.random()}",
+                        exclude_question_ids=list(used_question_ids)
+                    )
+                if base_questions and self.selection_mode == "auto_distribution" and not self.manual_question_ids:
+                    self.write({"manual_question_ids": [(6, 0, [q.id for q in base_questions])]})
 
-            # Record sampled questions into tracking set
-            for q in sampled_questions:
-                used_question_ids.add(q.id)
+            # Take the master question set and shuffle the question order specifically for this version
+            v_questions = list(base_questions)
+            version_rng = random.Random(f"version_{self.id}_{v_code}_{i}_{random.random()}")
+            version_rng.shuffle(v_questions)
 
             v_vals = {
                 "name": v_title,
@@ -280,7 +302,7 @@ class ExamDefinition(models.Model):
                 "block_copy_paste": self.block_copy_paste,
                 "block_screenshot": self.block_screenshot,
                 "selection_mode": "manual_select",
-                "manual_question_ids": [(6, 0, [q.id for q in sampled_questions])],
+                "manual_question_ids": [(6, 0, [q.id for q in v_questions])],
                 "is_version_paper": True,
                 "version_code": v_code,
                 "parent_exam_id": self.id,
@@ -306,7 +328,7 @@ class ExamDefinition(models.Model):
     def generate_question_pool_for_candidate(self, seed=None, exclude_question_ids=None):
         """
         Pulls questions from Question Bank based on configured distribution rules.
-        If exclude_question_ids is provided, prioritizes fresh unused questions.
+        Strictly enforces selected question_type and competency_id — NEVER falls back to other competencies or unselected question types.
         Returns a list of exam.question records.
         """
         self.ensure_one()
@@ -322,74 +344,77 @@ class ExamDefinition(models.Model):
                 if questions:
                     self.write({"manual_question_ids": [(6, 0, [q.id for q in questions])]})
             else:
-                # Fallback to general approved question pool if no manual questions exist
-                questions = list(self.env["exam.question"].search([("state", "=", "approved"), ("active", "=", True)], limit=10))
-                if questions:
-                    self.write({"manual_question_ids": [(6, 0, [q.id for q in questions])]})
+                questions = []
         else:
-            for dist in self.distribution_line_ids:
-                base_domain = [
-                    ("state", "=", "approved"),
-                    ("active", "=", True),
-                ]
-                if dist.question_type:
-                    base_domain.append(("question_type", "=", dist.question_type))
+            if self.manual_question_ids:
+                questions = list(self.manual_question_ids)
+            else:
+                for dist in self.distribution_line_ids:
+                    base_domain = [
+                        ("state", "=", "approved"),
+                        ("active", "=", True),
+                    ]
+                    if dist.question_type:
+                        base_domain.append(("question_type", "=", dist.question_type))
+                    if dist.competency_id:
+                        base_domain.append(("competency_id", "=", dist.competency_id.id))
 
-                target_job = dist.job_id or self.job_id
+                    target_job = dist.job_id or self.job_id
 
-                # --- Tier 1: Exact Match (Competency + Difficulty + Job) ---
-                t1_domain = list(base_domain)
-                if dist.competency_id:
-                    t1_domain.append(("competency_id", "=", dist.competency_id.id))
-                if dist.difficulty:
-                    t1_domain.append(("difficulty", "=", dist.difficulty))
-                if target_job:
-                    t1_domain.append(("job_id", "=", target_job.id))
-                available = self.env["exam.question"].search(t1_domain)
-
-                # --- Tier 2: Any Difficulty for this Competency & Job ---
-                if len(available) < dist.number_of_questions and dist.competency_id:
-                    t2_domain = list(base_domain) + [("competency_id", "=", dist.competency_id.id)]
+                    # --- Tier 1: Exact Match (Competency + Difficulty + Job + Question Type) ---
+                    t1_domain = list(base_domain)
+                    if dist.difficulty:
+                        t1_domain.append(("difficulty", "=", dist.difficulty))
                     if target_job:
-                        t2_domain.append(("job_id", "in", [target_job.id, False]))
-                    available = self.env["exam.question"].search(t2_domain)
+                        t1_domain.append(("job_id", "=", target_job.id))
+                    available = self.env["exam.question"].search(t1_domain)
 
-                # --- Tier 3: Any Competency for this Question Type & Job ---
-                if len(available) < dist.number_of_questions:
-                    t3_domain = list(base_domain)
-                    if target_job:
-                        t3_domain.append(("job_id", "in", [target_job.id, False]))
-                    available = self.env["exam.question"].search(t3_domain)
+                    # --- Tier 2: Any Difficulty for this Competency & Job & Question Type ---
+                    if len(available) < dist.number_of_questions:
+                        t2_domain = list(base_domain)
+                        if target_job:
+                            t2_domain.append(("job_id", "in", [target_job.id, False]))
+                        available = self.env["exam.question"].search(t2_domain)
 
-                # --- Tier 4: Global Approved Questions for this Question Type ---
-                if len(available) < dist.number_of_questions:
-                    t4_domain = list(base_domain)
-                    available = self.env["exam.question"].search(t4_domain)
+                    # --- Tier 3: Any Job for this Competency & Question Type ---
+                    if len(available) < dist.number_of_questions:
+                        t3_domain = list(base_domain)
+                        available = self.env["exam.question"].search(t3_domain)
 
-                # --- Tier 5: Absolute Fallback to ANY Approved Question in Bank ---
-                if not available:
-                    available = self.env["exam.question"].search([("state", "=", "approved"), ("active", "=", True)])
+                    # Strict validation: DO NOT drop competency_id or question_type filters!
+                    if len(available) < dist.number_of_questions:
+                        q_type_str = dict(dist._fields['question_type'].selection).get(dist.question_type, dist.question_type) if dist.question_type else _("Any")
+                        comp_str = dist.competency_id.name if dist.competency_id else _("Any Competency")
+                        job_str = target_job.name if target_job else _("General")
+                        raise UserError(_(
+                            "Insufficient approved questions in Question Bank for Competency Area '%(comp)s' and Question Type '%(qtype)s' (Job Position: %(job)s).\n"
+                            "Required: %(required)d question(s), but only %(found)d approved question(s) of this competency exist in the Question Bank.",
+                            comp=comp_str,
+                            qtype=q_type_str,
+                            job=job_str,
+                            required=dist.number_of_questions,
+                            found=len(available)
+                        ))
+                    
+                    # --- Anti-Repetition Filter: prioritize questions not yet used in previous sessions ---
+                    fresh_pool = [q for q in available if q.id not in exclude_set]
+                    if len(fresh_pool) >= dist.number_of_questions:
+                        sampled = random.sample(fresh_pool, dist.number_of_questions)
+                    else:
+                        # Take all fresh questions and fill remaining from available pool of SAME question_type & competency_id
+                        sampled = list(fresh_pool)
+                        remaining_needed = dist.number_of_questions - len(sampled)
+                        recycled_pool = [q for q in available if q not in sampled]
+                        if recycled_pool:
+                            sampled.extend(random.sample(recycled_pool, min(remaining_needed, len(recycled_pool))))
+                        while len(sampled) < dist.number_of_questions and available:
+                            sampled.append(random.choice(list(available)))
 
-                if not available:
-                    raise UserError(_("No approved questions exist in the Question Bank. Please create and approve questions first."))
+                    questions.extend(sampled)
                 
-                # --- Anti-Repetition Filter: prioritize questions not yet used in previous versions ---
-                fresh_pool = [q for q in available if q.id not in exclude_set]
-                if len(fresh_pool) >= dist.number_of_questions:
-                    sampled = random.sample(fresh_pool, dist.number_of_questions)
-                else:
-                    # Take all fresh questions and fill remaining from general pool
-                    sampled = list(fresh_pool)
-                    remaining_needed = dist.number_of_questions - len(sampled)
-                    recycled_pool = [q for q in available if q not in sampled]
-                    if recycled_pool:
-                        sampled.extend(random.sample(recycled_pool, min(remaining_needed, len(recycled_pool))))
-                    # If still short, sample from available with replacement
-                    while len(sampled) < dist.number_of_questions and available:
-                        sampled.append(random.choice(list(available)))
+                if questions and self.state == "confirmed":
+                    self.write({"manual_question_ids": [(6, 0, [q.id for q in questions])]})
 
-                questions.extend(sampled)
-        
         if self.randomize_questions and questions:
             rand_gen = random.Random(seed) if seed else random
             rand_gen.shuffle(questions)
@@ -413,16 +438,15 @@ class ExamDefinitionDistribution(models.Model):
         string="Job Filter",
         help="Leave empty to use Exam's target job position"
     )
-    competency_id = fields.Many2one("competency.competency", string="Competency Area", required=False)
+    competency_id = fields.Many2one("competency.competency", string="Competency Area", required=True)
     eligible_competency_ids = fields.Many2many("competency.competency", compute="_compute_eligible_competency_ids")
 
     @api.depends("job_id", "exam_id.job_id")
     def _compute_eligible_competency_ids(self):
         for rec in self:
             target_job = rec.job_id or (rec.exam_id and rec.exam_id.job_id)
+            all_comps = self.env["competency.competency"]
             if target_job:
-                all_comps = self.env["competency.competency"]
-
                 # 1. Primary table: hr_competencies_info_job
                 info_job_lines = self.env["hr_competencies_info_job"].search([
                     ("job_id", "=", target_job.id)
@@ -431,22 +455,20 @@ class ExamDefinitionDistribution(models.Model):
                     comps = info_job_lines.mapped("competencies")
                     if comps and comps._name == "competency.competency":
                         all_comps |= comps.filtered(
-                            lambda c: getattr(c, "status", None) == "active" and getattr(c, "pillar", None) in ["core", "leadership", "technical"]
+                            lambda c: getattr(c, "status", None) == "active"
                         )
                     elif comps and comps._name == "recruitment.competency":
                         comp_names = [c.competency for c in comps if getattr(c, "competency", False)]
                         if comp_names:
                             all_comps |= self.env["competency.competency"].search([
                                 ("name", "in", comp_names),
-                                ("status", "=", "active"),
-                                ("pillar", "in", ["core", "leadership", "technical"])
+                                ("status", "=", "active")
                             ])
 
                 # 2. Applicable jobs on competency.competency
                 comp1 = self.env["competency.competency"].search([
                     ("applicable_job_ids", "in", target_job.id),
-                    ("status", "=", "active"),
-                    ("pillar", "in", ["core", "leadership", "technical"])
+                    ("status", "=", "active")
                 ])
                 all_comps |= comp1
 
@@ -455,7 +477,7 @@ class ExamDefinitionDistribution(models.Model):
                     ("job_id", "=", target_job.id)
                 ])
                 all_comps |= rel_lines.mapped("competency_id").filtered(
-                    lambda c: c.status == "active" and c.pillar in ["core", "leadership", "technical"]
+                    lambda c: c.status == "active"
                 )
 
                 # 4. Role Mappings (competency.role.mapping)
@@ -463,39 +485,22 @@ class ExamDefinitionDistribution(models.Model):
                     ("job_position_id", "=", target_job.id)
                 ])
                 all_comps |= mappings.mapped("line_ids.competency_id").filtered(
-                    lambda c: c.status == "active" and c.pillar in ["core", "leadership", "technical"]
+                    lambda c: c.status == "active"
                 )
 
-                if not all_comps:
-                    all_comps = self.env["competency.competency"].search([
-                        ("pillar", "in", ["core", "leadership", "technical"]),
-                        ("status", "=", "active")
-                    ])
+            # Fall back to all active competencies if none specifically linked or target_job is absent
+            if not all_comps:
+                all_comps = self.env["competency.competency"].search([
+                    ("status", "=", "active")
+                ])
 
-                # Pick 1 representative competency for each Pillar Category existing for this position
-                pillar_comps = self.env["competency.competency"]
-                for p in ["core", "leadership", "technical"]:
-                    p_match = all_comps.filtered(lambda c: c.pillar == p)
-                    if p_match:
-                        pillar_comps |= p_match[0]
-
-                rec.eligible_competency_ids = pillar_comps
-            else:
-                pillar_comps = self.env["competency.competency"]
-                for p in ["core", "leadership", "technical"]:
-                    p_match = self.env["competency.competency"].search([
-                        ("pillar", "=", p),
-                        ("status", "=", "active")
-                    ], limit=1)
-                    if p_match:
-                        pillar_comps |= p_match
-                rec.eligible_competency_ids = pillar_comps
+            rec.eligible_competency_ids = all_comps
 
     @api.onchange("job_id", "exam_id")
     def _onchange_job_id_filter_competency(self):
         target_job = self.job_id or (self.exam_id and self.exam_id.job_id)
+        all_comps = self.env["competency.competency"]
         if target_job:
-            all_comps = self.env["competency.competency"]
             info_job_lines = self.env["hr_competencies_info_job"].search([
                 ("job_id", "=", target_job.id)
             ])
@@ -503,33 +508,30 @@ class ExamDefinitionDistribution(models.Model):
                 comps = info_job_lines.mapped("competencies")
                 if comps and comps._name == "competency.competency":
                     all_comps |= comps.filtered(
-                        lambda c: getattr(c, "status", None) == "active" and getattr(c, "pillar", None) in ["core", "leadership", "technical"]
+                        lambda c: getattr(c, "status", None) == "active"
                     )
                 elif comps and comps._name == "recruitment.competency":
                     comp_names = [c.competency for c in comps if getattr(c, "competency", False)]
                     if comp_names:
                         all_comps |= self.env["competency.competency"].search([
                             ("name", "in", comp_names),
-                            ("status", "=", "active"),
-                            ("pillar", "in", ["core", "leadership", "technical"])
+                            ("status", "=", "active")
                         ])
             comp1 = self.env["competency.competency"].search([
                 ("applicable_job_ids", "in", target_job.id),
-                ("status", "=", "active"),
-                ("pillar", "in", ["core", "leadership", "technical"])
+                ("status", "=", "active")
             ])
             all_comps |= comp1
 
-            pillar_comps = self.env["competency.competency"]
-            for p in ["core", "leadership", "technical"]:
-                p_match = all_comps.filtered(lambda c: c.pillar == p)
-                if p_match:
-                    pillar_comps |= p_match[0]
+        if not all_comps:
+            all_comps = self.env["competency.competency"].search([
+                ("status", "=", "active")
+            ])
 
-            if pillar_comps and self.competency_id and self.competency_id.id not in pillar_comps.ids:
-                self.competency_id = False
-            elif not pillar_comps and self.competency_id:
-                self.competency_id = False
+        self.eligible_competency_ids = all_comps
+        if self.competency_id and self.competency_id.id not in all_comps.ids:
+            self.competency_id = False
+        return {"domain": {"competency_id": [("id", "in", all_comps.ids)]}}
 
     difficulty = fields.Selection([
         ("basic", "Basic"),

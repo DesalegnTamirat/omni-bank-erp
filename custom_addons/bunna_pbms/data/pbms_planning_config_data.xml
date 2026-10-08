@@ -106,6 +106,8 @@
         <field name="enable_expense">True</field>
         <field name="enable_manpower">True</field>
         <field name="enable_fixed_asset">True</field>
+        <field name="enable_credit_portfolio">True</field>
+        <field name="enable_initiative_budget">True</field>
         <field name="deposit_measurement_type">monetary</field>
         <field name="customer_base_measurement_type">integer</field>
         <field name="fx_measurement_type">monetary</field>

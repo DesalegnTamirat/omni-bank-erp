@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="hr_employee_custom.CareerPathVisualizer" owl="1">
+        <div class="app">
+            
+            <!-- LOADING -->
+            <t t-if="state.loading">
+                <div style="padding:40px; text-align:center; color:#8B93A7;">
+                    <span style="font-size: 48px; display: block; margin-bottom: 16px;">⏳</span>
+                    <span>Loading career path...</span>
+                </div>
+            </t>
+            
+            <!-- ERROR -->
+            <t t-elif="state.error">
+                <div class="alert alert-danger m-4 rounded-3" style="background:#fff; color:#d9534f; border:1px solid #d9534f;">
+                    ⚠️
+                    <t t-esc="state.error"/>
+                </div>
+            </t>
+
+            <!-- MAIN CONTENT -->
+            <t t-else="">
+                <t t-set="current_node" t-value="state.graphData.nodes.find(n => n.is_current) || state.graphData.nodes[0]"/>
+                
+                <div class="pagehead">
+                    <div>
+                        <h1>Employee Career Path</h1>
+                        <div class="emp"><t t-esc="state.graphData.employee_name"/> — <t t-esc="state.graphData.current_job"/></div>
+                    </div>
+                    <div class="legend">
+                        <span><span class="swatch" style="background:var(--vertical)"></span>Vertical — Promotion</span>
+                        <span><span class="swatch" style="background:var(--lateral)"></span>Lateral — Cross-functional</span>
+                        <span><span class="swatch" style="background:var(--dual)"></span>Dual — Specialized</span>
+                    </div>
+                </div>
+
+                <div class="board">
+                    <!-- CURRENT ROLE -->
+                    <div class="current-wrap">
+                        <div class="current-label">YOUR CURRENT ROLE</div>
+                        <div class="current-card">
+                            <div class="avatar"><t t-esc="state.graphData.employee_name ? state.graphData.employee_name.charAt(0) : '👤'"/></div>
+                            <div class="current-card-content">
+                                <h3><t t-esc="state.graphData.employee_name"/></h3>
+                                <div class="sub"><t t-esc="current_node.job_name"/></div>
+                                <div class="desc">Career progression track based on your current competencies and performance score.</div>
+                            </div>
+                            <div class="tenure-chip">⏱ <t t-esc="current_node.requirements ? current_node.requirements.current_tenure.toFixed(1) : 'N/A'"/> years experience</div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN -->
+                    <div class="main-content-right">
+                        <!-- TAB NAVIGATION -->
+                        <div class="tab-nav">
+                            <button t-attf-class="tab-item {{ state.activeTab === 'vertical' ? 'active' : '' }}" t-on-click="() => this.switchTab('vertical')">Promotion Path</button>
+                            <button t-attf-class="tab-item {{ state.activeTab === 'lateral' ? 'active' : '' }}" t-on-click="() => this.switchTab('lateral')">Lateral Path</button>
+                            <button t-attf-class="tab-item {{ state.activeTab === 'dual' ? 'active' : '' }}" t-on-click="() => this.switchTab('dual')">Specialized Path</button>
+                        </div>
+                        
+                        <!-- TAB CONTENT: VERTICAL -->
+                        <div class="tab-content" t-if="state.activeTab === 'vertical'">
+                            <div class="lanes">
+                                <div class="lane vertical">
+                                    <div class="lane-head">
+                                        <div class="lane-icon">↑</div>
+                                        <div class="lane-title">Vertical Path</div>
+                                        <div class="lane-sub">Promotion into higher-grade roles</div>
+                                    </div>
+                                    <t t-if="verticalNodes.length === 0">
+                                        <div class="empty-state-card">
+                                            <span style="font-size: 32px; display:block; margin-bottom: 12px; color: #d1d6e0;">📈</span>
+                                            <div class="title">Apex Role Reached</div>
+                                            <div class="desc">No further vertical pathways are mapped.</div>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <div class="lane-track">
+                                            <div class="steps" id="steps-vertical">
+                                                <t t-foreach="verticalNodes" t-as="node" t-key="node.id">
+                                                    <div t-attf-class="step {{ state.selectedVerticalNode and state.selectedVerticalNode.id === node.id ? 'expanded' : '' }}">
+                                                        <div class="step-content-wrap" t-on-click="() => this.selectNode(node, 'vertical')">
+                                                            <t t-if="node_index === 0">
+                                                                <span class="best-badge"><span style="margin-right:4px;">⭐</span> Closest match</span>
+                                                            </t>
+                                                            <div class="step-main">
+                                                                <h4><t t-esc="node.job_name"/></h4>
+                                                                <div class="reqs" t-if="node.requirements">
+                                                                    <span class="req"><span style="color:#f39c12; margin-right:4px; font-size:14px;">★</span> PMS ≥ <t t-esc="node.requirements.min_pms_score"/></span>
+                                                                    <span class="req"><span style="color:#6c757d; margin-right:4px; font-size:14px;">⏱</span> Exp. ≥ <t t-esc="node.requirements.min_tenure_years"/> yrs</span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="tag">Promotion</div>
+                                                        </div>
+                                                        
+                                                        <div class="step-footer" t-on-click="() => this.selectNode(node, 'vertical')">
+                                                            <t t-set="hasProfile" t-value="node.requirements and node.requirements.competencies and node.requirements.competencies.length > 0"/>
+                                                            <t t-if="hasProfile">
+                                                                <t t-set="gapCount" t-value="getGapsCount(node)"/>
+                                                                <span>View gap analysis <span class="gap-badge"><t t-esc="gapCount"/></span></span>
+                                                            </t>
+                                                            <t t-else="">
+                                                                <span>View gap analysis <span class="gap-badge" style="background:#6c757d; width:auto; padding:0 6px; font-size:10px; border-radius:10px;">No Profile</span></span>
+                                                            </t>
+                                                            <span class="chevron-svg"><t t-if="state.selectedVerticalNode and state.selectedVerticalNode.id === node.id"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></t><t t-else=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></t></span>
+                                                        </div>
+                                                        
+                                                        <t t-if="state.selectedVerticalNode and state.selectedVerticalNode.id === node.id">
+                                                            <t t-call="CareerPathNodeContent"/>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB CONTENT: LATERAL -->
+                        <div class="tab-content" t-if="state.activeTab === 'lateral'">
+                            <div class="lanes">
+                                <div class="lane lateral">
+                                    <div class="lane-head">
+                                        <div class="lane-icon">→</div>
+                                        <div class="lane-title">Lateral Path</div>
+                                        <div class="lane-sub">Same level, different function</div>
+                                    </div>
+                                    <t t-if="lateralNodes.length === 0">
+                                        <div class="empty-state-card">
+                                            <span style="font-size: 32px; display:block; margin-bottom: 12px; color: #d1d6e0;">🔄</span>
+                                            <div class="title">No Data</div>
+                                            <div class="desc">No standard lateral transitions mapped.</div>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <div class="lane-track">
+                                            <div class="steps" id="steps-lateral">
+                                                <t t-foreach="lateralNodes" t-as="lat" t-key="lat.id">
+                                                    <div t-attf-class="step {{ state.selectedLateralNode and state.selectedLateralNode.id === lat.id ? 'expanded' : '' }}">
+                                                        <div class="step-content-wrap" t-on-click="() => this.selectNode(lat, 'lateral')">
+                                                            <div class="step-main">
+                                                                <h4><t t-esc="lat.job_name"/></h4>
+                                                                <div class="reqs" t-if="lat.requirements">
+                                                                    <span class="req"><span style="color:#f39c12; margin-right:4px; font-size:14px;">★</span> PMS ≥ <t t-esc="lat.requirements.min_pms_score"/></span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="tag">Lateral move</div>
+                                                        </div>
+                                                        
+                                                        <div class="step-footer" t-on-click="() => this.selectNode(lat, 'lateral')">
+                                                            <t t-set="hasProfile" t-value="lat.requirements and lat.requirements.competencies and lat.requirements.competencies.length > 0"/>
+                                                            <t t-if="hasProfile">
+                                                                <t t-set="gapCount" t-value="getGapsCount(lat)"/>
+                                                                <span>View gap analysis <span class="gap-badge"><t t-esc="gapCount"/></span></span>
+                                                            </t>
+                                                            <t t-else="">
+                                                                <span>View gap analysis <span class="gap-badge" style="background:#6c757d; width:auto; padding:0 6px; font-size:10px; border-radius:10px;">No Profile</span></span>
+                                                            </t>
+                                                            <span class="chevron-svg"><t t-if="state.selectedLateralNode and state.selectedLateralNode.id === lat.id"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></t><t t-else=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></t></span>
+                                                        </div>
+                                                        
+                                                        <t t-if="state.selectedLateralNode and state.selectedLateralNode.id === lat.id">
+                                                            <t t-set="node" t-value="lat"/>
+                                                            <t t-call="CareerPathNodeContent"/>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB CONTENT: DUAL -->
+                        <div class="tab-content" t-if="state.activeTab === 'dual'">
+                            <div class="lanes">
+                                <div class="lane dual">
+                                    <div class="lane-head">
+                                        <div class="lane-icon">★</div>
+                                        <div class="lane-title">Specialized Path</div>
+                                        <div class="lane-sub">Specialized individual contributor track</div>
+                                    </div>
+                                    <t t-if="dualNodes.length === 0">
+                                        <div class="empty-state-card">
+                                            <span style="font-size: 32px; display:block; margin-bottom: 12px; color: #d1d6e0;">⭐</span>
+                                            <div class="title">No Data</div>
+                                            <div class="desc">No specialized transitions are defined.</div>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <div class="lane-track">
+                                            <div class="steps" id="steps-dual">
+                                                <t t-foreach="dualNodes" t-as="dual" t-key="dual.id">
+                                                    <div t-attf-class="step {{ state.selectedDualNode and state.selectedDualNode.id === dual.id ? 'expanded' : '' }}">
+                                                        <div class="step-content-wrap" t-on-click="() => this.selectNode(dual, 'dual')">
+                                                            <div class="step-main">
+                                                                <h4><t t-esc="dual.job_name"/></h4>
+                                                                <div class="reqs" t-if="dual.requirements">
+                                                                    <span class="req"><span style="color:#f39c12; margin-right:4px; font-size:14px;">★</span> PMS ≥ <t t-esc="dual.requirements.min_pms_score"/></span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="tag">Specialized move</div>
+                                                        </div>
+                                                        
+                                                        <div class="step-footer" t-on-click="() => this.selectNode(dual, 'dual')">
+                                                            <t t-set="hasProfile" t-value="dual.requirements and dual.requirements.competencies and dual.requirements.competencies.length > 0"/>
+                                                            <t t-if="hasProfile">
+                                                                <t t-set="gapCount" t-value="getGapsCount(dual)"/>
+                                                                <span>View gap analysis <span class="gap-badge"><t t-esc="gapCount"/></span></span>
+                                                            </t>
+                                                            <t t-else="">
+                                                                <span>View gap analysis <span class="gap-badge" style="background:#6c757d; width:auto; padding:0 6px; font-size:10px; border-radius:10px;">No Profile</span></span>
+                                                            </t>
+                                                            <span class="chevron-svg"><t t-if="state.selectedDualNode and state.selectedDualNode.id === dual.id"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></t><t t-else=""><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></t></span>
+                                                        </div>
+                                                        
+                                                        <t t-if="state.selectedDualNode and state.selectedDualNode.id === dual.id">
+                                                            <t t-set="node" t-value="dual"/>
+                                                            <t t-call="CareerPathNodeContent"/>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+
+    <t t-name="CareerPathNodeContent">
+        <div class="step-gap-analysis">
+            <t t-set="groupedComps" t-value="groupCompetenciesByPillar(node)"/>
+            <t t-set="allPillars" t-value="['Core', 'Leadership', 'Technical', 'Other']"/>
+            <t t-set="availablePillars" t-value="allPillars.filter(p => groupedComps[p] and groupedComps[p].length > 0)"/>
+            
+            <t t-set="tabs" t-value="['Criteria'].concat(availablePillars)"/>
+            <t t-set="activePillar" t-value="tabs.includes(state.activeInnerTab) ? state.activeInnerTab : 'Criteria'" />
+            
+            <div class="inner-tab-nav" style="margin-bottom: 8px;">
+                <t t-foreach="tabs" t-as="tabName" t-key="tabName">
+                    <button t-attf-class="inner-tab-item {{ activePillar === tabName ? 'active' : '' }}" 
+                            t-on-click.stop="() => state.activeInnerTab = tabName">
+                        <t t-esc="tabName"/>
+                        <t t-if="tabName !== 'Criteria'">
+                            <t t-set="pillarGaps" t-value="groupedComps[tabName].filter(c => c.gap &lt; 0 or c.status === 'Missing').length"/>
+                            <span t-if="pillarGaps > 0" style="background:#e74c3c;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;"><t t-esc="pillarGaps"/></span>
+                        </t>
+                        <t t-else="">
+                            <t t-set="criteriaGaps" t-value="(node.requirements and (!node.requirements.meets_pms or !node.requirements.meets_tenure)) ? 1 : 0"/>
+                            <span t-if="criteriaGaps > 0" style="background:#e74c3c;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">!</span>
+                        </t>
+                    </button>
+                </t>
+            </div>
+
+            <t t-if="activePillar === 'Criteria'">
+                <t t-if="node.requirements">
+                    <div class="comp-pillar-section">
+                        <table class="comp-table">
+                            <thead>
+                                <tr>
+                                    <th>Criteria</th>
+                                    <th class="text-center">Your Score</th>
+                                    <th class="text-center">Required</th>
+                                    <th class="text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="comp-name"><b>PMS Score</b></td>
+                                    <td class="text-center"><t t-esc="node.requirements.current_pms"/></td>
+                                    <td class="text-center"><t t-esc="node.requirements.min_pms_score"/></td>
+                                    <td class="text-right">
+                                        <span t-attf-class="badge-status {{ node.requirements.meets_pms ? 'badge-meets' : 'badge-gap' }}">
+                                            <t t-if="node.requirements.meets_pms">✓ Meets</t>
+                                            <t t-else="">GAP</t>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="comp-name"><b>Experience (Years)</b></td>
+                                    <td class="text-center"><t t-esc="node.requirements.current_tenure"/></td>
+                                    <td class="text-center"><t t-esc="node.requirements.min_tenure_years"/></td>
+                                    <td class="text-right">
+                                        <span t-attf-class="badge-status {{ node.requirements.meets_tenure ? 'badge-meets' : 'badge-gap' }}">
+                                            <t t-if="node.requirements.meets_tenure">✓ Meets</t>
+                                            <t t-else="">GAP</t>
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div style="color:#8a94a6; font-size:12px; font-style:italic; padding: 8px 0;">
+                        No basic criteria (PMS/Experience) configured for this role.
+                    </div>
+                </t>
+                
+                <t t-if="availablePillars.length === 0">
+                    <div style="color:#8a94a6; font-size:12px; font-style:italic; padding: 8px 0; border-top: 1px solid #eee; margin-top: 8px;">
+                        No competency profile configured for this role. Contact HR to set up a Competency Role Mapping.
+                    </div>
+                </t>
+            </t>
+            <t t-else="">
+                <div class="comp-pillar-section">
+                    <table class="comp-table">
+                        <thead>
+                            <tr>
+                                <th>Competency</th>
+                                <th class="text-center">Your Evaluation</th>
+                                <th class="text-center">Required Level</th>
+                                <th class="text-right">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="groupedComps[activePillar]" t-as="comp" t-key="comp.name">
+                                <tr>
+                                    <td class="comp-name"><b><t t-esc="comp.name"/></b></td>
+                                    <td class="text-center">
+                                        <t t-if="comp.current === 0"><span style="color:#8a94a6;font-size:12px;font-style:italic;">Not Assessed</span></t>
+                                        <t t-else=""><t t-esc="comp.current"/></t>
+                                    </td>
+                                    <td class="text-center"><t t-esc="comp.required"/></td>
+                                    <td class="text-right">
+                                        <span t-attf-class="badge-status badge-{{ comp.status.toLowerCase() }}">
+                                            <t t-if="comp.status === 'Gap'">Gap (<t t-esc="comp.gap"/>)</t>
+                                            <t t-elif="comp.status === 'Missing'">MISSING</t>
+                                            <t t-elif="comp.status === 'Exceeds'">✓ Exceeds (+<t t-esc="comp.gap"/>)</t>
+                                            <t t-else="">✓ Meets</t>
+                                        </span>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+
+            <div class="gsummary">
+                <t t-set="gapCount" t-value="getGapsCount(node)"/>
+                <t t-if="gapCount > 0">
+                    <span class="text-danger" style="margin-right:4px; font-size: 16px;">⚠</span> <b><t t-esc="gapCount"/> competency gap(s)</b> to close for <b><t t-esc="node.job_name"/></b>.
+                </t>
+                <t t-elif="availablePillars.length > 0">
+                    <span class="text-success" style="margin-right:4px; font-size: 16px;">✓</span> <b>All competencies met</b> — ready for <b><t t-esc="node.job_name"/></b>.
+                </t>
+                <t t-else="">
+                    <span class="text-warning" style="margin-right:4px; font-size: 16px;">ℹ</span> Check PMS and Experience criteria above.
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

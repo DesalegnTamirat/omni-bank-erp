@@ -1,0 +1,22 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_resl_loan_employee,resl.loan employee,model_resl_loan,base.group_user,1,1,1,0
+access_resl_loan_manager,resl.loan manager,model_resl_loan,resl.group_resl_manager,1,1,1,1
+access_resl_loan_hr,resl.loan hr,model_resl_loan,resl.group_resl_hr,1,1,1,1
+access_resl_loan_guarantee_employee,resl.loan.guarantee employee,model_resl_loan_guarantee,base.group_user,1,1,1,0
+access_resl_loan_guarantee_manager,resl.loan.guarantee manager,model_resl_loan_guarantee,resl.group_resl_manager,1,1,1,1
+access_resl_loan_guarantee_hr,resl.loan.guarantee hr,model_resl_loan_guarantee,resl.group_resl_hr,1,1,1,1
+access_resl_loan_replacement_log_employee,resl.loan.replacement.log employee,model_resl_loan_replacement_log,base.group_user,1,0,0,0
+access_resl_loan_replacement_log_manager,resl.loan.replacement.log manager,model_resl_loan_replacement_log,resl.group_resl_manager,1,1,1,1
+access_resl_loan_replacement_log_hr,resl.loan.replacement.log hr,model_resl_loan_replacement_log,resl.group_resl_hr,1,1,1,1
+access_resl_loan_replacement_wizard_employee,resl.loan.replacement.wizard employee,model_resl_loan_replacement_wizard,base.group_user,1,1,1,1
+access_resl_loan_replacement_wizard_hr,resl.loan.replacement.wizard hr,model_resl_loan_replacement_wizard,resl.group_resl_hr,1,1,1,1
+access_resl_guarantor_lookup_employee,resl.guarantor.lookup employee,model_resl_guarantor_lookup,base.group_user,1,1,1,1
+access_resl_guarantor_lookup_line_employee,resl.guarantor.lookup.line employee,model_resl_guarantor_lookup_line,base.group_user,1,1,1,1
+access_resl_loan_disbursement_wizard_hr,resl.loan.disbursement.wizard hr,model_resl_loan_disbursement_wizard,resl.group_resl_hr,1,1,1,1
+access_resl_loan_auditor,resl.loan auditor,model_resl_loan,resl.group_resl_hr_auditor,1,0,0,0
+access_resl_loan_guarantee_auditor,resl.loan.guarantee auditor,model_resl_loan_guarantee,resl.group_resl_hr_auditor,1,0,0,0
+access_resl_loan_replacement_log_auditor,resl.loan.replacement.log auditor,model_resl_loan_replacement_log,resl.group_resl_hr_auditor,1,0,0,0
+access_resl_loan_accountant,resl.loan accountant,model_resl_loan,resl.group_resl_hr_accountant,1,1,0,0
+access_resl_loan_guarantee_accountant,resl.loan.guarantee accountant,model_resl_loan_guarantee,resl.group_resl_hr_accountant,1,0,0,0
+access_resl_loan_disbursement_wizard_accountant,resl.loan.disbursement.wizard accountant,model_resl_loan_disbursement_wizard,resl.group_resl_hr_accountant,1,1,1,1
+access_resl_loan_disbursement_wizard_employee,resl.loan.disbursement.wizard employee,model_resl_loan_disbursement_wizard,base.group_user,1,1,1,1

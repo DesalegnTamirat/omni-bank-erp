@@ -21,21 +21,27 @@
     <!-- Rename Officer: Manage all attendances -> Manager: Manage all attendances & Grant Export Access -->
     <record id="hr_attendance.group_hr_attendance_user" model="res.groups">
         <field name="name">Manager: Manage all attendances</field>
-        <field name="implied_ids" eval="[(4, ref('base.group_allow_export'))]"/>
+        <field name="implied_ids" eval="[(3, ref('custom_hr_attendance.group_hr_attendance_job_position_user')), (4, ref('base.group_allow_export'))]"/>
     </record>
 
-    <!-- Job Position Manager (Manager + Job Position Exceptions & Job Shifts) -->
+    <!-- 24/7 Shift Manager (Specialized Role: Manager + Rotational Rosters for Contact Center / SOC) -->
     <record id="group_hr_attendance_job_position_user" model="res.groups">
-        <field name="name">Job Position Manager</field>
+        <field name="name">24/7 Shift Manager</field>
         <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
         <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
     </record>
 
-    <!-- IT and Driver Manager (Manager + Over Time) -->
+    <!-- Auditor (Bank-Wide Read-Only Attendance & Reporting Oversight + Team Management for direct subordinates) -->
+    <record id="group_hr_attendance_auditor" model="res.groups">
+        <field name="name">Auditor</field>
+        <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
+        <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
+    </record>
+
+    <!-- IT and Driver Manager (Kept for backend compatibility; hidden from privilege dropdown) -->
     <record id="group_hr_attendance_it_driver_user" model="res.groups">
         <field name="name">IT and Driver Manager</field>
-        <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
-        <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
+        <field name="privilege_id" eval="False"/>
     </record>
 
     <!-- Requirement 4: Privacy - Regular Employee: Own Attendance Only -->

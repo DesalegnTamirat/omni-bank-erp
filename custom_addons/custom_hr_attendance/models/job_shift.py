@@ -266,5 +266,5 @@ class JobShift(models.Model):
             assigner_department=a_dept
         ))
         return allowed.ids
-        return allowed.ids
+        #return allowed.ids
 

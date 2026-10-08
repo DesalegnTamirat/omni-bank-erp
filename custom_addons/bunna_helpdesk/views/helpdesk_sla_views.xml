@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- ── SLA Policy ────────────────────────────────────────────────────────── -->
+    <record id="helpdesk_sla_view_list" model="ir.ui.view">
+        <field name="name">helpdesk.sla.view.list</field>
+        <field name="model">helpdesk.sla</field>
+        <field name="arch" type="xml">
+            <list string="SLA Policies">
+                <field name="name" />
+                <field name="team_id" />
+                <field name="priority" />
+                <field name="time_days" string="Days" />
+                <field name="time_hours" string="Hours" />
+                <field name="time_minutes" string="Minutes" />
+                <field name="stage_id" />
+                <field name="active" column_invisible="1" />
+            </list>
+        </field>
+    </record>
+
+    <record id="helpdesk_sla_view_form" model="ir.ui.view">
+        <field name="name">helpdesk.sla.view.form</field>
+        <field name="model">helpdesk.sla</field>
+        <field name="arch" type="xml">
+            <form string="SLA Policy">
+                <sheet>
+                    <widget
+                        name="web_ribbon"
+                        title="Archived"
+                        bg_color="bg-danger"
+                        invisible="active"
+                    />
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="SLA Policy Name..." />
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Applies To">
+                            <field name="team_id" />
+                            <field name="priority" />
+                            <field
+                                name="tag_ids"
+                                widget="many2many_tags"
+                                options="{'no_create_edit': True, 'color_field': 'color'}"
+                            />
+                        </group>
+                        <group string="Target">
+                            <field name="stage_id" />
+                            <label for="time_days" string="Deadline" />
+                            <div class="o_row">
+                                <field name="time_days" class="o_field_small" />
+                                <span>day(s)</span>
+                                <field name="time_hours" class="o_field_small" />
+                                <span>hour(s)</span>
+                                <field name="time_minutes" class="o_field_small" />
+                                <span>minute(s)</span>
+                            </div>
+                        </group>
+                    </group>
+                    <field name="active" invisible="1" />
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── SLA Status inline view (used in ticket form notebook) ────────────── -->
+    <record id="helpdesk_sla_status_view_list" model="ir.ui.view">
+        <field name="name">helpdesk.sla.status.view.list</field>
+        <field name="model">helpdesk.sla.status</field>
+        <field name="arch" type="xml">
+            <list string="SLA Statuses" create="false" delete="false">
+                <field name="sla_id" string="SLA Policy" />
+                <field name="deadline" />
+                <field name="reached_datetime" string="Reached On" />
+                <field
+                    name="status"
+                    widget="badge"
+                    decoration-success="status == 'reached'"
+                    decoration-warning="status == 'in_progress'"
+                    decoration-danger="status == 'failed'"
+                />
+            </list>
+        </field>
+    </record>
+
+    <record id="helpdesk_sla_view_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.sla.view.kanban</field>
+        <field name="model">helpdesk.sla</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_group_by="team_id">
+                <field name="name" />
+                <field name="team_id" />
+                <field name="stage_id" />
+                <field name="priority" />
+                <field name="time_days" />
+                <field name="time_hours" />
+                <field name="time_minutes" />
+                <field name="tag_ids" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-primary" t-if="record.team_id.value">
+                                <field name="team_id" />
+                            </span>
+                            <span class="badge text-bg-info" t-if="record.stage_id.value">
+                                Target: <field name="stage_id" />
+                            </span>
+                        </div>
+                        <field class="fw-bold fs-5 text-truncate" name="name" />
+                        <div class="text-muted small mt-1">
+                            <i class="fa fa-hourglass-end me-1" />
+                            Deadline:
+                            <t t-if="record.time_days.raw_value"><field name="time_days" />d </t>
+                            <t t-if="record.time_hours.raw_value"><field name="time_hours" />h </t>
+                            <t t-if="record.time_minutes.raw_value"><field name="time_minutes" />m</t>
+                        </div>
+                        <div class="mt-2" t-if="record.tag_ids.raw_value and record.tag_ids.raw_value.length">
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" />
+                        </div>
+                        <footer class="pt-2 d-flex justify-content-end align-items-center">
+                            <field name="priority" widget="priority" />
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ── Action ────────────────────────────────────────────────────────────── -->
+    <record id="helpdesk_sla_action" model="ir.actions.act_window">
+        <field name="name">SLA Policies</field>
+        <field name="res_model">helpdesk.sla</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="path">helpdesk-sla</field>
+    </record>
+</odoo>

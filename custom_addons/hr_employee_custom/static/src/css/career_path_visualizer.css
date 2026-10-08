@@ -1,0 +1,587 @@
+/* =========================================================================
+   CAREER PATH VISUALIZER - FULL DARK THEME REDESIGN
+   ========================================================================= */
+
+.app {
+    --canvas: transparent;
+    --panel: #FFFFFF;
+    --panel-current: #F8F9FA;
+    --border: #DEE2E6;
+    --text: #212529;
+    --text-muted: #6C757D;
+    --text-faint: #ADB5BD;
+
+    --vertical: #541718;
+    --vertical-dim: rgba(84, 23, 24, 0.4);
+    --vertical-bg: rgba(84, 23, 24, 0.05);
+
+    --lateral: #c17540;
+    --lateral-dim: rgba(193, 117, 64, 0.4);
+    --lateral-bg: rgba(193, 117, 64, 0.05);
+    
+    --dual: #4b3f72;
+    --dual-dim: rgba(75, 63, 114, 0.4);
+    --dual-bg: rgba(75, 63, 114, 0.05);
+
+    --current: #1d2b32;
+    --current-fill: rgba(29, 43, 50, 0.1);
+    --current-line: #1d2b32;
+
+    background: var(--canvas);
+    color: var(--text);
+    font-family: 'Inter', 'IBM Plex Sans', -apple-system, Segoe UI, sans-serif;
+    padding: 36px 40px 64px;
+    min-height: 100vh;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.app * {
+    box-sizing: border-box;
+    font-family: 'Inter', 'IBM Plex Sans', -apple-system, Segoe UI, sans-serif;
+}
+
+/* ---------- Header ---------- */
+.app .pagehead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+.app .pagehead h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--text);
+}
+.app .pagehead .emp {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-left: 12px;
+    display: inline-block;
+}
+.app .legend {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+.app .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.app .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+/* ---------- Career Path Board ---------- */
+.app .board {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 40px;
+    margin-bottom: 40px;
+}
+
+/* --- Current Role Top Panel --- */
+.app .current-wrap {
+    width: 320px;
+    flex-shrink: 0;
+}
+.app .main-content-right {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+.app .current-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--current);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+.app .current-card {
+    background: linear-gradient(180deg, #FFFFFF 0%, #F8F9FA 100%);
+    border: 1px solid rgba(29, 43, 50, 0.1);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+    border-radius: 16px;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+}
+.app .current-card .avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--current), #2a3c46);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #FFFFFF;
+    flex-shrink: 0;
+    box-shadow: 0 4px 15px rgba(29, 43, 50, 0.3);
+}
+.app .current-card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+.app .current-card h3 {
+    font-size: 20px;
+    margin: 0 0 4px;
+    font-weight: 600;
+    color: var(--text);
+}
+.app .current-card .sub {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+.app .current-card .desc {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-faint);
+}
+.app .tenure-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(29, 43, 50, 0.05);
+    border: 1px solid rgba(29, 43, 50, 0.15);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--current);
+    flex-shrink: 0;
+}
+
+/* --- Lanes Panel --- */
+.app .lanes {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.app .lane-head {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 16px;
+}
+.app .lane-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-right: 12px;
+}
+.app .lane-sub {
+    font-size: 13px;
+    color: var(--text-faint);
+}
+
+.app .lane.vertical .lane-title {
+    color: var(--vertical);
+}
+.app .lane.lateral .lane-title {
+    color: var(--lateral);
+}
+.app .lane.dual .lane-title {
+    color: var(--dual);
+}
+
+/* --- Vertical Steps Container (Timeline) --- */
+.app .lane-track {
+    position: relative;
+    padding-left: 30px; /* Space for the timeline */
+}
+/* The vertical line */
+.app .lane-track::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    bottom: 20px;
+    left: 8px; /* 10px from the left edge */
+    width: 2px;
+    border-left: 2px solid var(--border);
+    z-index: 1;
+}
+.app .lane.vertical .lane-track::before {
+    border-left-color: var(--vertical);
+}
+.app .lane.lateral .lane-track::before {
+    border-left-color: var(--lateral);
+}
+.app .lane.dual .lane-track::before {
+    border-left-color: var(--dual);
+}
+
+.app .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.app .step {
+    width: 100%;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+}
+.app .step-content-wrap {
+    padding: 20px 24px;
+}
+/* The timeline node (circle) */
+.app .step::before {
+    content: '';
+    position: absolute;
+    left: -28px; /* -30px padding + 2px adjustment to center on the line */
+    top: 36px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: #ffffff;
+    z-index: 2;
+    transition: all 0.2s ease;
+}
+.app .lane.vertical .step::before {
+    border-color: var(--vertical);
+}
+.app .lane.lateral .step::before {
+    border-color: var(--lateral);
+}
+.app .lane.dual .step::before {
+    border-color: var(--dual);
+}
+
+.app .step:hover {
+    border-color: var(--text-faint);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+.app .step.expanded {
+    border-color: var(--border);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.08);
+}
+.app .lane.vertical .step.expanded {
+    border-color: var(--vertical-dim);
+}
+.app .lane.lateral .step.expanded {
+    border-color: var(--lateral-dim);
+}
+.app .lane.dual .step.expanded {
+    border-color: var(--dual-dim);
+}
+
+
+/* Highlights for Selection (Expanded state) */
+.app .lane.vertical .step.expanded::before {
+    background: var(--vertical);
+}
+.app .lane.lateral .step.expanded::before {
+    background: var(--lateral);
+}
+.app .lane.dual .step.expanded::before {
+    background: var(--dual);
+}
+
+/* Card Content */
+.app .step-main h4 {
+    margin: 0 0 12px;
+    padding-right: 90px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+}
+.app .reqs {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+}
+.app .req {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    background: #F8F9FA;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid #E9ECEF;
+}
+.app .req i {
+    margin-right: 6px;
+}
+
+/* Badges inside card */
+.app .tag {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 6px 12px;
+    border-radius: 20px;
+    text-transform: uppercase;
+}
+.app .lane.vertical .tag {
+    background: var(--vertical-bg);
+    color: var(--vertical);
+}
+.app .lane.lateral .tag {
+    background: var(--lateral-bg);
+    color: var(--lateral);
+}
+.app .lane.dual .tag {
+    background: var(--dual-bg);
+    color: var(--dual);
+}
+
+/* Closest Match Badge */
+.app .best-badge {
+    align-self: flex-start;
+    background: var(--vertical);
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    display: inline-block;
+    box-shadow: 0 4px 8px rgba(84, 23, 24, 0.2);
+}
+
+/* Accordion Toggle */
+.app .step-footer {
+    padding: 12px 24px;
+    border-top: 1px solid var(--border);
+    background: #fdfdfd;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-radius: 0 0 12px 12px;
+    transition: all 0.2s ease;
+}
+.app .step-footer:hover {
+    background: #f8f9fa;
+    color: var(--text);
+}
+.app .step-footer .gap-badge {
+    background: rgba(0,0,0,0.05);
+    color: var(--text);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+}
+
+/* Gap Analysis Accordion Content */
+.app .step-gap-analysis {
+    padding: 0;
+    border-top: 1px solid var(--border);
+    animation: slideDown 0.3s ease;
+    background: #fafbfc;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.app .comp-pillar-section {
+    background: #ffffff;
+    border-bottom: 1px solid var(--border);
+}
+.app .comp-pillar-section:last-child {
+    border-bottom: none;
+}
+.app .comp-pillar-title {
+    background: rgba(0,0,0,0.02);
+    padding: 12px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    letter-spacing: 0.02em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.app .comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.app .comp-table th {
+    text-align: left;
+    padding: 10px 24px;
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    background: #ffffff;
+}
+.app .comp-table td {
+    padding: 12px 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+    color: var(--text);
+    vertical-align: middle;
+}
+.app .comp-table tr:last-child td {
+    border-bottom: none;
+}
+.app .comp-table .comp-name {
+    color: var(--text);
+    font-weight: 500;
+}
+.app .text-center { text-align: center !important; }
+.app .text-right { text-align: right !important; }
+
+.app .badge-status {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.app .badge-gap, .app .badge-missing {
+    background: rgba(255, 71, 87, 0.1);
+    color: #ff4757;
+    border: 1px solid rgba(255, 71, 87, 0.2);
+}
+.app .badge-meets {
+    background: rgba(46, 213, 115, 0.1);
+    color: #2ed573;
+    border: 1px solid rgba(46, 213, 115, 0.2);
+}
+.app .badge-exceeds {
+    background: rgba(63, 190, 176, 0.1);
+    color: #3FBEB0;
+    border: 1px solid rgba(63, 190, 176, 0.2);
+}
+
+.app .gsummary {
+    padding: 16px 24px;
+    background: #ffffff;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+}
+.app .gsummary b {
+    color: var(--text);
+}
+
+/* Tab Navigation Styles (RESTORED) */
+.tab-nav {
+    display: flex;
+    gap: 20px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 24px;
+    padding-bottom: 0px;
+}
+.tab-item {
+    background: none;
+    border: none;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-faint);
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s ease;
+}
+.tab-item:hover {
+    color: var(--text);
+}
+.tab-item.active {
+    color: var(--vertical); /* Primary highlight color */
+}
+.tab-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px; /* cover the border-bottom of the container */
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: var(--vertical);
+    border-radius: 3px 3px 0 0;
+}
+.tab-content {
+    animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.text-danger { color: #e53e3e; }
+.text-success { color: #38a169; }
+
+/* Inner Tabs (Gap Analysis) */
+.inner-tab-nav {
+    display: flex;
+    background: #f1f3f6;
+    padding: 8px 16px 0;
+    border-bottom: 1px solid var(--border);
+}
+.inner-tab-item {
+    background: none;
+    border: none;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    margin-right: 4px;
+    transition: all 0.2s ease;
+}
+.inner-tab-item:hover {
+    color: var(--text);
+    background: rgba(0,0,0,0.03);
+}
+.inner-tab-item.active {
+    background: #ffffff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom: 1px solid #ffffff;
+    margin-bottom: -1px;
+}
+.chevron-svg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-faint);
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_users_form_helpdesk_agent" model="ir.ui.view">
+        <field name="name">res.users.form.helpdesk.agent</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//notebook/page[@name='preferences']" position="after">
+                <page name="helpdesk_agent" string="Bunna Contact Center &amp; Helpdesk">
+                    <group>
+                        <group string="Real-Time Duty &amp; Attendance Status">
+                            <field name="agent_duty_status" widget="badge"
+                                decoration-success="agent_duty_status == 'available'"
+                                decoration-warning="agent_duty_status in ('busy', 'on_break')"
+                                decoration-danger="agent_duty_status == 'offline'"
+                            />
+                            <field name="agent_duty_status_reason" readonly="1" />
+                            <field name="agent_manual_duty_status" string="Manual Status Preference" />
+                        </group>
+                        <group string="Contact Center Routing">
+                            <field name="cc_phone_extension" />
+                            <field name="helpdesk_team_ids" widget="many2many_tags" />
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

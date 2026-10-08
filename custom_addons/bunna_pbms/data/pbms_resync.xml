@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Re-sync stored monthly/quarterly header figures with the requirement lines on every upgrade -->
+    <function model="pbms.planning.category" name="_pbms_resync_header_totals"/>
+</odoo>

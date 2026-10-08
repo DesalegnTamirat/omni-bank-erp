@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- LIST VIEW -->
+        <record id="view_succession_critical_position_list" model="ir.ui.view">
+            <field name="name">succession.critical.position.list</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <list decoration-danger="succession_risk == 'critical'"
+                      decoration-warning="succession_risk == 'high'"
+                      decoration-success="succession_risk == 'low'">
+                    <field name="display_name"/>
+                    <field name="department_id"/>
+                    <field name="risk_level" widget="badge"
+                           decoration-danger="risk_level == 'critical'"
+                           decoration-warning="risk_level == 'high'"
+                           decoration-info="risk_level == 'medium'"/>
+                    <field name="candidate_count"/>
+                    <field name="ready_now_count"/>
+                    <field name="bench_strength"/>
+                    <field name="succession_risk" widget="badge"
+                           decoration-danger="succession_risk == 'critical'"
+                           decoration-warning="succession_risk in ('high', 'medium')"
+                           decoration-success="succession_risk == 'low'"
+                           decoration-muted="succession_risk == 'draft'"/>
+                    <field name="state" widget="badge"
+                           decoration-success="state == 'approved'"
+                           decoration-warning="state in ('ppdd_review','spmc_approval')"
+                           decoration-muted="state == 'deactivated'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- FORM VIEW -->
+        <record id="view_succession_critical_position_form" model="ir.ui.view">
+            <field name="name">succession.critical.position.form</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_submit_for_spmc_approval"
+                                string="Submit for SPMC Approval"
+                                type="object" class="oe_highlight"
+                                invisible="state != 'draft'"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <button name="action_spmc_approve"
+                                string="✓ SPMC Final Approval"
+                                type="object" class="btn-success"
+                                invisible="state != 'spmc_approval'"
+                                groups="bunna_succession_management.group_succession_spmc"/>
+                        <button name="action_auto_match_candidates"
+                                string="Auto-Match Candidates"
+                                type="object" class="oe_highlight"
+                                invisible="state == 'draft'"/>
+                        <button name="action_deactivate"
+                                string="Deactivate"
+                                type="object"
+                                invisible="state in ('draft','deactivated')"
+                                groups="bunna_succession_management.group_succession_admin"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,spmc_approval,approved"/>
+                    </header>
+                    <sheet>
+                        <!-- Succession Risk Banner -->
+                        <div class="alert alert-danger" role="alert"
+                             invisible="succession_risk != 'critical' or state != 'approved'">
+                            <strong>&#128680; CRITICAL SUCCESSION RISK:</strong>
+                            No identified successors for this position. Immediate action required.
+                        </div>
+                        <div class="alert alert-warning" role="alert"
+                             invisible="succession_risk != 'high' or state != 'approved'">
+                            <strong>&#9888; HIGH SUCCESSION RISK:</strong>
+                            Candidates identified but none are Ready Now. Development plans required.
+                        </div>
+                        <div class="alert alert-success" role="alert"
+                             invisible="succession_risk != 'low' or state != 'approved'">
+                            <strong>&#10004; LOW SUCCESSION RISK:</strong>
+                            At least one Ready Now successor available.
+                        </div>
+
+                        <!-- Stats Buttons -->
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_talent_pools"
+                                    type="object"
+                                    class="oe_stat_button"
+                                    icon="fa-folder-open">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="talent_pool_count"/></span>
+                                    <span class="o_stat_text">Talent Pools</span>
+                                </div>
+                            </button>
+                            <button name="action_view_candidates"
+                                    type="object"
+                                    class="oe_stat_button"
+                                    icon="fa-users">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="candidate_count"/></span>
+                                    <span class="o_stat_text">Candidates</span>
+                                </div>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-check-circle" type="object" name="action_view_ready_now">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="ready_now_count"/></span>
+                                    <span class="o_stat_text">Ready Now</span>
+                                </div>
+                            </button>
+                        </div>
+
+                        <group>
+                            <group string="Position Details">
+                                <field name="job_id" readonly="state == 'approved'"/>
+                                <field name="department_id" readonly="state == 'approved'"/>
+                                <field name="risk_level"/>
+                                <field name="vacancy_probability"/>
+                            </group>
+                            <group string="Succession Status">
+                                <field name="min_successor_count"/>
+                                <field name="bench_strength"/>
+                                <field name="succession_risk" widget="badge"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Strategic Inputs &amp; Justification" icon="fa-lightbulb-o">
+                                <div class="alert alert-info mt-2 mb-4" role="alert" style="background-color: rgba(1, 126, 132, 0.05); border-left: 4px solid #017e84; color: #017e84; border-radius: 4px; padding: 1rem;">
+                                    <i class="fa fa-info-circle me-2"></i>
+                                    <strong>FR-SWP-001:</strong> To classify this position as Critical, PPDD must capture the strategic workforce planning inputs justifying this decision. These inputs guide the selection and training of future successors.
+                                </div>
+                                <div class="row" style="margin-top: 15px;">
+                                    <div class="col-md-6 mb-4">
+                                        <label for="strategic_plan_review_outcome" class="fw-bold" style="color: #017e84;"><i class="fa fa-bullseye me-2"></i>Strategic Plan Outcomes</label>
+                                        <div class="text-muted small mb-1">How does this position tie into the Bank's strategic goals?</div>
+                                        <field name="strategic_plan_review_outcome" placeholder="e.g. The bank's 3-year strategic plan requires a 50% shift to digital revenue..." nolabel="1"/>
+                                    </div>
+                                    <div class="col-md-6 mb-4">
+                                        <label for="workforce_risk_notes" class="fw-bold" style="color: #017e84;"><i class="fa fa-exclamation-triangle me-2"></i>Workforce Risks Identified</label>
+                                        <div class="text-muted small mb-1">What are the risks if this position is vacant?</div>
+                                        <field name="workforce_risk_notes" placeholder="e.g. Flight risks, retirement risks, market scarcity for this role..." nolabel="1"/>
+                                    </div>
+                                    <div class="col-md-6 mb-4">
+                                        <label for="emerging_business_needs" class="fw-bold" style="color: #017e84;"><i class="fa fa-rocket me-2"></i>Emerging Business Needs</label>
+                                        <div class="text-muted small mb-1">What new business demands make this role critical?</div>
+                                        <field name="emerging_business_needs" placeholder="e.g. Immediate need to integrate with external Fintech APIs..." nolabel="1"/>
+                                    </div>
+                                    <div class="col-md-6 mb-4">
+                                        <label for="future_capability_reqs" class="fw-bold" style="color: #017e84;"><i class="fa fa-graduation-cap me-2"></i>Future Capability Requirements</label>
+                                        <div class="text-muted small mb-1">What specific future skills must successors possess?</div>
+                                        <field name="future_capability_reqs" placeholder="e.g. Successors must possess advanced knowledge of Cloud Infrastructure (AWS)..." nolabel="1"/>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label for="business_impact" class="fw-bold" style="color: #017e84;"><i class="fa fa-briefcase me-2"></i>Overall Business Impact</label>
+                                        <field name="business_impact" placeholder="Describe the operational and strategic impact of this position being vacant..." nolabel="1"/>
+                                    </div>
+                                </div>
+                            </page>
+                            <page string="Required Competencies">
+                                <field name="required_role_mapping_line_ids">
+                                    <list string="Competencies">
+                                        <field name="competency_id"/>
+                                        <field name="pillar"/>
+                                        <field name="required_proficiency"/>
+                                        <field name="weight"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Talent Pools">
+                                <div class="alert alert-info text-center mt-3" role="alert" invisible="state == 'approved'">
+                                    <i class="fa fa-info-circle me-1"/> 
+                                    <b>Governance Lock:</b> Talent Pools can only be linked after the SPMC has approved this Critical Position.
+                                </div>
+                                <field name="talent_pool_ids" readonly="1">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="candidate_count"/>
+                                        <field name="ready_now_count"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Succession Pipeline">
+                                <div class="alert alert-info text-center mt-3" role="alert" invisible="state == 'approved'">
+                                    <i class="fa fa-info-circle me-1"/> 
+                                    <b>Governance Lock:</b> Successors cannot be nominated until the SPMC has officially approved this Critical Position.
+                                </div>
+                                <field name="candidate_ids" readonly="1">
+                                    <list decoration-success="readiness_level == 'ready_now'"
+                                          decoration-warning="readiness_level == 'ready_1_2_yrs'"
+                                          decoration-muted="state in ('rejected','waitlisted')">
+                                        <field name="employee_id"/>
+                                        <field name="readiness_level" widget="badge"/>
+                                        <field name="competency_match_percent"/>
+                                        <field name="latest_pms_score"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Approval &amp; Review Info">
+                                <group>
+                                    <group string="PPDD Review">
+                                        <field name="ppdd_reviewed_by_id" readonly="1"/>
+                                        <field name="ppdd_review_date" readonly="1"/>
+                                    </group>
+                                    <group string="SPMC Approval">
+                                        <field name="spmc_approved_by_id" readonly="1"/>
+                                        <field name="spmc_approval_date" readonly="1"/>
+                                    </group>
+                                </group>
+                                <group string="Review Cycle">
+                                    <group>
+                                        <field name="review_interval_months"/>
+                                        <field name="next_review_date"/>
+                                    </group>
+                                </group>
+                                <field name="notes" placeholder="Notes and justification..."/>
+                            </page>
+
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- SEARCH VIEW -->
+        <record id="view_succession_critical_position_search" model="ir.ui.view">
+            <field name="name">succession.critical.position.search</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="job_id"/>
+                    <field name="department_id"/>
+                    <filter string="Critical Risk" name="critical_risk"
+                            domain="[('risk_level','=','critical')]"/>
+                    <filter string="No Successors" name="no_successors"
+                            domain="[('succession_risk','=','critical')]"/>
+                    <filter string="Approved" name="approved"
+                            domain="[('state','=','approved')]"/>
+                    <filter string="Pending Approval" name="pending"
+                            domain="[('state','in',['ppdd_review','spmc_approval'])]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Risk Level" name="group_risk" context="{'group_by':'risk_level'}"/>
+                        <filter string="Department" name="group_dept" context="{'group_by':'department_id'}"/>
+                        <filter string="Succession Risk" name="group_succ_risk" context="{'group_by':'succession_risk'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- ACTION -->
+        <record id="action_succession_critical_position" model="ir.actions.act_window">
+            <field name="name">Critical Positions</field>
+            <field name="res_model">succession.critical.position</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_succession_critical_position_search"/>
+            <field name="context">{}</field>
+        </record>
+
+    </data>
+</odoo>

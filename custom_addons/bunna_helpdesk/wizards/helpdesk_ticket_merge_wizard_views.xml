@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- ── Merge Wizard ─────────────────────────────────────────────────────── -->
+    <record id="helpdesk_ticket_merge_wizard_view_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.merge.wizard.form</field>
+        <field name="model">helpdesk.ticket.merge.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Merge Tickets">
+                <sheet>
+                    <group>
+                        <field name="target_ticket_id" />
+                        <field name="source_ticket_ids" widget="many2many_tags" />
+                        <field name="merge_descriptions" />
+                    </group>
+                    <div class="alert alert-warning" role="alert">
+                        Source tickets will be <strong>archived</strong> and marked as
+                        duplicates of the target ticket. All messages and attachments will be
+                        moved to the target ticket.
+                    </div>
+                </sheet>
+                <footer>
+                    <button
+                        string="Merge"
+                        name="action_merge"
+                        type="object"
+                        class="btn-primary"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

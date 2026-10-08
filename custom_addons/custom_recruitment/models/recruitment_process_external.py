@@ -53,6 +53,22 @@ class RecruitmentProcessExternal(models.Model):
         self.status = 'notify'
         return self.status
 
+    def action_select_all_candidates(self):
+        """ Select all external candidates at once """
+        for rec in self:
+            if hasattr(rec, 'eligible_emp_external') and rec.eligible_emp_external:
+                rec.eligible_emp_external.write({'select_flag': True})
+            if hasattr(rec, 'ext_rec_sel') and rec.ext_rec_sel:
+                rec.ext_rec_sel.write({'select_flag': True})
+
+    def action_deselect_all_candidates(self):
+        """ Deselect all external candidates at once """
+        for rec in self:
+            if hasattr(rec, 'eligible_emp_external') and rec.eligible_emp_external:
+                rec.eligible_emp_external.write({'select_flag': False})
+            if hasattr(rec, 'ext_rec_sel') and rec.ext_rec_sel:
+                rec.ext_rec_sel.write({'select_flag': False})
+
     def action_open_shortlist_wizard(self):
         self.ensure_one()
         # Enforce: only HR Officer (group_hr_user) or HR Administrator (group_hr_manager) may shortlist

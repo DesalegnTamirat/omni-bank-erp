@@ -562,12 +562,8 @@ class RecruitmentRequest(models.Model):
 
     @api.constrains("employee_category", "sourcing_type", "job_level")
     def _check_job_level_required(self):
-        """Job Level is only required for Non-Managerial when Sourcing Type is External."""
+        """Job Level is optional."""
         for rec in self:
-            if rec.employee_category == "Non Managerial" and rec.sourcing_type == "external" and not rec.job_level:
-                raise ValidationError(_(
-                    "Job Level (Junior / Senior) is required for Non-Managerial external requests."
-                ))
             if rec.employee_category == "Managerial" and rec.job_level:
                 rec.job_level = False
 
@@ -608,8 +604,8 @@ class RecruitmentRequest(models.Model):
         if self.workforce_plan_id and self.workforce_plan_id.org_unit_id != self.operating_unit_id:
             self.workforce_plan_id = False
 
-        if self.job_position_id and self.allowed_job_ids and self.job_position_id not in self.allowed_job_ids:
-            self.job_position_id = False
+        # Always clear job_position_id when operating_unit_id changes so user picks a valid position for the new unit
+        self.job_position_id = False
 
     @api.onchange("job_position_id", "workforce_plan_id", "operating_unit_id")
     def _onchange_job_position_id_sync_fields(self):
@@ -714,7 +710,7 @@ class RecruitmentRequest(models.Model):
         """Verify that the current user belongs to Recruitment Officer or Manager group."""
         user = self.env.user
         if user.id in (1, 2) or self.env.is_admin():
-            return True
+            return
 
         has_manager_group = (
             user.has_group("custom_recruitment.group_recruitment_manager") or
@@ -727,7 +723,7 @@ class RecruitmentRequest(models.Model):
                 raise UserError(_(
                     "Access Denied: Only members of the Recruitment Manager group (group_recruitment_manager) are authorized to approve recruitment requests."
                 ))
-            return True
+            return
 
         has_hr_group = has_manager_group or (
             user.has_group("custom_recruitment.group_recruitment_officer") or
@@ -740,7 +736,6 @@ class RecruitmentRequest(models.Model):
             raise UserError(_(
                 "Access Denied: Only members of the HR / Recruitment team are authorized to review or manage recruitment requests."
             ))
-        return True
 
 
 
@@ -1045,6 +1040,12 @@ class RecruitmentRequest(models.Model):
 
 class OperatingUnitRecruitment(models.Model):
     _inherit = "operating.unit"
+
+    full_non_banking_credit = fields.Boolean(
+        string="Full Non-Banking Experience Credit (100%)",
+        default=False,
+        help="If checked, candidates applying to vacancies in this work unit receive 100% credit for non-banking experience. Otherwise 50% for external vacancies."
+    )
 
     recruitment_request_ids = fields.One2many(
         "recruitment.request", "operating_unit_id", string="Recruitment Requests"

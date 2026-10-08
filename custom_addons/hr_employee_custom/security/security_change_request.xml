@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Record Rule: Change Request - Employee User sees ONLY own records -->
+        <record id="rule_hr_employee_change_request_user_own" model="ir.rule">
+            <field name="name">Employee Change Request: Employee User sees own requests only</field>
+            <field name="model_id" ref="model_hr_employee_change_request"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">['|', ('requested_by_id', '=', user.id), ('employee_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <!-- Record Rule: Change Request - HR Officer & HR Manager sees ALL records -->
+        <record id="rule_hr_employee_change_request_officer_all" model="ir.rule">
+            <field name="name">Employee Change Request: HR Officers and Managers see all requests</field>
+            <field name="model_id" ref="model_hr_employee_change_request"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- Record Rule: Change History - Employee User sees ONLY own profile history -->
+        <record id="rule_hr_employee_change_history_user_own" model="ir.rule">
+            <field name="name">Employee Change History: Employee User sees own audit log only</field>
+            <field name="model_id" ref="model_hr_employee_change_history"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">['|', ('applied_by_id', '=', user.id), ('employee_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <!-- Record Rule: Change History - HR Officer & HR Manager sees ALL audit logs -->
+        <record id="rule_hr_employee_change_history_officer_all" model="ir.rule">
+            <field name="name">Employee Change History: HR Officers and Managers see all audit logs</field>
+            <field name="model_id" ref="model_hr_employee_change_history"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+    </data>
+</odoo>

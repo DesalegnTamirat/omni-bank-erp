@@ -19,7 +19,7 @@
 
                     <group>
                         <group string="Source &amp; Category">
-                            <field name="plan_id" readonly="1" options="{'no_open': True}"/>
+                            <field name="plan_id" readonly="plan_id and not context.get('allow_change_plan')" options="{'no_open': True}"/>
                             <field name="cycle_id" readonly="1"/>
                             <field name="source_org_unit_id" readonly="1"/>
                             <field name="cascade_level" widget="radio"/>
@@ -82,6 +82,8 @@
         <field name="res_model">pbms.target.cascade.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+        <field name="binding_model_id" ref="model_pbms_planning_category"/>
+        <field name="binding_view_types">list,form</field>
         <field name="context">{'default_cascade_level': 'ho_to_district'}</field>
     </record>
 
@@ -91,6 +93,8 @@
         <field name="res_model">pbms.target.cascade.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+        <field name="binding_model_id" ref="model_pbms_planning_category"/>
+        <field name="binding_view_types">list,form</field>
         <field name="context">{'default_cascade_level': 'district_to_branch'}</field>
     </record>
 </odoo>

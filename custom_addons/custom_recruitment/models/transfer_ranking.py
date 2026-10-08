@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Transfer Ranking Engine – Fixed for Direct & Vacancy Transfers
 
+import os
+import base64
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -11,6 +13,17 @@ class TransferCommitteeMinutes(models.Model):
     _description = "Transfer Committee Minutes"
     _rec_name = "name"
     active = fields.Boolean(default=True)
+
+    @api.model
+    def get_official_bunna_logo_base64(self):
+        """Returns base64 string of the official Bunna Bank logo for reliable QWeb PDF rendering."""
+        logo_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+        )
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        return ""
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
@@ -79,7 +92,7 @@ class TransferCommitteeMinutes(models.Model):
         for rec in self:
             req = rec.transfer_request_ids[:1]
             if not req and rec.target_vacancy_id:
-                grade = rec.target_vacancy_id.job_grade_id
+                grade = getattr(rec.target_vacancy_id, 'job_grade', False) or getattr(rec.target_vacancy_id, 'job_grade_id', False) or (getattr(rec.target_vacancy_id.job_position, 'grade', False) if rec.target_vacancy_id.job_position else False)
                 op_unit = rec.target_vacancy_id.operating_unit_id
                 category = rec.target_vacancy_id.employee_category
             elif req:

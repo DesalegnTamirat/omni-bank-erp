@@ -40,57 +40,146 @@ class InternalJobPosition(models.Model):
     employee_vacancy_ids = fields.One2many('employee.vacancy.available', 'vacancy_id', 'Vacancy Info')
     rejection_reason = fields.Text("Rejection Reason")
 
+    def _get_employee_active_discipline_cases(self, employee):
+        case_names = []
+        if not employee:
+            return case_names
+
+        # 1. Search discipline.case model (discipline_management module)
+        if 'discipline.case' in self.env:
+            cases = self.env['discipline.case'].search([
+                ('employee_id', '=', employee.id),
+                ('state', 'not in', ['revoked', 'closed']),
+            ])
+            for c in cases:
+                sel = c._fields['punishment_type'].selection if 'punishment_type' in c._fields else False
+                if callable(sel):
+                    try:
+                        sel = sel(c.env[c._name])
+                    except Exception:
+                        sel = False
+                p_label = dict(sel).get(c.punishment_type, c.punishment_type or 'Active Offense') if sel and isinstance(sel, (list, tuple)) else (c.punishment_type or 'Active Offense')
+                case_names.append("%s (%s - state: %s)" % (c.name or 'Case', p_label, c.state))
+
+        # 2. Search discipline.action model (hr_employee_custom module)
+        if 'discipline.action' in self.env:
+            actions = self.env['discipline.action'].search([
+                ('employee_name', '=', employee.id),
+            ])
+            for a in actions:
+                a_name = getattr(a, 'ref_no', False) or getattr(a, 'name', False) or 'Disciplinary Action'
+                case_names.append("Action: %s" % a_name)
+
+        # 3. Search disciplinary.action model (hr_employee_custom module)
+        if 'disciplinary.action' in self.env:
+            d_actions = self.env['disciplinary.action'].search([
+                ('employee_name', '=', employee.id),
+            ])
+            for da in d_actions:
+                da_name = getattr(da, 'ref_no', False) or getattr(da, 'name', False) or 'Disciplinary Action'
+                case_names.append("Disciplinary Action: %s" % da_name)
+
+        return case_names
+
     def apply(self):
         p_id = self.id
         today = date.today()
-        n = 0
-        x = 0
-        for val in self.employee_vacancy_ids:
-            if val:
-                x = x + 1
-                if val.location_preference > 0:
-                    n = n + 1
-        if x > 0:
-            if n > 0:
-                if self.last_date_to_apply and self.last_date_to_apply < today:
-                    raise ValidationError(_('You cannot apply after the Last Date to Apply.'))
-                else:
-                    # Auto-fill employee_id if missing from the available vacancy record
-                    for rec in self:
-                        if not rec.employee_id:
-                            emp = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
-                            if not emp:
-                                emp = self.env['hr.employee'].search([('create_uid', '=', self.env.uid)], limit=1)
-                            if emp:
-                                rec.write({
-                                    'employee_id': emp.id,
-                                    'employee_user_id': self.env.uid,
-                                    'employee_applicant': emp.name,
-                                })
+        if self.last_date_to_apply and self.last_date_to_apply < today:
+            raise ValidationError(_('You cannot apply after the Last Date to Apply.'))
 
-                    self.env.cr.execute('SELECT internal_application(%s)', (p_id,))
-                    self.env.invalidate_all()
-                    return {
-                        'type': 'ir.actions.client',
-                        'tag': 'display_notification',
-                        'params': {
-                            'title': _('Application Submitted'),
-                            'message': _('Your application has been successfully submitted.'),
-                            'type': 'success',
-                            'sticky': False,
-                            'next': {'type': 'ir.actions.client', 'tag': 'reload'},
-                        }
-                    }
-            else:
-                raise ValidationError(_('Please enter your preferences of work units.'))
+        # Auto-fill employee_id if missing from the available vacancy record
+        for rec in self:
+            if not rec.employee_id:
+                emp = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+                if not emp:
+                    emp = self.env['hr.employee'].search([('create_uid', '=', self.env.uid)], limit=1)
+                if emp:
+                    rec.write({
+                        'employee_id': emp.id,
+                        'employee_user_id': self.env.uid,
+                        'employee_applicant': emp.name,
+                    })
+
+            # Check active disciplinary cases
+            emp_rec = self.env['hr.employee'].browse(rec.employee_id) if rec.employee_id else False
+            if not emp_rec:
+                emp_rec = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+            if emp_rec:
+                active_cases = rec._get_employee_active_discipline_cases(emp_rec)
+                if active_cases:
+                    raise ValidationError(_(
+                        "You cannot apply for this vacancy because you have active disciplinary record(s):\n%s"
+                    ) % "\n".join(active_cases))
+
+        self.env.cr.execute('SELECT internal_application(%s)', (p_id,))
+        self.env.invalidate_all()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Application Submitted'),
+                'message': _('Your application has been successfully submitted.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def accept_promotion(self):
-        p_id = self.employee_id
-        self.env.cr.execute('SELECT employee_notify_promotion_acceptance(%s)', (p_id,))
+        for rec in self:
+            emp_id = rec.employee_id
+            if emp_id:
+                cand = self.env['new.internal.recruitment.selected.candidates'].search([
+                    ('emp_name', '=', emp_id),
+                    '|', ('new_int_sel_cand.vacancy_reference', '=', rec.vacancy_reference),
+                         ('new_int_sel_cand.vacancy_id', '=', rec.vacancy_id)
+                ], limit=1)
+                if cand:
+                    cand.action_accept_promotion()
+            try:
+                with self.env.cr.savepoint():
+                    self.env.cr.execute('SELECT employee_notify_promotion_acceptance(%s)', (emp_id,))
+            except Exception:
+                pass
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Offer Accepted'),
+                'message': _('You have successfully accepted the promotion/transfer offer.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def reject_promotion(self):
-        p_id = self.employee_id
-        self.env.cr.execute('SELECT employee_notify_promotion_rejection(%s)', (p_id,))
+        for rec in self:
+            emp_id = rec.employee_id
+            if emp_id:
+                cand = self.env['new.internal.recruitment.selected.candidates'].search([
+                    ('emp_name', '=', emp_id),
+                    '|', ('new_int_sel_cand.vacancy_reference', '=', rec.vacancy_reference),
+                         ('new_int_sel_cand.vacancy_id', '=', rec.vacancy_id)
+                ], limit=1)
+                if cand:
+                    cand.confirm_decline_promotion(_("Declined by employee via Internal Job Position portal."))
+            try:
+                with self.env.cr.savepoint():
+                    self.env.cr.execute('SELECT employee_notify_promotion_rejection(%s)', (emp_id,))
+            except Exception:
+                pass
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Offer Declined'),
+                'message': _('You have declined the promotion/transfer offer.'),
+                'type': 'warning',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def init(self):
         self.env.cr.execute("""
@@ -288,6 +377,5 @@ class InternalJobVacancy(models.Model):
     vacancy_id = fields.Many2one('employee.recruitment.available', string="Employee Vacancy")
     employee_applicant = fields.Char("Employee Applicant")
     operating_unit = fields.Char("Work Unit", readonly=True)
-    number_of_vacancies = fields.Integer("Number of Vacancies")
-    location_preference = fields.Integer(string="Location Preference", help='Provide Location Preference',
-                                         )
+    number_of_vacancies = fields.Integer("Number of Vacancies", readonly=True)
+    location_preference = fields.Integer(string="Location Preference", help='Provide Location Preference')

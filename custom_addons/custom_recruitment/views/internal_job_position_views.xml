@@ -4,7 +4,7 @@
         <field name="name">employee.recruitment.available.form</field>
         <field name="model">employee.recruitment.available</field>
         <field name="arch" type="xml">
-            <form string="Internal Job Position">
+            <form string="Internal Job Position" create="false">
                 <sheet>
                     <group colspan="2">
                         <group>
@@ -31,19 +31,19 @@
                     </group>
                     <group colspan="2">
                         <group>
-                            <button name="accept_promotion" invisible="application_status in ('New','Applied','Replied')" string="Accept Promotion" type="object" class="oe_highlight"/>
-                            <button name="reject_promotion" invisible="application_status in ('New','Applied','Replied')" string="Reject Promotion" type="object" class="oe_highlight"/>
+                            <button name="accept_promotion" invisible="application_status in ('New','Applied','Replied','Selected for Shortlist')" string="Accept Promotion" type="object" class="oe_highlight"/>
+                            <button name="reject_promotion" invisible="application_status in ('New','Applied','Replied','Selected for Shortlist')" string="Reject Promotion" type="object" class="oe_highlight"/>
                         </group>
                         <group>
-                            <field name="rejection_reason" invisible="application_status in ('New','Applied','Replied')"/>
+                            <field name="rejection_reason" invisible="application_status in ('New','Applied','Replied','Selected for Shortlist')"/>
                         </group>
                     </group>
                     <notebook>
                         <page string="Vacancies">
                             <field name="employee_vacancy_ids">
                                 <list editable="bottom">
-                                    <field name="operating_unit" width="40%"/>
-                                    <field name="number_of_vacancies" width="30%"/>
+                                    <field name="operating_unit" width="40%" readonly="1"/>
+                                    <field name="number_of_vacancies" width="30%" readonly="1"/>
                                     <field name="location_preference" width="30%"/>
                                 </list>
                             </field>
@@ -58,7 +58,7 @@
         <field name="name">employee.recruitment.available.list</field>
         <field name="model">employee.recruitment.available</field>
         <field name="arch" type="xml">
-            <list string="Internal Job Position">
+            <list string="Internal Job Position" create="false">
                 <field name="job_location"/>
                 <field name="job_position"/>
                 <field name="employee_grade"/>

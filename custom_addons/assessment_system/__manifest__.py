@@ -35,7 +35,7 @@ Comprehensive, enterprise-grade candidate assessment platform for Bunna Bank:
     """,
     'version': '19.0.2.0.0',
     'category': 'Human Resources',
-    'author': 'EAD Team',
+    'author': 'Natnael ',
     'license': 'LGPL-3',
     'depends': [
         'base',

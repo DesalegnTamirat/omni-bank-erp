@@ -23,7 +23,7 @@
                 <field name="can_view_sourcing_type"/>
                 <field name="color"/>
                 <field name="activity_state"/>
-                <progressbar field="state" colors='{"approved": "success", "ceo_review": "warning", "rejected": "danger", "returned": "muted", "people_solutions": "info", "cpco_review": "info"}'/>
+                <progressbar field="state" colors='{"approved": "forest", "ceo_review": "warning", "rejected": "danger", "returned": "muted", "people_solutions": "maroon", "cpco_review": "bronze"}'/>
                 <templates>
                     <t t-name="card">
                         <div class="card-body">
@@ -106,6 +106,7 @@
         <field name="model">pbms.exceptional.workforce.request</field>
         <field name="arch" type="xml">
             <list string="Exceptional Workforce Requests"
+                class="o_pbms_exceptional_list"
                   sample="1"
                   multi_edit="1"
                   decoration-info="state in ('people_solutions', 'cpco_review')"
@@ -133,6 +134,36 @@
                        decoration-success="state == 'approved'"
                        decoration-danger="state == 'rejected'"
                        decoration-muted="state == 'returned'"/>
+                <field name="can_district_submit" column_invisible="1"/>
+                <field name="can_people_solutions_action" column_invisible="1"/>
+                <field name="can_cpco_action" column_invisible="1"/>
+                <field name="can_ceo_action" column_invisible="1"/>
+                <button name="action_submit" type="object" string="Submit" icon="fa-paper-plane"
+                        class="btn-primary btn-sm"
+                        invisible="not can_district_submit"/>
+                <button name="action_people_solutions_escalate" type="object" string="Escalate to CPCO" icon="fa-arrow-right"
+                        class="btn-primary btn-sm"
+                        invisible="not can_people_solutions_action"
+                        groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_manager"/>
+                <button name="action_cpco_submit_memo" type="object" string="Submit to CEO" icon="fa-arrow-right"
+                        class="btn-primary btn-sm"
+                        invisible="not can_cpco_action"
+                        groups="bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_manager"/>
+                <button name="action_ceo_approve" type="object" string="CEO Final Approve" icon="fa-check-square"
+                        class="btn-success btn-sm"
+                        confirm="Are you sure you want to officially approve this Exceptional Workforce Request as CEO?"
+                        invisible="not can_ceo_action"
+                        groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+                <button name="%(bunna_pbms.action_pbms_exceptional_return_wizard)d" type="action" string="Return" icon="fa-undo"
+                        class="btn-warning text-white btn-sm"
+                        invisible="not can_people_solutions_action and not can_cpco_action and not can_ceo_action"
+                        groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+                <button name="%(bunna_pbms.action_pbms_exceptional_reject_wizard)d" type="action" string="Reject" icon="fa-ban"
+                        class="btn-danger btn-sm"
+                        invisible="not can_people_solutions_action and not can_cpco_action and not can_ceo_action"
+                        groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+                <button name="action_export_excel" type="object" string="Export" icon="fa-file-excel-o"
+                        class="btn-outline-secondary btn-sm"/>
             </list>
         </field>
     </record>
@@ -144,6 +175,14 @@
         <field name="arch" type="xml">
             <form string="Exceptional Workforce Request">
                 <header>
+                    <!-- Explicit Save Action Button -->
+                    <button name="action_save_request"
+                            string="Save"
+                            type="object"
+                            icon="fa-floppy-o"
+                            class="btn-primary o_pbms_save_btn d-none"
+                            invisible="state in ('approved', 'rejected')"/>
+
                     <!-- Export to Excel Action Button -->
                     <button name="action_export_excel"
                             string="Export to Excel"
@@ -151,13 +190,21 @@
                             icon="fa-file-excel-o"
                             class="btn btn-outline-secondary"/>
 
-                    <!-- District Reviewer Action: Submit to People Solutions -->
+                    <!-- District / Branch Action: Submit to People Solutions -->
                     <button name="action_submit"
                             string="Submit to People Solutions"
                             type="object"
                             class="oe_highlight"
-                            invisible="not can_district_submit"
-                            groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
+                            invisible="not can_district_submit or is_people_solutions_request"
+                            groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_branch_user,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_people_solutions"/>
+
+                    <!-- People Solutions Directorate Action: Submit Directly to CPCO Review -->
+                    <button name="action_submit"
+                            string="Submit to CPCO Review"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_district_submit or not is_people_solutions_request"
+                            groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_manager"/>
 
                     <!-- People Solutions Directorate Actions -->
                     <button name="action_people_solutions_escalate"
@@ -183,7 +230,7 @@
 
                     <!-- CPCO Actions -->
                     <button name="action_cpco_submit_memo"
-                            string="Submit Memo to CEO"
+                            string="Approve &amp; Submit Memo to CEO"
                             type="object"
                             class="oe_highlight"
                             invisible="not can_cpco_action"
@@ -205,25 +252,34 @@
 
                     <!-- CEO Decision Actions -->
                     <button name="action_ceo_approve"
-                            string="Approve Request"
+                            string="CEO Final Approve"
                             type="object"
+                            icon="fa-check-square"
                             class="btn-success"
-                            confirm="Are you sure you want to approve this Exceptional Workforce Request?"
+                            confirm="Are you sure you want to officially approve this Exceptional Workforce Request as CEO?"
                             invisible="not can_ceo_action"
-                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager"/>
+                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="%(bunna_pbms.action_pbms_exceptional_return_wizard)d"
+                            string="Return for Revision"
+                            type="action"
+                            class="btn-warning text-white"
+                            invisible="not can_ceo_action"
+                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
 
                     <button name="%(bunna_pbms.action_pbms_exceptional_reject_wizard)d"
                             string="Reject Request"
                             type="action"
                             class="btn-danger"
                             invisible="not can_ceo_action"
-                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager"/>
+                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
 
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,people_solutions,cpco_review,ceo_review,approved"/>
                 </header>
                 <sheet>
                     <!-- Client-side permission evaluation flags -->
+                    <field name="is_people_solutions_request" invisible="1"/>
                     <field name="eligible_job_ids" invisible="1"/>
                     <field name="can_district_edit" invisible="1"/>
                     <field name="can_district_submit" invisible="1"/>
@@ -238,8 +294,8 @@
                     <field name="can_edit" invisible="1"/>
 
                     <!-- Alert Banner for Returned Requests -->
-                    <div class="alert alert-warning mb-3" role="alert" invisible="state != 'returned'">
-                        <strong><i class="fa fa-exclamation-triangle"/> Returned for Revision: </strong>
+                    <div class="alert alert-warning mb-3" role="alert" invisible="not return_reason">
+                        <strong><i class="fa fa-exclamation-triangle"/> Feedback / Return Reason: </strong>
                         <field name="return_reason" readonly="1" class="d-inline ms-1"/>
                     </div>
 
@@ -285,19 +341,19 @@
 
                     <group string="Business Justification &amp; Supporting Documents">
                         <field name="justification_category_id"
-                               string="Justification"
+                               string="Reason"
                                options="{'no_create': True, 'no_open': True}"
                                readonly="not can_edit"
-                               placeholder="Select Business Justification..."/>
+                               placeholder="Select Business Reason..."/>
                         <field name="justification"
-                               string="Remarks / Details"
+                               string="Justification"
                                readonly="not can_edit"
-                               placeholder="Optional additional justification remarks or details..."/>
+                               placeholder="detail justification ..."/>
                         <field name="supporting_doc_ids" widget="many2many_binary" readonly="not can_edit"/>
                     </group>
 
                     <notebook>
-                        <page string="People Solutions Assessment" name="page_people_solutions" invisible="state == 'draft'">
+                        <page string="People Solutions Assessment" name="page_people_solutions" invisible="state == 'draft' and not is_people_solutions_request">
                             <group>
                                 <group>
                                     <field name="people_solutions_reviewer_id" readonly="1"/>
@@ -490,7 +546,7 @@
     <record id="action_pbms_exceptional_workforce" model="ir.actions.act_window">
         <field name="name">Exceptional Workforce Requests</field>
         <field name="res_model">pbms.exceptional.workforce.request</field>
-        <field name="view_mode">kanban,list,form,pivot,graph,activity,calendar</field>
+        <field name="view_mode">list,kanban,form,pivot,graph,activity,calendar</field>
         <field name="search_view_id" ref="view_pbms_exceptional_workforce_search"/>
         <field name="context">{'search_default_pending': 1}</field>
         <field name="help" type="html">
@@ -501,6 +557,19 @@
                 Use this to request mid-year workforce needs that were not included in the approved annual workforce plan.
             </p>
         </field>
+    </record>
+
+    <record id="action_pbms_exceptional_workforce_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_exceptional_workforce_tree"/>
+        <field name="act_window_id" ref="action_pbms_exceptional_workforce"/>
+    </record>
+    <record id="action_pbms_exceptional_workforce_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_exceptional_workforce_kanban"/>
+        <field name="act_window_id" ref="action_pbms_exceptional_workforce"/>
     </record>
 
     <!-- Server Action: Export to Excel from Exceptional Workforce Requests (appears in Action ⚙ menu) -->

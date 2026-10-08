@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Hourly safety net: re-resolves the disbursement officer of approved,
+         not-yet-disbursed loans and hands them over. -->
+    <data noupdate="1">
+        <record id="cron_resl_refresh_disbursement_routing" model="ir.cron">
+            <field name="name">RESL: refresh disbursement routing</field>
+            <field name="model_id" ref="model_resl_loan"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_refresh_disbursement_routing()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+
+    <!-- Runs on every module upgrade so already-approved loans (e.g.
+         LOAN00077 / LOAN00078) get routed immediately. -->
+    <data noupdate="0">
+        <function model="resl.loan" name="_cron_refresh_disbursement_routing"/>
+    </data>
+</odoo>

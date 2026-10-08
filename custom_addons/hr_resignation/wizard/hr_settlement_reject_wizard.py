@@ -15,15 +15,11 @@ class HrSettlementRejectWizard(models.TransientModel):
             
             # Post reason to chatter
             msg = f"<b>Sent Back for Revision:</b><br/>{rec.reason}"
-            settlement.message_post(body=msg, message_type='comment')
+            settlement.message_post(body=msg, message_type='notification')
             
             # Notify the POMD officer
             if pomd_officer:
-                settlement.message_post(
-                    body=f"The settlement has been sent back for revision.",
-                    message_type='notification',
-                    partner_ids=[pomd_officer.partner_id.id]
-                )
+                settlement.resignation_id._send_notification([pomd_officer.partner_id.id], 'Settlement Returned', "The settlement has been sent back for revision.")
             
             # Reset settlement to draft
             settlement.write({

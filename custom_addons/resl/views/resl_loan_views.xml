@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ── Search View with Filters & Group By (FR-RESL-017) ────────────── -->
+        <!-- NOTE: Defined first so action records can safely ref="view_resl_loan_search" -->
+        <record id="view_resl_loan_search" model="ir.ui.view">
+            <field name="name">resl.loan.search</field>
+            <field name="model">resl.loan</field>
+            <field name="arch" type="xml">
+                <search string="Search Staff Loans">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="designated_approver_id"/>
+                    <separator/>
+                    <filter string="Active / Approved" name="filter_approved" domain="[('status','=','approved')]"/>
+                    <filter string="Manager Review" name="filter_manager_review" domain="[('status','=','manager_review')]"/>
+                    <filter string="Waiting Guarantees" name="filter_guarantor_pending" domain="[('status','=','guarantor_pending')]"/>
+                    <filter string="Draft" name="filter_draft" domain="[('status','=','draft')]"/>
+                    <filter string="Rejected Requests" name="filter_rejected" domain="[('status','=','rejected')]"/>
+                    <separator/>
+                    <filter string="Needs Replacement" name="filter_replacement" domain="[('needs_guarantor_replacement','=',True)]"/>
+                    <filter string="Clearance Settlement Pending" name="filter_clearance" domain="[('settlement_status','=','pending_clearance')]"/>
+                    <filter string="Core Banking Disbursed" name="filter_disbursed" domain="[('core_banking_status','=','disbursed')]"/>
+                    <filter string="Disbursement Requested" name="filter_disbursement_requested"
+                        domain="[('disbursement_requested','=',True),('core_banking_status','!=','disbursed')]"/>
+                    <separator/>
+                    <filter string="Deleted" name="filter_deleted" domain="[('del_flag','=',True)]"/>
+                    <group>
+                        <filter string="Status" name="group_status" context="{'group_by':'status'}"/>
+                        <filter string="Approver Role" name="group_approver_role" context="{'group_by':'designated_approver_role'}"/>
+                        <filter string="Core Banking Status" name="group_cb_status" context="{'group_by':'core_banking_status'}"/>
+                        <filter string="Settlement Status" name="group_settlement" context="{'group_by':'settlement_status'}"/>
+                        <filter string="Request Month" name="group_request_date" context="{'group_by':'request_date:month'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- ── Actions ─────────────────────────────────────────────────────── -->
+
+        <record id="action_resl_loan_tree" model="ir.actions.act_window">
+            <field name="name">Staff Loans</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">list,kanban,form,pivot,graph</field>
+            <field name="search_view_id" ref="view_resl_loan_search"/>
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">Create staff loan requests.</p>
+            </field>
+        </record>
+
+        <!-- FR-RESL-017: Management reports -->
+        <record id="action_resl_loan_reporting" model="ir.actions.act_window">
+            <field name="name">RSSA Loans Analysis</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">pivot,graph,list</field>
+            <field name="search_view_id" ref="view_resl_loan_search"/>
+            <field name="help" type="html">
+                <p>Comprehensive RSSA staff loans analysis and statistics.</p>
+            </field>
+        </record>
+
+        <record id="action_resl_active_loans" model="ir.actions.act_window">
+            <field name="name">Active RSSA Loans</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">list,kanban,form,pivot</field>
+            <field name="domain">[('status','=','approved')]</field>
+            <field name="search_view_id" ref="view_resl_loan_search"/>
+        </record>
+
+        <record id="action_resl_settlement_pending" model="ir.actions.act_window">
+            <field name="name">Clearance &amp; Settlements</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('settlement_status','=','pending_clearance')]</field>
+            <field name="search_view_id" ref="view_resl_loan_search"/>
+        </record>
+
+        <!-- FR-RESL-020: HR Accountant's disbursement queue — approved loans
+             an HR Auditor has flagged as ready to pay, not yet disbursed. -->
+        <record id="action_resl_pending_disbursements" model="ir.actions.act_window">
+            <field name="name">Pending Disbursements</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="domain">[('status','=','approved'),('core_banking_status','!=','disbursed')]</field>
+            <field name="search_view_id" ref="view_resl_loan_search"/>
+        </record>
+
+        <!-- Disbursement officers (Branch Accountant / Division Manager):
+             approved loans routed to ME, not yet disbursed. -->
+        <record id="action_resl_my_disbursements" model="ir.actions.act_window">
+            <field name="name">My Disbursements</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="domain">[('status','=','approved'),('core_banking_status','!=','disbursed'),('disbursement_officer_id','=',uid)]</field>
+            <field name="search_view_id" ref="view_resl_loan_search"/>
+        </record>
+
+        <record id="action_resl_rejected_loans" model="ir.actions.act_window">
+            <field name="name">Rejected Requests</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="domain">[('status','=','rejected')]</field>
+            <field name="search_view_id" ref="view_resl_loan_search"/>
+        </record>
+
+        <record id="action_resl_loans_replacement_needed" model="ir.actions.act_window">
+            <field name="name">Loans Needing Replacement</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="domain">[('needs_guarantor_replacement','=',True)]</field>
+        </record>
+
+        <record id="action_resl_employee_guarantee_lines" model="ir.actions.act_window">
+            <field name="name">Guarantee Lines</field>
+            <field name="res_model">resl.loan.guarantee</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">List of guarantee lines.</p>
+            </field>
+        </record>
+
+        <record id="action_resl_loan_replacement_wizard" model="ir.actions.act_window">
+            <field name="name">Guarantor Replacement</field>
+            <field name="res_model">resl.loan.replacement.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="context">{'default_manual_request': True}</field>
+            <field name="target">new</field>
+        </record>
+
+        <record id="action_resl_my_guarantees" model="ir.actions.act_window">
+            <field name="name">My Pending Guarantees</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="domain">[
+                ('guarantor_line_ids.guarantor_id.user_id','=',uid),
+                ('guarantor_line_ids.state','=','pending')
+            ]</field>
+        </record>
+
+        <record id="action_resl_my_reviews" model="ir.actions.act_window">
+            <field name="name">My Reviews</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="domain">[('status','=','manager_review')]</field>
+        </record>
+
+        <!-- ── Kanban ──────────────────────────────────────────────────────── -->
+
+        <record id="view_resl_loan_kanban" model="ir.ui.view">
+            <field name="name">resl.loan.kanban</field>
+            <field name="model">resl.loan</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="status" quick_create="false">
+                    <field name="status"/>
+                    <field name="employee_id"/>
+                    <field name="name"/>
+                    <field name="loan_amount"/>
+                    <field name="eligible_amount"/>
+                    <field name="total_loans_taken"/>
+                    <field name="net_eligible_amount"/>
+                    <field name="approved_amount"/>
+                    <field name="currency_id"/>
+                    <field name="request_date"/>
+                    <field name="needs_guarantor_replacement"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <field name="employee_id" widget="many2one_avatar_employee"/>
+                                <div>
+                                    <t t-if="record.status.raw_value === 'approved'">
+                                        <span class="badge text-bg-success">Approved</span>
+                                    </t>
+                                    <t t-if="record.status.raw_value === 'rejected'">
+                                        <span class="badge text-bg-danger">Rejected</span>
+                                    </t>
+                                    <t t-if="['draft','guarantor_pending','manager_review'].includes(record.status.raw_value)">
+                                        <span class="badge text-bg-warning">
+                                            <t t-esc="record.status.value"/>
+                                        </span>
+                                    </t>
+                                    <t t-if="record.needs_guarantor_replacement.raw_value">
+                                        <span class="badge text-bg-danger ms-1">
+                                            <i class="fa fa-exclamation-triangle"/> Replacement Needed
+                                        </span>
+                                    </t>
+                                </div>
+                            </div>
+                            <div class="mb-1">
+                                <strong><t t-esc="record.name.value"/></strong>
+                            </div>
+                            <div class="mb-2">
+                                <div>Eligible: <strong><field name="eligible_amount"/></strong></div>
+                                <div>Taken: <strong><field name="total_loans_taken"/></strong></div>
+                                <div>Net: <strong><field name="net_eligible_amount"/></strong></div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-2">
+                                <div>
+                                    <t t-if="record.needs_guarantor_replacement.raw_value">
+                                        <span class="text-danger">
+                                            <i class="fa fa-exclamation-triangle"/> Replacement Needed
+                                        </span>
+                                    </t>
+                                    <t t-elif="record.approved_amount.raw_value">
+                                        <span class="text-success">Approved: <t t-esc="record.approved_amount.value"/></span>
+                                    </t>
+                                </div>
+                                <small class="text-muted">
+                                    <t t-esc="record.request_date.value"/>
+                                </small>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ── List (was Tree) ─────────────────────────────────────────────── -->
+
+        <record id="view_resl_loan_tree" model="ir.ui.view">
+            <field name="name">resl.loan.list</field>
+            <field name="model">resl.loan</field>
+            <field name="arch" type="xml">
+                <list
+                    decoration-success="status=='approved'"
+                    decoration-danger="status=='rejected' or needs_guarantor_replacement"
+                    decoration-warning="status in ('guarantor_pending','manager_review')">
+                    <field name="name"/>
+                    <field name="employee_id" widget="many2one_avatar_employee"/>
+                    <field name="loan_amount" string="Previous"/>
+                    <field name="eligible_amount" string="Eligible"/>
+                    <field name="total_loans_taken" string="Taken"/>
+                    <field name="net_eligible_amount" string="Net Eligible"/>
+                    <field name="approved_amount" string="Approved"/>
+                    <field name="status"/>
+                    <field name="needs_guarantor_replacement" string="Replacement Needed"/>
+                    <field name="request_date"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ── Form ───────────────────────────────────────────────────────── -->
+        <!--
+            Odoo 17 migration notes for form attrs:
+            - attrs="{'invisible': [...]}" → invisible="condition"  (new domain syntax)
+            - attrs="{'readonly': [...]}"  → readonly="condition"
+            - String conditions use Python-like domain tuples, or simple boolean fields
+        -->
+        <record id="view_resl_loan_form" model="ir.ui.view">
+            <field name="name">resl.loan.form</field>
+            <field name="model">resl.loan</field>
+            <field name="arch" type="xml">
+                <form string="Staff Loan">
+                    <sheet>
+                        <!-- Eye-catching corner ribbon mirroring the status bar,
+                             so the outcome is obvious even before reading the
+                             header (common Odoo pattern used on sale/purchase
+                             orders for cancelled/done documents). -->
+                        <widget name="web_ribbon" title="Rejected" bg_color="text-bg-danger"
+                            invisible="progress_status != 'rejected'"/>
+                        <widget name="web_ribbon" title="Disbursed" bg_color="text-bg-success"
+                            invisible="progress_status != 'disbursed'"/>
+
+                        <header>
+                            <!-- Hidden control fields -->
+                            <field name="needs_guarantor_replacement" invisible="1"/>
+                            <field name="is_employee_user" invisible="1"/>
+                            <field name="replacement_log_count" invisible="1"/>
+                            <field name="can_nominate_replacement" invisible="1"/>
+                            <field name="can_submit_manager" invisible="1"/>
+                            <field name="can_edit_guarantors" invisible="1"/>
+                            <field name="show_approve_button" invisible="1"/>
+                            <field name="is_eligible" invisible="1"/>
+                            <field name="settlement_status" invisible="1"/>
+                            <field name="core_banking_status" invisible="1"/>
+                            <field name="employee_active" invisible="1"/>
+                            <field name="can_respond_as_guarantor" invisible="1"/>
+                            <field name="is_manager_reviewer" invisible="1"/>
+                            <field name="has_active_guarantor" invisible="1"/>
+                            <field name="disbursement_requested" invisible="1"/>
+
+                            <!-- Nominate replacement -->
+                            <button name="action_nominate_replacement" type="object"
+                                string="Nominate Replacement Guarantor"
+                                icon="fa-user-plus"
+                                invisible="not can_nominate_replacement"/>
+
+                            <!-- Find Guarantor lookup wizard. Selecting a guarantor here
+                                 sends the request immediately (see action_select on the
+                                 wizard), so there is no separate "Request Guarantors"
+                                 step/button anymore. Borrower-only: hidden from a
+                                 guarantor viewing this same loan (is_employee_user is
+                                 false for them). Also hidden once the loan already has
+                                 an active guarantor (one guarantor per request) — it
+                                 reappears once that guarantor is rejected/replaced.
+                                 This is a custom widget, not a plain button, precisely
+                                 so it does NOT force-save a new/unsaved request just to
+                                 open the search — see find_guarantor_button.js. The
+                                 widget re-derives its own visibility from these same
+                                 fields client-side, so it stays in sync with a record
+                                 that hasn't been saved yet (a native invisible="" domain
+                                 also works pre-save, but the widget needs the same
+                                 fields loaded in the view regardless). -->
+                            <widget name="resl_find_guarantor_button"
+                                groups="base.group_user"/>
+
+                            <!-- Guarantor: Accept/Reject their own pending guarantee
+                                 directly from the header. Shown in place of the
+                                 borrower-only buttons above when the current user is
+                                 the guarantor with a pending request on this loan. -->
+                            <button name="action_guarantor_accept" type="object"
+                                string="Accept" icon="fa-thumbs-up" class="btn-primary"
+                                invisible="not can_respond_as_guarantor"/>
+                            <button name="action_guarantor_reject" type="object"
+                                string="Reject" icon="fa-thumbs-down" class="btn-secondary"
+                                invisible="not can_respond_as_guarantor"/>
+
+                            <!-- Submit to Manager -->
+                            <button name="action_submit_manager" type="object"
+                                string="Submit to Manager" icon="fa-paper-plane"
+                                groups="base.group_user"
+                                invisible="not can_submit_manager"
+                                class="btn-primary"
+                                help="Visible only to borrower once all guarantors have accepted."/>
+
+                            <!-- Borrower replacement. Only makes sense once there's
+                                 an active guarantor to swap out — hidden on a brand
+                                 new request (before Find Guarantor has been used),
+                                 same as the requirement that only "Find Guarantor"
+                                 shows at that point. Also hidden once the borrower
+                                 can't be considered an active employee: either
+                                 truly archived (employee_active = False), or
+                                 archived-in-practice — no active employment
+                                 contract (is_eligible = False, same check that
+                                 drives the "Borrower Ineligible" banner and the
+                                 Find Guarantor button). -->
+                            <button name="action_request_replacement" type="object"
+                                string="Request Guarantor Replacement"
+                                icon="fa-exchange"
+                                groups="base.group_user"
+                                context="{'default_manual_request': True}"
+                                invisible="not has_active_guarantor or not employee_active or not is_eligible or not is_employee_user or status not in ('draft','guarantor_pending','manager_review')"/>
+
+                            <!-- HR manual replacement. Same guard as above, plus
+                                 hidden once the loan has actually been disbursed —
+                                 there's nothing left to swap a guarantor on for a
+                                 loan that's already paid out. -->
+                            <button name="action_request_replacement" type="object"
+                                string="Manual Guarantor Replacement (HR)"
+                                icon="fa-exchange"
+                                class="btn-secondary"
+                                groups="resl.group_resl_hr"
+                                context="{'default_is_hr_action': True}"
+                                invisible="not has_active_guarantor or not employee_active or not is_eligible or core_banking_status == 'disbursed'"/>
+
+                            <!-- Approve -->
+                            <field name="can_approve" invisible="1"/>
+                            <button name="action_manager_approve" type="object"
+                                string="Approve" icon="fa-check" class="btn-primary"
+                                invisible="status != 'manager_review' or is_employee_user or not show_approve_button or not can_approve"/>
+
+                            <!-- Reject -->
+                            <button name="action_manager_reject" type="object"
+                                string="Reject" icon="fa-times" class="btn-secondary"
+                                invisible="status != 'manager_review' or is_employee_user or not show_approve_button or not can_approve"/>
+
+                            <!-- HR Auditor -> HR Accountant handoff (FR-RESL-020).
+                                 Auditor is read-only everywhere else; this is the
+                                 one action they get, and it only raises an
+                                 activity/chatter note for HR Accountant — it does
+                                 not disburse anything itself. Hidden once already
+                                 requested (avoid duplicate pings) or once disbursed. -->
+                            <button name="action_request_disbursement" type="object"
+                                string="Request Disbursement" icon="fa-paper-plane" class="btn-secondary"
+                                groups="resl.group_resl_hr_auditor"
+                                invisible="status != 'approved' or core_banking_status == 'disbursed' or disbursement_requested"/>
+
+                            <!-- Core Banking Disbursement (FR-RESL-019) -->
+                            <button name="action_disburse_core_banking" type="object"
+                                string="Disburse on Core Banking" icon="fa-money" class="btn-primary"
+                                invisible="status != 'approved' or core_banking_status == 'disbursed' or not can_disburse"/>
+                            <field name="can_disburse" invisible="1"/>
+
+                            <!-- Mark Settled (Clearance, FR-RESL-013) -->
+                            <button name="action_mark_settled" type="object"
+                                string="Mark Settled" icon="fa-check-square-o" class="btn-secondary"
+                                groups="resl.group_resl_hr,resl.group_resl_hr_accountant"
+                                invisible="settlement_status != 'pending_clearance'"/>
+
+                            <!-- Smart button: replacement logs. Borrower/manager/HR
+                                 only — hidden from a guarantor who is neither, so it
+                                 no longer shows up next to their Accept/Reject
+                                 buttons. -->
+                            <button name="action_open_replacement_logs" type="object"
+                                string="Replacement Logs" icon="fa-exchange"
+                                class="oe_stat_button"
+                                invisible="not id or (not is_employee_user and not is_manager_reviewer)"
+                                groups="base.group_user,resl.group_resl_manager,resl.group_resl_hr">
+                                <field name="replacement_log_count" widget="statinfo"
+                                    string="Replacements"/>
+                            </button>
+
+                            <!-- Top-right status bar: the simplified,
+                                 five-stage view of loan progress
+                                 (Requested / Accepted / Approved /
+                                 Disbursed, with Rejected as the branch
+                                 taken instead). It's a compute-only field
+                                 with no inverse, so Odoo already renders
+                                 it read-only/non-clickable on its own —
+                                 the workflow buttons above are what
+                                 actually move the loan forward. -->
+                            <field name="progress_status" widget="statusbar"
+                                statusbar_visible="requested,accepted,approved,disbursed"/>
+                        </header>
+
+                        <!-- Title block: reference + borrower, echoing the
+                             clean "New" heading style of a standard Odoo
+                             document form. -->
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                            <div invisible="not employee_id" class="text-muted fs-5 mt-1">
+                                <field name="employee_id" readonly="1" nolabel="1"
+                                    widget="many2one_avatar_employee"/>
+                            </div>
+                        </div>
+
+                        <!-- Policy & Status Banners -->
+                        <div class="alert alert-danger d-flex align-items-center"
+                            invisible="not needs_guarantor_replacement">
+                            <i class="fa fa-exclamation-triangle me-2"/>
+                            <span>One or more guarantors have separated from the Bank.
+                            Borrower must nominate a replacement.</span>
+                        </div>
+
+                        <div class="alert alert-info d-flex align-items-center"
+                            invisible="not guarantor_second_notice">
+                            <i class="fa fa-users me-2"/>
+                            <span><b>Guarantors:</b>
+                            <field name="guarantor_second_notice" readonly="1" nolabel="1" class="d-inline"/></span>
+                        </div>
+
+                        <div class="alert alert-danger d-flex align-items-center"
+                            invisible="not guarantor_rejected_notice">
+                            <i class="fa fa-times-circle me-2"/>
+                            <span><b>Guarantor Rejected:</b>
+                            <field name="guarantor_rejected_notice" readonly="1" nolabel="1" class="d-inline"/></span>
+                        </div>
+
+                        <div class="alert alert-warning d-flex align-items-center"
+                            invisible="settlement_status != 'pending_clearance'">
+                            <i class="fa fa-info-circle me-2"/>
+                            <span><b>Employee Separation / Clearance:</b> Outstanding loan balance must be recovered during clearance.</span>
+                        </div>
+
+                        <div class="alert alert-danger d-flex align-items-center"
+                            invisible="is_eligible or status != 'draft'">
+                            <i class="fa fa-ban me-2"/>
+                            <span><b>Borrower Ineligible:</b>
+                            <field name="ineligibility_reasons" readonly="1" nolabel="1" class="d-inline"/></span>
+                        </div>
+
+                        <!-- Balance & Loan Term/Amount: two clearly separated
+                             cards side by side (bootstrap grid so the split is
+                             solid regardless of screen width). Left card holds
+                             every "borrower balance" figure (ceiling, already
+                             disbursed, remaining balance, repayment term,
+                             months of service); right card is purely about
+                             this request's own amount/currency. Only shown
+                             once an employee is set, since none of these
+                             figures mean anything before that. Card chrome
+                             (.o_resl_card / .o_resl_card_title) lives in
+                             resl_backend.scss. -->
+                        <div class="row g-3 mb-3" invisible="not employee_id">
+                            <div class="col-lg-6">
+                                <div class="o_resl_card h-100">
+                                    <div class="o_resl_card_title">💰 Your RSSA Balance</div>
+                                    <group>
+                                        <field name="loan_amount" readonly="1" string="Previous Loan Amount"/>
+                                        <field name="eligible_amount" readonly="1" string="Eligible Ceiling"/>
+                                        <field name="total_loans_taken" readonly="1" string="Already Disbursed"
+                                            help="Sum of approved amounts for this employee's loans that have been disbursed on Core Banking. Updates automatically when a loan is disbursed."/>
+                                        <field name="net_eligible_amount" readonly="1" string="Remaining Balance" class="fw-bold fs-5"/>
+                                        <field name="loan_term_months" readonly="1" string="Repayment Term"/>
+                                        <field name="employee_months_of_service" readonly="1"/>
+                                    </group>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="o_resl_card h-100">
+                                    <div class="o_resl_card_title">💰 Loan Term &amp; Amount</div>
+                                    <group>
+                                        <field name="requested_amount" readonly="1" string="Requested Loan Amount"/>
+                                        <field name="approved_amount" readonly="1" string="Approved Loan Amount"/>
+                                        <field name="currency_id" readonly="1"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <notebook>
+                            <page string="Guarantors">
+                                <!--
+                                    Odoo 17: readonly on One2many uses the new domain expression.
+                                    can_edit_guarantors is a computed boolean — use it directly.
+                                -->
+                                <field name="guarantor_line_ids" nolabel="1"
+                                    readonly="not can_edit_guarantors">
+                                    <list create="false" delete="false"
+                                        decoration-success="state=='accepted'"
+                                        decoration-danger="state=='rejected'"
+                                        decoration-warning="state=='pending'">
+                                        <field name="loan_employee_id" column_invisible="1"/>
+                                        <field name="guarantor_id"
+                                            widget="many2one_avatar_employee"
+                                            domain="[('id','!=',loan_employee_id),('active','=',True)]"
+                                            options="{'no_open': True, 'no_create': True}"/>
+                                        <field name="guarantor_guarantee_count" readonly="1"/>
+                                        <field name="replacement_guarantor_id"
+                                            widget="many2one_avatar_employee"
+                                            readonly="1"
+                                            options="{'no_open': True}"/>
+                                        <field name="replacement_state" readonly="1"/>
+                                        <field name="state" readonly="1" widget="badge"
+                                            decoration-success="state == 'accepted'"
+                                            decoration-danger="state in ('rejected','separated')"
+                                            decoration-warning="state in ('draft','pending')"
+                                            decoration-info="state == 'replaced'"/>
+                                        <field name="can_act_as_guarantor" column_invisible="1"/>
+                                        <button name="action_accept" type="object"
+                                            string="Accept" icon="fa-thumbs-up"
+                                            invisible="not can_act_as_guarantor"/>
+                                        <button name="action_reject" type="object"
+                                            string="Reject" icon="fa-thumbs-down"
+                                            invisible="not can_act_as_guarantor"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Core Banking &amp; Settlement">
+                                <group>
+                                    <group string="Core Banking (FR-RESL-019)">
+                                        <field name="core_banking_status" readonly="1"/>
+                                        <field name="disbursement_officer_id" readonly="1"
+                                               invisible="not disbursement_officer_id"/>
+                                        <field name="disbursement_officer_role" readonly="1"
+                                               invisible="not disbursement_officer_id"/>
+                                        <field name="core_banking_ref" readonly="core_banking_status == 'disbursed'"/>
+                                        <field name="bank_account_number" readonly="1"
+                                               string="Disbursed-to Account No."/>
+                                        <field name="disbursement_date" readonly="1"/>
+                                        <field name="disbursed_by_id" readonly="1"/>
+                                        <field name="disbursement_requested_by_id" readonly="1"
+                                               string="Disbursement Requested By"
+                                               invisible="not disbursement_requested"/>
+                                        <field name="disbursement_requested_date" readonly="1"
+                                               string="Disbursement Requested On"
+                                               invisible="not disbursement_requested"/>
+                                    </group>
+                                    <group string="Separation Settlement (FR-RESL-013)">
+                                        <field name="settlement_status" readonly="1"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Log">
+                                <field name="message_follower_ids" widget="many2many_tags"
+                                    options="{'no_create': True}"/>
+                                <field name="message_ids" widget="mail_thread"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <!-- Odoo 17 chatter placement -->
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ── Replacement Wizard Form ─────────────────────────────────────── -->
+
+        <record id="view_resl_loan_replacement_wizard" model="ir.ui.view">
+            <field name="name">resl.loan.replacement.wizard.form</field>
+            <field name="model">resl.loan.replacement.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Nominate Replacement Guarantor">
+                    <sheet>
+                        <group>
+                            <field name="loan_id" readonly="1"/>
+                            <field name="manual_request" invisible="1"/>
+                            <field name="is_hr_action" invisible="1"/>
+                            <field name="loan_employee_id" invisible="1"/>
+
+                            <separator string="Current Guarantor" colspan="2"/>
+                            <field name="old_guarantee_id" readonly="1"
+                                invisible="is_hr_action"
+                                context="{'active_test': False}"
+                                options="{'no_create': True}"/>
+                            <field name="old_guarantee_ids" widget="many2many_tags"
+                                invisible="not is_hr_action"
+                                options="{'no_create': True}"
+                                domain="[('loan_id','=',loan_id)]"/>
+                            <field name="guarantor_name" readonly="1"/>
+
+                            <separator string="New Guarantor" colspan="2"/>
+                            <field name="new_guarantor_id"
+                                widget="many2one_avatar_employee"
+                                required="1"
+                                domain="[('active','=',True),('id','!=',loan_employee_id)]"
+                                context="{'resl_sudo_search': True}"
+                                options="{'no_open': True}"/>
+
+                            <separator string="Replacement Details" colspan="2"/>
+                            <field name="replacement_reason"
+                                required="not is_hr_action"
+                                placeholder="Please provide reason for replacement..."/>
+
+                            <div class="alert alert-info" invisible="not is_hr_action">
+                                ⚙️ This action is performed by <b>HR</b> and takes <b>immediate effect</b>.
+                            </div>
+                            <div class="alert alert-warning" invisible="not manual_request">
+                                📩 This replacement will be <b>submitted for review</b> once confirmed.
+                            </div>
+                        </group>
+                        <footer>
+                            <button name="action_confirm" type="object"
+                                string="Confirm Replacement" class="btn-primary" icon="fa-check"/>
+                            <button string="Cancel" class="btn-secondary" special="cancel" icon="fa-times"/>
+                        </footer>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ── Pivot View (FR-RESL-017, FR-RESL-018) ────────────────────── -->
+        <record id="view_resl_loan_pivot" model="ir.ui.view">
+            <field name="name">resl.loan.pivot</field>
+            <field name="model">resl.loan</field>
+            <field name="arch" type="xml">
+                <pivot string="Staff Loans Analysis">
+                    <field name="request_date" type="row" interval="month"/>
+                    <field name="status" type="col"/>
+                    <field name="eligible_amount" type="measure" string="Eligible Ceiling"/>
+                    <field name="loan_amount" type="measure"/>
+                    <field name="requested_amount" type="measure"/>
+                    <field name="approved_amount" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <!-- ── Graph View (FR-RESL-017) ────────────────────────────────────── -->
+        <record id="view_resl_loan_graph" model="ir.ui.view">
+            <field name="name">resl.loan.graph</field>
+            <field name="model">resl.loan</field>
+            <field name="arch" type="xml">
+                <graph string="Staff Loans Statistics" type="bar">
+                    <field name="request_date" interval="month"/>
+                    <field name="approved_amount" type="measure"/>
+                </graph>
+            </field>
+        </record>
+    </data>
+</odoo>

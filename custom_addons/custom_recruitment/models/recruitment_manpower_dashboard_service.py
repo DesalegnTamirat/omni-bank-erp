@@ -67,35 +67,58 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
 
     @api.model
     def _ensure_operating_unit_positions(self, matched_ou_ids):
-        """Ensure operating.unit.job.position exists for all active employees
-        and approved manpower plan lines within the matched operating units."""
+        """Ensure operating.unit.job.position exists for all active employees,
+        PBMS plan lines, recruitment requests, and job positions within matched operating units."""
         if not matched_ou_ids:
             return
-        OUJobPos = self.env["operating.unit.job.position"]
+        OUJobPos = self.env["operating.unit.job.position"].sudo()
         existing = OUJobPos.search([("operating_unit_id", "in", matched_ou_ids)])
-        existing_pairs = {(p.operating_unit_id.id, p.job_position_id.id) for p in existing}
+        existing_pairs = {(p.operating_unit_id.id, p.job_position_id.id) for p in existing if p.job_position_id and p.operating_unit_id}
 
         ou_tuple = tuple(matched_ou_ids)
-        self.env.cr.execute("""
-            SELECT DISTINCT
-                v.operating_unit_id AS ou_id,
-                v.job_id AS job_id
-            FROM hr_version v
-            WHERE v.active = true
-              AND v.operating_unit_id IN %s
-              AND v.operating_unit_id IS NOT NULL
-              AND v.job_id IS NOT NULL
-        """, (ou_tuple,))
+        discovered_pairs = set()
 
-        all_pairs = self.env.cr.fetchall()
+        # 1. From hr.employee (active employees)
+        emp_domain = [
+            ("active", "=", True),
+            ("default_operating_unit_id", "in", matched_ou_ids),
+            ("job_id", "!=", False),
+        ]
+        employees = self.env["hr.employee"].sudo().search(emp_domain)
+        for e in employees:
+            if e.default_operating_unit_id and e.job_id:
+                discovered_pairs.add((e.default_operating_unit_id.id, e.job_id.id))
+
+        # 3. From pbms.plan.category.line (manpower plan lines)
+        PlanLine = self.env.get("pbms.plan.category.line")
+        if PlanLine is not None:
+            plan_lines = PlanLine.sudo().search([
+                ("line_type", "=", "manpower"),
+                ("org_unit_id", "in", matched_ou_ids),
+                ("job_id", "!=", False),
+            ])
+            for pl in plan_lines:
+                discovered_pairs.add((pl.org_unit_id.id, pl.job_id.id))
+
+        # 4. From recruitment.request
+        RecReq = self.env.get("recruitment.request")
+        if RecReq is not None:
+            reqs = RecReq.sudo().search([
+                ("operating_unit_id", "in", matched_ou_ids),
+                ("job_position_id", "!=", False),
+            ])
+            for req in reqs:
+                discovered_pairs.add((req.operating_unit_id.id, req.job_position_id.id))
+
+        # Create missing pairs
         to_create = [
             {"operating_unit_id": ou_id, "job_position_id": job_id, "active": True}
-            for ou_id, job_id in all_pairs
-            if ou_id in matched_ou_ids and (ou_id, job_id) not in existing_pairs
+            for ou_id, job_id in discovered_pairs
+            if (ou_id, job_id) not in existing_pairs
         ]
 
         if to_create:
-            OUJobPos.sudo().create(to_create)
+            OUJobPos.create(to_create)
 
     @api.model
     def get_dashboard_metrics(self, level="corporate", department_id=None, workunit_id=None, cycle_id=None, search_term=""):
@@ -104,9 +127,9 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
         - level='department': aggregates all units under the selected Head Office Directorate or District.
         - level='workunit': aggregates specifically for the selected Work Unit / Branch.
         """
-        OU = self.env["operating.unit"]
-        OUJobPos = self.env["operating.unit.job.position"]
-        RecRequest = self.env["recruitment.request"]
+        OU = self.env["operating.unit"].sudo()
+        OUJobPos = self.env["operating.unit.job.position"].sudo()
+        RecRequest = self.env["recruitment.request"].sudo()
 
         # 1. Determine target operating unit IDs
         target_ou_domain = [("active", "=", True)]
@@ -173,16 +196,16 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
 
         # 4. Fetch Approved Plan from pbms_plan_category_line (display_approved_annual_total)
         # Default cycle must be active cycle if no cycle selected
-        Cycle = self.env["pbms.planning.cycle"] if "pbms.planning.cycle" in self.env else None
+        Cycle = self.env.get("pbms.planning.cycle")
         eff_cycle_id = int(cycle_id) if cycle_id else False
         if not eff_cycle_id and Cycle is not None:
-            active_c = Cycle.search([("active", "=", True)], order="id desc")
+            active_c = Cycle.sudo().search([("active", "=", True)], order="id desc")
             open_c = active_c.filtered(lambda c: getattr(c, "state", "") == "open")
             target_c = open_c[:1] or active_c[:1]
             if target_c:
                 eff_cycle_id = target_c.id
 
-        PbmsPlanLine = self.env["pbms.plan.category.line"] if "pbms.plan.category.line" in self.env else None
+        PbmsPlanLine = self.env.get("pbms.plan.category.line")
         approved_plan_map = {}
         if PbmsPlanLine is not None:
             plan_domain = [
@@ -191,45 +214,44 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
             ]
             if eff_cycle_id:
                 plan_domain.append(("cycle_id", "=", eff_cycle_id))
-            plan_lines = PbmsPlanLine.search(plan_domain)
+            plan_lines = PbmsPlanLine.sudo().search(plan_domain)
             if not plan_lines and eff_cycle_id:
-                # Fallback to lines across cycles if current active cycle has no specific entries
-                plan_lines = PbmsPlanLine.search([
+                plan_lines = PbmsPlanLine.sudo().search([
                     ("line_type", "=", "manpower"),
                     ("org_unit_id", "in", matched_ou_ids),
                 ])
             for pl in plan_lines:
                 if pl.org_unit_id and pl.job_id:
                     k = (pl.org_unit_id.id, pl.job_id.id)
-                    val = getattr(pl, "display_approved_annual_total", None)
+                    approved_total = getattr(pl, "approved_annual_total", 0.0) or (getattr(pl, "quantity", 0.0) or 0.0)
+                    fulfilled = getattr(pl, "fulfilled_quantity", 0.0) or 0.0
+                    val = getattr(pl, "remaining_approved_annual_total", None)
                     if val is None:
-                        val = getattr(pl, "approved_annual_total", 0.0) or (pl.quantity or 0.0)
+                        val = getattr(pl, "display_approved_annual_total", None)
+                    if val is None or (fulfilled > 0 and val == approved_total):
+                        val = max(0.0, approved_total - fulfilled)
                     approved_plan_map[k] = approved_plan_map.get(k, 0.0) + (val or 0.0)
 
-        # 5. Fetch Active Employees strictly from hr_version (v.active = true)
-        ou_tuple = tuple(matched_ou_ids)
-        self.env.cr.execute("""
-            SELECT 
-                v.operating_unit_id AS ou_id,
-                v.job_id AS job_id,
-                COUNT(DISTINCT v.id) AS active_cnt
-            FROM hr_version v
-            WHERE v.active = true
-              AND v.operating_unit_id IN %s
-              AND v.operating_unit_id IS NOT NULL
-              AND v.job_id IS NOT NULL
-            GROUP BY 1, 2
-        """, (ou_tuple,))
-        active_emp_map = {(r[0], r[1]): r[2] for r in self.env.cr.fetchall()}
+        # 5. Fetch Active Employees from hr.employee using ORM
+        active_emp_map = {}
+        emp_domain = [
+            ("active", "=", True),
+            ("default_operating_unit_id", "in", matched_ou_ids),
+            ("job_id", "!=", False),
+        ]
+        employees = self.env["hr.employee"].sudo().search(emp_domain)
+        for e in employees:
+            if e.default_operating_unit_id and e.job_id:
+                k = (e.default_operating_unit_id.id, e.job_id.id)
+                active_emp_map[k] = active_emp_map.get(k, 0) + 1
 
-        # Direct scope total active employee count strictly from hr_version where active = true
-        self.env.cr.execute("""
-            SELECT COUNT(DISTINCT v.id)
-            FROM hr_version v
-            WHERE v.active = true
-              AND v.operating_unit_id IN %s
-        """, (ou_tuple,))
-        scope_total_active = self.env.cr.fetchone()[0] or 0
+        scope_total_active = sum(active_emp_map.values())
+        if scope_total_active == 0:
+            all_emps = self.env["hr.employee"].sudo().search([
+                ("active", "=", True),
+                ("default_operating_unit_id", "in", matched_ou_ids),
+            ])
+            scope_total_active = len(all_emps)
 
         # 6. Process establishment lines and compute aggregated metrics
         table_rows = []
@@ -253,16 +275,15 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
 
             key = (ou.id, job.id if job else False)
 
-            # 1) Active employee fetched strictly from hr_version (v.active = true)
+            # 1) Active employee count
             act = active_emp_map.get(key, 0)
-            # 2) Approved plan fetched from pbms_plan_category_line (display_approved_annual_total)
+            # 2) Remaining Approved plan fetched from pbms_plan_category_line (remaining_approved_annual_total)
             plan = int(round(approved_plan_map.get(key, line.approved_plan_count or 0)))
-            # Baseline: active employee count + approved plan additions
+            # Authorized Establishment Baseline (Active + Remaining Approved Plan)
             base = act + plan
-            # 3) Headcount: baseline count (which includes approved plan additions)
             tot = base
-            # 4) Vacant: headcount - active
-            vac = max(0, tot - act)
+            # Vacant positions: remaining unfulfilled approved plan additions
+            vac = plan
 
             inflight = inflight_map.get(key, 0)
 

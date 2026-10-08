@@ -256,9 +256,59 @@
         <field name="company_id" eval="False"/>
     </record>
 
+    <!-- Conventional Loan Products (BB-APF-7 and BB-APF-8) -->
+    <record id="loan_product_term" model="pbms.loan.product">
+        <field name="name">Term Loan</field>
+        <field name="code">TL</field>
+        <field name="category_type">term_loan</field>
+        <field name="applies_to">disbursement_collection</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="loan_product_st" model="pbms.loan.product">
+        <field name="name">Short Term Loan</field>
+        <field name="code">STL</field>
+        <field name="category_type">term_loan</field>
+        <field name="applies_to">outstanding</field>
+        <field name="sequence">15</field>
+    </record>
+    <record id="loan_product_mt" model="pbms.loan.product">
+        <field name="name">Medium Term Loan</field>
+        <field name="code">MTL</field>
+        <field name="category_type">term_loan</field>
+        <field name="applies_to">outstanding</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="loan_product_lt" model="pbms.loan.product">
+        <field name="name">Long Term Loan</field>
+        <field name="code">LTL</field>
+        <field name="category_type">term_loan</field>
+        <field name="applies_to">outstanding</field>
+        <field name="sequence">25</field>
+    </record>
+    <record id="loan_product_overdraft" model="pbms.loan.product">
+        <field name="name">Overdraft</field>
+        <field name="code">OD</field>
+        <field name="category_type">overdraft</field>
+        <field name="applies_to">both</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="loan_product_advances" model="pbms.loan.product">
+        <field name="name">Advances</field>
+        <field name="code">ADV</field>
+        <field name="category_type">advances</field>
+        <field name="applies_to">both</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="loan_product_provisions" model="pbms.loan.product">
+        <field name="name">Outstanding Provisions</field>
+        <field name="code">PROV</field>
+        <field name="category_type">provisions</field>
+        <field name="applies_to">both</field>
+        <field name="sequence">50</field>
+    </record>
+
     <!-- Clear currency symbol so amounts format without 'Br' prefix -->
     <record id="base.ETB" model="res.currency">
         <field name="symbol"></field>
     </record>
-
 </odoo>

@@ -21,6 +21,7 @@ export class PerformanceDashboard extends Component {
                 department_id: null,
             },
             data: null,
+            watchlist_tab: 'pending',
         });
 
         this.bellCurveCanvas = useRef("bellCurveChart");
@@ -72,6 +73,15 @@ export class PerformanceDashboard extends Component {
                 if (!this.state.filters.fiscal_year_id && data.filters.selected_fiscal_year_id) {
                     this.state.filters.fiscal_year_id = data.filters.selected_fiscal_year_id;
                 }
+                if (data.filters.tier_readonly && data.filters.selected_tier) {
+                    this.state.filters.tier = data.filters.selected_tier;
+                }
+                if (data.filters.operating_unit_readonly && data.filters.selected_operating_unit_id) {
+                    this.state.filters.operating_unit_id = data.filters.selected_operating_unit_id;
+                }
+                if (!data.filters.show_department_filter) {
+                    this.state.filters.department_id = null;
+                }
             }
         } catch (error) {
             console.error("Failed to load dashboard data", error);
@@ -86,8 +96,19 @@ export class PerformanceDashboard extends Component {
     }
 
     async onFilterChange(filterKey, ev) {
+        if (this.state.data && this.state.data.filters) {
+            if (filterKey === 'tier' && this.state.data.filters.tier_readonly) {
+                return;
+            }
+            if (filterKey === 'operating_unit_id' && this.state.data.filters.operating_unit_readonly) {
+                return;
+            }
+        }
         const value = ev.target.value;
         this.state.filters[filterKey] = (value === "" || value === "all") ? (filterKey === "tier" ? "all" : null) : (filterKey === "tier" ? value : parseInt(value));
+        if (filterKey === 'operating_unit_id') {
+            this.state.filters.department_id = null;
+        }
         await this.loadData();
     }
 
@@ -335,30 +356,58 @@ export class PerformanceDashboard extends Component {
     }
 
     openRejectionsOrPending(target) {
-        const state = target || (this.state.data.kpis.rejected_count > 0 ? 'rejected' : 'notified');
-        const tier = this.state.filters.tier;
-        let model = 't3.appraisal';
-        let name = state === 'rejected' ? 'Rejected Appraisals' : 'Pending Acceptance Appraisals';
+        const state = target || (this.state.data && this.state.data.kpis && this.state.data.kpis.pending_count > 0 ? 'notified' : 'rejected');
+        const isPending = state === 'notified';
+        const list = isPending ? (this.state.data && this.state.data.tables ? this.state.data.tables.pending : []) : (this.state.data && this.state.data.tables ? this.state.data.tables.rejections : []);
 
-        if (tier === 't1') {
-            model = 'corporate.appraisal';
-            name = state === 'rejected' ? 'T1 Corporate Rejections' : 'T1 Corporate Pending Appraisals';
-        } else if (tier === 't2') {
-            model = 't2.appraisal';
-            name = state === 'rejected' ? 'T2 Division Rejections' : 'T2 Division Pending Appraisals';
-        } else {
-            if (this.state.data && this.state.data.tier_governance) {
-                const tg = this.state.data.tier_governance;
-                if (tg.hr.tier3.appraisals[state] > 0 || tg.hr.tier3.scorecards[state] > 0) {
-                    model = 't3.appraisal';
-                } else if (tg.planning.tier2.appraisals[state] > 0 || tg.planning.tier2.scorecards[state] > 0) {
-                    model = 't2.appraisal';
-                } else {
-                    model = 'corporate.appraisal';
-                }
+        if (list && list.length > 0) {
+            // Count records per model in the list
+            const modelCounts = {};
+            for (const item of list) {
+                modelCounts[item.model] = (modelCounts[item.model] || 0) + 1;
             }
+
+            // Prioritize matching selected tier filter
+            let bestModel = null;
+            const tier = this.state.filters.tier;
+            if (tier === 't1') {
+                bestModel = Object.keys(modelCounts).find(m => m.includes('corporate'));
+            } else if (tier === 't2') {
+                bestModel = Object.keys(modelCounts).find(m => m.includes('t2'));
+            } else if (tier === 't3') {
+                bestModel = Object.keys(modelCounts).find(m => m.includes('t3'));
+            }
+
+            if (!bestModel) {
+                bestModel = Object.entries(modelCounts).sort((a, b) => b[1] - a[1])[0][0];
+            }
+
+            const modelTitles = {
+                'corporate.scorecard': isPending ? 'T1 Corporate Scorecards - Pending Acceptance' : 'T1 Corporate Scorecards - Rejected',
+                'corporate.appraisal': isPending ? 'T1 Corporate Appraisals - Pending Acceptance' : 'T1 Corporate Appraisals - Rejected',
+                't2.scorecard': isPending ? 'Tier 2 Scorecards - Pending Acceptance' : 'Tier 2 Scorecards - Rejected',
+                't2.appraisal': isPending ? 'Tier 2 Appraisals - Pending Acceptance' : 'Tier 2 Appraisals - Rejected',
+                't3.scorecard': isPending ? 'Tier 3 Scorecards - Pending Acceptance' : 'Tier 3 Scorecards - Rejected',
+                't3.appraisal': isPending ? 'Tier 3 Appraisals - Pending Acceptance' : 'Tier 3 Appraisals - Rejected',
+            };
+
+            const matchingIds = list.filter(i => i.model === bestModel).map(i => i.id);
+            const domain = [['id', 'in', matchingIds]];
+            this.openFilteredList(bestModel, domain, modelTitles[bestModel] || (isPending ? 'Pending Acceptance' : 'Rejected Records'));
+            return;
         }
 
+        // If list is empty, open based on tier filter or first available model
+        const tier = this.state.filters.tier;
+        let model = 't3.scorecard';
+        let name = isPending ? 'Tier 3 Pending Scorecards' : 'Tier 3 Rejected Scorecards';
+        if (tier === 't1') {
+            model = 'corporate.scorecard';
+            name = isPending ? 'T1 Corporate Pending Scorecards' : 'T1 Corporate Rejections';
+        } else if (tier === 't2') {
+            model = 't2.scorecard';
+            name = isPending ? 'Tier 2 Pending Scorecards' : 'Tier 2 Rejections';
+        }
         const domain = [['state', '=', state]];
         if (this.state.filters.fiscal_year_id) {
             domain.push(['fiscal_year_id', '=', this.state.filters.fiscal_year_id]);
@@ -367,6 +416,10 @@ export class PerformanceDashboard extends Component {
             domain.push(['appraisal_period_id', '=', this.state.filters.appraisal_period_id]);
         }
         this.openFilteredList(model, domain, name);
+    }
+
+    setWatchlistTab(tab) {
+        this.state.watchlist_tab = tab;
     }
 
     openTierStatusList(model, state, title) {

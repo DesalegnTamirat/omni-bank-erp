@@ -1,7 +1,8 @@
-# -*- coding: utf-8 -*-
+import time
 import json
 import logging
-from odoo import models
+from odoo import models, _
+from odoo.exceptions import ValidationError
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -10,28 +11,48 @@ _logger = logging.getLogger(__name__)
 # Prevents employees from being fully locked out of the system or crashing web client metadata loads.
 # Prefix-matched: any route starting with these paths is exempt.
 _GATE_EXEMPT_PREFIXES = (
+    # Core web client infrastructure & static assets
     '/web/login',
     '/web/logout',
+    '/web/session/logout',
     '/web/assets',
+    '/web/bundle',
     '/web/static',
     '/web/webclient',
     '/web/session',
     '/web/image',
     '/web/action',
-    '/odoo/attendances',
-    '/discuss',
-    '/mail',
-    '/custom_hr_attendance',
-    '/web/dataset/call_kw/res.config',
+    '/web/manifest',
+    '/web/service-worker',
+    '/websocket',
+    '/web/dataset/call_kw/ir.attachment',
+    '/web/dataset/call_kw/ir.http',
     '/web/dataset/call_kw/res.users',
     '/web/dataset/call_kw/res.company',
     '/web/dataset/call_kw/ir.actions',
     '/web/dataset/call_kw/ir.ui.menu',
     '/web/dataset/call_kw/ir.model.data',
-    '/web/dataset/call_kw/hr.attendance',
-    '/web/dataset/call_kw/hr.employee',
     '/web/dataset/call_kw/bus.bus',
     '/bus/',
+    '/discuss',
+    '/mail',
+
+    # Attendance module UI and API controllers
+    '/odoo/attendances',
+    '/custom_hr_attendance',
+
+    # Attendance module models & administration (accessible to manage attendance & turn off gate)
+    '/web/dataset/call_kw/hr.attendance',
+    '/web/dataset/call_kw/hr.employee',
+    '/web/dataset/call_kw/job.shift',
+    '/web/dataset/call_kw/job.position',
+    '/web/dataset/call_kw/location.based',
+    '/web/dataset/call_kw/attendance.',
+    '/web/dataset/call_kw/over.time',
+    '/web/dataset/call_kw/overtime.',
+    '/web/dataset/call_kw/my.shift',
+    '/web/dataset/call_kw/res.config',
+    '/web/dataset/call_kw/ir.config_parameter',
 )
 
 
@@ -54,29 +75,41 @@ class IrHttp(models.AbstractModel):
             if not user or user._is_public():
                 return super()._dispatch(endpoint)
 
-            # System administrators & users without an employee profile are exempt
-            if user.has_group('base.group_system') or not user.employee_id:
+            # Pure root superuser (system maintenance) & technical accounts without an employee profile are exempt
+            if user._is_superuser() or not user.employee_id:
                 return super()._dispatch(endpoint)
 
-            # Check live DB state for the employee
+            # 1. Fast path: check session cache first with a 120s TTL
+            session = getattr(request, 'session', None)
+            now_ts = time.time()
+            if session:
+                cached_checked_in = session.get('attendance_checked_in')
+                last_check_ts = session.get('attendance_gate_checked_at', 0)
+                # If cached within 120s and checked in, bypass DB lookup completely (0 SQL queries)
+                if cached_checked_in is True and (now_ts - last_check_ts < 120):
+                    return super()._dispatch(endpoint)
+
+            # 2. Slow path: check live database state
             employee = user.employee_id
             if employee and employee.attendance_state == 'checked_in':
-                if request and hasattr(request, 'session'):
-                    request.session['attendance_checked_in'] = True
+                if session:
+                    session['attendance_checked_in'] = True
+                    session['attendance_gate_checked_at'] = now_ts
             else:
-                if request and hasattr(request, 'session'):
-                    request.session['attendance_checked_in'] = False
+                if session:
+                    session['attendance_checked_in'] = False
+                    session['attendance_gate_checked_at'] = now_ts
                 # Employee is not checked in — block access to restricted routes
                 return cls._attendance_gate_blocked_response()
         return super()._dispatch(endpoint)
 
     @classmethod
     def _attendance_gate_enabled(cls):
-        """Returns True if the attendance access gate feature is active."""
-        param = request.env['ir.config_parameter'].sudo().get_param(
-            'hr_attendance.enable_checkin_gate', 'False'
-        )
-        return param.lower() in ('true', '1')
+        """Returns True if the attendance access gate feature is active (read from RAM cache)."""
+        if not request or not request.env:
+            return False
+        cfg = request.env['hr.employee']._get_attendance_config_params()
+        return bool(cfg.get('enable_checkin_gate', False))
 
     @classmethod
     def _route_requires_gate(cls):
@@ -97,29 +130,21 @@ class IrHttp(models.AbstractModel):
     @classmethod
     def _attendance_gate_blocked_response(cls):
         """
-        Returns a minimal JSON-RPC error response directing the employee to check in.
-        Used for JSONRPC requests. For regular HTTP requests, redirects to attendance page.
+        Directs un-checked-in employees to check in.
+        Raises a standard Odoo ValidationError for RPC calls so the frontend displays a
+        clean, user-friendly Validation Error modal instead of crashing the OWL lifecycle.
+        For browser page navigation, redirects to the attendance screen.
         """
         content_type = request.httprequest.content_type or ''
-        if 'json' in content_type:
-            body = json.dumps({
-                'jsonrpc': '2.0',
-                'id': None,
-                'error': {
-                    'code': 403,
-                    'message': 'Access Restricted',
-                    'data': {
-                        'message': (
-                            'You must check in before accessing the system. '
-                            'Please use the Check-In button to record your attendance.'
-                        ),
-                    }
-                }
-            })
-            from werkzeug.wrappers import Response
-            return Response(body, status=200, content_type='application/json')
+        path = request.httprequest.path or ''
+        is_json = 'json' in content_type or path.startswith('/web/dataset/')
+        if is_json:
+            raise ValidationError(_(
+                'You must check in before accessing the system. '
+                'Please use the Check-In button to record your attendance.'
+            ))
 
-        # For regular HTTP routes, redirect to the attendance check-in screen
+        # For regular full-page browser navigation, redirect to attendance screen
         from werkzeug.utils import redirect
         return redirect('/odoo/attendances', code=302)
 
@@ -129,10 +154,12 @@ class IrHttp(models.AbstractModel):
         if user and not user._is_public():
             gate_enabled = self._attendance_gate_enabled()
             is_admin = user.has_group('base.group_system')
+            is_attendance_admin = is_admin or user.has_group('hr_attendance.group_hr_attendance_manager')
             employee = user.employee_id
             checked_in = bool(employee and employee.attendance_state == 'checked_in')
             res['enable_checkin_gate'] = gate_enabled
             res['is_system_admin'] = is_admin
+            res['is_attendance_admin'] = is_attendance_admin
             res['attendance_checked_in'] = checked_in
         return res
 

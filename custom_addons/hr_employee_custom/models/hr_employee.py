@@ -161,6 +161,43 @@ class HrEmployee(models.Model):
 
     grade_id = fields.Many2one('hr.employee.grade', string='Employee Grade', required=True)
     level_id = fields.Many2one('hr.employee.level', string='Employee Level', required=True)
+    disability_details = fields.Char(string='Disability Details')
+
+    former_spouse_name = fields.Char(string='Former Spouse Name')
+    is_previously_married = fields.Boolean(
+        string='Was Previously Married',
+        compute='_compute_is_previously_married',
+        store=True,
+        readonly=False
+    )
+
+    @api.depends('marital', 'former_spouse_name')
+    def _compute_is_previously_married(self):
+        for rec in self:
+            if rec.marital in ('divorced', 'widower') or rec.former_spouse_name:
+                rec.is_previously_married = True
+            elif not rec.is_previously_married:
+                rec.is_previously_married = False
+
+    work_permit_status = fields.Selection([
+        ('none', 'Not Applicable'),
+        ('valid', 'Valid'),
+        ('expiring_soon', 'Expiring Soon'),
+        ('expired', 'Expired'),
+    ], string='Work Permit Status', compute='_compute_work_permit_status', store=True)
+
+    @api.depends('work_permit_expiration_date')
+    def _compute_work_permit_status(self):
+        today = fields.Date.today()
+        for rec in self:
+            if not rec.work_permit_expiration_date:
+                rec.work_permit_status = 'none'
+            elif rec.work_permit_expiration_date < today:
+                rec.work_permit_status = 'expired'
+            elif (rec.work_permit_expiration_date - today).days <= 30:
+                rec.work_permit_status = 'expiring_soon'
+            else:
+                rec.work_permit_status = 'valid'
 
     @api.constrains('grade_id', 'level_id')
     def _check_employee_assignments(self):

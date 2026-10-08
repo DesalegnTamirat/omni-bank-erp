@@ -105,4 +105,115 @@
             </div>
         </t>
     </template>
+
+    <template id="internal_offer_response_page" name="Internal Promotion &amp; Transfer Response">
+        <t t-call="website.layout">
+            <div id="wrap" class="py-5 bg-light">
+                <div class="container" style="max-width: 750px;">
+                    <div class="card shadow-sm border-0 rounded-3">
+                        <div class="card-header text-white p-4" style="background-color: #4A2E1A;">
+                            <div class="d-flex align-items-center">
+                                <img src="/logo.png" alt="Bunna Bank" style="max-height: 40px;" class="me-3 bg-white p-1 rounded"/>
+                                <div>
+                                    <h4 class="mb-0 text-white">Bunna Bank S.C.</h4>
+                                    <small class="text-white-50">Official Promotion &amp; Transfer Acceptance Portal</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <t t-if="error">
+                                <div class="alert alert-danger" role="alert">
+                                    <i class="fa fa-exclamation-triangle me-2"></i><span t-esc="error"/>
+                                </div>
+                            </t>
+                            <t t-elif="success">
+                                <div class="alert alert-success p-4 text-center rounded-3" role="alert">
+                                    <h3 class="alert-heading text-success mb-2">Response Recorded!</h3>
+                                    <p class="mb-0 fs-5"><span t-esc="success"/></p>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <h5 class="fw-bold mb-3" style="color: #4A2E1A;">
+                                    <i class="fa fa-file-text-o me-2"></i>Offer &amp; Selection Notice
+                                </h5>
+                                <div class="table-responsive mb-4">
+                                    <table class="table table-bordered bg-white">
+                                        <tbody>
+                                            <tr>
+                                                <th class="bg-light w-35">Employee Name:</th>
+                                                <td><strong t-esc="candidate_name"/></td>
+                                            </tr>
+                                            <tr>
+                                                <th class="bg-light">Target Position / Offer:</th>
+                                                <td><strong t-esc="job_title"/></td>
+                                            </tr>
+                                            <tr t-if="work_unit">
+                                                <th class="bg-light">Work Unit / Branch:</th>
+                                                <td><span t-esc="work_unit"/></td>
+                                            </tr>
+                                            <tr>
+                                                <th class="bg-light">Current Acceptance Status:</th>
+                                                <td>
+                                                    <span t-if="acceptance_status == 'accepted'" class="badge bg-success fs-6">Accepted</span>
+                                                    <span t-elif="acceptance_status == 'rejected'" class="badge bg-danger fs-6">Declined</span>
+                                                    <span t-else="" class="badge bg-warning text-dark fs-6">Pending Response</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <t t-if="acceptance_status in ('accepted', 'rejected')">
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="fa fa-info-circle me-2"></i>You have already responded to this offer (Status: <strong t-esc="acceptance_status.capitalize()"/>). No further changes can be submitted online.
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div class="card p-3 mb-4 border-warning bg-warning-subtle">
+                                        <p class="mb-0 text-dark">
+                                            <strong>Please indicate your decision regarding this offer:</strong><br/>
+                                            Selecting <strong>Accept Offer</strong> will confirm your agreement to take on the position. Selecting <strong>Decline Offer</strong> will allow you to record your reasons for declining.
+                                        </p>
+                                    </div>
+
+                                    <form role="form" t-att-action="submit_url" method="POST">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">Select Decision:</label>
+                                            <div class="d-flex gap-4">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="decision" id="decision_accept" value="accept" checked="checked" onclick="document.getElementById('reason_box').style.display='none';"/>
+                                                    <label class="form-check-label fw-bold text-success fs-5" for="decision_accept">
+                                                        <i class="fa fa-check-circle me-1"></i>Accept Offer
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="decision" id="decision_decline" value="decline" onclick="document.getElementById('reason_box').style.display='block';"/>
+                                                    <label class="form-check-label fw-bold text-danger fs-5" for="decision_decline">
+                                                        <i class="fa fa-times-circle me-1"></i>Decline Offer
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div id="reason_box" class="mb-4" style="display: none;">
+                                            <label for="reason" class="form-label fw-bold text-danger">Rejection / Decline Reason (Required if declining):</label>
+                                            <textarea name="reason" id="reason" rows="3" class="form-control" placeholder="State your reason for declining this offer..."></textarea>
+                                        </div>
+
+                                        <div class="d-grid gap-2">
+                                            <button type="submit" class="btn btn-lg text-white fw-bold" style="background-color: #4A2E1A;">
+                                                <i class="fa fa-paper-plane me-2"></i>Submit Decision
+                                            </button>
+                                        </div>
+                                    </form>
+                                </t>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
 </odoo>

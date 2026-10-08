@@ -10,94 +10,117 @@
                     <field name="is_hr_manager" invisible="1"/>
                     <field name="is_processed" invisible="1"/>
 
-                    <!-- Step 1: POMD clicks this FIRST. Hidden once already processed. -->
-                    <button string="Process Settlement" type="object" name="action_generate_lines"
+                    <button string="Calculate Standard Lines" type="object" name="action_recalculate"
                             class="oe_highlight" invisible="state != 'draft' or is_processed"
-                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,base.group_system"/>
+                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
 
-                    <!-- Step 2: Only appears AFTER Process Settlement has been clicked -->
-                    <button string="Submit for Approval" type="object" name="action_confirm_settlement"
+                    <button string="Recalculate Standard Lines" type="object" name="action_recalculate"
+                            class="btn-secondary" invisible="state != 'draft' or not is_processed"
+                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
+
+                    <button string="Submit for Audit" type="object" name="action_confirm_settlement"
                             class="oe_highlight" invisible="state != 'draft' or not is_processed"
-                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,base.group_system"/>
-                    <button string="Approve" type="object" name="action_approve_settlement"
-                            class="oe_highlight" invisible="state != 'waiting_approval'"
-                            groups="hr_resignation.group_resignation_hr_manager"/>
-                    <button string="Refuse" type="object" name="action_open_return_wizard"
-                            class="btn-secondary" invisible="state != 'waiting_approval'"
-                            groups="hr_resignation.group_resignation_hr_manager"/>
-                    <button string="Pay" type="object" name="action_mark_paid"
-                            class="oe_highlight" invisible="state != 'confirmed'"
-                            groups="hr_resignation.group_pomd_officer"/>
+                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
 
-                    <field name="state" widget="statusbar" statusbar_visible="draft,waiting_approval,confirmed,paid"/>
+                    <button string="Confirm &amp; Send for Payment" type="object" name="action_audit_confirm"
+                            class="oe_highlight" invisible="state != 'waiting_audit'"
+                            groups="hr_resignation.group_resignation_auditor,base.group_system"/>
+                    <button string="Return for Revision" type="object" name="action_open_return_wizard"
+                            class="btn-secondary" invisible="state != 'waiting_audit'"
+                            groups="hr_resignation.group_resignation_auditor,base.group_system"/>
+
+                    <button string="Pay" type="object" name="action_mark_paid"
+                            class="oe_highlight" invisible="state != 'waiting_payment'"
+                            groups="hr_resignation.group_resignation_hr_manager,base.group_system"/>
+
+                    <button string="Reset to Draft" type="object" name="action_set_draft"
+                            class="btn-secondary"
+                            invisible="state == 'draft' or state == 'paid'"
+                            groups="hr_resignation.group_resignation_hr_manager,base.group_system"/>
+
+                    <button string="Reset Lines" type="object" name="action_reset_lines"
+                            class="btn-secondary" invisible="state != 'draft' or not is_processed"
+                            groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+
+                    <field name="state" widget="statusbar" statusbar_visible="draft,waiting_audit,waiting_payment,paid"/>
                 </header>
                 <sheet>
-                    <widget name="web_ribbon" title="APPROVED" bg_color="text-bg-success" invisible="state != 'confirmed'"/>
-                    <widget name="web_ribbon" title="PAID" bg_color="text-bg-success" invisible="state != 'paid'"/>
-
                     <div class="oe_title">
-                        <h1><field name="employee_id" readonly="1" options="{'no_open': True}"/></h1>
-                        <h2><field name="separation_reason" readonly="1"/></h2>
+                        <h1>
+                            <field name="employee_sudo_name" readonly="1" string="Employee"/>
+                        </h1>
+                        <h2>
+                            <field name="resignation_id" readonly="1"/>
+                        </h2>
                     </div>
 
-                    <!-- Green Banner similar to screenshot -->
-                    <div class="alert alert-success text-center mb-4" role="alert" style="font-size: 1.25rem; font-weight: bold; background-color: #d1e7dd; color: #0f5132;">
-                        Final Settlement to be Paid: $ <field name="net_payment" readonly="1" nolabel="1"/>
-                    </div>
-                    
                     <group>
-                        <group string="SERVICE CONTEXT">
+                        <group string="Employment Context">
+                            <field name="separation_reason" readonly="1"/>
+                            <field name="job_category" readonly="1"/>
+                            <field name="joined_date" readonly="1"/>
                             <field name="service_years" readonly="1"/>
-                            <field name="employment_type" readonly="1"/>
-                            <field name="settlement_authorized" readonly="1" widget="boolean_toggle"/>
-                        </group>
-                        <group string="SALARY PARAMETERS">
-                            <field name="basic_salary" readonly="state != 'draft'"/>
-                            <field name="worked_days_final_month" readonly="state != 'draft'"/>
-                            <field name="total_days_in_month" readonly="state != 'draft'"/>
-                        </group>
-                    </group>
-                    <group>
-                        <group string="ELIGIBILITY &amp; CALCULATIONS">
-                            <field name="severance_eligible" readonly="1" widget="badge" decoration-success="severance_eligible == 'yes'" decoration-danger="severance_eligible == 'no'"/>
-                            <field name="pf_eligible" readonly="1" widget="badge" decoration-success="pf_eligible == 'yes'" decoration-danger="pf_eligible == 'no'"/>
-                            <field name="years_for_severance" readonly="state != 'draft'"/>
-                        </group>
-                        <group>
-                            <!-- Empty group to balance columns -->
-                        </group>
-                    </group>
-
-                    <!-- Audit Information -->
-                    <group string="Audit Information">
-                        <group>
-                            <field name="processed_by_id"/>
-                            <field name="processed_date"/>
-                            <field name="paid_by_id"/>
-                            <field name="paid_date"/>
-                        </group>
-                        <group>
-                            <field name="confirmed_by_id"/>
-                            <field name="confirmed_date"/>
                         </group>
                     </group>
 
                     <notebook>
-                        <!-- Tab 1: Full Final Settlement -->
-                        <page string="Full Final Settlement">
+                        <page string="Standard Parameters">
+                            <group>
+                                <group>
+                                    <field name="basic_salary" readonly="state != 'draft'"/>
+                                    <field name="related_release_date" invisible="1"/>
+                                    <field name="settlement_date" string="Release Date (End Date)" readonly="state != 'draft'"/>
+                                    <field name="date_change_justification" invisible="settlement_date == related_release_date" required="settlement_date != related_release_date"/>
+                                    <field name="worked_days_final_month" string="Final Month Working Days" readonly="state != 'draft'"/>
+                                </group>
+                            </group>
+                        </page>
+                        
+                        <page string="Cash Indemnity, PF &amp; Eligibility">
+                            <group>
+                                <!-- Row 1: Eligibility and Notice Period -->
+                                <group string="Policy Eligibility">
+                                    <field name="severance_eligible" readonly="1"/>
+                                    <field name="pf_eligible" readonly="1"/>
+                                </group>
+                                <group string="Notice Period Status">
+                                    <field name="notice_period_accepted" readonly="1"/>
+                                    <field name="liability" readonly="1" invisible="notice_period_accepted != 'no'"/>
+                                </group>
 
-                            <!-- Placeholder shown BEFORE Process Settlement is clicked -->
+                                <!-- Row 2: Cash Indemnity Calculation and Fetched Balances -->
+                                <group string="Cash Indemnity Calculation">
+                                    <field name="cbs_start_date" string="Indemnity Start Date" readonly="state != 'draft'"/>
+                                    <field name="cbs_end_date" string="Indemnity End Date" readonly="state != 'draft'"/>
+                                    <field name="cash_indemnity_working_days" string="Indemnity Total Days" readonly="state != 'draft'"/>
+                                    <button string="Calculate Cash Indemnity" type="object" name="action_fetch_cbs_indemnity"
+                                            class="oe_highlight mt-3" invisible="state != 'draft'"
+                                            groups="hr_resignation.group_pomd_officer,base.group_system" colspan="2"/>
+                                </group>
+                                <group string="System Balances (Read-Only)">
+                                    <field name="cbs_user_id" string="Employee ID" readonly="1"/>
+                                    <field name="cbs_working_days" invisible="1"/>
+                                    
+                                    <hr colspan="2" class="mt-3 mb-3"/>
+                                    
+                                    <field name="cbs_indemnity_account" string="Cash Indemnity Account" readonly="1"/>
+                                    <field name="cbs_indemnity_amount" string="Cash Indemnity Balance" readonly="1" force_save="1" style="font-weight: bold; color: #017e84;"/>
+                                    
+                                    <hr colspan="2" class="mt-3 mb-3"/>
+                                    
+                                    <field name="cbs_pf_account" string="Provident Fund Account" readonly="1"/>
+                                    <field name="pf_amount" string="Provident Fund Balance" readonly="1" force_save="1" style="font-weight: bold; color: #017e84;"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Settlement Breakdown">
                             <div class="alert alert-warning text-center mt-4" role="alert" invisible="is_processed">
                                 <h4>Settlement Not Yet Processed</h4>
-                                <p>Click the <strong>"Process Settlement"</strong> button above to calculate the settlement amounts.</p>
+                                <p>Click the <strong>"Calculate Standard Lines"</strong> button above to calculate benefits and sync amounts into the table below.</p>
                             </div>
 
-                            <!-- Lines only visible AFTER Process Settlement is clicked -->
                             <field name="line_ids" nolabel="1" readonly="state != 'draft'" invisible="not is_processed">
                                 <list editable="bottom">
-                                    <control>
-                                        <create name="add_line_control" string="Add a line"/>
-                                    </control>
                                     <field name="name" string="Description"/>
                                     <field name="line_type" string="Type"/>
                                     <field name="is_taxable" string="Taxable?" widget="boolean"/>
@@ -106,10 +129,8 @@
                                 </list>
                             </field>
 
-                            <!-- Totals only visible AFTER Process Settlement is clicked -->
                             <group class="mt-4" col="12" invisible="not is_processed">
                                 <group colspan="8">
-                                    <!-- Empty space on left -->
                                 </group>
                                 <group colspan="4" class="text-end">
                                     <field name="taxable_gross" string="Taxable Gross:" readonly="1" class="text-info"/>
@@ -119,19 +140,21 @@
                                 </group>
                             </group>
                         </page>
-
-                        <!-- Tab 2: Eligibility Assessment -->
-                        <page string="Eligibility Assessment">
+                        <page string="Audit Information">
                             <group>
-                                <field name="severance_eligible" readonly="1"/>
-                                <field name="pf_eligible" readonly="1"/>
-                                <field name="service_years" readonly="1" string="Years for Severance"/>
-                                <field name="notice_period_accepted" readonly="1"/>
-                                <field name="liability" readonly="1" invisible="notice_period_accepted != 'no'"/>
+                                <group>
+                                    <field name="processed_by_id"/>
+                                    <field name="processed_date"/>
+                                    <field name="paid_by_id"/>
+                                    <field name="paid_date"/>
+                                </group>
+                                <group>
+                                    <field name="confirmed_by_id"/>
+                                    <field name="confirmed_date"/>
+                                </group>
                             </group>
                         </page>
 
-                        <!-- Tab 3: HR Notes -->
                         <page string="HR Notes">
                             <field name="notes" placeholder="Additional HR notes..." readonly="state != 'draft'"/>
                         </page>

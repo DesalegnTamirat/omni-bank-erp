@@ -301,16 +301,33 @@ class ExternalShortlistChoiceWizard(models.TransientModel):
                     'preferred_location': candidate.preferred_location,
                     'vacancy_id': vacancy_int_id,
                     'select_flag': True,
+                    'selection_type': 'shortlisted',
                 })
                 added += 1
+            if candidate.applicant_name:
+                candidate.applicant_name.sudo().write({'bunna_app_status': 'shortlisted'})
 
         # Mark shortlisting as done — hides the Shortlist button on the form
         recruitment.write({'shortlisting_done': True})
         if recruitment.vacancy_id:
-            recruitment.vacancy_id.write({
+            recruitment.vacancy_id.sudo().write({
+                'ext_selected_recruitment_id': selected_rec.id,
                 'shortlist_done': True,
-                'recruitment_step': 'notify_cand',
+                'recruitment_step': 'notify_exam' if recruitment.vacancy_id.has_written_exam else 'notify_panel',
             })
+            recruitment.vacancy_id._sync_selected_recruitment_records()
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Shortlisting Completed'),
+                    'message': _('External candidates shortlisting completed successfully for vacancy %s (%s eligible candidates selected).') % (
+                        recruitment.vacancy_id.reference, len(matched_candidates)),
+                    'type': 'success',
+                    'sticky': False,
+                    'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+                }
+            }
 
         return {
             'name': _('External Recruitment Selected Candidates'),

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pm_lead_office_tree" model="ir.ui.view">
+        <field name="name">pm.lead.office.list</field>
+        <field name="model">pm.lead.office</field>
+        <field name="arch" type="xml">
+            <list string="Project Lead Offices" editable="bottom">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="head_id"/>
+                <field name="description"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_lead_office_form" model="ir.ui.view">
+        <field name="name">pm.lead.office.form</field>
+        <field name="model">pm.lead.office</field>
+        <field name="arch" type="xml">
+            <form string="Project Lead Office">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Office / Directorate Name"/>
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="head_id"/>
+                        </group>
+                        <group>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Scope &amp; Mandate" name="mandate">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pm_lead_office" model="ir.actions.act_window">
+        <field name="name">Project Lead Offices</field>
+        <field name="res_model">pm.lead.office</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Register organizational lead offices and directorates (e.g. EADOD, DCTO, CIDO, CEO, PMO).
+            </p>
+        </field>
+    </record>
+</odoo>

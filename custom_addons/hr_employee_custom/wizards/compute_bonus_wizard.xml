@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="compute_bonus_wizard_form" model="ir.ui.view">
+        <field name="name">Compute Bonus Wizard</field>
+        <field name="model">compute.bonus.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Salary Rules">
+
+
+                <footer>
+                    <button name="call_populate_bonus" string="Populate Bonus" type="object" class="btn btn-primary"/>
+                    <button string="Cancel" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+
+        </field>
+    </record>
+
+    <record id="action_compute_bonus_wizard_form" model="ir.actions.act_window">
+        <field name="name">Compute Bonus Wizard</field>
+        <field name="res_model">compute.bonus.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="compute_bonus_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menu item commented out: payroll module not currently installed.
+    <menuitem id="menu_compute_bonus_wizards" name="Compute Bonus Wizard" parent="hr_employee_custom.menu_hr_payroll_community_wizards_stub" action="action_compute_bonus_wizard_form"/>
+    -->
+</odoo>

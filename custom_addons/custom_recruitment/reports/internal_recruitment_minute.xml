@@ -223,13 +223,13 @@
                         <div class="mt-4 mb-4" style="text-align: justify;">
                             <p class="font-weight-bold mb-1">Decision/ Comment-</p>
                             <p>
-                                The committee has decided to promote the top-ranked employee, 
-                                <strong><t t-esc="stats.get('top_cand_salutation', 'Ato/Wy')"/> <t t-esc="stats.get('top_cand_name', '____________')"/></strong> 
+                                The committee has decided to <t t-esc="stats.get('action_verb', 'promote')"/> <t t-esc="stats.get('emp_word', 'the top-ranked employee')"/>, 
+                                <strong><t t-esc="stats.get('selected_cands_str') or ((stats.get('top_cand_salutation', 'Ato/Wy') + ' ') if stats.get('top_cand_salutation') else '') + stats.get('top_cand_name', '____________')"/></strong> 
                                 on the position of <strong><span t-field="o.job_position.name"/></strong> 
                                 (Job Grade <strong><span t-field="o.job_grade"/></strong>) at 
                                 <strong><t t-esc="stats.get('top_cand_unit', '____________')"/></strong> (work unit). 
                                 Regarding the salary, in accordance with the bank’s procedure, 
-                                <strong><t t-esc="stats.get('top_cand_salutation', 'Ato/Wy')"/> <t t-esc="stats.get('top_cand_name', '____________')"/></strong> 
+                                <strong><t t-esc="stats.get('selected_cands_str') or ((stats.get('top_cand_salutation', 'Ato/Wy') + ' ') if stats.get('top_cand_salutation') else '') + stats.get('top_cand_name', '____________')"/></strong> 
                                 will be entitled a base salary of Birr________(figure) (Words). 
                                 <t t-if="stats.get('res_rank_start') and stats.get('res_rank_end')">
                                     Employees ranked from <strong><t t-esc="stats.get('res_rank_start')"/></strong> 

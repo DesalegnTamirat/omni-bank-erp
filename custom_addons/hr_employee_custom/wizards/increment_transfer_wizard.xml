@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="increment_transfer_form" model="ir.ui.view">
+        <field name="name">Increment Transfer Wizard</field>
+        <field name="model">increment.transfer.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Increment Transfer">
+<!--                     <group>-->
+<!--                        <field name="hr_period"/>-->
+<!--                    </group>-->
+                <footer>
+                    <button name="increment_transfer" string="Increment Transfer" type="object" class="btn btn-primary"/>
+<!--                    <button name="process_api" string="Process Net Pay API" type="object" class="btn btn-primary" model="call.api"/>-->
+                    <button string="Cancel" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+
+        </field>
+    </record>
+
+    <record id="action_increment_transfer_wizard" model="ir.actions.act_window">
+        <field name="name">Increment Transfer Wizard</field>
+        <field name="res_model">increment.transfer.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="increment_transfer_form"/>
+        <field name="target">new</field>
+    </record>
+
+
+    <!-- Menu item commented out: payroll module not currently installed.
+    <menuitem id="menu_increment_transfer_wizard" name="Increment Transfer Wizard" parent="hr_employee_custom.menu_hr_payroll_community_wizards_stub" action="action_increment_transfer_wizard"/>
+    -->
+
+</odoo>

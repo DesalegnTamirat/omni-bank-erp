@@ -14,11 +14,11 @@ class HrExitInterviewTemplate(models.Model):
     question_ids = fields.One2many('hr.exit.interview.question', 'template_id', string='Questions')
 
     # Configurable Question Labels (Deprecated - kept for fallback/migration compatibility)
-    rating_label = fields.Char(string='Rating Question (Deprecated)', default='Work Environment Rating', translate=True)
-    recommend_label = fields.Char(string='Boolean Question (Deprecated)', default='Would Recommend the Bank to Others?', translate=True)
-    text_1_label = fields.Char(string='Text Question 1 (Deprecated)', default='PRIMARY REASON FOR LEAVING', translate=True)
-    text_2_label = fields.Char(string='Text Question 2 (Deprecated)', default='FEEDBACK ON MANAGEMENT AND WORK EXPERIENCE', translate=True)
-    text_3_label = fields.Char(string='Text Question 3 (Deprecated)', default='SUGGESTIONS FOR IMPROVEMENT', translate=True)
+    rating_label = fields.Char(string='Rating Question (Deprecated)', default='Work Environment Rating')
+    recommend_label = fields.Char(string='Boolean Question (Deprecated)', default='Would Recommend the Bank to Others?')
+    text_1_label = fields.Char(string='Text Question 1 (Deprecated)', default='PRIMARY REASON FOR LEAVING')
+    text_2_label = fields.Char(string='Text Question 2 (Deprecated)', default='FEEDBACK ON MANAGEMENT AND WORK EXPERIENCE')
+    text_3_label = fields.Char(string='Text Question 3 (Deprecated)', default='SUGGESTIONS FOR IMPROVEMENT')
 
 
 class HrExitInterviewQuestion(models.Model):
@@ -39,12 +39,29 @@ class HrExitInterviewQuestion(models.Model):
         ('checkbox',     'Multiple Choices'),
         ('text',         'Open-ended Text'),
     ], string='Type', default='text', required=True)
-    section = fields.Char(string='Section', help='Group heading for the portal form')
+
+    preview_text = fields.Text(string='Preview Text', compute='_compute_preview_text')
+
+    @api.depends('question_type', 'option_ids')
+    def _compute_preview_text(self):
+        for rec in self:
+            if rec.question_type == 'text':
+                rec.preview_text = "Example: [Employee enters their detailed text response here...]"
+            else:
+                rec.preview_text = ""
+    section = fields.Char(string='Section', help='Group heading for the portal form', translate=True)
 
     option_ids = fields.One2many(
         'hr.exit.interview.question.option', 'question_id',
         string='Options',
         help='Define selectable options for Custom/Multiple Choice types.')
+    is_mandatory = fields.Boolean(string='Mandatory', default=False)
+    active = fields.Boolean(string='Active', default=True)
+
+    def action_delete_question(self):
+        self.ensure_one()
+        self.write({'active': False})
+        return {'type': 'ir.actions.act_window_close'}
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -110,7 +127,7 @@ class HrExitInterview(models.Model):
 
     state = fields.Selection([
         ('draft', 'Draft'),
-        ('done',  'Submitted'),
+        ('completed',  'Submitted'),
     ], default='draft', tracking=True)
 
     can_edit = fields.Boolean(compute='_compute_can_edit')
@@ -118,7 +135,7 @@ class HrExitInterview(models.Model):
     @api.depends_context('uid')
     def _compute_can_edit(self):
         for rec in self:
-            is_employee = (rec.employee_id.user_id == self.env.user)
+            is_employee = (rec.employee_id.sudo().user_id == self.env.user)
             rec.can_edit = is_employee and rec.state == 'draft'
 
     @api.onchange('template_id')
@@ -132,6 +149,7 @@ class HrExitInterview(models.Model):
                     'question_name': question.name,
                     'question_type': question.question_type,
                     'section': question.section,
+                    'is_mandatory': question.is_mandatory,
                 }))
             self.line_ids = [(5, 0, 0)] + lines
 
@@ -148,6 +166,7 @@ class HrExitInterview(models.Model):
                         'question_name': question.name,
                         'question_type': question.question_type,
                         'section': question.section,
+                        'is_mandatory': question.is_mandatory,
                     }))
                 vals['line_ids'] = lines
         return super().create(vals_list)
@@ -163,6 +182,7 @@ class HrExitInterview(models.Model):
                     'question_name': question.name,
                     'question_type': question.question_type,
                     'section': question.section,
+                    'is_mandatory': question.is_mandatory,
                 }))
             vals['line_ids'] = lines
         return super().write(vals)
@@ -301,7 +321,13 @@ class HrExitInterview(models.Model):
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('This interview has already been submitted.'))
-            rec.state = 'done'
+            
+            unanswered_mandatory = rec.line_ids.filtered(lambda l: l.is_mandatory and not l.answer)
+            if unanswered_mandatory:
+                questions = ', '.join(unanswered_mandatory.mapped('question_name'))
+                raise UserError(_('Please answer the following mandatory questions:\n\n%s') % questions)
+                
+            rec.state = 'completed'
             if rec.resignation_id and rec.resignation_id.state == 'last_day_recorded':
                 rec.resignation_id.state = 'exit_interviewed'
                 rec.resignation_id._check_and_advance_cleared()
@@ -358,7 +384,7 @@ class HrExitInterview(models.Model):
         import re
         from collections import Counter
 
-        interviews_done = self.env['hr.exit.interview'].search([('state', '=', 'done')])
+        interviews_done = self.env['hr.exit.interview'].search([('state', '=', 'completed')])
         lines = self.env['hr.exit.interview.line'].search([('interview_id', 'in', interviews_done.ids)])
 
         total = len(interviews_done)
@@ -490,8 +516,9 @@ class HrExitInterviewLine(models.Model):
     question_id = fields.Many2one('hr.exit.interview.question', string='Question Template', ondelete='set null')
     available_option_ids = fields.One2many(related='question_id.option_ids')
     sequence = fields.Integer(string='Sequence', default=10)
-    section = fields.Char(string='Section')
-    question_name = fields.Char(string='Question', required=True)
+    section = fields.Char(string='Section', translate=True)
+    question_name = fields.Char(string='Question', required=True, translate=True)
+    is_mandatory = fields.Boolean(string='Mandatory', default=False)
     question_type = fields.Selection([
         ('rating',       'Rating'),
         ('satisfaction', 'Satisfaction'),
@@ -538,14 +565,14 @@ class HrExitInterviewLine(models.Model):
     choice_id = fields.Many2one(
         'hr.exit.interview.question.option',
         string='Selected Option',
-        domain="[('question_id.name', '=', question_name)]")
+        domain="[('question_id', '=', question_id)]")
 
     choice_ids = fields.Many2many(
         'hr.exit.interview.question.option',
         'exit_interview_line_option_rel',
         'line_id', 'option_id',
         string='Selected Options',
-        domain="[('question_id.name', '=', question_name)]")
+        domain="[('question_id', '=', question_id)]")
 
     text_value = fields.Text(string='Response')
 

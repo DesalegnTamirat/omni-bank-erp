@@ -598,8 +598,8 @@
                                                 <i class="fa fa-check-circle me-1"/> Applied
                                             </span>
                                         </t>
-                                        <t t-elif="vacancy.vacancy_status == 'closed' or (vacancy.last_date_to_apply and vacancy.last_date_to_apply &lt; today)">
-                                            <span class="btn btn-sm btn-secondary disabled px-3 rounded" style="pointer-events: none; opacity: 0.7;"><i class="fa fa-lock me-1"/> Closed</span>
+                                        <t t-elif="vacancy.vacancy_status == 'closed'">
+                                            <span class="btn btn-sm btn-secondary disabled px-3 rounded"><i class="fa fa-lock me-1"/> Closed</span>
                                         </t>
                                         <t t-else="">
                                             <a t-attf-href="/jobs/apply/#{vacancy.id}" class="btn btn-sm btn-apply px-3 rounded">Apply Now</a>
@@ -2286,54 +2286,52 @@
                             <span class="ats-sidebar-title">Bunna ATS</span>
                         </div>
 
-                        <!-- Full Navigation ONLY visible when Profile is 100% Completed -->
-                        <t t-if="is_profile_complete">
-                            <!-- 1. Dashboard Menu -->
-                            <a href="/my/candidate/dashboard" t-attf-class="ats-nav-item #{'active' if active_tab == 'dashboard' else ''}" title="Dashboard">
-                                <i class="fa fa-dashboard nav-icon"/>
-                                <span class="ats-nav-text">Dashboard</span>
-                            </a>
+                        <!-- Full Navigation ALWAYS visible and functional for all logged-in candidates -->
+                        <!-- 1. Dashboard Menu -->
+                        <a href="/my/candidate/dashboard" t-attf-class="ats-nav-item #{'active' if active_tab == 'dashboard' else ''}" title="Dashboard">
+                            <i class="fa fa-dashboard nav-icon"/>
+                            <span class="ats-nav-text">Dashboard</span>
+                        </a>
 
-                            <!-- 1b. News & Announcements Menu -->
-                            <a href="/my/candidate/news" t-attf-class="ats-nav-item #{'active' if active_tab == 'news' else ''}" title="News &amp; Announcements">
-                                <i class="fa fa-newspaper-o nav-icon"/>
-                                <span class="ats-nav-text">News &amp; Announcements</span>
-                            </a>
+                        <!-- 1b. News & Announcements Menu -->
+                        <a href="/my/candidate/news" t-attf-class="ats-nav-item #{'active' if active_tab == 'news' else ''}" title="News &amp; Announcements">
+                            <i class="fa fa-newspaper-o nav-icon"/>
+                            <span class="ats-nav-text">News &amp; Announcements</span>
+                        </a>
 
-                            <!-- 2. Open Vacancy Menu -->
-                            <a href="/jobs" t-attf-class="ats-nav-item #{'active' if active_tab == 'vacancy' else ''}" title="Open Vacancies">
-                                <i class="fa fa-briefcase nav-icon"/>
-                                <span class="ats-nav-text">Open Vacancies</span>
-                            </a>
+                        <!-- 2. Open Vacancy Menu -->
+                        <a href="/jobs" t-attf-class="ats-nav-item #{'active' if active_tab == 'vacancy' else ''}" title="Open Vacancies">
+                            <i class="fa fa-briefcase nav-icon"/>
+                            <span class="ats-nav-text">Open Vacancies</span>
+                        </a>
 
-                            <!-- 3. Application Menu -->
-                            <a href="/my/candidate/applications" t-attf-class="ats-nav-item #{'active' if active_tab == 'application' else ''}" title="Applications">
-                                <i class="fa fa-file-text-o nav-icon"/>
-                                <span class="ats-nav-text">Applications</span>
-                            </a>
+                        <!-- 3. Application Menu -->
+                        <a href="/my/candidate/applications" t-attf-class="ats-nav-item #{'active' if active_tab == 'application' else ''}" title="Applications">
+                            <i class="fa fa-file-text-o nav-icon"/>
+                            <span class="ats-nav-text">Applications</span>
+                        </a>
 
-                            <!-- 3b. Job Offers Menu (BRD FR-ATS: External Selected Candidates 3-Day Offer Response) -->
-                            <t t-set="cand_email_val" t-value="cand.email if cand else request.env.user.email"/>
-                            <t t-set="pending_offer_cnt" t-value="request.env['recruitment.offer.letter'].sudo().search_count([('state', '=', 'sent'), '|', ('candidate_email', '=ilike', cand_email_val), ('applicant_id.partner_id', '=', request.env.user.partner_id.id)]) if cand_email_val else 0"/>
-                            <a href="/my/candidate/offers" t-attf-class="ats-nav-item #{'active' if active_tab == 'offers' else ''}" title="Job Offers">
-                                <i class="fa fa-envelope-open-o nav-icon"/>
-                                <span class="ats-nav-text">Job Offers</span>
-                                <t t-if="pending_offer_cnt &gt; 0">
-                                    <span class="badge bg-danger rounded-pill ms-auto px-2 py-1 small" style="font-size: 0.75rem;"><t t-esc="pending_offer_cnt"/> New</span>
-                                </t>
-                            </a>
-
-                            <!-- 3c. Admin Applicants List Menu (Visible ONLY to Recruitment Administrators) -->
-                            <t t-if="request.env.user.has_group('custom_recruitment.group_recruitment_administrator') or request.env.user.has_group('custom_recruitment.group_recruitment_manager') or request.env.user.has_group('hr_recruitment.group_hr_recruitment_manager') or request.env.user.has_group('base.group_system')">
-                                <a href="/my/recruitment/applicants" t-attf-class="ats-nav-item #{'active' if active_tab == 'admin_applicants' else ''}" title="Applicants List per Vacancy">
-                                    <i class="fa fa-users nav-icon text-warning"/>
-                                    <span class="ats-nav-text">Applicants List</span>
-                                </a>
-                                <a href="/my/recruitment/candidates" t-attf-class="ats-nav-item #{'active' if active_tab == 'admin_candidates' else ''}" title="All Registered Candidate Profiles">
-                                    <i class="fa fa-id-card-o nav-icon text-info"/>
-                                    <span class="ats-nav-text">Candidate Profiles</span>
-                                </a>
+                        <!-- 3b. Job Offers Menu (BRD FR-ATS: External Selected Candidates 3-Day Offer Response) -->
+                        <t t-set="cand_email_val" t-value="cand.email if cand else request.env.user.email"/>
+                        <t t-set="pending_offer_cnt" t-value="request.env['recruitment.offer.letter'].sudo().search_count([('state', '=', 'sent'), '|', ('candidate_email', '=ilike', cand_email_val), ('applicant_id.partner_id', '=', request.env.user.partner_id.id)]) if cand_email_val else 0"/>
+                        <a href="/my/candidate/offers" t-attf-class="ats-nav-item #{'active' if active_tab == 'offers' else ''}" title="Job Offers">
+                            <i class="fa fa-envelope-open-o nav-icon"/>
+                            <span class="ats-nav-text">Job Offers</span>
+                            <t t-if="pending_offer_cnt &gt; 0">
+                                <span class="badge bg-danger rounded-pill ms-auto px-2 py-1 small" style="font-size: 0.75rem;"><t t-esc="pending_offer_cnt"/> New</span>
                             </t>
+                        </a>
+
+                        <!-- 3c. Admin Applicants List Menu (Visible ONLY to Recruitment Administrators) -->
+                        <t t-if="request.env.user.has_group('custom_recruitment.group_recruitment_administrator') or request.env.user.has_group('custom_recruitment.group_recruitment_manager') or request.env.user.has_group('hr_recruitment.group_hr_recruitment_manager') or request.env.user.has_group('base.group_system')">
+                            <a href="/my/recruitment/applicants" t-attf-class="ats-nav-item #{'active' if active_tab == 'admin_applicants' else ''}" title="Applicants List per Vacancy">
+                                <i class="fa fa-users nav-icon text-warning"/>
+                                <span class="ats-nav-text">Applicants List</span>
+                            </a>
+                            <a href="/my/recruitment/candidates" t-attf-class="ats-nav-item #{'active' if active_tab == 'admin_candidates' else ''}" title="All Registered Candidate Profiles">
+                                <i class="fa fa-id-card-o nav-icon text-info"/>
+                                <span class="ats-nav-text">Candidate Profiles</span>
+                            </a>
                         </t>
 
                         <!-- 4. My Profile Menu (ALWAYS VISIBLE) -->
@@ -2342,20 +2340,18 @@
                             <span class="ats-nav-text">My Profile</span> 
                         </a>
 
-                        <!-- 5. Settings Menu (ONLY visible when Profile is Completed) -->
-                        <t t-if="is_profile_complete">
-                            <a href="#" id="settingsToggle" t-attf-class="ats-nav-item #{'active' if active_tab == 'settings' or active_tab == 'password' else ''}" title="Settings">
-                                <i class="fa fa-cog nav-icon"/>
-                                <span class="ats-nav-text me-auto">Settings</span>
-                                <i t-attf-class="fa #{'fa-chevron-down' if active_tab in ['settings', 'password'] else 'fa-chevron-right'} nav-arrow" id="settingsChevron"/>
+                        <!-- 5. Settings Menu (ALWAYS VISIBLE) -->
+                        <a href="#" id="settingsToggle" t-attf-class="ats-nav-item #{'active' if active_tab == 'settings' or active_tab == 'password' else ''}" title="Settings">
+                            <i class="fa fa-cog nav-icon"/>
+                            <span class="ats-nav-text me-auto">Settings</span>
+                            <i t-attf-class="fa #{'fa-chevron-down' if active_tab in ['settings', 'password'] else 'fa-chevron-right'} nav-arrow" id="settingsChevron"/>
+                        </a>
+                        <div class="ats-nav-sub" id="settingsSubmenu" t-att-style="'display: block;' if active_tab in ['settings', 'password'] else 'display: none;'">
+                            <a href="/my/candidate/change_password" t-attf-class="ats-nav-item #{'active' if active_tab == 'password' else ''}" style="font-size: 0.85rem; padding: 0.5rem 1.5rem;" title="Change Password">
+                                <i class="fa fa-key nav-icon"/>
+                                <span class="ats-nav-text">Change Password</span>
                             </a>
-                            <div class="ats-nav-sub" id="settingsSubmenu" t-att-style="'display: block;' if active_tab in ['settings', 'password'] else 'display: none;'">
-                                <a href="/my/candidate/change_password" t-attf-class="ats-nav-item #{'active' if active_tab == 'password' else ''}" style="font-size: 0.85rem; padding: 0.5rem 1.5rem;" title="Change Password">
-                                    <i class="fa fa-key nav-icon"/>
-                                    <span class="ats-nav-text">Change Password</span>
-                                </a>
-                            </div>
-                        </t>
+                        </div>
                     </div>
 
                     <!-- MAIN -->

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ── Module Category (groups in Settings → Users) ────────────────── -->
+        <record id="module_category_resl" model="ir.module.category">
+            <field name="name">RESL Staff Loan</field>
+            <field name="sequence">100</field>
+        </record>
+
+        <!-- ── Privilege (Odoo 19: groups are clustered via res.groups.privilege) -->
+        <record model="res.groups.privilege" id="res_groups_privilege_resl">
+            <field name="name">Staff Loan (RESL)</field>
+            <field name="category_id" ref="module_category_resl"/>
+            <field name="sequence">10</field>
+        </record>
+
+        <!-- ── Groups ─────────────────────────────────────────────────────── -->
+
+        <!-- Base employee group: can create and view own loans.
+             Every user is treated as an employee for RESL purposes (they
+             can request a loan or act as a guarantor) — nobody has to be
+             manually switched to "Employee" any more. This is done by
+             making base.group_user (every internal user) automatically
+             imply this group below. All the actual eligibility rules
+             (permanent status, service length, disciplinary status, work
+             unit type, etc.) are still fully enforced elsewhere; this only
+             grants baseline access to the RESL feature itself.
+
+             No `privilege_id` on purpose: this is plumbing, not one of the
+             5 roles that should appear on the Staff Loan (RESL) selector
+             (Settings → Users). It still exists and still works — it's
+             just not offered as a manual choice any more.
+
+             NOTE: baseline module access itself (ir.model.access.csv,
+             record rules, view button visibility) is bound to
+             base.group_user directly, NOT to this group — because the
+             Staff Loan (RESL) role selector on the user form manages a
+             privilege cluster (HR Officer / HO Approver / HR Auditor /
+             HR Accountant / HR Approver) and strips any group that is
+             present ONLY via implication from a previously-selected role
+             in that cluster whenever the selector is switched. Since this
+             group is implied through that chain (HR Officer -> Loan
+             Manager -> this group), switching the selector to "No" would
+             silently remove it too. base.group_user is never touched by
+             that selector, so it is the safe, permanent binding point.
+             This group is kept for any legacy/manual reference and so the
+             implied_ids chain below still resolves. -->
+        <record id="group_resl_employee" model="res.groups">
+            <field name="name">Employee (RESL baseline)</field>
+            <field name="privilege_id" eval="False"/>
+            <field name="comment">Can create and track own loan requests and act as guarantor.</field>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- Every internal user automatically gets group_resl_employee: no
+             manual assignment via the privilege selector is required for
+             the baseline "can request / can be a guarantor" capability. -->
+        <record id="base.group_user" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('group_resl_employee'))]"/>
+        </record>
+
+        <!-- Safety net, re-run on every module upgrade (not just fresh
+             install): make sure every EXISTING internal user already has
+             this group in their group_ids, not just users created after
+             this rule existed. base.group_user's implied_ids only
+             auto-propagates a newly-added implied group to users added to
+             base.group_user AFTER the implication was defined - it does
+             NOT retroactively backfill users who were already internal
+             users before this module/rule existed. Odoo 19 renamed
+             res.users' groups field from groups_id to group_ids - using
+             the old name here silently does nothing. -->
+        <function model="res.users" name="write"
+            eval="(
+                obj('res.users').search([('share', '=', False)]).ids,
+                {'group_ids': [(4, ref('group_resl_employee'))]}
+            )"/>
+
+        <!-- Loan Manager: the underlying "can approve/reject" permission.
+             Implied by every named approver role below (HO Approver, HR
+             Approver, HR Officer). Also assign it directly (via Settings →
+             Technical → Groups, since it's hidden from the simple
+             selector) to the actual Branch Managers / District Directors /
+             Accountant (Disbursement) / Division Manager (Disbursement)
+             holders, who are routed to per-loan by job title but aren't
+             one of the 5 HO roles on the selector.
+
+             No `privilege_id` on purpose — same reasoning as Employee
+             above: it's plumbing shared by several visible roles, not a
+             distinct choice on the selector itself. -->
+        <record id="group_resl_manager" model="res.groups">
+            <field name="name">Loan Manager (RESL baseline approver right)</field>
+            <field name="privilege_id" eval="False"/>
+            <field name="comment">Can review and approve/reject loan requests.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_employee'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- HR Officer: full access including replacement and cross-OU approval -->
+        <record id="group_resl_hr" model="res.groups">
+            <field name="name">HR Officer</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">30</field>
+            <field name="comment">Full access: approval, replacement management, disbursement, and settlement.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_manager'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- ── The 5 roles shown on the Staff Loan (RESL) selector ─────────
+             HO Approver, HR Approver, HR Officer (above), HR Auditor,
+             HR Accountant.
+
+             NOTE: this selector only grants PERMISSION to act (approve,
+             view, disburse). It does not decide WHICH specific loan a
+             person is routed to — that routing is computed per-loan from
+             the borrower's operating unit / job title, in
+             resl.loan._compute_designated_approver(). -->
+
+        <!-- HO Approver: primary Head Office approver. Can approve/reject
+             any loan routed to them (subject to the normal designated-
+             approver / operating-unit checks already enforced on the
+             loan itself). -->
+        <record id="group_resl_ho_approver" model="res.groups">
+            <field name="name">HO Approver</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">32</field>
+            <field name="comment">Head Office primary approver for HO-based staff loan requests.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_manager'))]"/>
+        </record>
+
+        <!-- HR Approver: approves FOR the HO Approver whenever the HO
+             Approver is themselves the borrower. Carries full HR authority
+             so they can also step in on replacement/disbursement/
+             settlement matters at that escalated level. -->
+        <record id="group_resl_hr_senior" model="res.groups">
+            <field name="name">HR Approver</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">34</field>
+            <field name="comment">Approves in place of the HO Approver when the HO Approver is the borrower.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_hr'))]"/>
+        </record>
+
+        <!-- NOT USED by routing any more. The branch Accountant role is
+             now found the same way Manager/Director are - by Job Position
+             title ("accountant") in resl.loan._resolve_disbursement_officer
+             / _compute_designated_approver - so no manual Settings
+             assignment is needed. This group definition is kept only so
+             nothing breaks for any user it may already have been assigned
+             to (Odoo blocks deleting a group that's still referenced
+             elsewhere); it has no effect on RESL behavior any more. -->
+        <record id="group_resl_branch_accountant" model="res.groups">
+            <field name="name">RESL Branch Accountant</field>
+            <field name="privilege_id" eval="False"/>
+            <field name="sequence">33</field>
+            <field name="comment">Approves the Branch Manager's requests and disburses all requests of its own branch (including its own).</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_manager'))]"/>
+        </record>
+
+        <!-- RESL District: district-tier loan role, assigned per user in
+             Settings -> Users -> Staff Loan (RESL).
+               * approves the requests of the District Director of its own
+                 district (the Director's chain is otherwise empty), and
+               * disburses ALL loans of its own district, its own included.
+             The RESL District user's OWN request is approved by the District
+             Director. "Own district" = the user's Default Operating Unit or
+             any Operating Unit assigned on their employee record. -->
+        <record id="group_resl_district" model="res.groups">
+            <field name="name">RESL District</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">31</field>
+            <field name="comment">Approves the District Director's requests and disburses all requests of its own district (including its own).</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_manager'))]"/>
+        </record>
+
+        <!-- HR Auditor: organization-wide READ-ONLY visibility for audit
+             purposes. Deliberately does NOT imply Loan Manager or HR
+             Officer, so an auditor can see every request but cannot
+             approve, edit, or disburse anything. -->
+        <record id="group_resl_hr_auditor" model="res.groups">
+            <field name="name">HR Auditor</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">36</field>
+            <field name="comment">Read-only, organization-wide audit visibility over all staff loan requests.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_employee'))]"/>
+        </record>
+
+        <!-- HR Accountant: organization-wide read visibility plus the
+             ability to record Core Banking disbursements and settlements,
+             without general approve/reject or HR-record-management rights. -->
+        <record id="group_resl_hr_accountant" model="res.groups">
+            <field name="name">HR Accountant</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">38</field>
+            <field name="comment">Organization-wide read access plus Core Banking disbursement/settlement recording.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_employee'))]"/>
+        </record>
+
+        <!-- Head Office: cross-OU exception. Hidden from the selector for
+             the same reason as Employee/Loan Manager above — assign via
+             Settings → Technical → Groups if the sol_id cross-branch
+             exception is still needed for a specific HO user. -->
+        <record id="group_resl_head_office" model="res.groups">
+            <field name="name">Head Office (cross-OU exception)</field>
+            <field name="privilege_id" eval="False"/>
+            <field name="comment">Cross-branch exception access for head-office staff.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_manager'))]"/>
+        </record>
+
+        <!-- POMD / People & Organizational Management Directorate
+             (FR-RESL-016). Hidden from the selector for the same reason;
+             assign via Settings → Technical → Groups if still needed. -->
+        <record id="group_resl_pomd" model="res.groups">
+            <field name="name">POMD (Organization-Wide Monitor)</field>
+            <field name="privilege_id" eval="False"/>
+            <field name="comment">Organization-wide monitoring of all loans (POMD / FR-RESL-016).</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_hr'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+    </data>
+</odoo>

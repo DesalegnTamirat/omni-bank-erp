@@ -47,18 +47,54 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         required=True,
         tracking=True,
     )
+    @api.model
+    def _default_initiator_role(self):
+        user = self.env.user
+        if user.has_group("bunna_pbms.group_pbms_people_solutions"):
+            return "people_solutions"
+        if user.has_group("bunna_pbms.group_pbms_district_reviewer"):
+            return "district_director"
+        if user.has_group("bunna_pbms.group_pbms_branch_user"):
+            return "branch_manager"
+        return "district_director"
+
     initiator_role = fields.Selection(
         [
             ("district_director", "District Director"),
             ("department_director", "Department Director"),
             ("branch_manager", "Branch Manager"),
+            ("people_solutions", "People Solutions Directorate"),
             ("other", "Other"),
         ],
         string="Initiator Role",
-        default="district_director",
+        default=_default_initiator_role,
         required=True,
         tracking=True,
     )
+    is_people_solutions_request = fields.Boolean(
+        string="Is People Solutions Request",
+        compute="_compute_is_people_solutions_request",
+        store=True,
+        index=True,
+        help="Flag indicating this request was initiated directly by People Solutions Directorate.",
+    )
+
+    def _check_is_people_solutions_request(self):
+        self.ensure_one()
+        if self.initiator_role == "people_solutions":
+            return True
+        if self.initiator_id and self.initiator_id.has_group("bunna_pbms.group_pbms_people_solutions"):
+            return True
+        if self.create_uid and self.create_uid.has_group("bunna_pbms.group_pbms_people_solutions"):
+            return True
+        if not self.id and self.env.user.has_group("bunna_pbms.group_pbms_people_solutions"):
+            return True
+        return False
+
+    @api.depends("initiator_role", "initiator_id", "create_uid")
+    def _compute_is_people_solutions_request(self):
+        for rec in self:
+            rec.is_people_solutions_request = rec._check_is_people_solutions_request()
     operating_unit_id = fields.Many2one(
         "operating.unit",
         string="Branch / Work Unit",
@@ -122,14 +158,14 @@ class PbmsExceptionalWorkforceRequest(models.Model):
     )
     justification_category_id = fields.Many2one(
         "pbms.justification.category",
-        string="Justification",
+        string="Reasion",
         required=True,
         tracking=True,
         index=True,
         help="Business justification category from the business justification table.",
     )
     justification = fields.Text(
-        string="Justification Remarks",
+        string="Justification",
         required=False,
         tracking=True,
         help="Optional detailed notes or justification remarks.",
@@ -415,17 +451,19 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         )
 
         for rec in self:
-            is_initiator = (rec.initiator_id == user) or (rec.create_uid == user) or (not rec.id)
+            is_ps_req = rec.is_people_solutions_request or rec._check_is_people_solutions_request()
+            is_initiator = (rec.initiator_id == user) or (rec.create_uid == user) or (not rec.id) or (is_solutions and is_ps_req)
 
             # District Reviewer stage: draft or returned
-            c_dist = rec.state in ("draft", "returned") and (is_district or is_initiator)
+            c_dist = rec.state in ("draft", "returned") and (is_district or is_initiator or (is_solutions and is_ps_req))
             rec.can_district_edit = c_dist
             rec.can_district_submit = c_dist
 
-            # People Solutions stage: people_solutions
-            c_sol = rec.state == "people_solutions" and is_solutions
-            rec.can_people_solutions_edit = c_sol
-            rec.can_people_solutions_action = c_sol
+            # People Solutions stage: people_solutions, or editing assessment in draft/returned for own request
+            c_sol_action = rec.state == "people_solutions" and is_solutions
+            c_sol_edit = (rec.state == "people_solutions" or (rec.state in ("draft", "returned") and is_ps_req)) and is_solutions
+            rec.can_people_solutions_edit = c_sol_edit
+            rec.can_people_solutions_action = c_sol_action
 
             # CPCO stage: cpco_review
             c_cpco = rec.state == "cpco_review" and is_cpco
@@ -441,12 +479,16 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             rec.can_view_sourcing_type = (
                 not is_district_only
                 and is_solutions_or_above
-                and rec.state in ("people_solutions", "cpco_review", "ceo_review", "approved")
+                and (
+                    rec.state in ("people_solutions", "cpco_review", "ceo_review", "approved")
+                    or (rec.state in ("draft", "returned") and is_ps_req)
+                )
             )
             rec.can_edit_sourcing_type = (
                 not is_district_only
                 and (
                     (rec.state == "people_solutions" and is_solutions)
+                    or (rec.state in ("draft", "returned") and is_ps_req and is_solutions)
                     or (rec.state == "cpco_review" and is_cpco)
                     or (rec.state == "ceo_review" and is_ceo)
                     or is_admin
@@ -454,7 +496,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             )
 
             # SPPMD Administrator can edit any non-finalized request; stage reviewers edit during their stage
-            rec.can_edit = (is_admin and rec.state not in ("rejected",)) or c_dist or c_sol or c_cpco or c_ceo
+            rec.can_edit = (is_admin and rec.state not in ("rejected",)) or c_dist or c_sol_edit or c_cpco or c_ceo
 
     # ---- Recruitment Action (People Operations & Management) ----
     recruitment_request_id = fields.Integer(
@@ -481,7 +523,13 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             if not vals.get("name") or vals["name"] == _("New"):
                 seq = self.env["ir.sequence"].next_by_code("pbms.exceptional.workforce.request")
                 vals["name"] = seq or _("New")
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        for rec in records:
+            try:
+                rec._notify_created()
+            except Exception as e:
+                _logger.warning("Failed to dispatch creation notification for %s: %s", rec.name, str(e))
+        return records
 
     def write(self, vals):
         if (
@@ -506,9 +554,10 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         is_admin = user._pbms_is_sppmd_admin() or user._pbms_is_manager() or self.env.is_admin()
 
         for rec in self:
+            is_ps_req = rec.is_people_solutions_request or rec._check_is_people_solutions_request()
             if rec.state in ("draft", "returned"):
-                if not (user._pbms_is_district_reviewer() or rec.initiator_id == user or rec.create_uid == user or is_admin):
-                    raise AccessError(_("Only the District Reviewer or initiator can edit this request while in Draft or Returned stage."))
+                if not (user._pbms_is_district_reviewer() or rec.initiator_id == user or rec.create_uid == user or (is_ps_req and user._pbms_is_people_solutions()) or is_admin):
+                    raise AccessError(_("Only the authorized initiator or reviewer can edit this request while in Draft or Returned stage."))
             elif rec.state == "people_solutions":
                 if not (user._pbms_is_people_solutions() or is_admin):
                     raise AccessError(_("Only People Solutions Directorate officers can edit this request during People Solutions Review."))
@@ -528,6 +577,25 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         for rec in self:
             if rec.headcount < 1:
                 raise ValidationError(_("Required headcount must be at least 1."))
+            if rec.headcount != int(rec.headcount):
+                raise ValidationError(_("Required headcount must be a whole number (integer)."))
+
+    @api.constrains("justification", "rejection_reason", "return_reason", "ceo_decision_remarks")
+    def _check_text_fields_not_pure_numbers(self):
+        text_fields = {
+            "justification": _("Justification"),
+            "rejection_reason": _("Rejection Reason"),
+            "return_reason": _("Return Reason"),
+            "ceo_decision_remarks": _("CEO Decision Remarks"),
+        }
+        for rec in self:
+            for fname, label in text_fields.items():
+                val = getattr(rec, fname, False)
+                if val:
+                    s = str(val).strip()
+                    cleaned = s.replace(".", "").replace(",", "").replace("-", "").replace("+", "").replace(" ", "")
+                    if cleaned and cleaned.isdigit():
+                        raise ValidationError(_("%s cannot be purely numeric digits. Please enter a meaningful text description.") % label)
 
     # -------------------------------------------------------------------------
     # EMAIL NOTIFICATION TEMPLATES & DISPATCH
@@ -575,6 +643,168 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             f'{extra_rows}'
             '</table>'
         )
+
+    def _get_exceptional_created_email_body(self):
+        self.ensure_one()
+        base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "")
+        action_url = f"{base_url}/web#id={self.id}&model={self._name}&view_type=form"
+        summary_table = self._get_exceptional_summary_table_html()
+
+        return (
+            f'<div style="margin: 0px; padding: 0px; font-family: \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">'
+            f'<table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">'
+            f'<tr><td align="center">'
+            f'<table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">'
+            f'<tr><td style="padding-bottom: 20px; border-bottom: 2.5px solid #C17540;">'
+            f'<h2 style="color: #541718; margin: 0; font-weight: 700;">Bunna Bank - Plan &amp; Budget Management System</h2>'
+            f'<p style="color: #C17540; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">Exceptional Workforce Request Initiated / Created</p>'
+            f'</td></tr>'
+            f'<tr><td style="padding: 20px 0;">'
+            f'<p>Dear Colleague / Unit Reviewer,</p>'
+            f'<p>A new <b>Exceptional Workforce Request</b> (<b>{self.name}</b>) has been created for <b>{self.operating_unit_id.display_name if self.operating_unit_id else "your work unit"}</b> and is currently in <b>Draft</b> status.</p>'
+            f'{summary_table}'
+            f'<div style="background-color: #FFFBF0; border-left: 4px solid #C17540; padding: 12px; margin: 16px 0; border-radius: 4px;">'
+            f'<p style="margin: 0; color: #541718; font-weight: bold;">Next Step:</p>'
+            f'<p style="margin: 4px 0 0 0; color: #333333; font-size: 13px;">Review the request details, confirm justification and headcount requirements, then submit the request to People Solutions Directorate for review.</p>'
+            f'</div>'
+            f'<div style="text-align: center; margin: 30px 0;">'
+            f'<a href="{action_url}" '
+            f'style="background-color: #541718; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">'
+            f'View Exceptional Request'
+            f'</a>'
+            f'</div>'
+            f'</td></tr>'
+            f'<tr><td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">'
+            f'Bunna Bank S.C. | People &amp; Culture / SPPMD<br/>'
+            f'This is an automated system notification from Bunna PBMS.'
+            f'</td></tr>'
+            f'</table></td></tr></table></div>'
+        )
+
+    def _get_exceptional_submitted_email_body(self):
+        self.ensure_one()
+        base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "")
+        action_url = f"{base_url}/web#id={self.id}&model={self._name}&view_type=form"
+        summary_table = self._get_exceptional_summary_table_html()
+
+        return (
+            f'<div style="margin: 0px; padding: 0px; font-family: \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">'
+            f'<table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">'
+            f'<tr><td align="center">'
+            f'<table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">'
+            f'<tr><td style="padding-bottom: 20px; border-bottom: 2.5px solid #425727;">'
+            f'<h2 style="color: #541718; margin: 0; font-weight: 700;">Bunna Bank - Plan &amp; Budget Management System</h2>'
+            f'<p style="color: #425727; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">Exceptional Workforce Request Submitted for Review</p>'
+            f'</td></tr>'
+            f'<tr><td style="padding: 20px 0;">'
+            f'<p>Dear Initiator / Unit Reviewer,</p>'
+            f'<p>Your <b>Exceptional Workforce Request</b> (<b>{self.name}</b>) has been successfully submitted and escalated to the <b>People Solutions Directorate</b> for assessment.</p>'
+            f'{summary_table}'
+            f'<div style="background-color: #F7FAF5; border-left: 4px solid #425727; padding: 12px; margin: 16px 0; border-radius: 4px;">'
+            f'<p style="margin: 0; color: #425727; font-weight: bold;">Status: Under Assessment</p>'
+            f'<p style="margin: 4px 0 0 0; color: #333333; font-size: 13px;">The People Solutions Directorate is reviewing the position justification, eligibility, and sourcing strategy. You will receive updates as the request advances through CPCO and CEO approval.</p>'
+            f'</div>'
+            f'<div style="text-align: center; margin: 30px 0;">'
+            f'<a href="{action_url}" '
+            f'style="background-color: #425727; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">'
+            f'Track Request Status'
+            f'</a>'
+            f'</div>'
+            f'</td></tr>'
+            f'<tr><td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">'
+            f'Bunna Bank S.C. | People &amp; Culture / SPPMD<br/>'
+            f'This is an automated system notification from Bunna PBMS.'
+            f'</td></tr>'
+            f'</table></td></tr></table></div>'
+        )
+
+    def _get_respective_unit_reviewers(self):
+        """Find the respective reviewer users (District Reviewers / Work Unit Reviewers) for this request's unit."""
+        self.ensure_one()
+        reviewers = self.env["res.users"]
+        ou = self.operating_unit_id
+        all_dist_users = self._get_group_users("bunna_pbms.group_pbms_district_reviewer")
+
+        if ou and all_dist_users:
+            matching_users = self.env["res.users"]
+            for u in all_dist_users:
+                u_ous = u._pbms_operating_unit_ids() if hasattr(u, "_pbms_operating_unit_ids") else u.operating_unit_ids.ids
+                if ou.id in u_ous:
+                    matching_users |= u
+                elif hasattr(ou, "parent_id") and ou.parent_id and ou.parent_id.id in u_ous:
+                    matching_users |= u
+            if matching_users:
+                reviewers |= matching_users
+            else:
+                reviewers |= all_dist_users
+        elif all_dist_users:
+            reviewers |= all_dist_users
+
+        return reviewers
+
+    def _get_exceptional_discuss_body(self, status_title, message="", extra_lines=None):
+        """Format structured Discuss / Inbox notification message body matching the PBMS standard."""
+        self.ensure_one()
+        role_label = dict(self._fields["initiator_role"].selection).get(self.initiator_role, self.initiator_role)
+        emp_type_label = dict(self._fields["employment_type"].selection).get(self.employment_type, self.employment_type)
+        sourcing_label = dict(self._fields["sourcing_type"].selection).get(self.sourcing_type, self.sourcing_type) if self.sourcing_type else "Pending Determination"
+        state_label = dict(self._fields["state"].selection).get(self.state, self.state)
+        grade_name = (self.job_grade_id.display_name or self.job_grade_id.grade_name or self.job_grade_id.grade_code or "N/A") if self.job_grade_id else "N/A"
+        dept_name = self.department_id.name if self.department_id else "N/A"
+
+        just_name = self.justification_category_id.name if self.justification_category_id else (self.justification or "N/A")
+        if self.justification_category_id and self.justification:
+            just_display = f"{self.justification_category_id.name}: {self.justification}"
+        else:
+            just_display = just_name
+
+        lines = [
+            f"<b>Exceptional Workforce Request Status Update: {status_title}</b>",
+            f"<b>Exceptional Request:</b> {self.name or 'N/A'}",
+            f"<b>Work Unit / Branch:</b> {self.operating_unit_id.display_name if self.operating_unit_id else 'N/A'}",
+            f"<b>Department:</b> {dept_name}",
+            f"<b>Position / Job Title:</b> {self.job_id.name if self.job_id else 'N/A'} (Grade: {grade_name})",
+            f"<b>Required Headcount:</b> {self.headcount} Position(s)",
+            f"<b>Employment / Sourcing:</b> {emp_type_label} / {sourcing_label}",
+            f"<b>Initiator:</b> {self.initiator_id.name if self.initiator_id else 'N/A'} ({role_label})",
+            f"<b>Status:</b> {state_label}",
+            f"<b>Business Justification:</b> {just_display}",
+        ]
+        if extra_lines:
+            lines.extend(extra_lines)
+        if message:
+            lines.append(f"<p style='margin: 8px 0 0 0;'>{message}</p>")
+
+        return "<br/>".join(lines)
+
+    def _notify_created(self):
+        """Send notifications to initiator and respective unit reviewers when an exceptional request is created."""
+        for rec in self:
+            recipients = self.env["res.users"]
+            if rec.initiator_id:
+                recipients |= rec.initiator_id
+            if rec.create_uid:
+                recipients |= rec.create_uid
+
+            is_ps = rec._check_is_people_solutions_request()
+            if is_ps:
+                recipients |= self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+                instruction = _("A new exceptional workforce request has been created in Draft status by People Solutions Directorate. Review requirements, determine sourcing type, and submit directly to CPCO.")
+            else:
+                recipients |= rec._get_respective_unit_reviewers()
+                instruction = _("A new exceptional workforce request has been created in Draft status. Please review position requirements and submit to People Solutions Directorate.")
+
+            subject = _("Exceptional Workforce Request Created: %s - %s (%s)") % (
+                rec.name,
+                rec.job_id.name if rec.job_id else "",
+                rec.operating_unit_id.display_name if rec.operating_unit_id else "",
+            )
+            body = rec._get_exceptional_created_email_body()
+            discuss_body = rec._get_exceptional_discuss_body(
+                _("Created / Initiated"),
+                instruction
+            )
+            rec._send_exceptional_notification(subject, body, recipients, discuss_body=discuss_body)
 
     def _get_exceptional_review_email_body(self, stage_name):
         self.ensure_one()
@@ -759,8 +989,10 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             f'</table></td></tr></table></div>'
         )
 
-    def _send_exceptional_notification(self, subject, body_html, recipient_users, extra_partners=None):
+    def _send_exceptional_notification(self, subject, body_html, recipient_users, extra_partners=None, discuss_body=None):
         self.ensure_one()
+        from .pbms_access import send_pbms_inbox_notification
+
         partner_ids = set()
         if recipient_users:
             partner_ids.update(recipient_users.mapped("partner_id").ids)
@@ -769,7 +1001,18 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         partner_ids.discard(0)
         partner_ids.discard(False)
 
-        # 1. Post Bunna Bank branded template card to chatter (Image 1)
+        # 1. Direct in-app Discuss [Inbox] notification (chat bubble badge & Discuss Inbox)
+        in_app_body = discuss_body or body_html
+        all_recipients = (recipient_users or self.env["res.users"])
+        if extra_partners:
+            all_recipients = all_recipients | extra_partners
+        if all_recipients:
+            try:
+                send_pbms_inbox_notification(self.env, self, all_recipients, subject, in_app_body)
+            except Exception as e:
+                _logger.warning("Error sending Discuss inbox notification for %s: %s", self.name, str(e))
+
+        # 2. Post Bunna Bank branded template card to chatter
         try:
             self.message_post(
                 subject=subject,
@@ -797,13 +1040,36 @@ class PbmsExceptionalWorkforceRequest(models.Model):
     # -------------------------------------------------------------------------
     # WORKFLOW ACTIONS
     # -------------------------------------------------------------------------
+    def action_save_request(self):
+        """Explicit Save action to persist draft inputs and edits."""
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Request Saved"),
+                "message": _("Your exceptional workforce request has been saved successfully."),
+                "type": "success",
+                "sticky": False,
+            },
+        }
+
     def action_submit(self):
-        """District Reviewer initiates and submits request to People Solutions Directorate."""
+        """District Reviewer initiates and submits request to People Solutions Directorate,
+        or People Solutions initiates and submits directly to CPCO.
+        """
         user = self.env.user
         is_admin = user._pbms_is_sppmd_admin() or user._pbms_is_manager() or self.env.is_admin() or self.env.su
         for rec in self:
-            if not (user._pbms_is_district_reviewer() or rec.initiator_id == user or rec.create_uid == user or is_admin):
-                raise AccessError(_("Only the District Reviewer or initiator can submit this exceptional workforce request."))
+            is_ps = rec.is_people_solutions_request or rec._check_is_people_solutions_request()
+            can_submit = (
+                user._pbms_is_district_reviewer()
+                or (is_ps and user._pbms_is_people_solutions())
+                or rec.initiator_id == user
+                or rec.create_uid == user
+                or is_admin
+            )
+            if not can_submit:
+                raise AccessError(_("Only authorized reviewers or initiator can submit this exceptional workforce request."))
             if rec.state not in ("draft", "returned"):
                 raise UserError(_("You can only submit requests in Draft or Returned stage."))
             if not rec.job_id:
@@ -811,23 +1077,121 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             if not rec.justification_category_id and not rec.justification:
                 raise ValidationError(_("Business Justification is required before submitting the exceptional request."))
 
-            rec.with_context(bypass_workforce_lock=True).write({
-                "state": "people_solutions",
-            })
-            users = self._get_group_users("bunna_pbms.group_pbms_people_solutions")
-            for u in users:
-                rec.with_context(mail_activity_quick_update=True).activity_schedule(
-                    activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
-                    summary=_("Exceptional Workforce Request Review: %s") % rec.name,
-                    note=_("Exceptional request for %s position(s) of '%s' submitted for assessment.") % (rec.headcount, rec.job_id.name),
-                    user_id=u.id,
+            if is_ps:
+                # -------------------------------------------------------------
+                # People Solutions Directorate Request: Directly to CPCO Review
+                # -------------------------------------------------------------
+                if not rec.sourcing_type:
+                    raise ValidationError(_("Please select the Sourcing Type (Internal, External, or Both) before submitting this request to CPCO."))
+
+                rec.sudo().with_context(bypass_workforce_lock=True).write({
+                    "state": "cpco_review",
+                    "people_solutions_reviewer_id": user.id,
+                    "people_solutions_review_date": fields.Datetime.now(),
+                    "return_reason": False,
+                })
+
+                # 1. Action Required notification to CPCO
+                cpco_users = self._get_group_users("bunna_pbms.group_pbms_cpco")
+                for u in cpco_users:
+                    rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
+                        activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
+                        summary=_("CPCO Review: Exceptional Workforce Request %s") % rec.name,
+                        note=_("Exceptional request for %s position(s) of '%s' submitted directly by People Solutions Directorate. Please review, prepare memo, and submit to the CEO.") % (rec.headcount, rec.job_id.name),
+                        user_id=u.id,
+                    )
+                cpco_subject = _("Action Required: Exceptional Workforce Request Pending CPCO Review - %s (%s)") % (
+                    rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
                 )
-            # Dispatch branded Bunna Bank notification
-            subject = _("Action Required: Exceptional Workforce Request Pending Review - %s (%s)") % (
-                rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
-            )
-            body = rec._get_exceptional_review_email_body(_("People Solutions Review"))
-            rec._send_exceptional_notification(subject, body, users)
+                cpco_body = rec._get_exceptional_review_email_body(_("CPCO Review"))
+                extra_lines = [f"<b>Direct Submission:</b> People Solutions Directorate"]
+                if rec.people_solutions_assessment:
+                    extra_lines.append(f"<b>People Solutions Assessment:</b> {rec.people_solutions_assessment}")
+                cpco_discuss = rec._get_exceptional_discuss_body(
+                    _("Pending CPCO Review (Direct Submission)"),
+                    _("Action Required: People Solutions Directorate has submitted an exceptional workforce request directly for CPCO review. Please review justification, prepare recommendation memo, and submit to the CEO for final approval."),
+                    extra_lines=extra_lines
+                )
+                rec._send_exceptional_notification(cpco_subject, cpco_body, cpco_users, discuss_body=cpco_discuss)
+
+                # 2. Confirmation to Initiator / Creators
+                sub_recipients = self.env["res.users"]
+                if rec.initiator_id:
+                    sub_recipients |= rec.initiator_id
+                if rec.create_uid:
+                    sub_recipients |= rec.create_uid
+                sub_recipients -= cpco_users
+
+                if sub_recipients:
+                    sub_subject = _("Submitted to CPCO: Exceptional Workforce Request - %s (%s)") % (
+                        rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
+                    )
+                    sub_body = rec._get_exceptional_submitted_email_body()
+                    sub_discuss = rec._get_exceptional_discuss_body(
+                        _("Submitted Directly to CPCO"),
+                        _("Your exceptional workforce request has been submitted directly to the Chief of People & Culture Office (CPCO) for review.")
+                    )
+                    rec._send_exceptional_notification(sub_subject, sub_body, sub_recipients, discuss_body=sub_discuss)
+
+            else:
+                # -------------------------------------------------------------
+                # Standard District / Branch Request: To People Solutions Review
+                # -------------------------------------------------------------
+                rec.sudo().with_context(bypass_workforce_lock=True).write({
+                    "state": "people_solutions",
+                    "return_reason": False,
+                })
+                # 1. Action Required notification to People Solutions Directorate
+                sol_users = self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+                for u in sol_users:
+                    rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
+                        activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
+                        summary=_("Exceptional Workforce Request Review: %s") % rec.name,
+                        note=_("Exceptional request for %s position(s) of '%s' submitted for assessment.") % (rec.headcount, rec.job_id.name),
+                        user_id=u.id,
+                    )
+                sol_subject = _("Action Required: Exceptional Workforce Request Pending Review - %s (%s)") % (
+                    rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
+                )
+                sol_body = rec._get_exceptional_review_email_body(_("People Solutions Review"))
+                sol_discuss = rec._get_exceptional_discuss_body(
+                    _("Pending People Solutions Review"),
+                    _("Action Required: Exceptional workforce request has been submitted for assessment. Please review justification, check headcount impact, and determine sourcing type before escalating to CPCO.")
+                )
+                rec._send_exceptional_notification(sol_subject, sol_body, sol_users, discuss_body=sol_discuss)
+
+                # 2. Submission Confirmation notification to Initiator and Respective Unit Reviewers
+                sub_recipients = self.env["res.users"]
+                if rec.initiator_id:
+                    sub_recipients |= rec.initiator_id
+                if rec.create_uid:
+                    sub_recipients |= rec.create_uid
+                sub_recipients |= rec._get_respective_unit_reviewers()
+                sub_recipients -= sol_users
+
+                if sub_recipients:
+                    sub_subject = _("Submitted for Review: Exceptional Workforce Request - %s (%s)") % (
+                        rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
+                    )
+                    sub_body = rec._get_exceptional_submitted_email_body()
+                    sub_discuss = rec._get_exceptional_discuss_body(
+                        _("Submitted for Assessment"),
+                        _("Your exceptional workforce request has been successfully submitted to People Solutions Directorate for review.")
+                    )
+                    rec._send_exceptional_notification(sub_subject, sub_body, sub_recipients, discuss_body=sub_discuss)
+
+        is_any_ps = any(r.is_people_solutions_request or r._check_is_people_solutions_request() for r in self)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Request Submitted"),
+                "message": _("Exceptional Workforce Request has been successfully submitted directly to CPCO for review.") if is_any_ps else _("Exceptional Workforce Request has been successfully submitted to People Solutions Directorate."),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
 
     def action_people_solutions_escalate(self):
         """People Solutions Directorate reviews and assesses the request, escalates to CPCO."""
@@ -841,14 +1205,15 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             if not rec.sourcing_type:
                 raise ValidationError(_("Please select the Sourcing Type (Internal, External, or Both) before escalating this request to CPCO."))
 
-            rec.with_context(bypass_workforce_lock=True).write({
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
                 "state": "cpco_review",
                 "people_solutions_reviewer_id": self.env.uid,
                 "people_solutions_review_date": fields.Datetime.now(),
+                "return_reason": False,
             })
             users = self._get_group_users("bunna_pbms.group_pbms_cpco")
             for u in users:
-                rec.with_context(mail_activity_quick_update=True).activity_schedule(
+                rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
                     activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
                     summary=_("CPCO Review: Exceptional Workforce Request %s") % rec.name,
                     note=_("Please prepare and submit memo to the CEO for '%s' (%s positions).") % (rec.job_id.name, rec.headcount),
@@ -859,7 +1224,24 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
             )
             body = rec._get_exceptional_review_email_body(_("CPCO Review"))
-            rec._send_exceptional_notification(subject, body, users)
+            cpco_discuss = rec._get_exceptional_discuss_body(
+                _("Escalated to CPCO Review"),
+                _("Action Required: People Solutions has completed assessment. Please prepare and submit recommendation memo to the CEO."),
+                extra_lines=[f"<b>People Solutions Assessment:</b> {rec.people_solutions_assessment or 'Assessed as justified.'}"]
+            )
+            rec._send_exceptional_notification(subject, body, users, discuss_body=cpco_discuss)
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Request Escalated"),
+                "message": _("Exceptional Workforce Request has been assessed and escalated to CPCO for memo preparation."),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
 
     def action_people_solutions_return(self, reason=False):
         """People Solutions returns request to District Reviewer for revision."""
@@ -871,13 +1253,13 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             if rec.state != "people_solutions":
                 raise UserError(_("Request is not in People Solutions Review stage."))
             feedback = reason or rec.return_reason or _("Please revise and resubmit.")
-            rec.with_context(bypass_workforce_lock=True).write({
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
                 "state": "returned",
                 "return_reason": feedback,
             })
             target_user = rec.initiator_id or (rec.create_uid if rec.create_uid else False)
             if target_user:
-                rec.with_context(mail_activity_quick_update=True).activity_schedule(
+                rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
                     activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
                     summary=_("Exceptional Request Returned for Revision: %s") % rec.name,
                     note=_("Request returned by People Solutions for revision: %s") % feedback,
@@ -888,7 +1270,12 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
             )
             body = rec._get_exceptional_returned_email_body(feedback)
-            rec._send_exceptional_notification(subject, body, target_user)
+            ret_discuss = rec._get_exceptional_discuss_body(
+                _("Returned for Revision"),
+                _("Request returned by People Solutions for revision. Please review feedback, adjust, and resubmit."),
+                extra_lines=[f"<b>Return Feedback / Reason:</b> {feedback}"]
+            )
+            rec._send_exceptional_notification(subject, body, target_user, discuss_body=ret_discuss)
 
     def action_people_solutions_reject(self, reason=False):
         """People Solutions rejects the request."""
@@ -900,7 +1287,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             if rec.state != "people_solutions":
                 raise UserError(_("Request is not in People Solutions Review stage."))
             rej_reason = reason or rec.rejection_reason or _("Rejected during People Solutions assessment.")
-            rec.with_context(bypass_workforce_lock=True).write({
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
                 "state": "rejected",
                 "rejection_reason": rej_reason,
             })
@@ -910,7 +1297,12 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
             )
             body = rec._get_exceptional_rejected_email_body(rej_reason)
-            rec._send_exceptional_notification(subject, body, target_user)
+            rej_discuss = rec._get_exceptional_discuss_body(
+                _("Request Rejected"),
+                _("Exceptional workforce request rejected during People Solutions assessment."),
+                extra_lines=[f"<b>Rejection Reason:</b> {rej_reason}"]
+            )
+            rec._send_exceptional_notification(subject, body, target_user, discuss_body=rej_discuss)
 
     def action_cpco_submit_memo(self):
         """CPCO prepares and submits memo with justification/recommendation to the CEO."""
@@ -924,14 +1316,15 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             if not rec.cpco_memo:
                 raise ValidationError(_("Please provide the CPCO Recommendation Memo to the CEO before submitting."))
 
-            rec.with_context(bypass_workforce_lock=True).write({
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
                 "state": "ceo_review",
                 "cpco_reviewer_id": self.env.uid,
                 "cpco_submission_date": fields.Datetime.now(),
+                "return_reason": False,
             })
             users = self._get_group_users("bunna_pbms.group_pbms_ceo")
             for u in users:
-                rec.with_context(mail_activity_quick_update=True).activity_schedule(
+                rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
                     activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
                     summary=_("CEO Decision Required: Exceptional Workforce Request %s") % rec.name,
                     note=_("Memo submitted by CPCO for '%s' (%s positions). Please review and approve/reject.") % (rec.job_id.name, rec.headcount),
@@ -942,10 +1335,32 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
             )
             body = rec._get_exceptional_review_email_body(_("Pending CEO Approval"))
-            rec._send_exceptional_notification(subject, body, users)
+            memo_extra = [f"<b>CPCO Recommendation Memo:</b> {rec.cpco_memo}"]
+            if rec.people_solutions_assessment:
+                memo_extra.insert(0, f"<b>People Solutions Assessment:</b> {rec.people_solutions_assessment}")
+            ceo_discuss = rec._get_exceptional_discuss_body(
+                _("CPCO Endorsed: Recommendation Memo Submitted to CEO"),
+                _("Action Required: CPCO has reviewed, endorsed, and submitted recommendation memo for final approval. Please review and record CEO final decision."),
+                extra_lines=memo_extra
+            )
+            rec._send_exceptional_notification(subject, body, users, discuss_body=ceo_discuss)
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Approved & Submitted to CEO"),
+                "message": _("Recommendation memo approved and submitted to the CEO for final approval."),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
 
     def action_cpco_return(self, reason=False):
-        """CPCO returns request to People Solutions for revision."""
+        """CPCO returns request for revision: back to People Solutions for their own request,
+        or back to People Solutions stage for district requests.
+        """
         user = self.env.user
         is_admin = user._pbms_is_sppmd_admin() or user._pbms_is_manager() or self.env.is_admin() or self.env.su
         for rec in self:
@@ -954,13 +1369,27 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             if rec.state != "cpco_review":
                 raise UserError(_("Request is not in CPCO Review stage."))
             feedback = reason or rec.return_reason or _("Please revise assessment/justification.")
-            rec.with_context(bypass_workforce_lock=True).write({
-                "state": "people_solutions",
+
+            is_ps = rec.is_people_solutions_request or rec._check_is_people_solutions_request()
+            target_state = "returned" if is_ps else "people_solutions"
+
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
+                "state": target_state,
                 "return_reason": feedback,
             })
-            users = self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+
+            if is_ps:
+                users = self.env["res.users"]
+                if rec.initiator_id:
+                    users |= rec.initiator_id
+                if rec.create_uid:
+                    users |= rec.create_uid
+                users |= self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+            else:
+                users = self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+
             for u in users:
-                rec.with_context(mail_activity_quick_update=True).activity_schedule(
+                rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
                     activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
                     summary=_("Exceptional Request Returned by CPCO: %s") % rec.name,
                     note=_("CPCO returned request for revision: %s") % feedback,
@@ -971,7 +1400,12 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
             )
             body = rec._get_exceptional_returned_email_body(feedback)
-            rec._send_exceptional_notification(subject, body, users)
+            ret_discuss = rec._get_exceptional_discuss_body(
+                _("Returned by CPCO for Revision"),
+                _("CPCO returned request for revision. Please review feedback, adjust proposal, and resubmit."),
+                extra_lines=[f"<b>Return Feedback / Reason:</b> {feedback}"]
+            )
+            rec._send_exceptional_notification(subject, body, users, discuss_body=ret_discuss)
 
     def action_cpco_reject(self, reason=False):
         """CPCO rejects the request."""
@@ -983,7 +1417,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             if rec.state != "cpco_review":
                 raise UserError(_("Request is not in CPCO Review stage."))
             rej_reason = reason or rec.rejection_reason or _("Rejected during CPCO review.")
-            rec.with_context(bypass_workforce_lock=True).write({
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
                 "state": "rejected",
                 "rejection_reason": rej_reason,
             })
@@ -998,7 +1432,12 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
             )
             body = rec._get_exceptional_rejected_email_body(rej_reason)
-            rec._send_exceptional_notification(subject, body, target_users)
+            rej_discuss = rec._get_exceptional_discuss_body(
+                _("Request Rejected by CPCO"),
+                _("Exceptional workforce request was reviewed and rejected by CPCO."),
+                extra_lines=[f"<b>Rejection Reason:</b> {rej_reason}"]
+            )
+            rec._send_exceptional_notification(subject, body, target_users, discuss_body=rej_discuss)
 
     def action_ceo_approve(self, remarks=False):
         """CEO views, edits, and approves request.
@@ -1014,19 +1453,20 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 raise UserError(_("Request is not in Pending CEO Approval stage."))
 
             approval_remarks = remarks or rec.ceo_decision_remarks or _("Approved by CEO.")
-            rec.with_context(bypass_workforce_lock=True).write({
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
                 "state": "approved",
                 "ceo_decision": "approved",
                 "ceo_approver_id": user.id,
                 "ceo_decision_recorded_by": user.id,
                 "ceo_decision_date": fields.Datetime.now(),
                 "ceo_decision_remarks": approval_remarks,
+                "return_reason": False,
             })
 
             # Record/affect in CPCO: Notify CPCO team of approval
             cpco_users = self._get_group_users("bunna_pbms.group_pbms_cpco")
             for u in cpco_users:
-                rec.with_context(mail_activity_quick_update=True).activity_schedule(
+                rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
                     activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
                     summary=_("CEO Decision: Approved - %s") % rec.name,
                     note=_(
@@ -1038,8 +1478,13 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             # Affect People Operations & Management Directorate: auto-initiate recruitment
             rec._auto_initiate_recruitment()
 
-            # Target users for approval email: CPCO, People Operations, and Initiator
-            stakeholder_users = cpco_users | self._get_group_users("bunna_pbms.group_pbms_people_operations")
+            # Target users for approval notification: CPCO, People Operations, People Solutions, Unit Reviewers, and Initiator
+            stakeholder_users = (
+                cpco_users
+                | self._get_group_users("bunna_pbms.group_pbms_people_operations")
+                | self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+                | rec._get_respective_unit_reviewers()
+            )
             if rec.initiator_id:
                 stakeholder_users |= rec.initiator_id
             if rec.create_uid:
@@ -1049,7 +1494,27 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 rec.name, rec.job_id.name if rec.job_id else "", rec.operating_unit_id.display_name if rec.operating_unit_id else ""
             )
             body = rec._get_exceptional_approved_email_body()
-            rec._send_exceptional_notification(subject, body, stakeholder_users)
+            extra_lines = [f"<b>CEO Approval Remarks:</b> {approval_remarks}"]
+            if rec.recruitment_request_reference:
+                extra_lines.append(f"<b>Recruitment Reference:</b> {rec.recruitment_request_reference}")
+            appr_discuss = rec._get_exceptional_discuss_body(
+                _("Officially APPROVED by CEO"),
+                _("The Chief Executive Officer (CEO) has officially approved this Exceptional Workforce Request. Recruitment processing has been auto-initiated with People Operations."),
+                extra_lines=extra_lines
+            )
+            rec._send_exceptional_notification(subject, body, stakeholder_users, discuss_body=appr_discuss)
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("CEO Final Approval Recorded"),
+                "message": _("Exceptional Workforce Request %s has been officially approved by the CEO.") % (self.name if len(self) == 1 else ""),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
 
     def action_ceo_reject(self, reason=False):
         """CEO views, edits, and rejects request.
@@ -1064,7 +1529,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 raise UserError(_("Request is not in Pending CEO Approval stage."))
 
             rej_reason = reason or rec.rejection_reason or rec.ceo_decision_remarks or _("Rejected by CEO.")
-            rec.with_context(bypass_workforce_lock=True).write({
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
                 "state": "rejected",
                 "ceo_decision": "rejected",
                 "ceo_approver_id": user.id,
@@ -1076,7 +1541,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             # Record/affect in CPCO: Notify CPCO team of rejection
             cpco_users = self._get_group_users("bunna_pbms.group_pbms_cpco")
             for u in cpco_users:
-                rec.with_context(mail_activity_quick_update=True).activity_schedule(
+                rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
                     activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
                     summary=_("CEO Decision: Rejected - %s") % rec.name,
                     note=_(
@@ -1085,7 +1550,11 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                     user_id=u.id,
                 )
 
-            stakeholder_users = cpco_users | self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+            stakeholder_users = (
+                cpco_users
+                | self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+                | rec._get_respective_unit_reviewers()
+            )
             if rec.initiator_id:
                 stakeholder_users |= rec.initiator_id
             if rec.create_uid:
@@ -1095,7 +1564,78 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 rec.name, rec.job_id.name if rec.job_id else "", rec.operating_unit_id.display_name if rec.operating_unit_id else ""
             )
             body = rec._get_exceptional_rejected_email_body(rej_reason)
-            rec._send_exceptional_notification(subject, body, stakeholder_users)
+            rej_discuss = rec._get_exceptional_discuss_body(
+                _("Request Rejected by CEO"),
+                _("Exceptional workforce request was reviewed and rejected by the Chief Executive Officer (CEO)."),
+                extra_lines=[f"<b>Rejection Reason:</b> {rej_reason}"]
+            )
+            rec._send_exceptional_notification(subject, body, stakeholder_users, discuss_body=rej_discuss)
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Request Rejected by CEO"),
+                "message": _("Exceptional Workforce Request %s has been rejected by the CEO.") % (self.name if len(self) == 1 else ""),
+                "type": "danger",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
+    def action_ceo_return(self, reason=False):
+        """CEO returns request to CPCO for revision."""
+        user = self.env.user
+        is_admin = user._pbms_is_sppmd_admin() or user._pbms_is_manager() or self.env.is_admin() or self.env.su
+        for rec in self:
+            if not (user._pbms_is_ceo() or is_admin):
+                raise AccessError(_("Only the Chief Executive Officer (CEO) or Administrators can return this request."))
+            if rec.state != "ceo_review":
+                raise UserError(_("Request is not in Pending CEO Approval stage."))
+            feedback = reason or rec.return_reason or _("CEO returned request to CPCO for revision.")
+            rec.sudo().with_context(bypass_workforce_lock=True).write({
+                "state": "cpco_review",
+                "return_reason": feedback,
+            })
+            cpco_users = self._get_group_users("bunna_pbms.group_pbms_cpco")
+            for u in cpco_users:
+                rec.sudo().with_context(mail_activity_quick_update=True).activity_schedule(
+                    activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
+                    summary=_("Exceptional Request Returned by CEO: %s") % rec.name,
+                    note=_("CEO returned request to CPCO for revision: %s") % feedback,
+                    user_id=u.id,
+                )
+            target_users = (
+                cpco_users
+                | self._get_group_users("bunna_pbms.group_pbms_people_solutions")
+                | rec._get_respective_unit_reviewers()
+            )
+            if rec.initiator_id:
+                target_users |= rec.initiator_id
+            if rec.create_uid:
+                target_users |= rec.create_uid
+            subject = _("Revision Required: Exceptional Workforce Request Returned by CEO - %s (%s)") % (
+                rec.name, rec.operating_unit_id.display_name if rec.operating_unit_id else ""
+            )
+            body = rec._get_exceptional_returned_email_body(feedback)
+            ret_discuss = rec._get_exceptional_discuss_body(
+                _("Returned by CEO for Revision"),
+                _("The CEO returned this request to CPCO for revision. Please review remarks and adjust proposal."),
+                extra_lines=[f"<b>Return Feedback / Reason:</b> {feedback}"]
+            )
+            rec._send_exceptional_notification(subject, body, target_users, discuss_body=ret_discuss)
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Request Returned by CEO"),
+                "message": _("Exceptional Workforce Request %s has been returned to CPCO for revision.") % (self.name if len(self) == 1 else ""),
+                "type": "warning",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
 
     def action_record_ceo_approval(self, remarks=False):
         """Alias for action_ceo_approve."""
@@ -1109,9 +1649,11 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         """Generic return router."""
         for rec in self:
             if rec.state == "people_solutions":
-                rec.action_people_solutions_return(comment)
+                return rec.action_people_solutions_return(comment)
             elif rec.state == "cpco_review":
-                rec.action_cpco_return(comment)
+                return rec.action_cpco_return(comment)
+            elif rec.state == "ceo_review":
+                return rec.action_ceo_return(comment)
             else:
                 raise UserError(_("Cannot return request from current stage %s.") % rec.state)
 
@@ -1154,18 +1696,33 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                     if default_dept:
                         dept_id = default_dept.id
 
+                if self.job_grade_id:
+                    target_job_grade_id = self.job_grade_id.id
+                elif hasattr(self.job_id, "grade") and self.job_id.grade:
+                    target_job_grade_id = self.job_id.grade.id
+                else:
+                    target_job_grade_id = False
+
+                if self.justification_category_id:
+                    if self.justification:
+                        justification_detail = f"{self.justification_category_id.name}: {self.justification}"
+                    else:
+                        justification_detail = self.justification_category_id.name
+                else:
+                    justification_detail = self.justification or ""
+
                 vals = {
                     "request_type": "unplanned",
                     "operating_unit_id": self.operating_unit_id.id,
                     "department_id": dept_id,
                     "job_position_id": self.job_id.id,
-                    "job_grade_id": self.job_grade_id.id if self.job_grade_id else (self.job_id.grade.id if hasattr(self.job_id, "grade") and self.job_id.grade else False),
+                    "job_grade_id": target_job_grade_id,
                     "required_headcount": self.headcount,
                     "employment_type": self.employment_type,
                     "sourcing_type": self.sourcing_type,
                     "justification": _("[Exceptional Request %s] %s") % (
                         self.name,
-                        (f"{self.justification_category_id.name}: {self.justification}" if self.justification else self.justification_category_id.name) if self.justification_category_id else (self.justification or "")
+                        justification_detail,
                     ),
                     "requested_by": requested_by,
                     "state": "under_review",

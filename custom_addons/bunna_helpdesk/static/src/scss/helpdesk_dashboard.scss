@@ -1,0 +1,529 @@
+/* ==========================================================================
+   Bunna Bank Helpdesk Interactive OWL Dashboard Styles
+   ========================================================================== */
+
+/* Bunna Bank Official Brand Palette */
+$bunna-primary-slate: #1D2B32;       /* Swatch 4: C:83 M:67 Y:58 K:62 | R:29 G:43 B:50 */
+$bunna-primary-maroon: #541718;      /* Swatch 6: C:39 M:89 Y:79 K:60 | R:84 G:24 B:24 */
+$bunna-secondary-forest: #425727;    /* Swatch 1: C:70 M:44 Y:100 K:39 | R:66 G:87 B:39 */
+$bunna-secondary-bronze: #726732;    /* Swatch 2: C:50 M:47 Y:92 K:26 | R:114 G:103 B:50 */
+$bunna-secondary-terracotta: #C17540;/* Swatch 3: C:20 M:60 Y:84 K:5 | R:193 G:117 B:64 */
+$bunna-secondary-pine: #1E2917;      /* Swatch 5: C:73 M:56 Y:81 K:73 | R:30 G:41 B:23 */
+
+.o_bunna_helpdesk_dashboard {
+    background-color: #f7f9f6;
+    border-bottom: 2px solid #e2e8f0;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    padding-bottom: 1.25rem;
+    overflow: visible !important;
+
+    /* --- Sticky Top Header Container --- */
+    .bunna-sticky-header {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background: #f7f9f6;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 0.75rem;
+    }
+
+    /* --- Top Bunna Header Banner --- */
+    .bunna-header-banner {
+        background: linear-gradient(135deg, #541718 0%, #3a0d0e 60%, #1d2b32 100%);
+        color: #ffffff;
+        padding: 0.85rem 1.5rem;
+        border-bottom: 3px solid #c17540;
+        box-shadow: 0 4px 15px rgba(84, 23, 24, 0.18);
+        border-radius: 0;
+        margin-bottom: 0;
+
+        .bunna-logo-img {
+            height: 48px;
+            width: auto;
+            border-radius: 6px;
+            background: #ffffff;
+            padding: 2px 6px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            object-fit: contain;
+        }
+
+        .bunna-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.3px;
+        }
+
+        .bunna-subtitle {
+            font-size: 0.82rem;
+            color: #f3d7c5;
+            font-weight: 400;
+        }
+
+        .btn-bunna-action {
+            background-color: #c17540;
+            border-color: #c17540;
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
+            padding: 0.45rem 0.9rem;
+            font-size: 0.85rem;
+
+            &:hover {
+                background-color: #a85f2e;
+                border-color: #a85f2e;
+                transform: translateY(-1px);
+                box-shadow: 0 3px 8px rgba(193, 117, 64, 0.4);
+            }
+        }
+
+        .btn-bunna-outline {
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: 500;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            padding: 0.45rem 0.8rem;
+            transition: all 0.2s;
+
+            &:hover {
+                background: rgba(255, 255, 255, 0.22);
+                border-color: #ffffff;
+            }
+        }
+    }
+
+    /* --- Filter Toolbar --- */
+    .bunna-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.5rem 1.25rem;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+
+        .period-pill-group {
+            background: #ffffff;
+            border: 1px solid #dcdfdc;
+            border-radius: 20px;
+            padding: 3px;
+            display: inline-flex;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+
+            .period-pill {
+                border: none;
+                background: transparent;
+                padding: 4px 14px;
+                font-size: 0.82rem;
+                font-weight: 600;
+                color: #55626a;
+                border-radius: 16px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+
+                &:hover {
+                    color: #541718;
+                    background: #f7ede8;
+                }
+
+                &.active {
+                    background: #541718;
+                    color: #ffffff;
+                    box-shadow: 0 2px 6px rgba(84, 23, 24, 0.3);
+                }
+            }
+        }
+
+        .team-select {
+            max-width: 220px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-radius: 8px;
+            border: 1.5px solid #541718;
+            background-color: #ffffff;
+            color: #1D2B32;
+            padding: 0.4rem 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            cursor: pointer;
+            accent-color: #541718;
+            color-scheme: light;
+
+            &:hover {
+                border-color: #C17540;
+            }
+
+            &:focus {
+                border-color: #541718;
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(84, 23, 24, 0.2);
+            }
+
+            option {
+                color: #1D2B32;
+                background-color: #ffffff;
+
+                &:hover, &:checked, &:focus {
+                    background-color: #541718 !important;
+                    color: #ffffff !important;
+                }
+            }
+        }
+    }
+
+    /* --- Bunna Custom Interactive Dropdowns (Hover in Official Bunna Maroon) --- */
+    .bunna-dropdown {
+        position: relative;
+        display: inline-block;
+
+        .bunna-dropdown-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            min-width: 140px;
+            font-size: 0.84rem;
+            font-weight: 500;
+            border-radius: 8px;
+            border: 1.5px solid #541718;
+            background-color: #ffffff;
+            color: #1D2B32;
+            padding: 0.38rem 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            cursor: pointer;
+            transition: all 0.18s ease-in-out;
+            user-select: none;
+
+            &:hover {
+                border-color: #C17540;
+                background-color: #fff9f6;
+            }
+
+            &:focus {
+                outline: none;
+                border-color: #541718;
+                box-shadow: 0 0 0 3px rgba(84, 23, 24, 0.2);
+            }
+
+            .bunna-dropdown-arrow {
+                font-size: 0.72rem;
+                color: #541718;
+                transition: transform 0.2s ease;
+            }
+        }
+
+        &.dropdown-open .bunna-dropdown-toggle {
+            border-color: #541718;
+            box-shadow: 0 0 0 3px rgba(84, 23, 24, 0.2);
+
+            .bunna-dropdown-arrow {
+                transform: rotate(180deg);
+            }
+        }
+
+        .bunna-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            z-index: 1050;
+            min-width: 100%;
+            width: max-content;
+            max-width: 290px;
+            max-height: 280px;
+            overflow-y: auto;
+            background-color: #ffffff;
+            border: 1.5px solid #541718;
+            border-radius: 8px;
+            box-shadow: 0 6px 20px rgba(84, 23, 24, 0.18);
+            padding: 0.35rem 0;
+            margin: 0;
+            list-style: none;
+            animation: bunnaDropdownFade 0.15s ease-out;
+
+            /* Custom Bunna scrollbar */
+            &::-webkit-scrollbar {
+                width: 6px;
+            }
+            &::-webkit-scrollbar-track {
+                background: #fdf8f6;
+            }
+            &::-webkit-scrollbar-thumb {
+                background: #C17540;
+                border-radius: 3px;
+            }
+
+            .bunna-dropdown-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+                width: 100%;
+                padding: 0.45rem 0.85rem;
+                font-size: 0.83rem;
+                font-weight: 500;
+                color: #1D2B32;
+                background: transparent;
+                border: none;
+                text-align: left;
+                cursor: pointer;
+                transition: background-color 0.12s ease, color 0.12s ease;
+
+                /* Hover state strictly in Bunna Maroon & white text - NO CYAN BLUE! */
+                &:hover, &:focus {
+                    background-color: #541718 !important;
+                    color: #ffffff !important;
+                    outline: none;
+
+                    .item-icon {
+                        color: #ffffff !important;
+                    }
+                }
+
+                /* Active/Selected item */
+                &.selected {
+                    background-color: rgba(84, 23, 24, 0.08);
+                    color: #541718;
+                    font-weight: 600;
+
+                    .item-icon {
+                        color: #541718;
+                    }
+
+                    &:hover {
+                        background-color: #541718 !important;
+                        color: #ffffff !important;
+
+                        .item-icon {
+                            color: #ffffff !important;
+                        }
+                    }
+                }
+
+                .item-icon {
+                    font-size: 0.75rem;
+                }
+            }
+        }
+
+        &.bunna-dropdown-sm {
+            .bunna-dropdown-toggle {
+                min-width: 120px;
+                font-size: 0.78rem;
+                padding: 0.25rem 0.65rem;
+                border-radius: 6px;
+            }
+
+            .bunna-dropdown-menu {
+                max-width: 290px;
+                .bunna-dropdown-item {
+                    font-size: 0.78rem;
+                    padding: 0.35rem 0.7rem;
+                }
+            }
+        }
+    }
+
+    @keyframes bunnaDropdownFade {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* --- Interactive KPI Metric Cards --- */
+    .kpi-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 0.9rem;
+        padding: 0 1.25rem 1rem 1.25rem;
+
+        .bunna-kpi-card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 1rem 1.1rem;
+            border: 1px solid #e5e9e5;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+
+            &::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 4px;
+                height: 100%;
+                background-color: var(--kpi-color, #541718);
+            }
+
+            &:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 6px 16px rgba(84, 23, 24, 0.12);
+                border-color: var(--kpi-color, #541718);
+            }
+
+            .kpi-icon-wrap {
+                width: 36px;
+                height: 36px;
+                border-radius: 8px;
+                background-color: var(--kpi-bg, rgba(84, 23, 24, 0.08));
+                color: var(--kpi-color, #541718);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.1rem;
+                margin-bottom: 0.6rem;
+            }
+
+            .kpi-value {
+                font-size: 1.65rem;
+                font-weight: 700;
+                color: #1d2b32;
+                line-height: 1.1;
+                margin-bottom: 0.2rem;
+            }
+
+            .kpi-label {
+                font-size: 0.78rem;
+                font-weight: 600;
+                color: #65747d;
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+            }
+
+            .kpi-subtext {
+                font-size: 0.72rem;
+                color: #92a0a8;
+                margin-top: 0.2rem;
+            }
+
+            /* Bunna Theme Card Variations (Strictly Official Brand Swatches) */
+            &.card-total { --kpi-color: #1D2B32; --kpi-bg: rgba(29, 43, 50, 0.08); }
+            &.card-open { --kpi-color: #541718; --kpi-bg: rgba(84, 23, 24, 0.08); }
+            &.card-unassigned { --kpi-color: #C17540; --kpi-bg: rgba(193, 117, 64, 0.1); }
+            &.card-unattended { --kpi-color: #726732; --kpi-bg: rgba(114, 103, 50, 0.1); }
+            &.card-urgent { --kpi-color: #541718; --kpi-bg: rgba(84, 23, 24, 0.12); }
+            &.card-sla { --kpi-color: #C17540; --kpi-bg: rgba(193, 117, 64, 0.12); }
+            &.card-nbe { --kpi-color: #541718; --kpi-bg: rgba(84, 23, 24, 0.08); }
+            &.card-escalated { --kpi-color: #C17540; --kpi-bg: rgba(193, 117, 64, 0.1); }
+            &.card-cust-type { --kpi-color: #425727; --kpi-bg: rgba(66, 87, 39, 0.1); }
+            &.card-csat { --kpi-color: #425727; --kpi-bg: rgba(66, 87, 39, 0.1); }
+            &.card-hours { --kpi-color: #1E2917; --kpi-bg: rgba(30, 41, 23, 0.1); }
+        }
+    }
+
+    /* --- Interactive Charts Row --- */
+    .bunna-charts-row {
+        padding: 0 1.25rem;
+        margin-bottom: 1.25rem;
+
+        .chart-panel {
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #e5e9e5;
+            padding: 1.1rem 1.25rem;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+            display: flex;
+            flex-direction: column;
+
+            .panel-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 0.65rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 1px solid #edf2ed;
+
+                .panel-title {
+                    font-size: 0.92rem;
+                    font-weight: 700;
+                    color: #541718;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.45rem;
+                }
+            }
+
+            .trend-bullet-inflow {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: #541718;
+                display: inline-block;
+            }
+
+            .trend-bullet-closed {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: #425727;
+                display: inline-block;
+            }
+
+            .trend-bullet-sla {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: #c17540;
+                display: inline-block;
+            }
+
+            .chart-canvas-container {
+                position: relative;
+                flex: 1;
+                min-height: 280px;
+                max-height: 320px;
+                width: 100%;
+            }
+
+            .btn-bunna-action {
+                background-color: #541718;
+                border-color: #541718;
+                color: #ffffff;
+                font-weight: 600;
+            }
+        }
+    }
+}
+
+/* Ensure duplicate team cards are completely removed from the dashboard */
+.o_kanban_renderer.o_helpdesk_dashboard_view,
+.o_kanban_view[class*="helpdesk"],
+.o_helpdesk_dashboard_kanban {
+    .o_kanban_record:not(.bunna-kpi-card):not(.bunna-panel),
+    .o_kanban_group {
+        display: none !important;
+    }
+}
+
+/* Remove the top control panel bar (Dashboard breadcrumb, Search bar, Pager, View switchers) on Dashboard */
+.o_helpdesk_dashboard_kanban,
+.o_kanban_view[class*="helpdesk"]:has(.o_bunna_helpdesk_dashboard),
+.o_action_manager:has(.o_bunna_helpdesk_dashboard) {
+    > .o_control_panel,
+    .o_control_panel {
+        display: none !important;
+    }
+}
+
+/* Ensure parents allow position: sticky to stick to .o_content */
+.o_kanban_view.o_helpdesk_dashboard_kanban,
+.o_kanban_view[class*="helpdesk"]:has(.o_bunna_helpdesk_dashboard) {
+    overflow: visible !important;
+
+    .o_kanban_renderer {
+        overflow: visible !important;
+    }
+}
+

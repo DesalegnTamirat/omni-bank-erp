@@ -70,6 +70,11 @@ class AssessmentResultPublication(models.Model):
         for rec in self:
             if not rec.line_ids:
                 raise UserError(_("Cannot publish: Please populate candidate results before publishing."))
+            for line in rec.line_ids:
+                vals = {}
+                line._resolve_user_and_employee(vals)
+                if vals:
+                    line.sudo().write(vals)
             rec.write({
                 "state": "published",
                 "publication_date": fields.Datetime.now()
@@ -156,36 +161,53 @@ class AssessmentResultPublicationLine(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
-        if "candidate_code" in vals or "candidate_email" in vals or "employee_id" in vals:
+        if "candidate_code" in vals or "candidate_email" in vals or "candidate_name_private" in vals or "employee_id" in vals:
             self._resolve_user_and_employee(vals)
         return super().write(vals)
 
     def _resolve_user_and_employee(self, vals):
         code = (vals.get("candidate_code") or (self.candidate_code if self else False) or "").strip()
         email = (vals.get("candidate_email") or (self.candidate_email if self else False) or "").strip()
+        name_priv = (vals.get("candidate_name_private") or (self.candidate_name_private if self else False) or "").strip()
         
         emp = False
         if not vals.get("employee_id"):
             if code:
                 emp = self.env["hr.employee"].sudo().search([
-                    "|", ("identification_id", "=ilike", code), ("barcode", "=ilike", code)
+                    "|", "|", "|", ("identification_id", "=ilike", code), ("barcode", "=ilike", code), ("name", "=ilike", code), ("work_email", "=ilike", code)
                 ], limit=1)
             if not emp and email:
                 emp = self.env["hr.employee"].sudo().search([
                     "|", ("work_email", "=ilike", email), ("user_id.login", "=ilike", email)
                 ], limit=1)
+            if not emp and name_priv:
+                emp = self.env["hr.employee"].sudo().search([
+                    ("name", "=ilike", name_priv)
+                ], limit=1)
             if emp:
                 vals["employee_id"] = emp.id
 
+        emp_obj = emp or (self.env["hr.employee"].sudo().browse(vals["employee_id"]) if vals.get("employee_id") else (self.employee_id if self else False))
+
         if not vals.get("user_id"):
-            if emp and emp.user_id:
-                vals["user_id"] = emp.user_id.id
+            if emp_obj and emp_obj.user_id:
+                vals["user_id"] = emp_obj.user_id.id
             elif email:
-                user = self.env["res.users"].sudo().search([("login", "=ilike", email)], limit=1)
+                user = self.env["res.users"].sudo().search([
+                    "|", ("login", "=ilike", email), ("email", "=ilike", email)
+                ], limit=1)
                 if user:
                     vals["user_id"] = user.id
             elif code:
-                user = self.env["res.users"].sudo().search([("login", "=ilike", code)], limit=1)
+                user = self.env["res.users"].sudo().search([
+                    "|", "|", ("login", "=ilike", code), ("name", "=ilike", code), ("employee_id.identification_id", "=ilike", code)
+                ], limit=1)
+                if user:
+                    vals["user_id"] = user.id
+            elif name_priv:
+                user = self.env["res.users"].sudo().search([
+                    ("name", "=ilike", name_priv)
+                ], limit=1)
                 if user:
                     vals["user_id"] = user.id
 

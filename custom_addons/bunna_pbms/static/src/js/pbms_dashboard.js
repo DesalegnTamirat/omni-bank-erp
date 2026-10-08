@@ -109,13 +109,23 @@ const MODEL_CONFIG = {
         icon: 'fa-mobile-alt',
         color: BUNNA.primarySlate // Swatch 4: #1D2B32
     },
+    'loan_disbursement_collection': {
+        label: 'Loan Disbursement & Collection',
+        icon: 'fa-hand-holding-usd',
+        color: BUNNA.forestGreen
+    },
+    'loan_outstanding': {
+        label: 'Loan & Advances Outstanding',
+        icon: 'fa-file-invoice-dollar',
+        color: BUNNA.bronzeOlive
+    },
     'general_expense': {
         label: 'General Expense',
         icon: 'fa-receipt',
         color: BUNNA.primaryMaroon// Swatch 6: #541718
     },
     'manpower': {
-        label: 'Manpower',
+        label: 'Workforce',
         icon: 'fa-user-tie',
         color: BUNNA.deepPine     // Swatch 5: #1E2917
     },
@@ -123,6 +133,16 @@ const MODEL_CONFIG = {
         label: 'Fixed Asset',
         icon: 'fa-building',
         color: BUNNA.bronzeOlive  // Swatch 2: #726732
+    },
+    'credit_portfolio': {
+        label: 'Credit Portfolio',
+        icon: 'fa-briefcase',
+        color: BUNNA.terracotta
+    },
+    'initiative_budget': {
+        label: 'Initiative Budget',
+        icon: 'fa-lightbulb',
+        color: BUNNA.primarySlate
     },
 };
 
@@ -163,9 +183,13 @@ const PLAN_TYPES = [
     { id: 'customer_base', name: 'Customer Base' },
     { id: 'fx', name: 'FX Mobilization' },
     { id: 'digital_banking', name: 'Digital Banking' },
+    { id: 'loan_disbursement_collection', name: 'Loan Disbursement & Collection' },
+    { id: 'loan_outstanding', name: 'Loan & Advances Outstanding' },
     { id: 'general_expense', name: 'General Expense' },
-    { id: 'manpower', name: 'Manpower' },
+    { id: 'manpower', name: 'Workforce' },
     { id: 'fixed_asset', name: 'Fixed Asset' },
+    { id: 'credit_portfolio', name: 'Credit Portfolio' },
+    { id: 'initiative_budget', name: 'Initiative Budget' },
 ];
 
 export class PbmsDashboard extends Component {
@@ -185,6 +209,7 @@ export class PbmsDashboard extends Component {
             selectedModel: 'all',
             cycleDropdownOpen: false,
             planTypeDropdownOpen: false,
+            planTypes: PLAN_TYPES,
             submission: [],
             kpi: [],
             currentPage: 1,
@@ -216,6 +241,12 @@ export class PbmsDashboard extends Component {
             this.state.cycleId = data.active_cycle_id || (data.cycles.length ? data.cycles[0].id : false);
             this.state.submission = data.submission || [];
             this.state.kpi = data.kpi || [];
+            if (data.plan_types && data.plan_types.length) {
+                this.state.planTypes = data.plan_types;
+                if (!this.state.planTypes.some(p => p.id === this.state.selectedModel)) {
+                    this.state.selectedModel = 'all';
+                }
+            }
             this.state.loading = false;
         });
 
@@ -238,6 +269,12 @@ export class PbmsDashboard extends Component {
         }
         this.state.submission = data.submission || [];
         this.state.kpi = data.kpi || [];
+        if (data.plan_types && data.plan_types.length) {
+            this.state.planTypes = data.plan_types;
+            if (!this.state.planTypes.some(p => p.id === this.state.selectedModel)) {
+                this.state.selectedModel = 'all';
+            }
+        }
         this.state.loading = false;
 
         setTimeout(() => this.initCharts(), 300);
@@ -275,7 +312,8 @@ export class PbmsDashboard extends Component {
     }
 
     getSelectedPlanTypeName() {
-        const plan = this.PLAN_TYPES.find(p => p.id === this.state.selectedModel);
+        const types = this.state.planTypes || this.PLAN_TYPES;
+        const plan = types.find(p => p.id === this.state.selectedModel);
         return plan ? plan.name : "All Plans";
     }
 
@@ -471,6 +509,11 @@ export class PbmsDashboard extends Component {
         }
         if (this.state.selectedModel && this.state.selectedModel !== 'all') {
             domain.push(['category', '=', this.state.selectedModel]);
+        } else if (this.state.planTypes && this.state.planTypes.length) {
+            const allowedCats = this.state.planTypes.filter(p => p.id !== 'all').map(p => p.id);
+            if (allowedCats.length) {
+                domain.push(['category', 'in', allowedCats]);
+            }
         }
         if (stage && STAGE_DOMAINS[stage]) {
             domain.push(...STAGE_DOMAINS[stage]);

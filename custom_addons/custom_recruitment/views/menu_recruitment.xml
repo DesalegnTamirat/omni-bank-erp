@@ -109,7 +109,7 @@
         <!-- Internal Job Position - Manager & Administrator only -->
         <menuitem id="menu_hr_employee_custom_internal_job_position"
                   name="Internal Job Position"
-                  parent="hr.menu_hr_employee_payroll"
+                  parent="hr.menu_hr_root"
                   action="internal_job_position_tree_form"
                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="17"/>
@@ -345,6 +345,38 @@
                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
+        <menuitem id="menu_recruitment_signatory_config"
+                  name="Authorized Signatories &amp; Stamps"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="action_recruitment_signatory_config"
+                  sequence="60"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                />
+
+        <!-- Ensure standard Configuration menu is accessible by Recruitment Officers, Managers, Administrators -->
+        <record id="hr_recruitment.menu_hr_recruitment_configuration" model="ir.ui.menu">
+            <field name="group_ids" eval="[
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator')),
+                (4, ref('base.group_user'))
+            ]"/>
+        </record>
+
+        <!-- Direct Configuration under Recruitments menu for quick access -->
+        <menuitem id="menu_recruitment_config_root"
+                  name="Configuration"
+                  parent="new_recruitment_menu"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  sequence="99"/>
+
+        <menuitem id="menu_recruitment_signatory_config_direct"
+                  name="Authorized Signatories &amp; Stamps"
+                  parent="menu_recruitment_config_root"
+                  action="action_recruitment_signatory_config"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  sequence="10"/>
+
         <!-- ============================================ -->
         <!-- WIZARD MENUS - Manager & Administrator only -->
         <!-- ============================================ -->
@@ -360,7 +392,7 @@
                   name="Offer Letters"
                   parent="menu_external_recruitment"
                   action="action_recruitment_offer_letter"
-                 groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="10"/>
 
     </data>

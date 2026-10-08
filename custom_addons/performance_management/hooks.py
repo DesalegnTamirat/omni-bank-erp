@@ -55,4 +55,10 @@ def post_init_hook(env):
     env.registry.clear_cache('groups')
     env.invalidate_all()
 
+    # 3. Auto-convert any existing standalone Job KPIs into consolidated Position Templates
+    try:
+        env['performance.job.template'].action_import_from_existing_kpis()
+    except Exception:
+        pass
+
 

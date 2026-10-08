@@ -122,8 +122,16 @@
                     <div class="mt-4" style="font-size: 12.5px; line-height: 1.5;">
                         <div><strong>CC:</strong></div>
                         <ul style="list-style-type: disc; margin-left: 20px; padding-left: 0; margin-top: 4px;">
+                            <t t-if="o.current_work_unit_name">
+                                <li><span t-esc="o.current_work_unit_name"/></li>
+                            </t>
+                            <t t-if="o.new_work_unit_name and o.new_work_unit_name != o.current_work_unit_name">
+                                <li><span t-esc="o.new_work_unit_name"/></li>
+                            </t>
                             <li>IT Security Management Directorate</li>
-                            <li>All respective work units</li>
+                            <t t-if="o.cc_extra_work_units">
+                                <li><span t-esc="o.cc_extra_work_units"/></li>
+                            </t>
                             <li><u><strong>Bunna Bank S.C</strong></u></li>
                         </ul>
                     </div>

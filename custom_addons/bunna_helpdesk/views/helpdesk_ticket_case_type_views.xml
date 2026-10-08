@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Case Type Search View -->
+    <record id="view_helpdesk_ticket_case_type_search" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.case.type.search</field>
+        <field name="model">helpdesk.ticket.case.type</field>
+        <field name="arch" type="xml">
+            <search string="Case Types">
+                <field name="name" string="Case Type" />
+                <field name="code" />
+                <filter string="NBE Regulated" name="nbe_regulated" domain="[('is_nbe_complaint', '=', True)]" />
+                <separator />
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]" />
+            </search>
+        </field>
+    </record>
+
+    <!-- Case Type List View -->
+    <record id="view_helpdesk_ticket_case_type_list" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.case.type.list</field>
+        <field name="model">helpdesk.ticket.case.type</field>
+        <field name="arch" type="xml">
+            <list string="Case Types" editable="bottom">
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="code" />
+                <field name="default_priority" widget="priority" />
+                <field name="is_nbe_complaint" widget="boolean_toggle" />
+                <field name="description" optional="show" />
+                <field name="active" widget="boolean_toggle" />
+            </list>
+        </field>
+    </record>
+
+    <!-- Case Type Form View -->
+    <record id="view_helpdesk_ticket_case_type_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.case.type.form</field>
+        <field name="model">helpdesk.ticket.case.type</field>
+        <field name="arch" type="xml">
+            <form string="Case Type">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" string="Case Type Name" />
+                        <h1>
+                            <field name="name" placeholder="e.g. Complaint, Inquiry, Service Request" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="e.g. complaint, inquiry, request" />
+                            <field name="sequence" />
+                        </group>
+                        <group>
+                            <field name="default_priority" widget="priority" />
+                            <field name="is_nbe_complaint" widget="boolean_toggle" />
+                            <field name="active" invisible="1" />
+                        </group>
+                    </group>
+                    <group string="Description &amp; Operational Scope">
+                        <field name="description" placeholder="Guidance for agents on when to classify a case under this type..." nolabel="1" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Case Type Kanban View -->
+    <record id="view_helpdesk_ticket_case_type_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.case.type.kanban</field>
+        <field name="model">helpdesk.ticket.case.type</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile">
+                <field name="name" />
+                <field name="code" />
+                <field name="default_priority" />
+                <field name="is_nbe_complaint" />
+                <field name="description" />
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-secondary font-monospace" t-if="record.code.value">
+                                <field name="code" />
+                            </span>
+                            <span class="badge text-bg-warning" t-if="record.is_nbe_complaint.raw_value">
+                                <i class="fa fa-shield me-1" />NBE Regulated
+                            </span>
+                        </div>
+                        <field class="fw-bold fs-5" name="name" />
+                        <div class="text-muted small mt-1 text-truncate" t-if="record.description.value">
+                            <field name="description" />
+                        </div>
+                        <footer class="pt-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">Default Priority</span>
+                            <field name="default_priority" widget="priority" />
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Case Type Action -->
+    <record id="action_helpdesk_ticket_case_type" model="ir.actions.act_window">
+        <field name="name">Case Types</field>
+        <field name="res_model">helpdesk.ticket.case.type</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Case Type
+            </p>
+            <p>
+                Configure ticket classifications such as Complaints, Inquiries, Service Requests, and Incidents.
+            </p>
+        </field>
+    </record>
+</odoo>

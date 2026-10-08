@@ -24,6 +24,9 @@ class HrSeparationType(models.Model):
              'Used by the Provident Fund eligibility rule (FR-15) to '
              'exclude company-terminated employees regardless of tenure.')
 
+    allow_salary_payment = fields.Boolean(string="Remaining salary", default=True)
+    allow_leave_encashment = fields.Boolean(string="Accrued leave pay", default=True)
+
     default_notice_period = fields.Integer(
         string='Default Notice Period (Days)', default=30,
         help='Default number of days required for notice when submitting a resignation of this type.')

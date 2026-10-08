@@ -73,6 +73,20 @@ class EmployeeRelative(models.Model):
         string='National ID',
         help='National identification number of the relative',
     )
+    is_dependent = fields.Boolean(
+        string='Is Dependent',
+        default=False,
+    )
+    birth_certificate_no = fields.Char(
+        string='Birth Certificate Number',
+    )
+    birth_certificate_doc = fields.Binary(
+        string='Birth Certificate / Supporting Document',
+        attachment=True,
+    )
+    birth_certificate_filename = fields.Char(
+        string='Birth Certificate Filename',
+    )
 
     # ---------------------------------------------------------------
     # Link to employee
@@ -92,7 +106,7 @@ class EmployeeRelative(models.Model):
 
 
 # -----------------------------------------------------------------------
-# Extend hr.employee — relative_ids + relative_count smart button
+# Extend hr.employee — relative_ids + relative_count smart button + children/dependent metrics
 # -----------------------------------------------------------------------
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
@@ -100,7 +114,7 @@ class HrEmployee(models.Model):
     relative_ids = fields.One2many(
         'employee.relative',
         'employee_id',
-        string='Relatives',
+        string='Relatives & Dependents',
     )
 
     relative_count = fields.Integer(
@@ -109,7 +123,28 @@ class HrEmployee(models.Model):
         store=False,
     )
 
-    @api.depends('relative_ids')
+    children_count = fields.Integer(
+        string='Number of Children',
+        compute='_compute_family_counts',
+        store=False,
+    )
+
+    dependent_count = fields.Integer(
+        string='Number of Dependents',
+        compute='_compute_family_counts',
+        store=False,
+    )
+
+    @api.depends('relative_ids', 'relative_ids.relative_type', 'relative_ids.is_dependent')
     def _compute_relative_count(self):
         for employee in self:
             employee.relative_count = len(employee.relative_ids)
+
+    @api.depends('relative_ids', 'relative_ids.relative_type', 'relative_ids.is_dependent')
+    def _compute_family_counts(self):
+        for employee in self:
+            relatives = employee.relative_ids
+            # Children count: Son, Daughter, or Child
+            employee.children_count = len([r for r in relatives if r.relative_type in ('son', 'daughter', 'child')])
+            # Dependent count: is_dependent is True OR relative_type is dependent
+            employee.dependent_count = len([r for r in relatives if r.is_dependent or r.relative_type == 'dependent'])

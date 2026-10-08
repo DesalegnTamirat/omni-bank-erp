@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import os
+import base64
 import logging
 from datetime import timedelta
 from odoo import api, fields, models, _
@@ -74,6 +76,17 @@ class RecruitmentOfferLetter(models.Model):
     _inherit = ['mail.thread']
     _rec_name = 'name'
     _order = 'offer_date desc, id desc'
+
+    @api.model
+    def get_official_bunna_logo_base64(self):
+        """Returns base64 string of the official Bunna Bank logo for reliable QWeb PDF rendering."""
+        logo_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+        )
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        return ""
 
     name = fields.Char(
         string='Offer Reference',

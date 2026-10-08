@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Master Data Change Request Sequence -->
+        <record id="seq_hr_employee_change_request" model="ir.sequence">
+            <field name="name">Employee Master Data Change Request Sequence</field>
+            <field name="code">hr.employee.change.request</field>
+            <field name="prefix">EMCR/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Master Data Change History Sequence -->
+        <record id="seq_hr_employee_change_history" model="ir.sequence">
+            <field name="name">Employee Master Data Change History Sequence</field>
+            <field name="code">hr.employee.change.history</field>
+            <field name="prefix">EMCH/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

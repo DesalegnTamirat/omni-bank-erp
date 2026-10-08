@@ -16,6 +16,7 @@
                 <field name="operating_unit_id"/>
                 <field name="department_id"/>
                 <field name="manager_id"/>
+                <field name="accept_by" string="Accept By" optional="show"/>
                 <field name="total_weight"/>
                 <field name="state" widget="badge"
                        decoration-info="state == 'draft'"
@@ -218,12 +219,13 @@
                                 <div class="card-body p-3">
                                     <group class="m-0 p-0">
                                         <field name="fiscal_year_id" string="Fiscal Year" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft' or is_current_employee"/>
-                                        <field name="appraisal_period_id" string="Appraisal Period" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft' or is_current_employee"/>
+                                        <field name="appraisal_period_id" string="Appraisal Period" options="{'no_create': True, 'no_open': True}" readonly="1"/>
                                         <field name="start_date" string="Period Start Date" readonly="1"/>
                                         <field name="end_date" string="Period End Date" readonly="1"/>
+                                        <field name="accept_by" string="Accept By Deadline" readonly="state != 'draft' or is_current_employee"/>
                                         <field name="manager_id" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft' or is_current_employee"/>
                                         <field name="job_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
-                                        <field name="total_weight" widget="progressbar" readonly="1"/>
+                                        <field name="total_weight" readonly="1"/>
                                     </group>
                                 </div>
                             </div>
@@ -236,39 +238,41 @@
 
                             <field name="line_ids" readonly="state != 'draft' or is_current_employee">
 
-                                <list editable="bottom">
+                                <list editable="bottom" create="false" delete="false">
 
                                     <field name="perspective_name" column_invisible="1"/>
                                     <field name="state" column_invisible="1"/>
 
                                     <field name="perspective_id" string="Perspective" widget="badge"
                                            decoration-success="perspective_name == 'Financial'"
-                                           decoration-warning="perspective_name == 'Stakeholder'"
-                                           decoration-info="perspective_name == 'Internal Process'"
+                                           decoration-warning="perspective_name in ('Stakeholder', 'Customer')"
+                                           decoration-info="perspective_name in ('Internal Process', 'Internal Business')"
                                            options="{'no_create': True, 'no_open': True}"
-                                           readonly="state != 'draft'"/>
+                                           readonly="1"/>
 
-                                    <field name="objective_id" string="Strategic Objective" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft'"/>
+                                    <field name="objective_id" string="Strategic Objective" options="{'no_create': True, 'no_open': True}" readonly="1"/>
 
-                                    <field name="measure_id" string="Performance Measure" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft'"/>
+                                    <field name="measure_id" string="Performance Measure" options="{'no_create': True, 'no_open': True}" readonly="1"/>
 
-                                    <field name="weight" string="Weight (%)" sum="Total Weight" readonly="state != 'draft'"/>
+                                    <field name="weight" string="Weight (%)" sum="Total Weight" readonly="1"/>
 
-                                    <field name="target_type" readonly="state != 'draft'"/>
+                                    <field name="target_type" readonly="1"/>
 
-                                    <field name="baseline" readonly="state != 'draft'"/>
+                                    <field name="baseline" readonly="state != 'draft' or parent.is_current_employee"/>
 
                                     <field name="period_code" column_invisible="1"/>
 
-                                    <field name="q1_target" string="Q1 Target" readonly="state != 'draft' or period_code != 'Q1'"/>
+                                    <field name="q1_target" string="Q1 Target" readonly="state != 'draft' or parent.is_current_employee or period_code != 'Q1'"/>
 
-                                    <field name="h1_target" string="H1 Target" readonly="state != 'draft' or period_code != 'H1'"/>
+                                    <field name="h1_target" string="H1 Target" readonly="state != 'draft' or parent.is_current_employee or period_code != 'H1'"/>
 
-                                    <field name="q3_target" string="Q3 Target" readonly="state != 'draft' or period_code != 'Q3'"/>
+                                    <field name="q3_target" string="Q3 Target" readonly="state != 'draft' or parent.is_current_employee or period_code != 'Q3'"/>
 
-                                    <field name="h2_target" string="H2 Target" readonly="state != 'draft' or period_code != 'H2'"/>
+                                    <field name="h2_target" string="H2 Target" readonly="state != 'draft' or parent.is_current_employee or period_code != 'H2'"/>
 
-                                    <field name="annual_target" string="Annual Target" readonly="state != 'draft' or period_code not in ('ANNUAL', 'annual')"/>
+                                    <field name="annual_target" string="Annual Target" readonly="state != 'draft' or parent.is_current_employee or period_code not in ('ANNUAL', 'annual')"/>
+
+                                    <field name="target_description" string="Target Description" readonly="state != 'draft' or parent.is_current_employee"/>
 
                                 </list>
 

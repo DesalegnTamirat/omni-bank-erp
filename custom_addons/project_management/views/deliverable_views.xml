@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pm_deliverable_tree" model="ir.ui.view">
+        <field name="name">pm.deliverable.list</field>
+        <field name="model">pm.deliverable</field>
+        <field name="arch" type="xml">
+            <list string="Deliverables / Major Activities">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name" string="Deliverable / Major Activity"/>
+                <field name="project_id"/>
+                <field name="milestone_id"/>
+                <field name="weight"/>
+                <field name="date_start" optional="show"/>
+                <field name="date_deadline"/>
+                <field name="task_count"/>
+                <field name="closed_task_count"/>
+                <field name="progress_rate" widget="progressbar"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-danger="state == 'at_risk'" decoration-success="state == 'completed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_deliverable_form" model="ir.ui.view">
+        <field name="name">pm.deliverable.form</field>
+        <field name="model">pm.deliverable</field>
+        <field name="arch" type="xml">
+            <form string="Deliverable / Major Activity">
+                <header>
+                    <field name="state" widget="statusbar" options="{'clickable': '1'}"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Deliverable / Major Activity Title"/>
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Project &amp; Work Breakdown">
+                            <field name="code"/>
+                            <field name="project_id" options="{'no_create_edit': True}"/>
+                            <field name="milestone_id" options="{'no_create_edit': True}" domain="[('project_id', '=', project_id)]"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group string="Timeline &amp; Progress Weight">
+                            <field name="weight"/>
+                            <field name="date_start"/>
+                            <field name="date_deadline"/>
+                            <field name="progress_rate" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Tasks" name="tasks">
+                            <field name="task_ids" context="{'default_project_id': project_id, 'default_deliverable_id': id, 'default_milestone_id': milestone_id, 'default_is_project_task': True}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="user_ids" widget="many2many_avatar_user"/>
+                                    <field name="weight"/>
+                                    <field name="date_deadline"/>
+                                    <field name="stage_id" widget="badge"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Description &amp; Notes" name="description">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pm_deliverable" model="ir.actions.act_window">
+        <field name="name">Deliverables / Major Activities</field>
+        <field name="res_model">pm.deliverable</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Register key project deliverables and major activities!
+            </p>
+        </field>
+    </record>
+    <record id="view_pm_deliverable_search" model="ir.ui.view">
+        <field name="name">pm.deliverable.search</field>
+        <field name="model">pm.deliverable</field>
+        <field name="arch" type="xml">
+            <search string="Deliverables / Major Activities">
+                <field name="name" string="Deliverable Title"/>
+                <field name="code"/>
+                <field name="project_id"/>
+                <field name="milestone_id"/>
+                <separator/>
+                <filter name="filter_in_progress" string="In Progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter name="filter_completed" string="Completed" domain="[('state', '=', 'completed')]"/>
+                <filter name="filter_at_risk" string="At Risk" domain="[('state', '=', 'at_risk')]"/>
+                <group>
+                    <filter name="group_project" string="Project" context="{'group_by': 'project_id'}"/>
+                    <filter name="group_milestone" string="Milestone" context="{'group_by': 'milestone_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

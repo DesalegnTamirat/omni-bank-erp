@@ -17,6 +17,7 @@
                 <field name="end_date" string="End Date"/>
                 <field name="accept_by" string="Accept By"/>
                 <field name="employee_score" string="Employee Score"/>
+                <field name="work_unit_score" string="Work Unit Score" optional="show"/>
                 <field name="performance_rating" string="Performance Rating" widget="badge"
                        decoration-success="performance_rating in ('Outstanding', 'outstanding')"
                        decoration-info="performance_rating in ('Excellent', 'excellent')"
@@ -229,7 +230,8 @@
                                         <field name="accept_by" string="Accept By Deadline" readonly="state != 'draft' or is_current_employee"/>
                                         <field name="manager_id" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft' or is_current_employee"/>
                                         <field name="job_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
-                                        <field name="employee_score" widget="progressbar" readonly="1"/>
+                                        <field name="employee_score" readonly="1"/>
+                                        <field name="work_unit_score" readonly="1"/>
                                         <field name="performance_rating" widget="badge"
                                                decoration-success="performance_rating in ('Outstanding', 'outstanding')"
                                                decoration-info="performance_rating in ('Excellent', 'excellent')"
@@ -244,19 +246,19 @@
                     <notebook>
                         <page string="Performance Appraisal Details" name="appraisal_details">
                             <field name="line_ids" nolabel="1" readonly="state != 'draft' or is_current_employee">
-                                <list editable="bottom">
+                                <list editable="bottom" create="false" delete="false">
                                     <field name="sequence" widget="handle"/>
                                     <field name="perspective_name" column_invisible="1"/>
                                     <field name="state" column_invisible="1"/>
                                     <field name="perspective_id" string="Perspective" widget="badge"
                                            decoration-success="perspective_name == 'Financial'"
-                                           decoration-warning="perspective_name == 'Stakeholder'"
-                                           decoration-info="perspective_name == 'Internal Process'"
+                                           decoration-warning="perspective_name in ('Stakeholder', 'Customer')"
+                                           decoration-info="perspective_name in ('Internal Process', 'Internal Business')"
+                                           decoration-primary="perspective_name in ('Learning &amp; Growth', 'Learning and Growth')"
                                            options="{'no_create': True, 'no_open': True}"
                                            readonly="1"/>
-                                    <field name="parent_objective_id" string="Objective" readonly="1" options="{'no_create': True, 'no_open': True}"/>
-                                    <field name="job_objective_id" string="Key Performance Indicator" readonly="1" options="{'no_create': True, 'no_open': True}"/>
-                                    <field name="job_measure_id" string="Measurements" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="parent_objective_id" string="Strategic Objective" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="job_measure_id" string="Job Position Measure" readonly="1" options="{'no_create': True, 'no_open': True}"/>
                                     <field name="weight" string="Weight (%)" readonly="1" sum="Total Weight"/>
                                     <field name="target" string="Target" readonly="1"/>
                                     <field name="appraisal_type" string="Appraisal Type" readonly="1"/>

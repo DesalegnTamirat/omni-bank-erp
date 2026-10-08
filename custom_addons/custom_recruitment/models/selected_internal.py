@@ -1,9 +1,11 @@
+import os
+import base64
+import logging
 from email.policy import default
 
 from odoo import api, models, fields, _
 from odoo.exceptions import UserError, ValidationError
 from markupsafe import Markup
-import logging
 from .recruitment_offer_letter import amount_to_words_birr
 
 # Initialize the logger
@@ -69,6 +71,38 @@ def _update_employee_job_grade(emp, grade_val):
         emp.write(vals)
 
 
+def _update_pbms_and_operating_unit_counts(env, operating_unit_id, job_id, count=1):
+    """
+    Increments fulfilled_quantity on pbms.plan.category.line
+    and recomputes operating.unit.job.position metrics for (operating_unit_id, job_id).
+    """
+    if not operating_unit_id or not job_id:
+        return
+
+    ou_id = operating_unit_id.id if hasattr(operating_unit_id, 'id') else operating_unit_id
+    j_id = job_id.id if hasattr(job_id, 'id') else job_id
+
+    if 'pbms.plan.category.line' in env:
+        PbmsLine = env['pbms.plan.category.line'].sudo()
+        lines = PbmsLine.search([
+            ('line_type', '=', 'manpower'),
+            ('org_unit_id', '=', ou_id),
+            ('job_id', '=', j_id),
+        ])
+        for line in lines:
+            curr_fulfilled = line.fulfilled_quantity or 0
+            line.write({'fulfilled_quantity': curr_fulfilled + count})
+
+    if 'operating.unit.job.position' in env:
+        OUJobPos = env['operating.unit.job.position'].sudo()
+        pos_lines = OUJobPos.search([
+            ('operating_unit_id', '=', ou_id),
+            ('job_position_id', '=', j_id),
+        ])
+        if pos_lines:
+            pos_lines._recompute_all_counts()
+
+
 class NewInternalRecruitmentSelected(models.Model):
     _name = "new.internal.recruitment.selected"
     _description = "New Internal Recruitment Selected"
@@ -100,8 +134,18 @@ class NewInternalRecruitmentSelected(models.Model):
     no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice", default=12)
     no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion", default=12)
     minimum_pms_score = fields.Float(string="Minimum PMS Score", default=75.0)
-    status = fields.Selection([('draft', 'Draft'), ('notify', 'Notified'), ('evaluate', 'Evaluate'), ('approved', 'Approved')], string="Status", default='draft')
-    state = fields.Selection([('draft', 'Draft'), ('notify', 'Notified'), ('evaluate', 'Evaluate'), ('approved', 'Approved')], string="State", default='draft')
+    transfer_eval_mode = fields.Selection([
+        ('standard', 'Standard (Exam + Interview)'),
+        ('interview_only', 'Interview Only'),
+        ('transfer_matrix_only', 'Transfer Matrix Only'),
+    ], string='Transfer Evaluation Mode', default='transfer_matrix_only')
+    supervisor_rec_requested = fields.Boolean(string="Supervisor Recommendation Requested", default=False)
+    app_date_weight = fields.Float(string="Application Date Weight (%)", default=20.0)
+    experience_weight = fields.Float(string="Experience Weight (%)", default=20.0)
+    location_weight = fields.Float(string="Location Weight (%)", default=20.0)
+    recommendation_weight = fields.Float(string="Recommendation Weight (%)", default=10.0)
+    status = fields.Selection([('draft', 'Draft'), ('shortlist', 'Shortlisted'), ('notify', 'Notified'), ('evaluate', 'Evaluate'), ('approved', 'Approved')], string="Status", default='draft')
+    state = fields.Selection([('draft', 'Draft'), ('shortlist', 'Shortlisted'), ('notify', 'Notified'), ('evaluate', 'Evaluate'), ('approved', 'Approved')], string="State", default='draft')
     exam_candidate_summary = fields.Text(
         string="Exam & Selected Candidates Summary",
         help="Summary regarding exams (written & interview) and selected candidates for the Approval Committee review."
@@ -116,6 +160,13 @@ class NewInternalRecruitmentSelected(models.Model):
         try:
             with self.env.cr.savepoint():
                 self.env.cr.execute("""
+                    ALTER TABLE new_internal_recruitment_selected 
+                    ADD COLUMN IF NOT EXISTS approval_hierarchy_type VARCHAR,
+                    ADD COLUMN IF NOT EXISTS chairperson_id INT4,
+                    ADD COLUMN IF NOT EXISTS panel_member_id INT4,
+                    ADD COLUMN IF NOT EXISTS secretary_id INT4,
+                    ADD COLUMN IF NOT EXISTS observer_id INT4;
+
                     UPDATE new_internal_recruitment_selected 
                     SET state = 'notify',
                         status = 'notify'
@@ -185,14 +236,28 @@ class NewInternalRecruitmentSelected(models.Model):
         help="Weight % for Interview score in the final weighted score formula."
     )
 
-    @api.onchange("job_category", "job_position")
+    @api.onchange("job_category", "job_position", "transfer_eval_mode")
     def _onchange_set_internal_brd_default_weights(self):
         """
-        BRD Matrix Default Auto-Population for Internal:
+        BRD Matrix Default Auto-Population:
+        - Transfer / Lateral: 30% PMS + 20% App Date + 20% Exp + 20% Loc + 10% Rec
         - Managerial: 60% PMS + 40% Interview (0% Exam)
         - Non-Managerial: 40% PMS + 30% Exam + 30% Interview
         - Junior: 50% PMS + 25% Exam + 25% Interview
         """
+        is_transfer = self.transfer_eval_mode == 'transfer_matrix_only' or (
+            self.vacancy_id and getattr(self.vacancy_id, 'internal_movement_type', False) in ('lateral', 'transfer')
+        )
+        if is_transfer:
+            self.pms_weight = 30.0
+            self.app_date_weight = 20.0
+            self.experience_weight = 20.0
+            self.location_weight = 20.0
+            self.recommendation_weight = 10.0
+            self.written_weight = 0.0
+            self.interview_weight = 0.0
+            return
+
         cat_str = (self.job_category or "").lower()
         if "managerial" in cat_str and "non" not in cat_str:
             self.pms_weight = 60.0
@@ -219,6 +284,23 @@ class NewInternalRecruitmentSelected(models.Model):
     new_int_rec_sel = fields.One2many("new.internal.recruitment.selected.candidates", "new_int_sel_cand", string="Selected candidates for Recruitment")
     new_int_rec_panel = fields.One2many("new.internal.recruitment.panel", "new_int_panel",string="Selected Panel for Recruitment")
     recr_selected_team_id = fields.One2many("new.recrt.delegation.team", "new_rec_del_id", string="Internal Recruitment Selected Delegation Team")
+
+    approval_hierarchy_type = fields.Selection(
+        [
+            ("ho_district_grade2_plus", "Head Office & District Grade II and above"),
+            ("non_managerial_ho", "For all non-managerial head office"),
+            ("non_managerial_district", "For all non-managerial district"),
+        ],
+        string="Approval Hierarchy Category",
+        tracking=True,
+    )
+    chairperson_id = fields.Many2one("res.users", string="Chairperson", tracking=True)
+    panel_member_id = fields.Many2one("res.users", string="Panel Member", tracking=True)
+    secretary_id = fields.Many2one("res.users", string="Panel Member & Secretary", tracking=True)
+    observer_id = fields.Many2one(
+        "res.users", string="Labor Representative (Observer)", tracking=True,
+        help="Observer role (optional to sign)"
+    )
 
     def _get_partner_for_employee(self, emp):
         if not emp:
@@ -284,6 +366,11 @@ class NewInternalRecruitmentSelected(models.Model):
     def notify(self):
         if not self.scores_computed:
             raise UserError(_("Sequence Error: You must compute & rank final scores ('Compute Final Scores') before notifying approvers."))
+        selected_cands = self.new_int_rec_sel.filtered(lambda c: c.selection_type in ('selected', 'Selected'))
+        if not selected_cands:
+            raise UserError(_("No candidates have passed both the examination and interview assessments (minimum 50% required in each stage). Cannot proceed to notify the approval committee."))
+        if not self.recr_selected_team_id or not self.recr_selected_team_id.filtered(lambda t: t.employee_name or t.alternate_committee_member):
+            raise UserError(_("Please add committee members in the Committee / Delegation Team tab before notifying approvers."))
         p_id = self.id
         try:
             with self.env.cr.savepoint():
@@ -327,6 +414,9 @@ class NewInternalRecruitmentSelected(models.Model):
     def evaluate(self):
         if self.state not in ('notify', 'evaluate', 'approved'):
             raise UserError(_("Sequence Error: You must notify approvers ('Notify Approvers') before approving the selection."))
+        selected_cands = self.new_int_rec_sel.filtered(lambda c: c.selection_type in ('selected', 'Selected'))
+        if not selected_cands:
+            raise UserError(_("Cannot approve selection because no candidates passed the examination and interview assessments."))
         n = 0
         usr_name = self.env.user.name
         for val in self.recr_selected_team_id:
@@ -400,24 +490,38 @@ class NewInternalRecruitmentSelected(models.Model):
         channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def notify_written_exam(self):
+        if not self.new_int_rec_sel:
+            raise UserError(_("No candidates found in the shortlisted selection list. Please shortlist candidates first."))
+        registered_cands = self.new_int_rec_sel.filtered(lambda c: c.emp_name and c.select_flag and c.selection_type != 'rejected')
+        if not registered_cands:
+            raise UserError(_("No registered/eligible candidates found to notify for the written exam. Please shortlist active candidates first."))
         if not self.written_exam_date:
-            raise UserError(_('Please specify the Written Exam Date before sending notifications.'))
+            vac = False
+            if self.vacancy_id:
+                vac = self.env['job.vacancy'].browse(self.vacancy_id)
+            elif self.vacancy_reference:
+                vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+            if vac and vac.exists() and vac.written_exam_date:
+                self.written_exam_date = vac.written_exam_date
+                if not self.exam_location and vac.exam_location:
+                    self.exam_location = vac.exam_location
+        if not self.written_exam_date or not self.exam_location:
+            raise UserError(_('Please specify both the Written Exam Date and Exam Location before sending notifications.'))
         count = 0
         position_name = self.job_position.name if self.job_position else ''
         location_name = self.exam_location or 'Main Branch'
         unit_name = self._get_hiring_work_units()
 
-        for val in self.new_int_rec_sel:
-            if val.emp_name and val.selection_type != 'rejected':
-                partner = self._get_partner_for_employee(val.emp_name)
-                if partner:
-                    _logger.info("[notify_written_exam] Sending written exam notification to %s (Partner ID=%s)", val.emp_name.name, partner.id)
-                    self.mail_channel_msgs_exam(partner.id, val.emp_name.name, position_name, self.written_exam_date, location_name, work_unit=unit_name)
-                    val.exam_notified = 'Yes'
-                    val.select_flag = True
-                    count += 1
-                else:
-                    _logger.warning("[notify_written_exam] Could not locate res.partner for employee: %s (ID=%s)", val.emp_name.name, val.emp_name.id)
+        for val in registered_cands:
+            partner = self._get_partner_for_employee(val.emp_name)
+            if partner:
+                _logger.info("[notify_written_exam] Sending written exam notification to %s (Partner ID=%s)", val.emp_name.name, partner.id)
+                self.mail_channel_msgs_exam(partner.id, val.emp_name.name, position_name, self.written_exam_date, location_name, work_unit=unit_name)
+                val.exam_notified = 'Yes'
+                val.select_flag = True
+                count += 1
+            else:
+                _logger.warning("[notify_written_exam] Could not locate res.partner for employee: %s (ID=%s)", val.emp_name.name, val.emp_name.id)
 
         try:
             with self.env.cr.savepoint():
@@ -428,6 +532,13 @@ class NewInternalRecruitmentSelected(models.Model):
             _logger.warning("Stored procedures for written exam failed: %s", e)
 
         self.exam_scheduled = 'Yes'
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+        if vac and vac.exists():
+            vac.sudo().write({'exam_scheduled': 'Yes', 'exam_notified': True})
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -439,6 +550,18 @@ class NewInternalRecruitmentSelected(models.Model):
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
+
+    def action_select_all_candidates(self):
+        """ Select all candidate records at once """
+        for rec in self:
+            if rec.new_int_rec_sel:
+                rec.new_int_rec_sel.write({'select_flag': True})
+
+    def action_deselect_all_candidates(self):
+        """ Deselect all candidate records at once """
+        for rec in self:
+            if rec.new_int_rec_sel:
+                rec.new_int_rec_sel.write({'select_flag': False})
 
     def fetch_exam_score(self):
         if self.exam_scheduled != 'Yes':
@@ -484,11 +607,20 @@ class NewInternalRecruitmentSelected(models.Model):
         except Exception as e:
             _logger.warning("Stored procedure employee_exam_score error: %s", e)
 
+        if not self.new_int_rec_sel:
+            raise UserError(_("No candidates found in the shortlisted selection list. Please shortlist candidates first."))
+
+        # Check if any candidate actually took the exam / has a score
+        has_any_score = any(cand.written_exam_score and cand.written_exam_score > 0 for cand in self.new_int_rec_sel)
+        if fetched_count == 0 and not has_any_score:
+            raise UserError(_("No exam scores found. None of the shortlisted candidates have completed their written exam assessment yet."))
+
         # 3. Evaluate 50% written exam threshold for candidate selection
         for cand in self.new_int_rec_sel:
             score = cand.written_exam_score or 0.0
             if score < 50.0:
                 cand.select_flag = False
+                cand.selection_type = 'rejected'
                 cand.remarks = _("Disqualified: Written Exam score (%.2f%%) is below 50%% threshold.") % score
 
         self.exam_scores_fetched = True
@@ -497,7 +629,7 @@ class NewInternalRecruitmentSelected(models.Model):
             'tag': 'display_notification',
             'params': {
                 'title': _('Exam Scores Fetched'),
-                'message': _('Written Exam scores fetched successfully for %d candidate(s) from Written Assessment Module.') % fetched_count,
+                'message': _('Written Exam scores fetched successfully for %d candidate(s) from Written Assessment Module.') % (fetched_count or len([c for c in self.new_int_rec_sel if c.written_exam_score])),
                 'type': 'success',
                 'sticky': False,
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
@@ -539,10 +671,27 @@ class NewInternalRecruitmentSelected(models.Model):
         return _("Head Office")
 
     def notify_interview_panel(self):
-        if not self.new_int_rec_panel or not any(line.emp_name for line in self.new_int_rec_panel):
-            raise UserError(_('No panel members have been added. Please add at least one panel member before notifying the interview panel.'))
+        if not self.new_int_rec_panel or not self.new_int_rec_panel.filtered(lambda p: p.emp_name):
+            raise UserError(_("Please add at least one panel member in the Panel Members tab before notifying the panel."))
+        
+        # Validate that at least one candidate passed the written exam (>= 50%)
+        if self.new_int_rec_sel:
+            passing_cands = self.new_int_rec_sel.filtered(lambda c: (c.written_exam_score or 0.0) >= 50.0 and c.selection_type != 'rejected')
+            if not passing_cands:
+                raise UserError(_("No candidates have passed the written examination (minimum 50% score required). Cannot proceed to notify the interview panel."))
+
         if not self.interview_date:
-            raise UserError(_('Please specify the Interview Date before notifying the panel.'))
+            vac = False
+            if self.vacancy_id:
+                vac = self.env['job.vacancy'].browse(self.vacancy_id)
+            elif self.vacancy_reference:
+                vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+            if vac and vac.exists() and vac.interview_date:
+                self.interview_date = vac.interview_date
+                if not self.interview_location and vac.interview_location:
+                    self.interview_location = vac.interview_location
+        if not self.interview_date or not self.interview_location:
+            raise UserError(_('Please specify both the Interview Date and Interview Location before notifying the panel.'))
         pos_title = self._get_position_title()
         work_unit_str = self._get_hiring_work_units()
         for val in self.new_int_rec_panel:
@@ -550,7 +699,7 @@ class NewInternalRecruitmentSelected(models.Model):
                 val.write({'response_status': 'pending'})
                 usr = self._get_partner_for_employee(val.emp_name)
                 if usr:
-                    self.mail_channel_msgs_panel(usr.id, val.emp_name.name, pos_title, self.interview_date, self.interview_location or 'Head Office', work_unit=work_unit_str)
+                    self.mail_channel_msgs_panel(usr.id, val.emp_name.name, pos_title, self.interview_date, self.interview_location, work_unit=work_unit_str)
         try:
             with self.env.cr.savepoint():
                 self.env.cr.execute('SELECT notify_panel_internal_interview(%s)', (self.id,))
@@ -569,6 +718,10 @@ class NewInternalRecruitmentSelected(models.Model):
             }
         }
 
+    def action_notify_panel_members(self):
+        """Alias for notify_interview_panel to ensure consistent proxy delegation."""
+        return self.notify_interview_panel()
+
     def action_open_reschedule_wizard(self):
         self.ensure_one()
         return {
@@ -581,6 +734,150 @@ class NewInternalRecruitmentSelected(models.Model):
                 'default_internal_selected_id': self.id,
                 'default_new_interview_date': self.interview_date or fields.Date.today(),
                 'default_new_interview_location': self.interview_location or '',
+            }
+        }
+
+    def action_open_supervisor_evaluation_wizard(self):
+        """Opens batch or single supervisor evaluation wizard for candidates in this selection process."""
+        self.ensure_one()
+        cands = self.new_int_rec_sel.filtered(lambda c: c.emp_name)
+        if not cands:
+            raise UserError(_("No candidates found to evaluate."))
+
+        # Filter candidates by current user's direct subordinates if user is not HR manager
+        is_hr = self.env.user.has_group('custom_recruitment.group_recruitment_officer') or self.env.user.has_group('custom_recruitment.group_recruitment_manager')
+        if not is_hr:
+            user_emp = self.env.user.employee_id or self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+            subordinates = cands.filtered(lambda c: c.emp_name.parent_id.id == user_emp.id or c.emp_name.coach_id.id == user_emp.id)
+            if subordinates:
+                cands = subordinates
+
+        lines = [(0, 0, {
+            'candidate_id': c.id,
+            'employee_id': c.emp_name.id,
+            'current_position': c.emp_name.job_id.name if c.emp_name and c.emp_name.job_id else '',
+            'current_work_unit': c.emp_name.default_operating_unit_id.name if c.emp_name and c.emp_name.default_operating_unit_id else '',
+            'service_in_company': c.service_in_company or 0.0,
+            'pms_score': c.pms_score or 0.0,
+            'recommendation_score': c.supervisor_recommendation_score or 100.0,
+            'recommendation_remarks': c.supervisor_remarks or '',
+        }) for c in cands]
+
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Grant Supervisor Recommendation Marks'),
+            'res_model': 'supervisor.recommendation.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_vacancy_id': vac.id if vac and vac.exists() else False,
+                'default_selected_recruitment_id': self.id,
+                'default_is_batch': True,
+                'default_line_ids': lines,
+            }
+        }
+
+    def action_request_supervisor_recommendation(self):
+        """Request supervisor recommendation for eligible transfer/lateral candidates."""
+        self.ensure_one()
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+        if vac and vac.exists():
+            return vac.action_request_supervisor_recommendation()
+
+        cands = self.new_int_rec_sel.filtered(lambda c: c.emp_name) if hasattr(self, 'new_int_rec_sel') else []
+        if not cands:
+            raise UserError(_("No eligible candidates found to request supervisor recommendation."))
+
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url') or ''
+        pos_title = self.job_position.name if self.job_position else _('Job Position')
+        ref_str = self.vacancy_reference or _('TBD')
+
+        supervisor_cands = {}
+        for cand in cands:
+            emp = cand.emp_name
+            sup = emp.parent_id or emp.coach_id
+            if sup and sup.user_id and sup.user_id.partner_id:
+                supervisor_cands.setdefault(sup, []).append(cand)
+
+        if not supervisor_cands:
+            raise UserError(_("None of the eligible candidates have a direct supervisor/coach linked to an active user account."))
+
+        todo_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+        notified_supervisors = []
+        eval_url = f"{base_url.rstrip('/')}/recruitment/supervisor_evaluation/{vac.id if vac else self.id}"
+
+        for sup, sup_c_list in supervisor_cands.items():
+            partner_id = sup.user_id.partner_id.id
+            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[partner_id])
+            c_names = ", ".join(c.emp_name.name for c in sup_c_list)
+            
+            msg = (
+                f"<div style='font-family: inherit; font-size: 14px; line-height: 1.5;'>"
+                f"<p>Dear <b>{sup.name}</b>,</p>"
+                f"<p>Your subordinate(s) <b>{c_names}</b> have applied for the vacancy: <b>{pos_title}</b> (Ref: <code>{ref_str}</code>).</p>"
+                f"<p>Kindly evaluate and grant their <b>Supervisor Recommendation Marks (0 - 100%)</b> and evaluation comments in the system before candidate ranking:</p>"
+                f"<p style='margin: 16px 0;'>"
+                f"<a href='{eval_url}' style='display:inline-block; padding:9px 18px; background-color:#541718; color:#ffffff; text-decoration:none; border-radius:4px; font-weight:bold; font-size:13px;'>"
+                f"⭐ Evaluate My Candidate(s)"
+                f"</a>"
+                f"</p>"
+                f"<p style='color: #666; font-size: 12px;'>Direct link: <a href='{eval_url}'>{eval_url}</a></p>"
+                f"<p>Best regards,<br/><b>Bunna Bank Talent Acquisition &amp; OD</b></p>"
+                f"</div>"
+            )
+            channel.message_post(body=Markup(msg), message_type='comment', subtype_xmlid='mail.mt_comment')
+
+            if sup.user_id:
+                try:
+                    existing_act = self.env['mail.activity'].sudo().search([
+                        ('res_model', '=', 'new.internal.recruitment.selected'),
+                        ('res_id', '=', self.id),
+                        ('user_id', '=', sup.user_id.id),
+                        ('summary', 'ilike', 'Supervisor Recommendation'),
+                    ], limit=1)
+                    if not existing_act:
+                        self.activity_schedule(
+                            activity_type_id=todo_type.id if todo_type else False,
+                            summary=_('Supervisor Recommendation: %s (%s)') % (pos_title, c_names),
+                            note=Markup(_("<p>Please evaluate recommendation marks for: <b>%s</b></p><p><a href='%s'>Click here to evaluate</a></p>") % (c_names, eval_url)),
+                            user_id=sup.user_id.id
+                        )
+                except Exception:
+                    pass
+
+            if sup.name not in notified_supervisors:
+                notified_supervisors.append(sup.name)
+
+        self.supervisor_rec_requested = True
+        msg_body = _("Supervisor recommendation requested for %d candidate(s). Notified Supervisors: %s") % (
+            len(cands), ", ".join(notified_supervisors)
+        )
+        try:
+            self.message_post(body=msg_body)
+        except Exception:
+            pass
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Supervisor Evaluation Links Sent'),
+                'message': _('Supervisor evaluation notification links sent successfully to: %s') % (
+                    ", ".join(notified_supervisors)
+                ),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
 
@@ -613,6 +910,8 @@ class NewInternalRecruitmentSelected(models.Model):
         channel.message_post(body=Markup(message), message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def notify_exam_panel(self):
+        if not self.new_int_rec_panel or not self.new_int_rec_panel.filtered(lambda p: p.emp_name):
+            raise UserError(_("Please add at least one panel member in the Panel Members tab before notifying the panel."))
         if not self.written_exam_date:
             raise UserError(_('Please specify the Written Exam Date.'))
         pos_title = self._get_position_title()
@@ -653,25 +952,29 @@ class NewInternalRecruitmentSelected(models.Model):
         channel.message_post(body=Markup(message), message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def notify_interview(self):
-        vac = False
-        if self.vacancy_id:
-            vac = self.env['job.vacancy'].browse(self.vacancy_id)
-        elif self.vacancy_reference:
-            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
-
-        has_exam = True
-        if vac and hasattr(vac, 'has_written_exam'):
-            has_exam = vac.has_written_exam
-
-        if has_exam and not self.exam_scores_fetched:
+        if not self.exam_scores_fetched:
             raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before sending interview invitations to candidates."))
         if not self.panel_notified:
             raise UserError(_("Sequence Error: You must notify the Interview Panel ('Notify Interview Panel') before sending interview invitations to candidates."))
         if not self.interview_date:
-            raise UserError(_('Please specify the Interview Date before sending candidate invitations.'))
+            vac = False
+            if self.vacancy_id:
+                vac = self.env['job.vacancy'].browse(self.vacancy_id)
+            elif self.vacancy_reference:
+                vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+            if vac and vac.exists() and vac.interview_date:
+                self.interview_date = vac.interview_date
+                if not self.interview_location and vac.interview_location:
+                    self.interview_location = vac.interview_location
+        if not self.interview_date or not self.interview_location:
+            raise UserError(_('Please specify both the Interview Date and Interview Location before sending candidate invitations.'))
+
+        passing_cands = self.new_int_rec_sel.filtered(lambda c: (c.written_exam_score or 0.0) >= 50.0 and c.selection_type != 'rejected')
+        if not passing_cands:
+            raise UserError(_("No candidates have passed the written examination (minimum 50% score required). Cannot proceed with interview notification."))
         for val in self.new_int_rec_sel:
             score = val.written_exam_score or 0.0
-            if has_exam and score < 50.0:
+            if score < 50.0:
                 val.select_flag = False
                 val.remarks = _("Disqualified: Written Exam score (%.2f%%) is below 50%% threshold.") % score
             else:
@@ -680,7 +983,7 @@ class NewInternalRecruitmentSelected(models.Model):
                     if usr:
                         self.mail_channel_msgs_interview(
                             usr.id, val.emp_name.name, self.job_position.name if self.job_position else '',
-                            self.interview_date, self.interview_location or 'Head Office',
+                            self.interview_date, self.interview_location,
                             work_unit=self._get_hiring_work_units()
                         )
                         val.interview_notified = 'Yes'
@@ -693,6 +996,13 @@ class NewInternalRecruitmentSelected(models.Model):
         except Exception as e:
             _logger.warning("Stored procedures for interview failed: %s", e)
         self.interview_scheduled = 'Yes'
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+        if vac and vac.exists():
+            vac.sudo().write({'interview_scheduled': 'Yes'})
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -717,7 +1027,17 @@ class NewInternalRecruitmentSelected(models.Model):
             vac_ref = rec.vacancy_reference
             pms_w, exam_w, int_w = rec._get_internal_weights()
 
-            for cand in rec.new_int_rec_sel:
+            # Eligible candidates for interview (not disqualified at exam stage)
+            cands_to_evaluate = rec.new_int_rec_sel.filtered(lambda c: c.selection_type != 'rejected' or (c.written_exam_score or 0.0) >= 50.0)
+            if not cands_to_evaluate:
+                cands_to_evaluate = rec.new_int_rec_sel
+
+            if not cands_to_evaluate:
+                raise UserError(_("No candidates found in the selection list. Please shortlist candidates first."))
+
+            cand_eval_info = []
+
+            for cand in cands_to_evaluate:
                 emp = cand.emp_name if hasattr(cand, 'emp_name') and cand.emp_name else False
                 emp_id_int = emp.id if emp and hasattr(emp, 'id') and not isinstance(emp, int) else (emp if isinstance(emp, int) else False)
 
@@ -757,9 +1077,17 @@ class NewInternalRecruitmentSelected(models.Model):
                         first_last = f"{parts[0]}%{parts[-1]}"
                         cbis_res = CBISCand.search([('candidate_name', '=ilike', first_last)], order='average_interview_score desc, submitted_eval_count desc, id desc', limit=1)
 
+                is_absent = False
+                is_evaluated = False
                 fetched_score = 0.0
+
                 if cbis_res:
-                    fetched_score = cbis_res.average_interview_score or 0.0
+                    if cbis_res.is_absent or cbis_res.state == 'absent':
+                        is_absent = True
+                        fetched_score = 0.0
+                    elif cbis_res.submitted_eval_count > 0 or cbis_res.state in ('evaluated', 'locked') or (cbis_res.average_interview_score and cbis_res.average_interview_score > 0):
+                        is_evaluated = True
+                        fetched_score = cbis_res.average_interview_score or 0.0
                 else:
                     # Fallback to interview.final.result
                     final_res = False
@@ -771,7 +1099,10 @@ class NewInternalRecruitmentSelected(models.Model):
                         final_res = FinalResult.search([('candidate_name', 'ilike', clean_name)], order='id desc', limit=1)
 
                     if final_res:
-                        fetched_score = getattr(final_res, 'final_score', 0.0) or getattr(final_res, 'average_score', 0.0) or getattr(final_res, 'interview_score', 0.0) or 0.0
+                        score_val = getattr(final_res, 'final_score', 0.0) or getattr(final_res, 'average_score', 0.0) or getattr(final_res, 'interview_score', 0.0) or 0.0
+                        if score_val > 0:
+                            is_evaluated = True
+                            fetched_score = score_val
                     else:
                         # Fallback to recruitment.candidate.score
                         score_rec = False
@@ -780,18 +1111,75 @@ class NewInternalRecruitmentSelected(models.Model):
                         if not score_rec and clean_name:
                             score_rec = CandScore.search([('candidate_name', '=ilike', clean_name)], limit=1)
                         if score_rec:
-                            fetched_score = getattr(score_rec, 'interview_score', 0.0) or 0.0
+                            score_val = getattr(score_rec, 'interview_score', 0.0) or 0.0
+                            if score_val > 0:
+                                is_evaluated = True
+                                fetched_score = score_val
 
-                # Calculate updated candidate weighted score
+                cand_eval_info.append({
+                    'cand': cand,
+                    'is_absent': is_absent,
+                    'is_evaluated': is_evaluated,
+                    'fetched_score': fetched_score,
+                })
+
+            total_cands = len(cand_eval_info)
+            absent_cands = [info for info in cand_eval_info if info['is_absent']]
+            evaluated_cands = [info for info in cand_eval_info if info['is_evaluated']]
+            pending_cands = [info for info in cand_eval_info if not info['is_absent'] and not info['is_evaluated']]
+
+            # Validation: Detect if all candidates were absent or no evaluations conducted
+            if len(absent_cands) == total_cands and total_cands > 0:
+                raise UserError(_("All candidates were marked absent for the interview assessment in CBIS. No candidates were present to take the interview examination."))
+
+            if not evaluated_cands:
+                if len(absent_cands) > 0:
+                    raise UserError(_("No candidates have completed their interview evaluation yet in CBIS (%d candidate(s) marked absent, %d pending).") % (len(absent_cands), len(pending_cands)))
+                else:
+                    raise UserError(_("Interview evaluations have not been completed yet in CBIS. None of the candidates have submitted interview evaluations."))
+
+            # Apply scores to candidates
+            for info in cand_eval_info:
+                cand = info['cand']
                 pms = cand.pms_score or 0.0
                 exam = cand.written_exam_score or 0.0
-                intv = fetched_score
-                weighted = round((pms * pms_w / 100.0) + (exam * exam_w / 100.0) + (intv * int_w / 100.0), 2)
+                fetched_score = info['fetched_score']
+                weighted = round((pms * pms_w / 100.0) + (exam * exam_w / 100.0) + (fetched_score * int_w / 100.0), 2)
 
-                cand.write({
-                    'interview_score': fetched_score,
-                    'weighted_score': weighted
-                })
+                if info['is_absent']:
+                    cand.write({
+                        'interview_score': 0.0,
+                        'weighted_score': weighted,
+                        'select_flag': False,
+                        'selection_type': 'rejected',
+                        'remarks': _("Disqualified: Marked absent during interview assessment."),
+                    })
+                elif info['is_evaluated']:
+                    if fetched_score < 50.0:
+                        cand.write({
+                            'interview_score': fetched_score,
+                            'weighted_score': weighted,
+                            'select_flag': False,
+                            'selection_type': 'rejected',
+                            'remarks': _("Disqualified: Interview score (%.2f%%) is below 50%% threshold.") % fetched_score,
+                        })
+                    else:
+                        cand.write({
+                            'interview_score': fetched_score,
+                            'weighted_score': weighted,
+                            'select_flag': True,
+                            'selection_type': 'interview',
+                            'remarks': _("Interview Completed (Score: %.2f%%)") % fetched_score,
+                        })
+                else:
+                    # Pending candidate without evaluation
+                    cand.write({
+                        'interview_score': 0.0,
+                        'weighted_score': weighted,
+                        'select_flag': False,
+                        'selection_type': 'rejected',
+                        'remarks': _("Disqualified: No interview evaluation submitted in CBIS."),
+                    })
 
             rec.interview_scores_fetched = True
 
@@ -800,7 +1188,7 @@ class NewInternalRecruitmentSelected(models.Model):
             'tag': 'display_notification',
             'params': {
                 'title': _('Interview Scores Fetched'),
-                'message': _('Interview scores fetched successfully from panel final results. Proceed to Compute Final Scores.'),
+                'message': _('Interview scores fetched successfully (%d evaluated, %d absent). Proceed to Compute & Rank Scores.') % (len(evaluated_cands), len(absent_cands)),
                 'type': 'success',
                 'sticky': False,
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
@@ -810,28 +1198,14 @@ class NewInternalRecruitmentSelected(models.Model):
     def _get_internal_weights(self):
         """
         Fetches PMS, Written Exam, and Interview weight percentages directly from the 
-        Vacancy form, auto-populated from Assessment module Weight Profiles (assessment.weight.profile).
+        Assessment module Weight Profiles (assessment.weight.profile).
         """
         self.ensure_one()
-        vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
-        if not vac and self.vacancy_reference:
-            vac = self.env["job.vacancy"].search([('reference', '=', self.vacancy_reference)], limit=1)
-
-        if vac and (vac.pms_weight or vac.written_weight or vac.interview_weight):
-            pms_w = vac.pms_weight
-            exam_w = vac.written_weight if getattr(vac, 'has_written_exam', True) else 0.0
-            int_w = vac.interview_weight
-            total = pms_w + exam_w + int_w
-            if total > 0 and abs(total - 100.0) > 0.01:
-                pms_w = round((pms_w / total) * 100.0, 2)
-                int_w = round(100.0 - pms_w, 2)
-                exam_w = 0.0
-            return (pms_w, exam_w, int_w)
-
         pms_w, exam_w, int_w = (40.0, 30.0, 30.0)
 
         if "assessment.weight.profile" in self.env:
-            role_lvl = "managerial" if (vac and vac.employee_category == 'Managerial') else "non_managerial"
+            role_lvl = "non_managerial"
+            vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
             if vac and getattr(vac, "interview_type", False):
                 role_lvl = vac.interview_type
 
@@ -846,60 +1220,114 @@ class NewInternalRecruitmentSelected(models.Model):
                     elif line.component == "interview":
                         int_w = line.weight_percentage
 
-        if vac and hasattr(vac, 'has_written_exam') and not vac.has_written_exam:
-            exam_w = 0.0
-            total_rem = pms_w + int_w
-            if total_rem > 0:
-                pms_w = round((pms_w / total_rem) * 100.0, 2)
-                int_w = round(100.0 - pms_w, 2)
-            else:
-                pms_w, int_w = 60.0, 40.0
-
         return (pms_w, exam_w, int_w)
 
     def _compute_scores_on_lines(self):
         """
         Compute weighted_score and rank for all candidate lines using the
-        vacancy-configured weights (PMS %, Written %, Interview %).
+        vacancy-configured weights (PMS %, Written %, Interview %) or Transfer Matrix weights.
         Returns list of (cand_line, weighted_score) tuples sorted by score desc.
         """
-        pms_w, exam_w, int_w = self._get_internal_weights()
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        is_lateral_transfer = False
+        if self.transfer_eval_mode == 'transfer_matrix_only':
+            is_lateral_transfer = True
+        elif vac and vac.exists():
+            if vac.transfer_eval_mode == 'transfer_matrix_only' or vac.internal_movement_type in ('lateral', 'transfer') or 'LAT' in (vac.reference or '').upper():
+                is_lateral_transfer = True
 
         all_candidates = [
             cand for cand in self.new_int_rec_sel
             if cand.emp_name
         ]
 
-        # Compute raw weighted score per candidate
-        vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
-        if not vac and self.vacancy_reference:
-            vac = self.env["job.vacancy"].search([('reference', '=', self.vacancy_reference)], limit=1)
-
-        is_trf_matrix = vac and getattr(vac, 'transfer_eval_mode', False) == 'transfer_matrix_only'
-
         scored = []
-        for cand in all_candidates:
-            pms  = cand.pms_score or 0.0
-            exam = cand.written_exam_score or 0.0
-            intv = cand.interview_score or 0.0
+        if is_lateral_transfer:
+            w_pms = self.pms_weight or 0.0
+            w_app = self.app_date_weight or 0.0
+            w_exp = self.experience_weight or 0.0
+            w_loc = self.location_weight or 0.0
+            w_rec = self.recommendation_weight or 0.0
+            if (w_pms + w_app + w_exp + w_loc + w_rec) == 0.0:
+                w_pms, w_app, w_exp, w_loc, w_rec = 30.0, 20.0, 20.0, 20.0, 10.0
 
-            if is_trf_matrix:
-                app_w = getattr(vac, 'app_date_weight', 20.0) or 20.0
-                exp_w = getattr(vac, 'experience_weight', 20.0) or 20.0
-                loc_w = getattr(vac, 'location_weight', 20.0) or 20.0
-                rec_w = getattr(vac, 'recommendation_weight', 10.0) or 10.0
-                
-                app_score = 100.0
-                exp_score = getattr(cand, 'total_experience', 5.0) * 10.0 if hasattr(cand, 'total_experience') else 80.0
-                loc_score = getattr(cand, 'service_in_company', 3.0) * 10.0 if hasattr(cand, 'service_in_company') else 75.0
-                rec_score = cand.supervisor_recommendation_score if hasattr(cand, 'supervisor_recommendation_score') and cand.supervisor_recommendation_score else 90.0
+            # Ensure candidate fields (service, experience, application_date) have sensible values
+            today = fields.Date.context_today(self)
+            for cand in all_candidates:
+                emp = cand.emp_name
+                if not cand.application_date and cand.create_date:
+                    cand.application_date = cand.create_date.date()
+                elif not cand.application_date:
+                    cand.application_date = today
 
-                ws = round((pms * pms_w / 100.0) + (app_score * app_w / 100.0) + (min(100.0, exp_score) * exp_w / 100.0) + (min(100.0, loc_score) * loc_w / 100.0) + (rec_score * rec_w / 100.0), 2)
-            else:
+                if not cand.service_in_company and emp:
+                    if getattr(emp, 'months_of_service', False):
+                        cand.service_in_company = round(emp.months_of_service / 12.0, 2)
+                    elif getattr(emp, 'service_start_date', False):
+                        cand.service_in_company = round((today - emp.service_start_date).days / 365.25, 2)
+                    elif getattr(emp, 'joining_date', False):
+                        cand.service_in_company = round((today - emp.joining_date).days / 365.25, 2)
+
+                if not cand.relevant_experience and emp:
+                    if getattr(emp, 'relevant_experience', False):
+                        cand.relevant_experience = emp.relevant_experience
+                    elif cand.service_in_company:
+                        cand.relevant_experience = cand.service_in_company
+
+            max_exp = max([cand.relevant_experience or cand.service_in_company or 1.0 for cand in all_candidates] or [1.0]) or 1.0
+            max_loc = max([cand.service_in_company or 1.0 for cand in all_candidates] or [1.0]) or 1.0
+
+            dates = [cand.application_date or (cand.create_date.date() if cand.create_date else False) for cand in all_candidates]
+            dates = [d for d in dates if d]
+            min_date = min(dates) if dates else False
+            max_date = max(dates) if dates else False
+            date_span = (max_date - min_date).days if (min_date and max_date) else 0
+
+            for cand in all_candidates:
+                pms = cand.pms_score or 0.0
+                rec_score = cand.supervisor_recommendation_score if cand.supervisor_recommendation_score > 0 else 100.0
+                exp_val = cand.relevant_experience or cand.service_in_company or 0.0
+                exp_score = min(100.0, (exp_val / max_exp * 100.0)) if max_exp else 100.0
+                loc_val = cand.service_in_company or 0.0
+                loc_score = min(100.0, (loc_val / max_loc * 100.0)) if max_loc else 100.0
+
+                if date_span and date_span > 0:
+                    cand_date = cand.application_date or (cand.create_date.date() if cand.create_date else min_date)
+                    days_from_earliest = (cand_date - min_date).days if cand_date else 0
+                    app_score = max(0.0, min(100.0, 100.0 * (1.0 - (days_from_earliest / float(date_span)))))
+                else:
+                    app_score = 100.0
+
+                deduction = cand.written_warning or 0.0
+                ws = round(
+                    (pms * w_pms / 100.0)
+                    + (app_score * w_app / 100.0)
+                    + (exp_score * w_exp / 100.0)
+                    + (loc_score * w_loc / 100.0)
+                    + (rec_score * w_rec / 100.0)
+                    - deduction,
+                    2
+                )
+                ws = max(0.0, ws)
+                cand.app_date_score = round(app_score, 2)
+                cand.experience_score = round(exp_score, 2)
+                cand.location_score = round(loc_score, 2)
+                cand.weighted_score = ws
+                scored.append((cand, ws))
+        else:
+            pms_w, exam_w, int_w = self._get_internal_weights()
+            for cand in all_candidates:
+                pms  = cand.pms_score or 0.0
+                exam = cand.written_exam_score or 0.0
+                intv = cand.interview_score or 0.0
                 ws = round((pms * pms_w / 100.0) + (exam * exam_w / 100.0) + (intv * int_w / 100.0), 2)
-
-            cand.weighted_score = ws
-            scored.append((cand, ws))
+                cand.weighted_score = ws
+                scored.append((cand, ws))
 
         # Sort: descending score, female priority tie-breaker, PMS tie-breaker
         def sort_key(item):
@@ -923,14 +1351,44 @@ class NewInternalRecruitmentSelected(models.Model):
         No score transfer to external recruitment scoring model is needed for internal vacancies.
         """
         for rec in self:
-            pms_w, exam_w, int_w = rec._get_internal_weights()
-            total_weight = pms_w + exam_w + int_w
-            if abs(total_weight - 100.0) > 0.01:
-                raise UserError(_(
-                    "Assessment weights must sum to 100%%.\n"
-                    "Currently: PMS %(pms)s%% + Written %(exam)s%% + Interview %(intv)s%% = %(total)s%%\n"
-                    "Please correct the weights before computing scores."
-                ) % {'pms': pms_w, 'exam': exam_w, 'intv': int_w, 'total': total_weight})
+            vac = False
+            if rec.vacancy_id:
+                vac = self.env['job.vacancy'].browse(rec.vacancy_id)
+            elif rec.vacancy_reference:
+                vac = self.env['job.vacancy'].search([('reference', '=', rec.vacancy_reference)], limit=1)
+
+            is_lateral_transfer = False
+            if rec.transfer_eval_mode == 'transfer_matrix_only':
+                is_lateral_transfer = True
+            elif vac and vac.exists():
+                if vac.transfer_eval_mode == 'transfer_matrix_only' or vac.internal_movement_type in ('lateral', 'transfer') or 'LAT' in (vac.reference or '').upper():
+                    is_lateral_transfer = True
+
+            if is_lateral_transfer:
+                w_pms = rec.pms_weight or 0.0
+                w_app = rec.app_date_weight or 0.0
+                w_exp = rec.experience_weight or 0.0
+                w_loc = rec.location_weight or 0.0
+                w_rec = rec.recommendation_weight or 0.0
+                tot = w_pms + w_app + w_exp + w_loc + w_rec
+                if tot == 0.0:
+                    w_pms, w_app, w_exp, w_loc, w_rec = 30.0, 20.0, 20.0, 20.0, 10.0
+                    tot = 100.0
+                elif abs(tot - 100.0) > 0.01:
+                    raise UserError(_(
+                        "Transfer Evaluation weights must sum to 100%%.\n"
+                        "Currently: PMS %(pms)s%% + App Date %(app)s%% + Experience %(exp)s%% + Location %(loc)s%% + Recommendation %(rec)s%% = %(total)s%%\n"
+                        "Please correct the weights before computing scores."
+                    ) % {'pms': w_pms, 'app': w_app, 'exp': w_exp, 'loc': w_loc, 'rec': w_rec, 'total': tot})
+            else:
+                pms_w, exam_w, int_w = rec._get_internal_weights()
+                total_weight = pms_w + exam_w + int_w
+                if abs(total_weight - 100.0) > 0.01:
+                    raise UserError(_(
+                        "Assessment weights must sum to 100%%.\n"
+                        "Currently: PMS %(pms)s%% + Written %(exam)s%% + Interview %(intv)s%% = %(total)s%%\n"
+                        "Please correct the weights before computing scores."
+                    ) % {'pms': pms_w, 'exam': exam_w, 'intv': int_w, 'total': total_weight})
 
             # Sort and compute scores on active candidate lines
             results = rec._compute_scores_on_lines()
@@ -938,14 +1396,8 @@ class NewInternalRecruitmentSelected(models.Model):
 
             # Determine number of vacancies
             vac_slots = rec.no_of_vacancies or 1
-            if rec.vacancy_id:
-                vac = self.env["job.vacancy"].browse(rec.vacancy_id)
-                if vac and vac.no_of_vacancies > 0:
-                    vac_slots = vac.no_of_vacancies
-            elif rec.vacancy_reference:
-                vac = self.env["job.vacancy"].search([("reference", "=", rec.vacancy_reference)], limit=1)
-                if vac and vac.no_of_vacancies > 0:
-                    vac_slots = vac.no_of_vacancies
+            if vac and vac.no_of_vacancies > 0:
+                vac_slots = vac.no_of_vacancies
 
             selected_count = 0
             reserve_count = 0
@@ -957,19 +1409,52 @@ class NewInternalRecruitmentSelected(models.Model):
                 if idx < vac_slots:
                     if score >= 50.0:
                         cand.selection_type = 'selected'
+                        cand.select_flag = True
                         selected_count += 1
                     else:
                         cand.selection_type = 'rejected'
+                        cand.select_flag = False
+                        cand.remarks = _("Disqualified: Weighted score (%.2f%%) is below 50%% threshold.") % score
                         disqualified_count += 1
                 else:
                     if score >= 50.0:
                         cand.selection_type = 'reserve'
+                        cand.select_flag = True
                         reserve_count += 1
                     else:
                         cand.selection_type = 'rejected'
+                        cand.select_flag = False
+                        cand.remarks = _("Disqualified: Weighted score (%.2f%%) is below 50%% threshold.") % score
                         disqualified_count += 1
 
             total = len(results)
+
+            if selected_count == 0:
+                raise UserError(_("No candidates have passed the evaluation. All candidates scored below the 50% threshold. Cannot proceed to candidate ranking or committee approval."))
+
+        if is_lateral_transfer:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Transfer Evaluation Scores Computed & Selection Decisions Applied'),
+                    'message': _(
+                        'Transfer Weights: PMS %(pms)s%% · App Date %(app)s%% · Experience %(exp)s%% · Location %(loc)s%% · Rec %(rec)s%%\n'
+                        '%(total)s candidates ranked for %(slots)s transfer vacancy slot(s):\n'
+                        '• %(sel)s Selected\n'
+                        '• %(res)s Reserved\n'
+                        '• %(disq)s Disqualified (<50%%)\n'
+                        'You can now proceed to "Notify Approval Committee".'
+                    ) % {
+                        'pms': w_pms, 'app': w_app, 'exp': w_exp, 'loc': w_loc, 'rec': w_rec,
+                        'total': total, 'slots': vac_slots,
+                        'sel': selected_count, 'res': reserve_count, 'disq': disqualified_count
+                    },
+                    'type': 'success',
+                    'sticky': True,
+                    'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+                }
+            }
 
         return {
             'type': 'ir.actions.client',
@@ -982,7 +1467,7 @@ class NewInternalRecruitmentSelected(models.Model):
                     '• %(sel)s Selected\n'
                     '• %(res)s Reserved\n'
                     '• %(disq)s Disqualified (<50%%)\n'
-                    'You can now click "Generate Minute" to produce the committee minute for selected candidates.'
+                    'You can now proceed to "Notify Approval Committee".'
                 ) % {
                     'pms': pms_w, 'exam': exam_w, 'intv': int_w,
                     'total': total, 'slots': vac_slots,
@@ -1251,12 +1736,40 @@ class NewInternalRecruitmentSelected(models.Model):
                         if vals:
                             emp.sudo().with_context(job_history_reason='promotion').write(vals)
 
-                        # Update salary on contract if specified
-                        if cand.promoted_salary and hasattr(emp, 'contract_id') and emp.contract_id:
-                            try:
-                                emp.contract_id.sudo().write({'wage': cand.promoted_salary})
-                            except Exception as e:
-                                _logger.warning("Could not update contract wage: %s", e)
+                        # Update salary, job position & grade on hr.version & contract
+                        v_vals = {}
+                        if cand.promoted_salary and cand.promoted_salary > 0:
+                            v_vals['wage'] = cand.promoted_salary
+                        if job_pos:
+                            v_vals['job_id'] = job_pos.id
+                        if grade_rec and grade_rec.exists() and 'job_grade' in self.env['hr.version']._fields:
+                            v_vals['job_grade'] = grade_rec.id
+
+                        if v_vals:
+                            if hasattr(emp, 'version_id') and emp.version_id:
+                                try:
+                                    emp.version_id.sudo().write(v_vals)
+                                except Exception as e:
+                                    _logger.warning("Could not update version_id on same unit promotion: %s", e)
+                            elif 'hr.version' in self.env:
+                                ver = self.env['hr.version'].sudo().search([('employee_id', '=', emp.id)], limit=1)
+                                if ver:
+                                    try:
+                                        ver.write(v_vals)
+                                    except Exception as e:
+                                        _logger.warning("Could not update hr.version on same unit promotion: %s", e)
+
+                        if hasattr(emp, 'contract_id') and emp.contract_id:
+                            c_vals = {}
+                            if cand.promoted_salary and cand.promoted_salary > 0:
+                                c_vals['wage'] = cand.promoted_salary
+                            if job_pos:
+                                c_vals['job_id'] = job_pos.id
+                            if c_vals:
+                                try:
+                                    emp.contract_id.sudo().write(c_vals)
+                                except Exception as e:
+                                    _logger.warning("Could not update contract wage: %s", e)
 
                         # Log department.history
                         today = fields.Date.context_today(self)
@@ -1277,6 +1790,7 @@ class NewInternalRecruitmentSelected(models.Model):
                         cand.promotion_status = 'promoted'
                         same_unit_count += 1
                         cand.action_send_promotion_notification()
+                        _update_pbms_and_operating_unit_counts(self.env, emp.default_operating_unit_id or emp.operating_unit_id, job_pos or emp.job_id, count=1)
                 else:
                     if cand.promotion_status not in ('released', 'promoted'):
                         cand.promotion_status = 'pending_release'
@@ -1406,18 +1920,70 @@ class NewInternalRecruitmentSelected(models.Model):
         return self.action_compute_and_rank()
 
     def notify_selection(self):
+        vac_id = False
+        if getattr(self, 'vacancy_id', False):
+            vac_id = self.vacancy_id if isinstance(self.vacancy_id, int) else getattr(self.vacancy_id, 'id', False)
+        vac_ref = getattr(self, 'vacancy_reference', False) or getattr(self, 'recruitment_reference', False)
+        if not vac_id and vac_ref:
+            vac = self.env["job.vacancy"].search([("reference", "=", vac_ref)], limit=1)
+            if vac:
+                vac_id = vac.id
+
+        minute_rec = False
+        if vac_id:
+            minute_rec = self.env["recruitment.selection.minute"].search([
+                ("vacancy_id", "=", vac_id),
+                ("state", "=", "approved")
+            ], limit=1)
+
+        if not minute_rec:
+            raise UserError(_("Sequence Error: The Recruitment Approval Committee minute has not been approved yet. You cannot notify selected candidates until the selection minute is approved and finalized."))
+
+        vac = self.env["job.vacancy"].browse(vac_id) if vac_id else False
+        is_lateral = (
+            (vac and getattr(vac, 'internal_movement_type', False) in ('lateral', 'transfer'))
+            or (vac and getattr(vac, 'transfer_eval_mode', False) == 'transfer_matrix_only')
+            or (vac_ref and 'LAT' in str(vac_ref).upper())
+            or (getattr(self, 'transfer_eval_mode', False) == 'transfer_matrix_only')
+        )
+
         for val in self.new_int_rec_sel:
             if val.emp_name and (val.select_flag or val.select_flag is None):
                 usr = self._get_partner_for_employee(val.emp_name)
                 if usr:
                     if val.selection_type in ['selected', 'Selected']:
-                        msg1 = _("We are pleased to inform you that you have been Selected for the position of ")
-                        msg2 = _("\n\nPlease indicate your acceptance of promotion in the system.\n\nCongratulations!")
-                        self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name if self.job_position else '', msg2)
+                        if is_lateral:
+                            msg1 = _("We are pleased to inform you that you have been Selected for Lateral Transfer to the position of ")
+                            summary_msg = _('Action Required: Respond to Transfer Offer (%s)') % (self.job_position.name if self.job_position else '')
+                            note_text = _("<p>Congratulations! <a href='%s'>Click here to Review and Respond to Transfer Offer</a></p>")
+                        else:
+                            msg1 = _("We are pleased to inform you that you have been Selected for Internal Promotion to the position of ")
+                            summary_msg = _('Action Required: Respond to Promotion Offer (%s)') % (self.job_position.name if self.job_position else '')
+                            note_text = _("<p>Congratulations! <a href='%s'>Click here to Review and Respond to Promotion Offer</a></p>")
+
+                        msg2 = _("\n\nPlease review and indicate your acceptance/response via the ERP portal.\n\nCongratulations!")
+                        self.mail_channel_msgs_selection(
+                            usr.id, val.emp_name.name, msg1,
+                            self.job_position.name if self.job_position else '',
+                            msg2, candidate_id=val.id, is_lateral=is_lateral
+                        )
+                        if val.emp_name and val.emp_name.user_id:
+                            try:
+                                todo_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+                                base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+                                p_url = f"{base_url.rstrip('/')}/recruitment/transfer_acceptance/{val.id}" if base_url else f"/recruitment/transfer_acceptance/{val.id}"
+                                self.activity_schedule(
+                                    activity_type_id=todo_type.id if todo_type else False,
+                                    summary=summary_msg,
+                                    note=Markup(note_text % p_url),
+                                    user_id=val.emp_name.user_id.id,
+                                )
+                            except Exception:
+                                pass
                     elif val.selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']:
                         msg1 = _("We are pleased to inform you that you have been placed in the Reserve Pool for the position of ")
                         msg2 = _("\n\nYour status is valid for 6 months.")
-                        self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name if self.job_position else '', msg2)
+                        self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name if self.job_position else '', msg2, is_lateral=is_lateral)
                     val.decision_notified = 'Yes'
         try:
             with self.env.cr.savepoint():
@@ -1437,11 +2003,35 @@ class NewInternalRecruitmentSelected(models.Model):
             }
         }
     
-    def mail_channel_msgs_selection(self, rec_id, emp, msg1, position, msg2):
+    def mail_channel_msgs_selection(self, rec_id, emp, msg1, position, msg2, candidate_id=None, is_lateral=False):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-        message = f"Dear {emp},\n\n{msg1}{position}.{msg2}"
+        portal_btn = ""
+        if candidate_id:
+            base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+            portal_url = f"{base_url.rstrip('/')}/recruitment/transfer_acceptance/{candidate_id}" if base_url else f"/recruitment/transfer_acceptance/{candidate_id}"
+            btn_title = _("👉 Review &amp; Respond to Transfer Offer (Accept / Decline)") if is_lateral else _("👉 Review &amp; Respond to Promotion Offer (Accept / Decline)")
+            portal_btn = (
+                f"<div style='margin: 16px 0;'>"
+                f"<a href='{portal_url}' target='_blank' style='"
+                f"display: inline-block; padding: 10px 22px; background-color: #541718; "
+                f"color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; "
+                f"box-shadow: 0 2px 4px rgba(0,0,0,0.15); font-size: 13px;'>"
+                f"{btn_title}"
+                f"</a>"
+                f"<p style='color: #666; font-size: 12px; margin-top: 6px;'>Direct link: <a href='{portal_url}'>{portal_url}</a></p>"
+                f"</div>"
+            )
+        clean_msg2 = msg2.replace('\n', '<br/>')
+        msg = (
+            f"<div style='font-family: inherit; font-size: 14px; line-height: 1.5;'>"
+            f"<p>Dear <b>{emp}</b>,</p>"
+            f"<p>{msg1}<b>{position}</b>.{clean_msg2}</p>"
+            f"{portal_btn}"
+            f"<p>Best regards,<br/><b>Bunna Bank Talent Acquisition &amp; Human Capital</b></p>"
+            f"</div>"
+        )
         channel.message_post(
-            body=message,
+            body=Markup(msg),
             message_type='comment',
             subtype_xmlid='mail.mt_comment',
         )
@@ -1534,28 +2124,98 @@ class NewInternalRecruitmentSelectedDelegation(models.Model):
             if not vac and getattr(sel, 'vacancy_reference', False):
                 vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
 
-        # 1. Panel Member: Strictly from Vacancy's Hiring Work Unit
+        # 1. Panel Member: From Vacancy's Hiring Work Unit (and its parent District) AND Vacancy Responsible Officer's Work Unit
         if role_val == 'panel_member':
+            ou_set = set()
+
+            def _is_district_or_branch_ou(ou_ref):
+                if not ou_ref:
+                    return False
+                try:
+                    curr = ou_ref
+                    if isinstance(ou_ref, int) and ou_ref > 0:
+                        curr = self.env['operating.unit'].browse(ou_ref)
+                    if not curr or not curr.exists():
+                        return False
+                    w_type = getattr(curr, 'work_unit_type', False)
+                    if w_type in ('district_office', 'branch', 'sub_branch', 'regional_office', 'service_center'):
+                        return True
+                    name_str = str(getattr(curr, 'name', '') or '').lower()
+                    code_str = str(getattr(curr, 'code', '') or '').lower()
+                    return 'branch' in name_str or 'district' in name_str or 'branch' in code_str or 'district' in code_str
+                except Exception:
+                    return False
+
+            def _get_ho_root_and_children(ou_ref):
+                res = set()
+                if not ou_ref:
+                    return res
+                curr = ou_ref
+                if isinstance(ou_ref, int) and ou_ref > 0:
+                    curr = self.env['operating.unit'].browse(ou_ref)
+                if not curr or not curr.exists():
+                    return res
+                while curr.parent_unit and curr.parent_unit.exists() and not _is_district_or_branch_ou(curr.parent_unit):
+                    curr = curr.parent_unit
+                res.add(curr.id)
+                frontier = [curr.id]
+                while frontier:
+                    children = self.env['operating.unit'].search([('parent_unit', 'in', frontier)])
+                    new_ids = set(children.ids) - res
+                    if not new_ids:
+                        break
+                    res.update(new_ids)
+                    frontier = list(new_ids)
+                return res
+
             hiring_ou = False
             if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-                hiring_ou = vac.operating_unit_id.id
+                hiring_ou = vac.operating_unit_id
             elif sel and getattr(sel, 'workunit_id', False):
                 w_id = sel.workunit_id
-                hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
+                hiring_ou = self.env['operating.unit'].browse(w_id) if isinstance(w_id, int) else w_id
             elif sel and getattr(sel, 'job_location', False):
                 ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
                 if ou:
-                    hiring_ou = ou.id
+                    hiring_ou = ou
             elif self.env.context.get('parent_operating_unit_id'):
                 p_ou = self.env.context.get('parent_operating_unit_id')
-                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+                hiring_ou = self.env['operating.unit'].browse(p_ou) if isinstance(p_ou, int) else p_ou
             elif self.env.context.get('parent_workunit_id'):
                 p_wu = self.env.context.get('parent_workunit_id')
-                hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+                hiring_ou = self.env['operating.unit'].browse(p_wu) if isinstance(p_wu, int) else p_wu
 
-            if hiring_ou:
+            if hiring_ou and hiring_ou.exists():
+                if not _is_district_or_branch_ou(hiring_ou):
+                    ou_set.update(_get_ho_root_and_children(hiring_ou))
+                else:
+                    ou_set.add(hiring_ou.id)
+                    parent = getattr(hiring_ou, 'parent_unit', False)
+                    if parent and parent.exists():
+                        ou_set.add(parent.id)
+                    else:
+                        district_name = getattr(hiring_ou, 'district', False)
+                        if district_name and isinstance(district_name, str) and district_name.strip() and district_name.lower() not in ('false', 'none', 'n/a'):
+                            dist_ou = self.env['operating.unit'].search([('name', '=ilike', district_name.strip())], limit=1)
+                            if dist_ou and dist_ou.exists():
+                                ou_set.add(dist_ou.id)
+
+            # Responsible Person's Operating Unit (for both Head Office and District)
+            if vac and getattr(vac, 'responsible', False) and vac.responsible and getattr(vac.responsible, 'default_operating_unit_id', False):
+                ou_set.add(vac.responsible.default_operating_unit_id.id)
+            if vac and getattr(vac, 'responsible_employee', False) and vac.responsible_employee and getattr(vac.responsible_employee, 'default_operating_unit_id', False):
+                ou_set.add(vac.responsible_employee.default_operating_unit_id.id)
+            if sel and getattr(sel, 'responsible_employee', False) and sel.responsible_employee and getattr(sel.responsible_employee, 'default_operating_unit_id', False):
+                ou_set.add(sel.responsible_employee.default_operating_unit_id.id)
+            if self.env.context.get('parent_responsible_id'):
+                r_id = self.env.context.get('parent_responsible_id')
+                emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
+                if emp and hasattr(emp, 'default_operating_unit_id') and emp.default_operating_unit_id:
+                    ou_set.add(emp.default_operating_unit_id.id)
+
+            if ou_set:
                 employees = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', '=', hiring_ou),
+                    ('default_operating_unit_id', 'in', list(ou_set)),
                     ('active', '=', True),
                     ('user_id', '!=', False)
                 ])
@@ -1613,6 +2273,7 @@ class NewInternalRecruitmentSelectedDelegation(models.Model):
 class InternalRecruitmentSelectedCandidates(models.Model):
     _name = "new.internal.recruitment.selected.candidates"
     _description = "New Internal Recruitment Selected Candidates"
+    _order = "rank asc, weighted_score desc, id asc"
 
     emp_name = fields.Many2one("hr.employee", string="Name")
     active = fields.Boolean(default=True)
@@ -1678,7 +2339,25 @@ class InternalRecruitmentSelectedCandidates(models.Model):
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     written_exam_score = fields.Float(string="Written Exam Score")
     interview_score = fields.Float(string="Interview Score")
-    supervisor_recommendation_score = fields.Float(string="Supervisor Recommendation Score", default=90.0)
+    supervisor_recommendation_score = fields.Float(string="Supervisor Recommendation Score", default=0.0)
+    supervisor_remarks = fields.Text(string="Supervisor Recommendation Remarks")
+    application_date = fields.Date(
+        string="Application Date",
+        compute="_compute_application_date",
+        store=True,
+        readonly=False,
+    )
+    app_date_score = fields.Float(string="App Date Score", default=0.0)
+    experience_score = fields.Float(string="Experience Score", default=0.0)
+    location_score = fields.Float(string="Location Score", default=0.0)
+
+    @api.depends('create_date')
+    def _compute_application_date(self):
+        for rec in self:
+            if not rec.application_date:
+                rec.application_date = rec.create_date.date() if rec.create_date else fields.Date.context_today(rec)
+
+    # pms_score = fields.Float(string="PMS Score")
     weighted_score = fields.Float(string="Weighted Score")
     rank = fields.Integer(string="Rank", default=0)
     # selection_type = fields.Char(string="Selection Type")
@@ -1687,7 +2366,10 @@ class InternalRecruitmentSelectedCandidates(models.Model):
     decision_notified = fields.Char(string="decision_notified")
     selection_type = fields.Selection([
         ('pending', 'Pending Evaluation'),
-        ('selected', 'Selected'),
+        ('shortlisted', 'Shortlisted'),
+        ('exam', 'Selected for Exam'),
+        ('interview', 'Selected for Interview'),
+        ('selected', 'Selected to hire'),
         ('reserve', 'Reserved'),
         ('rejected', 'Disqualified')
     ], string="Result", default='pending')
@@ -1715,6 +2397,180 @@ class InternalRecruitmentSelectedCandidates(models.Model):
         ('pending', 'Pending Handover')
     ], string="Handover Status")
 
+    acceptance_status = fields.Selection([
+        ('pending', 'Pending Response'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Declined')
+    ], string="Offer Acceptance Status", default='pending')
+    acceptance_date = fields.Date(string="Response Date")
+    rejection_reason = fields.Text(string="Reason for Declining")
+
+    def action_accept_promotion(self):
+        """Candidate accepts the promotion/transfer offer."""
+        for rec in self:
+            rec.write({
+                'acceptance_status': 'accepted',
+                'acceptance_date': fields.Date.context_today(self),
+            })
+            emp_name = rec.emp_name.name if rec.emp_name else _('Candidate')
+            parent_rec = rec.new_int_sel_cand
+            if parent_rec:
+                parent_rec.message_post(
+                    body=_("<b>Offer Accepted:</b> Candidate <b>%s</b> has ACCEPTED the promotion/transfer offer.") % emp_name
+                )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Offer Accepted'),
+                'message': _('Promotion/Transfer offer accepted successfully.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    def action_decline_promotion(self):
+        """Opens decline wizard to capture reason for declining promotion/transfer offer."""
+        self.ensure_one()
+        return {
+            'name': _('Decline / Reject Promotion or Transfer Offer'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'internal.selection.decline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_candidate_id': self.id,
+            }
+        }
+
+    def confirm_decline_promotion(self, reason):
+        """
+        Executed when a candidate declines the promotion/transfer offer.
+        Marks candidate as rejected/declined, then automatically promotes the next
+        highest-ranked candidate from the Reserve Pool (score >= 50%) and dispatches notification.
+        """
+        for rec in self:
+            emp_name = rec.emp_name.name if rec.emp_name else _('Candidate')
+            parent_rec = rec.new_int_sel_cand
+
+            rec.write({
+                'acceptance_status': 'rejected',
+                'acceptance_date': fields.Date.context_today(self),
+                'rejection_reason': reason,
+                'selection_type': 'rejected',
+                'select_flag': False,
+                'remarks': _("Offer Declined: %s") % reason,
+            })
+
+            if parent_rec:
+                parent_rec.message_post(
+                    body=Markup(_("<b>Offer Declined:</b> Candidate <b>%s</b> has declined the promotion/transfer offer.<br/><b>Reason:</b> %s") % (emp_name, reason))
+                )
+
+                # ── AUTO-REPLACEMENT FROM RESERVE POOL ──
+                reserve_cands = parent_rec.new_int_rec_sel.filtered(
+                    lambda c: c.id != rec.id
+                    and c.selection_type in ('reserve', 'reserved', 'Reserve', 'Reserved')
+                    and (c.weighted_score or 0.0) >= 50.0
+                    and c.emp_name
+                ).sorted(key=lambda c: (c.rank or 9999, -(c.weighted_score or 0.0)))
+
+                if reserve_cands:
+                    next_cand = reserve_cands[0]
+                    next_name = next_cand.emp_name.name
+                    next_cand.write({
+                        'selection_type': 'selected',
+                        'select_flag': True,
+                        'acceptance_status': 'pending',
+                        'remarks': _("Promoted from Reserve Pool following decline by %s (Rank: %s, Score: %.2f%%).") % (
+                            emp_name, next_cand.rank, next_cand.weighted_score or 0.0
+                        )
+                    })
+
+                    # Dispatch Selection Notification to newly promoted reserve candidate
+                    vac_id = parent_rec.vacancy_id if isinstance(parent_rec.vacancy_id, int) else getattr(parent_rec.vacancy_id, 'id', False)
+                    vac_ref = getattr(parent_rec, 'vacancy_reference', False) or getattr(parent_rec, 'recruitment_reference', False)
+                    vac = parent_rec.env["job.vacancy"].browse(vac_id) if vac_id else (parent_rec.env["job.vacancy"].search([("reference", "=", vac_ref)], limit=1) if vac_ref else False)
+                    is_lat = (
+                        (vac and getattr(vac, 'internal_movement_type', False) in ('lateral', 'transfer'))
+                        or (vac and getattr(vac, 'transfer_eval_mode', False) == 'transfer_matrix_only')
+                        or (vac_ref and 'LAT' in str(vac_ref).upper())
+                        or (getattr(parent_rec, 'transfer_eval_mode', False) == 'transfer_matrix_only')
+                    )
+
+                    usr = parent_rec._get_partner_for_employee(next_cand.emp_name)
+                    pos_title = parent_rec.job_position.name if parent_rec.job_position else (parent_rec._get_position_title() if hasattr(parent_rec, '_get_position_title') else '')
+                    if usr:
+                        if is_lat:
+                            msg1 = _("We are pleased to inform you that you have been Selected for Lateral Transfer from the Reserve Pool for the position of ")
+                            summary_msg = _('Action Required: Respond to Transfer Offer (%s)') % pos_title
+                            note_txt = _("<p>You have been selected from the Reserve Pool. <a href='%s'>Click here to Review and Respond to Transfer Offer</a></p>")
+                        else:
+                            msg1 = _("We are pleased to inform you that you have been Selected for Internal Promotion from the Reserve Pool for the position of ")
+                            summary_msg = _('Action Required: Respond to Promotion Offer (%s)') % pos_title
+                            note_txt = _("<p>You have been selected from the Reserve Pool. <a href='%s'>Click here to Review and Respond to Promotion Offer</a></p>")
+
+                        msg2 = _("\n\nPlease review and indicate your acceptance/response via the ERP portal.\n\nCongratulations!")
+                        parent_rec.mail_channel_msgs_selection(usr.id, next_name, msg1, pos_title, msg2, candidate_id=next_cand.id, is_lateral=is_lat)
+                        if next_cand.emp_name and next_cand.emp_name.user_id:
+                            try:
+                                todo_type = parent_rec.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+                                base_url = parent_rec.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+                                p_url = f"{base_url.rstrip('/')}/recruitment/transfer_acceptance/{next_cand.id}" if base_url else f"/recruitment/transfer_acceptance/{next_cand.id}"
+                                parent_rec.activity_schedule(
+                                    activity_type_id=todo_type.id if todo_type else False,
+                                    summary=summary_msg,
+                                    note=Markup(note_txt % p_url),
+                                    user_id=next_cand.emp_name.user_id.id,
+                                )
+                            except Exception:
+                                pass
+
+                    parent_rec.message_post(
+                        body=Markup(_(
+                            "<b>Automatic Reserve Promotion:</b> Candidate <b>%s</b> has been automatically promoted from the Reserve Pool to <b>Selected</b> (Rank: %s, Score: %.2f%%) and notified to accept/decline."
+                        ) % (next_name, next_cand.rank, next_cand.weighted_score or 0.0))
+                    )
+        return True
+
+    def action_open_supervisor_rec_wizard(self):
+        """Opens modal wizard to grade / grant supervisor recommendation marks for this candidate."""
+        self.ensure_one()
+        vac = False
+        if self.new_int_sel_cand and self.new_int_sel_cand.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.new_int_sel_cand.vacancy_id)
+        elif self.new_int_sel_cand and self.new_int_sel_cand.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.new_int_sel_cand.vacancy_reference)], limit=1)
+
+        emp = self.emp_name
+        sup = emp.parent_id if emp and emp.parent_id else (emp.coach_id if emp and emp.coach_id else False)
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Grant Supervisor Recommendation Marks'),
+            'res_model': 'supervisor.recommendation.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_candidate_id': self.id,
+                'default_vacancy_id': vac.id if vac and vac.exists() else False,
+                'default_selected_recruitment_id': self.new_int_sel_cand.id if self.new_int_sel_cand else False,
+                'default_employee_id': emp.id if emp else False,
+                'default_job_position': vac.job_position.name if vac and vac.job_position else (self.new_int_sel_cand.job_position.name if self.new_int_sel_cand and self.new_int_sel_cand.job_position else ''),
+                'default_current_position': emp.job_id.name if emp and emp.job_id else (emp.job_position.name if emp and emp.job_position else ''),
+                'default_current_grade': emp.job_grade.grade_name if emp and emp.job_grade else '',
+                'default_current_work_unit': emp.default_operating_unit_id.name if emp and emp.default_operating_unit_id else '',
+                'default_current_department': emp.department_id.name if emp and emp.department_id else '',
+                'default_service_in_company': self.service_in_company or 0.0,
+                'default_pms_score': self.pms_score or 0.0,
+                'default_supervisor_id': sup.id if sup else False,
+                'default_recommendation_score': self.supervisor_recommendation_score or 100.0,
+                'default_recommendation_remarks': self.supervisor_remarks or '',
+                'default_is_batch': False,
+            }
+        }
+
     # ── Promotion Letter Fields (Official Bunna Bank Stationery) ──────────
     promotion_ref_no = fields.Char(string="Promotion Reference No", copy=False, readonly=True)
     salutation = fields.Selection([
@@ -1724,11 +2580,8 @@ class InternalRecruitmentSelectedCandidates(models.Model):
     ], string="Salutation", compute="_compute_salutation", store=True, readonly=False)
     promoted_salary = fields.Float(string="Promoted Monthly Salary (ETB)", default=0.0)
     promotion_date = fields.Date(string="Promotion Date", default=fields.Date.context_today)
-    signatory_config_id = fields.Many2one(
-        'recruitment.signatory.config',
-        string='Signatory & Stamp Configuration',
-        help='Resolved signatory configuration for the target promotion work unit / district.'
-    )
+    signatory_config_id = fields.Many2one('recruitment.signatory.config', string="Signatory Configuration")
+
 
     @api.depends('emp_name', 'emp_name.gender')
     def _compute_salutation(self):
@@ -1821,18 +2674,126 @@ class InternalRecruitmentSelectedCandidates(models.Model):
 
         return salary or 0.0
 
-    def get_promoted_salary_figure(self):
-        """Returns the monthly salary figure, resolving automatically from target grade if blank."""
+    def compute_promoted_salary_from_grade_and_version(self):
+        """
+        Computes promoted salary step based on:
+        1. Candidate's current wage from hr_versions / contract / employee (W_current).
+        2. Target grade base salary and increment steps (S_0, S_1, S_2, ..., S_10).
+        3. Algorithm:
+           - S_0 = target_grade.base_salary
+           - Step increments S_1..S_10 from target_grade.increment_id (amount_1..amount_10) 
+             or dynamically computed using salary_factor.
+           - Iterate through steps S_0, S_1, S_2, ...
+             - If step S <= W_current: skip step (current wage already >= S).
+             - If step S > W_current:
+               - Calculate diff = S - W_current.
+               - If diff < 1000 ETB: skip step (raise gain is less than 1000 ETB threshold).
+               - If diff >= 1000 ETB: select step S.
+        """
         self.ensure_one()
-        sal = self.promoted_salary
-        if not sal or sal <= 0:
-            sal = self._get_grade_base_salary()
-            if sal and sal > 0:
-                try:
-                    self.sudo().write({'promoted_salary': sal})
-                except Exception:
-                    pass
-        return sal or 0.0
+        emp = self.emp_name
+        current_wage = 0.0
+
+        if emp:
+            if hasattr(emp, 'version_id') and emp.version_id and getattr(emp.version_id, 'wage', False):
+                current_wage = float(emp.version_id.wage or 0.0)
+            if not current_wage and 'hr.version' in self.env:
+                ver = self.env['hr.version'].sudo().search([('employee_id', '=', emp.id)], limit=1)
+                if ver and getattr(ver, 'wage', False):
+                    current_wage = float(ver.wage or 0.0)
+            if not current_wage and hasattr(emp, 'contract_id') and emp.contract_id and getattr(emp.contract_id, 'wage', False):
+                current_wage = float(emp.contract_id.wage or 0.0)
+            if not current_wage and hasattr(emp, 'wage') and emp.wage:
+                current_wage = float(emp.wage or 0.0)
+
+        grade_val = False
+        if self.new_int_sel_cand:
+            grade_val = self.new_int_sel_cand.job_grade or getattr(self.new_int_sel_cand, 'job_grade_id', False)
+        if not grade_val and getattr(self, 'vacancy_id', False):
+            vac_id = self.vacancy_id.id if hasattr(self.vacancy_id, 'id') else self.vacancy_id
+            vac = self.env['job.vacancy'].browse(vac_id)
+            if vac and vac.exists():
+                grade_val = getattr(vac.job_id, 'job_grade', False) or getattr(vac, 'job_grade', False) or getattr(vac, 'grade', False)
+
+        grade_rec = False
+        if grade_val and 'employee.grade' in self.env:
+            if isinstance(grade_val, int):
+                grade_rec = self.env['employee.grade'].browse(grade_val)
+            elif hasattr(grade_val, 'base_salary') or hasattr(grade_val, 'salary_factor'):
+                grade_rec = grade_val
+            else:
+                g_str = _format_clean_text(grade_val)
+                if g_str:
+                    grade_rec = self.env['employee.grade'].search([
+                        '|', ('grade_name', '=ilike', str(g_str).strip()), ('grade_code', '=ilike', str(g_str).strip())
+                    ], limit=1)
+
+        base_salary = 0.0
+        salary_factor = 1.05
+
+        if grade_rec and grade_rec.exists():
+            base_salary = float(getattr(grade_rec, 'base_salary', 0.0) or getattr(grade_rec, 'starting_salary', 0.0) or 0.0)
+            salary_factor = float(getattr(grade_rec, 'salary_factor', 1.05) or 1.05)
+
+        if not base_salary:
+            base_salary = float(self._get_grade_base_salary() or 0.0)
+
+        steps = []
+        if base_salary > 0:
+            steps.append(base_salary)
+
+        if grade_rec and grade_rec.exists() and hasattr(grade_rec, 'increment_id') and grade_rec.increment_id:
+            inc = grade_rec.increment_id
+            for seq in range(1, 11):
+                amt = float(getattr(inc, f'amount_{seq}', 0.0) or 0.0)
+                if amt > 0:
+                    steps.append(amt)
+
+        if len(steps) <= 1 and base_salary > 0 and salary_factor > 1.0:
+            curr_step = base_salary
+            for _ in range(1, 11):
+                curr_step = round(curr_step * salary_factor, 2)
+                steps.append(curr_step)
+
+        if not steps:
+            return current_wage or 0.0
+
+        steps = sorted(list(set(steps)))
+
+        if current_wage <= 0:
+            return steps[0]
+
+        chosen_salary = False
+        for step_val in steps:
+            if step_val <= current_wage:
+                continue
+            diff = step_val - current_wage
+            if diff >= 1000.0:
+                chosen_salary = step_val
+                break
+
+        if not chosen_salary:
+            highest_step = steps[-1]
+            factor = salary_factor if salary_factor > 1.0 else 1.05
+            curr_step = max(highest_step, current_wage)
+            while True:
+                curr_step = round(curr_step * factor, 2)
+                if (curr_step - current_wage) >= 1000.0:
+                    chosen_salary = curr_step
+                    break
+
+        return chosen_salary or current_wage or 0.0
+
+    def get_promoted_salary_figure(self):
+        """Returns the monthly salary figure, resolving automatically from target grade steps & hr_versions wage."""
+        self.ensure_one()
+        sal = self.compute_promoted_salary_from_grade_and_version()
+        if sal and sal > 0 and self.promoted_salary != sal:
+            try:
+                self.sudo().write({'promoted_salary': sal})
+            except Exception:
+                pass
+        return sal or self.promoted_salary or 0.0
 
     def get_promoted_salary_in_words(self):
         self.ensure_one()
@@ -1841,14 +2802,38 @@ class InternalRecruitmentSelectedCandidates(models.Model):
             return amount_to_words_birr(sal)
         return ""
 
+    def _get_parent_vacancy(self):
+        self.ensure_one()
+        parent_rec = self.new_int_sel_cand
+        if parent_rec:
+            if getattr(parent_rec, 'vacancy_id', False):
+                vac_id = parent_rec.vacancy_id
+                if isinstance(vac_id, int):
+                    vac = self.env['job.vacancy'].browse(vac_id)
+                    if vac.exists():
+                        return vac
+                elif hasattr(vac_id, 'job_position'):
+                    return vac_id
+            if getattr(parent_rec, 'vacancy_reference', False):
+                vac = self.env['job.vacancy'].search([('reference', '=', parent_rec.vacancy_reference)], limit=1)
+                if vac.exists():
+                    return vac
+        return False
+
     def get_new_job_position_name(self):
         self.ensure_one()
+        vac = self._get_parent_vacancy()
+        if vac and vac.job_position:
+            return vac.job_position.name
         if self.new_int_sel_cand and self.new_int_sel_cand.job_position:
             return self.new_int_sel_cand.job_position.name
         return ""
 
     def get_new_job_grade_name(self):
         self.ensure_one()
+        vac = self._get_parent_vacancy()
+        if vac and vac.job_grade:
+            return _format_clean_text(vac.job_grade)
         if self.new_int_sel_cand:
             grade_val = self.new_int_sel_cand.job_grade or getattr(self.new_int_sel_cand, 'job_grade_id', False)
             if grade_val:
@@ -1857,76 +2842,136 @@ class InternalRecruitmentSelectedCandidates(models.Model):
 
     def get_target_work_unit_name(self):
         self.ensure_one()
-        target = self.preferred_location or (self.new_int_sel_cand.job_location if self.new_int_sel_cand else False)
-        return _format_clean_text(target) or ""
+        if self.preferred_location:
+            return _format_clean_text(self.preferred_location)
+        vac = self._get_parent_vacancy()
+        if vac and vac.operating_unit_id:
+            return _format_clean_text(vac.operating_unit_id.name)
+        parent_rec = self.new_int_sel_cand
+        if parent_rec and parent_rec.job_location:
+            return _format_clean_text(parent_rec.job_location)
+        return ""
 
     def get_current_work_unit_name(self):
         self.ensure_one()
-        return _format_clean_text(self.current_work_unit) or ""
+        if self.current_work_unit:
+            return _format_clean_text(self.current_work_unit)
+        if self.emp_name:
+            unit = getattr(self.emp_name, 'default_operating_unit_id', False) or getattr(self.emp_name, 'operating_unit_id', False)
+            if unit:
+                return _format_clean_text(unit.name)
+        return ""
 
-    def get_target_operating_unit(self):
-        """Resolves the target operating unit (branch or office) for promotion."""
+    def is_candidate_in_pomd(self):
         self.ensure_one()
-        if self.new_int_sel_cand and self.new_int_sel_cand.vacancy_id:
-            vac = self.env['job.vacancy'].browse(self.new_int_sel_cand.vacancy_id)
-            if vac.exists() and vac.operating_unit_id:
-                return vac.operating_unit_id
+        curr_dept = (self.current_department or (self.emp_name.department_id.name if self.emp_name and self.emp_name.department_id else '')).lower()
+        curr_unit = (self.current_work_unit or (self.emp_name.default_operating_unit_id.name if self.emp_name and getattr(self.emp_name, 'default_operating_unit_id', False) else '')).lower()
+        return (
+            'pomd' in curr_dept or 'people' in curr_dept or 'human resource' in curr_dept or
+            'pomd' in curr_unit or 'people' in curr_unit or 'human resource' in curr_unit
+        )
 
-        if self.new_int_sel_cand and self.new_int_sel_cand.workunit_id:
-            ou = self.env['operating.unit'].browse(self.new_int_sel_cand.workunit_id)
-            if ou.exists():
-                return ou
+    def get_letter_subject(self):
+        self.ensure_one()
+        parent_rec = self.new_int_sel_cand
+        vac = False
+        if parent_rec and parent_rec.vacancy_id:
+            vac = self.env['job.vacancy'].browse(parent_rec.vacancy_id)
+        elif parent_rec and parent_rec.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', parent_rec.vacancy_reference)], limit=1)
+        if (parent_rec and parent_rec.transfer_eval_mode == 'transfer_matrix_only') or (vac and (vac.transfer_eval_mode == 'transfer_matrix_only' or vac.internal_movement_type in ('lateral', 'transfer'))):
+            return "Lateral Transfer"
+        return "Promotion"
 
-        target_name = self.get_target_work_unit_name()
-        if target_name:
-            ou = self.env['operating.unit'].search([
-                '|', ('name', '=ilike', target_name.strip()),
-                     ('district', '=ilike', target_name.strip())
-            ], limit=1)
-            if ou:
-                return ou
-
-        return self.env['operating.unit']
+    def get_letter_action_verb(self):
+        self.ensure_one()
+        if self.get_letter_subject() == "Lateral Transfer":
+            return "transferred"
+        return "promoted"
 
     def get_signatory_config(self):
-        """Resolves the active signatory configuration for this promotion."""
         self.ensure_one()
         if self.signatory_config_id:
             return self.signatory_config_id
-
-        target_ou = self.get_target_operating_unit()
-        target_name = target_ou or self.get_target_work_unit_name()
-        return self.env['recruitment.signatory.config'].get_signatory_for_unit(
-            work_unit=target_name,
-            doc_type='promotion_letter'
-        )
+        target_unit = self.get_target_work_unit_name() or self.get_current_work_unit_name()
+        sig = False
+        if 'recruitment.signatory.config' in self.env:
+            sig = self.env['recruitment.signatory.config'].get_signatory_for_unit(
+                work_unit=target_unit, doc_type='promotion_letter'
+            )
+            if not sig:
+                sig = self.env['recruitment.signatory.config'].get_signatory_for_unit(
+                    work_unit=target_unit, doc_type='employment_letter'
+                )
+            if not sig:
+                sig = self.env['recruitment.signatory.config'].search([('active', '=', True)], limit=1)
+        return sig or False
 
     def get_signatory_name(self):
         self.ensure_one()
-        sig = self.get_signatory_config()
-        return sig.signatory_name if sig and sig.signatory_name else ""
+        sig = self.signatory_config_id or self.get_signatory_config()
+        if sig and sig.signatory_name:
+            return sig.signatory_name
+        return ""
 
     def get_signatory_title(self):
         self.ensure_one()
-        sig = self.get_signatory_config()
-        return sig.signatory_title if sig and sig.signatory_title else "People Operation Management Directorate"
+        sig = self.signatory_config_id or self.get_signatory_config()
+        if sig and sig.signatory_title:
+            return sig.signatory_title
+        return "Director, People Operations Management Directorate"
 
     def get_signatory_company(self):
         self.ensure_one()
-        sig = self.get_signatory_config()
-        return sig.signatory_company if sig and sig.signatory_company else "Bunna Bank S.C."
+        sig = self.signatory_config_id or self.get_signatory_config()
+        if sig and sig.signatory_company:
+            return sig.signatory_company
+        return "Bunna Bank S.C."
+
+    @api.model
+    def get_official_bunna_logo_base64(self):
+        """Returns base64 string of the official Bunna Bank logo for reliable QWeb PDF rendering."""
+        logo_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'bunna_bank_official_logo.png')
+        )
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        return ""
 
     def get_signature_stamp_base64(self):
         self.ensure_one()
-        sig = self.get_signatory_config()
+        sig = self.signatory_config_id or self.get_signatory_config()
         if sig:
-            return sig.get_signature_stamp_base64()
+            b64 = sig.get_signature_stamp_base64()
+            if b64:
+                return b64
+
+        static_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'src', 'img', 'default_signatory_stamp.png')
+        )
+        if os.path.exists(static_path):
+            with open(static_path, 'rb') as f:
+                return f"data:image/png;base64,{base64.b64encode(f.read()).decode('utf-8')}"
         return ""
+
+    def get_promotion_letter_cc_lines(self):
+        self.ensure_one()
+        lines = []
+        curr_unit = self.get_current_work_unit_name()
+        target_unit = self.get_target_work_unit_name()
+
+        if curr_unit:
+            lines.append(f"{curr_unit}")
+        if target_unit and target_unit != curr_unit:
+            lines.append(f"{target_unit}")
+
+        lines.append("IT Security Management Directorate")
+        lines.append("People Operations Management Directorate")
+        return lines
 
     def action_print_promotion_letter(self):
         self.ensure_one()
-        if not self.signatory_config_id:
-            self.signatory_config_id = self.get_signatory_config()
         if not self.promotion_ref_no:
             seq_val = self.env['ir.sequence'].next_by_code('bunna.internal.promotion.letter')
             self.promotion_ref_no = seq_val or ('BB/TAOD/%04d/%s' % (self.id, fields.Date.today().year))
@@ -1934,6 +2979,10 @@ class InternalRecruitmentSelectedCandidates(models.Model):
             self.promotion_date = fields.Date.context_today(self)
         if not self.promoted_salary or self.promoted_salary <= 0:
             self.promoted_salary = self.get_promoted_salary_figure()
+        if not self.signatory_config_id:
+            sig = self.get_signatory_config()
+            if sig:
+                self.signatory_config_id = sig.id
         return self.env.ref('custom_recruitment.action_report_internal_promotion_letter').report_action(self)
 
     def action_send_promotion_notification(self):
@@ -1966,18 +3015,29 @@ class InternalRecruitmentSelectedCandidates(models.Model):
             if hasattr(rec.emp_name, 'message_post'):
                 rec.emp_name.message_post(body=body_html, message_type='notification')
 
-    @api.depends('current_work_unit', 'preferred_location', 'new_int_sel_cand.job_location', 'emp_name')
+    @api.depends('current_work_unit', 'preferred_location', 'new_int_sel_cand.job_location', 'new_int_sel_cand.vacancy_id', 'emp_name', 'emp_name.default_operating_unit_id')
     def _compute_promotion_type(self):
         for rec in self:
-            cand_unit = (rec.current_work_unit or '').strip().lower()
-            vacancy_unit = (rec.new_int_sel_cand.job_location or '').strip().lower() if rec.new_int_sel_cand else ''
-            pref_unit = (rec.preferred_location or '').strip().lower()
+            cand_unit = rec.get_current_work_unit_name()
+            if not cand_unit and rec.emp_name and getattr(rec.emp_name, 'default_operating_unit_id', False):
+                cand_unit = rec.emp_name.default_operating_unit_id.name or ''
+            cand_unit = cand_unit.strip().lower()
 
-            target_unit = pref_unit or vacancy_unit
-            if not cand_unit or not target_unit or cand_unit == target_unit:
-                rec.promotion_type = 'same_unit'
-            else:
+            target_unit = rec.get_target_work_unit_name()
+            if not target_unit and rec.new_int_sel_cand and rec.new_int_sel_cand.job_location:
+                target_unit = rec.new_int_sel_cand.job_location or ''
+            if not target_unit and rec.new_int_sel_cand and getattr(rec.new_int_sel_cand, 'vacancy_id', False):
+                vac = rec.new_int_sel_cand.vacancy_id
+                if isinstance(vac, int) and vac > 0:
+                    vac = self.env['job.vacancy'].browse(vac)
+                if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
+                    target_unit = vac.operating_unit_id.name or ''
+            target_unit = target_unit.strip().lower()
+
+            if cand_unit and target_unit and cand_unit != target_unit:
                 rec.promotion_type = 'diff_unit'
+            else:
+                rec.promotion_type = 'same_unit'
 
     @api.depends('emp_name')
     def _compute_coach_id(self):
@@ -1988,9 +3048,13 @@ class InternalRecruitmentSelectedCandidates(models.Model):
                 rec.coach_id = False
 
     def action_open_release_wizard(self):
+        self = self.sudo()
         self.ensure_one()
-        emp = self.emp_name
-        parent_rec = self.new_int_sel_cand
+        if self.promotion_type == 'same_unit':
+            raise UserError(_("This candidate is promoted within the Same Work Unit. No release form is required as employee master data and versioned contract records are updated automatically."))
+
+        emp = self.emp_name.sudo() if self.emp_name else False
+        parent_rec = self.new_int_sel_cand.sudo() if self.new_int_sel_cand else False
 
         # 1. Current Position (Ref #1)
         curr_pos = self.emp_position
@@ -2098,20 +3162,62 @@ class InternalRecruitmentSelectedCandidates(models.Model):
 
     @api.onchange('emp_name')
     def _onchange_emp_name_prefill_pms(self):
-        """Pre-fill PMS score from contract when employee is selected.
-        HR can freely override the value afterward."""
+        """Pre-fill PMS score, experience, service, and application date when employee is selected.
+        HR can freely override the values afterward."""
+        today = fields.Date.context_today(self)
         for record in self:
             if record.emp_name:
-                contract_pms = record.emp_name.contract_id.pms_score if record.emp_name.contract_id else 0.0
-                # Only pre-fill if score hasn't been set yet (don't overwrite manual edits)
+                emp = record.emp_name
+                contract_pms = emp.contract_id.pms_score if emp.contract_id else 0.0
                 if not record.pms_score:
                     record.pms_score = contract_pms or 0.0
+                if not record.application_date:
+                    record.application_date = record.create_date.date() if record.create_date else today
+
+                if not record.service_in_company:
+                    if getattr(emp, 'months_of_service', False):
+                        record.service_in_company = round(emp.months_of_service / 12.0, 2)
+                    elif getattr(emp, 'service_start_date', False):
+                        record.service_in_company = round((today - emp.service_start_date).days / 365.25, 2)
+                    elif getattr(emp, 'joining_date', False):
+                        record.service_in_company = round((today - emp.joining_date).days / 365.25, 2)
+
+                if not record.relevant_experience:
+                    if getattr(emp, 'relevant_experience', False):
+                        record.relevant_experience = emp.relevant_experience
+                    elif record.service_in_company:
+                        record.relevant_experience = record.service_in_company
+
 class InternalRecruitmentPanel(models.Model):
     _name = "new.internal.recruitment.panel"
     _description = "New Internal Recruitment Panel"
 
     emp_name = fields.Many2one("hr.employee", string="Name")
     active = fields.Boolean(default=True)
+
+    def _grant_panel_member_group(self):
+        group_panel = self.env.ref("assessment_system.group_assessment_panel_member", raise_if_not_found=False)
+        if not group_panel:
+            return
+        for rec in self:
+            if rec.emp_name and rec.emp_name.user_id:
+                user = rec.emp_name.user_id
+                groups = getattr(user, 'group_ids', False) or getattr(user, 'groups_id', False)
+                if groups is not False and group_panel not in groups:
+                    field_name = 'group_ids' if 'group_ids' in user._fields else 'groups_id'
+                    user.sudo().write({field_name: [(4, group_panel.id)]})
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records._grant_panel_member_group()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if "emp_name" in vals:
+            self._grant_panel_member_group()
+        return res
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
@@ -2140,83 +3246,177 @@ class InternalRecruitmentPanel(models.Model):
         string='Eligible Panel Employees'
     )
 
-    @api.depends('new_int_panel', 'new_int_panel.vacancy_id', 'new_int_panel.workunit_id')
-    def _compute_eligible_employee_ids(self):
-        for rec in self:
-            sel = rec.new_int_panel
-            vac = False
-            if sel:
-                vac_id = getattr(sel, 'vacancy_id', False)
-                if isinstance(vac_id, int) and vac_id > 0:
-                    vac = self.env['job.vacancy'].browse(vac_id)
-                elif hasattr(vac_id, 'operating_unit_id') and vac_id:
-                    vac = vac_id
-                if not vac and getattr(sel, 'vacancy_reference', False):
-                    vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
+    def _get_eligible_panel_info(self, vac=False, sel=False):
+        target_ou_ids = set()
+        resp_ou_ids = set()
 
-            hiring_ou = False
-            if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-                hiring_ou = vac.operating_unit_id.id
-            elif sel and getattr(sel, 'workunit_id', False):
-                w_id = sel.workunit_id
-                hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
-            elif sel and getattr(sel, 'job_location', False):
-                ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
-                if ou:
-                    hiring_ou = ou.id
+        def _is_district_or_branch_ou(ou_ref):
+            if not ou_ref:
+                return False
+            try:
+                curr = ou_ref
+                if isinstance(ou_ref, int) and ou_ref > 0:
+                    curr = self.env['operating.unit'].browse(ou_ref)
+                if not curr or not curr.exists():
+                    return False
+                w_type = getattr(curr, 'work_unit_type', False)
+                if w_type in ('district_office', 'branch', 'sub_branch', 'regional_office', 'service_center'):
+                    return True
+                name_str = str(getattr(curr, 'name', '') or '').lower()
+                code_str = str(getattr(curr, 'code', '') or '').lower()
+                return 'branch' in name_str or 'district' in name_str or 'branch' in code_str or 'district' in code_str
+            except Exception:
+                return False
 
-            elif self.env.context.get('parent_operating_unit_id'):
-                p_ou = self.env.context.get('parent_operating_unit_id')
-                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
-            elif self.env.context.get('parent_workunit_id'):
-                p_wu = self.env.context.get('parent_workunit_id')
-                hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+        def _get_ho_root_and_children(ou_ref):
+            res = set()
+            if not ou_ref:
+                return res
+            curr = ou_ref
+            if isinstance(ou_ref, int) and ou_ref > 0:
+                curr = self.env['operating.unit'].browse(ou_ref)
+            if not curr or not curr.exists():
+                return res
+            while curr.parent_unit and curr.parent_unit.exists() and not _is_district_or_branch_ou(curr.parent_unit):
+                curr = curr.parent_unit
+            res.add(curr.id)
+            frontier = [curr.id]
+            while frontier:
+                children = self.env['operating.unit'].search([('parent_unit', 'in', frontier)])
+                new_ids = set(children.ids) - res
+                if not new_ids:
+                    break
+                res.update(new_ids)
+                frontier = list(new_ids)
+            return res
 
-            if hiring_ou:
-                rec.eligible_employee_ids = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', '=', hiring_ou),
-                    ('active', '=', True)
-                ])
-            else:
-                rec.eligible_employee_ids = self.env['hr.employee'].search([('active', '=', True)])
-
-    @api.onchange('new_int_panel', 'selection_criteria')
-    def _onchange_new_int_panel_domain(self):
-        """Filter panel members strictly to the Hiring Work Unit."""
-        sel = self.new_int_panel
-        vac = False
-        if sel:
-            vac_id = getattr(sel, 'vacancy_id', False)
-            if isinstance(vac_id, int) and vac_id > 0:
-                vac = self.env['job.vacancy'].browse(vac_id)
-            elif hasattr(vac_id, 'operating_unit_id') and vac_id:
-                vac = vac_id
-            if not vac and getattr(sel, 'vacancy_reference', False):
-                vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
-
+        # 1. Hiring Work Unit
         hiring_ou = False
-        if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-            hiring_ou = vac.operating_unit_id.id
+        if vac and getattr(vac, 'operating_unit_id', False):
+            hiring_ou = vac.operating_unit_id
         elif sel and getattr(sel, 'workunit_id', False):
             w_id = sel.workunit_id
-            hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
+            hiring_ou = self.env['operating.unit'].browse(w_id) if isinstance(w_id, int) else w_id
         elif sel and getattr(sel, 'job_location', False):
             ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
             if ou:
-                hiring_ou = ou.id
+                hiring_ou = ou
         elif self.env.context.get('parent_operating_unit_id'):
             p_ou = self.env.context.get('parent_operating_unit_id')
-            hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+            hiring_ou = self.env['operating.unit'].browse(p_ou) if isinstance(p_ou, int) else p_ou
         elif self.env.context.get('parent_workunit_id'):
             p_wu = self.env.context.get('parent_workunit_id')
-            hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+            hiring_ou = self.env['operating.unit'].browse(p_wu) if isinstance(p_wu, int) else p_wu
 
-        if hiring_ou:
-            domain = [('default_operating_unit_id', '=', hiring_ou), ('active', '=', True)]
-            self.eligible_employee_ids = self.env['hr.employee'].search(domain)
-            if self.emp_name and self.emp_name.id not in self.eligible_employee_ids.ids:
-                self.emp_name = False
-            return {'domain': {'emp_name': domain}}
+        if hiring_ou and hiring_ou.exists():
+            dept = getattr(hiring_ou, 'department', False)
+            dept_name = dept.name if dept else ''
+
+            is_ho = False
+            if dept_name and 'head office' in dept_name.lower():
+                is_ho = True
+            elif not _is_district_or_branch_ou(hiring_ou):
+                is_ho = True
+
+            if is_ho:
+                # Rule 1 (Head Office): Include ONLY the Hiring Work Unit operating unit itself
+                target_ou_ids.add(hiring_ou.id)
+            else:
+                # Rule 2 (District/Branch - Out of Head Office): Target ONLY the District operating unit
+                dist_ou = False
+                if dept:
+                    dist_ou = self.env['operating.unit'].search([
+                        ('name', '=ilike', dept.name),
+                        ('work_unit_type', '=', 'district_office')
+                    ], limit=1)
+                    if not dist_ou:
+                        dist_ou = self.env['operating.unit'].search([('name', '=ilike', dept.name)], limit=1)
+
+                if not dist_ou and getattr(hiring_ou, 'parent_unit', False):
+                    p = hiring_ou.parent_unit
+                    if getattr(p, 'work_unit_type', '') == 'district_office' or 'district' in (p.name or '').lower():
+                        dist_ou = p
+
+                if not dist_ou and getattr(hiring_ou, 'district', False):
+                    dist_name = hiring_ou.district
+                    dist_ou = self.env['operating.unit'].search([('name', '=ilike', dist_name)], limit=1)
+
+                if dist_ou and dist_ou.exists():
+                    target_ou_ids.add(dist_ou.id)
+                else:
+                    target_ou_ids.add(hiring_ou.id)
+
+        # 2. Responsible Person's Operating Unit (for both Head Office and District)
+        sources = [s for s in (vac, sel) if s]
+        for src in sources:
+            if getattr(src, 'responsible', False) and src.responsible:
+                resp_emp = src.responsible
+                if getattr(resp_emp, 'default_operating_unit_id', False):
+                    resp_ou_ids.add(resp_emp.default_operating_unit_id.id)
+                if getattr(resp_emp, 'user_id', False) and getattr(resp_emp.user_id, 'employee_id', False):
+                    resp_user_emp = resp_emp.user_id.employee_id
+                    if getattr(resp_user_emp, 'default_operating_unit_id', False):
+                        resp_ou_ids.add(resp_user_emp.default_operating_unit_id.id)
+            if getattr(src, 'responsible_employee', False) and src.responsible_employee:
+                resp_emp = src.responsible_employee
+                if getattr(resp_emp, 'default_operating_unit_id', False):
+                    resp_ou_ids.add(resp_emp.default_operating_unit_id.id)
+
+            del_teams = getattr(src, 'vac_del_team_id', False) or getattr(src, 'new_recrt_delegation_team', False) or getattr(src, 'external_recrt_delegation_team', False)
+            if del_teams:
+                for del_line in del_teams:
+                    emp_user = getattr(del_line, 'employee_name', False)
+                    if emp_user and getattr(emp_user, 'employee_id', False):
+                        emp = emp_user.employee_id
+                        if getattr(emp, 'default_operating_unit_id', False):
+                            resp_ou_ids.add(emp.default_operating_unit_id.id)
+                    alt_user = getattr(del_line, 'alternate_committee_member', False)
+                    if alt_user and getattr(alt_user, 'employee_id', False):
+                        alt_emp = alt_user.employee_id
+                        if getattr(alt_emp, 'default_operating_unit_id', False):
+                            resp_ou_ids.add(alt_emp.default_operating_unit_id.id)
+
+            hierarchy_users = [
+                getattr(src, 'chairperson_id', False),
+                getattr(src, 'panel_member_id', False),
+                getattr(src, 'secretary_id', False),
+                getattr(src, 'observer_id', False),
+            ]
+            for user in hierarchy_users:
+                if user and getattr(user, 'employee_id', False):
+                    emp = user.employee_id
+                    if getattr(emp, 'default_operating_unit_id', False):
+                        resp_ou_ids.add(emp.default_operating_unit_id.id)
+
+        return list(target_ou_ids), list(resp_ou_ids)
+
+    def _get_eligible_operating_units(self, vac=False, sel=False):
+        target_ou_ids, resp_ou_ids = self._get_eligible_panel_info(vac=vac, sel=sel)
+        return list(set(target_ou_ids) | set(resp_ou_ids))
+
+    def _get_eligible_employees(self, vac=False, sel=False):
+        return self.env['hr.employee'].search([('active', '=', True)])
+
+    @api.depends(
+        'new_int_panel',
+        'new_int_panel.workunit_id',
+        'new_int_panel.chairperson_id',
+        'new_int_panel.panel_member_id',
+        'new_int_panel.secretary_id',
+        'new_int_panel.observer_id',
+    )
+    def _compute_eligible_employee_ids(self):
+        all_emps = self.env['hr.employee'].search([('active', '=', True)])
+        for rec in self:
+            rec.eligible_employee_ids = all_emps
+
+    @api.onchange('new_int_panel', 'selection_criteria')
+    def _onchange_new_int_panel_domain(self):
+        """Allow all active employees to be selected as panel members."""
+        all_emps = self.env['hr.employee'].search([('active', '=', True)])
+        self.eligible_employee_ids = all_emps
+        domain = [('active', '=', True)]
+        return {'domain': {'emp_name': domain}}
 
         domain = [('active', '=', True)]
         self.eligible_employee_ids = self.env['hr.employee'].search(domain)

@@ -7,7 +7,7 @@
     <record id="hr_employee_rule_manager_hierarchy" model="ir.rule">
         <field name="name">HR Employee: Manager Subordinate Hierarchy (Write Control)</field>
         <field name="model_id" ref="hr.model_hr_employee"/>
-        <field name="domain_force">['|', '|', '|', '|', '|', '|', ('user_id', '=', user.id), ('parent_id.user_id', '=', user.id), ('attendance_manager_id', '=', user.id), ('id', 'child_of', user.employee_id.id), ('id', '=', user.employee_id.coach_id.id), ('id', '=', user.employee_id.parent_id.id), ('default_operating_unit_id', '=', user.employee_id.default_operating_unit_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('user_id', '=', user.id), ('parent_id.user_id', '=', user.id), ('attendance_manager_id', '=', user.id), ('id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
         <field name="perm_read" eval="0"/>
         <field name="perm_write" eval="1"/>
@@ -15,6 +15,13 @@
         <field name="perm_unlink" eval="0"/>
     </record>
 
+    <!-- Override stock hr.hr_employee_comp_rule to restrict multi-company without leaking superior records -->
+    <record id="hr.hr_employee_comp_rule" model="ir.rule">
+        <field name="name">Employee multi company rule</field>
+        <field name="model_id" ref="hr.model_hr_employee"/>
+        <field name="domain_force">['|', ('company_id', 'in', company_ids + [False]), ('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[]"/>
+    </record>
 
     <record id="hr_employee_rule_read_attendance_user" model="ir.rule">
         <field name="name">HR Employee: Coached and Managed Subordinates Only</field>
@@ -38,7 +45,7 @@
     <record id="hr_attendance.hr_attendance_rule_attendance_admin" model="ir.rule">
         <field name="name">Attendance Manager: Restrict to Subordinate Hierarchy</field>
         <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
@@ -57,13 +64,24 @@
         <field name="perm_unlink" eval="1"/>
     </record>
 
+    <record id="hr_attendance_rule_auditor_all" model="ir.rule">
+        <field name="name">Attendance Auditor: Bank-wide Read-Only</field>
+        <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
     <!-- ====================================================
          3. Over Time Record Rules
          ==================================================== -->
     <record id="over_time_rule_manager_hierarchy" model="ir.rule">
         <field name="name">Over Time: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="model_over_time"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
@@ -86,21 +104,10 @@
          4. Job Position Exception Record Rules
          ==================================================== -->
     <record id="job_position_exception_rule_manager_hierarchy" model="ir.rule">
-        <field name="name">Job Position Exception: Manager Subordinate Hierarchy Read-Only</field>
+        <field name="name">Job Position Exception: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="model_job_position_exception"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
-        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
-        <field name="perm_read" eval="1"/>
-        <field name="perm_write" eval="0"/>
-        <field name="perm_create" eval="0"/>
-        <field name="perm_unlink" eval="0"/>
-    </record>
-
-    <record id="job_position_exception_rule_officer_team" model="ir.rule">
-        <field name="name">Job Position Exception: Job Position Officer Managed Team</field>
-        <field name="model_id" ref="model_job_position_exception"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
-        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_job_position_user'))]"/>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user')), (4, ref('custom_hr_attendance.group_hr_attendance_job_position_user'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
         <field name="perm_create" eval="1"/>
@@ -116,6 +123,17 @@
         <field name="perm_write" eval="1"/>
         <field name="perm_create" eval="1"/>
         <field name="perm_unlink" eval="1"/>
+    </record>
+
+    <record id="job_position_exception_rule_auditor" model="ir.rule">
+        <field name="name">Job Position Exception: Auditor Full Read-Only</field>
+        <field name="model_id" ref="model_job_position_exception"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
     </record>
 
     <!-- ====================================================
@@ -135,7 +153,7 @@
     <record id="attendance_preapproval_rule_manager_hierarchy" model="ir.rule">
         <field name="name">Attendance Preapproval: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="model_attendance_preapproval"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
@@ -156,6 +174,17 @@
         <field name="perm_unlink" eval="1"/>
     </record>
 
+    <record id="attendance_preapproval_rule_auditor_all" model="ir.rule">
+        <field name="name">Attendance Preapproval: Auditor Full Read-Only</field>
+        <field name="model_id" ref="model_attendance_preapproval"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
     <!-- ====================================================
          6. Report Models Record Rules
          ==================================================== -->
@@ -164,7 +193,7 @@
     <record id="generate_employee_attendance_details_rule_manager" model="ir.rule">
         <field name="name">Generated Attendance Details: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="model_generate_employee_attendance_details"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
     </record>
 
@@ -172,14 +201,14 @@
         <field name="name">Generated Attendance Details: Admin Full Access</field>
         <field name="model_id" ref="model_generate_employee_attendance_details"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager')), (4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
     </record>
 
     <!-- 6.2 Over Time Report -->
     <record id="overtime_report_rule_manager" model="ir.rule">
         <field name="name">Overtime Report: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="model_overtime_report"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
     </record>
 
@@ -187,14 +216,14 @@
         <field name="name">Overtime Report: Admin Full Access</field>
         <field name="model_id" ref="model_overtime_report"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager')), (4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
     </record>
 
     <!-- 6.3 Job Position Exception Report -->
     <record id="job_position_exception_report_rule_manager" model="ir.rule">
         <field name="name">Job Position Exception Report: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="model_job_position_exception_report"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
     </record>
 
@@ -202,14 +231,14 @@
         <field name="name">Job Position Exception Report: Admin Full Access</field>
         <field name="model_id" ref="model_job_position_exception_report"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager')), (4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
     </record>
 
     <!-- 6.4 Predefined Attendance Report -->
     <record id="attendance_preapproval_report_rule_manager" model="ir.rule">
         <field name="name">Predefined Attendance Report: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="model_attendance_preapproval_report"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
     </record>
 
@@ -217,14 +246,14 @@
         <field name="name">Predefined Attendance Report: Admin Full Access</field>
         <field name="model_id" ref="model_attendance_preapproval_report"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager')), (4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
     </record>
 
     <!-- 6.5 Acknowledged Attendance Report -->
     <record id="acknowledged_attendance_report_rule_manager" model="ir.rule">
         <field name="name">Acknowledged Attendance Report: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="model_acknowledged_attendance_report"/>
-        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id and user.employee_id.id or 0)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
     </record>
 
@@ -232,7 +261,7 @@
         <field name="name">Acknowledged Attendance Report: Admin Full Access</field>
         <field name="model_id" ref="model_acknowledged_attendance_report"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager')), (4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
     </record>
 
     <!-- ====================================================
@@ -307,6 +336,28 @@
         <field name="perm_unlink" eval="1"/>
     </record>
 
+    <record id="job_position_roster_exception_rule_auditor_all" model="ir.rule">
+        <field name="name">Job Position Roster Exception: Auditor Full Read-Only</field>
+        <field name="model_id" ref="model_job_position_roster_exception"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="job_position_roster_exception_line_rule_auditor_all" model="ir.rule">
+        <field name="name">Job Position Roster Exception Line: Auditor Full Read-Only</field>
+        <field name="model_id" ref="model_job_position_roster_exception_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
     <!-- ====================================================
          Batch Attendance Request Record Rules
          ==================================================== -->
@@ -330,6 +381,17 @@
         <field name="perm_write" eval="1"/>
         <field name="perm_create" eval="1"/>
         <field name="perm_unlink" eval="1"/>
+    </record>
+
+    <record id="batch_attendance_request_rule_auditor" model="ir.rule">
+        <field name="name">Batch Request: Auditor Full Read-Only</field>
+        <field name="model_id" ref="model_hr_attendance_batch_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_auditor'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
     </record>
 
 </odoo>

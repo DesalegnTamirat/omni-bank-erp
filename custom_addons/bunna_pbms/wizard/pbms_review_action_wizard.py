@@ -45,6 +45,11 @@ class PbmsReviewActionWizard(models.TransientModel):
         if not self.comment or not self.comment.strip():
             raise UserError(_("Please enter your comments before proceeding."))
 
+        s = self.comment.strip()
+        cleaned = s.replace(".", "").replace(",", "").replace("-", "").replace("+", "").replace(" ", "")
+        if cleaned and cleaned.isdigit():
+            raise UserError(_("Comments cannot be purely numeric digits. Please enter a meaningful text description."))
+
         plan = self.plan_id
         if not plan:
             raise UserError(_("No planning record found."))

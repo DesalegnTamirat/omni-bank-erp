@@ -113,8 +113,34 @@ class HrApplicantCustom(models.Model):
         help='Link to the applicant\'s master candidate profile / electronic CV.',
     )
     total_experience_years = fields.Float(
-        related='candidate_profile_id.total_experience_years',
         string="Total Exp (Years)",
+        compute="_compute_weighted_experience",
+        store=True,
+        readonly=True,
+        help="Weighted total experience calculated for this vacancy based on hiring workunit rules."
+    )
+    raw_banking_experience = fields.Float(
+        related='candidate_profile_id.banking_experience',
+        string="Banking Exp (Years)",
+        readonly=True,
+        store=True,
+    )
+    raw_non_banking_experience = fields.Float(
+        related='candidate_profile_id.non_banking_experience',
+        string="Raw Non-Banking Exp (Years)",
+        readonly=True,
+        store=True,
+    )
+    weighted_non_banking_experience = fields.Float(
+        string="Weighted Non-Banking Exp (Years)",
+        compute="_compute_weighted_experience",
+        store=True,
+        readonly=True,
+    )
+    is_hr_or_it_workunit = fields.Boolean(
+        string="HR/IT Workunit (Full Credit)",
+        compute="_compute_weighted_experience",
+        store=True,
         readonly=True,
     )
     highest_education = fields.Char(
@@ -159,6 +185,64 @@ class HrApplicantCustom(models.Model):
     is_interview_notified = fields.Boolean(
         string="Interview Notified", compute="_compute_assessment_schedules"
     )
+
+    @api.depends(
+        'candidate_profile_id.banking_experience',
+        'candidate_profile_id.non_banking_experience',
+        'candidate_profile_id.total_experience_years',
+        'application_type',
+        'app_reference',
+        'app_reference.operating_unit_id',
+        'app_reference.non_banking_exp_weight',
+        'department_id',
+        'job_id',
+        'job_id.department_id'
+    )
+    def _compute_weighted_experience(self):
+        for app in self:
+            cand = app.candidate_profile_id
+            raw_b = cand.banking_experience if cand else 0.0
+            raw_nb = cand.non_banking_experience if cand else 0.0
+            raw_tot = cand.total_experience_years if cand else (raw_b + raw_nb)
+
+            weight_override = False
+            if app.app_reference and getattr(app.app_reference, 'non_banking_exp_weight', False):
+                weight_override = app.app_reference.non_banking_exp_weight
+
+            ou = False
+            dept = False
+            if app.app_reference:
+                ou = getattr(app.app_reference, 'operating_unit_id', False)
+                if hasattr(app.app_reference, 'department_id') and app.app_reference.department_id:
+                    dept = app.app_reference.department_id
+            if not dept:
+                dept = app.department_id or (app.job_id and app.job_id.department_id)
+
+            is_hr_it = False
+            if ou:
+                ou_name = (ou.name or '').lower()
+                ou_code = (getattr(ou, 'code', '') or '').lower()
+                if getattr(ou, 'full_non_banking_credit', False) or any(kw in ou_name or kw in ou_code for kw in ['hr', 'human resource', 'it', 'information technology', 'ict', 'software', 'digital']):
+                    is_hr_it = True
+
+            if not is_hr_it and dept:
+                dept_name = (dept.name or '').lower()
+                dept_code = (getattr(dept, 'code', '') or '').lower()
+                if getattr(dept, 'full_non_banking_credit', False) or any(kw in dept_name or kw in dept_code for kw in ['hr', 'human resource', 'it', 'information technology', 'ict', 'software', 'digital']):
+                    is_hr_it = True
+
+            app.is_hr_or_it_workunit = is_hr_it
+
+            # Apply non-banking experience weighting rule ONLY for External vacancies
+            is_external = (app.application_type == 'External') or (app.app_reference and getattr(app.app_reference, 'sourcing_type', '') in ('external', 'both'))
+            if is_external:
+                weight = weight_override if weight_override is not False else (1.0 if is_hr_it else 0.5)
+                w_nb = round(raw_nb * weight, 2)
+                app.weighted_non_banking_experience = w_nb
+                app.total_experience_years = round(raw_b + w_nb, 2)
+            else:
+                app.weighted_non_banking_experience = round(raw_nb, 2)
+                app.total_experience_years = round(raw_tot, 2)
 
     def _compute_assessment_schedules(self):
         ExtSelCand = self.env['external.recruitment.selected.candidates'].sudo()
@@ -251,7 +335,8 @@ class HrApplicantCustom(models.Model):
     bunna_app_status = fields.Selection([
         ('draft', 'Draft'),
         ('shortlisted', 'Shortlisted'),
-        ('interview', 'Interview'),
+        ('exam', 'Selected for Exam'),
+        ('interview', 'Selected for Interview'),
         ('offer', 'Offer Issued'),
         ('hired', 'Hired'),
         ('rejected', 'Rejected'),
@@ -1137,24 +1222,145 @@ class HrApplicantCustom(models.Model):
                         'vacancy_reference': app.app_reference.reference,
                         'responsible': app.app_reference.responsible.id if app.app_reference.responsible else self.env.user.employee_id.id,
                     })
-                
+
+                cand = app.candidate_profile_id
+                if not cand and app.email_from:
+                    cand = self.env['candidate.profile'].sudo().search([('email', '=ilike', app.email_from.strip())], limit=1)
+                    if cand:
+                        app.sudo().write({'candidate_profile_id': cand.id})
+
+                cgpa_val = app.latest_cgpa or (getattr(cand, 'latest_cgpa', 0.0) if cand else 0.0) or (getattr(cand, 'cgpa', 0.0) if cand else 0.0)
+                if not cgpa_val and cand and cand.education_ids:
+                    c_list = [e.cgpa for e in cand.education_ids if e.cgpa]
+                    cgpa_val = max(c_list) if c_list else 0.0
+
+                tot_exp = getattr(app, 'total_experience_years', 0.0) or (getattr(cand, 'total_experience_years', 0.0) if cand else 0.0) or (getattr(cand, 'total_experience', 0.0) if cand else 0.0)
+                bank_exp = getattr(app, 'banking_experience', 0.0) or (getattr(cand, 'banking_experience', 0.0) if cand else 0.0)
+                rel_exp = tot_exp
+
+                edu_name = app.highest_education or (getattr(cand, 'highest_education', False) if cand else False)
+                field_study = False
+                inst_name = False
+                if cand and cand.education_ids:
+                    field_study = cand.education_ids[0].field_of_study or cand.education_ids[0].other_field_of_study
+                    inst_name = cand.education_ids[0].institution or cand.education_ids[0].other_institution
+
+                vals_dict = {
+                    'external_recruitment_id': rec_ext.id,
+                    'applicant_name': app.id,
+                    'applicant_email': app.email_from or (cand.email if cand else ''),
+                    'applicant_phone': cand.phone if cand else (app.partner_phone or ''),
+                    'date_of_birth': getattr(cand, 'dob', False) if cand else False,
+                    'gender': getattr(cand, 'gender', False) if cand else (app.gender if hasattr(app, 'gender') else False),
+                    'highest_cgpa': cgpa_val,
+                    'total_experience': tot_exp,
+                    'relevant_experience': rel_exp,
+                    'banking_experience': bank_exp,
+                    'educational_qualification': edu_name or (cand.highest_education if cand else False),
+                    'field_of_study': field_study,
+                    'institution_name': inst_name,
+                }
+
                 existing = self.env['external.recruitment.eligible.employees'].sudo().search([
                     ('external_recruitment_id', '=', rec_ext.id),
                     ('applicant_name', '=', app.id),
                 ], limit=1)
-                
-                if not existing:
-                    cand = app.candidate_profile_id
-                    self.env['external.recruitment.eligible.employees'].sudo().create({
-                        'external_recruitment_id': rec_ext.id,
-                        'applicant_name': app.id,
-                        'applicant_email': app.email_from or (cand.email if cand else ''),
-                        'applicant_phone': cand.phone if cand else (app.partner_phone or ''),
-                        'date_of_birth': getattr(cand, 'dob', False) if cand else False,
-                        'gender': getattr(cand, 'gender', False) if cand else False,
-                        'highest_cgpa': getattr(cand, 'cgpa', 0.0) if cand else 0.0,
-                        'total_experience': getattr(cand, 'total_experience', 0.0) if cand else 0.0,
-                    })
+
+                if existing:
+                    existing.sudo().write(vals_dict)
+                    elig_rec = existing
+                else:
+                    elig_rec = self.env['external.recruitment.eligible.employees'].sudo().create(vals_dict)
+
+                # Sync sub-lines (education, experience, certification, skills, languages)
+                if cand:
+                    # Education
+                    if cand.education_ids and not elig_rec.education_ids:
+                        for edu in cand.education_ids:
+                            raw_lvl = str(edu.education_level or '').lower()
+                            if 'phd' in raw_lvl or 'doctor' in raw_lvl:
+                                mapped_lvl = 'phd'
+                            elif 'mba' in raw_lvl:
+                                mapped_lvl = 'mba'
+                            elif 'msc' in raw_lvl or 'ma_msc' in raw_lvl or 'master' in raw_lvl:
+                                mapped_lvl = 'msc'
+                            elif 'ba' in raw_lvl:
+                                mapped_lvl = 'ba'
+                            elif 'diploma' in raw_lvl:
+                                mapped_lvl = 'diploma'
+                            else:
+                                mapped_lvl = 'bsc'
+
+                            self.env['external.applicant.education'].sudo().create({
+                                'applicant_record_id': elig_rec.id,
+                                'level': mapped_lvl,
+                                'field_of_study': edu.field_of_study or edu.other_field_of_study or '',
+                                'institution_name': edu.institution or edu.other_institution or '',
+                                'cgpa': edu.cgpa or 0.0,
+                                'graduation_date': edu.end_date or False,
+                            })
+                    # Experience / Work history
+                    if cand.experience_ids and not elig_rec.work_history_ids:
+                        for exp_line in cand.experience_ids:
+                            job_title = getattr(exp_line, 'position', '') or getattr(exp_line, 'job_title', '') or ''
+                            company_name = getattr(exp_line, 'organization', '') or getattr(exp_line, 'employer', '') or getattr(exp_line, 'company_name', '') or 'N/A'
+                            emp_type = exp_line.employment_type if hasattr(exp_line, 'employment_type') and exp_line.employment_type in ['full_time', 'part_time', 'contract', 'internship'] else 'full_time'
+
+                            self.env['external.applicant.work.history'].sudo().create({
+                                'applicant_record_id': elig_rec.id,
+                                'job_title': job_title,
+                                'company_name': company_name,
+                                'employment_type': emp_type,
+                                'start_date': exp_line.start_date or False,
+                                'end_date': exp_line.end_date or False,
+                                'is_current': exp_line.is_current if hasattr(exp_line, 'is_current') else False,
+                                'responsibilities': getattr(exp_line, 'responsibilities', '') or '',
+                            })
+                    # Certifications
+                    if cand.certification_ids and not elig_rec.certification_ids:
+                        for cert in cand.certification_ids:
+                            self.env['external.applicant.certification'].sudo().create({
+                                'applicant_record_id': elig_rec.id,
+                                'name': cert.name or '',
+                                'issuing_institution': getattr(cert, 'issuing_organization', '') or getattr(cert, 'issuing_institution', '') or '',
+                                'issue_date': cert.issue_date or False,
+                                'expiry_date': getattr(cert, 'expiry_date', False) or getattr(cert, 'expiration_date', False) or False,
+                                'has_expiry': getattr(cert, 'has_expiry', True),
+                                'certificate_url': getattr(cert, 'cert_url', '') or '',
+                            })
+                    # Skills
+                    if cand.skill_ids and not elig_rec.skill_ids:
+                        for sk in cand.skill_ids:
+                            sk_name = sk.name or ''
+                            prof = getattr(sk, 'level', 'intermediate') or 'intermediate'
+                            if prof not in ['beginner', 'intermediate', 'advanced', 'expert']:
+                                prof = 'intermediate'
+                            self.env['external.applicant.skill'].sudo().create({
+                                'applicant_record_id': elig_rec.id,
+                                'skill_name': sk_name,
+                                'skill_category': 'business',
+                                'proficiency': prof,
+                            })
+                    # Languages
+                    if cand.language_ids and not elig_rec.language_ids:
+                        for lang in cand.language_ids:
+                            l_name = str(lang.name or '').lower().strip()
+                            valid_langs = ['english', 'amharic', 'afaan_oromo', 'tigrinya', 'somali', 'sidama', 'afar']
+                            matched_lang = 'other'
+                            for v in valid_langs:
+                                if v in l_name or l_name in v:
+                                    matched_lang = v
+                                    break
+                            
+                            prof = getattr(lang, 'proficiency', 'professional') or 'professional'
+                            if prof not in ['basic', 'conversational', 'professional', 'fluent', 'native']:
+                                prof = 'professional'
+
+                            self.env['external.applicant.language'].sudo().create({
+                                'applicant_record_id': elig_rec.id,
+                                'language': matched_lang,
+                                'proficiency': prof,
+                            })
 
     @api.model_create_multi
     def create(self, vals_list):

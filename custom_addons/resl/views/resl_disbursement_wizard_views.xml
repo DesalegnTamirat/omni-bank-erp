@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Form view ──────────────────────────────────────────────────────── -->
+    <record id="view_resl_disbursement_wizard_form" model="ir.ui.view">
+        <field name="name">resl.loan.disbursement.wizard.form</field>
+        <field name="model">resl.loan.disbursement.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Confirm Core Banking Disbursement">
+
+                <!-- Hidden bindings -->
+                <field name="loan_id" invisible="1"/>
+                <field name="currency_id" invisible="1"/>
+                <field name="has_account" invisible="1"/>
+
+                <div class="o_form_view o_resl_disbursement_wizard">
+
+                    <!-- Employee HAS an account (od_account filled) -->
+                    <div class="alert alert-info mb-3" role="alert" invisible="not has_account">
+                        <i class="fa fa-info-circle me-2"/>
+                        The approved amount will be disbursed to the employee's account below.
+                    </div>
+
+                    <!-- Employee has NO account (od_account empty) -->
+                    <div class="alert alert-warning mb-3" role="alert" invisible="has_account">
+                        <i class="fa fa-exclamation-triangle me-2"/>
+                        This employee doesn't have a bank account yet.
+                        Create one to continue with the disbursement.
+                    </div>
+
+                    <group>
+                        <group string="Loan Details">
+                            <field name="employee_name" string="Employee"/>
+                            <field name="approved_amount" string="Approved Loan Amount"
+                                   widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                        </group>
+                        <group string="Account Information" invisible="not has_account">
+                            <field name="od_account" string="Bank Account Number" readonly="1"/>
+                        </group>
+                    </group>
+                </div>
+
+                <footer>
+                    <!-- Only when an account exists -->
+                    <button name="action_confirm_disburse"
+                            type="object"
+                            string="Confirm Disbursement"
+                            class="btn-primary"
+                            icon="fa-money"
+                            data-hotkey="v"
+                            invisible="not has_account"/>
+                    <!-- Only when there is no account -->
+                    <button name="action_create_account"
+                            type="object"
+                            string="Create Account"
+                            class="btn-primary"
+                            icon="fa-plus"
+                            invisible="has_account"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"
+                            icon="fa-times"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Window action (opened programmatically from action_disburse_core_banking) ── -->
+    <record id="action_resl_disbursement_wizard" model="ir.actions.act_window">
+        <field name="name">Confirm Core Banking Disbursement</field>
+        <field name="res_model">resl.loan.disbursement.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="view_resl_disbursement_wizard_form"/>
+    </record>
+
+</odoo>

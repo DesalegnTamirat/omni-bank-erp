@@ -61,6 +61,67 @@ class AuditRule(models.Model):
         rules = self.search([('active', '=', True)])
         return {r.model_name: r for r in rules}
 
+    @api.model
+    def is_audit_enabled(self):
+        """Check if global audit trail tracking master switch is enabled."""
+        enabled = self.env['ir.config_parameter'].sudo().get_param('audit_trail.enabled', 'True')
+        return str(enabled).strip().lower() not in ('false', '0', 'off', 'no')
+
+    @api.model
+    def _sync_models_internal(self):
+        """
+        Internal helper to auto-discover and synchronize business models from ir.model into audit.rule.
+        Excludes system internal framework models (ir.*, bus.*, audit.*, mail.notification) and transient wizards.
+        """
+        existing_model_ids = set(self.sudo().search([]).mapped('model_id.id'))
+        
+        domain = []
+        if 'transient' in self.env['ir.model']._fields:
+            domain.append(('transient', '=', False))
+
+        all_models = self.env['ir.model'].sudo().search(domain)
+        EXCLUDED_PREFIXES = ('ir.', 'bus.', 'audit.', 'rel.', 'mail.notification', 'mail.tracking')
+        
+        new_rules = []
+        created_count = 0
+
+        for m in all_models:
+            if m.id in existing_model_ids:
+                continue
+            m_name = m.model or ''
+            if any(m_name.startswith(p) for p in EXCLUDED_PREFIXES):
+                continue
+            
+            new_rules.append({
+                'name': m.name or m_name,
+                'model_id': m.id,
+                'log_create': True,
+                'log_write': True,
+                'log_unlink': True,
+                'active': True,
+            })
+            created_count += 1
+
+        if new_rules:
+            self.sudo().create(new_rules)
+        return created_count
+
+    @api.model
+    def action_sync_models(self):
+        """Action handler to sync models manually or via button."""
+        created_count = self._sync_models_internal()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Model Synchronization Completed'),
+                'message': _('Successfully synchronized models. Created %s new Audit Rule(s).') % created_count if created_count > 0 else _('All business models are already synchronized.'),
+                'type': 'success' if created_count > 0 else 'info',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
     @api.constrains('model_id', 'log_create', 'log_write', 'log_unlink')
     def _check_duplicate_rule(self):
         """

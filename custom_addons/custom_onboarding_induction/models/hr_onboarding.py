@@ -555,11 +555,35 @@ class HrOnboardingPlan(models.Model):
                 ))
 
             # Identity check first (using real user, not sudo)
-            emp_user = rec.employee_id.sudo().user_id if rec.employee_id else False
-            if not emp_user or emp_user.id != current_user.id:
-                raise ValidationError(_(
-                    "Only the new hire employee ('%s') can submit their own digital sign-off."
-                ) % (rec.sudo().employee_id.name if rec.employee_id else ""))
+            emp = rec.sudo().employee_id
+            emp_user = emp.user_id if emp else False
+            is_matched_employee = False
+
+            if emp_user and emp_user.id == current_user.id:
+                is_matched_employee = True
+            elif emp and (emp in current_user.employee_ids or current_user.employee_id == emp):
+                is_matched_employee = True
+                # Auto-link user_id if missing on the employee record
+                if not emp.user_id:
+                    emp.sudo().write({"user_id": current_user.id})
+            elif emp and not emp.user_id and (
+                (emp.work_email and current_user.email and emp.work_email.strip().lower() == current_user.email.strip().lower())
+                or (emp.name and current_user.name and emp.name.strip().lower() == current_user.name.strip().lower())
+            ):
+                is_matched_employee = True
+                emp.sudo().write({"user_id": current_user.id})
+
+            if not is_matched_employee:
+                if not emp_user:
+                    raise ValidationError(_(
+                        "The employee record ('%s') is not linked to any user account.\n"
+                        "Please go to Employees -> '%s' -> HR Settings tab -> set 'Related User' to '%s'."
+                    ) % (emp.name if emp else "", emp.name if emp else "", current_user.name))
+                else:
+                    raise ValidationError(_(
+                        "Only the new hire employee ('%s') can submit their own digital sign-off.\n"
+                        "Currently logged in as: '%s'."
+                    ) % (emp.name if emp else "", current_user.name))
 
             if rec.sudo().final_employee_signoff:
                 raise ValidationError(_("Employee has already signed off on this onboarding file."))
@@ -598,11 +622,34 @@ class HrOnboardingPlan(models.Model):
                 ))
 
             # Identity check first (using real user, not sudo)
-            sup_user = rec.sudo().supervisor_id.user_id if rec.supervisor_id else False
-            if not sup_user or sup_user.id != current_user.id:
-                raise ValidationError(_(
-                    "Only the assigned Immediate Supervisor ('%s') can submit the supervisor digital sign-off."
-                ) % (rec.sudo().supervisor_id.name if rec.supervisor_id else "Not Assigned"))
+            sup = rec.sudo().supervisor_id
+            sup_user = sup.user_id if sup else False
+            is_matched_sup = False
+
+            if sup_user and sup_user.id == current_user.id:
+                is_matched_sup = True
+            elif sup and (sup in current_user.employee_ids or current_user.employee_id == sup):
+                is_matched_sup = True
+                if not sup.user_id:
+                    sup.sudo().write({"user_id": current_user.id})
+            elif sup and not sup.user_id and (
+                (sup.work_email and current_user.email and sup.work_email.strip().lower() == current_user.email.strip().lower())
+                or (sup.name and current_user.name and sup.name.strip().lower() == current_user.name.strip().lower())
+            ):
+                is_matched_sup = True
+                sup.sudo().write({"user_id": current_user.id})
+
+            if not is_matched_sup:
+                if not sup_user:
+                    raise ValidationError(_(
+                        "The supervisor employee record ('%s') is not linked to any user account.\n"
+                        "Please go to Employees -> '%s' -> HR Settings tab -> set 'Related User' to '%s'."
+                    ) % (sup.name if sup else "Not Assigned", sup.name if sup else "Not Assigned", current_user.name))
+                else:
+                    raise ValidationError(_(
+                        "Only the assigned Immediate Supervisor ('%s') can submit the supervisor digital sign-off.\n"
+                        "Currently logged in as: '%s'."
+                    ) % (sup.name if sup else "Not Assigned", current_user.name))
 
             if rec.sudo().final_supervisor_signoff:
                 raise ValidationError(_("Supervisor has already signed off on this onboarding file."))

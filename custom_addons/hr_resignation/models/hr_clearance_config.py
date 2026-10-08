@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import api, fields, models, _
+from odoo.exceptions import UserError
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEMPLATE — Checklist Sub-Item (CONFIGURATION)
@@ -27,8 +28,13 @@ class HrClearanceTemplateItem(models.Model):
         default=True,
         help='If checked, this sub-item must be completed before the parent '
              'clearance line can be approved.')
+    active = fields.Boolean(default=True, string="Active")
     note         = fields.Text(string='Guidance Note')
 
+    def unlink(self):
+        for rec in self:
+            rec.active = False
+        return True
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEMPLATE — Work Unit (CONFIGURATION)
@@ -43,13 +49,23 @@ class HrResignationClearanceTemplate(models.Model):
     Clearance Work Unit Template
     Defines a clearance step required during the employee separation process.
     When a resignation is approved, records from this model are instantiated
-    as actual clearance tasks for the respective operating units.
     """
 
     _name        = 'hr.resignation.clearance.template'
     _description = 'Clearance Work Unit Template'
     _order       = 'sequence asc'
     _rec_name    = 'work_unit_id'   # work_unit_id is required=True, always set.
+
+    def action_view_archived_items(self):
+        self.ensure_one()
+        return {
+            'name': _('Archived Tasks'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.clearance.template.item',
+            'view_mode': 'list,form',
+            'domain': [('template_id', '=', self.id), ('active', '=', False)],
+            'context': {'default_template_id': self.id, 'active_test': False},
+        }
 
     # ── Identity ─────────────────────────────────────────────────────────────
     sequence     = fields.Integer(default=10)
@@ -82,11 +98,11 @@ class HrResignationClearanceTemplate(models.Model):
                 
                 # Add users whose employee record is in this operating unit
                 if 'operating_unit_id' in self.env['hr.employee']._fields:
-                    emps = self.env['hr.employee'].search([('operating_unit_id', '=', rec.work_unit_id.id)])
+                    emps = self.env['hr.employee'].sudo().search([('operating_unit_id', '=', rec.work_unit_id.id)])
                     user_ids.update(emps.mapped('user_id').ids)
                 
                 if 'department_id' in self.env['hr.employee']._fields and 'operating_unit_id' in self.env['hr.department']._fields:
-                    emps = self.env['hr.employee'].search([('department_id.operating_unit_id', '=', rec.work_unit_id.id)])
+                    emps = self.env['hr.employee'].sudo().search([('department_id.operating_unit_id', '=', rec.work_unit_id.id)])
                     user_ids.update(emps.mapped('user_id').ids)
                 
                 if user_ids:

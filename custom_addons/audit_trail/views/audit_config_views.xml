@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Audit Config: Form View ──────────────────────────────────────── -->
+    <record id="view_audit_config_form" model="ir.ui.view">
+        <field name="name">audit.config.form</field>
+        <field name="model">audit.config</field>
+        <field name="arch" type="xml">
+            <form string="Audit Trail Configuration">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Automatic Model Sync &amp; Tracking Control">
+                            <field name="audit_trail_enabled" widget="boolean_toggle" string="Enable Audit Trail &amp; Auto-Sync Models"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info mt-3" role="alert">
+                        <strong>Automatic Synchronization &amp; Resource Management:</strong>
+                        <ul class="mb-0 ps-3 mt-1">
+                            <li>When <b>Enable Audit Trail &amp; Auto-Sync Models</b> is toggled <b>ON</b>, the system automatically discovers and synchronizes all business models into Audit Rules and starts activity tracking without manual intervention.</li>
+                            <li>When toggled <b>OFF</b>, all audit logging activities stop immediately across all models to optimize performance and conserve database storage space.</li>
+                        </ul>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Server Action to load/open the singleton Audit Config record directly -->
+    <record id="action_audit_config" model="ir.actions.server">
+        <field name="name">Audit Trail Configuration</field>
+        <field name="model_id" ref="model_audit_config"/>
+        <field name="state">code</field>
+        <field name="code">
+            action = model.action_open_audit_config()
+        </field>
+    </record>
+
+</odoo>

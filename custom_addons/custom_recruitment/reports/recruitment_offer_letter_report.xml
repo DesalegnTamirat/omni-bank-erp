@@ -21,7 +21,12 @@
                     <!-- Official Header -->
                     <div class="row mb-3" style="border-bottom: 3px solid #541718; padding-bottom: 12px;">
                         <div class="col-7">
-                            <img src="/bunna_custom_web_page/static/src/img/bunna_logo.png" style="max-height: 70px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
+                            <t t-if="o.get_official_bunna_logo_base64()">
+                                <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 85px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
+                            </t>
+                            <t t-else="">
+                                <img src="/custom_recruitment/static/src/img/bunna_bank_official_logo.png" style="max-height: 85px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
+                            </t>
                         </div>
                         <div class="col-5 text-end my-auto" style="font-size: 13px;">
                             <div><strong>Date: </strong> <span t-esc="o.offer_date.strftime('%d/%m/%Y') if o.offer_date else ''"/></div>

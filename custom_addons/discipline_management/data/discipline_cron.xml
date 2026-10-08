@@ -51,5 +51,17 @@
             <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=45, second=0)"/>
             <field name="active" eval="True"/>
         </record>
+
+        <!-- Cron: Process Expired Appeal Window Salary Deductions (Off-peak staggered at 02:40) -->
+        <record id="ir_cron_discipline_appeal_window_deductions" model="ir.cron">
+            <field name="name">Discipline Management: Expired Appeal Window Deduction Scheduling</field>
+            <field name="model_id" ref="discipline_management.model_discipline_case"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_process_appeal_window_deductions()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=40, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>

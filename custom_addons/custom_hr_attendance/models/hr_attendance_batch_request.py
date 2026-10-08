@@ -99,7 +99,7 @@ class HrAttendanceBatchRequest(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
-                vals['name'] = self.env['ir.sequence'].next_by_code('hr.attendance.batch.request') or _('Batch Request')
+                vals['name'] = self.env['ir.sequence'].sudo().next_by_code('hr.attendance.batch.request') or _('Batch Request')
         return super(HrAttendanceBatchRequest, self).create(vals_list)
 
     @api.depends('start_date', 'end_date')

@@ -4,7 +4,7 @@
     'summary': "Adds Employee Grades and Levels configurations and mandatory fields.",
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
-    'author': 'Bunna Bank',
+    'author': 'Natnael',
     'license': 'LGPL-3',
     'depends': [
         'base',
@@ -55,6 +55,7 @@
         # -- Service Request --
         'security/security_service_request.xml',
         'security/security_delegation.xml',
+        'security/security_change_request.xml',
         'data/employee_service_request_sequence.xml',
         'data/emp_service_req.xml',
         'data/employee_self_service_sequence.xml',
@@ -97,7 +98,15 @@
         # -- Increment --
         'views/increment.xml',
         'views/employee_increment_setup.xml',
+#######################Carer Path##########
+        'views/hr_career_track_views.xml',
+        'views/hr_employee_career_plan_views.xml',
+        'views/hr_career_aspiration_views.xml',
+        'views/hr_career_idp_views.xml',
+        'views/hr_employee_career_views.xml',
+        'views/career_path_visualizer_action.xml',
 
+        ###############
         # -- Insurance / Training / Report Codes / Service Award --
         'views/hr_employee_insurance_views.xml',
         'views/hr_training_history_views.xml',
@@ -136,15 +145,30 @@
         'views/hr_employee_relative_views.xml',
         'views/hr_employee_education_detail_views.xml',
         'views/hr_employee_previous_occupation_views.xml',
+        # -- Master Data Change Requests (EM-067 to EM-075) --
+        'data/hr_employee_change_sequence.xml',
+        'data/hr_employee_change_config_data.xml',
+        'views/hr_employee_change_config_views.xml',
+        'views/hr_employee_change_request_views.xml',
+        'views/hr_employee_change_history_views.xml',
+
+        # -- Insurance Notification System (FR-INS-001 to FR-INS-010) --
+        'security/hr_insurance_security.xml',
+        'views/hr_insurance_views.xml',
+
         'views/ldap_installer_views.xml',
         'views/res_config_settings_views.xml',
         'views/unregistered_employee_notice.xml',
+        'views/hr_reporting_views.xml',
         'views/menu.xml',
     ],
     'assets': {
         'web.assets_backend': [
             'hr_employee_custom/static/src/css/hr_employee_custom.css',
             'hr_employee_custom/static/src/js/idle_logout.js',
+            'hr_employee_custom/static/src/css/career_path_visualizer.css',
+            'hr_employee_custom/static/src/js/career_path_visualizer.js',
+            'hr_employee_custom/static/src/xml/career_path_visualizer.xml',
         ],
     },
     'installable': True,

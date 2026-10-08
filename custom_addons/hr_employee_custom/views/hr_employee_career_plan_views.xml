@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Employee Career Plan List View -->
+        <record id="view_employee_career_plan_list" model="ir.ui.view">
+            <field name="name">hr.employee.career.plan.list</field>
+            <field name="model">hr.employee.career.plan</field>
+            <field name="arch" type="xml">
+                <list decoration-success="state == 'ready'" decoration-info="state == 'active'">
+                    <field name="employee_id"/>
+                    <field name="career_path_id"/>
+                    <field name="current_job_id"/>
+                    <field name="target_step_id"/>
+                    <field name="readiness_score" widget="progressbar"/>
+                    <field name="state" widget="badge" 
+                           decoration-success="state == 'ready'" 
+                           decoration-info="state == 'active'" 
+                           decoration-muted="state == 'draft'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Employee Career Plan Form View -->
+        <record id="view_employee_career_plan_form" model="ir.ui.view">
+            <field name="name">hr.employee.career.plan.form</field>
+            <field name="model">hr.employee.career.plan</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_activate" string="Activate Plan" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_mark_ready" string="Mark Ready" type="object" class="oe_highlight" invisible="state != 'active'"/>
+                        <button name="action_promote" string="Process Promotion" type="object" class="btn-success" invisible="state != 'ready'"/>
+                        <button name="action_cancel" string="Cancel" type="object" invisible="state in ('promoted', 'cancelled')"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,active,ready,promoted"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="employee_id" placeholder="Select Employee..." readonly="state != 'draft'"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="career_path_id" readonly="state != 'draft'"/>
+                                <field name="current_job_id"/>
+                            </group>
+                            <group>
+                                <field name="current_step_id" readonly="state != 'draft'"/>
+                                <field name="target_step_id" readonly="state != 'draft'"/>
+                                <field name="target_job_id"/>
+                            </group>
+                        </group>
+                        
+                        <notebook>
+                            <page string="Readiness &amp; Gap Analysis" name="readiness">
+                                <group>
+                                    <group>
+                                        <field name="readiness_score" widget="percentpie"/>
+                                    </group>
+                                    <group>
+                                        <field name="gap_analysis" nolabel="1"/>
+                                    </group>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Action for Employee Career Plan -->
+        <record id="action_employee_career_plan" model="ir.actions.act_window">
+            <field name="name">Employee Career Plans</field>
+            <field name="res_model">hr.employee.career.plan</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create the first Employee Career Plan
+                </p>
+                <p>
+                    Track an employee's progression along a career path and analyze their readiness for the next role.
+                </p>
+            </field>
+        </record>
+
+        <!-- Menu Item -->
+        <!-- <menuitem id="menu_employee_career_plan" 
+                  name="Employee Career Plans" 
+                  parent="hr_employee_custom.menu_career_management_category" 
+                  action="action_employee_career_plan" 
+                  sequence="20"/> -->
+    </data>
+</odoo>

@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, AccessError
 
@@ -42,6 +42,11 @@ class PbmsExceptionalWorkforceWizard(models.TransientModel):
         if not self.reason or not self.reason.strip():
             raise UserError(_("Please provide a reason before proceeding."))
 
+        s = self.reason.strip()
+        cleaned = s.replace(".", "").replace(",", "").replace("-", "").replace("+", "").replace(" ", "")
+        if cleaned and cleaned.isdigit():
+            raise UserError(_("Reason / Feedback cannot be purely numeric digits. Please enter a meaningful text explanation."))
+
         req = self.request_id
         if not req:
             raise UserError(_("No exceptional workforce request found."))
@@ -53,6 +58,8 @@ class PbmsExceptionalWorkforceWizard(models.TransientModel):
                 req.action_people_solutions_return(reason)
             elif req.state == "cpco_review":
                 req.action_cpco_return(reason)
+            elif req.state == "ceo_review":
+                req.action_ceo_return(reason)
             else:
                 req.action_return(reason)
         elif self.action_type == "reject":

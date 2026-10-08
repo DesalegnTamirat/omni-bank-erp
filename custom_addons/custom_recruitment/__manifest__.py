@@ -47,7 +47,7 @@ dependency, so they were intentionally left in place.
     """,
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
-    'author': 'EAD Team',
+    'author': 'Natnael',
     'license': 'LGPL-3',
     'depends': [
         'base',
@@ -150,6 +150,8 @@ dependency, so they were intentionally left in place.
         'wizards/blacklist_import_wizard.xml',
         'wizards/panel_member_response_wizard.xml',
         'wizards/reschedule_interview_wizard.xml',
+        'wizards/internal_selection_decline_wizard_views.xml',
+        'wizards/supervisor_recommendation_wizard_views.xml',
 
         # -- Menus (must load AFTER wizards so action refs resolve) --
         'views/menu_recruitment.xml',

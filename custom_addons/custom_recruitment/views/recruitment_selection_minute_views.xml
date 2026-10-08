@@ -49,10 +49,29 @@
                         </group>
                         <group string="Approval Hierarchy &amp; Committee Roles">
                             <field name="approval_hierarchy_type" widget="radio" readonly="state != 'draft'"/>
-                            <field name="chairperson_id" readonly="state != 'draft'"/>
-                            <field name="panel_member_id" readonly="state != 'draft'"/>
-                            <field name="secretary_id" readonly="state != 'draft'"/>
-                            <field name="observer_id" readonly="state != 'draft'" invisible="approval_hierarchy_type == 'ho_district_grade2_plus'"/>
+
+                            <!-- Head Office & District Grade II and above -->
+                            <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                            <field name="panel_member_id" string="Respective Senior Management (Panel Member)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                            <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+
+                            <!-- For all non-managerial head office -->
+                            <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                            <field name="panel_member_id" string="Head Office / District Director (Panel Member)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                            <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+
+                            <!-- For all non-managerial district -->
+                            <field name="chairperson_id" string="District Director (Chairperson)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                            <field name="panel_member_id" string="District Division Member (Panel Member)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                            <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+
+                            <!-- Default fallback if unassigned -->
+                            <field name="chairperson_id" string="Chairperson" readonly="state != 'draft'" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                            <field name="panel_member_id" string="Panel Member" readonly="state != 'draft'" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                            <field name="secretary_id" string="Panel Member &amp; Secretary" readonly="state != 'draft'" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
                         </group>
                     </group>
                     <notebook>

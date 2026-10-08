@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
+from markupsafe import Markup
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -7,7 +8,7 @@ from odoo.exceptions import UserError, ValidationError
 class DisciplineAppeal(models.Model):
     _name = 'discipline.appeal'
     _description = 'Disciplinary Appeal Record'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'submission_date desc, id desc'
 
     name = fields.Char(
@@ -45,6 +46,255 @@ class DisciplineAppeal(models.Model):
         related='case_id.final_decision_date',
         readonly=True
     )
+    original_punishment_type = fields.Selection([
+        ('dismissal', 'Dismissal / Separation'),
+        ('demotion', 'Demotion to Lower Grade / Position'),
+        ('final_warning_penalty', 'Final Written Warning + Penalty'),
+        ('second_warning_penalty', 'Second Written Warning + Penalty'),
+        ('first_warning_penalty', 'First Written Warning + Penalty'),
+        ('fine', 'Salary Fine Deduction'),
+        ('verbal_warning', 'Recorded Verbal Warning'),
+        ('exonerate', 'Exonerated / No Action'),
+    ], string='Original Punishment', compute='_compute_original_penalty_details', store=True, readonly=True)
+
+    original_penalty_percentage = fields.Float(
+        string='Original Penalty Percentage (%)',
+        compute='_compute_original_penalty_details',
+        store=True,
+        readonly=True
+    )
+    original_fine_days = fields.Float(
+        string='Original Salary Fine (Days)',
+        compute='_compute_original_penalty_details',
+        store=True,
+        readonly=True
+    )
+
+    @api.depends('case_id', 'case_id.punishment_type', 'case_id.penalty_percentage', 'case_id.fine_days',
+                 'parent_appeal_id', 'parent_appeal_id.revised_punishment_type', 'parent_appeal_id.revised_penalty_percentage', 'parent_appeal_id.revised_fine_days')
+    def _compute_original_penalty_details(self):
+        for rec in self:
+            if rec.parent_appeal_id and rec.parent_appeal_id.state == 'decided':
+                rec.original_punishment_type = rec.parent_appeal_id.revised_punishment_type or False
+                rec.original_penalty_percentage = rec.parent_appeal_id.revised_penalty_percentage
+                rec.original_fine_days = rec.parent_appeal_id.revised_fine_days
+            elif rec.case_id:
+                # If appeal already has locked baseline values and is active/decided, preserve them
+                if rec.state in ('under_review', 'decided') and rec.original_punishment_type:
+                    continue
+                rec.original_punishment_type = rec.case_id.punishment_type or rec.case_id.decided_punishment_type
+                rec.original_penalty_percentage = rec.case_id.penalty_percentage if rec.case_id.penalty_percentage > 0 else rec.case_id.decided_penalty_percentage
+                rec.original_fine_days = rec.case_id.fine_days if rec.case_id.fine_days > 0 else rec.case_id.decided_fine_days
+            else:
+                rec.original_punishment_type = False
+                rec.original_penalty_percentage = 0.0
+                rec.original_fine_days = 0.0
+
+    # Multi-Tier Appeal Structure
+    appeal_level = fields.Selection([
+        ('first', '1st Level Appeal'),
+        ('second', '2nd Level Appeal'),
+        ('third', '3rd Level Appeal (Final to CEO)'),
+    ], string='Appeal Stage', default='first', required=True, tracking=True)
+
+    parent_appeal_id = fields.Many2one('discipline.appeal', string='Prior Appeal Reference', tracking=True)
+    child_appeal_ids = fields.One2many('discipline.appeal', 'parent_appeal_id', string='Subsequent Escalated Appeals')
+
+    decision_source_display = fields.Char(
+        string='Decision Source',
+        compute='_compute_decision_source_display',
+        store=True,
+        help='Displays the specific prior authority person whose decision is currently under appeal.'
+    )
+
+    designated_appeal_authority_display = fields.Char(
+        string='Designated Appeal Authority',
+        compute='_compute_designated_appeal_authority_display',
+        store=True,
+        help='Displays the name of the designated authority responsible for reviewing this appeal.'
+    )
+
+    case_origin_type = fields.Selection([
+        ('manager', 'Appeal on Line Manager / Coach Decision'),
+        ('director', 'Appeal on Directorate Director Decision'),
+        ('chief', 'Appeal on Chief Officer Decision'),
+        ('committee', 'Appeal on Disciplinary Committee Decision'),
+    ], string='Decision Source Type', compute='_compute_case_origin_type', store=True)
+
+    appeal_target_authority = fields.Selection([
+        ('directorate', 'Respective Directorate Director (Coach of Manager)'),
+        ('chief', 'Respective Chief Officer / CPCO (Coach of Director)'),
+        ('secretary', 'Disciplinary Committee Secretary (POMD)'),
+        ('ceo', 'Chief Executive Officer (CEO)'),
+    ], string='Designated Appeal Authority Type', compute='_compute_appeal_target_authority', store=True, tracking=True)
+
+    is_submitted_on_behalf = fields.Boolean(
+        string='Submitted on Behalf of Employee',
+        default=False,
+        help='Submitted by POMD or Committee Secretary on behalf of deactivated or suspended employee.'
+    )
+    submitted_by_id = fields.Many2one('res.users', string='Submitted By', default=lambda self: self.env.user, tracking=True)
+
+    @api.onchange('case_id')
+    def _onchange_case_id_auto_level(self):
+        """Auto-detect existing decided appeals on the selected case and configure appeal level, parent appeal, and baseline."""
+        if not self.case_id:
+            return
+
+        all_case_appeals = self.case_id.appeal_ids.filtered(lambda a: a.id != (self._origin.id if self._origin else False))
+        decided_appeals = all_case_appeals.filtered(lambda a: a.state == 'decided').sorted(
+            lambda a: (a.review_date or (a.write_date.date() if a.write_date else fields.Date.today()), a.id or 0),
+            reverse=True
+        )
+        active_appeals = all_case_appeals.filtered(lambda a: a.state in ('submitted', 'under_review'))
+        if active_appeals:
+            return {
+                'warning': {
+                    'title': _('Active Appeal in Progress'),
+                    'message': _('Case %s already has an active appeal (%s) in progress with state %s.') % (self.case_id.name, active_appeals[0].name, active_appeals[0].state)
+                }
+            }
+
+        num_decided = len(decided_appeals)
+        if num_decided == 0:
+            self.appeal_level = 'first'
+            self.parent_appeal_id = False
+            self.original_punishment_type = self.case_id.punishment_type or self.case_id.decided_punishment_type
+            self.original_penalty_percentage = self.case_id.penalty_percentage if self.case_id.penalty_percentage > 0 else self.case_id.decided_penalty_percentage
+            self.original_fine_days = self.case_id.fine_days if self.case_id.fine_days > 0 else self.case_id.decided_fine_days
+        elif num_decided == 1:
+            self.appeal_level = 'second'
+            parent = decided_appeals[0]
+            self.parent_appeal_id = parent.id
+            if parent.decision_outcome == 'penalty_reduced':
+                self.original_punishment_type = parent.revised_punishment_type or parent.original_punishment_type
+                self.original_penalty_percentage = parent.revised_penalty_percentage
+                self.original_fine_days = parent.revised_fine_days
+            else:
+                self.original_punishment_type = parent.original_punishment_type
+                self.original_penalty_percentage = parent.original_penalty_percentage
+                self.original_fine_days = parent.original_fine_days
+        else:
+            self.appeal_level = 'third'
+            parent = decided_appeals[0]
+            self.parent_appeal_id = parent.id
+            if parent.decision_outcome == 'penalty_reduced':
+                self.original_punishment_type = parent.revised_punishment_type or parent.original_punishment_type
+                self.original_penalty_percentage = parent.revised_penalty_percentage
+                self.original_fine_days = parent.revised_fine_days
+            else:
+                self.original_punishment_type = parent.original_punishment_type
+                self.original_penalty_percentage = parent.original_penalty_percentage
+                self.original_fine_days = parent.original_fine_days
+
+    @api.depends('appeal_level', 'parent_appeal_id', 'parent_appeal_id.reviewer_id', 'case_id', 'case_id.reported_by_id', 'case_id.approver_id', 'case_id.case_action_track')
+    def _compute_decision_source_display(self):
+        for rec in self:
+            if rec.appeal_level == 'first' or not rec.parent_appeal_id:
+                if rec.case_id:
+                    if rec.case_id.case_action_track == 'committee_escalation' or rec.case_id.initiator_type == 'audit':
+                        rec.decision_source_display = _("Disciplinary Committee")
+                    else:
+                        init_name = (rec.case_id.reported_by_id and rec.case_id.reported_by_id.name) or (rec.case_id.approver_id and rec.case_id.approver_id.name) or _('Line Manager')
+                        rec.decision_source_display = init_name
+                else:
+                    rec.decision_source_display = _("Line Manager")
+            elif rec.appeal_level == 'second':
+                parent = rec.parent_appeal_id
+                rev_name = (parent and parent.reviewer_id and parent.reviewer_id.name) or (parent and parent.employee_id and parent.employee_id.coach_id and parent.employee_id.coach_id.name) or _('Directorate Director')
+                rec.decision_source_display = rev_name
+            elif rec.appeal_level == 'third':
+                parent = rec.parent_appeal_id
+                rev_name = (parent and parent.reviewer_id and parent.reviewer_id.name) or (parent and parent.employee_id and parent.employee_id.coach_id and parent.employee_id.coach_id.coach_id and parent.employee_id.coach_id.coach_id.name) or _('Chief Officer')
+                rec.decision_source_display = rev_name
+            else:
+                rec.decision_source_display = False
+
+    @api.depends('appeal_level', 'appeal_target_authority', 'case_id', 'case_id.reported_by_id', 'case_id.employee_id', 'case_id.director_id', 'case_id.chief_id')
+    def _compute_designated_appeal_authority_display(self):
+        EmpModel = self.env['hr.employee'].sudo()
+        for rec in self:
+            case = rec.case_id.sudo() if rec.case_id else False
+            target = rec.appeal_target_authority
+            auth_name = False
+
+            if target == 'directorate':
+                if case:
+                    reviewer = (
+                        case.director_id or
+                        (case.reported_by_id and (case.reported_by_id.coach_id or case.reported_by_id.parent_id)) or
+                        (case.employee_id and (case.employee_id.coach_id.coach_id or case.employee_id.parent_id.parent_id))
+                    )
+                    auth_name = reviewer.name if reviewer else False
+                if not auth_name:
+                    auth_name = _("Directorate Director")
+            elif target == 'chief':
+                if case and case.chief_id:
+                    auth_name = case.chief_id.name
+                else:
+                    cpco_u = EmpModel.get_cpco_user()
+                    auth_name = cpco_u.name if cpco_u else _("Chief People & Culture Officer")
+            elif target == 'ceo':
+                ceo_u = EmpModel.get_ceo_user()
+                auth_name = ceo_u.name if ceo_u else _("Chief Executive Officer")
+            elif target == 'secretary':
+                sec_u = EmpModel.get_secretary_user()
+                auth_name = sec_u.name if sec_u else _("Disciplinary Committee Secretary")
+            else:
+                auth_name = False
+
+            rec.designated_appeal_authority_display = auth_name
+
+    @api.depends('case_id', 'case_id.initiator_type', 'case_id.case_action_track', 'case_id.reported_by_id', 'case_id.employee_id')
+    def _compute_case_origin_type(self):
+        for rec in self:
+            case = rec.case_id.sudo()
+            if not case:
+                rec.case_origin_type = 'manager'
+                continue
+            if case.initiator_type == 'audit' or case.case_action_track == 'committee_escalation':
+                rec.case_origin_type = 'committee'
+            else:
+                initiator_emp = case.reported_by_id.sudo().employee_id if case.reported_by_id else False
+                if not initiator_emp and case.employee_id:
+                    initiator_emp = case.employee_id.sudo().coach_id or case.employee_id.sudo().parent_id
+                
+                level = getattr(initiator_emp, 'executive_level', False) if initiator_emp else False
+                if not level and initiator_emp:
+                    job_name = (initiator_emp.job_id.sudo().name or '').lower() if initiator_emp.job_id else ''
+                    if any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+                        level = 'chief'
+                    elif any(k in job_name for k in ['director', 'directorate']):
+                        level = 'director'
+                    else:
+                        level = 'manager'
+                
+                if level == 'chief':
+                    rec.case_origin_type = 'chief'
+                elif level == 'director':
+                    rec.case_origin_type = 'director'
+                else:
+                    rec.case_origin_type = 'manager'
+
+    @api.depends('case_origin_type', 'appeal_level')
+    def _compute_appeal_target_authority(self):
+        for rec in self:
+            if rec.case_origin_type == 'manager':
+                if rec.appeal_level == 'first':
+                    rec.appeal_target_authority = 'directorate'
+                elif rec.appeal_level == 'second':
+                    rec.appeal_target_authority = 'chief'
+                else:
+                    rec.appeal_target_authority = 'ceo'
+            elif rec.case_origin_type == 'director':
+                if rec.appeal_level == 'first':
+                    rec.appeal_target_authority = 'chief'
+                else:
+                    rec.appeal_target_authority = 'ceo'
+            elif rec.case_origin_type == 'chief' or rec.case_origin_type == 'committee':
+                rec.appeal_target_authority = 'ceo'
+            else:
+                rec.appeal_target_authority = 'ceo'
 
     submission_date = fields.Date(
         string='Appeal Submission Date',
@@ -56,22 +306,9 @@ class DisciplineAppeal(models.Model):
     supporting_document = fields.Binary(string='Supporting Appeal Document', attachment=True)
     document_filename = fields.Char(string='Document Filename')
 
-    # Two-Level Appeal Routing (FR-DIS-033)
-    appeal_level = fields.Selection([
-        ('level_1', 'First Appeal'),
-        ('level_2', 'Second Appeal (Final)'),
-    ], string='Appeal Level', default='level_1', required=True, tracking=True)
-
-    appeal_source_type = fields.Selection([
-        ('manager', 'Appeal against Line Manager / Director Decision'),
-        ('committee', 'Appeal against Disciplinary Committee Decision'),
-    ], string='Decision Source Type', compute='_compute_appeal_source_type', store=True, tracking=True)
-
-    submitted_on_behalf = fields.Boolean(string='Submitted on Behalf of Employee', default=False, tracking=True)
-    submitted_by_id = fields.Many2one('res.users', string='Submitted By', default=lambda self: self.env.user, tracking=True)
-
-    reviewer_id = fields.Many2one('res.users', string='Appeal Authority / Reviewer', compute='_compute_appeal_reviewer', store=True, readonly=False, tracking=True)
+    reviewer_id = fields.Many2one('res.users', string='Appeal Authority / Chair', tracking=True)
     review_date = fields.Date(string='Review Date', tracking=True)
+    decision_date = fields.Date(string='Decision Date', related='review_date', store=True, readonly=True)
 
     # Appeal Tracking & Decision Outcome
     decision_outcome = fields.Selection([
@@ -81,117 +318,816 @@ class DisciplineAppeal(models.Model):
     ], string='Appeal Decision Outcome', tracking=True)
 
     revised_penalty_percentage = fields.Float(string='Revised Penalty Percentage (%)', tracking=True)
+    revised_fine_days = fields.Float(string='Revised Salary Fine (Days)', tracking=True)
     revised_punishment_type = fields.Selection([
         ('dismissal', 'Dismissal / Separation'),
-        ('final_warning_penalty', 'Final Written Warning + 20% Salary Deduction'),
-        ('second_warning_penalty', 'Second Written Warning + 10% Salary Deduction'),
-        ('first_warning_penalty', 'First Written Warning + 5% Salary Deduction'),
+        ('final_warning_penalty', 'Final Written Warning + Penalty'),
+        ('second_warning_penalty', 'Second Written Warning + Penalty'),
+        ('first_warning_penalty', 'First Written Warning + Penalty'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('exonerate', 'Exonerated / No Action'),
     ], string='Revised Punishment', tracking=True)
 
     appeal_decision_notes = fields.Text(string='Appeal Board Decision Rationale', tracking=True)
 
+    def _compute_and_set_revised_penalties(self, punishment_type):
+        """Helper to auto-compute and populate default revised penalty percentages or fine days."""
+        if not punishment_type or punishment_type in ['exonerate', 'verbal_warning', 'dismissal']:
+            self.revised_penalty_percentage = 0.0
+            self.revised_fine_days = 0.0
+            return
+
+        emp = self.sudo().employee_id or (self.case_id and self.case_id.sudo().employee_id)
+        job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+        is_managerial = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
+
+        type_to_level_code = {
+            'final_warning_penalty': 'level_2',
+            'second_warning_penalty': 'level_3',
+            'first_warning_penalty': 'level_4',
+        }
+        target_code = type_to_level_code.get(punishment_type)
+
+        severity_level = False
+        if target_code:
+            severity_level = self.env['discipline.severity.level'].search([('code', '=', target_code)], limit=1)
+
+        if is_managerial:
+            self.revised_penalty_percentage = 0.0
+            if severity_level:
+                self.revised_fine_days = getattr(severity_level, 'default_managerial_fine_days', 0.0) or getattr(severity_level, 'default_fine_days', 0.0) or (3.0 if target_code == 'level_2' else (2.0 if target_code == 'level_3' else 1.0))
+            else:
+                self.revised_fine_days = 3.0 if punishment_type == 'final_warning_penalty' else (2.0 if punishment_type == 'second_warning_penalty' else 1.0)
+        else:
+            self.revised_fine_days = 0.0
+            if severity_level:
+                self.revised_penalty_percentage = getattr(severity_level, 'default_non_managerial_penalty_pct', 0.0) or getattr(severity_level, 'default_penalty_percentage', 0.0) or (20.0 if target_code == 'level_2' else (10.0 if target_code == 'level_3' else 5.0))
+            else:
+                self.revised_penalty_percentage = 20.0 if punishment_type == 'final_warning_penalty' else (10.0 if punishment_type == 'second_warning_penalty' else 5.0)
+
+    @api.onchange('decision_outcome')
+    def _onchange_decision_outcome(self):
+        """Automatically set revised punishment and clear penalties if decision is overturned,
+        upheld, or reduced."""
+        if self.decision_outcome == 'overturned':
+            self.revised_punishment_type = 'exonerate'
+            self.revised_penalty_percentage = 0.0
+            self.revised_fine_days = 0.0
+        elif self.decision_outcome == 'upheld':
+            self.revised_punishment_type = self.original_punishment_type or (self.case_id and (self.case_id.decided_punishment_type or self.case_id.punishment_type))
+            self.revised_penalty_percentage = self.original_penalty_percentage if self.original_penalty_percentage > 0 else (self.case_id.penalty_percentage if self.case_id else 0.0)
+            self.revised_fine_days = self.original_fine_days if self.original_fine_days > 0 else (self.case_id.fine_days if self.case_id else 0.0)
+        elif self.decision_outcome == 'penalty_reduced':
+            orig = self.original_punishment_type or (self.case_id and (self.case_id.decided_punishment_type or self.case_id.punishment_type))
+            reduction_defaults = {
+                'dismissal': 'final_warning_penalty',
+                'demotion': 'final_warning_penalty',
+                'final_warning_penalty': 'second_warning_penalty',
+                'second_warning_penalty': 'first_warning_penalty',
+                'first_warning_penalty': 'verbal_warning',
+                'verbal_warning': 'exonerate',
+                'exonerate': 'exonerate',
+            }
+            default_lower = reduction_defaults.get(orig, 'exonerate')
+            self.revised_punishment_type = default_lower
+            self._compute_and_set_revised_penalties(default_lower)
+
+    @api.onchange('revised_punishment_type')
+    def _onchange_revised_punishment_type(self):
+        """Auto-populate default penalty percentage and salary fine days based on severity policy matrix,
+        and validate that revised punishment does not exceed original punishment when reducing penalty."""
+        if not self.revised_punishment_type:
+            return
+
+        punishment_rank = {
+            'dismissal': 6,
+            'demotion': 5,
+            'final_warning_penalty': 4,
+            'second_warning_penalty': 3,
+            'first_warning_penalty': 2,
+            'verbal_warning': 1,
+            'exonerate': 0,
+            False: 0,
+        }
+        reduction_defaults = {
+            'dismissal': 'final_warning_penalty',
+            'demotion': 'final_warning_penalty',
+            'final_warning_penalty': 'second_warning_penalty',
+            'second_warning_penalty': 'first_warning_penalty',
+            'first_warning_penalty': 'verbal_warning',
+            'verbal_warning': 'exonerate',
+            'exonerate': 'exonerate',
+        }
+
+        # Severity filtering & enforcement when penalty is reduced
+        if self.decision_outcome == 'penalty_reduced':
+            orig_punish = self.original_punishment_type or (self.case_id and (self.case_id.decided_punishment_type or self.case_id.punishment_type))
+            orig_rank = punishment_rank.get(orig_punish, 0)
+            rev_rank = punishment_rank.get(self.revised_punishment_type, 0)
+
+            if rev_rank > orig_rank:
+                default_lower = reduction_defaults.get(orig_punish, 'exonerate')
+                orig_label = dict(self._fields['original_punishment_type'].selection).get(orig_punish, orig_punish or 'None')
+                attempted_label = dict(self._fields['revised_punishment_type'].selection).get(self.revised_punishment_type, self.revised_punishment_type or 'None')
+                reset_label = dict(self._fields['revised_punishment_type'].selection).get(default_lower, default_lower)
+
+                self.revised_punishment_type = default_lower
+                self._compute_and_set_revised_penalties(default_lower)
+
+                return {
+                    'warning': {
+                        'title': _('Invalid Disciplinary Sanction Selection'),
+                        'message': _(
+                            "When selecting 'Penalty / Action Reduced', the revised punishment cannot be more severe than "
+                            "the original baseline penalty ('%s').\n\n"
+                            "Attempted selection '%s' has been automatically reset to allowable reduced sanction '%s'."
+                        ) % (orig_label, attempted_label, reset_label)
+                    }
+                }
+
+        self._compute_and_set_revised_penalties(self.revised_punishment_type)
+
+    @api.onchange('revised_penalty_percentage', 'revised_fine_days')
+    def _onchange_revised_penalty_amounts(self):
+        """Ensure revised monetary deductions do not exceed original baseline values when reducing penalty."""
+        if self.decision_outcome == 'penalty_reduced':
+            punishment_rank = {
+                'dismissal': 6,
+                'demotion': 5,
+                'final_warning_penalty': 4,
+                'second_warning_penalty': 3,
+                'first_warning_penalty': 2,
+                'verbal_warning': 1,
+                'exonerate': 0,
+                False: 0,
+            }
+            orig_punish = self.original_punishment_type or (self.case_id and (self.case_id.original_punishment_type or self.case_id.punishment_type))
+            orig_rank = punishment_rank.get(orig_punish, 0)
+            rev_rank = punishment_rank.get(self.revised_punishment_type, 0)
+
+            orig_pct = self.original_penalty_percentage
+            orig_days = self.original_fine_days
+
+            if self.revised_penalty_percentage > orig_pct and orig_pct > 0:
+                self.revised_penalty_percentage = orig_pct
+                return {
+                    'warning': {
+                        'title': _('Invalid Penalty Percentage'),
+                        'message': _("Under 'Penalty Reduced', revised penalty percentage cannot exceed the original baseline (%s%%).") % orig_pct
+                    }
+                }
+
+            if self.revised_fine_days > orig_days and orig_days > 0:
+                self.revised_fine_days = orig_days
+                return {
+                    'warning': {
+                        'title': _('Invalid Fine Days'),
+                        'message': _("Under 'Penalty Reduced', revised salary fine days cannot exceed the original baseline (%s days).") % orig_days
+                    }
+                }
+
     state = fields.Selection([
+        ('draft', 'Draft'),
         ('submitted', 'Appeal Submitted'),
-        ('under_review', 'Under Appeal Review'),
+        ('under_review', 'Under Review'),
         ('decided', 'Final Decision Rendered'),
         ('rejected_expired', 'Rejected (Window Expired)'),
-    ], string='Status', default='submitted', required=True, tracking=True)
+    ], string='Status', default='draft', required=True, tracking=True)
 
-    can_review = fields.Boolean(compute='_compute_can_review', string='Can Current User Review Appeal')
-    is_current_user_appellant = fields.Boolean(compute='_compute_can_review', string='Is Current User Appellant')
+    is_appeal_reviewer_or_admin = fields.Boolean(
+        string='Is Appeal Reviewer or Admin',
+        compute='_compute_is_appeal_reviewer_or_admin'
+    )
 
-    def _compute_can_review(self):
+    can_user_review_current_stage = fields.Boolean(
+        string='Can User Review Current Stage',
+        compute='_compute_can_user_review_current_stage'
+    )
+
+    is_appellant_employee = fields.Boolean(
+        string='Is Appellant Employee',
+        compute='_compute_is_appellant_employee'
+    )
+
+    is_managerial = fields.Boolean(
+        string='Is Managerial Staff',
+        compute='_compute_staff_category_flags',
+        store=True,
+        help="Indicates whether the appellant employee is in a managerial position (fine days vs penalty percentage)."
+    )
+
+    @api.depends('case_id', 'case_id.staff_category', 'case_id.employee_id', 'employee_id', 'employee_id.job_id')
+    def _compute_staff_category_flags(self):
+        for rec in self:
+            if rec.case_id and rec.case_id.staff_category:
+                rec.is_managerial = (rec.case_id.staff_category == 'managerial')
+            else:
+                emp = rec.employee_id or (rec.case_id and rec.case_id.employee_id)
+                job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+                rec.is_managerial = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
+
+    def _compute_is_appeal_reviewer_or_admin(self):
         user = self.env.user
-        is_officer = (
-            user.has_group('discipline_management.group_discipline_officer') or
+        emp = user.sudo().employee_id
+        job_name = (emp.sudo().job_id.name or '').lower() if emp and emp.job_id else ''
+        is_reviewer = (
+            user.has_group('discipline_management.group_discipline_director') or
+            user.has_group('discipline_management.group_discipline_pomd') or
+            user.has_group('discipline_management.group_discipline_chief') or
+            user.has_group('discipline_management.group_discipline_cpco') or
+            user.has_group('discipline_management.group_discipline_ceo') or
             user.has_group('discipline_management.group_discipline_admin') or
-            user.has_group('base.group_system')
+            user.has_group('base.group_system') or
+            any(kw in job_name for kw in ['director', 'chief', 'ceo', 'president', 'head', 'vp'])
         )
         for rec in self:
-            rec.is_current_user_appellant = bool(rec.employee_id.user_id and rec.employee_id.user_id.id == user.id)
-            rec.can_review = (is_officer or (rec.reviewer_id and rec.reviewer_id.id == user.id)) and not rec.is_current_user_appellant
+            rec.is_appeal_reviewer_or_admin = is_reviewer
 
-    @api.depends('case_id', 'case_id.committee_meeting_ids')
-    def _compute_appeal_source_type(self):
+    @api.depends('appeal_target_authority', 'appeal_level', 'case_origin_type', 'case_id', 'case_id.reported_by_id', 'case_id.employee_id')
+    def _compute_can_user_review_current_stage(self):
+        user = self.env.user
+        EmpModel = self.env['hr.employee'].sudo()
+        cpco_user = EmpModel.get_cpco_user()
+        sec_user = EmpModel.get_secretary_user()
+        ceo_user = EmpModel.get_ceo_user()
+        is_admin = user.has_group('discipline_management.group_discipline_admin') or user.has_group('base.group_system')
+        is_ceo = bool((ceo_user and user.id == ceo_user.id) or user.has_group('discipline_management.group_discipline_ceo'))
+        is_chief = bool((cpco_user and user.id == cpco_user.id) or user.has_group('discipline_management.group_discipline_cpco') or user.has_group('discipline_management.group_discipline_chief'))
+        is_pomd = bool((sec_user and user.id == sec_user.id) or user.has_group('discipline_management.group_discipline_pomd'))
+        emp = user.sudo().employee_id
+        job_name = (emp.sudo().job_id.name or '').lower() if emp and emp.job_id else ''
+
         for rec in self:
-            if rec.case_id and rec.case_id.committee_meeting_ids:
-                rec.appeal_source_type = 'committee'
+            target = rec.appeal_target_authority
+            can_review = False
+            case = rec.case_id.sudo()
+
+            initiator_emp = case.reported_by_id.sudo() if (case and case.reported_by_id) else False
+            if not initiator_emp and case and case.employee_id:
+                initiator_emp = case.employee_id.sudo().parent_id or case.employee_id.sudo().coach_id
+
+            is_coach_of_initiator = bool(
+                emp and initiator_emp and (
+                    initiator_emp.parent_id.id == emp.id or
+                    initiator_emp.coach_id.id == emp.id or
+                    (initiator_emp.department_id and initiator_emp.department_id.manager_id.id == emp.id)
+                )
+            )
+
+            is_director_role = (
+                is_coach_of_initiator or
+                (emp and emp.executive_level in ('director', 'chief', 'ceo')) or
+                user.has_group('discipline_management.group_discipline_director') or
+                'director' in job_name
+            )
+            is_chief_role = is_chief or (emp and emp.executive_level in ('chief', 'ceo')) or 'chief' in job_name or 'cpco' in job_name
+            is_ceo_role = is_ceo or (emp and emp.executive_level == 'ceo') or 'ceo' in job_name or 'president' in job_name
+
+            if target == 'directorate':
+                can_review = is_director_role or is_chief_role or is_ceo_role or is_admin
+            elif target == 'chief':
+                can_review = is_chief_role or is_ceo_role or is_admin
+            elif target == 'secretary':
+                can_review = is_pomd or is_admin
+            elif target == 'ceo':
+                can_review = is_ceo_role or is_admin
             else:
-                rec.appeal_source_type = 'manager'
+                can_review = is_admin
+            rec.can_user_review_current_stage = can_review
 
-    @api.depends('appeal_level', 'appeal_source_type', 'case_id')
-    def _compute_appeal_reviewer(self):
-        """FR-DIS-033:
-
-        Line Manager Decision:
-          Level 1 -> Respective Directorate
-          Level 2 -> CPCO
-        Committee Decision:
-          Level 1 -> Disciplinary Committee Secretary
-          Level 2 -> CEO
-        """
+    @api.depends('case_id', 'case_id.employee_id', 'employee_id')
+    def _compute_is_appellant_employee(self):
+        current_user = self.env.user
+        current_emp = current_user.sudo().employee_id
         for rec in self:
-            case = rec.case_id
-            if rec.appeal_source_type == 'manager':
-                if rec.appeal_level == 'level_1':
-                    rec.reviewer_id = case.director_id if case and case.director_id else self.env.user
-                else:
-                    cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
-                    cpco_u = cpco_group.user_ids[0] if (cpco_group and cpco_group.user_ids) else (cpco_group.all_user_ids[0] if (cpco_group and cpco_group.all_user_ids) else False)
-                    rec.reviewer_id = cpco_u or self.env.user
-            else:
-                # Committee decision
-                if rec.appeal_level == 'level_1':
-                    sec_group = self.env.ref('discipline_management.group_discipline_committee_secretary', raise_if_not_found=False)
-                    sec_u = sec_group.user_ids[0] if (sec_group and sec_group.user_ids) else (sec_group.all_user_ids[0] if (sec_group and sec_group.all_user_ids) else False)
-                    rec.reviewer_id = sec_u or self.env.user
-                else:
-                    ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
-                    ceo_u = ceo_group.user_ids[0] if (ceo_group and ceo_group.user_ids) else (ceo_group.all_user_ids[0] if (ceo_group and ceo_group.all_user_ids) else False)
-                    rec.reviewer_id = ceo_u or (case.ceo_id if case and case.ceo_id else self.env.user)
+            emp = rec.sudo().employee_id or (rec.case_id and rec.case_id.sudo().employee_id)
+            if not emp and current_emp:
+                emp = current_emp
+            is_emp = bool(
+                emp and (
+                    (emp.user_id and emp.user_id.id == current_user.id) or
+                    (current_emp and current_emp.id == emp.id) or
+                    (hasattr(current_user, 'employee_ids') and emp.id in current_user.sudo().employee_ids.ids)
+                )
+            )
+            # Default to True for new/unsaved records
+            if not rec.id:
+                is_emp = True
+            rec.is_appellant_employee = is_emp
 
-    # Appeal Window Enforcement (10 Calendar Days)
+    can_submit_next_appeal = fields.Boolean(
+        string='Can Submit Next Appeal',
+        compute='_compute_can_submit_next_appeal'
+    )
+    next_appeal_button_label = fields.Char(
+        string='Next Appeal Button Label',
+        compute='_compute_can_submit_next_appeal'
+    )
+
+    # Backward compatibility alias
+    can_submit_second_appeal = fields.Boolean(
+        string='Can Submit 2nd Appeal',
+        related='can_submit_next_appeal'
+    )
+
+    def _compute_can_submit_next_appeal(self):
+        current_user = self.env.user
+        is_pomd = current_user.has_group('discipline_management.group_discipline_pomd') or current_user.has_group('discipline_management.group_discipline_admin')
+        for rec in self:
+            is_emp = bool(
+                rec.employee_id and (
+                    (rec.employee_id.user_id and rec.employee_id.user_id.id == current_user.id) or
+                    (current_user.employee_id and current_user.employee_id.id == rec.employee_id.id) or
+                    (hasattr(current_user, 'employee_ids') and rec.employee_id.id in current_user.employee_ids.ids)
+                )
+            )
+            is_dismissal_inactive = bool(
+                rec.case_id and
+                (rec.case_id.severity_level == 'level_1' or rec.case_id.punishment_type == 'dismissal') and
+                (not rec.employee_id.active or (rec.employee_id.user_id and not rec.employee_id.user_id.active))
+            )
+            eligible_user = is_emp or (is_pomd and is_dismissal_inactive)
+
+            is_fully_cleared = (
+                rec.decision_outcome == 'overturned' or
+                rec.revised_punishment_type == 'exonerate' or
+                (rec.decision_outcome == 'penalty_reduced' and rec.revised_penalty_percentage == 0.0 and rec.revised_fine_days == 0.0 and rec.revised_punishment_type in ('exonerate', False))
+            )
+
+            # Check if record is decided and outcome has remaining penalty to appeal
+            is_decided_with_penalty = (
+                rec.state == 'decided' and
+                rec.decision_outcome in ('upheld', 'penalty_reduced') and
+                not is_fully_cleared
+            )
+
+            # Check if next level is available
+            has_next_level = False
+            label = _('Submit Next Level Appeal')
+            if rec.case_origin_type == 'manager':
+                if rec.appeal_level == 'first':
+                    has_next_level = True
+                    label = _('Submit 2nd Level Appeal (To Chief Officer / CPCO)')
+                elif rec.appeal_level == 'second':
+                    has_next_level = True
+                    label = _('Submit 3rd Level Appeal (To CEO)')
+            elif rec.case_origin_type == 'director':
+                if rec.appeal_level == 'first':
+                    has_next_level = True
+                    label = _('Submit 2nd Level Appeal (To CEO)')
+            elif rec.case_origin_type in ('chief', 'committee'):
+                has_next_level = False
+
+            # Check if child appeal is already created
+            has_child = bool(rec.child_appeal_ids)
+
+            rec.can_submit_next_appeal = eligible_user and is_decided_with_penalty and has_next_level and not has_child
+            rec.next_appeal_button_label = label
+
+    # Case Completed / Enforced Validation
+    @api.constrains('case_id')
+    def _check_case_enforced_for_appeal(self):
+        for rec in self:
+            if rec.case_id and rec.case_id.state not in ('enforced', 'closed', 'appealed'):
+                case_status = dict(rec.case_id._fields['state'].selection).get(rec.case_id.state, rec.case_id.state)
+                raise ValidationError(_(
+                    'Invalid Appeal Request: An appeal cannot be requested before the disciplinary case is completed and enforced. '
+                    'Case "%s" is currently in "%s" state.'
+                ) % (rec.case_id.name, case_status))
+
+    # Appeal Window Enforcement (10 Calendar Days for 1st level appeal)
     @api.constrains('submission_date', 'case_id')
     def _check_appeal_window(self):
         for rec in self:
-            if rec.case_id and rec.case_id.final_decision_date:
-                deadline = rec.case_id.final_decision_date + timedelta(days=10)
-                if rec.submission_date > deadline:
+            if rec.appeal_level in ('second', 'third'):
+                continue
+            if rec.case_id:
+                base_date = rec.case_id.delivery_receipt_date or rec.case_id.final_decision_date
+                if base_date:
+                    deadline = base_date + timedelta(days=10)
+                    if rec.submission_date > deadline:
+                        raise ValidationError(_(
+                            'Appeal Window Expired: Policy restricts appeal submission to 10 calendar days '
+                            'from the decision notice receipt date (%s). Deadline was %s.'
+                        ) % (base_date, deadline))
+
+    # Duplicate Appeal Validation for Same Case
+    @api.constrains('case_id', 'appeal_level')
+    def _check_duplicate_appeals(self):
+        """Validate that only one appeal can exist per case at the same appeal level,
+        and that a higher-level appeal cannot be lodged before prior levels are decided."""
+        for rec in self:
+            if not rec.case_id:
+                continue
+
+            # 1. Prevent duplicate appeals for the same case and same appeal level
+            duplicate_same_level = self.search([
+                ('id', '!=', rec.id),
+                ('case_id', '=', rec.case_id.id),
+                ('appeal_level', '=', rec.appeal_level),
+            ], limit=1)
+            if duplicate_same_level:
+                stage_name = dict(self._fields['appeal_level'].selection).get(rec.appeal_level, rec.appeal_level)
+                raise ValidationError(_(
+                    'Duplicate Appeal Error: An appeal record (%s) already exists for Case "%s" at the "%s" level. '
+                    'You cannot create duplicate appeals for the same case.'
+                ) % (duplicate_same_level.name, rec.case_id.name, stage_name))
+
+            # 2. Prevent creating 2nd level appeal without a prior completed 1st level appeal
+            if rec.appeal_level == 'second':
+                first_appeal = self.search([
+                    ('id', '!=', rec.id),
+                    ('case_id', '=', rec.case_id.id),
+                    ('appeal_level', '=', 'first'),
+                ], limit=1)
+                if not first_appeal:
                     raise ValidationError(_(
-                        'Appeal Window Expired: Policy restricts appeal submission to 10 calendar days '
-                        'from the decision notice date (%s). Deadline was %s.'
-                    ) % (rec.case_id.final_decision_date, deadline))
+                        'Invalid Appeal Stage: A 2nd Level Appeal cannot be created for Case "%s" without an existing 1st Level Appeal.'
+                    ) % rec.case_id.name)
+                if first_appeal.state != 'decided':
+                    raise ValidationError(_(
+                        'Pending Appeal in Progress: Cannot lodge a 2nd Level Appeal because the 1st Level Appeal (%s) is still pending review.'
+                    ) % first_appeal.name)
+
+            # 3. Prevent creating 3rd level appeal without a prior completed 2nd level appeal
+            elif rec.appeal_level == 'third':
+                second_appeal = self.search([
+                    ('id', '!=', rec.id),
+                    ('case_id', '=', rec.case_id.id),
+                    ('appeal_level', '=', 'second'),
+                ], limit=1)
+                if not second_appeal:
+                    raise ValidationError(_(
+                        'Invalid Appeal Stage: A 3rd Level Appeal cannot be created for Case "%s" without an existing 2nd Level Appeal.'
+                    ) % rec.case_id.name)
+                if second_appeal.state != 'decided':
+                    raise ValidationError(_(
+                        'Pending Appeal in Progress: Cannot lodge a 3rd Level Appeal because the 2nd Level Appeal (%s) is still pending review.'
+                    ) % second_appeal.name)
+
+    # Appeal Decision Outcome & Penalty Reduction Order Validation
+    @api.constrains('decision_outcome', 'revised_punishment_type', 'revised_penalty_percentage', 'revised_fine_days', 'state')
+    def _check_decision_outcome_validity(self):
+        """Validate that the appeal decision outcome strictly complies with penalty hierarchy rules:
+        1. 'penalty_reduced' must strictly reduce punishment severity or monetary deductions compared to baseline.
+        2. 'upheld' must maintain the baseline penalty without modification.
+        3. 'overturned' must fully exonerate the employee (zero penalty).
+        """
+        punishment_rank = {
+            'dismissal': 6,
+            'demotion': 5,
+            'final_warning_penalty': 4,
+            'second_warning_penalty': 3,
+            'first_warning_penalty': 2,
+            'verbal_warning': 1,
+            'exonerate': 0,
+            False: 0,
+        }
+        for rec in self:
+            if rec.state not in ('under_review', 'decided') or not rec.decision_outcome:
+                continue
+
+            orig_punish = rec.original_punishment_type
+            rev_punish = rec.revised_punishment_type
+            orig_rank = punishment_rank.get(orig_punish, 0)
+            rev_rank = punishment_rank.get(rev_punish, 0)
+
+            orig_pct = round(rec.original_penalty_percentage, 2)
+            rev_pct = round(rec.revised_penalty_percentage, 2)
+            orig_days = round(rec.original_fine_days, 2)
+            rev_days = round(rec.revised_fine_days, 2)
+
+            if rec.decision_outcome == 'penalty_reduced':
+                # Rule A: Cannot increase punishment severity rank
+                if rev_rank > orig_rank:
+                    orig_label = dict(self._fields['original_punishment_type'].selection).get(orig_punish, orig_punish or 'None')
+                    rev_label = dict(self._fields['revised_punishment_type'].selection).get(rev_punish, rev_punish or 'None')
+                    raise ValidationError(_(
+                        "Invalid Appeal Decision: You selected 'Penalty / Action Reduced', but the revised punishment ('%s') "
+                        "is more severe than the baseline penalty ('%s'). An appeal cannot increase penalty severity."
+                    ) % (rev_label, orig_label))
+
+                # Rule B: Cannot increase monetary deductions
+                if rev_pct > orig_pct or rev_days > orig_days:
+                    raise ValidationError(_(
+                        "Invalid Appeal Decision: You selected 'Penalty / Action Reduced', but the revised penalty (%s%%, %s fine days) "
+                        "is greater than the baseline penalty (%s%%, %s fine days)."
+                    ) % (rev_pct, rev_days, orig_pct, orig_days))
+
+                # Rule C: If punishment rank is identical, monetary deductions MUST be strictly reduced
+                if rev_rank == orig_rank and rev_pct == orig_pct and rev_days == orig_days:
+                    orig_label = dict(self._fields['original_punishment_type'].selection).get(orig_punish, orig_punish or 'None')
+                    raise ValidationError(_(
+                        "Invalid Appeal Decision: You selected 'Penalty / Action Reduced', but the revised punishment and penalties "
+                        "are identical to the baseline penalty (%s, %s%%, %s fine days).\n\n"
+                        "• To maintain the exact same penalty, please select 'Original Decision Upheld (Appeal Rejected)'.\n"
+                        "• To reduce the penalty, select a lower severity punishment or decrease the penalty percentage / fine days."
+                    ) % (orig_label, orig_pct, orig_days))
+
+            elif rec.decision_outcome == 'upheld':
+                # Upheld maintains the exact original penalty
+                if rev_punish and (rev_rank != orig_rank or rev_pct != orig_pct or rev_days != orig_days):
+                    orig_label = dict(self._fields['original_punishment_type'].selection).get(orig_punish, orig_punish or 'None')
+                    raise ValidationError(_(
+                        "Invalid Appeal Decision: You selected 'Original Decision Upheld (Appeal Rejected)', but modified the punishment "
+                        "or penalty values. When upholding a decision, the baseline penalty (%s, %s%%, %s fine days) must remain unchanged."
+                    ) % (orig_label, orig_pct, orig_days))
+
+            elif rec.decision_outcome == 'overturned':
+                # Overturned requires zero penalty
+                if (rev_punish and rev_punish != 'exonerate') or rev_pct > 0 or rev_days > 0:
+                    raise ValidationError(_(
+                        "Invalid Appeal Decision: You selected 'Decision Overturned (Exonerated)'. "
+                        "All penalties must be cleared to 0.00 and punishment set to 'Exonerated / No Action'."
+                    ))
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('discipline.appeal') or _('New')
-            if not vals.get('reviewer_id'):
-                admin_group = self.env.ref('discipline_management.group_discipline_admin', raise_if_not_found=False)
-                if admin_group and admin_group.user_ids:
-                    vals['reviewer_id'] = admin_group.user_ids[0].id
         appeals = super().create(vals_list)
         for app in appeals:
-            if app.case_id:
-                app.case_id.with_context(force_write=True).write({'state': 'appealed'})
-                app.case_id.message_post(body=_('Appeal %s submitted by employee against Case decision.') % app.name)
+            if app.case_id and not self.env.su:
+                current_user = self.env.user
+                is_self = bool(
+                    (app.employee_id.user_id and app.employee_id.user_id.id == current_user.id) or
+                    (current_user.employee_id and current_user.employee_id.id == app.employee_id.id)
+                )
+                is_dismissal = bool(
+                    app.case_id.punishment_type == 'dismissal' or
+                    app.case_id.severity_level == 'level_1' or
+                    app.case_id.decided_punishment_type == 'dismissal' or
+                    app.original_punishment_type == 'dismissal'
+                )
+                is_auth_third_party = (
+                    current_user.has_group('discipline_management.group_discipline_pomd') or
+                    current_user.has_group('discipline_management.group_discipline_admin') or
+                    current_user.has_group('base.group_system')
+                )
+                if not is_self and not (is_dismissal and is_auth_third_party):
+                    raise ValidationError(_(
+                        "Appeal Access Denied: Disciplinary appeals must be submitted directly by the employee (%s). "
+                        "Submissions on behalf by HR / POMD are permitted solely for Dismissal / Separation cases."
+                    ) % (app.employee_id.name or 'Employee'))
+
+            if app.state == 'submitted' and app.case_id:
+                app.case_id.sudo().with_context(force_write=True).write({'state': 'appealed'})
+                app.case_id.sudo().message_post(body=_('Appeal %s (%s) submitted against Case decision.') % (app.name, app.appeal_level))
+                app._send_appeal_submission_notifications()
         return appeals
+
+    def action_submit_appeal(self):
+        """Explicitly submit draft appeal and transition parent case to appealed state."""
+        for rec in self:
+            if not rec.appeal_grounds:
+                raise UserError(_('Please provide the grounds and justification for your appeal before submitting.'))
+            if rec.case_id and rec.case_id.state not in ('enforced', 'closed', 'appealed'):
+                raise UserError(_('An appeal can only be submitted for a disciplinary case that has been finalized and enforced.'))
+            
+            # Submission access check
+            current_user = self.env.user
+            is_self = bool(
+                (rec.employee_id.user_id and rec.employee_id.user_id.id == current_user.id) or
+                (current_user.employee_id and current_user.employee_id.id == rec.employee_id.id)
+            )
+            is_dismissal = bool(
+                rec.case_id and (
+                    rec.case_id.punishment_type == 'dismissal' or
+                    rec.case_id.severity_level == 'level_1' or
+                    rec.case_id.decided_punishment_type == 'dismissal' or
+                    rec.original_punishment_type == 'dismissal'
+                )
+            )
+            is_auth_third_party = (
+                current_user.has_group('discipline_management.group_discipline_pomd') or
+                current_user.has_group('discipline_management.group_discipline_admin') or
+                current_user.has_group('base.group_system')
+            )
+            if not is_self and not (is_dismissal and is_auth_third_party):
+                raise UserError(_(
+                    "Appeal Access Denied: Disciplinary appeals must be submitted directly by the employee (%s). "
+                    "Submissions on behalf by HR / POMD are permitted solely for Dismissal / Separation cases."
+                ) % (rec.employee_id.name or 'Employee'))
+
+            if rec.appeal_level == 'first' and rec.case_id:
+                rec._check_appeal_window()
+            rec.write({'state': 'submitted'})
+            if rec.case_id:
+                rec.case_id.sudo().with_context(force_write=True).write({'state': 'appealed'})
+                rec.case_id.sudo().message_post(body=_('Appeal %s (%s) submitted against Case decision.') % (rec.name, rec.appeal_level))
+            rec._send_appeal_submission_notifications()
+
+    def _send_appeal_submission_notifications(self):
+        """Send official notifications to the case initiator, prior reviewers, and designated appeal reviewer."""
+        for rec in self:
+            case = rec.case_id.sudo() if rec.case_id else False
+            appellant_name = rec.employee_id.name if rec.employee_id else _('Employee')
+            case_name = case.name if case else _('Disciplinary Case')
+            appeal_lvl_label = dict(rec._fields['appeal_level'].selection).get(rec.appeal_level, rec.appeal_level)
+            target_label = dict(rec._fields['appeal_target_authority'].selection).get(rec.appeal_target_authority, rec.appeal_target_authority)
+            EmpModel = self.env['hr.employee'].sudo()
+
+            # 1. Notify Case Initiator / Reporting Manager (Eyob)
+            initiator_user = (case.reported_by_id and case.reported_by_id.user_id) or (case.create_uid if case else False)
+            if initiator_user and initiator_user.partner_id:
+                rec.sudo().message_subscribe(partner_ids=[initiator_user.partner_id.id])
+                if case:
+                    case.sudo().message_subscribe(partner_ids=[initiator_user.partner_id.id])
+                
+                try:
+                    channel = self.env['discuss.channel'].with_user(rec.env.user)._get_or_create_chat(
+                        partners_to=[initiator_user.partner_id.id]
+                    )
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Disciplinary Appeal Notice (%s Level)</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>Employee <strong>%s</strong> has submitted an appeal (Ref: <strong>%s</strong>, %s Level) against disciplinary case <strong>%s</strong>.</p>'
+                            '<p><strong>Grounds for Appeal:</strong> <em>%s</em></p>'
+                            '<p>The appeal has been routed to <strong>%s</strong> for official review.</p>'
+                        ) % (
+                            appeal_lvl_label,
+                            initiator_user.name,
+                            appellant_name,
+                            rec.name,
+                            appeal_lvl_label,
+                            case_name,
+                            rec.appeal_grounds or _('Not specified'),
+                            target_label,
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=rec.env.user.partner_id.id,
+                        )
+                except Exception:
+                    pass
+
+            # 2. Notify Previous Stage Reviewer (e.g., Directorate Director Derese) if escalated
+            if rec.parent_appeal_id and rec.parent_appeal_id.reviewer_id and rec.parent_appeal_id.reviewer_id.partner_id:
+                prev_reviewer_user = rec.parent_appeal_id.reviewer_id
+                rec.sudo().message_subscribe(partner_ids=[prev_reviewer_user.partner_id.id])
+                try:
+                    channel = self.env['discuss.channel'].with_user(rec.env.user)._get_or_create_chat(
+                        partners_to=[prev_reviewer_user.partner_id.id]
+                    )
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Disciplinary Appeal Escalation Notice</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>Employee <strong>%s</strong> has escalated their appeal (Ref: <strong>%s</strong>, %s Level) against disciplinary case <strong>%s</strong> to <strong>%s</strong> following previous review decision on %s.</p>'
+                            '<p><strong>Grounds for Appeal:</strong> <em>%s</em></p>'
+                        ) % (
+                            prev_reviewer_user.name,
+                            appellant_name,
+                            rec.name,
+                            appeal_lvl_label,
+                            case_name,
+                            target_label,
+                            rec.parent_appeal_id.name,
+                            rec.appeal_grounds or _('Not specified'),
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=rec.env.user.partner_id.id,
+                        )
+                except Exception:
+                    pass
+
+            # 3. Resolve and Notify Designated Appeal Reviewer (e.g. Yeshanew for Chief level)
+            reviewer_user = rec.reviewer_id
+            if not reviewer_user:
+                if rec.appeal_target_authority == 'directorate':
+                    if case:
+                        reviewer_user = (
+                            case.director_id or
+                            (case.reported_by_id and (case.reported_by_id.coach_id.user_id or case.reported_by_id.parent_id.user_id)) or
+                            (case.employee_id and (case.employee_id.coach_id.coach_id.user_id or case.employee_id.parent_id.parent_id.user_id))
+                        )
+                elif rec.appeal_target_authority == 'chief':
+                    if case:
+                        reviewer_user = (
+                            case.chief_id or
+                            (case.reported_by_id and (case.reported_by_id.coach_id.coach_id.user_id or case.reported_by_id.parent_id.parent_id.user_id)) or
+                            (case.employee_id and (case.employee_id.coach_id.coach_id.coach_id.user_id or case.employee_id.parent_id.parent_id.parent_id.user_id)) or
+                            EmpModel.get_cpco_user()
+                        )
+                    else:
+                        reviewer_user = EmpModel.get_cpco_user()
+                elif rec.appeal_target_authority == 'secretary':
+                    reviewer_user = EmpModel.get_secretary_user()
+                elif rec.appeal_target_authority == 'ceo':
+                    reviewer_user = EmpModel.get_ceo_user()
+
+            if reviewer_user and reviewer_user.partner_id:
+                rec.sudo().message_subscribe(partner_ids=[reviewer_user.partner_id.id])
+                if case:
+                    case.sudo().message_subscribe(partner_ids=[reviewer_user.partner_id.id])
+                
+                try:
+                    channel = self.env['discuss.channel'].with_user(rec.env.user)._get_or_create_chat(
+                        partners_to=[reviewer_user.partner_id.id]
+                    )
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Action Required: Disciplinary Appeal Submitted (%s Level)</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>A formal %s level disciplinary appeal (Ref: <strong>%s</strong>) has been submitted by <strong>%s</strong> regarding case <strong>%s</strong> and is awaiting your review as <strong>%s</strong>.</p>'
+                            '<p><strong>Grounds for Appeal:</strong> <em>%s</em></p>'
+                            '<p>Please review the appeal in Bunna Bank ERP under <strong>Discipline Operations &gt; Appeals</strong> to render your formal decision.</p>'
+                        ) % (
+                            appeal_lvl_label,
+                            reviewer_user.name,
+                            appeal_lvl_label,
+                            rec.name,
+                            appellant_name,
+                            case_name,
+                            target_label,
+                            rec.appeal_grounds or _('Not specified'),
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=rec.env.user.partner_id.id,
+                        )
+                except Exception:
+                    pass
+
+    def write(self, vals):
+        # Decision outcome and revised action fields can only be modified by designated stage authority or admin
+        outcome_fields = {
+            'decision_outcome', 'revised_punishment_type', 'revised_penalty_percentage',
+            'revised_fine_days', 'appeal_decision_notes', 'review_date'
+        }
+        if not self.env.su and any(f in vals for f in outcome_fields):
+            for rec in self:
+                if not rec.can_user_review_current_stage:
+                    target_label = dict(self._fields['appeal_target_authority'].selection).get(rec.appeal_target_authority, rec.appeal_target_authority)
+                    raise UserError(_('Permission Denied: Decision outcome and revised action fields can only be modified by the designated appeal authority (%s) or HR Administrator.') % target_label)
+
+        # Supporting document can only be uploaded / modified by the employee or POMD/Admin on behalf
+        doc_fields = {'supporting_document', 'document_filename'}
+        if not self.env.su and any(f in vals for f in doc_fields):
+            for rec in self:
+                current_user = self.env.user
+                is_emp = bool(
+                    rec.employee_id and (
+                        (rec.employee_id.user_id and rec.employee_id.user_id.id == current_user.id) or
+                        (current_user.employee_id and current_user.employee_id.id == rec.employee_id.id) or
+                        (hasattr(current_user, 'employee_ids') and rec.employee_id.id in current_user.employee_ids.ids)
+                    )
+                )
+                is_pomd_on_behalf = rec.is_submitted_on_behalf and (
+                    current_user.has_group('discipline_management.group_discipline_pomd') or
+                    current_user.has_group('discipline_management.group_discipline_admin') or
+                    current_user.has_group('base.group_system')
+                )
+                if not (is_emp or is_pomd_on_behalf):
+                    raise UserError(_('Permission Denied: Only the appellant employee can attach or modify supporting appeal documents.'))
+
+        return super().write(vals)
+
+    def unlink(self):
+        cases = self.mapped('case_id')
+        res = super().unlink()
+        for case in cases:
+            if case.exists():
+                active_appeals = case.appeal_ids.filtered(lambda a: a.state in ('submitted', 'under_review'))
+                if not active_appeals and case.state == 'appealed':
+                    case.sudo().with_context(force_write=True).write({'state': 'enforced'})
+                case._compute_appeal_outcome()
+                case._compute_appeal_stats()
+        return res
 
     def action_start_review(self):
         for rec in self:
+            if not rec.can_user_review_current_stage:
+                target_label = dict(self._fields['appeal_target_authority'].selection).get(rec.appeal_target_authority, rec.appeal_target_authority)
+                raise UserError(_('Authority Restriction: You do not have the required authority role (%s) to start review for this appeal stage.') % target_label)
             rec.write({
                 'reviewer_id': self.env.user.id,
                 'state': 'under_review'
             })
+            if rec.case_id:
+                rec.case_id.sudo().message_post(
+                    body=_('Appeal %s review initiated by %s (%s).') % (rec.name, self.env.user.name, rec.appeal_target_authority or 'Review Authority')
+                )
 
     def action_render_decision(self):
         """Apply appeal decision and update original case outcome."""
         for rec in self:
+            if not rec.can_user_review_current_stage:
+                target_label = dict(self._fields['appeal_target_authority'].selection).get(rec.appeal_target_authority, rec.appeal_target_authority)
+                raise UserError(_('Authority Restriction: You do not have the required authority role (%s) to render decisions for this appeal stage.') % target_label)
             if not rec.decision_outcome:
                 raise UserError(_('Select an Appeal Decision Outcome before finalizing.'))
+
+            rec._check_decision_outcome_validity()
 
             rec.write({
                 'review_date': fields.Date.context_today(self),
@@ -203,31 +1139,344 @@ class DisciplineAppeal(models.Model):
                 continue
 
             if rec.decision_outcome == 'upheld':
-                case.write({'state': 'enforced'})
-                case.message_post(body=_('Appeal %s decided: Original decision UPHELD.') % rec.name)
+                upheld_punish = rec.original_punishment_type or case.decided_punishment_type or case.punishment_type
+                upheld_pct = rec.original_penalty_percentage if rec.original_penalty_percentage is not False else case.decided_penalty_percentage
+                upheld_days = rec.original_fine_days if rec.original_fine_days is not False else case.decided_fine_days
+
+                case.sudo().with_context(force_write=True).write({
+                    'punishment_type': upheld_punish,
+                    'decided_punishment_type': upheld_punish,
+                    'penalty_percentage': upheld_pct,
+                    'decided_penalty_percentage': upheld_pct,
+                    'fine_days': upheld_days,
+                    'decided_fine_days': upheld_days,
+                    'state': 'enforced'
+                })
+                case.sudo()._process_appeal_window_deductions()
+                case.sudo().message_post(body=_('Appeal %s decided: Original decision UPHELD.') % rec.name)
 
             elif rec.decision_outcome == 'overturned':
-                # Revert employee disciplinary marks
-                if hasattr(case.employee_id, 'active_disciplinary_action'):
-                    case.employee_id.active_disciplinary_action = False
-                if hasattr(case.employee_id, 'disciplinary_warning_count') and case.employee_id.disciplinary_warning_count > 0:
+                # Revert employee disciplinary marks & restore mobility
+                case.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({
+                    'active_disciplinary_action': False,
+                    'is_ineligible_for_promotion_transfer': False,
+                    'is_suspended': False,
+                    'suspension_type': False,
+                })
+                if case.employee_id.disciplinary_warning_count > 0:
                     case.employee_id.disciplinary_warning_count -= 1
+                
+                # Reactivate user account if employee had been archived
+                if case.employee_id.user_id:
+                    case.employee_id.user_id.sudo().write({'active': True})
+                if not case.employee_id.active:
+                    case.employee_id.sudo().write({'active': True})
                 
                 # Cancel pending payroll penalties
                 if hasattr(case, 'payroll_penalty_ids') and case.payroll_penalty_ids:
-                    case.payroll_penalty_ids.write({'state': 'cancelled'})
+                    case.payroll_penalty_ids.sudo().filtered(lambda p: p.state == 'pending').write({'state': 'cancelled'})
                 
-                case.write({'state': 'closed'})
-                case.message_post(body=_('Appeal %s decided: Decision OVERTURNED. Employee exonerated.') % rec.name)
+                case.sudo().with_context(force_write=True).write({
+                    'penalty_percentage': 0.0,
+                    'fine_days': 0.0,
+                    'punishment_type': 'exonerate',
+                    'active_duration_days': 0,
+                    'active_penalty_end_date': False,
+                    'deduction_status': 'cancelled',
+                    'state': 'closed'
+                })
+                case.sudo().message_post(body=_('Appeal %s decided: Decision OVERTURNED. Employee exonerated and records restored.') % rec.name)
 
             elif rec.decision_outcome == 'penalty_reduced':
-                case.write({'penalty_percentage': rec.revised_penalty_percentage, 'state': 'enforced'})
+                is_full_exoneration = (rec.revised_punishment_type == 'exonerate') or (rec.revised_penalty_percentage == 0.0 and rec.revised_fine_days == 0.0 and rec.revised_punishment_type in ['exonerate', False])
                 
-                # Update pending payroll penalties
-                if hasattr(case, 'payroll_penalty_ids') and case.payroll_penalty_ids:
-                    pending_penalties = case.payroll_penalty_ids.filtered(lambda p: p.state == 'pending')
-                    if pending_penalties:
-                        pending_penalties.write({'penalty_percentage': rec.revised_penalty_percentage})
+                if is_full_exoneration:
+                    # Revert employee disciplinary marks & restore mobility
+                    case.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({
+                        'active_disciplinary_action': False,
+                        'is_ineligible_for_promotion_transfer': False,
+                        'is_suspended': False,
+                        'suspension_type': False,
+                    })
+                    if case.employee_id.disciplinary_warning_count > 0:
+                        case.employee_id.disciplinary_warning_count -= 1
+                    
+                    # Cancel pending payroll penalties
+                    if hasattr(case, 'payroll_penalty_ids') and case.payroll_penalty_ids:
+                        case.payroll_penalty_ids.sudo().filtered(lambda p: p.state == 'pending').write({'state': 'cancelled'})
+                    
+                    case.sudo().with_context(force_write=True).write({
+                        'penalty_percentage': 0.0,
+                        'fine_days': 0.0,
+                        'punishment_type': 'exonerate',
+                        'active_duration_days': 0,
+                        'active_penalty_end_date': False,
+                        'deduction_status': 'cancelled',
+                        'state': 'closed'
+                    })
+                    case.sudo().message_post(body=_('Appeal %s decided: Penalty REDUCED to ZERO (Exonerated). Employee records restored.') % rec.name)
+                else:
+                    new_punish = rec.revised_punishment_type or case.punishment_type
+                    val_days = 180
+                    if new_punish == 'first_warning_penalty':
+                        val_days = 90
+                    elif new_punish in ('verbal_warning', 'exonerate'):
+                        val_days = 0
+                    elif new_punish in ('second_warning_penalty', 'final_warning_penalty'):
+                        val_days = 180
+
+                    new_vals = {
+                        'penalty_percentage': rec.revised_penalty_percentage,
+                        'fine_days': rec.revised_fine_days,
+                        'punishment_type': new_punish,
+                        'decided_punishment_type': new_punish,
+                        'decided_penalty_percentage': rec.revised_penalty_percentage,
+                        'decided_fine_days': rec.revised_fine_days,
+                        'active_duration_days': val_days,
+                        'state': 'enforced'
+                    }
+                    case.sudo().with_context(force_write=True).write(new_vals)
+                    case.sudo()._process_appeal_window_deductions()
+                    
+                    case.sudo().message_post(body=_('Appeal %s decided: Penalty REDUCED (Pct: %s%%, Days: %s).') % (
+                        rec.name, rec.revised_penalty_percentage, rec.revised_fine_days
+                    ))
+
+            rec._send_appeal_decision_notifications()
+
+    def _send_appeal_decision_notifications(self):
+        """Send official decision notifications to the appellant employee, case initiator, and prior reviewers upon decision rendering."""
+        for rec in self:
+            case = rec.case_id.sudo() if rec.case_id else False
+            appellant_emp = rec.employee_id.sudo() if rec.employee_id else (case.employee_id.sudo() if case else False)
+            appellant_user = appellant_emp.user_id if appellant_emp else False
+            appellant_name = appellant_emp.name if appellant_emp else _('Employee')
+            case_name = case.name if case else _('Disciplinary Case')
+            appeal_lvl_label = dict(rec._fields['appeal_level'].selection).get(rec.appeal_level, rec.appeal_level)
+            target_label = dict(rec._fields['appeal_target_authority'].selection).get(rec.appeal_target_authority, rec.appeal_target_authority)
+            outcome_label = dict(rec._fields['decision_outcome'].selection).get(rec.decision_outcome, rec.decision_outcome or _('Decided'))
+            reviewer_user = rec.reviewer_id or self.env.user
+            reviewer_name = reviewer_user.name if reviewer_user else _('Appeal Authority')
+            
+            # Formulate punishment & penalty details
+            if rec.decision_outcome == 'overturned':
+                sanction_desc = _('Fully Exonerated / Decision Overturned (0.00% Penalty)')
+            elif rec.decision_outcome == 'penalty_reduced':
+                punish_label = dict(rec._fields['revised_punishment_type'].selection).get(rec.revised_punishment_type, rec.revised_punishment_type or '')
+                pen_parts = []
+                if rec.revised_penalty_percentage > 0.0:
+                    pen_parts.append(_('%s%% Salary Deduction') % rec.revised_penalty_percentage)
+                if rec.revised_fine_days > 0.0:
+                    pen_parts.append(_('%d Day(s) Salary Fine') % int(rec.revised_fine_days))
+                pen_str = (' (' + ', '.join(pen_parts) + ')') if pen_parts else ''
+                sanction_desc = f"{punish_label}{pen_str}" if punish_label else _('Penalty Reduced')
+            else: # upheld
+                orig_punish = dict(rec._fields['original_punishment_type'].selection).get(rec.original_punishment_type, rec.original_punishment_type or '')
+                orig_pen_parts = []
+                if rec.original_penalty_percentage > 0.0:
+                    orig_pen_parts.append(_('%s%% Salary Deduction') % rec.original_penalty_percentage)
+                if rec.original_fine_days > 0.0:
+                    orig_pen_parts.append(_('%d Day(s) Salary Fine') % int(rec.original_fine_days))
+                orig_pen_str = (' (' + ', '.join(orig_pen_parts) + ')') if orig_pen_parts else ''
+                sanction_desc = f"{orig_punish}{orig_pen_str} (Original Enforced Sanction Maintained)"
+
+            rationale_text = rec.appeal_decision_notes or _('Decision rendered in accordance with Bank Disciplinary Policy.')
+
+            # 1. Notify Appellant Employee (Chala)
+            if appellant_user and appellant_user.partner_id:
+                rec.sudo().message_subscribe(partner_ids=[appellant_user.partner_id.id])
+                if case:
+                    case.sudo().message_subscribe(partner_ids=[appellant_user.partner_id.id])
                 
-                case.message_post(body=_('Appeal %s decided: Penalty REDUCED to %s%%.') % (rec.name, rec.revised_penalty_percentage))
+                try:
+                    channel = self.env['discuss.channel'].with_user(reviewer_user)._get_or_create_chat(
+                        partners_to=[appellant_user.partner_id.id]
+                    )
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Official Disciplinary Appeal Decision Notice (%s Level)</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>A formal decision has been rendered on your disciplinary appeal (Ref: <strong>%s</strong>) for Case <strong>%s</strong> by <strong>%s</strong> (%s).</p>'
+                            '<ul>'
+                            '<li><strong>Decision Outcome:</strong> %s</li>'
+                            '<li><strong>Sanction / Decided Action:</strong> %s</li>'
+                            '<li><strong>Decision Date:</strong> %s</li>'
+                            '</ul>'
+                            '<p><strong>Decision Justification &amp; Rationale:</strong><br/><em>%s</em></p>'
+                            '<p>You can view full details in Bunna Bank ERP under <strong>Discipline Operations &gt; Appeals</strong>.</p>'
+                        ) % (
+                            appeal_lvl_label,
+                            appellant_name,
+                            rec.name,
+                            case_name,
+                            reviewer_name,
+                            target_label,
+                            outcome_label,
+                            sanction_desc,
+                            rec.review_date or fields.Date.today(),
+                            rationale_text,
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=reviewer_user.partner_id.id,
+                        )
+                except Exception:
+                    pass
+
+            # 2. Notify Case Initiator / Reporting Manager (Eyob)
+            initiator_user = (case and case.reported_by_id and case.reported_by_id.user_id) or (case.create_uid if case else False)
+            if initiator_user and initiator_user.partner_id and initiator_user.id != reviewer_user.id:
+                rec.sudo().message_subscribe(partner_ids=[initiator_user.partner_id.id])
+                if case:
+                    case.sudo().message_subscribe(partner_ids=[initiator_user.partner_id.id])
+                
+                try:
+                    channel = self.env['discuss.channel'].with_user(reviewer_user)._get_or_create_chat(
+                        partners_to=[initiator_user.partner_id.id]
+                    )
+                    if channel:
+                        msg_body = Markup(_(
+                            '<p><strong>Disciplinary Appeal Decision Update (%s Level)</strong></p>'
+                            '<p>Dear %s,</p>'
+                            '<p>The %s level appeal (Ref: <strong>%s</strong>) by <strong>%s</strong> regarding case <strong>%s</strong> has been concluded by <strong>%s</strong> (%s).</p>'
+                            '<ul>'
+                            '<li><strong>Outcome:</strong> %s</li>'
+                            '<li><strong>Enforced Sanction:</strong> %s</li>'
+                            '</ul>'
+                            '<p><strong>Rationale:</strong> <em>%s</em></p>'
+                        ) % (
+                            appeal_lvl_label,
+                            initiator_user.name,
+                            appeal_lvl_label,
+                            rec.name,
+                            appellant_name,
+                            case_name,
+                            reviewer_name,
+                            target_label,
+                            outcome_label,
+                            sanction_desc,
+                            rationale_text,
+                        ))
+                        channel.message_post(
+                            body=msg_body,
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment',
+                            author_id=reviewer_user.partner_id.id,
+                        )
+                except Exception:
+                    pass
+
+            # 3. Notify Previous Reviewer (e.g. Derese) if escalated
+            if rec.parent_appeal_id and rec.parent_appeal_id.reviewer_id and rec.parent_appeal_id.reviewer_id.partner_id:
+                prev_reviewer_user = rec.parent_appeal_id.reviewer_id
+                if prev_reviewer_user.id != reviewer_user.id:
+                    rec.sudo().message_subscribe(partner_ids=[prev_reviewer_user.partner_id.id])
+                    try:
+                        channel = self.env['discuss.channel'].with_user(reviewer_user)._get_or_create_chat(
+                            partners_to=[prev_reviewer_user.partner_id.id]
+                        )
+                        if channel:
+                            msg_body = Markup(_(
+                                '<p><strong>Escalated Disciplinary Appeal Concluded (%s Level)</strong></p>'
+                                '<p>Dear %s,</p>'
+                                '<p>The escalated appeal (Ref: <strong>%s</strong>) by <strong>%s</strong> regarding case <strong>%s</strong> (prior appeal: %s) has been decided by <strong>%s</strong> (%s).</p>'
+                                '<ul>'
+                                '<li><strong>Outcome:</strong> %s</li>'
+                                '<li><strong>Sanction:</strong> %s</li>'
+                                '</ul>'
+                                '<p><strong>Rationale:</strong> <em>%s</em></p>'
+                            ) % (
+                                appeal_lvl_label,
+                                prev_reviewer_user.name,
+                                rec.name,
+                                appellant_name,
+                                case_name,
+                                rec.parent_appeal_id.name,
+                                reviewer_name,
+                                target_label,
+                                outcome_label,
+                                sanction_desc,
+                                rationale_text,
+                            ))
+                            channel.message_post(
+                                body=msg_body,
+                                message_type='comment',
+                                subtype_xmlid='mail.mt_comment',
+                                author_id=reviewer_user.partner_id.id,
+                            )
+                    except Exception:
+                        pass
+
+    def action_create_next_appeal(self):
+        """Submit Next Level Appeal if previous appeal was upheld or partially reduced upon review."""
+        self.ensure_one()
+        current_user = self.env.user
+        is_emp = bool(
+            self.employee_id and (
+                (self.employee_id.user_id and self.employee_id.user_id.id == current_user.id) or
+                (current_user.employee_id and current_user.employee_id.id == self.employee_id.id) or
+                (hasattr(current_user, 'employee_ids') and self.employee_id.id in current_user.employee_ids.ids)
+            )
+        )
+        is_pomd = current_user.has_group('discipline_management.group_discipline_pomd') or current_user.has_group('discipline_management.group_discipline_admin')
+        is_dismissal_inactive = bool(
+            self.case_id and
+            (self.case_id.severity_level == 'level_1' or self.case_id.punishment_type == 'dismissal') and
+            (not self.employee_id.active or (self.employee_id.user_id and not self.employee_id.user_id.active))
+        )
+        if not (is_emp or (is_pomd and is_dismissal_inactive)):
+            raise UserError(_('Appeal Access Restriction: Only the subject employee (or POMD for dismissed/inactive employees) can submit an appeal escalation.'))
+
+        if self.state != 'decided' or self.decision_outcome not in ('upheld', 'penalty_reduced'):
+            raise UserError(_('A subsequent appeal can only be lodged if the current appeal was decided and not fully overturned/exonerated.'))
+
+        # Determine next level
+        if self.case_origin_type == 'manager':
+            if self.appeal_level == 'first':
+                next_level = 'second'
+                next_title = _('Submit 2nd Level Appeal (To Chief Officer / CPCO) for Case %s') % self.case_id.name
+            elif self.appeal_level == 'second':
+                next_level = 'third'
+                next_title = _('Submit 3rd Level Appeal (To CEO) for Case %s') % self.case_id.name
+            else:
+                raise UserError(_('This record is already at the final 3rd level appeal stage (CEO).'))
+        elif self.case_origin_type == 'director':
+            if self.appeal_level == 'first':
+                next_level = 'second'
+                next_title = _('Submit 2nd Level Appeal (To CEO) for Case %s') % self.case_id.name
+            else:
+                raise UserError(_('This record is already at the final 2nd level appeal stage (CEO).'))
+        elif self.case_origin_type == 'chief':
+            raise UserError(_('Decisions by Chief Officers directly escalate to CEO at 1st level and cannot be appealed further.'))
+        else: # committee
+            if self.appeal_level == 'first':
+                next_level = 'second'
+                next_title = _('Submit 2nd Level Appeal (To CEO) for Case %s') % self.case_id.name
+            else:
+                raise UserError(_('This record is already at the final 2nd level appeal stage (CEO).'))
+
+        # Check if already submitted
+        existing_child = self.search([('parent_appeal_id', '=', self.id)], limit=1)
+        if existing_child:
+            raise UserError(_('An escalated appeal (%s) has already been lodged for this record.') % existing_child.name)
+
+        return {
+            'name': next_title,
+            'type': 'ir.actions.act_window',
+            'res_model': 'discipline.appeal',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_case_id': self.case_id.id,
+                'default_parent_appeal_id': self.id,
+                'default_appeal_level': next_level,
+                'default_submission_date': fields.Date.context_today(self),
+            }
+        }
+
+    def action_create_second_appeal(self):
+        """Backward compatibility alias for action_create_next_appeal."""
+        return self.action_create_next_appeal()
                 

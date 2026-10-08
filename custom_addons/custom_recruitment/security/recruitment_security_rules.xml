@@ -214,6 +214,22 @@
             <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
         </record>
 
+        <!-- Candidate Release Form: Coach/Supervisor Access to Subordinates' Records -->
+        <record id="rule_candidate_release_coach_supervisor" model="ir.rule">
+            <field name="name">Candidate Release: Coach / Supervisor / Subordinate Access</field>
+            <field name="model_id" ref="model_new_internal_recruitment_selected_candidates"/>
+            <field name="domain_force">['|', '|', '|', '|', ('coach_id.user_id', '=', user.id), ('emp_name.parent_id.user_id', '=', user.id), ('emp_name.department_id.manager_id.user_id', '=', user.id), ('emp_name.user_id', '=', user.id), ('create_uid', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+        <!-- Candidate Release Form: Officer & Administrator All Records -->
+        <record id="rule_candidate_release_officer_all" model="ir.rule">
+            <field name="name">Candidate Release: Officer &amp; Administrator All</field>
+            <field name="model_id" ref="model_new_internal_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_officer')), (4, ref('group_recruitment_administrator'))]"/>
+        </record>
+
         <!-- Panel Member: Regular user sees ONLY their own panel invitations -->
         <record id="rule_panel_member_user_own" model="ir.rule">
             <field name="name">Panel Member: User - Own Invitations Only</field>

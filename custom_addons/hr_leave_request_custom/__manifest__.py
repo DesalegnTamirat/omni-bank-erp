@@ -1,6 +1,6 @@
 {
     'name': 'HR Leave Request Custom',
-    'version': '19.0.1.0.31',
+    'version': '19.0.1.0.32',
     'summary': 'Custom Leave Request extension for hr.holidays (Time Off)',
     'description': """
         Extends the standard Time Off (hr.holidays) module with additional

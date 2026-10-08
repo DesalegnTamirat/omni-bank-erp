@@ -5,7 +5,7 @@
             <field name="name">discipline.payroll.penalty.list</field>
             <field name="model">discipline.payroll.penalty</field>
             <field name="arch" type="xml">
-                <list create="false">
+                <list>
                     <field name="name"/>
                     <field name="case_id"/>
                     <field name="employee_id"/>
@@ -14,6 +14,7 @@
                     <field name="suspension_days"/>
                     <field name="daily_rate"/>
                     <field name="calculated_amount"/>
+                    <field name="payroll_month"/>
                     <field name="effective_date"/>
                     <field name="state" widget="badge"/>
                 </list>
@@ -24,13 +25,18 @@
             <field name="name">discipline.payroll.penalty.form</field>
             <field name="model">discipline.payroll.penalty</field>
             <field name="arch" type="xml">
-                <form create="false">
+                <form>
                     <header>
-                        <button name="action_transmit_to_payroll" string="Transmit to Payroll" type="object" class="oe_highlight" invisible="state != 'pending'"/>
-                        <button name="action_mark_deducted" string="Mark as Deducted" type="object" class="btn-success" invisible="state != 'transferred'"/>
+                        <button name="action_transmit_to_payroll" string="Transmit to Payroll" type="object" class="oe_highlight"
+                                invisible="state != 'pending'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin,base.group_system"/>
+                        <button name="action_mark_deducted" string="Mark as Deducted" type="object" class="btn-success"
+                                invisible="state != 'transferred'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin,base.group_system"/>
                         <!-- Cancel button -->
                         <button name="action_cancel" string="Cancel / Waive" type="object" class="btn-danger"
                                 invisible="state in ('deducted', 'cancelled')"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin,base.group_system"
                                 confirm="Cancel this penalty deduction?"/>
                         <field name="state" widget="statusbar" statusbar_visible="pending,transferred,deducted"/>
                     </header>
@@ -55,6 +61,7 @@
                         <group>
                             <group string="Deduction Amounts &amp; Dates">
                                 <field name="calculated_amount" readonly="1"/>
+                                <field name="payroll_month" string="Target Payroll Month"/>
                                 <field name="effective_date"/>
                                 <field name="payslip_reference"/>
                             </group>

@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="bunna_succession_management.NineBoxGrid" owl="1">
+        <div class="o_nine_box_dashboard container-fluid h-100 overflow-auto py-4" style="background-color: #f4f6f9;">
+            
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary-subtle">
+                <h2 class="fw-bold mb-0 text-dark" style="letter-spacing: -0.5px;">Nine-Box Talent Grid</h2>
+                <div class="me-2">
+                    <select class="form-select border shadow-sm fw-bold text-dark cursor-pointer" 
+                            style="min-width: 250px; background-color: #ffffff;"
+                            t-on-change="(e) => this.setTrack(e.target.value)">
+                        <t t-foreach="state.trackDefs" t-as="tDef" t-key="tDef.key">
+                            <option t-att-value="tDef.key" t-att-selected="tDef.key === state.activeTrack">
+                                <t t-esc="tDef.label"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <!-- 9-Box Grid Column (Left) -->
+                <div class="col-xl-8 col-lg-7">
+                    <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded shadow-sm border">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input cursor-pointer" type="checkbox" id="critOnlySwitch" t-model="state.critOnlyFlag" style="width: 2.5em; height: 1.25em;"/>
+                            <label class="form-check-label fw-semibold text-dark ms-2 pt-1 cursor-pointer" for="critOnlySwitch">
+                                <i class="fa fa-shield text-warning me-1"></i> Focus on Critical Position Successors
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- The Grid -->
+                    <div class="d-flex" style="gap: 15px;">
+                        <!-- Y-Axis Label -->
+                        <div class="d-flex flex-column justify-content-center text-muted" style="writing-mode: vertical-rl; transform: rotate(180deg);">
+                            <span class="fw-bolder tracking-wide" style="letter-spacing: 2px; font-size: 0.85rem;">POTENTIAL (LOW TO HIGH)</span>
+                        </div>
+
+                        <div class="flex-grow-1">
+                            <!-- 3 Rows -->
+                            <t t-foreach="[2, 1, 0]" t-as="r" t-key="r">
+                                <div class="row g-3 mb-3">
+                                    <t t-foreach="[0, 1, 2]" t-as="c" t-key="c">
+                                        <t t-set="def" t-value="state.boxDefs[r][c]"/>
+                                        <div class="col-4">
+                                            <div t-attf-class="card h-100 border-0 shadow-sm o_9box_cell tier-{{def.tier}} position-relative overflow-hidden" style="height: 220px !important;"
+                                                 t-on-dragover="(e) => this.onDragOver(e)"
+                                                 t-on-drop="(e) => this.onDrop(e, r, c)">
+                                                
+                                                <!-- Watermark Number -->
+                                                <div class="position-absolute fw-bolder" style="font-size: 8rem; right: -10px; bottom: -30px; opacity: 0.05; z-index: 0; pointer-events: none; line-height: 1;">
+                                                    <t t-esc="this.getBoxCount(r, c)"/>
+                                                </div>
+
+                                                <div class="card-header border-0 bg-transparent py-3 d-flex justify-content-between align-items-center" style="z-index: 1;">
+                                                    <span class="fw-bold text-dark text-truncate" style="font-size: 0.95rem;">
+                                                        <t t-esc="def.name"/>
+                                                        <i class="fa fa-info-circle ms-1 text-muted cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" t-att-title="def.desc"></i>
+                                                    </span>
+                                                    <span class="badge rounded-pill text-bg-dark opacity-75 shadow-sm"><t t-esc="this.getBoxCount(r, c)"/></span>
+                                                </div>
+                                                <div class="card-body p-3 overflow-auto custom-scrollbar d-flex flex-wrap align-content-start gap-2" style="z-index: 1;">
+                                                    <t t-foreach="this.getPeopleInBox(r, c)" t-as="p" t-key="p.id">
+                                                        <div class="o_9box_avatar_wrap" 
+                                                             draggable="true"
+                                                             t-on-dragstart="(e) => this.onDragStart(e, p)"
+                                                             t-on-click="() => this.selectPerson(p.id)"
+                                                             data-bs-toggle="tooltip" t-att-title="p.name">
+                                                            <img t-attf-src="/web/image?model=hr.employee&amp;field=avatar_128&amp;id={{p.emp_id || 0}}" 
+                                                                 t-attf-class="rounded-circle o_9box_avatar {{ p.readyClass }} {{ state.selectedId === p.id ? 'selected' : '' }} shadow-sm"/>
+                                                            <t t-if="p.critical"><div class="o_9box_flag"><i class="fa fa-star text-white" style="font-size: 8px;"></i></div></t>
+                                                        </div>
+                                                    </t>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </t>
+                            <!-- X-Axis Label -->
+                            <div class="row g-3 mt-1 text-center text-muted fw-bolder tracking-wide" style="letter-spacing: 1px; font-size: 0.8rem;">
+                                <div class="col-4">LOW PERFORMANCE</div>
+                                <div class="col-4">MEDIUM PERFORMANCE</div>
+                                <div class="col-4">HIGH PERFORMANCE</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="mt-4 p-3 bg-white rounded shadow-sm border d-flex justify-content-center flex-wrap gap-4 small fw-semibold text-secondary">
+                        <div class="d-flex align-items-center"><span class="o_ring_sample r-now me-2"></span> Ready Now</div>
+                        <div class="d-flex align-items-center"><span class="o_ring_sample r-soon me-2"></span> Ready Soon (1-2 yrs)</div>
+                        <div class="d-flex align-items-center"><span class="o_ring_sample r-later me-2"></span> Ready Later (3-5 yrs)</div>
+                        <div class="d-flex align-items-center"><div class="o_9box_flag position-relative me-2" style="bottom:0;right:0;"><i class="fa fa-star text-white" style="font-size: 8px;"></i></div> Critical Position Successor</div>
+                    </div>
+                </div>
+
+                <!-- Detail Column (Right) -->
+                <div class="col-xl-4 col-lg-5">
+                    <div class="card shadow-lg border-0 sticky-top overflow-hidden" style="top: 20px; border-radius: 12px;">
+                        <t t-if="!state.selectedId">
+                            <div class="card-body p-4">
+                                <div class="mb-4 p-3 calib-gold-border rounded-end bg-light">
+                                    <h5 class="fw-bold mb-1" style="font-family: 'Source Serif 4', serif; color: #1d2b32;">Calibration session</h5>
+                                    <p class="small mb-2" style="color: #6b7280;"><t t-esc="this.getCalibrationText()"/></p>
+                                    <div class="progress" style="height: 6px; background-color: #e5e7eb; border-radius: 99px;">
+                                        <div class="progress-bar bg-success rounded-pill" role="progressbar" t-att-style="'width: ' + this.getCalibrationPct() + '%'"/>
+                                    </div>
+                                </div>
+                                
+                                <h4 class="fw-bold mb-1" style="font-family: 'Source Serif 4', serif; color: #1d2b32;">Employee detail</h4>
+                                <p class="small mb-3" style="color: #6b7280;">Selected from the grid</p>
+                                
+                                <div class="p-4 mb-4 rounded text-center bg-light border" style="font-style: italic; color: #6b7280;">
+                                    Select an employee on the grid to view their career &amp; succession record.
+                                </div>
+                                
+                                <h4 class="fw-bold mb-1 mt-4" style="font-family: 'Source Serif 4', serif; color: #1d2b32;">Succession pool coverage</h4>
+                                <p class="small mb-4" style="color: #6b7280;">Critical positions with a "Ready Now" successor, by category</p>
+                                
+                                <t t-foreach="this.getPipelineCoverage()" t-as="cat" t-key="cat.name">
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between mb-1 small fw-semibold" style="color: #4b5563;">
+                                            <span class="text-truncate" style="max-width: 70%;"><t t-esc="cat.name"/></span>
+                                            <span><t t-esc="cat.covered"/>/<t t-esc="cat.total || '0'"/> covered</span>
+                                        </div>
+                                        <div class="progress" style="height: 6px; background-color: #e5e7eb; border-radius: 99px;">
+                                            <div t-attf-class="progress-bar {{ cat.hasGap ? 'bg-danger' : 'bg-success' }} rounded-pill" role="progressbar" t-att-style="'width: ' + cat.pct + '%'"/>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <t t-set="selP" t-value="this.getSelectedPerson()"/>
+                            <div class="card-header border-0 py-4 position-relative" style="height: 100px; background: linear-gradient(to right, #1d2b32, #726732);">
+                                <div class="position-absolute" style="bottom: -40px; left: 50%; transform: translateX(-50%);">
+                                    <img t-attf-src="/web/image?model=hr.employee&amp;field=avatar_128&amp;id={{selP.emp_id || 0}}" 
+                                         class="rounded-circle shadow-lg border border-4" style="width: 80px; height: 80px; object-fit: cover; background: #ffffff; border-color: #ffffff !important;"/>
+                                </div>
+                            </div>
+                            <div class="card-body text-center mt-4 pt-3 pb-2 border-bottom">
+                                <h4 class="mb-1 fw-bold" style="color: #1d2b32;"><t t-esc="this.getDisplayName(selP, false)"/></h4>
+                                <p class="mb-2 fw-medium" style="color: #6b7280;"><t t-esc="selP.role"/></p>
+                                <span t-attf-class="badge rounded-pill {{ selP.ready === 'ready_now' ? 'bg-success' : 'bg-warning text-dark' }} mb-2 px-3 py-2 shadow-sm">
+                                    Readiness: <t t-esc="selP.readyLabel || 'Not assessed'"/>
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush bg-transparent">
+                                    <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-3 px-4">
+                                        <span class="small fw-semibold" style="color: #6b7280;">Career Track</span>
+                                        <span class="fw-bold" style="color: #1d2b32;"><t t-esc="this.getTrackLabel(selP.track)"/></span>
+                                    </li>
+                                    <li class="list-group-item bg-transparent py-3 px-4">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="small fw-semibold" style="color: #6b7280;">Competency Match</span>
+                                            <span class="fw-bold" style="color: #1d2b32;"><t t-esc="100 - selP.gap"/>%</span>
+                                        </div>
+                                        <div class="progress rounded-pill shadow-sm" style="height: 8px; background-color: #e5e7eb;">
+                                            <div class="progress-bar bg-success rounded-pill" role="progressbar" t-att-style="'width: ' + (100 - selP.gap) + '%'"/>
+                                        </div>
+                                    </li>
+                                    <t t-if="selP.critical">
+                                        <li class="list-group-item bg-transparent py-3 px-4">
+                                            <div class="small mb-1 fw-bold" style="color: #c17540;"><i class="fa fa-star"></i> Designated Successor For</div>
+                                            <div class="fw-bold" style="font-size: 1.1rem; color: #1d2b32;"><t t-esc="selP.critical"/></div>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </div>
+                            <div class="card-footer p-3 border-top-0 d-flex gap-2 bg-light">
+                                <button class="btn btn-outline-secondary w-25" t-on-click="() => this.selectPerson(null)"><i class="fa fa-times"></i></button>
+                                <button class="btn btn-primary w-75 fw-bold shadow-sm" style="background-color: #1d2b32; border-color: #1d2b32;" t-on-click="() => this.openForm(selP.id)" t-att-disabled="selP.id &lt; 0 ? 'disabled' : undefined">
+                                    <t t-if="selP.id &lt; 0">Test Data (View Only)</t>
+                                    <t t-else="">Open Full Record</t>
+                                </button>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

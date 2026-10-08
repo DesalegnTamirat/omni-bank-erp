@@ -12,6 +12,18 @@
                        decoration-success="state == 'approved'"
                        decoration-warning="state in ('open', 'budget_call', 'consolidation', 'board_approval')"
                        decoration-muted="state == 'closed'"/>
+                <button name="action_start_budget_call" type="object" string="Start Budget Call" icon="fa-bullhorn"
+                        class="btn-primary btn-sm" invisible="state != 'draft'" groups="bunna_pbms.group_pbms_manager"/>
+                <button name="action_open_for_input" type="object" string="Open for Input" icon="fa-unlock"
+                        class="btn-primary btn-sm" invisible="state != 'budget_call'" groups="bunna_pbms.group_pbms_manager"/>
+                <button name="action_start_consolidation" type="object" string="Start Consolidation" icon="fa-compress"
+                        class="btn-primary btn-sm" invisible="state != 'open'" groups="bunna_pbms.group_pbms_manager"/>
+                <button name="action_send_to_board" type="object" string="Send to Board" icon="fa-users"
+                        class="btn-primary btn-sm" invisible="state != 'consolidation'" groups="bunna_pbms.group_pbms_manager"/>
+                <button name="action_approve" type="object" string="Mark Approved" icon="fa-check-square-o"
+                        class="btn-primary btn-sm" invisible="state != 'board_approval'" groups="bunna_pbms.group_pbms_manager"/>
+                <button name="action_close" type="object" string="Close Cycle" icon="fa-lock"
+                        class="btn-secondary btn-sm" invisible="state != 'approved'" groups="bunna_pbms.group_pbms_manager"/>
             </list>
         </field>
     </record>
@@ -133,7 +145,7 @@
     <record id="action_pbms_planning_cycle" model="ir.actions.act_window">
         <field name="name">Planning Cycles</field>
         <field name="res_model">pbms.planning.cycle</field>
-        <field name="view_mode">kanban,list,form</field>
+        <field name="view_mode">list,kanban,form</field>
         <field name="search_view_id" ref="view_pbms_planning_cycle_search"/>
     </record>
 </odoo>

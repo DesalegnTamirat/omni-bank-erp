@@ -7,8 +7,9 @@
             <field name="name">hr.employee.pension.inherit</field>
             <field name="model">hr.employee</field>
             <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="priority">110</field>
             <field name="arch" type="xml">
-                <notebook position="inside">
+                <xpath expr="//notebook/page[@name='more_nested_lists']" position="before">
                     <page string="Pension Information" name="pension_information">
                         <group>
                             <group>
@@ -25,7 +26,7 @@
                             <field name="pension_notes" nolabel="1"/>
                         </group>
                     </page>
-                </notebook>
+                </xpath>
             </field>
         </record>
 

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Unified Planning Categories logic - Enhanced for Manpower & Fixed Asset."""
+import re
+
 from odoo import Command, api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.osv import expression
@@ -27,6 +29,10 @@ CATEGORY_REQUIRED_FIELDS = {
     "general_expense": [],
     "manpower": [],
     "fixed_asset": [],
+    "loan_disbursement_collection": [],
+    "loan_outstanding": [],
+    "credit_portfolio": [],
+    "initiative_budget": [],
 }
 
 # All planning categories support itemized lines within a single plan submission.
@@ -38,6 +44,10 @@ ITEMIZED_CATEGORIES = (
     "general_expense",
     "manpower",
     "fixed_asset",
+    "loan_disbursement_collection",
+    "loan_outstanding",
+    "credit_portfolio",
+    "initiative_budget",
 )
 
 # Work Unit Type options (mirrors operating.unit.work_unit_type).
@@ -47,6 +57,7 @@ WORK_UNIT_TYPES = [
     ("head_office", "Head Office"),
     ("regional_office", "Regional Office"),
     ("district_office", "District Office"),
+    ("area_office", "Area Office"),
     ("service_center", "Service Center"),
     ("other", "Other"),
 ]
@@ -54,22 +65,54 @@ WORK_UNIT_TYPES = [
 # Quarter fields for itemized categories
 QUARTER_FIELDS = ['q1', 'q2', 'q3', 'q4']
 QUARTER_LABELS = {
-    'q1': 'Q1 (Jul-Sep)',
-    'q2': 'Q2 (Oct-Dec)',
-    'q3': 'Q3 (Jan-Mar)',
-    'q4': 'Q4 (Apr-Jun)',
+    'q1': 'QI',
+    'q2': 'QII',
+    'q3': 'QIII',
+    'q4': 'QIV',
 }
+
+
+def _validate_month_values_not_text(vals):
+    """Validate that monthly/numeric target inputs do not contain non-numeric characters or text."""
+    if not isinstance(vals, dict):
+        return
+    month_fields = (
+        "m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12",
+        "proposed_m01", "proposed_m02", "proposed_m03", "proposed_m04", "proposed_m05", "proposed_m06",
+        "proposed_m07", "proposed_m08", "proposed_m09", "proposed_m10", "proposed_m11", "proposed_m12",
+        "approved_m01", "approved_m02", "approved_m03", "approved_m04", "approved_m05", "approved_m06",
+        "approved_m07", "approved_m08", "approved_m09", "approved_m10", "approved_m11", "approved_m12",
+        "hc_m01", "hc_m02", "hc_m03", "hc_m04", "hc_m05", "hc_m06", "hc_m07", "hc_m08", "hc_m09", "hc_m10", "hc_m11", "hc_m12",
+        "opening_balance", "proposed_opening_balance", "approved_opening_balance",
+        "annual_total", "proposed_annual_total", "approved_annual_total",
+    )
+    for fname in month_fields:
+        if fname in vals and vals[fname] is not None and vals[fname] is not False:
+            val = vals[fname]
+            if isinstance(val, str):
+                s = val.strip().replace(",", "")
+                if not s:
+                    continue
+                try:
+                    float(s)
+                except (ValueError, TypeError):
+                    raise ValidationError(_("Monthly target field '%s' cannot accept text or character values ('%s'). Please enter a valid number.") % (fname, val))
+    # Recursively check one2many lines
+    for k, v in vals.items():
+        if isinstance(v, (list, tuple)):
+            for cmd in v:
+                if isinstance(cmd, (list, tuple)) and len(cmd) > 2 and isinstance(cmd[2], dict):
+                    _validate_month_values_not_text(cmd[2])
 
 
 class HrEmployeeGrade(models.Model):
     _inherit = "employee.grade"
+    _rec_name = "grade_code"
 
     @api.depends("grade_code", "grade_name")
     def _compute_display_name(self):
         for rec in self:
-            if rec.grade_code and rec.grade_name:
-                rec.display_name = f"{rec.grade_code} - {rec.grade_name}"
-            elif rec.grade_code:
+            if rec.grade_code:
                 rec.display_name = rec.grade_code
             elif rec.grade_name:
                 rec.display_name = rec.grade_name
@@ -96,6 +139,63 @@ class PbmsDepositType(models.Model):
     active = fields.Boolean(default=True)
 
     _code_uniq = models.Constraint("unique(code)", "Deposit type code must be unique.")
+
+
+class PbmsLoanProduct(models.Model):
+    _name = "pbms.loan.product"
+    _description = "Conventional Loan Product"
+    _order = "sequence, name"
+
+    name = fields.Char(string="Loan Product", required=True)
+    code = fields.Char(string="Code", required=True)
+    sequence = fields.Integer(string="Sequence", default=10)
+    category_type = fields.Selection([
+        ("term_loan", "Term Loan"),
+        ("overdraft", "Overdraft"),
+        ("advances", "Advances"),
+        ("provisions", "Provisions"),
+        ("other", "Other"),
+    ], string="Product Category", default="term_loan")
+    applies_to = fields.Selection([
+        ("disbursement_collection", "Disbursement & Collection (BB-APF-8)"),
+        ("outstanding", "Outstanding (BB-APF-7)"),
+        ("both", "Both"),
+    ], string="Applies To", default="both")
+    product_type = fields.Selection([
+        ("disbursement_collection", "Disbursement & Collection (BB-APF-8)"),
+        ("outstanding", "Outstanding (BB-APF-7)"),
+        ("both", "Both"),
+    ], string="Product Type", compute="_compute_product_type", store=True, readonly=True)
+    active = fields.Boolean(string="Active", default=True)
+
+    @api.depends("applies_to")
+    def _compute_product_type(self):
+        for rec in self:
+            rec.product_type = rec.applies_to or "both"
+
+    _code_uniq = models.Constraint("unique(code)", "Loan product code must be unique.")
+
+
+class PbmsCreditPortfolioItem(models.Model):
+    _name = "pbms.credit.portfolio.item"
+    _description = "Credit Portfolio Planning Item (BB-APF-15)"
+    _order = "sequence, name"
+
+    name = fields.Char(string="Portfolio Item", required=True, translate=True)
+    code = fields.Char(string="Code", required=True)
+    sequence = fields.Integer(string="Sequence", default=10)
+    section = fields.Selection([
+        ("balance_sheet", "Balance Sheet"),
+        ("income_statement", "Income Statement"),
+    ], string="Section", default="balance_sheet", required=True)
+    totals_basis = fields.Selection([
+        ("last_month", "Last Month (Default)"),
+        ("sum_of_months", "Sum of Months"),
+    ], string="Totals Basis", default="last_month", required=True)
+    description = fields.Text(string="Description / Guidance")
+    active = fields.Boolean(string="Active", default=True)
+
+    _code_uniq = models.Constraint("unique(code)", "Credit portfolio item code must be unique.")
 
 
 class PbmsDigitalChannel(models.Model):
@@ -176,6 +276,22 @@ class PbmsJustificationCategory(models.Model):
     active = fields.Boolean(string="Active", default=True)
 
     _code_uniq = models.Constraint("unique(code)", "Justification category code must be unique.")
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get("code"):
+                name = vals.get("name")
+                if isinstance(name, dict):
+                    name = next(iter(name.values()), "")
+                base = re.sub(r"[^a-zA-Z0-9_]", "", (name or "cat").lower().replace(" ", "_")) or "cat"
+                candidate = base
+                idx = 1
+                while self.search_count([("code", "=", candidate)]):
+                    candidate = f"{base}_{idx}"
+                    idx += 1
+                vals["code"] = candidate
+        return super().create(vals_list)
 
 
 class PbmsPositionType(models.Model):
@@ -384,6 +500,7 @@ class PbmsReviewComment(models.Model):
             ("ho_review", "Head Office Review"),
             ("ho_endorse_cpco", "HO Functional Reviewer Endorsement to CPCO"),
             ("cpco_endorse_solutions", "CPCO Final Endorsement to People Solutions"),
+            ("cpco_endorse_operations", "CPCO Final Endorsement to People Operations & Management"),
             ("ho_approve", "Head Office Final Approval"),
             ("hr_submit_committee", "Submitted to Committee"),
             ("submit_committee", "Submitted to Review Committee"),
@@ -411,6 +528,9 @@ class PbmsPlanCategoryLine(models.Model):
 
     plan_id = fields.Many2one(
         "pbms.planning.category", required=False, ondelete="cascade", index=True,
+    )
+    active = fields.Boolean(
+        related="plan_id.active", store=True, default=True, index=True,
     )
     org_unit_id = fields.Many2one(
         "operating.unit", related="plan_id.org_unit_id", store=True, string="Operating Unit", index=True,
@@ -474,7 +594,7 @@ class PbmsPlanCategoryLine(models.Model):
             found_dist = False
             curr = unit
             while curr:
-                if curr.work_unit_type in ("district_office", "regional_office"):
+                if curr.work_unit_type in ("district_office", "regional_office", "area_office"):
                     found_dist = curr
                     break
                 curr = curr.parent_unit
@@ -509,7 +629,7 @@ class PbmsPlanCategoryLine(models.Model):
                 line.broad_category = "1.Branches"
 
     cycle_id = fields.Many2one(
-        "pbms.planning.cycle", related="plan_id.cycle_id", store=True, string="Cycle", index=True,
+        "pbms.planning.cycle", related="plan_id.cycle_id", store=True, string="FY(the Planning year)", index=True,
     )
     plan_state = fields.Selection(
         related="plan_id.state", store=True, string="Plan Status", index=True,
@@ -553,6 +673,10 @@ class PbmsPlanCategoryLine(models.Model):
             ("general_expense", "General Expense"),
             ("manpower", "Work Force"),
             ("fixed_asset", "Fixed Asset"),
+            ("loan_disbursement_collection", "Loan Disbursement & Collection (BB-APF-8)"),
+            ("loan_outstanding", "Loan & Advances Outstanding (BB-APF-7)"),
+            ("credit_portfolio", "Credit Portfolio (BB-APF-15)"),
+            ("initiative_budget", "Initiative Budget"),
         ],
         string="Line Type",
         compute="_compute_line_type",
@@ -561,6 +685,34 @@ class PbmsPlanCategoryLine(models.Model):
         index=True,
     )
 
+    # ---- Conventional Loan Planning (BB-APF-7 & BB-APF-8) ----
+    loan_product_id = fields.Many2one("pbms.loan.product", string="Loan Product", index=True)
+    loan_flow_type = fields.Selection(
+        [
+            ("disbursement", "Disbursement"),
+            ("collection", "Collection"),
+            ("outstanding", "Outstanding Balance"),
+            ("provision", "Outstanding Provisions"),
+        ],
+        string="Flow / Movement Type",
+        default="disbursement",
+    )
+
+    # ---- Credit Portfolio (BB-APF-15) ----
+    credit_portfolio_item_id = fields.Many2one("pbms.credit.portfolio.item", string="Portfolio Item", index=True)
+    credit_portfolio_section = fields.Selection(
+        related="credit_portfolio_item_id.section", string="Section", store=True, readonly=True,
+    )
+    totals_basis = fields.Selection([
+        ("last_month", "Last Month (Default)"),
+        ("sum_of_months", "Sum of Months"),
+    ], string="Totals Basis", default="last_month")
+
+    # ---- Initiative Budget ----
+    initiative_name = fields.Char(string="Initiative Name")
+    initiative_cost = fields.Monetary(string="Initiative Cost (ETB)", currency_field="currency_id")
+    initiative_description = fields.Text(string="Initiative Description")
+
     # ---- Configurable dropdown domains (from planning config) ----
     deposit_type_domain = fields.Char(compute="_compute_deposit_type_domain", store=False)
     channel_domain = fields.Char(compute="_compute_channel_domain", store=False)
@@ -568,11 +720,29 @@ class PbmsPlanCategoryLine(models.Model):
     fa_category_domain = fields.Char(compute="_compute_fa_category_domain", store=False)
     justification_category_domain = fields.Char(compute="_compute_justification_category_domain", store=False)
     fx_source_type_domain = fields.Char(compute="_compute_fx_source_type_domain", store=False)
+    loan_product_domain = fields.Char(compute="_compute_loan_product_domain", store=False)
+    credit_portfolio_item_domain = fields.Char(compute="_compute_credit_portfolio_item_domain", store=False)
+
+    @api.depends("line_type", "plan_id.org_unit_id")
+    def _compute_loan_product_domain(self):
+        import json
+        Config = self.env["pbms.planning.config"]
+        for line in self:
+            domain = []
+            plan = line.plan_id
+            config = False
+            if plan and plan.org_unit_id:
+                config = Config.get_config_for_unit(plan.org_unit_id)
+            if config and config.loan_product_ids:
+                domain.append(("id", "in", config.loan_product_ids.ids))
+            else:
+                domain.append(("active", "=", True))
+            line.loan_product_domain = json.dumps(domain)
 
     # ---- Deposit ----
     deposit_type_id = fields.Many2one("pbms.deposit.type", string="Deposit Type", index=True)
     plan_category = fields.Selection(
-        [("amount", "Amount")],
+        [("amount", "Amount"), ("account", "Number of Accounts")],
         string="Plan Basis", default="amount",
     )
     measurement_type = fields.Selection(
@@ -624,7 +794,7 @@ class PbmsPlanCategoryLine(models.Model):
     is_office_rent = fields.Boolean(string="Office Rent")
 
     # ---- Monthly targets (Float allows seamless integer/number or monetary formatting) ----
-    opening_balance = fields.Float(string="Opening / Current Balance")
+    opening_balance = fields.Float(string="Estimate")
     m01 = fields.Float(string="Jul")
     m02 = fields.Float(string="Aug")
     m03 = fields.Float(string="Sep")
@@ -639,19 +809,19 @@ class PbmsPlanCategoryLine(models.Model):
     m12 = fields.Float(string="Jun")
 
     quarter1_total = fields.Float(
-        string="Q1 (Jul - Sep)",
+        string="QI",
         compute="_compute_quarter_targets", store=True, readonly=False,
     )
     quarter2_total = fields.Float(
-        string="Q2 (Oct - Dec)",
+        string="QII",
         compute="_compute_quarter_targets", store=True, readonly=False,
     )
     quarter3_total = fields.Float(
-        string="Q3 (Jan - Mar)",
+        string="QIII",
         compute="_compute_quarter_targets", store=True, readonly=False,
     )
     quarter4_total = fields.Float(
-        string="Q4 (Apr - Jun)",
+        string="QIV",
         compute="_compute_quarter_targets", store=True, readonly=False,
     )
     annual_total = fields.Float(
@@ -705,7 +875,24 @@ class PbmsPlanCategoryLine(models.Model):
         string="Approved / Cascaded Total",
         compute="_compute_approved_annual_total", store=True, readonly=False,
     )
-    display_approved_annual_total = fields.Float(
+    fulfilled_quantity = fields.Integer(
+        string="Fulfilled Quantity / Hires",
+        default=0,
+        help="Number of filled/hired candidates linked to this plan line."
+    )
+    remaining_approved_annual_total = fields.Float(
+        string="Remaining Approved Plan",
+        compute="_compute_remaining_approved_annual_total",
+        store=True,
+        help="Remaining unfulfilled approved target (Approved Target - Fulfilled Quantity)."
+    )
+
+    @api.depends("approved_annual_total", "display_approved_annual_total", "fulfilled_quantity")
+    def _compute_remaining_approved_annual_total(self):
+        for line in self:
+            base_val = line.display_approved_annual_total or line.approved_annual_total or line.quantity or 0.0
+            line.remaining_approved_annual_total = max(0.0, float(base_val) - float(line.fulfilled_quantity or 0))
+    display_approved_annual_total = fields.Integer(
         string="Approved Target",
         compute="_compute_display_approved_annual_total",
         compute_sudo=False,
@@ -740,15 +927,21 @@ class PbmsPlanCategoryLine(models.Model):
         "channel_id",
         "expense_account_id",
         "category_id", "item_description",
+        "loan_product_id", "loan_flow_type",
+        "credit_portfolio_item_id", "initiative_name", "initiative_cost",
     )
     def _compute_line_type(self):
         for line in self:
             # Preserve existing line_type if already set and valid
-            if line.line_type in ("manpower", "fx", "digital_banking", "general_expense", "fixed_asset", "customer_base", "deposit"):
+            if line.line_type in ("manpower", "fx", "digital_banking", "general_expense", "fixed_asset", "customer_base", "deposit", "loan_disbursement_collection", "loan_outstanding", "credit_portfolio", "initiative_budget"):
                 continue
 
             if line.position_type_id or line.position_type or line.job_id or line.new_job_title:
                 line.line_type = "manpower"
+            elif line.credit_portfolio_item_id:
+                line.line_type = "credit_portfolio"
+            elif line.initiative_name or line.initiative_cost:
+                line.line_type = "initiative_budget"
             elif line.fx_source_type:
                 line.line_type = "fx"
             elif line.channel_id:
@@ -757,6 +950,11 @@ class PbmsPlanCategoryLine(models.Model):
                 line.line_type = "general_expense"
             elif line.category_id or line.item_description:
                 line.line_type = "fixed_asset"
+            elif line.loan_product_id:
+                if line.loan_flow_type in ("disbursement", "collection"):
+                    line.line_type = "loan_disbursement_collection"
+                else:
+                    line.line_type = "loan_outstanding"
             elif line.deposit_type_id and line.base_type:
                 line.line_type = "customer_base"
             elif line.deposit_type_id:
@@ -792,11 +990,7 @@ class PbmsPlanCategoryLine(models.Model):
     # -------------------------------------------------------------------------
 
     # 1. Deposit Mobilization & Customer Base
-    @api.depends(
-        "line_type", "plan_id", "plan_id.org_unit_id", "plan_id.org_unit_id.work_unit_type",
-        "plan_id.deposit_line_ids.deposit_type_id",
-        "plan_id.customer_base_line_ids.deposit_type_id",
-    )
+    @api.depends("line_type", "plan_id.org_unit_id")
     def _compute_deposit_type_domain(self):
         import json
         Config = self.env["pbms.planning.config"]
@@ -867,10 +1061,7 @@ class PbmsPlanCategoryLine(models.Model):
         return {"domain": {"deposit_type_id": domain}}
 
     # 2. Digital Banking Channels
-    @api.depends(
-        "line_type", "plan_id", "plan_id.org_unit_id", "plan_id.org_unit_id.work_unit_type",
-        "plan_id.digital_banking_line_ids.channel_id",
-    )
+    @api.depends("line_type", "plan_id.org_unit_id")
     def _compute_channel_domain(self):
         import json
         Config = self.env["pbms.planning.config"]
@@ -925,10 +1116,7 @@ class PbmsPlanCategoryLine(models.Model):
         return {"domain": {"channel_id": domain}}
 
     # 3. FX Source Types
-    @api.depends(
-        "line_type", "plan_id", "plan_id.org_unit_id", "plan_id.org_unit_id.work_unit_type",
-        "plan_id.fx_line_ids.fx_source_type",
-    )
+    @api.depends("line_type", "plan_id.org_unit_id")
     def _compute_fx_source_type_domain(self):
         import json
         Config = self.env["pbms.planning.config"]
@@ -983,10 +1171,7 @@ class PbmsPlanCategoryLine(models.Model):
         return {"domain": {"fx_source_type": domain}}
 
     # 4. Expense Accounts
-    @api.depends(
-        "line_type", "plan_id", "plan_id.org_unit_id", "plan_id.org_unit_id.work_unit_type",
-        "plan_id.expense_line_ids.expense_account_id",
-    )
+    @api.depends("line_type", "plan_id.org_unit_id")
     def _compute_expense_account_domain(self):
         import json
         Config = self.env["pbms.planning.config"]
@@ -1041,10 +1226,7 @@ class PbmsPlanCategoryLine(models.Model):
         return {"domain": {"expense_account_id": domain}}
 
     # 5. Fixed Asset Categories
-    @api.depends(
-        "line_type", "plan_id", "plan_id.org_unit_id", "plan_id.org_unit_id.work_unit_type",
-        "plan_id.fixed_asset_line_ids.category_id",
-    )
+    @api.depends("line_type", "plan_id.org_unit_id")
     def _compute_fa_category_domain(self):
         import json
         Config = self.env["pbms.planning.config"]
@@ -1118,6 +1300,66 @@ class PbmsPlanCategoryLine(models.Model):
                 domain.append(("active", "=", True))
             line.justification_category_domain = json.dumps(domain)
 
+    # 7. Credit Portfolio Items (BB-APF-15)
+    @api.depends(
+        "line_type", "plan_id", "plan_id.org_unit_id", "plan_id.org_unit_id.work_unit_type",
+        "plan_id.credit_portfolio_line_ids.credit_portfolio_item_id",
+    )
+    def _compute_credit_portfolio_item_domain(self):
+        import json
+        Config = self.env["pbms.planning.config"]
+        for line in self:
+            domain = []
+            plan = line.plan_id
+            config = False
+            if plan and plan.org_unit_id:
+                config = Config.get_config_for_unit(plan.org_unit_id)
+            elif plan and plan.org_unit_id and plan.org_unit_id.work_unit_type:
+                config = Config.get_config_for_type(plan.org_unit_id.work_unit_type)
+
+            if config and config.credit_portfolio_item_ids:
+                domain.append(("id", "in", config.credit_portfolio_item_ids.ids))
+            else:
+                domain.append(("active", "=", True))
+
+            if plan and line.line_type == "credit_portfolio":
+                other_lines = plan.credit_portfolio_line_ids.filtered(
+                    lambda l: not line._is_same_line(l) and l.credit_portfolio_item_id
+                )
+                used_ids = other_lines.mapped("credit_portfolio_item_id.id")
+                if used_ids:
+                    domain.append(("id", "not in", used_ids))
+
+            line.credit_portfolio_item_domain = json.dumps(domain)
+
+    @api.onchange("credit_portfolio_item_id", "line_type", "plan_id")
+    def _onchange_credit_portfolio_item_update_domain(self):
+        if self.credit_portfolio_item_id and not self.totals_basis:
+            self.totals_basis = self.credit_portfolio_item_id.totals_basis or "last_month"
+        Config = self.env["pbms.planning.config"]
+        plan = self.plan_id
+        config = False
+        if plan and plan.org_unit_id:
+            config = Config.get_config_for_unit(plan.org_unit_id)
+        elif plan and plan.org_unit_id and plan.org_unit_id.work_unit_type:
+            config = Config.get_config_for_type(plan.org_unit_id.work_unit_type)
+
+        domain = []
+        if config and config.credit_portfolio_item_ids:
+            domain.append(("id", "in", config.credit_portfolio_item_ids.ids))
+        else:
+            domain.append(("active", "=", True))
+
+        if plan and self.line_type == "credit_portfolio":
+            other_lines = plan.credit_portfolio_line_ids.filtered(
+                lambda l: not self._is_same_line(l) and l.credit_portfolio_item_id
+            )
+            used_ids = other_lines.mapped("credit_portfolio_item_id.id")
+            if used_ids:
+                domain.append(("id", "not in", used_ids))
+
+        return {"domain": {"credit_portfolio_item_id": domain}}
+
     # ---- Manpower (Configurable Request / Position Type) ----
     position_type_id = fields.Many2one(
         "pbms.position.type",
@@ -1146,12 +1388,16 @@ class PbmsPlanCategoryLine(models.Model):
     def _default_position_type_id(self):
         return self.env["pbms.position.type"].search([("code", "=", "new")], limit=1)
 
-    @api.depends("position_type_id", "position_type_id.code", "position_type_id.is_new_position")
+    @api.depends("position_type_id", "position_type_id.code", "position_type_id.name", "position_type_id.is_new_position")
     def _compute_position_type_code(self):
         for line in self:
             if line.position_type_id:
                 if line.position_type_id.is_new_position or line.position_type_id.code in ("new", "new_position"):
                     line.position_type = "new"
+                elif line.position_type_id.code == "additional" or (line.position_type_id.name and line.position_type_id.name.strip().lower() == "additional position"):
+                    line.position_type = "additional"
+                elif line.position_type_id.code in dict(self._fields["position_type"].selection):
+                    line.position_type = line.position_type_id.code
                 else:
                     line.position_type = "additional"
             elif not line.position_type:
@@ -1178,8 +1424,13 @@ class PbmsPlanCategoryLine(models.Model):
         if self.position_type_id:
             if self.position_type_id.is_new_position or self.position_type_id.code in ("new", "new_position"):
                 self.position_type = "new"
+            elif self.position_type_id.code == "additional" or (self.position_type_id.name and self.position_type_id.name.strip().lower() == "additional position"):
+                self.position_type = "additional"
+            elif self.position_type_id.code in dict(self._fields["position_type"].selection):
+                self.position_type = self.position_type_id.code
             else:
                 self.position_type = "additional"
+
             if self.position_type_id.is_new_position or self.position_type == "new":
                 self.job_id = False
                 self.job_grade_id = False
@@ -1231,10 +1482,10 @@ class PbmsPlanCategoryLine(models.Model):
     hc_m11 = fields.Integer(string="May", default=0)
     hc_m12 = fields.Integer(string="Jun", default=0)
 
-    q1 = fields.Integer(string="Q1 (Jul-Sep)", compute="_compute_manpower_quarters", store=True, readonly=False)
-    q2 = fields.Integer(string="Q2 (Oct-Dec)", compute="_compute_manpower_quarters", store=True, readonly=False)
-    q3 = fields.Integer(string="Q3 (Jan-Mar)", compute="_compute_manpower_quarters", store=True, readonly=False)
-    q4 = fields.Integer(string="Q4 (Apr-Jun)", compute="_compute_manpower_quarters", store=True, readonly=False)
+    q1 = fields.Integer(string="QI", compute="_compute_manpower_quarters", store=True, readonly=False)
+    q2 = fields.Integer(string="QII", compute="_compute_manpower_quarters", store=True, readonly=False)
+    q3 = fields.Integer(string="QIII", compute="_compute_manpower_quarters", store=True, readonly=False)
+    q4 = fields.Integer(string="QIV", compute="_compute_manpower_quarters", store=True, readonly=False)
 
     base_salary = fields.Monetary(compute="_compute_base_salary", store=True, readonly=False, currency_field="currency_id")
     pension_rate = fields.Float(string="Employer Pension (%)", default=11.0)
@@ -1276,6 +1527,66 @@ class PbmsPlanCategoryLine(models.Model):
             else:
                 line.fulfillment_total = 0
                 line.fulfillment_balance = 0
+
+    @api.onchange("fulfillment_promotion", "fulfillment_transfer", "fulfillment_lateral", "fulfillment_external")
+    def _onchange_manpower_sourcing(self):
+        for line in self:
+            if line.line_type != "manpower":
+                continue
+            target = int(round(line.annual_total or line.quantity or 0))
+            prom = max(0, int(line.fulfillment_promotion or 0))
+            trans = max(0, int(line.fulfillment_transfer or 0))
+            lat = max(0, int(line.fulfillment_lateral or 0))
+            ext = max(0, int(line.fulfillment_external or 0))
+
+            line.fulfillment_promotion = prom
+            line.fulfillment_transfer = trans
+            line.fulfillment_lateral = lat
+            line.fulfillment_external = ext
+
+            tot = prom + trans + lat + ext
+            if tot > target:
+                excess = tot - target
+                if ext > 0:
+                    deduct = min(ext, excess)
+                    ext -= deduct
+                    excess -= deduct
+                    line.fulfillment_external = ext
+                if excess > 0 and lat > 0:
+                    deduct = min(lat, excess)
+                    lat -= deduct
+                    excess -= deduct
+                    line.fulfillment_lateral = lat
+                if excess > 0 and trans > 0:
+                    deduct = min(trans, excess)
+                    trans -= deduct
+                    excess -= deduct
+                    line.fulfillment_transfer = trans
+                if excess > 0 and prom > 0:
+                    deduct = min(prom, excess)
+                    prom -= deduct
+                    excess -= deduct
+                    line.fulfillment_promotion = prom
+
+                line.fulfillment_total = prom + trans + lat + ext
+                appr = int(line.approved_annual_total or line.annual_total or 0)
+                line.fulfillment_balance = appr - line.fulfillment_total
+                pos_name = line.job_id.name or line.new_job_title or (line.position_type_id.name if line.position_type_id else _("Position"))
+                return {
+                    "warning": {
+                        "title": _("Sourcing Allocation Limit"),
+                        "message": _(
+                            "Total sourcing for '%s' cannot be greater than the requested headcount (%d).\n\n"
+                            "In People Solutions Directorate, sourcing allocations must equal the requested headcount and cannot exceed it."
+                        ) % (pos_name, target),
+                    }
+                }
+            elif tot < target:
+                diff = target - tot
+                line.fulfillment_external = ext + diff
+                line.fulfillment_total = target
+                appr = int(line.approved_annual_total or line.annual_total or 0)
+                line.fulfillment_balance = appr - target
 
     def _auto_balance_manpower_sourcing(self):
         """Auto-adjust sourcing strategy when Budget Hiring Committee or CEO adds or minuses headcount:
@@ -1369,10 +1680,10 @@ class PbmsPlanCategoryLine(models.Model):
         help="Select the eligible job position for this operating unit that requires this item.",
     )
     estimated_unit_price = fields.Monetary(currency_field="currency_id")
-    fa_q1 = fields.Integer(string="Q1 (Jul-Sep)", default=0)
-    fa_q2 = fields.Integer(string="Q2 (Oct-Dec)", default=0)
-    fa_q3 = fields.Integer(string="Q3 (Jan-Mar)", default=0)
-    fa_q4 = fields.Integer(string="Q4 (Apr-Jun)", default=0)
+    fa_q1 = fields.Integer(string="QI", default=0)
+    fa_q2 = fields.Integer(string="QII", default=0)
+    fa_q3 = fields.Integer(string="QIII", default=0)
+    fa_q4 = fields.Integer(string="QIV", default=0)
     fa_q1_cost = fields.Monetary(compute="_compute_fa_quarter_costs", store=True, currency_field="currency_id")
     fa_q2_cost = fields.Monetary(compute="_compute_fa_quarter_costs", store=True, currency_field="currency_id")
     fa_q3_cost = fields.Monetary(compute="_compute_fa_quarter_costs", store=True, currency_field="currency_id")
@@ -1397,9 +1708,77 @@ class PbmsPlanCategoryLine(models.Model):
                 line.currency_id = Config.get_category_currency("fx", org_unit=line.plan_id.org_unit_id if line.plan_id else False)
             else:
                 line.currency_id = line.plan_id.currency_id if line.plan_id and line.plan_id.currency_id else self.env.company.currency_id
-    # ------------------------------------------------------------------
-    # AUTOMATED VALIDATION RULES (per line_type only)
-    # ------------------------------------------------------------------
+    # Four consolidable planning categories that require mandatory monthly planning
+    _CONSOLIDABLE_LINE_TYPES = ("deposit", "customer_base", "fx", "digital_banking")
+    # Ordered fiscal-year month sequence: (field_name, display_label)
+    _FISCAL_MONTH_SEQUENCE = [
+        ("m01", "July"), ("m02", "August"), ("m03", "September"),
+        ("m04", "October"), ("m05", "November"), ("m06", "December"),
+        ("m07", "January"), ("m08", "February"), ("m09", "March"),
+        ("m10", "April"), ("m11", "May"), ("m12", "June"),
+    ]
+
+    @api.constrains(
+        "line_type",
+        "m01", "m02", "m03", "m04", "m05", "m06",
+        "m07", "m08", "m09", "m10", "m11", "m12",
+    )
+    def _check_consolidable_monthly_positive(self):
+        """Enforce that monthly values cannot be negative (< 0) for the
+        four consolidable planning categories: Deposit Mobilization, Customer
+        Base, FX Mobilization, and Digital Banking."""
+        category_labels = dict(self._fields["line_type"].selection)
+        for line in self:
+            if line.line_type not in self._CONSOLIDABLE_LINE_TYPES:
+                continue
+            cat_label = category_labels.get(line.line_type, line.line_type)
+            for fname, month_label in self._FISCAL_MONTH_SEQUENCE:
+                val = getattr(line, fname, 0.0) or 0.0
+                if val < 0:
+                    raise ValidationError(_(
+                        "%(category)s — %(month)s: A monthly plan value cannot be negative.\n"
+                        "Current value for %(month)s: %(val)s",
+                        category=cat_label,
+                        month=month_label,
+                        val=val,
+                    ))
+
+    @api.constrains(
+        "line_type",
+        "m01", "m02", "m03", "m04", "m05", "m06",
+        "m07", "m08", "m09", "m10", "m11", "m12",
+    )
+    def _check_consolidable_monthly_nondecreasing(self):
+        """Enforce a non-decreasing monthly planning hierarchy for the four
+        consolidable categories. Each month's plan must be >= the previous
+        month's plan (July through June). Equal values are allowed; decreasing
+        values are rejected."""
+        category_labels = dict(self._fields["line_type"].selection)
+        for line in self:
+            if line.line_type not in self._CONSOLIDABLE_LINE_TYPES:
+                continue
+            cat_label = category_labels.get(line.line_type, line.line_type)
+            prev_val = None
+            prev_label = None
+            for fname, month_label in self._FISCAL_MONTH_SEQUENCE:
+                val = getattr(line, fname, 0.0) or 0.0
+                if val <= 0.0:
+                    continue
+                if prev_val is not None and val < prev_val:
+                    raise ValidationError(_(
+                        "%(category)s - Monthly plan hierarchy violated: %(month)s (%(val)s) "
+                        "cannot be less than %(prev_month)s (%(prev_val)s).\n"
+                        "Each month's plan must be greater than or equal to the previous month's plan "
+                        "(July <= August <= September ... <= June).\n"
+                        "Minimum allowed value for %(month)s: %(prev_val)s",
+                        category=cat_label,
+                        month=month_label,
+                        val=val,
+                        prev_month=prev_label,
+                        prev_val=prev_val,
+                    ))
+                prev_val = val
+                prev_label = month_label
 
     @api.constrains("fx_source_type", "line_type")
     def _check_fx_fields(self):
@@ -1416,6 +1795,40 @@ class PbmsPlanCategoryLine(models.Model):
                 continue
             if not line.deposit_type_id:
                 raise ValidationError(_("Deposit Type is required for Deposit Mobilization lines."))
+
+    @api.constrains("deposit_type_id", "line_type", "plan_id")
+    def _check_deposit_type_unique_per_plan(self):
+        """Prevent the same Deposit Type or Customer Base Product from being planned
+        more than once per plan for branch units. District/HO units consolidate lines
+        from multiple branches so duplicates are allowed there."""
+        for line in self:
+            if line.line_type not in ("deposit", "customer_base"):
+                continue
+            if not line.deposit_type_id or not line.plan_id:
+                continue
+            plan = line.plan_id
+            # District and Head Office plans aggregate branch lines — allow duplicates
+            if plan.org_unit_type in ("district_office", "regional_office", "head_office"):
+                continue
+            # Check for sibling lines with the same deposit_type_id (excluding self)
+            if line.line_type == "deposit":
+                siblings = plan.deposit_line_ids.filtered(
+                    lambda l: l.id != line.id and l.deposit_type_id == line.deposit_type_id
+                )
+            else:
+                siblings = plan.customer_base_line_ids.filtered(
+                    lambda l: l.id != line.id and l.deposit_type_id == line.deposit_type_id
+                )
+            if siblings:
+                type_label = "Deposit Type" if line.line_type == "deposit" else "Product / Account Type"
+                raise ValidationError(_(
+                    "%(type_label)s '%(name)s' is already planned on this form. "
+                    "Each %(type_label_lower)s can only be planned once per plan. "
+                    "Please update the existing line instead of adding a duplicate.",
+                    type_label=type_label,
+                    type_label_lower=type_label.lower(),
+                    name=line.deposit_type_id.display_name or line.deposit_type_id.name,
+                ))
 
     @api.constrains("deposit_type_id", "base_type", "line_type")
     def _check_customer_base_fields(self):
@@ -1435,6 +1848,52 @@ class PbmsPlanCategoryLine(models.Model):
             if not line.channel_id:
                 raise ValidationError(_("Digital Channel is required for Digital Banking lines."))
 
+    @api.constrains("channel_id", "line_type", "plan_id")
+    def _check_channel_unique_per_plan(self):
+        """Prevent the same Digital Channel from being planned more than once per plan
+        for branch units. District/HO consolidation plans allow duplicates."""
+        for line in self:
+            if line.line_type != "digital_banking":
+                continue
+            if not line.channel_id or not line.plan_id:
+                continue
+            plan = line.plan_id
+            if plan.org_unit_type in ("district_office", "regional_office", "head_office"):
+                continue
+            siblings = plan.digital_banking_line_ids.filtered(
+                lambda l: l.id != line.id and l.channel_id == line.channel_id
+            )
+            if siblings:
+                raise ValidationError(_(
+                    "Digital Channel '%(name)s' is already planned on this form. "
+                    "Each channel can only be planned once per plan. "
+                    "Please update the existing line instead of adding a duplicate.",
+                    name=line.channel_id.display_name or line.channel_id.name,
+                ))
+
+    @api.constrains("fx_source_type", "line_type", "plan_id")
+    def _check_fx_source_unique_per_plan(self):
+        """Prevent the same FX Source from being planned more than once per plan
+        for branch units. District/HO consolidation plans allow duplicates."""
+        for line in self:
+            if line.line_type != "fx":
+                continue
+            if not line.fx_source_type or not line.plan_id:
+                continue
+            plan = line.plan_id
+            if plan.org_unit_type in ("district_office", "regional_office", "head_office"):
+                continue
+            siblings = plan.fx_line_ids.filtered(
+                lambda l: l.id != line.id and l.fx_source_type == line.fx_source_type
+            )
+            if siblings:
+                raise ValidationError(_(
+                    "FX Source '%(name)s' is already planned on this form. "
+                    "Each FX source can only be planned once per plan. "
+                    "Please update the existing line instead of adding a duplicate.",
+                    name=line.fx_source_type.display_name or line.fx_source_type.name,
+                ))
+
     @api.constrains("expense_account_id", "line_type")
     def _check_general_expense_fields(self):
         for line in self:
@@ -1442,6 +1901,44 @@ class PbmsPlanCategoryLine(models.Model):
                 continue
             if not line.expense_account_id:
                 raise ValidationError(_("Expense Account is required for General Expense lines."))
+
+    @api.constrains("credit_portfolio_item_id", "line_type")
+    def _check_credit_portfolio_fields(self):
+        for line in self:
+            if line.line_type != "credit_portfolio":
+                continue
+            if not line.credit_portfolio_item_id:
+                raise ValidationError(_("Portfolio Item is required for Credit Portfolio lines."))
+
+    @api.constrains("credit_portfolio_item_id", "line_type", "plan_id")
+    def _check_credit_portfolio_item_unique(self):
+        for line in self:
+            if line.line_type != "credit_portfolio" or not line.credit_portfolio_item_id or not line.plan_id:
+                continue
+            plan = line.plan_id
+            same_plan_lines = [
+                l for l in plan.line_ids
+                if l.line_type == "credit_portfolio" and not line._is_same_line(l)
+            ]
+            dups = [
+                l for l in same_plan_lines
+                if l.credit_portfolio_item_id == line.credit_portfolio_item_id
+            ]
+            if dups:
+                raise ValidationError(_(
+                    "Credit portfolio item '%(item)s' is already included in this plan.",
+                    item=line.credit_portfolio_item_id.name,
+                ))
+
+    @api.constrains("initiative_name", "initiative_cost", "line_type")
+    def _check_initiative_budget_fields(self):
+        for line in self:
+            if line.line_type != "initiative_budget":
+                continue
+            if not line.initiative_name:
+                raise ValidationError(_("Initiative Name is required for Initiative Budget lines."))
+            if (line.initiative_cost or 0.0) < 0:
+                raise ValidationError(_("Initiative cost cannot be negative."))
 
     @api.constrains(
         "position_type_id", "position_type", "job_id", "new_job_title", "new_job_grade", "job_grade_id",
@@ -1492,14 +1989,29 @@ class PbmsPlanCategoryLine(models.Model):
             if line.line_type != "manpower":
                 continue
             for m_name in ("m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12"):
-                if (getattr(line, m_name) or 0) < 0:
-                    raise ValidationError(_("Workforce requests cannot be negative."))
+                v = getattr(line, m_name)
+                if v is not None:
+                    if v < 0:
+                        raise ValidationError(_("Workforce requests cannot be negative."))
+                    if v != int(v):
+                        raise ValidationError(_("Workforce requests must be whole numbers (integers), not decimal numbers."))
             for m_name in HC_MONTH_FIELDS:
-                if (getattr(line, m_name) or 0) < 0:
-                    raise ValidationError(_("Workforce requests cannot be negative."))
+                v = getattr(line, m_name)
+                if v is not None:
+                    if v < 0:
+                        raise ValidationError(_("Workforce requests cannot be negative."))
+                    if v != int(v):
+                        raise ValidationError(_("Workforce requests must be whole numbers (integers), not decimal numbers."))
             for q_name in ("q1", "q2", "q3", "q4"):
-                if (getattr(line, q_name) or 0) < 0:
-                    raise ValidationError(_("Additional requests for %s must be positive integers.") % q_name.upper())
+                v = getattr(line, q_name)
+                if v is not None:
+                    if v < 0:
+                        raise ValidationError(_("Additional requests for %s must be positive integers.") % q_name.upper())
+                    if v != int(v):
+                        raise ValidationError(_("Additional requests for %s must be whole numbers (integers).") % q_name.upper())
+
+            if line.quantity is not None and line.quantity != int(line.quantity):
+                raise ValidationError(_("Workforce quantity must be a whole number (integer)."))
 
             total_m = sum(getattr(line, m) or 0 for m in ("m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12"))
             total_hc = sum(getattr(line, m) or 0 for m in HC_MONTH_FIELDS)
@@ -1507,6 +2019,48 @@ class PbmsPlanCategoryLine(models.Model):
 
             if total_m <= 0 and total_hc <= 0 and total_quarterly <= 0 and (line.quantity or 0) <= 0:
                 raise ValidationError(_("Total additional workforce request must be greater than zero."))
+
+    @api.constrains("fulfillment_promotion", "fulfillment_transfer", "fulfillment_lateral", "fulfillment_external", "annual_total", "quantity", "line_type")
+    def _check_manpower_sourcing_not_greater_than_requested(self):
+        for line in self:
+            if line.line_type != "manpower":
+                continue
+            for f_name in ("fulfillment_promotion", "fulfillment_transfer", "fulfillment_lateral", "fulfillment_external"):
+                v = getattr(line, f_name) or 0
+                if v < 0:
+                    raise ValidationError(_("Sourcing allocations cannot be negative."))
+                if v != int(v):
+                    raise ValidationError(_("Sourcing allocations must be whole numbers (integers)."))
+
+            target = int(round(line.annual_total or line.quantity or 0))
+            tot_sourced = int((line.fulfillment_promotion or 0) + (line.fulfillment_transfer or 0) + (line.fulfillment_lateral or 0) + (line.fulfillment_external or 0))
+            if tot_sourced > target:
+                pos_name = line.job_id.name or line.new_job_title or (line.position_type_id.name if line.position_type_id else _("Position"))
+                raise ValidationError(_(
+                    "Sourcing Total Exceeds Request for '%s':\n"
+                    "• Requested Headcount: %d\n"
+                    "• Total Sourced: %d (Promotion: %d, Transfer: %d, Lateral: %d, External Vacancy: %d)\n\n"
+                    "Total sourced (%d) cannot be greater than the requested headcount (%d). "
+                    "In People Solutions Directorate, sourcing allocations must equal the requested headcount and cannot exceed it."
+                ) % (pos_name, target, tot_sourced, line.fulfillment_promotion or 0, line.fulfillment_transfer or 0, line.fulfillment_lateral or 0, line.fulfillment_external or 0, tot_sourced, target))
+
+    @api.constrains("new_job_title", "reason", "other_justification", "business_justification", "item_description")
+    def _check_text_field_not_pure_numbers(self):
+        text_fields = {
+            "new_job_title": _("New Job Title"),
+            "reason": _("Reason"),
+            "other_justification": _("Justification Remarks"),
+            "business_justification": _("Business Justification"),
+            "item_description": _("Item Description"),
+        }
+        for line in self:
+            for fname, label in text_fields.items():
+                val = getattr(line, fname, False)
+                if val:
+                    s = str(val).strip()
+                    cleaned = s.replace(".", "").replace(",", "").replace("-", "").replace("+", "").replace(" ", "")
+                    if cleaned and cleaned.isdigit():
+                        raise ValidationError(_("Field '%s' cannot be purely numbers. Please enter a meaningful text description.") % label)
 
     @api.constrains("justification_category_id", "other_justification", "line_type")
     def _check_manpower_justification(self):
@@ -1648,44 +2202,71 @@ class PbmsPlanCategoryLine(models.Model):
             if not line.item_description:
                 raise ValidationError(_("Item Description is required for Fixed Asset lines."))
 
-    @api.constrains("fa_q1", "fa_q2", "fa_q3", "fa_q4", "line_type")
+    @api.constrains("fa_q1", "fa_q2", "fa_q3", "fa_q4", "quantity", "estimated_unit_price", "unit_cost", "line_type")
     def _check_fixed_asset_quantities(self):
         for line in self:
             if line.line_type != "fixed_asset":
                 continue
+            for q_name in ("fa_q1", "fa_q2", "fa_q3", "fa_q4", "quantity"):
+                v = getattr(line, q_name, 0) or 0
+                if v < 0:
+                    raise ValidationError(_("Fixed Asset quantities cannot be negative."))
+                if v != int(v):
+                    raise ValidationError(_("Fixed Asset quantities must be whole numbers (integers), not decimal numbers."))
+            for p_name in ("estimated_unit_price", "unit_cost"):
+                p = getattr(line, p_name, 0.0) or 0.0
+                if p < 0:
+                    raise ValidationError(_("Fixed Asset unit price/cost cannot be negative."))
             total = (line.fa_q1 or 0) + (line.fa_q2 or 0) + (line.fa_q3 or 0) + (line.fa_q4 or 0)
             if total <= 0:
                 raise ValidationError(_("At least one quarter must have a quantity greater than zero for Fixed Asset lines."))
 
-    @api.depends("position_type_id", "position_type", "plan_id", "plan_id.org_unit_id", "plan_id.manpower_line_ids.job_id", "plan_id.manpower_line_ids.position_type_id")
+    def _is_additional_position_type(self):
+        """Returns True only when the position type is strictly code 'additional'
+        or request type 'Additional Position', requiring operating unit eligible positions."""
+        self.ensure_one()
+        p_code = (self.position_type_id.code or "").strip().lower() if self.position_type_id else (self.position_type or "").strip().lower()
+        p_name = (self.position_type_id.name or "").strip().lower() if self.position_type_id else ""
+        return p_code == "additional" or p_name == "additional position"
+
+    def _get_operating_unit_job_ids(self, org_unit):
+        """Returns set of hr.job IDs eligible in the given operating unit."""
+        unit_job_ids = set()
+        if not org_unit:
+            return unit_job_ids
+        if "operating.unit.job.position" in self.env:
+            ou_positions = self.env["operating.unit.job.position"].search([
+                ("operating_unit_id", "=", org_unit.id),
+                ("active", "=", True),
+            ])
+            unit_job_ids.update(ou_positions.mapped("job_position_id.id"))
+        if "hr.employee" in self.env:
+            emp_domain = [
+                ("active", "=", True),
+                "|",
+                ("operating_unit_ids", "in", [org_unit.id]),
+                ("default_operating_unit_id", "=", org_unit.id),
+            ]
+            employees = self.env["hr.employee"].search(emp_domain)
+            for emp in employees:
+                j = getattr(emp, "job_position", False) or getattr(emp, "job_id", False)
+                if j:
+                    unit_job_ids.add(j.id)
+        return unit_job_ids
+
+    @api.depends(
+        "position_type_id",
+        "position_type",
+        "plan_id.org_unit_id",
+    )
     def _compute_job_id_domain(self):
         import json
         for line in self:
             domain = [("active", "=", True)]
             if line.line_type == "manpower" and line.plan_id:
                 plan = line.plan_id
-                unit_job_ids = set()
-                if plan.org_unit_id:
-                    if "operating.unit.job.position" in self.env:
-                        ou_positions = self.env["operating.unit.job.position"].search([
-                            ("operating_unit_id", "=", plan.org_unit_id.id),
-                            ("active", "=", True),
-                        ])
-                        unit_job_ids.update(ou_positions.mapped("job_position_id.id"))
-                    if "hr.employee" in self.env:
-                        emp_domain = [
-                            ("active", "=", True),
-                            "|",
-                            ("operating_unit_ids", "in", [plan.org_unit_id.id]),
-                            ("default_operating_unit_id", "=", plan.org_unit_id.id),
-                        ]
-                        employees = self.env["hr.employee"].search(emp_domain)
-                        for emp in employees:
-                            j = getattr(emp, "job_position", False) or getattr(emp, "job_id", False)
-                            if j:
-                                unit_job_ids.add(j.id)
-
-                if unit_job_ids:
+                if line._is_additional_position_type() and plan.org_unit_id:
+                    unit_job_ids = line._get_operating_unit_job_ids(plan.org_unit_id)
                     domain.append(("id", "in", list(unit_job_ids)))
 
                 other_lines = plan.manpower_line_ids.filtered(
@@ -1705,31 +2286,15 @@ class PbmsPlanCategoryLine(models.Model):
         domain = [("active", "=", True)]
         if self.line_type == "manpower" and self.plan_id:
             plan = self.plan_id
-            unit_job_ids = set()
-            if plan.org_unit_id:
-                if "operating.unit.job.position" in self.env:
-                    ou_positions = self.env["operating.unit.job.position"].search([
-                        ("operating_unit_id", "=", plan.org_unit_id.id),
-                        ("active", "=", True),
-                    ])
-                    unit_job_ids.update(ou_positions.mapped("job_position_id.id"))
-                if "hr.employee" in self.env:
-                    emp_domain = [
-                        ("active", "=", True),
-                        "|",
-                        ("operating_unit_ids", "in", [plan.org_unit_id.id]),
-                        ("default_operating_unit_id", "=", plan.org_unit_id.id),
-                    ]
-                    employees = self.env["hr.employee"].search(emp_domain)
-                    for emp in employees:
-                        j = getattr(emp, "job_position", False) or getattr(emp, "job_id", False)
-                        if j:
-                            unit_job_ids.add(j.id)
-
-            if unit_job_ids:
+            if self._is_additional_position_type() and plan.org_unit_id:
+                unit_job_ids = self._get_operating_unit_job_ids(plan.org_unit_id)
                 domain.append(("id", "in", list(unit_job_ids)))
+                if self.job_id and unit_job_ids and self.job_id.id not in unit_job_ids:
+                    self.job_id = False
+                    self.job_grade_id = False
+                    self.base_salary = 0.0
 
-            other_lines = self.plan_id.manpower_line_ids.filtered(
+            other_lines = plan.manpower_line_ids.filtered(
                 lambda l: not self._is_same_line(l) and l.job_id and (
                     (l.position_type_id and self.position_type_id and l.position_type_id == self.position_type_id)
                     or (l.position_type == self.position_type)
@@ -1849,24 +2414,40 @@ class PbmsPlanCategoryLine(models.Model):
         return res
 
     def _apply_manpower_quarter_rollups(self):
-        """Roll Jul-Jun monthly headcount into fiscal quarters."""
+        """Roll Jul-Jun monthly headcount into fiscal quarters and annual totals."""
         if self.line_type != "manpower":
             return
-        values = self._manpower_month_values()
+        month_keys = ("m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12")
+        for m in month_keys:
+            val_m = getattr(self, m, 0) or 0
+            val_hc = getattr(self, f"hc_{m}", 0) or 0
+            if val_m != val_hc:
+                if val_m:
+                    setattr(self, f"hc_{m}", int(round(val_m)))
+                elif val_hc:
+                    setattr(self, m, float(val_hc))
+                else:
+                    setattr(self, f"hc_{m}", 0)
+                    setattr(self, m, 0.0)
+
+        values = {m: int(round(getattr(self, m, 0) or 0)) for m in month_keys}
         q1_calc = sum(values[m] for m in ("m01", "m02", "m03"))
         q2_calc = sum(values[m] for m in ("m04", "m05", "m06"))
         q3_calc = sum(values[m] for m in ("m07", "m08", "m09"))
         q4_calc = sum(values[m] for m in ("m10", "m11", "m12"))
 
-        self.q1 = int(q1_calc if q1_calc else (self.quarter1_total or self.q1 or 0))
-        self.q2 = int(q2_calc if q2_calc else (self.quarter2_total or self.q2 or 0))
-        self.q3 = int(q3_calc if q3_calc else (self.quarter3_total or self.q3 or 0))
-        self.q4 = int(q4_calc if q4_calc else (self.quarter4_total or self.q4 or 0))
-
+        self.q1 = int(round(q1_calc))
+        self.q2 = int(round(q2_calc))
+        self.q3 = int(round(q3_calc))
+        self.q4 = int(round(q4_calc))
         self.quarter1_total = float(self.q1)
         self.quarter2_total = float(self.q2)
         self.quarter3_total = float(self.q3)
         self.quarter4_total = float(self.q4)
+        self.annual_total = float(self.q1 + self.q2 + self.q3 + self.q4)
+        self.quantity = int(round(self.annual_total))
+        if not self.is_cascaded:
+            self.proposed_annual_total = self.annual_total
 
     @api.depends(
         "m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12",
@@ -1884,8 +2465,16 @@ class PbmsPlanCategoryLine(models.Model):
         *HC_MONTH_FIELDS
     )
     def _onchange_hc_months(self):
-        if self.line_type == "manpower":
-            self._apply_manpower_quarter_rollups()
+        for line in self:
+            if line.line_type == "manpower":
+                line._apply_manpower_quarter_rollups()
+                line._compute_quarter_costs()
+                line._compute_annual_total_cost()
+                plan_state = line.plan_id.state if line.plan_id else self.env.context.get("default_state")
+                if plan_state in ("committee_review", "ceo_approval") or (
+                    self.env.user._pbms_is_budget_hiring_committee() or self.env.user._pbms_is_ceo() or self.env.is_admin()
+                ):
+                    line._auto_balance_manpower_sourcing()
 
     @api.onchange("q1")
     def _onchange_q1(self):
@@ -2169,26 +2758,56 @@ class PbmsPlanCategoryLine(models.Model):
     @api.depends(
         "m01", "m02", "m03", "m04", "m05", "m06",
         "m07", "m08", "m09", "m10", "m11", "m12",
+        "line_type", "totals_basis",
     )
     def _compute_quarter_targets(self):
         for line in self:
-            line.quarter1_total = (line.m01 or 0.0) + (line.m02 or 0.0) + (line.m03 or 0.0)
-            line.quarter2_total = (line.m04 or 0.0) + (line.m05 or 0.0) + (line.m06 or 0.0)
-            line.quarter3_total = (line.m07 or 0.0) + (line.m08 or 0.0) + (line.m09 or 0.0)
-            line.quarter4_total = (line.m10 or 0.0) + (line.m11 or 0.0) + (line.m12 or 0.0)
+            if line.line_type == "credit_portfolio" and (line.totals_basis or "last_month") == "last_month":
+                line.quarter1_total = line.m03 or 0.0
+                line.quarter2_total = line.m06 or 0.0
+                line.quarter3_total = line.m09 or 0.0
+                line.quarter4_total = line.m12 or 0.0
+            else:
+                line.quarter1_total = (line.m01 or 0.0) + (line.m02 or 0.0) + (line.m03 or 0.0)
+                line.quarter2_total = (line.m04 or 0.0) + (line.m05 or 0.0) + (line.m06 or 0.0)
+                line.quarter3_total = (line.m07 or 0.0) + (line.m08 or 0.0) + (line.m09 or 0.0)
+                line.quarter4_total = (line.m10 or 0.0) + (line.m11 or 0.0) + (line.m12 or 0.0)
 
     @api.onchange(
         "m01", "m02", "m03", "m04", "m05", "m06",
         "m07", "m08", "m09", "m10", "m11", "m12",
+        "totals_basis", "initiative_cost",
     )
     def _onchange_months_update_quarters(self):
         for line in self:
-            line.quarter1_total = (line.m01 or 0.0) + (line.m02 or 0.0) + (line.m03 or 0.0)
-            line.quarter2_total = (line.m04 or 0.0) + (line.m05 or 0.0) + (line.m06 or 0.0)
-            line.quarter3_total = (line.m07 or 0.0) + (line.m08 or 0.0) + (line.m09 or 0.0)
-            line.quarter4_total = (line.m10 or 0.0) + (line.m11 or 0.0) + (line.m12 or 0.0)
-            if line.line_type not in ("manpower", "fixed_asset"):
-                line.annual_total = line.quarter1_total + line.quarter2_total + line.quarter3_total + line.quarter4_total
+            if line.line_type == "credit_portfolio" and (line.totals_basis or "last_month") == "last_month":
+                line.quarter1_total = line.m03 or 0.0
+                line.quarter2_total = line.m06 or 0.0
+                line.quarter3_total = line.m09 or 0.0
+                line.quarter4_total = line.m12 or 0.0
+                line.annual_total = line.m12 or 0.0
+                line.outstanding_year_end = (line.opening_balance or 0.0) + (line.annual_total or 0.0)
+            elif line.line_type == "initiative_budget":
+                line.quarter1_total = (line.m01 or 0.0) + (line.m02 or 0.0) + (line.m03 or 0.0)
+                line.quarter2_total = (line.m04 or 0.0) + (line.m05 or 0.0) + (line.m06 or 0.0)
+                line.quarter3_total = (line.m07 or 0.0) + (line.m08 or 0.0) + (line.m09 or 0.0)
+                line.quarter4_total = (line.m10 or 0.0) + (line.m11 or 0.0) + (line.m12 or 0.0)
+                line.annual_total = line.initiative_cost or 0.0
+                line.outstanding_year_end = (line.opening_balance or 0.0) + (line.annual_total or 0.0)
+            else:
+                line.quarter1_total = (line.m01 or 0.0) + (line.m02 or 0.0) + (line.m03 or 0.0)
+                line.quarter2_total = (line.m04 or 0.0) + (line.m05 or 0.0) + (line.m06 or 0.0)
+                line.quarter3_total = (line.m07 or 0.0) + (line.m08 or 0.0) + (line.m09 or 0.0)
+                line.quarter4_total = (line.m10 or 0.0) + (line.m11 or 0.0) + (line.m12 or 0.0)
+                if line.line_type not in ("manpower", "fixed_asset"):
+                    line.annual_total = line.quarter1_total + line.quarter2_total + line.quarter3_total + line.quarter4_total
+                    line.outstanding_year_end = (line.opening_balance or 0.0) + (line.annual_total or 0.0)
+
+    @api.onchange("initiative_cost")
+    def _onchange_initiative_cost(self):
+        for line in self:
+            if line.line_type == "initiative_budget":
+                line.annual_total = line.initiative_cost or 0.0
                 line.outstanding_year_end = (line.opening_balance or 0.0) + (line.annual_total or 0.0)
 
     @api.onchange("opening_balance")
@@ -2226,26 +2845,14 @@ class PbmsPlanCategoryLine(models.Model):
     )
     def _onchange_manpower_monthly_headcount(self):
         for line in self:
-            if line.line_type != "manpower":
-                continue
-            line.quarter1_total = (line.m01 or 0.0) + (line.m02 or 0.0) + (line.m03 or 0.0)
-            line.quarter2_total = (line.m04 or 0.0) + (line.m05 or 0.0) + (line.m06 or 0.0)
-            line.quarter3_total = (line.m07 or 0.0) + (line.m08 or 0.0) + (line.m09 or 0.0)
-            line.quarter4_total = (line.m10 or 0.0) + (line.m11 or 0.0) + (line.m12 or 0.0)
-            line.annual_total = (
-                line.quarter1_total + line.quarter2_total + line.quarter3_total + line.quarter4_total
-            )
-            plan_state = line.plan_id.state if line.plan_id else self.env.context.get("default_state")
-            if plan_state in ("committee_review", "ceo_approval") or (
-                self.env.user._pbms_is_budget_hiring_committee() or self.env.user._pbms_is_ceo() or self.env.is_admin()
-            ):
-                line._auto_balance_manpower_sourcing()
+            if line.line_type == "manpower":
+                line._onchange_hc_months()
 
     @api.depends(
         "quarter1_total", "quarter2_total", "quarter3_total", "quarter4_total",
         "m01", "m02", "m03", "m04", "m05", "m06",
         "m07", "m08", "m09", "m10", "m11", "m12",
-        "fa_annual_total_cost", "line_type",
+        "fa_annual_total_cost", "line_type", "totals_basis", "initiative_cost",
     )
     def _compute_annual_total(self):
         for line in self:
@@ -2259,6 +2866,18 @@ class PbmsPlanCategoryLine(models.Model):
                 line.annual_total = (
                     line.quarter1_total + line.quarter2_total + line.quarter3_total + line.quarter4_total
                 )
+            elif line.line_type == "initiative_budget":
+                line.annual_total = line.initiative_cost or 0.0
+            elif line.line_type == "credit_portfolio":
+                if (line.totals_basis or "last_month") == "last_month":
+                    line.annual_total = line.m12 or 0.0
+                else:
+                    line.annual_total = (
+                        (line.quarter1_total or 0.0)
+                        + (line.quarter2_total or 0.0)
+                        + (line.quarter3_total or 0.0)
+                        + (line.quarter4_total or 0.0)
+                    )
             else:
                 line.annual_total = (
                     (line.quarter1_total or 0.0)
@@ -2271,7 +2890,11 @@ class PbmsPlanCategoryLine(models.Model):
         """Distribute modified annual_total proportionally across m01..m12 and quarters."""
         Config = self.env["pbms.planning.config"] if "pbms.planning.config" in self.env else False
         for line in self:
-            if line.line_type in ("manpower", "fixed_asset"):
+            if line.line_type in ("manpower", "fixed_asset", "initiative_budget"):
+                continue
+            if line.line_type == "credit_portfolio" and (line.totals_basis or "last_month") == "last_month":
+                line.m12 = line.annual_total
+                line.quarter4_total = line.m12
                 continue
             new_total = line.annual_total or 0.0
             old_months = [(getattr(line, m) or 0.0) for m in MONTH_FIELDS]
@@ -2297,22 +2920,38 @@ class PbmsPlanCategoryLine(models.Model):
                 rounded_months = [round(val, 2) for val in new_months]
                 diff = round(new_total - sum(rounded_months), 2)
                 if abs(diff) > 0.0001:
-                    last_idx = 11
-                    for idx in reversed(range(12)):
-                        if abs(old_months[idx]) > 1e-6:
-                            last_idx = idx
-                            break
-                    rounded_months[last_idx] = round(rounded_months[last_idx] + diff, 2)
+                    if diff > 0:
+                        last_idx = 11
+                        for idx in reversed(range(12)):
+                            if abs(old_months[idx]) > 1e-6:
+                                last_idx = idx
+                                break
+                        rounded_months[last_idx] = round(rounded_months[last_idx] + diff, 2)
+                    else:
+                        first_idx = 0
+                        for idx in range(12):
+                            if abs(old_months[idx]) > 1e-6:
+                                first_idx = idx
+                                break
+                        rounded_months[first_idx] = round(rounded_months[first_idx] + diff, 2)
             else:
                 rounded_months = [int(round(val)) for val in new_months]
                 diff = int(round(new_total)) - sum(rounded_months)
                 if diff != 0:
-                    last_idx = 11
-                    for idx in reversed(range(12)):
-                        if abs(old_months[idx]) > 1e-6:
-                            last_idx = idx
-                            break
-                    rounded_months[last_idx] += diff
+                    if diff > 0:
+                        last_idx = 11
+                        for idx in reversed(range(12)):
+                            if abs(old_months[idx]) > 1e-6:
+                                last_idx = idx
+                                break
+                        rounded_months[last_idx] += diff
+                    else:
+                        first_idx = 0
+                        for idx in range(12):
+                            if abs(old_months[idx]) > 1e-6:
+                                first_idx = idx
+                                break
+                        rounded_months[first_idx] += diff
 
             for i, m in enumerate(MONTH_FIELDS):
                 setattr(line, m, rounded_months[i])
@@ -2504,7 +3143,7 @@ class PbmsPlanCategoryLine(models.Model):
                 if state in ("ho_endorse", "cpco_endorse", "approved"):
                     line.approved_annual_total = line.approved_annual_total if line.approved_annual_total else (tot if tot > 0 else 0.0)
                 else:
-                    line.approved_annual_total = 0.0
+                    line.approved_annual_total = 0
             elif is_expense:
                 if line.plan_id and line.plan_id.state == "approved":
                     line.approved_annual_total = tot if tot > 0 else (line.approved_annual_total or line.annual_total or 0.0)
@@ -2515,7 +3154,7 @@ class PbmsPlanCategoryLine(models.Model):
             elif line.plan_id and line.plan_id.org_unit_type == "head_office" and line.plan_id.state == "approved":
                 line.approved_annual_total = tot if tot > 0 else (line.approved_annual_total or line.annual_total or 0.0)
             else:
-                line.approved_annual_total = 0.0
+                line.approved_annual_total = 0
 
     @api.depends("plan_id.state", "approved_annual_total", "fulfillment_total", "annual_total", "line_type")
     def _compute_display_approved_annual_total(self):
@@ -2546,7 +3185,7 @@ class PbmsPlanCategoryLine(models.Model):
                 if is_cpco or is_comm or is_ceo or is_ho or is_admin:
                     line.display_approved_annual_total = target
                 else:
-                    line.display_approved_annual_total = 0.0
+                    line.display_approved_annual_total = 0
 
             # 3. State 'ho_endorse': CEO has approved.
             # Valued for Budget Hiring Committee, CEO, HO Reviewer, Admin.
@@ -2556,12 +3195,12 @@ class PbmsPlanCategoryLine(models.Model):
                 if is_comm or is_ceo or is_ho or is_admin:
                     line.display_approved_annual_total = target
                 else:
-                    line.display_approved_annual_total = 0.0
+                    line.display_approved_annual_total = 0
 
             # 4. In all other states (draft, submitted, chief_review, people_solutions_review, cpco_review, committee_review, ceo_approval):
             # No valued! In ceo_approval, Approved Target must NOT be valued before CEO final approval takes action!
             else:
-                line.display_approved_annual_total = 0.0
+                line.display_approved_annual_total = 0
 
     @api.depends("proposed_annual_total", "approved_annual_total", "annual_total", "is_cascaded")
     def _compute_target_variance(self):
@@ -2609,6 +3248,66 @@ class PbmsPlanCategoryLine(models.Model):
             "proposed_m09", "proposed_m10", "proposed_m11", "proposed_m12",
         ])
 
+    def _populate_approved_targets_batch(self):
+        """Populate approved targets from existing values or actual values in batch SQL."""
+        if not self:
+            return
+        self.env.cr.execute("""
+            UPDATE pbms_plan_category_line
+            SET
+                approved_opening_balance = COALESCE(NULLIF(approved_opening_balance, 0.0), opening_balance, 0.0),
+                approved_annual_total = COALESCE(NULLIF(approved_annual_total, 0.0), annual_total, 0.0),
+                approved_m01 = COALESCE(NULLIF(approved_m01, 0.0), m01, 0.0),
+                approved_m02 = COALESCE(NULLIF(approved_m02, 0.0), m02, 0.0),
+                approved_m03 = COALESCE(NULLIF(approved_m03, 0.0), m03, 0.0),
+                approved_m04 = COALESCE(NULLIF(approved_m04, 0.0), m04, 0.0),
+                approved_m05 = COALESCE(NULLIF(approved_m05, 0.0), m05, 0.0),
+                approved_m06 = COALESCE(NULLIF(approved_m06, 0.0), m06, 0.0),
+                approved_m07 = COALESCE(NULLIF(approved_m07, 0.0), m07, 0.0),
+                approved_m08 = COALESCE(NULLIF(approved_m08, 0.0), m08, 0.0),
+                approved_m09 = COALESCE(NULLIF(approved_m09, 0.0), m09, 0.0),
+                approved_m10 = COALESCE(NULLIF(approved_m10, 0.0), m10, 0.0),
+                approved_m11 = COALESCE(NULLIF(approved_m11, 0.0), m11, 0.0),
+                approved_m12 = COALESCE(NULLIF(approved_m12, 0.0), m12, 0.0)
+            WHERE id IN %s;
+        """, (tuple(self.ids),))
+        self.invalidate_recordset([
+            "approved_opening_balance", "approved_annual_total",
+            "approved_m01", "approved_m02", "approved_m03", "approved_m04",
+            "approved_m05", "approved_m06", "approved_m07", "approved_m08",
+            "approved_m09", "approved_m10", "approved_m11", "approved_m12",
+        ])
+
+    def _populate_approved_from_annual_total_batch(self):
+        """Populate approved targets directly from annual_total and m01..m12 in batch SQL."""
+        if not self:
+            return
+        self.env.cr.execute("""
+            UPDATE pbms_plan_category_line
+            SET
+                approved_opening_balance = COALESCE(opening_balance, 0.0),
+                approved_annual_total = COALESCE(annual_total, 0.0),
+                approved_m01 = COALESCE(m01, 0.0),
+                approved_m02 = COALESCE(m02, 0.0),
+                approved_m03 = COALESCE(m03, 0.0),
+                approved_m04 = COALESCE(m04, 0.0),
+                approved_m05 = COALESCE(m05, 0.0),
+                approved_m06 = COALESCE(m06, 0.0),
+                approved_m07 = COALESCE(m07, 0.0),
+                approved_m08 = COALESCE(m08, 0.0),
+                approved_m09 = COALESCE(m09, 0.0),
+                approved_m10 = COALESCE(m10, 0.0),
+                approved_m11 = COALESCE(m11, 0.0),
+                approved_m12 = COALESCE(m12, 0.0)
+            WHERE id IN %s;
+        """, (tuple(self.ids),))
+        self.invalidate_recordset([
+            "approved_opening_balance", "approved_annual_total",
+            "approved_m01", "approved_m02", "approved_m03", "approved_m04",
+            "approved_m05", "approved_m06", "approved_m07", "approved_m08",
+            "approved_m09", "approved_m10", "approved_m11", "approved_m12",
+        ])
+
 
     def _pbms_check_parent_plan_editable(self):
         if (
@@ -2622,6 +3321,12 @@ class PbmsPlanCategoryLine(models.Model):
             return
         for line in self:
             if line.plan_id:
+                if (
+                    line.line_type == "manpower"
+                    and line.plan_id.state == "people_solutions_review"
+                    and self.env.user._pbms_is_people_solutions()
+                ):
+                    continue
                 if line.plan_id.cycle_id and line.plan_id.cycle_id.state != "open":
                     cycle_label = dict(line.plan_id.cycle_id._fields["state"].selection).get(line.plan_id.cycle_id.state, line.plan_id.cycle_id.state)
                     raise AccessError(_(
@@ -2680,6 +3385,7 @@ class PbmsPlanCategoryLine(models.Model):
             or self.env.context.get("bypass_plan_lock")
         )
         for vals in vals_list:
+            _validate_month_values_not_text(vals)
             target_line_type = vals.get("line_type") or self.env.context.get("default_line_type")
             plan_id = vals.get("plan_id")
             if not plan_id:
@@ -2691,8 +3397,33 @@ class PbmsPlanCategoryLine(models.Model):
                 if not plan_id and self.env.context.get("params", {}).get("id") and self.env.context.get("params", {}).get("model") == "pbms.planning.category":
                     plan_id = self.env.context.get("params", {}).get("id")
 
+            if not target_line_type and plan_id:
+                curr_p = Plan.browse(plan_id)
+                if curr_p.exists() and curr_p.category:
+                    target_line_type = curr_p.category
+                    vals["line_type"] = target_line_type
+
+            if vals.get("quantity") and not any(vals.get(m) for m in ("m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12", "q1", "q2", "q3", "q4")):
+                q_val = vals["quantity"]
+                if target_line_type == "fixed_asset" and not any(vals.get(f) for f in ("fa_q1", "fa_q2", "fa_q3", "fa_q4")):
+                    vals["fa_q1"] = q_val
+                else:
+                    vals["m01"] = float(q_val)
+
+            if vals.get("position_type") and not vals.get("position_type_id"):
+                is_new = (vals["position_type"] == "new")
+                p_type = self.env["pbms.position.type"].search([
+                    ("code", "=", "new" if is_new else "additional")
+                ], limit=1)
+                if not p_type and not is_new:
+                    p_type = self.env["pbms.position.type"].search([
+                        ("is_new_position", "=", False)
+                    ], limit=1)
+                if p_type:
+                    vals["position_type_id"] = p_type.id
+
             # Validate plan_id matches target_line_type to avoid saving across different categories
-            if plan_id and target_line_type:
+            if plan_id and target_line_type and not self.env.context.get("is_planning_request"):
                 curr_plan = Plan.browse(plan_id)
                 if curr_plan.exists() and curr_plan.category and curr_plan.category != target_line_type:
                     found_plan = Plan.search([
@@ -2707,7 +3438,7 @@ class PbmsPlanCategoryLine(models.Model):
                             "cycle_id": curr_plan.cycle_id.id,
                             "company_id": curr_plan.company_id.id if curr_plan.company_id else self.env.company.id,
                             "category": target_line_type,
-                            "state": "draft",
+                            "state": curr_plan.state if curr_plan.state else "draft",
                         })
                     plan_id = found_plan.id
                     vals["plan_id"] = plan_id
@@ -2738,11 +3469,11 @@ class PbmsPlanCategoryLine(models.Model):
 
             if plan_id and not is_admin:
                 plan = Plan.browse(plan_id)
-                if not is_bypass and (user._pbms_is_district_reviewer() or user._pbms_is_ho_reviewer()):
+                if not is_bypass and (user._pbms_is_district_reviewer() or user._pbms_is_ho_reviewer() or user._pbms_is_respective_chief()):
                     if not plan._is_own_operating_unit_plan():
                         raise UserError(_(
-                            "District Reviewers and Head Office Reviewers cannot add new lines to child work unit plans. "
-                            "You can only edit lines created by the branch."
+                            "Reviewers and Chiefs cannot add new lines to subordinate operating unit plans. "
+                            "You can only edit lines submitted by the operating unit, or add lines to your own operating unit's plan."
                         ))
                 if plan.cycle_id and plan.cycle_id.state != "open":
                     cycle_label = dict(plan.cycle_id._fields["state"].selection).get(plan.cycle_id.state, plan.cycle_id.state)
@@ -2755,7 +3486,24 @@ class PbmsPlanCategoryLine(models.Model):
                         "You cannot add requirement lines while the parent plan is view-only "
                         "at its current workflow stage."
                     ))
+        vals_list = [self._pbms_mirror_manpower_months(v) for v in vals_list]
         return super().create(vals_list)
+
+    @api.model
+    def _pbms_mirror_manpower_months(self, vals):
+        """Workforce months are typed into hc_mNN (integer) in the form, while
+        list views, group totals and exports read mNN.  Keep both in step so the
+        list shows exactly what the form shows."""
+        vals = dict(vals)
+        is_manpower = vals.get("line_type") == "manpower" or (
+            "line_type" not in vals and self.env.context.get("default_line_type") == "manpower")
+        if not is_manpower:
+            return vals
+        for m in MONTH_FIELDS:
+            hc = "hc_%s" % m
+            if hc in vals and m not in vals:
+                vals[m] = float(vals[hc] or 0)
+        return vals
 
     SYSTEM_AUTOMATED_LINE_FIELDS = {
         "existing_establishment",
@@ -2775,9 +3523,20 @@ class PbmsPlanCategoryLine(models.Model):
         "q1", "q2", "q3", "q4",
         "fulfillment_total",
         "fulfillment_balance",
+        "plan_people_solutions_comment",
+        "people_solutions_comment",
+        "plan_cpco_comment",
+        "cpco_comment",
+        "plan_cpco_attachment_ids",
+        "cpco_attachment_ids",
     }
 
     def write(self, vals):
+        _validate_month_values_not_text(vals)
+        if "plan_cpco_attachment_ids" in vals and not self.env.context.get("bypass_plan_lock"):
+            for line in self:
+                if line.plan_id and line.plan_id.state in ("committee_review", "ceo_approval", "approved", "rejected", "rejection_recommended", "ho_endorse", "cpco_endorse"):
+                    raise UserError(_("CPCO Attachments cannot be added or modified after the plan has been submitted to the Budget & Hiring Committee."))
         if "plan_id" in vals and not vals["plan_id"]:
             vals = dict(vals)
             del vals["plan_id"]
@@ -2785,6 +3544,24 @@ class PbmsPlanCategoryLine(models.Model):
                 return True
         if not set(vals.keys()).issubset(self.SYSTEM_AUTOMATED_LINE_FIELDS):
             self._pbms_check_parent_plan_editable()
+        if any(("hc_%s" % m) in vals for m in MONTH_FIELDS):
+            manpower_lines = self.filtered(lambda l: l.line_type == "manpower")
+            if manpower_lines and manpower_lines == self:
+                vals = self._pbms_mirror_manpower_months(dict(vals, line_type="manpower"))
+                vals.pop("line_type", None)
+
+        if any(f in vals for f in ("fulfillment_promotion", "fulfillment_transfer", "fulfillment_lateral")) and "fulfillment_external" not in vals and not self.env.context.get("auto_balancing_sourcing"):
+            for line in self:
+                if line.line_type == "manpower":
+                    target = int(round(vals.get("annual_total", line.annual_total or line.quantity or 0)))
+                    prom = int(vals.get("fulfillment_promotion", line.fulfillment_promotion or 0))
+                    trans = int(vals.get("fulfillment_transfer", line.fulfillment_transfer or 0))
+                    lat = int(vals.get("fulfillment_lateral", line.fulfillment_lateral or 0))
+                    internal = prom + trans + lat
+                    vals = dict(vals)
+                    vals["fulfillment_external"] = max(0, target - internal)
+                    break
+
         res = super().write(vals)
 
         # For manpower lines, ensure quarters, annual_total, and sourcing are synchronized
@@ -2811,6 +3588,7 @@ class PbmsPlanCategoryLine(models.Model):
                             self.env.user._pbms_is_people_solutions() or self.env.user._pbms_is_cpco() or self.env.user._pbms_is_budget_hiring_committee() or self.env.user._pbms_is_ceo() or self.env.is_admin()
                         ):
                             line._auto_balance_manpower_sourcing()
+
         return res
 
     def unlink(self):
@@ -2823,12 +3601,12 @@ class PbmsPlanCategoryLine(models.Model):
             or self.env.context.get("bypass_plan_lock")
             or self.env.context.get("skip_reviewer_check")
         )
-        if not is_bypass and (user._pbms_is_district_reviewer() or user._pbms_is_ho_reviewer()):
+        if not is_bypass and (user._pbms_is_district_reviewer() or user._pbms_is_ho_reviewer() or user._pbms_is_respective_chief()):
             for line in self:
                 if line.plan_id and not line.plan_id._is_own_operating_unit_plan():
                     raise UserError(_(
-                        "District Reviewers and Head Office Reviewers cannot delete lines from child work unit plans. "
-                        "You can only edit lines created by the branch."
+                        "Reviewers and Chiefs cannot delete lines from subordinate operating unit plans. "
+                        "You can only edit lines submitted by the operating unit, or manage lines for your own operating unit's plan."
                     ))
         self._pbms_check_parent_plan_editable()
         return super().unlink()
@@ -2836,9 +3614,14 @@ class PbmsPlanCategoryLine(models.Model):
     def action_export_excel(self):
         """Export selected plan requirement lines using official Bunna Bank form templates."""
         records = self or self.browse(self.env.context.get("active_ids", []))
+        line_types = [t for t in records.mapped("line_type") if t]
+        target_category = line_types[0] if len(set(line_types)) == 1 else False
         plans = records.mapped("plan_id")
         if plans:
-            return plans.action_export_excel()
+            ctx = dict(self.env.context)
+            if target_category:
+                ctx["target_category"] = target_category
+            return plans.with_context(ctx).action_export_excel()
         raise UserError(_("No planning records associated with the selected lines."))
 
     @api.model
@@ -2847,7 +3630,7 @@ class PbmsPlanCategoryLine(models.Model):
         NON_EXPORTABLE_LINE_FIELDS = {
             "deposit_type_domain", "channel_domain", "expense_account_domain",
             "fa_category_domain", "justification_category_domain", "fx_source_type_domain",
-            "is_monetary", "new_job_grade",
+            "credit_portfolio_item_domain", "is_monetary", "new_job_grade",
         }
         for fname in NON_EXPORTABLE_LINE_FIELDS:
             if fname in res:
@@ -2875,6 +3658,375 @@ class PbmsPlanCategoryLine(models.Model):
     _hc_m10_non_negative = models.Constraint("CHECK(hc_m10 >= 0)", "Apr headcount cannot be negative.")
     _hc_m11_non_negative = models.Constraint("CHECK(hc_m11 >= 0)", "May headcount cannot be negative.")
     _hc_m12_non_negative = models.Constraint("CHECK(hc_m12 >= 0)", "Jun headcount cannot be negative.")
+
+    # ------------------------------------------------------------------
+    # Plan-level workflow buttons shown on every line row of the nested
+    # lists.  The visibility flags mirror the plan form (non-stored related
+    # fields, evaluated for the current user) and the actions are forwarded
+    # to the parent plan, so the same permissions/guards as the form apply.
+    # ------------------------------------------------------------------
+    plan_cat = fields.Selection(related="plan_id.category", string="Plan Category", compute_sudo=False)
+    plan_is_cycle_open = fields.Boolean(related="plan_id.is_cycle_open", compute_sudo=False)
+    plan_is_district_unit = fields.Boolean(related="plan_id.is_district_unit", compute_sudo=False)
+    plan_is_head_office_unit = fields.Boolean(related="plan_id.is_head_office_unit", compute_sudo=False)
+    plan_can_chief_review = fields.Boolean(related="plan_id.can_chief_review", compute_sudo=False)
+    plan_can_submit_plan = fields.Boolean(related="plan_id.can_submit_plan", compute_sudo=False)
+    plan_can_district_review = fields.Boolean(related="plan_id.can_district_review", compute_sudo=False)
+    plan_can_ho_review = fields.Boolean(related="plan_id.can_ho_review", compute_sudo=False)
+    plan_can_sppmd_review = fields.Boolean(related="plan_id.can_sppmd_review", compute_sudo=False)
+    plan_can_people_solutions_review = fields.Boolean(related="plan_id.can_people_solutions_review", compute_sudo=False)
+    plan_can_cpco_review = fields.Boolean(related="plan_id.can_cpco_review", compute_sudo=False)
+    plan_can_committee_review = fields.Boolean(related="plan_id.can_committee_review", compute_sudo=False)
+    plan_can_ceo_approve = fields.Boolean(related="plan_id.can_ceo_approve", compute_sudo=False)
+    plan_can_ho_endorse = fields.Boolean(related="plan_id.can_ho_endorse", compute_sudo=False)
+    plan_can_cpco_endorse = fields.Boolean(related="plan_id.can_cpco_endorse", compute_sudo=False)
+    plan_can_delete_plan = fields.Boolean(related="plan_id.can_delete_plan", compute_sudo=False)
+    plan_can_use_reviewer_actions = fields.Boolean(related="plan_id.can_use_reviewer_actions", compute_sudo=False)
+    plan_can_use_reviewer_wizards = fields.Boolean(related="plan_id.can_use_reviewer_wizards", compute_sudo=False)
+    plan_has_cascaded_targets = fields.Boolean(related="plan_id.has_cascaded_targets", compute_sudo=False)
+    plan_is_targets_cascaded = fields.Boolean(related="plan_id.is_targets_cascaded", compute_sudo=False)
+    plan_can_edit_sourcing_fields = fields.Boolean(related="plan_id.can_edit_sourcing_fields", compute_sudo=False)
+    plan_can_view_sourcing_fields = fields.Boolean(related="plan_id.can_view_sourcing_fields", compute_sudo=False)
+    plan_people_solutions_comment = fields.Text(related="plan_id.people_solutions_comment", string="Review Comment", readonly=False, compute_sudo=False)
+    plan_cpco_comment = fields.Text(related="plan_id.cpco_comment", string="CPCO Comment", readonly=False, compute_sudo=False)
+    plan_cpco_attachment_ids = fields.Many2many(related="plan_id.cpco_attachment_ids", string="CPCO Attachments", readonly=False)
+
+    _PBMS_PLAN_METHODS = frozenset({
+        "action_submit", "action_reset_to_draft", "action_district_approve",
+        "action_district_approve_workforce", "action_ho_approve",
+        "action_submit_to_committee", "action_committee_approve_resource",
+        "action_chief_approve_escalate", "action_people_solutions_escalate_cpco",
+        "action_cpco_submit_to_committee", "action_committee_approve",
+        "action_ceo_approve", "action_ho_endorse_to_cpco",
+        "action_cpco_endorse_to_solutions", "action_approve",
+        "action_already_cascaded_notice", "action_open_import_wizard",
+        "action_export_excel", "action_refresh_existing_manpower",
+    })
+    _PBMS_PLAN_WIZARDS = {
+        "review_comment": ("bunna_pbms.action_pbms_review_comment_wizard", {}),
+        "request_info": ("bunna_pbms.action_pbms_request_info_wizard", {}),
+        "return": ("bunna_pbms.action_pbms_return_revision_wizard", {}),
+        "reject": ("bunna_pbms.action_pbms_reject_wizard", {}),
+        "cascade_district": ("bunna_pbms.action_pbms_target_cascade_district_wizard",
+                             {"default_cascade_level": "district_to_branch"}),
+        "cascade_ho": ("bunna_pbms.action_pbms_target_cascade_ho_wizard",
+                       {"default_cascade_level": "ho_to_district"}),
+    }
+
+    def _pbms_plan_for_button(self):
+        self.ensure_one()
+        if not self.plan_id:
+            raise UserError(_("This line is not attached to a plan."))
+        return self.plan_id.with_context(
+            active_id=self.plan_id.id,
+            active_ids=self.plan_id.ids,
+            active_model="pbms.planning.category",
+        )
+
+    def action_plan_dispatch(self):
+        """Forward a workflow button clicked on a line row to its parent plan."""
+        method = self.env.context.get("pbms_plan_method")
+        if method not in self._PBMS_PLAN_METHODS:
+            raise UserError(_("Unsupported plan action."))
+        return getattr(self._pbms_plan_for_button(), method)()
+
+    def action_plan_wizard(self):
+        """Open a plan wizard (comment / info / return / reject / cascade) for the parent plan."""
+        from ast import literal_eval
+        key = self.env.context.get("pbms_wizard")
+        if key not in self._PBMS_PLAN_WIZARDS:
+            raise UserError(_("Unsupported plan wizard."))
+        plan = self._pbms_plan_for_button()
+        xmlid, extra = self._PBMS_PLAN_WIZARDS[key]
+        action = self.env["ir.actions.actions"]._for_xml_id(xmlid)
+        ctx = dict(literal_eval(action.get("context") or "{}"))
+        ctx.update(extra)
+        ctx.update(
+            active_id=plan.id, active_ids=plan.ids,
+            active_model="pbms.planning.category", default_plan_id=plan.id,
+        )
+        action["context"] = ctx
+        return action
+
+    def action_open_plan(self):
+        """Open the parent plan (header) form of this line."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "pbms.planning.category",
+            "res_id": self.plan_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_district_approve(self):
+        res = False
+        for plan in self.mapped("plan_id"):
+            if plan.category == "manpower":
+                res = plan.action_district_approve_workforce()
+            else:
+                res = plan.action_district_approve()
+        return res
+
+    def action_ho_approve(self):
+        res = False
+        for plan in self.mapped("plan_id"):
+            if plan.category == "fixed_asset":
+                res = plan.action_submit_to_committee()
+            elif plan.category == "manpower":
+                res = plan.action_ho_endorse_to_cpco()
+            else:
+                res = plan.action_ho_approve()
+        return res
+
+    def action_reset_to_draft(self):
+        plans = self.mapped("plan_id")
+        return plans.action_reset_to_draft()
+
+    def action_bulk_approve(self):
+        """Bulk (role-aware) approval for plans of selected lines."""
+        return self.mapped("plan_id").action_bulk_approve()
+
+    def action_bulk_ho_approve(self):
+        """Bulk HO approval for plans of selected lines."""
+        plans = self.mapped("plan_id")
+        return plans.action_bulk_ho_approve()
+
+    def action_bulk_district_approve(self):
+        """Bulk District approval for plans of selected lines."""
+        plans = self.mapped("plan_id")
+        return plans.action_bulk_district_approve()
+
+    def action_bulk_delete(self):
+        """Bulk delete selected plan category lines for SPPMD Administrator."""
+        user = self.env.user
+        if not (self.env.is_admin() or user._pbms_is_sppmd_admin()):
+            raise AccessError(_("Only the SPPMD Administrator can delete plan lines in bulk."))
+        records = self or self.browse(self.env.context.get("active_ids", []))
+        if not records:
+            return False
+        count = len(records)
+        parent_plans = records.mapped("plan_id")
+        records.unlink()
+        if parent_plans:
+            try:
+                parent_plans.sudo()._compute_totals()
+            except Exception:
+                pass
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Deleted"),
+                "message": _("%s requirement line(s) deleted successfully.", count),
+                "sticky": False,
+                "type": "success",
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
+    @api.model
+    def action_planning_categories_menu(self):
+        """Dynamic dispatch for Planning Categories menu.
+        Branch / Head Office users without reviewer or approver privileges
+        do not need district grouping (groups by Category -> Branch).
+        Reviewers, chiefs, and approvers retain full District grouping.
+        """
+        user = self.env.user
+        is_branch_ho_user = user.has_group("bunna_pbms.group_pbms_branch_user") and not (
+            user.has_group("bunna_pbms.group_pbms_district_reviewer") or
+            user.has_group("bunna_pbms.group_pbms_ho_reviewer") or
+            user.has_group("bunna_pbms.group_pbms_approver") or
+            user.has_group("bunna_pbms.group_pbms_manager") or
+            user.has_group("bunna_pbms.group_pbms_respective_chief") or
+            user.has_group("bunna_pbms.group_pbms_people_solutions") or
+            user.has_group("bunna_pbms.group_pbms_cpco") or
+            user.has_group("bunna_pbms.group_pbms_budget_hiring_committee") or
+            user.has_group("bunna_pbms.group_pbms_ceo")
+        )
+        action = self.env["ir.actions.actions"]._for_xml_id("bunna_pbms.action_pbms_planning_category_lines")
+        raw_ctx = action.get("context") or {}
+        if isinstance(raw_ctx, str):
+            from odoo.tools.safe_eval import safe_eval
+            try:
+                ctx = dict(safe_eval(raw_ctx))
+            except Exception:
+                ctx = {}
+        else:
+            ctx = dict(raw_ctx)
+
+        if is_branch_ho_user:
+            ctx.pop("search_default_group_district", None)
+            ctx["search_default_group_by_line_type"] = 1
+            ctx["search_default_group_by_branch"] = 2
+        else:
+            ctx["search_default_group_by_line_type"] = 1
+            ctx["search_default_group_district"] = 2
+            ctx["search_default_group_by_branch"] = 3
+        action["context"] = ctx
+        return action
+
+    @api.model
+    def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
+        has_id_filter = any(isinstance(leaf, (list, tuple)) and len(leaf) >= 2 and leaf[0] == "id" for leaf in (domain or []))
+        has_plan_filter = any(isinstance(leaf, (list, tuple)) and len(leaf) >= 2 and leaf[0] == "plan_id" for leaf in (domain or []))
+        if not self.env.su and not bypass_access and not has_id_filter and not has_plan_filter and not self.env.context.get("bypass_category_config_filter"):
+            Config = self.env.get("pbms.planning.config")
+            if Config is not None:
+                target_cats = set()
+                for leaf in (domain or []):
+                    if isinstance(leaf, (list, tuple)) and len(leaf) == 3 and leaf[0] == "line_type":
+                        if leaf[1] == "=" and leaf[2]:
+                            target_cats.add(leaf[2])
+                        elif leaf[1] == "in" and isinstance(leaf[2], (list, tuple, set)):
+                            target_cats.update(c for c in leaf[2] if c)
+                for cat in target_cats:
+                    if cat not in ("general_expense", "fixed_asset", "manpower"):
+                        disabled_ou_ids = Config.sudo().get_disabled_unit_ids_for_category(cat)
+                        if disabled_ou_ids:
+                            domain = expression.AND([domain, ["|", ("org_unit_type", "in", ("district_office", "head_office", "regional_office")), ("org_unit_id", "not in", disabled_ou_ids)]])
+        user = self.env.user
+        if (
+            not self.env.su
+            and not bypass_access
+            and not has_id_filter
+            and not self.env.context.get("bypass_approver_branch_filter")
+            and not user._pbms_is_sppmd_admin()
+            and not self.env.is_admin()
+        ):
+            role_domains = []
+            if user.has_group("bunna_pbms.group_pbms_approver"):
+                role_domains.append([
+                    "|", "|",
+                    ("line_type", "not in", ("deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding")),
+                    ("org_unit_type", "in", ("head_office", "district_office")),
+                    ("plan_id.state", "in", ("district_endorsed", "ho_reviewed", "approved")),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_ho_reviewer") or user._pbms_is_ho_reviewer():
+                role_domains.append([
+                    "|", "|", "|", "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    "&",
+                        ("line_type", "=", "manpower"),
+                        ("plan_state", "in", ("ho_endorse", "cpco_endorse", "approved")),
+                    "&",
+                        ("org_unit_type", "=", "head_office"),
+                        ("plan_state", "in", ("submitted", "ho_reviewed", "committee_review", "board_ceo_approval", "approved", "info_requested", "returned")),
+                    "&",
+                        "&",
+                            ("org_unit_type", "in", ("district_office", "regional_office")),
+                            ("line_type", "in", ("deposit", "customer_base", "fx", "digital_banking")),
+                        ("plan_state", "in", ("district_endorsed", "ho_reviewed", "approved")),
+                    "&",
+                        "&",
+                            ("line_type", "in", ("general_expense", "fixed_asset", "credit_portfolio", "initiative_budget", "loan_disbursement_collection", "loan_outstanding")),
+                            ("org_unit_type", "not in", ("head_office",)),
+                        ("plan_state", "in", ("district_approved", "district_endorsed", "committee_review", "board_ceo_approval", "ho_reviewed", "approved")),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_respective_chief") or user._pbms_is_respective_chief():
+                chief_post_states = (
+                    "district_approved", "district_endorsed",
+                    "submitted", "ho_reviewed",
+                    "people_solutions_review", "cpco_review", "committee_review",
+                    "ceo_approval", "board_ceo_approval", "ho_endorse", "cpco_endorse",
+                    "approved", "rejected", "info_requested",
+                )
+                chief_scope_ou_ids = user._pbms_chief_scope_unit_ids()
+                sub_user_ids = user._pbms_chief_subordinate_user_ids()
+                user_ou_ids = user._pbms_operating_unit_ids()
+                direct_chief_criteria = [
+                    "|",
+                    ("plan_id.create_uid", "in", sub_user_ids),
+                    "|",
+                    ("plan_id.submitted_by", "in", sub_user_ids),
+                    "|",
+                    ("district_id", "in", chief_scope_ou_ids),
+                    ("org_unit_id", "in", chief_scope_ou_ids),
+                ]
+                chief_line_domain = [
+                    "&",
+                    ("line_type", "in", ("manpower", "general_expense", "fixed_asset", "credit_portfolio", "initiative_budget", "loan_disbursement_collection", "loan_outstanding")),
+                    "|",
+                    ("org_unit_id", "in", user_ou_ids),
+                    "|",
+                    "&",
+                    ("plan_state", "=", "chief_review"),
+                    *direct_chief_criteria,
+                    "|",
+                    "&",
+                    ("line_type", "=", "manpower"),
+                    "&",
+                    ("plan_state", "in", chief_post_states),
+                    *direct_chief_criteria,
+                    "&",
+                    ("line_type", "in", ("general_expense", "fixed_asset", "credit_portfolio", "initiative_budget", "loan_disbursement_collection", "loan_outstanding")),
+                    "&",
+                    ("org_unit_type", "=", "head_office"),
+                    "&",
+                    ("plan_state", "in", chief_post_states),
+                    *direct_chief_criteria,
+                ]
+                role_domains.append(chief_line_domain)
+            if user.has_group("bunna_pbms.group_pbms_district_reviewer"):
+                user_ou_ids = user._pbms_operating_unit_ids()
+                child_unit_ids = user._pbms_child_operating_unit_ids()
+                role_domains.append([
+                    "|",
+                    ("org_unit_id", "in", user_ou_ids),
+                    "|",
+                    ("district_id", "in", user_ou_ids),
+                    "|",
+                    ("org_unit_id", "in", child_unit_ids),
+                    ("org_unit_id.parent_unit", "in", user_ou_ids),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_people_solutions"):
+                role_domains.append([
+                    "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    "&",
+                    ("line_type", "=", "manpower"),
+                    ("plan_state", "in", (
+                        "people_solutions_review", "cpco_review", "committee_review",
+                        "ceo_approval", "board_ceo_approval", "ho_endorse", "cpco_endorse",
+                        "approved",
+                    )),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_cpco"):
+                role_domains.append([
+                    "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    "&",
+                    ("line_type", "=", "manpower"),
+                    ("plan_state", "in", (
+                        "cpco_review", "committee_review",
+                        "ceo_approval", "board_ceo_approval", "ho_endorse", "cpco_endorse",
+                        "approved",
+                    )),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_budget_hiring_committee"):
+                role_domains.append([
+                    "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    "&",
+                    ("line_type", "in", ("manpower", "fixed_asset", "initiative_budget")),
+                    ("plan_state", "in", (
+                        "committee_review", "ceo_approval", "board_ceo_approval",
+                        "ho_endorse", "cpco_endorse", "approved",
+                    )),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_ceo") or user._pbms_is_ceo():
+                role_domains.append([
+                    "|",
+                    ("plan_state", "in", ("ceo_approval", "board_ceo_approval")),
+                    "|",
+                    ("plan_id.ceo_approver_id", "=", user.id),
+                    "&",
+                    ("line_type", "=", "manpower"),
+                    ("plan_state", "in", ("ho_endorse", "cpco_endorse", "approved", "rejected")),
+                ])
+            if role_domains:
+                domain = expression.AND([domain, expression.OR(role_domains)])
+        return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
 
     def init(self):
         super().init()
@@ -2964,6 +4116,10 @@ class PbmsPlanningCategory(models.Model):
     enable_expense = fields.Boolean(compute="_compute_eligibility")
     enable_manpower = fields.Boolean(compute="_compute_eligibility")
     enable_fixed_asset = fields.Boolean(compute="_compute_eligibility")
+    enable_loan_disbursement_collection = fields.Boolean(compute="_compute_eligibility")
+    enable_loan_outstanding = fields.Boolean(compute="_compute_eligibility")
+    enable_credit_portfolio = fields.Boolean(compute="_compute_eligibility")
+    enable_initiative_budget = fields.Boolean(compute="_compute_eligibility")
 
     # Measurement Types per category (monetary, integer, count)
     deposit_measurement_type = fields.Selection(
@@ -3008,6 +4164,18 @@ class PbmsPlanningCategory(models.Model):
         compute="_compute_measurement_types",
         store=True,
     )
+    loan_disbursement_measurement_type = fields.Selection(
+        [("monetary", "Monetary"), ("integer", "Integer"), ("count", "Count")],
+        string="Loan Disbursement Measurement",
+        compute="_compute_measurement_types",
+        store=True,
+    )
+    loan_outstanding_measurement_type = fields.Selection(
+        [("monetary", "Monetary"), ("integer", "Integer"), ("count", "Count")],
+        string="Loan Outstanding Measurement",
+        compute="_compute_measurement_types",
+        store=True,
+    )
 
     is_deposit_monetary = fields.Boolean(compute="_compute_measurement_types", store=True)
     is_customer_base_monetary = fields.Boolean(compute="_compute_measurement_types", store=True)
@@ -3016,18 +4184,20 @@ class PbmsPlanningCategory(models.Model):
     is_expense_monetary = fields.Boolean(compute="_compute_measurement_types", store=True)
     is_manpower_monetary = fields.Boolean(compute="_compute_measurement_types", store=True)
     is_fixed_asset_monetary = fields.Boolean(compute="_compute_measurement_types", store=True)
+    is_loan_disbursement_monetary = fields.Boolean(compute="_compute_measurement_types", store=True)
+    is_loan_outstanding_monetary = fields.Boolean(compute="_compute_measurement_types", store=True)
 
     can_edit_content = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
-    can_delete_plan = fields.Boolean(compute="_compute_access_flags")
-    can_submit_plan = fields.Boolean(compute="_compute_access_flags")
-    can_district_review = fields.Boolean(compute="_compute_access_flags")
-    can_ho_review = fields.Boolean(compute="_compute_access_flags")
-    can_sppmd_review = fields.Boolean(compute="_compute_access_flags")
-    can_use_reviewer_wizards = fields.Boolean(compute="_compute_access_flags")
-    can_committee_review = fields.Boolean(compute="_compute_access_flags")
-    can_hr_fulfill = fields.Boolean(compute="_compute_access_flags")
-    can_ceo_approve = fields.Boolean(compute="_compute_access_flags")
-    can_chief_review = fields.Boolean(compute="_compute_access_flags")
+    can_delete_plan = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_submit_plan = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_district_review = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_ho_review = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_sppmd_review = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_use_reviewer_wizards = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_committee_review = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_hr_fulfill = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_ceo_approve = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_chief_review = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
     can_cpco_review = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
     can_people_solutions_review = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
     can_ho_endorse = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
@@ -3051,20 +4221,19 @@ class PbmsPlanningCategory(models.Model):
         is_cpco = user._pbms_is_cpco()
         is_ceo = user._pbms_is_ceo()
         is_chief = user._pbms_is_respective_chief()
-        is_ho = user._pbms_is_ho_reviewer()
-        is_dist = user._pbms_is_district_reviewer()
+        is_ho_user = user._pbms_is_ho_reviewer()
+        is_dist_user = user._pbms_is_district_reviewer()
         is_appr = user._pbms_is_sppmd_approver()
+        is_people_ops = user._pbms_is_people_operations()
         child_ou_ids = set(user._pbms_child_operating_unit_ids()) if is_chief else set()
-        is_sourcing_privileged_base = (
-            is_ps or is_cpco or is_bhc or is_ceo or is_ho or is_admin
-        )
+        is_sourcing_privileged_base = user._pbms_can_view_sourcing()
 
         # Pre-fetch sibling resource plans across the batch in a single indexed query to eliminate N*3 searches
-        ou_ids = [ou.id for ou in self.mapped("org_unit_id") if ou]
-        cycle_ids = [cy.id for cy in self.mapped("cycle_id") if cy]
+        ou_ids = [ou.id for ou in self.sudo().mapped("org_unit_id") if ou]
+        cycle_ids = [cy.id for cy in self.sudo().mapped("cycle_id") if cy]
         sibling_plans_map = {}
         if ou_ids and cycle_ids:
-            sibling_plans = self.search([
+            sibling_plans = self.sudo().search([
                 ("org_unit_id", "in", ou_ids),
                 ("cycle_id", "in", cycle_ids),
                 ("category", "in", ("general_expense", "fixed_asset", "manpower")),
@@ -3084,7 +4253,7 @@ class PbmsPlanningCategory(models.Model):
             rec.can_sppmd_review = rec._pbms_can_sppmd_review_plan()
             rec.can_use_reviewer_wizards = rec._pbms_can_use_reviewer_wizards()
             rec.can_committee_review = (
-                rec.category in ("manpower", "general_expense", "fixed_asset")
+                rec.category in ("manpower", "fixed_asset", "initiative_budget")
                 and rec.state == "committee_review"
                 and (is_bhc or is_admin)
             )
@@ -3098,49 +4267,66 @@ class PbmsPlanningCategory(models.Model):
                 and rec.state == "ceo_approval"
                 and (is_ceo or is_admin)
             )
-            rec.can_chief_review = (
-                rec.category == "manpower"
-                and rec.state in ("chief_review", "district_approved", "district_endorsed")
-                and (
+            is_ho = rec._is_head_office_plan() or rec.org_unit_type == "head_office"
+            is_dist = rec._is_district_plan() or rec.org_unit_type in ("district_office", "regional_office")
+
+            if (
+                rec.state == "chief_review"
+                and rec.category in ("manpower", "general_expense", "fixed_asset", "credit_portfolio", "initiative_budget", "loan_disbursement_collection", "loan_outstanding")
+            ):
+                is_self = rec._is_plan_self_submitted(user)
+                chief_user = rec.sudo()._get_plan_chief_user()
+                is_branch_plan = rec.org_unit_type in ("branch", "sub_branch", "service_center", "other") or (rec.org_unit_type not in ("head_office", "district_office"))
+                if is_branch_plan and rec.category == "manpower":
+                    is_designated_chief = bool(chief_user and chief_user.id == user.id) or is_ceo
+                else:
+                    is_designated_chief = (chief_user and chief_user.id == user.id) or not chief_user or is_ceo
+                rec.can_chief_review = (
                     is_admin
                     or (
-                        is_chief
-                        and (
-                            rec._is_child_operating_unit_plan()
-                            or (rec.org_unit_id and rec.org_unit_id.id in child_ou_ids)
-                        )
+                        (is_chief or is_ceo or rec._is_plan_manager_user(user))
+                        and is_designated_chief
+                        and not is_self
                     )
                 )
-            )
+            else:
+                rec.can_chief_review = False
+
+            if rec.category == "manpower":
+                is_manpower_applicable = True
+            elif rec.category:
+                is_manpower_applicable = False
+            else:
+                is_manpower_applicable = (
+                    getattr(rec, "enable_manpower", False)
+                    or bool(rec.line_ids.filtered(lambda l: l.line_type == "manpower"))
+                )
             rec.can_cpco_review = (
-                rec.category == "manpower"
+                is_manpower_applicable
                 and rec.state == "cpco_review"
                 and (is_cpco or is_admin)
             )
             rec.can_people_solutions_review = (
-                rec.category == "manpower"
+                is_manpower_applicable
                 and rec.state == "people_solutions_review"
                 and (is_ps or is_admin)
             )
             rec.can_ho_endorse = (
-                rec.category == "manpower"
+                is_manpower_applicable
                 and rec.state == "ho_endorse"
                 and (is_ho or rec._pbms_can_ho_review_plan() or is_admin)
             )
             rec.can_cpco_endorse = (
-                rec.category == "manpower"
+                is_manpower_applicable
                 and rec.state == "cpco_endorse"
                 and (is_cpco or is_admin)
             )
 
             # Sourcing fields visibility:
             # Sourcing fulfillment is made by People Solutions Directorate.
-            # Visible to: People Solutions Directorate, CPCO, Budget Hiring Committee, CEO, HO Functional Reviewer, Admin.
-            # Hidden from: branch/HO user, district reviewer, respective chief.
-            is_sourcing_privileged = (
-                is_sourcing_privileged_base
-                or rec._pbms_can_ho_review_plan()
-            )
+            # Visible to: People Solutions Directorate, CPCO, Budget Hiring Committee, CEO, Admin, People Solutions Management Directorate,
+            # and Head Office Functional Reviewer during endorsement into CPCO (ho_endorse, cpco_endorse, approved), NOT during request.
+            is_sourcing_privileged = is_sourcing_privileged_base
             is_editable_state = (not rec.state) or (rec.state in PBMS_BRANCH_EDITABLE_STATES)
             is_ps_actor = (
                 is_ps
@@ -3150,23 +4336,19 @@ class PbmsPlanningCategory(models.Model):
                     or ("people" in (rec.org_unit_id.name or "").lower() and "solution" in (rec.org_unit_id.name or "").lower())
                 ))
             )
-            rec.can_view_sourcing_fields = (
-                rec.category == "manpower"
-                and is_sourcing_privileged
-                and (
-                    rec.state in (
-                        "people_solutions_review",
-                        "cpco_review",
-                        "committee_review",
-                        "hr_fulfillment",
-                        "ceo_approval",
-                        "ho_endorse",
-                        "cpco_endorse",
-                        "approved",
-                    )
-                    or (is_editable_state and is_ps_actor)
-                )
-            )
+            is_sourcing_core = is_ps or is_cpco or is_bhc or is_ceo or is_people_ops or is_admin
+            is_ho_reviewer_only = is_ho_user and not is_sourcing_core
+
+            if is_manpower_applicable:
+                if is_sourcing_core:
+                    # People Solutions Directorate, CPCO, BHC, CEO, People Operations, and Admin can ALWAYS view sourcing fields
+                    rec.can_view_sourcing_fields = True
+                elif is_ho_reviewer_only:
+                    rec.can_view_sourcing_fields = rec.state in ("ho_endorse", "cpco_endorse", "approved")
+                else:
+                    rec.can_view_sourcing_fields = False
+            else:
+                rec.can_view_sourcing_fields = False
 
             # Sourcing fields editability:
             # - Sourcing fulfillment is made by People Solutions Directorate in people_solutions_review, OR during draft/creation of its own plan!
@@ -3174,7 +4356,7 @@ class PbmsPlanningCategory(models.Model):
             # - Budget Hiring Committee in committee_review.
             # - CEO in ceo_approval.
             rec.can_edit_sourcing_fields = (
-                rec.category == "manpower"
+                is_manpower_applicable
                 and (
                     (rec.state == "people_solutions_review" and (is_ps or is_admin))
                     or (is_editable_state and is_ps_actor)
@@ -3197,6 +4379,8 @@ class PbmsPlanningCategory(models.Model):
             # District Reviewer and Head Office Reviewer reviewing child unit plans CANNOT add lines (they can only edit lines created by branch)
             elif is_dist or is_ho:
                 rec.can_add_lines = False
+            elif rec.can_chief_review and rec.state == "chief_review":
+                rec.can_add_lines = rec._is_own_operating_unit_plan()
             elif is_appr and not is_admin:
                 rec.can_add_lines = False
             else:
@@ -3249,66 +4433,48 @@ class PbmsPlanningCategory(models.Model):
     @api.depends("org_unit_id", "org_unit_id.work_unit_type", "category", "org_unit_type", "is_planning_request")
     def _compute_eligibility(self):
         Config = self.env["pbms.planning.config"]
-        MOBILIZATION_CATS = {"deposit", "customer_base", "fx", "digital_banking"}
-        RESOURCE_CATS = {"manpower", "general_expense", "fixed_asset"}
 
         CATEGORY_TOGGLE_MAP = [
             ("deposit", "enable_deposit"),
             ("customer_base", "enable_customer_base"),
             ("fx", "enable_fx"),
             ("digital_banking", "enable_digital_banking"),
+            ("loan_disbursement_collection", "enable_loan_disbursement_collection"),
+            ("loan_outstanding", "enable_loan_outstanding"),
             ("general_expense", "enable_expense"),
             ("manpower", "enable_manpower"),
             ("fixed_asset", "enable_fixed_asset"),
+            ("credit_portfolio", "enable_credit_portfolio"),
+            ("initiative_budget", "enable_initiative_budget"),
         ]
 
         for rec in self:
             is_req = rec.is_planning_request or bool(self.env.context.get("is_planning_request"))
-            unit_type = rec.org_unit_type or (rec.org_unit_id.work_unit_type if rec.org_unit_id else False)
-            is_dist_or_ho = unit_type in ("district_office", "head_office")
+            ou = rec.org_unit_id or self.env.user.default_operating_unit_id
 
             if is_req:
-                # In Planning Request workspace:
-                # District Reviewer and Head Office operating units plan ONLY workforce, general expense, and fixed asset!
-                # Mobilization categories (deposit, customer base, FX, digital banking) are consolidated from branches,
-                # so they are never allowed or visible in the Planning Request tabs for district & HO units.
-                if is_dist_or_ho:
-                    rec.enable_deposit = False
-                    rec.enable_customer_base = False
-                    rec.enable_fx = False
-                    rec.enable_digital_banking = False
-                    if rec.org_unit_id and Config is not None:
-                        rec.enable_expense = Config.is_category_enabled("general_expense", rec.org_unit_id)
-                        rec.enable_manpower = Config.is_category_enabled("manpower", rec.org_unit_id)
-                        rec.enable_fixed_asset = Config.is_category_enabled("fixed_asset", rec.org_unit_id)
-                    else:
-                        rec.enable_expense = True
-                        rec.enable_manpower = True
-                        rec.enable_fixed_asset = True
-                elif rec.org_unit_id:
+                # Unified Planning Request across any work unit (including People Solutions Directorate):
+                # Display all planning categories enabled in Planning Configuration for this work unit in tabs!
+                if ou:
                     for cat, toggle in CATEGORY_TOGGLE_MAP:
-                        rec[toggle] = Config.is_category_enabled(cat, rec.org_unit_id)
+                        rec[toggle] = Config.is_category_enabled(cat, ou)
                 else:
                     for _cat, toggle in CATEGORY_TOGGLE_MAP:
                         rec[toggle] = True
-
             elif rec.category:
-                # Dedicated category card in Planning Categories:
-                # Mobilization categories for District Office and Head Office are consolidated overview cards,
-                # so they COME IN PLANNING CATEGORIES WHETHER THEY ARE ENABLED IN PLANNING CONFIGURATION OR NOT!
-                if is_dist_or_ho and rec.category in MOBILIZATION_CATS:
-                    is_enabled = True
-                else:
-                    is_enabled = Config.is_category_enabled(rec.category, rec.org_unit_id) if (Config and rec.org_unit_id) else True
+                # Dedicated category card (e.g. Deposit Plan, Manpower Plan, Fixed Asset Plan, Expense Plan):
+                # ALWAYS display its own category tab so records are visible on form view!
                 for cat, toggle in CATEGORY_TOGGLE_MAP:
-                    rec[toggle] = (cat == rec.category) and is_enabled
-
-            elif rec.org_unit_id:
+                    if cat == rec.category:
+                        rec[toggle] = True
+                    else:
+                        rec[toggle] = False
+            elif ou:
                 for cat, toggle in CATEGORY_TOGGLE_MAP:
-                    rec[toggle] = Config.is_category_enabled(cat, rec.org_unit_id)
+                    rec[toggle] = Config.is_category_enabled(cat, ou)
             else:
-                for _cat, toggle in CATEGORY_TOGGLE_MAP:
-                    rec[toggle] = True
+                for cat, toggle in CATEGORY_TOGGLE_MAP:
+                    rec[toggle] = False
 
     @api.depends("org_unit_id", "org_unit_id.work_unit_type")
     def _compute_measurement_types(self):
@@ -3318,6 +4484,8 @@ class PbmsPlanningCategory(models.Model):
             rec.customer_base_measurement_type = Config.get_measurement_type("customer_base", org_unit=rec.org_unit_id)
             rec.fx_measurement_type = Config.get_measurement_type("fx", org_unit=rec.org_unit_id)
             rec.digital_banking_measurement_type = Config.get_measurement_type("digital_banking", org_unit=rec.org_unit_id)
+            rec.loan_disbursement_measurement_type = Config.get_measurement_type("loan_disbursement_collection", org_unit=rec.org_unit_id)
+            rec.loan_outstanding_measurement_type = Config.get_measurement_type("loan_outstanding", org_unit=rec.org_unit_id)
             rec.expense_measurement_type = Config.get_measurement_type("general_expense", org_unit=rec.org_unit_id)
             rec.manpower_measurement_type = Config.get_measurement_type("manpower", org_unit=rec.org_unit_id)
             rec.fixed_asset_measurement_type = Config.get_measurement_type("fixed_asset", org_unit=rec.org_unit_id)
@@ -3326,6 +4494,8 @@ class PbmsPlanningCategory(models.Model):
             rec.is_customer_base_monetary = (rec.customer_base_measurement_type == "monetary")
             rec.is_fx_monetary = (rec.fx_measurement_type == "monetary")
             rec.is_digital_banking_monetary = (rec.digital_banking_measurement_type == "monetary")
+            rec.is_loan_disbursement_monetary = (rec.loan_disbursement_measurement_type == "monetary")
+            rec.is_loan_outstanding_monetary = (rec.loan_outstanding_measurement_type == "monetary")
             rec.is_fixed_asset_monetary = (rec.fixed_asset_measurement_type == "monetary")
 
             if rec.category == "customer_base":
@@ -3334,6 +4504,10 @@ class PbmsPlanningCategory(models.Model):
                 rec.is_category_monetary = rec.is_digital_banking_monetary
             elif rec.category == "fx":
                 rec.is_category_monetary = rec.is_fx_monetary
+            elif rec.category == "loan_disbursement_collection":
+                rec.is_category_monetary = rec.is_loan_disbursement_monetary
+            elif rec.category == "loan_outstanding":
+                rec.is_category_monetary = rec.is_loan_outstanding_monetary
             else:
                 rec.is_category_monetary = True
 
@@ -3392,9 +4566,13 @@ class PbmsPlanningCategory(models.Model):
             ("customer_base", "Customer Base"),
             ("fx", "FX Mobilization"),
             ("digital_banking", "Digital Banking"),
+            ("loan_disbursement_collection", "Loan Disbursement & Collection"),
+            ("loan_outstanding", "Loan & Advances Outstanding"),
             ("general_expense", "General Expense"),
             ("manpower", "work Force"),
             ("fixed_asset", "Fixed Asset Requirement"),
+            ("credit_portfolio", "Credit Portfolio (BB-APF-15)"),
+            ("initiative_budget", "Initiative Budget"),
         ],
         string="Planning Category",
         compute="_compute_category",
@@ -3405,10 +4583,10 @@ class PbmsPlanningCategory(models.Model):
         help="The planning category this line belongs to.",
     )
 
-    @api.depends("line_ids.line_type", "manpower_line_ids", "deposit_line_ids", "customer_base_line_ids", "fx_line_ids", "digital_banking_line_ids", "expense_line_ids", "fixed_asset_line_ids", "org_unit_id")
+    @api.depends("line_ids.line_type", "org_unit_id")
     def _compute_category(self):
         Config = self.env.get("pbms.planning.config")
-        MOBILIZATION_CATS = {"deposit", "customer_base", "fx", "digital_banking"}
+        MOBILIZATION_CATS = {"deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding", "credit_portfolio", "initiative_budget"}
         RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
         for rec in self:
             unit_type = rec.org_unit_type or (rec.org_unit_id.work_unit_type if rec.org_unit_id else False)
@@ -3519,9 +4697,15 @@ class PbmsPlanningCategory(models.Model):
             # If re-aligning lines leaves behind an empty plan whose category is disabled in config, unlink or archive it
             target_plans.invalidate_recordset(["line_ids"])
             Config = self.env.get("pbms.planning.config")
+            MOBILIZATION_CATS = {"deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding"}
             for p in target_plans:
+                unit_type = p.org_unit_type or (p.org_unit_id.work_unit_type if p.org_unit_id else False)
+                is_dist_or_ho = unit_type in ("district_office", "head_office", "regional_office")
+                if is_dist_or_ho and p.category in MOBILIZATION_CATS:
+                    continue
                 p_lines = p.line_ids
-                if not p_lines and p.org_unit_id and p.category:
+                has_header_data = any(getattr(p, m, 0.0) for m in PBMS_MONTH_FIELDS) or ((getattr(p, "annual_total", 0.0) or 0.0) > 0.0)
+                if not p_lines and not has_header_data and p.org_unit_id and p.category:
                     if Config is not None and not Config.is_category_enabled(p.category, p.org_unit_id) and p.state in ("draft", "returned", "info_requested"):
                         try:
                             p.with_context(bypass_plan_lock=True).unlink()
@@ -3675,7 +4859,7 @@ class PbmsPlanningCategory(models.Model):
         compute="_compute_category_specific_fields", store=True, readonly=False,
     )
     plan_category = fields.Selection(
-        [("amount", "Amount")],
+        [("amount", "Amount"), ("account", "Number of Accounts")],
         string="Plan Basis", index=True,
         compute="_compute_category_specific_fields", store=True, readonly=False,
     )
@@ -3701,13 +4885,6 @@ class PbmsPlanningCategory(models.Model):
 
     @api.depends(
         "category",
-        "deposit_line_ids.deposit_type_id",
-        "customer_base_line_ids.deposit_type_id",
-        "customer_base_line_ids.base_type",
-        "fx_line_ids.fx_source_type",
-        "digital_banking_line_ids.channel_id",
-        "expense_line_ids.expense_account_id",
-        "manpower_line_ids.justification_category_id",
         "line_ids.deposit_type_id",
         "line_ids.base_type",
         "line_ids.fx_source_type",
@@ -3855,7 +5032,6 @@ class PbmsPlanningCategory(models.Model):
     def _compute_outstanding_balance(self):
         for rec in self:
             if rec.line_ids and rec.category not in ('manpower', 'fixed_asset'):
-                rec.opening_balance = sum(rec.line_ids.mapped('opening_balance'))
                 rec.outstanding_balance_end_period = sum(rec.line_ids.mapped('outstanding_year_end'))
             else:
                 balance = rec.opening_balance or 0.0
@@ -3932,6 +5108,117 @@ class PbmsPlanningCategory(models.Model):
         domain=[("line_type", "=", "fixed_asset")],
         context={"default_line_type": "fixed_asset"},
     )
+    loan_disbursement_line_ids = fields.One2many(
+        "pbms.plan.category.line", "plan_id",
+        string="Loan Disbursement & Collection Lines",
+        domain=[("line_type", "=", "loan_disbursement_collection")],
+        context={"default_line_type": "loan_disbursement_collection"},
+    )
+    loan_outstanding_line_ids = fields.One2many(
+        "pbms.plan.category.line", "plan_id",
+        string="Loan Outstanding Lines",
+        domain=[("line_type", "=", "loan_outstanding")],
+        context={"default_line_type": "loan_outstanding"},
+    )
+    credit_portfolio_line_ids = fields.One2many(
+        "pbms.plan.category.line", "plan_id",
+        string="Credit Portfolio Lines",
+        domain=[("line_type", "=", "credit_portfolio")],
+        context={"default_line_type": "credit_portfolio"},
+    )
+    initiative_budget_line_ids = fields.One2many(
+        "pbms.plan.category.line", "plan_id",
+        string="Initiative Budget Lines",
+        domain=[("line_type", "=", "initiative_budget")],
+        context={"default_line_type": "initiative_budget"},
+    )
+
+    # Branch records for District Reviewer and Head Office Functional Reviewer
+    branch_customer_base_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Customer Base Records",
+    )
+    branch_deposit_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Deposit Records",
+    )
+    branch_fx_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch FX Records",
+    )
+    branch_digital_banking_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Digital Banking Records",
+    )
+    branch_loan_disbursement_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Loan Disbursement Records",
+    )
+    branch_loan_outstanding_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Loan Outstanding Records",
+    )
+    branch_expense_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Expense Records",
+    )
+    branch_fixed_asset_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Fixed Asset Records",
+    )
+    branch_manpower_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Manpower Records",
+    )
+    branch_credit_portfolio_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Credit Portfolio Records",
+    )
+    branch_initiative_budget_line_ids = fields.Many2many(
+        "pbms.plan.category.line",
+        compute="_compute_branch_category_lines",
+        string="Branch Initiative Budget Records",
+    )
+
+    def _compute_branch_category_lines(self):
+        for rec in self:
+            if rec.org_unit_type == "district_office":
+                dist_id = rec.org_unit_id.id
+                domain = [
+                    ("cycle_id", "=", rec.cycle_id.id),
+                    ("district_id", "=", dist_id),
+                    ("org_unit_type", "not in", ("district_office", "head_office")),
+                ]
+            elif rec.org_unit_type == "head_office":
+                domain = [
+                    ("cycle_id", "=", rec.cycle_id.id),
+                    ("org_unit_type", "not in", ("district_office", "head_office")),
+                ]
+            else:
+                domain = [("id", "=", False)]
+
+            all_lines = self.env["pbms.plan.category.line"].search(domain) if domain[0][0] != "id" else self.env["pbms.plan.category.line"]
+            rec.branch_customer_base_line_ids = all_lines.filtered(lambda l: l.line_type == "customer_base")
+            rec.branch_deposit_line_ids = all_lines.filtered(lambda l: l.line_type == "deposit")
+            rec.branch_fx_line_ids = all_lines.filtered(lambda l: l.line_type == "fx")
+            rec.branch_digital_banking_line_ids = all_lines.filtered(lambda l: l.line_type == "digital_banking")
+            rec.branch_loan_disbursement_line_ids = all_lines.filtered(lambda l: l.line_type == "loan_disbursement_collection")
+            rec.branch_loan_outstanding_line_ids = all_lines.filtered(lambda l: l.line_type == "loan_outstanding")
+            rec.branch_expense_line_ids = all_lines.filtered(lambda l: l.line_type == "general_expense")
+            rec.branch_fixed_asset_line_ids = all_lines.filtered(lambda l: l.line_type == "fixed_asset")
+            rec.branch_manpower_line_ids = all_lines.filtered(lambda l: l.line_type == "manpower")
+            rec.branch_credit_portfolio_line_ids = all_lines.filtered(lambda l: l.line_type == "credit_portfolio")
+            rec.branch_initiative_budget_line_ids = all_lines.filtered(lambda l: l.line_type == "initiative_budget")
 
     # Dynamic dropdown exclusion fields (evaluated real-time on client before saving)
     available_deposit_type_ids = fields.Many2many(
@@ -4053,12 +5340,11 @@ class PbmsPlanningCategory(models.Model):
                 plan.available_job_ids = self.env["hr.job"].search([("active", "=", True)])
 
     @api.depends(
-        "deposit_line_ids.deposit_type_id",
-        "customer_base_line_ids.deposit_type_id",
-        "digital_banking_line_ids.channel_id",
-        "fx_line_ids.fx_source_type",
-        "expense_line_ids.expense_account_id",
-        "fixed_asset_line_ids.category_id",
+        "line_ids.deposit_type_id",
+        "line_ids.channel_id",
+        "line_ids.fx_source_type",
+        "line_ids.expense_account_id",
+        "line_ids.category_id",
     )
     def _compute_used_dropdown_options(self):
         for plan in self:
@@ -4164,6 +5450,24 @@ class PbmsPlanningCategory(models.Model):
     digital_banking_q3_total = fields.Float(compute="_compute_category_summaries", store=True)
     digital_banking_q4_total = fields.Float(compute="_compute_category_summaries", store=True)
 
+    loan_disbursement_line_count = fields.Integer(compute="_compute_category_summaries", store=True)
+    loan_disbursement_annual_total = fields.Float(compute="_compute_category_summaries", store=True)
+    loan_disbursement_proposed_total = fields.Float(compute="_compute_category_summaries", store=True, string="Proposed Loan Disbursement Target")
+    loan_disbursement_approved_total = fields.Float(compute="_compute_category_summaries", store=True, string="Approved Loan Disbursement Target")
+    loan_disbursement_q1_total = fields.Float(compute="_compute_category_summaries", store=True)
+    loan_disbursement_q2_total = fields.Float(compute="_compute_category_summaries", store=True)
+    loan_disbursement_q3_total = fields.Float(compute="_compute_category_summaries", store=True)
+    loan_disbursement_q4_total = fields.Float(compute="_compute_category_summaries", store=True)
+
+    loan_outstanding_line_count = fields.Integer(compute="_compute_category_summaries", store=True)
+    loan_outstanding_annual_total = fields.Float(compute="_compute_category_summaries", store=True)
+    loan_outstanding_proposed_total = fields.Float(compute="_compute_category_summaries", store=True, string="Proposed Loan Outstanding Target")
+    loan_outstanding_approved_total = fields.Float(compute="_compute_category_summaries", store=True, string="Approved Loan Outstanding Target")
+    loan_outstanding_q1_total = fields.Float(compute="_compute_category_summaries", store=True)
+    loan_outstanding_q2_total = fields.Float(compute="_compute_category_summaries", store=True)
+    loan_outstanding_q3_total = fields.Float(compute="_compute_category_summaries", store=True)
+    loan_outstanding_q4_total = fields.Float(compute="_compute_category_summaries", store=True)
+
     expense_line_count = fields.Integer(compute="_compute_category_summaries", store=True)
     expense_annual_total = fields.Float(compute="_compute_category_summaries", store=True)
     expense_proposed_total = fields.Float(compute="_compute_category_summaries", store=True, string="Proposed Expense Budget")
@@ -4187,6 +5491,74 @@ class PbmsPlanningCategory(models.Model):
     fixed_asset_total_quantity = fields.Integer(compute="_compute_category_summaries", store=True, string="Total Fixed Asset Quantity")
     fixed_asset_approved_total = fields.Monetary(compute="_compute_category_summaries", store=True, string="Total Approved Fixed Asset Cost", currency_field="currency_id")
     fixed_asset_approved_quantity = fields.Integer(compute="_compute_category_summaries", store=True, string="Total Approved Fixed Asset Items")
+
+    proposed_annual_total = fields.Float(
+        string="Proposed Plan",
+        compute="_compute_plan_proposed_approved_totals",
+        store=True,
+    )
+    approved_annual_total = fields.Float(
+        string="Approved Target",
+        compute="_compute_plan_proposed_approved_totals",
+        store=True,
+    )
+    variance_amount = fields.Float(
+        string="Variance (+/-)",
+        compute="_compute_plan_proposed_approved_totals",
+        store=True,
+    )
+    variance_percentage = fields.Float(
+        string="Var %",
+        compute="_compute_plan_proposed_approved_totals",
+        store=True,
+        digits=(16, 2),
+    )
+
+    @api.depends(
+        "category", "annual_total",
+        "deposit_proposed_total", "deposit_approved_total",
+        "customer_base_proposed_total", "customer_base_approved_total",
+        "fx_proposed_total", "fx_approved_total",
+        "digital_banking_proposed_total", "digital_banking_approved_total",
+        "expense_proposed_total", "expense_approved_total",
+        "manpower_total_headcount", "manpower_approved_headcount",
+        "fixed_asset_total_quantity", "fixed_asset_approved_total",
+    )
+    def _compute_plan_proposed_approved_totals(self):
+        for rec in self:
+            cat = rec.category
+            if cat == "deposit":
+                rec.proposed_annual_total = rec.deposit_proposed_total or rec.annual_total or 0.0
+                rec.approved_annual_total = rec.deposit_approved_total or 0.0
+            elif cat == "customer_base":
+                rec.proposed_annual_total = rec.customer_base_proposed_total or rec.annual_total or 0.0
+                rec.approved_annual_total = rec.customer_base_approved_total or 0.0
+            elif cat == "fx":
+                rec.proposed_annual_total = rec.fx_proposed_total or rec.annual_total or 0.0
+                rec.approved_annual_total = rec.fx_approved_total or 0.0
+            elif cat == "digital_banking":
+                rec.proposed_annual_total = rec.digital_banking_proposed_total or rec.annual_total or 0.0
+                rec.approved_annual_total = rec.digital_banking_approved_total or 0.0
+            elif cat == "general_expense":
+                rec.proposed_annual_total = rec.expense_proposed_total or rec.annual_total or 0.0
+                rec.approved_annual_total = rec.expense_approved_total or 0.0
+            elif cat == "manpower":
+                rec.proposed_annual_total = float(rec.manpower_total_headcount or 0.0)
+                rec.approved_annual_total = float(rec.manpower_approved_headcount or 0.0)
+            elif cat == "fixed_asset":
+                rec.proposed_annual_total = float(rec.fixed_asset_total_quantity or 0.0)
+                rec.approved_annual_total = float(rec.fixed_asset_approved_total or 0.0)
+            else:
+                rec.proposed_annual_total = rec.annual_total or 0.0
+                rec.approved_annual_total = 0.0
+
+            active_tot = rec.annual_total or 0.0
+            appr = rec.approved_annual_total or 0.0
+            rec.variance_amount = active_tot - appr if appr else 0.0
+            if appr and abs(appr) > 1e-6:
+                rec.variance_percentage = round(((active_tot - appr) / appr) * 100.0, 2)
+            else:
+                rec.variance_percentage = 0.0
 
     # Fixed Asset total - using fa_annual_total_cost instead of estimated_total_price
     total_estimated_amount = fields.Monetary(
@@ -4297,6 +5669,30 @@ class PbmsPlanningCategory(models.Model):
     )
 
     # Fixed Asset quarter totals
+    fa_q1 = fields.Integer(
+        string="FA Q1",
+        compute="_compute_fa_quarter_quantities",
+        store=True,
+        help="Total Q1 fixed asset quantity",
+    )
+    fa_q2 = fields.Integer(
+        string="FA Q2",
+        compute="_compute_fa_quarter_quantities",
+        store=True,
+        help="Total Q2 fixed asset quantity",
+    )
+    fa_q3 = fields.Integer(
+        string="FA Q3 ",
+        compute="_compute_fa_quarter_quantities",
+        store=True,
+        help="Total Q3 fixed asset quantity",
+    )
+    fa_q4 = fields.Integer(
+        string="FA Q4 ",
+        compute="_compute_fa_quarter_quantities",
+        store=True,
+        help="Total Q4 fixed asset quantity",
+    )
     fa_q1_total_cost = fields.Monetary(
         compute="_compute_fa_quarter_totals",
         store=True,
@@ -4320,6 +5716,25 @@ class PbmsPlanningCategory(models.Model):
         store=True,
         currency_field="currency_id",
         help="Total Q4 fixed asset cost",
+    )
+
+    # Universal quarterly rollup (same 4 fields for EVERY planning category).
+    # Each record shows the Q1-Q4 totals of its OWN category only.
+    rollup_q1_total = fields.Float(
+        string="QI Total", compute="_compute_rollup_quarter_totals", store=True,
+        help="Q1 total of this plan's own planning category",
+    )
+    rollup_q2_total = fields.Float(
+        string="QII Total", compute="_compute_rollup_quarter_totals", store=True,
+        help="Q2 total of this plan's own planning category",
+    )
+    rollup_q3_total = fields.Float(
+        string="QIII Total", compute="_compute_rollup_quarter_totals", store=True,
+        help="Q3 total of this plan's own planning category",
+    )
+    rollup_q4_total = fields.Float(
+        string="QIV Total", compute="_compute_rollup_quarter_totals", store=True,
+        help="Q4 total of this plan's own planning category",
     )
 
     # ---- Workspace back-links ----
@@ -4349,9 +5764,13 @@ class PbmsPlanningCategory(models.Model):
         "customer_base": "customer_base_line_ids",
         "fx": "fx_line_ids",
         "digital_banking": "digital_banking_line_ids",
+        "loan_disbursement_collection": "loan_disbursement_line_ids",
+        "loan_outstanding": "loan_outstanding_line_ids",
         "general_expense": "expense_line_ids",
         "manpower": "manpower_line_ids",
         "fixed_asset": "fixed_asset_line_ids",
+        "credit_portfolio": "credit_portfolio_line_ids",
+        "initiative_budget": "initiative_budget_line_ids",
     }
 
     currency_id = fields.Many2one(
@@ -4436,10 +5855,10 @@ class PbmsPlanningCategory(models.Model):
     display_quarter = fields.Selection(
         [
             ('all', 'All Quarters'),
-            ('q1', 'Q1 (Jul - Sep)'),
-            ('q2', 'Q2 (Oct - Dec)'),
-            ('q3', 'Q3 (Jan - Mar)'),
-            ('q4', 'Q4 (Apr - Jun)'),
+            ('q1', 'QI'),
+            ('q2', 'QII'),
+            ('q3', 'QIII'),
+            ('q4', 'QIV'),
         ],
         string="Display Quarter",
         default='all',
@@ -4447,22 +5866,22 @@ class PbmsPlanningCategory(models.Model):
 
     quarter1_total = fields.Float(
         compute='_compute_totals',
-        string="Q1 Total",
+        string="QI Total",
         store=True
     )
     quarter2_total = fields.Float(
         compute='_compute_totals',
-        string="Q2 Total",
+        string="QII Total",
         store=True
     )
     quarter3_total = fields.Float(
         compute='_compute_totals',
-        string="Q3 Total",
+        string="QIII Total",
         store=True
     )
     quarter4_total = fields.Float(
         compute='_compute_totals',
-        string="Q4 Total",
+        string="QIV Total",
         store=True
     )
     annual_total = fields.Float(
@@ -4484,13 +5903,39 @@ class PbmsPlanningCategory(models.Model):
         'line_ids.m01', 'line_ids.m02', 'line_ids.m03', 'line_ids.m04',
         'line_ids.m05', 'line_ids.m06', 'line_ids.m07', 'line_ids.m08',
         'line_ids.m09', 'line_ids.m10', 'line_ids.m11', 'line_ids.m12',
+        'line_ids.hc_m01', 'line_ids.hc_m02', 'line_ids.hc_m03', 'line_ids.hc_m04',
+        'line_ids.hc_m05', 'line_ids.hc_m06', 'line_ids.hc_m07', 'line_ids.hc_m08',
+        'line_ids.hc_m09', 'line_ids.hc_m10', 'line_ids.hc_m11', 'line_ids.hc_m12',
+        'deposit_line_ids.annual_total', 'deposit_line_ids.quarter1_total', 'deposit_line_ids.quarter2_total', 'deposit_line_ids.quarter3_total', 'deposit_line_ids.quarter4_total',
+        'deposit_line_ids.m01', 'deposit_line_ids.m02', 'deposit_line_ids.m03', 'deposit_line_ids.m04', 'deposit_line_ids.m05', 'deposit_line_ids.m06', 'deposit_line_ids.m07', 'deposit_line_ids.m08', 'deposit_line_ids.m09', 'deposit_line_ids.m10', 'deposit_line_ids.m11', 'deposit_line_ids.m12',
+        'customer_base_line_ids.annual_total', 'customer_base_line_ids.quarter1_total', 'customer_base_line_ids.quarter2_total', 'customer_base_line_ids.quarter3_total', 'customer_base_line_ids.quarter4_total',
+        'customer_base_line_ids.m01', 'customer_base_line_ids.m02', 'customer_base_line_ids.m03', 'customer_base_line_ids.m04', 'customer_base_line_ids.m05', 'customer_base_line_ids.m06', 'customer_base_line_ids.m07', 'customer_base_line_ids.m08', 'customer_base_line_ids.m09', 'customer_base_line_ids.m10', 'customer_base_line_ids.m11', 'customer_base_line_ids.m12',
+        'fx_line_ids.annual_total', 'fx_line_ids.quarter1_total', 'fx_line_ids.quarter2_total', 'fx_line_ids.quarter3_total', 'fx_line_ids.quarter4_total',
+        'digital_banking_line_ids.annual_total', 'digital_banking_line_ids.quarter1_total', 'digital_banking_line_ids.quarter2_total', 'digital_banking_line_ids.quarter3_total', 'digital_banking_line_ids.quarter4_total',
+        'expense_line_ids.annual_total', 'expense_line_ids.quarter1_total', 'expense_line_ids.quarter2_total', 'expense_line_ids.quarter3_total', 'expense_line_ids.quarter4_total',
+        'loan_disbursement_line_ids.annual_total', 'loan_disbursement_line_ids.quarter1_total', 'loan_disbursement_line_ids.quarter2_total', 'loan_disbursement_line_ids.quarter3_total', 'loan_disbursement_line_ids.quarter4_total',
+        'loan_outstanding_line_ids.annual_total', 'loan_outstanding_line_ids.quarter1_total', 'loan_outstanding_line_ids.quarter2_total', 'loan_outstanding_line_ids.quarter3_total', 'loan_outstanding_line_ids.quarter4_total',
+        'credit_portfolio_line_ids.annual_total', 'credit_portfolio_line_ids.quarter1_total', 'credit_portfolio_line_ids.quarter2_total', 'credit_portfolio_line_ids.quarter3_total', 'credit_portfolio_line_ids.quarter4_total',
+        'credit_portfolio_line_ids.m01', 'credit_portfolio_line_ids.m02', 'credit_portfolio_line_ids.m03', 'credit_portfolio_line_ids.m04', 'credit_portfolio_line_ids.m05', 'credit_portfolio_line_ids.m06', 'credit_portfolio_line_ids.m07', 'credit_portfolio_line_ids.m08', 'credit_portfolio_line_ids.m09', 'credit_portfolio_line_ids.m10', 'credit_portfolio_line_ids.m11', 'credit_portfolio_line_ids.m12',
+        'initiative_budget_line_ids.annual_total', 'initiative_budget_line_ids.quarter1_total', 'initiative_budget_line_ids.quarter2_total', 'initiative_budget_line_ids.quarter3_total', 'initiative_budget_line_ids.quarter4_total',
+        'initiative_budget_line_ids.initiative_cost',
+        'manpower_line_ids.annual_total', 'manpower_line_ids.quantity',
+        'manpower_line_ids.quarter1_total', 'manpower_line_ids.quarter2_total',
+        'manpower_line_ids.quarter3_total', 'manpower_line_ids.quarter4_total',
+        'manpower_line_ids.m01', 'manpower_line_ids.m02', 'manpower_line_ids.m03',
+        'manpower_line_ids.m04', 'manpower_line_ids.m05', 'manpower_line_ids.m06',
+        'manpower_line_ids.m07', 'manpower_line_ids.m08', 'manpower_line_ids.m09',
+        'manpower_line_ids.m10', 'manpower_line_ids.m11', 'manpower_line_ids.m12',
+        'manpower_line_ids.annual_total_cost',
         'm01', 'm02', 'm03', 'm04', 'm05', 'm06',
         'm07', 'm08', 'm09', 'm10', 'm11', 'm12'
     )
     def _compute_totals(self):
-        for rec in self:
+        for rec in self.with_context(in_distribute_plan_sync=True):
             target_cat = rec.category or (rec.line_ids[0].line_type if rec.line_ids else "deposit")
             cat_lines = rec.line_ids.filtered(lambda l: l.line_type == target_cat) if rec.line_ids else rec.env["pbms.plan.category.line"]
+            if target_cat == "manpower" and rec.manpower_line_ids:
+                cat_lines = rec.manpower_line_ids
             if not cat_lines and rec.org_unit_id and rec.cycle_id:
                 cat_lines = self.env["pbms.plan.category.line"].search([
                     ("plan_id.org_unit_id", "=", rec.org_unit_id.id),
@@ -4500,17 +5945,26 @@ class PbmsPlanningCategory(models.Model):
                 ])
 
             if target_cat == "manpower":
-                rec.annual_total = sum(cat_lines.mapped("annual_total_cost"))
-                rec.quarter1_total = sum(cat_lines.mapped("q1_cost"))
-                rec.quarter2_total = sum(cat_lines.mapped("q2_cost"))
-                rec.quarter3_total = sum(cat_lines.mapped("q3_cost"))
-                rec.quarter4_total = sum(cat_lines.mapped("q4_cost"))
+                rec.annual_total = sum(cat_lines.mapped("annual_total")) or sum(cat_lines.mapped("quantity")) or 0.0
+                rec.quarter1_total = sum(cat_lines.mapped("quarter1_total")) or 0.0
+                rec.quarter2_total = sum(cat_lines.mapped("quarter2_total")) or 0.0
+                rec.quarter3_total = sum(cat_lines.mapped("quarter3_total")) or 0.0
+                rec.quarter4_total = sum(cat_lines.mapped("quarter4_total")) or 0.0
+                for m in MONTH_FIELDS:
+                    setattr(rec, m, sum(
+                        (getattr(line, m) or getattr(line, f"hc_{m}") or 0.0)
+                        for line in cat_lines
+                    ))
             elif target_cat == "fixed_asset":
-                rec.annual_total = sum(cat_lines.mapped("fa_annual_total_cost"))
-                rec.quarter1_total = sum(cat_lines.mapped("fa_q1_cost"))
-                rec.quarter2_total = sum(cat_lines.mapped("fa_q2_cost"))
-                rec.quarter3_total = sum(cat_lines.mapped("fa_q3_cost"))
-                rec.quarter4_total = sum(cat_lines.mapped("fa_q4_cost"))
+                rec.annual_total = sum(cat_lines.mapped("quantity")) or 0.0
+                rec.quarter1_total = sum(cat_lines.mapped("fa_q1")) or 0.0
+                rec.quarter2_total = sum(cat_lines.mapped("fa_q2")) or 0.0
+                rec.quarter3_total = sum(cat_lines.mapped("fa_q3")) or 0.0
+                rec.quarter4_total = sum(cat_lines.mapped("fa_q4")) or 0.0
+                rec.fa_q1 = int(sum(cat_lines.mapped("fa_q1")) or 0)
+                rec.fa_q2 = int(sum(cat_lines.mapped("fa_q2")) or 0)
+                rec.fa_q3 = int(sum(cat_lines.mapped("fa_q3")) or 0)
+                rec.fa_q4 = int(sum(cat_lines.mapped("fa_q4")) or 0)
             elif cat_lines:
                 rec.annual_total = sum(cat_lines.mapped("annual_total"))
                 rec.quarter1_total = sum(cat_lines.mapped("quarter1_total"))
@@ -4529,7 +5983,9 @@ class PbmsPlanningCategory(models.Model):
 
     def _distribute_plan_annual_total_proportionally(self):
         """When annual_total on plan is edited, distribute proportionally to lines or months."""
-        for rec in self:
+        if self.env.context.get("in_distribute_plan_sync"):
+            return
+        for rec in self.with_context(in_distribute_plan_sync=True):
             if rec.category in ("manpower", "fixed_asset"):
                 continue
             cat_lines = rec.line_ids.filtered(lambda l: l.line_type == rec.category) if rec.line_ids else rec.env["pbms.plan.category.line"]
@@ -4546,23 +6002,102 @@ class PbmsPlanningCategory(models.Model):
                     for l in cat_lines:
                         l.annual_total = equal_share
                         l._distribute_annual_total_proportionally()
+                q1 = sum(cat_lines.mapped("quarter1_total"))
+                q2 = sum(cat_lines.mapped("quarter2_total"))
+                q3 = sum(cat_lines.mapped("quarter3_total"))
+                q4 = sum(cat_lines.mapped("quarter4_total"))
+                rec.quarter1_total = q1
+                rec.quarter2_total = q2
+                rec.quarter3_total = q3
+                rec.quarter4_total = q4
+                for m in MONTH_FIELDS:
+                    setattr(rec, m, sum(cat_lines.mapped(m)))
+                if rec.id:
+                    plan_vals = {
+                        "quarter1_total": q1,
+                        "quarter2_total": q2,
+                        "quarter3_total": q3,
+                        "quarter4_total": q4,
+                    }
+                    for m in MONTH_FIELDS:
+                        plan_vals[m] = sum(cat_lines.mapped(m))
+                    rec.with_context(in_distribute_plan_sync=True, skip_sync_lines=True, bypass_plan_lock=True).write(plan_vals)
             else:
                 old_months = [(getattr(rec, m) or 0.0) for m in MONTH_FIELDS]
                 old_sum = sum(old_months)
+                plan_vals = {}
                 if abs(old_sum) > 1e-6:
                     for i, m in enumerate(MONTH_FIELDS):
-                        setattr(rec, m, round(new_total * (old_months[i] / old_sum), 2))
+                        val = round(new_total * (old_months[i] / old_sum), 2)
+                        setattr(rec, m, val)
+                        plan_vals[m] = val
                 else:
                     for m in MONTH_FIELDS:
-                        setattr(rec, m, round(new_total / 12.0, 2))
-                rec._compute_totals()
+                        val = round(new_total / 12.0, 2)
+                        setattr(rec, m, val)
+                        plan_vals[m] = val
+                q1 = sum(getattr(rec, f) or 0.0 for f in QUARTERS["q1"])
+                q2 = sum(getattr(rec, f) or 0.0 for f in QUARTERS["q2"])
+                q3 = sum(getattr(rec, f) or 0.0 for f in QUARTERS["q3"])
+                q4 = sum(getattr(rec, f) or 0.0 for f in QUARTERS["q4"])
+                rec.quarter1_total = q1
+                rec.quarter2_total = q2
+                rec.quarter3_total = q3
+                rec.quarter4_total = q4
+                plan_vals["quarter1_total"] = q1
+                plan_vals["quarter2_total"] = q2
+                plan_vals["quarter3_total"] = q3
+                plan_vals["quarter4_total"] = q4
+                if rec.id:
+                    rec.with_context(in_distribute_plan_sync=True, skip_sync_lines=True, bypass_plan_lock=True).write(plan_vals)
 
     @api.onchange("annual_total")
     def _onchange_annual_total(self):
         self._distribute_plan_annual_total_proportionally()
 
     def _inverse_annual_total(self):
+        if self.env.context.get("in_distribute_plan_sync"):
+            return
         self._distribute_plan_annual_total_proportionally()
+
+    @api.onchange(
+        "m01", "m02", "m03", "m04", "m05", "m06",
+        "m07", "m08", "m09", "m10", "m11", "m12",
+        "opening_balance",
+    )
+    def _onchange_months_update_quarters(self):
+        for rec in self:
+            rec.quarter1_total = (rec.m01 or 0.0) + (rec.m02 or 0.0) + (rec.m03 or 0.0)
+            rec.quarter2_total = (rec.m04 or 0.0) + (rec.m05 or 0.0) + (rec.m06 or 0.0)
+            rec.quarter3_total = (rec.m07 or 0.0) + (rec.m08 or 0.0) + (rec.m09 or 0.0)
+            rec.quarter4_total = (rec.m10 or 0.0) + (rec.m11 or 0.0) + (rec.m12 or 0.0)
+            if rec.category not in ("manpower", "fixed_asset"):
+                rec.annual_total = rec.quarter1_total + rec.quarter2_total + rec.quarter3_total + rec.quarter4_total
+                rec.outstanding_balance_end_period = (rec.opening_balance or 0.0) + (rec.annual_total or 0.0)
+
+    @api.onchange("quarter1_total")
+    def _onchange_quarter1_total(self):
+        if self.quarter1_total and not (self.m01 or self.m02 or self.m03):
+            self.m03 = self.quarter1_total
+        self.quarter1_total = (self.m01 or 0.0) + (self.m02 or 0.0) + (self.m03 or 0.0)
+
+    @api.onchange("quarter2_total")
+    def _onchange_quarter2_total(self):
+        if self.quarter2_total and not (self.m04 or self.m05 or self.m06):
+            self.m06 = self.quarter2_total
+        self.quarter2_total = (self.m04 or 0.0) + (self.m05 or 0.0) + (self.m06 or 0.0)
+
+    @api.onchange("quarter3_total")
+    def _onchange_quarter3_total(self):
+        if self.quarter3_total and not (self.m07 or self.m08 or self.m09):
+            self.m09 = self.quarter3_total
+        self.quarter3_total = (self.m07 or 0.0) + (self.m08 or 0.0) + (self.m09 or 0.0)
+
+    @api.onchange("quarter4_total")
+    def _onchange_quarter4_total(self):
+        if self.quarter4_total and not (self.m10 or self.m11 or self.m12):
+            self.m12 = self.quarter4_total
+        self.quarter4_total = (self.m10 or 0.0) + (self.m11 or 0.0) + (self.m12 or 0.0)
 
 
     @api.depends("org_unit_id", "cycle_id", "request_number", "category", "plan_category_title")
@@ -4612,7 +6147,7 @@ class PbmsPlanningCategory(models.Model):
 
 
     # FIXED: Using fa_annual_total_cost instead of estimated_total_price
-    @api.depends("line_ids.fa_annual_total_cost", "line_ids.line_type", "category", "fixed_asset_line_ids.fa_annual_total_cost")
+    @api.depends("line_ids.fa_annual_total_cost", "line_ids.line_type", "category")
     def _compute_total_estimated_amount(self):
         for rec in self:
             if rec.category != "fixed_asset":
@@ -4621,7 +6156,7 @@ class PbmsPlanningCategory(models.Model):
                 fa_lines = rec.line_ids.filtered(lambda l: l.line_type == "fixed_asset") or rec.fixed_asset_line_ids
                 rec.total_estimated_amount = sum(fa_lines.mapped("fa_annual_total_cost"))
 
-    @api.depends("line_ids.annual_total_cost", "line_ids.line_type", "category", "manpower_line_ids.annual_total_cost")
+    @api.depends("line_ids.annual_total_cost", "line_ids.line_type", "manpower_line_ids.annual_total_cost", "category")
     def _compute_total_manpower_cost(self):
         for rec in self:
             if rec.category != "manpower" and not getattr(rec, "enable_manpower", False):
@@ -4629,6 +6164,14 @@ class PbmsPlanningCategory(models.Model):
             else:
                 mp_lines = rec.line_ids.filtered(lambda l: l.line_type == "manpower") or rec.manpower_line_ids
                 rec.total_manpower_cost = sum(mp_lines.mapped("annual_total_cost"))
+
+    @api.onchange("manpower_line_ids")
+    def _onchange_manpower_line_ids(self):
+        for rec in self:
+            if rec.category == "manpower" or getattr(rec, "enable_manpower", False):
+                rec._compute_totals()
+                rec._compute_total_manpower_cost()
+                rec._compute_operating_unit_manpower_budget()
 
     @api.depends(
         "existing_manpower_summary_ids.approved_plan_count",
@@ -4651,7 +6194,7 @@ class PbmsPlanningCategory(models.Model):
             if is_manpower_applicable:
                 rec.existing_total_authorized = sum(rec.existing_manpower_summary_ids.mapped("approved_plan_count"))
                 rec.existing_total_active = sum(rec.existing_manpower_summary_ids.mapped("active_employee_count"))
-                rec.existing_total_vacancies = sum(rec.existing_manpower_summary_ids.mapped("vacant_position_count"))
+                rec.existing_total_vacancies = max(0, sum(rec.existing_manpower_summary_ids.mapped("vacant_position_count")))
                 rec.existing_total_monthly_salary = sum(rec.existing_manpower_summary_ids.mapped("monthly_salary"))
                 annual = sum(rec.existing_manpower_summary_ids.mapped("annual_salary"))
                 rec.existing_total_annual_salary = annual
@@ -4814,7 +6357,7 @@ class PbmsPlanningCategory(models.Model):
                 active_count = len(job_emps)
                 ou_pos = p_info.get("ou_pos")
                 approved_count = p_info.get("approved_count", 0)
-                vacant_count = getattr(ou_pos, "vacant_position_count", False) if ou_pos else max(0, approved_count - active_count)
+                vacant_count = max(0, getattr(ou_pos, "vacant_position_count", 0) or 0) if ou_pos else max(0, approved_count - active_count)
                 if vacant_count is False:
                     vacant_count = max(0, approved_count - active_count)
 
@@ -4850,10 +6393,17 @@ class PbmsPlanningCategory(models.Model):
             "customer_base": "customer_base_line_ids",
             "fx": "fx_line_ids",
             "digital_banking": "digital_banking_line_ids",
+            "loan_disbursement_collection": "loan_disbursement_line_ids",
+            "loan_outstanding": "loan_outstanding_line_ids",
             "general_expense": "expense_line_ids",
             "manpower": "manpower_line_ids",
             "fixed_asset": "fixed_asset_line_ids",
+            "credit_portfolio": "credit_portfolio_line_ids",
+            "initiative_budget": "initiative_budget_line_ids",
         }
+        # Workforce and Fixed Asset cards only ever roll up their OWN category.
+        if self.category in ("manpower", "fixed_asset") and cat != self.category:
+            return self.env["pbms.plan.category.line"]
         fname = cat_field_map.get(cat)
         if fname and hasattr(self, fname):
             field_lines = getattr(self, fname)
@@ -4870,7 +6420,7 @@ class PbmsPlanningCategory(models.Model):
             real_cycle_id = self.cycle_id._origin.id if (hasattr(self.cycle_id, "_origin") and self.cycle_id._origin) else (self.cycle_id.id if isinstance(self.cycle_id.id, int) else False)
             if real_unit_id and real_cycle_id:
                 if self.org_unit_type == "district_office":
-                    if cat in ("deposit", "customer_base", "fx", "digital_banking"):
+                    if cat in ("deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding"):
                         return self.env["pbms.plan.category.line"].search([
                             "|",
                             ("district_id", "=", real_unit_id),
@@ -5014,6 +6564,41 @@ class PbmsPlanningCategory(models.Model):
             rec.fa_q3_total_cost = sum(fa_lines.mapped("fa_q3_cost"))
             rec.fa_q4_total_cost = sum(fa_lines.mapped("fa_q4_cost"))
 
+    @api.depends("line_ids.fa_q1", "line_ids.fa_q2", "line_ids.fa_q3", "line_ids.fa_q4", "line_ids.line_type")
+    def _compute_fa_quarter_quantities(self):
+        for rec in self:
+            fa_lines = rec._get_category_lines("fixed_asset")
+            rec.fa_q1 = int(sum(fa_lines.mapped("fa_q1")) or 0)
+            rec.fa_q2 = int(sum(fa_lines.mapped("fa_q2")) or 0)
+            rec.fa_q3 = int(sum(fa_lines.mapped("fa_q3")) or 0)
+            rec.fa_q4 = int(sum(fa_lines.mapped("fa_q4")) or 0)
+
+    _ROLLUP_QUARTER_FIELDS = {
+        "deposit": ("deposit_q1_total", "deposit_q2_total", "deposit_q3_total", "deposit_q4_total"),
+        "customer_base": ("customer_base_q1_total", "customer_base_q2_total", "customer_base_q3_total", "customer_base_q4_total"),
+        "fx": ("fx_q1_total", "fx_q2_total", "fx_q3_total", "fx_q4_total"),
+        "digital_banking": ("digital_banking_q1_total", "digital_banking_q2_total", "digital_banking_q3_total", "digital_banking_q4_total"),
+        "general_expense": ("expense_q1_total", "expense_q2_total", "expense_q3_total", "expense_q4_total"),
+        "manpower": ("q1_total_cost", "q2_total_cost", "q3_total_cost", "q4_total_cost"),
+        "fixed_asset": ("fa_q1_total_cost", "fa_q2_total_cost", "fa_q3_total_cost", "fa_q4_total_cost"),
+    }
+
+    @api.depends(
+        "category",
+        "deposit_q1_total", "deposit_q2_total", "deposit_q3_total", "deposit_q4_total",
+        "customer_base_q1_total", "customer_base_q2_total", "customer_base_q3_total", "customer_base_q4_total",
+        "fx_q1_total", "fx_q2_total", "fx_q3_total", "fx_q4_total",
+        "digital_banking_q1_total", "digital_banking_q2_total", "digital_banking_q3_total", "digital_banking_q4_total",
+        "expense_q1_total", "expense_q2_total", "expense_q3_total", "expense_q4_total",
+        "q1_total_cost", "q2_total_cost", "q3_total_cost", "q4_total_cost",
+        "fa_q1_total_cost", "fa_q2_total_cost", "fa_q3_total_cost", "fa_q4_total_cost",
+    )
+    def _compute_rollup_quarter_totals(self):
+        for rec in self:
+            names = self._ROLLUP_QUARTER_FIELDS.get(rec.category)
+            vals = [float(rec[n] or 0.0) for n in names] if names else [0.0] * 4
+            rec.rollup_q1_total, rec.rollup_q2_total, rec.rollup_q3_total, rec.rollup_q4_total = vals
+
     @api.depends("line_ids.is_cascaded")
     def _compute_has_cascaded_targets(self):
         for rec in self:
@@ -5073,70 +6658,228 @@ class PbmsPlanningCategory(models.Model):
         }
 
     @api.depends(
-        "line_ids",
+        "category",
         "line_ids.line_type",
         "line_ids.quantity",
-        "line_ids.fa_q1", "line_ids.fa_q2", "line_ids.fa_q3", "line_ids.fa_q4",
-        "line_ids.fa_annual_total_cost", "line_ids.approved_quantity", "line_ids.fa_approved_total_cost",
+        "line_ids.approved_quantity",
+        "line_ids.fa_approved_total_cost",
         "line_ids.annual_total",
         "line_ids.proposed_annual_total",
         "line_ids.approved_annual_total",
-        "line_ids.quarter1_total", "line_ids.quarter2_total",
-        "line_ids.quarter3_total", "line_ids.quarter4_total",
-        "line_ids.fulfillment_promotion", "line_ids.fulfillment_transfer",
-        "line_ids.fulfillment_lateral", "line_ids.fulfillment_external",
+        "line_ids.display_approved_annual_total",
+        "line_ids.quarter1_total",
+        "line_ids.quarter2_total",
+        "line_ids.quarter3_total",
+        "line_ids.quarter4_total",
+        "line_ids.fulfillment_promotion",
+        "line_ids.fulfillment_transfer",
+        "line_ids.fulfillment_lateral",
+        "line_ids.fulfillment_external",
     )
     def _compute_category_summaries(self):
         for rec in self:
             dep_lines = rec._get_category_lines("deposit")
-            rec.deposit_line_count = len(dep_lines)
-            rec.deposit_annual_total = sum(dep_lines.mapped("annual_total"))
-            rec.deposit_proposed_total = sum(dep_lines.mapped("proposed_annual_total"))
-            rec.deposit_approved_total = sum(dep_lines.mapped("approved_annual_total"))
-            rec.deposit_q1_total = sum(dep_lines.mapped("quarter1_total"))
-            rec.deposit_q2_total = sum(dep_lines.mapped("quarter2_total"))
-            rec.deposit_q3_total = sum(dep_lines.mapped("quarter3_total"))
-            rec.deposit_q4_total = sum(dep_lines.mapped("quarter4_total"))
+            if dep_lines:
+                rec.deposit_line_count = len(dep_lines)
+                rec.deposit_annual_total = sum(dep_lines.mapped("annual_total"))
+                rec.deposit_proposed_total = sum(dep_lines.mapped("proposed_annual_total"))
+                rec.deposit_approved_total = sum(dep_lines.mapped("approved_annual_total"))
+                rec.deposit_q1_total = sum(dep_lines.mapped("quarter1_total"))
+                rec.deposit_q2_total = sum(dep_lines.mapped("quarter2_total"))
+                rec.deposit_q3_total = sum(dep_lines.mapped("quarter3_total"))
+                rec.deposit_q4_total = sum(dep_lines.mapped("quarter4_total"))
+            elif rec.category == "deposit":
+                rec.deposit_line_count = 1
+                rec.deposit_annual_total = rec.annual_total or 0.0
+                rec.deposit_proposed_total = rec.proposed_annual_total or 0.0
+                rec.deposit_approved_total = rec.approved_annual_total or 0.0
+                rec.deposit_q1_total = rec.quarter1_total or 0.0
+                rec.deposit_q2_total = rec.quarter2_total or 0.0
+                rec.deposit_q3_total = rec.quarter3_total or 0.0
+                rec.deposit_q4_total = rec.quarter4_total or 0.0
+            else:
+                rec.deposit_line_count = 0
+                rec.deposit_annual_total = 0.0
+                rec.deposit_proposed_total = 0.0
+                rec.deposit_approved_total = 0.0
+                rec.deposit_q1_total = 0.0
+                rec.deposit_q2_total = 0.0
+                rec.deposit_q3_total = 0.0
+                rec.deposit_q4_total = 0.0
 
             cb_lines = rec._get_category_lines("customer_base")
-            rec.customer_base_line_count = len(cb_lines)
-            rec.customer_base_annual_total = sum(cb_lines.mapped("annual_total"))
-            rec.customer_base_proposed_total = sum(cb_lines.mapped("proposed_annual_total"))
-            rec.customer_base_approved_total = sum(cb_lines.mapped("approved_annual_total"))
-            rec.customer_base_q1_total = sum(cb_lines.mapped("quarter1_total"))
-            rec.customer_base_q2_total = sum(cb_lines.mapped("quarter2_total"))
-            rec.customer_base_q3_total = sum(cb_lines.mapped("quarter3_total"))
-            rec.customer_base_q4_total = sum(cb_lines.mapped("quarter4_total"))
+            if cb_lines:
+                rec.customer_base_line_count = len(cb_lines)
+                rec.customer_base_annual_total = sum(cb_lines.mapped("annual_total"))
+                rec.customer_base_proposed_total = sum(cb_lines.mapped("proposed_annual_total"))
+                rec.customer_base_approved_total = sum(cb_lines.mapped("approved_annual_total"))
+                rec.customer_base_q1_total = sum(cb_lines.mapped("quarter1_total"))
+                rec.customer_base_q2_total = sum(cb_lines.mapped("quarter2_total"))
+                rec.customer_base_q3_total = sum(cb_lines.mapped("quarter3_total"))
+                rec.customer_base_q4_total = sum(cb_lines.mapped("quarter4_total"))
+            elif rec.category == "customer_base":
+                rec.customer_base_line_count = 1
+                rec.customer_base_annual_total = rec.annual_total or 0.0
+                rec.customer_base_proposed_total = rec.proposed_annual_total or 0.0
+                rec.customer_base_approved_total = rec.approved_annual_total or 0.0
+                rec.customer_base_q1_total = rec.quarter1_total or 0.0
+                rec.customer_base_q2_total = rec.quarter2_total or 0.0
+                rec.customer_base_q3_total = rec.quarter3_total or 0.0
+                rec.customer_base_q4_total = rec.quarter4_total or 0.0
+            else:
+                rec.customer_base_line_count = 0
+                rec.customer_base_annual_total = 0.0
+                rec.customer_base_proposed_total = 0.0
+                rec.customer_base_approved_total = 0.0
+                rec.customer_base_q1_total = 0.0
+                rec.customer_base_q2_total = 0.0
+                rec.customer_base_q3_total = 0.0
+                rec.customer_base_q4_total = 0.0
 
             fx_lines = rec._get_category_lines("fx")
-            rec.fx_line_count = len(fx_lines)
-            rec.fx_annual_total = sum(fx_lines.mapped("annual_total"))
-            rec.fx_proposed_total = sum(fx_lines.mapped("proposed_annual_total"))
-            rec.fx_approved_total = sum(fx_lines.mapped("approved_annual_total"))
-            rec.fx_q1_total = sum(fx_lines.mapped("quarter1_total"))
-            rec.fx_q2_total = sum(fx_lines.mapped("quarter2_total"))
-            rec.fx_q3_total = sum(fx_lines.mapped("quarter3_total"))
-            rec.fx_q4_total = sum(fx_lines.mapped("quarter4_total"))
+            if fx_lines:
+                rec.fx_line_count = len(fx_lines)
+                rec.fx_annual_total = sum(fx_lines.mapped("annual_total"))
+                rec.fx_proposed_total = sum(fx_lines.mapped("proposed_annual_total"))
+                rec.fx_approved_total = sum(fx_lines.mapped("approved_annual_total"))
+                rec.fx_q1_total = sum(fx_lines.mapped("quarter1_total"))
+                rec.fx_q2_total = sum(fx_lines.mapped("quarter2_total"))
+                rec.fx_q3_total = sum(fx_lines.mapped("quarter3_total"))
+                rec.fx_q4_total = sum(fx_lines.mapped("quarter4_total"))
+            elif rec.category == "fx":
+                rec.fx_line_count = 1
+                rec.fx_annual_total = rec.annual_total or 0.0
+                rec.fx_proposed_total = rec.proposed_annual_total or 0.0
+                rec.fx_approved_total = rec.approved_annual_total or 0.0
+                rec.fx_q1_total = rec.quarter1_total or 0.0
+                rec.fx_q2_total = rec.quarter2_total or 0.0
+                rec.fx_q3_total = rec.quarter3_total or 0.0
+                rec.fx_q4_total = rec.quarter4_total or 0.0
+            else:
+                rec.fx_line_count = 0
+                rec.fx_annual_total = 0.0
+                rec.fx_proposed_total = 0.0
+                rec.fx_approved_total = 0.0
+                rec.fx_q1_total = 0.0
+                rec.fx_q2_total = 0.0
+                rec.fx_q3_total = 0.0
+                rec.fx_q4_total = 0.0
 
             db_lines = rec._get_category_lines("digital_banking")
-            rec.digital_banking_line_count = len(db_lines)
-            rec.digital_banking_annual_total = sum(db_lines.mapped("annual_total"))
-            rec.digital_banking_proposed_total = sum(db_lines.mapped("proposed_annual_total"))
-            rec.digital_banking_approved_total = sum(db_lines.mapped("approved_annual_total"))
-            rec.digital_banking_q1_total = sum(db_lines.mapped("quarter1_total"))
-            rec.digital_banking_q2_total = sum(db_lines.mapped("quarter2_total"))
-            rec.digital_banking_q3_total = sum(db_lines.mapped("quarter3_total"))
-            rec.digital_banking_q4_total = sum(db_lines.mapped("quarter4_total"))
+            if db_lines:
+                rec.digital_banking_line_count = len(db_lines)
+                rec.digital_banking_annual_total = sum(db_lines.mapped("annual_total"))
+                rec.digital_banking_proposed_total = sum(db_lines.mapped("proposed_annual_total"))
+                rec.digital_banking_approved_total = sum(db_lines.mapped("approved_annual_total"))
+                rec.digital_banking_q1_total = sum(db_lines.mapped("quarter1_total"))
+                rec.digital_banking_q2_total = sum(db_lines.mapped("quarter2_total"))
+                rec.digital_banking_q3_total = sum(db_lines.mapped("quarter3_total"))
+                rec.digital_banking_q4_total = sum(db_lines.mapped("quarter4_total"))
+            elif rec.category == "digital_banking":
+                rec.digital_banking_line_count = 1
+                rec.digital_banking_annual_total = rec.annual_total or 0.0
+                rec.digital_banking_proposed_total = rec.proposed_annual_total or 0.0
+                rec.digital_banking_approved_total = rec.approved_annual_total or 0.0
+                rec.digital_banking_q1_total = rec.quarter1_total or 0.0
+                rec.digital_banking_q2_total = rec.quarter2_total or 0.0
+                rec.digital_banking_q3_total = rec.quarter3_total or 0.0
+                rec.digital_banking_q4_total = rec.quarter4_total or 0.0
+            else:
+                rec.digital_banking_line_count = 0
+                rec.digital_banking_annual_total = 0.0
+                rec.digital_banking_proposed_total = 0.0
+                rec.digital_banking_approved_total = 0.0
+                rec.digital_banking_q1_total = 0.0
+                rec.digital_banking_q2_total = 0.0
+                rec.digital_banking_q3_total = 0.0
+                rec.digital_banking_q4_total = 0.0
+
+            ld_lines = rec._get_category_lines("loan_disbursement_collection")
+            if ld_lines:
+                rec.loan_disbursement_line_count = len(ld_lines)
+                rec.loan_disbursement_annual_total = sum(ld_lines.mapped("annual_total"))
+                rec.loan_disbursement_proposed_total = sum(ld_lines.mapped("proposed_annual_total"))
+                rec.loan_disbursement_approved_total = sum(ld_lines.mapped("approved_annual_total"))
+                rec.loan_disbursement_q1_total = sum(ld_lines.mapped("quarter1_total"))
+                rec.loan_disbursement_q2_total = sum(ld_lines.mapped("quarter2_total"))
+                rec.loan_disbursement_q3_total = sum(ld_lines.mapped("quarter3_total"))
+                rec.loan_disbursement_q4_total = sum(ld_lines.mapped("quarter4_total"))
+            elif rec.category == "loan_disbursement_collection":
+                rec.loan_disbursement_line_count = 1
+                rec.loan_disbursement_annual_total = rec.annual_total or 0.0
+                rec.loan_disbursement_proposed_total = rec.proposed_annual_total or 0.0
+                rec.loan_disbursement_approved_total = rec.approved_annual_total or 0.0
+                rec.loan_disbursement_q1_total = rec.quarter1_total or 0.0
+                rec.loan_disbursement_q2_total = rec.quarter2_total or 0.0
+                rec.loan_disbursement_q3_total = rec.quarter3_total or 0.0
+                rec.loan_disbursement_q4_total = rec.quarter4_total or 0.0
+            else:
+                rec.loan_disbursement_line_count = 0
+                rec.loan_disbursement_annual_total = 0.0
+                rec.loan_disbursement_proposed_total = 0.0
+                rec.loan_disbursement_approved_total = 0.0
+                rec.loan_disbursement_q1_total = 0.0
+                rec.loan_disbursement_q2_total = 0.0
+                rec.loan_disbursement_q3_total = 0.0
+                rec.loan_disbursement_q4_total = 0.0
+
+            lo_lines = rec._get_category_lines("loan_outstanding")
+            if lo_lines:
+                rec.loan_outstanding_line_count = len(lo_lines)
+                rec.loan_outstanding_annual_total = sum(lo_lines.mapped("annual_total"))
+                rec.loan_outstanding_proposed_total = sum(lo_lines.mapped("proposed_annual_total"))
+                rec.loan_outstanding_approved_total = sum(lo_lines.mapped("approved_annual_total"))
+                rec.loan_outstanding_q1_total = sum(lo_lines.mapped("quarter1_total"))
+                rec.loan_outstanding_q2_total = sum(lo_lines.mapped("quarter2_total"))
+                rec.loan_outstanding_q3_total = sum(lo_lines.mapped("quarter3_total"))
+                rec.loan_outstanding_q4_total = sum(lo_lines.mapped("quarter4_total"))
+            elif rec.category == "loan_outstanding":
+                rec.loan_outstanding_line_count = 1
+                rec.loan_outstanding_annual_total = rec.annual_total or 0.0
+                rec.loan_outstanding_proposed_total = rec.proposed_annual_total or 0.0
+                rec.loan_outstanding_approved_total = rec.approved_annual_total or 0.0
+                rec.loan_outstanding_q1_total = rec.quarter1_total or 0.0
+                rec.loan_outstanding_q2_total = rec.quarter2_total or 0.0
+                rec.loan_outstanding_q3_total = rec.quarter3_total or 0.0
+                rec.loan_outstanding_q4_total = rec.quarter4_total or 0.0
+            else:
+                rec.loan_outstanding_line_count = 0
+                rec.loan_outstanding_annual_total = 0.0
+                rec.loan_outstanding_proposed_total = 0.0
+                rec.loan_outstanding_approved_total = 0.0
+                rec.loan_outstanding_q1_total = 0.0
+                rec.loan_outstanding_q2_total = 0.0
+                rec.loan_outstanding_q3_total = 0.0
+                rec.loan_outstanding_q4_total = 0.0
 
             exp_lines = rec._get_category_lines("general_expense")
-            rec.expense_line_count = len(exp_lines)
-            rec.expense_annual_total = sum(exp_lines.mapped("annual_total"))
-            rec.expense_proposed_total = sum(exp_lines.mapped("proposed_annual_total"))
-            rec.expense_approved_total = sum(exp_lines.mapped("approved_annual_total"))
-            rec.expense_q1_total = sum(exp_lines.mapped("quarter1_total"))
-            rec.expense_q2_total = sum(exp_lines.mapped("quarter2_total"))
-            rec.expense_q3_total = sum(exp_lines.mapped("quarter3_total"))
-            rec.expense_q4_total = sum(exp_lines.mapped("quarter4_total"))
+            if exp_lines:
+                rec.expense_line_count = len(exp_lines)
+                rec.expense_annual_total = sum(exp_lines.mapped("annual_total"))
+                rec.expense_proposed_total = sum(exp_lines.mapped("proposed_annual_total"))
+                rec.expense_approved_total = sum(exp_lines.mapped("approved_annual_total"))
+                rec.expense_q1_total = sum(exp_lines.mapped("quarter1_total"))
+                rec.expense_q2_total = sum(exp_lines.mapped("quarter2_total"))
+                rec.expense_q3_total = sum(exp_lines.mapped("quarter3_total"))
+                rec.expense_q4_total = sum(exp_lines.mapped("quarter4_total"))
+            elif rec.category == "general_expense":
+                rec.expense_line_count = 1
+                rec.expense_annual_total = rec.annual_total or 0.0
+                rec.expense_proposed_total = rec.proposed_annual_total or 0.0
+                rec.expense_approved_total = rec.approved_annual_total or 0.0
+                rec.expense_q1_total = rec.quarter1_total or 0.0
+                rec.expense_q2_total = rec.quarter2_total or 0.0
+                rec.expense_q3_total = rec.quarter3_total or 0.0
+                rec.expense_q4_total = rec.quarter4_total or 0.0
+            else:
+                rec.expense_line_count = 0
+                rec.expense_annual_total = 0.0
+                rec.expense_proposed_total = 0.0
+                rec.expense_approved_total = 0.0
+                rec.expense_q1_total = 0.0
+                rec.expense_q2_total = 0.0
+                rec.expense_q3_total = 0.0
+                rec.expense_q4_total = 0.0
 
             mp_lines = rec._get_category_lines("manpower")
             rec.manpower_line_count = len(mp_lines)
@@ -5168,38 +6911,14 @@ class PbmsPlanningCategory(models.Model):
         "category",
         "state",
         "currency_id",
-        "currency_id.symbol",
-        "line_ids",
         "line_ids.line_type",
         "line_ids.quantity",
-        "line_ids.annual_total_cost",
-        "line_ids.position_type_id",
-        "line_ids.position_type_id.name",
-        "line_ids.position_type",
-        "line_ids.deposit_type_id",
-        "line_ids.deposit_type_id.name",
-        "line_ids.base_type",
-        "line_ids.fx_source_type",
-        "line_ids.fx_source_type.name",
-        "line_ids.channel_id",
-        "line_ids.channel_id.name",
-        "line_ids.channel_id.unit_of_measure",
-        "line_ids.expense_account_id",
-        "line_ids.expense_account_id.name",
-        "line_ids.category_id",
-        "line_ids.category_id.name",
-        "line_ids.fa_annual_total_cost",
         "line_ids.annual_total",
+        "line_ids.annual_total_cost",
         "line_ids.proposed_annual_total",
         "line_ids.approved_annual_total",
+        "line_ids.fa_annual_total_cost",
         "line_ids.is_cascaded",
-        "is_deposit_monetary",
-        "is_customer_base_monetary",
-        "is_fx_monetary",
-        "is_digital_banking_monetary",
-        "is_expense_monetary",
-        "is_manpower_monetary",
-        "is_fixed_asset_monetary",
     )
     def _compute_kanban_breakdown_html(self):
         category_titles = {
@@ -5241,10 +6960,16 @@ class PbmsPlanningCategory(models.Model):
                 rec.kanban_breakdown_html = False
                 continue
 
-            # Isolate card breakdown strictly to this plan's category
-            target_cat = rec.category or "deposit"
-            used_cats = [target_cat]
-            is_multi_category = False
+            # Isolate card breakdown strictly to this plan's category, or all categories if in planning request or has multiple line types
+            is_req = getattr(rec, "is_planning_request", False) or self.env.context.get("is_planning_request")
+            present_line_types = {l.line_type for l in all_lines if l.line_type}
+            if is_req or len(present_line_types) > 1:
+                used_cats = [c for c in cat_order if c in present_line_types] or cat_order
+                is_multi_category = len(used_cats) > 1
+            else:
+                target_cat = rec.category or "deposit"
+                used_cats = [target_cat]
+                is_multi_category = False
             html_sections = []
 
             for cat in used_cats:
@@ -5469,6 +7194,8 @@ class PbmsPlanningCategory(models.Model):
                     "customer_base": (_("Account Type"), _("Target Accounts")),
                     "fx": (_("FX Source"), _("Annual Target")),
                     "digital_banking": (_("Digital Channel"), _("Target")),
+                    "loan_disbursement_collection": (_("Loan Product / Flow"), _("Annual Total")),
+                    "loan_outstanding": (_("Loan Product"), _("Annual Total")),
                     "general_expense": (_("Expense Account"), _("Annual Budget")),
                     "fixed_asset": (_("Asset Category"), _("Total Cost")),
                 }
@@ -5538,6 +7265,8 @@ class PbmsPlanningCategory(models.Model):
             "customer_base": {"color": "#726732", "bg": "#F7F5EB", "border": "#DDD5B8", "icon": "fa-users", "label": _("Customer Base Expansion")},
             "fx": {"color": "#C17540", "bg": "#FCF6F0", "border": "#F0D5C0", "icon": "fa-money", "label": _("FX Mobilization")},
             "digital_banking": {"color": "#541718", "bg": "#FBF2F2", "border": "#E5C5C5", "icon": "fa-mobile", "label": _("Digital Banking")},
+            "loan_disbursement_collection": {"color": "#425727", "bg": "#EDF3E8", "border": "#C8DCB8", "icon": "fa-exchange", "label": _("Loan Disbursement & Collection")},
+            "loan_outstanding": {"color": "#726732", "bg": "#F7F5EB", "border": "#DDD5B8", "icon": "fa-credit-card", "label": _("Loan & Advances Outstanding")},
             "general_expense": {"color": "#541718", "bg": "#FBF2F2", "border": "#E5C5C5", "icon": "fa-calculator", "label": _("General Expense")},
             "manpower": {"color": "#1E2917", "bg": "#EAECE8", "border": "#CCD3C5", "icon": "fa-id-badge", "label": _("Work Force")},
             "fixed_asset": {"color": "#726732", "bg": "#F7F5EB", "border": "#DDD5B8", "icon": "fa-building", "label": _("Fixed Asset Acquisition")},
@@ -5592,12 +7321,16 @@ class PbmsPlanningCategory(models.Model):
         if "category" in fields_list:
             cur_cat = res.get("category")
             unit_type = ou.work_unit_type if ou else False
-            is_dist_or_ho = unit_type in ("district_office", "head_office")
+            is_dist = unit_type in ("district_office", "regional_office")
+            is_ho = unit_type == "head_office"
+            is_dist_or_ho = is_dist or is_ho
             if cur_cat and is_dist_or_ho and cur_cat in ("deposit", "customer_base", "fx", "digital_banking"):
                 return res  # Preserve explicit mobilization category for district/HO overview cards
             if not cur_cat or (Config is not None and ou and not Config.is_category_enabled(cur_cat, ou)):
                 if Config is not None and ou:
-                    if is_dist_or_ho:
+                    if is_dist:
+                        res["category"] = "deposit"
+                    elif is_ho:
                         RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
                         res["category"] = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, ou)), "general_expense")
                     else:
@@ -5626,6 +7359,7 @@ class PbmsPlanningCategory(models.Model):
 
         user_unit_ids = self.env.user._pbms_operating_unit_ids()
         for vals in vals_list:
+            _validate_month_values_not_text(vals)
             org_unit_id = vals.get("org_unit_id")
             if org_unit_id and user_unit_ids and org_unit_id not in user_unit_ids:
                 if not (self.env.user._pbms_is_sppmd_admin() or self.env.user._pbms_is_sppmd_approver() or self.env.user._pbms_is_ho_reviewer() or self.env.user._pbms_is_district_reviewer()):
@@ -5681,9 +7415,11 @@ class PbmsPlanningCategory(models.Model):
             Config = self.env.get("pbms.planning.config")
             ou = self.env["operating.unit"].browse(org_unit_id) if org_unit_id else self.env.user.default_operating_unit_id
             unit_type = ou.work_unit_type if ou else False
-            is_dist_or_ho = unit_type in ("district_office", "head_office")
+            is_dist = unit_type in ("district_office", "regional_office")
+            is_ho = unit_type == "head_office"
+            is_dist_or_ho = is_dist or is_ho
             explicit_cat = vals.get("category") or self.env.context.get("default_category")
-            if explicit_cat and is_dist_or_ho and explicit_cat in ("deposit", "customer_base", "fx", "digital_banking"):
+            if explicit_cat:
                 vals["category"] = explicit_cat
             elif Config is not None and ou and vals.get("category") and not Config.is_category_enabled(vals["category"], ou):
                 found_cat = False
@@ -5693,6 +7429,8 @@ class PbmsPlanningCategory(models.Model):
                         break
                 if found_cat:
                     vals["category"] = found_cat
+                elif is_dist:
+                    vals["category"] = "deposit"
                 elif not is_dist_or_ho:
                     vals["category"] = Config.get_default_category_for_unit(ou)
                 else:
@@ -5701,23 +7439,27 @@ class PbmsPlanningCategory(models.Model):
 
             # Default fallback if still not determined
             if not vals.get("category"):
-                if is_dist_or_ho:
+                if is_dist:
+                    vals["category"] = "deposit"
+                elif is_ho:
                     RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
                     vals["category"] = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, ou)), "general_expense") if (Config is not None and ou) else "general_expense"
                 else:
                     vals["category"] = Config.get_default_category_for_unit(ou) if (Config is not None and ou) else "deposit"
 
             # 1. Submitted Plan Check: Prevent creating another plan for the same category if already submitted or approved
-            if org_unit_id and vals.get("cycle_id") and not self.env.context.get("skip_sync_category_records"):
+            if org_unit_id and vals.get("cycle_id") and not self.env.context.get("skip_sync_category_records") and not self.env.context.get("bypass_plan_lock"):
                 is_mobilization_card = is_dist_or_ho and vals.get("category") in ("deposit", "customer_base", "fx", "digital_banking")
                 if not is_mobilization_card:
-                    submitted_existing = self.search([
+                    domain_sub = [
                         ("org_unit_id", "=", org_unit_id),
                         ("cycle_id", "=", vals.get("cycle_id")),
-                        ("category", "=", vals.get("category")),
                         ("active", "=", True),
                         ("state", "in", ("submitted", "district_approved", "district_endorsed", "ho_reviewed", "approved")),
-                    ], limit=1)
+                    ]
+                    if ou and ou.work_unit_type not in ("branch", "sub_branch", "service_center"):
+                        domain_sub.append(("category", "=", vals.get("category")))
+                    submitted_existing = self.search(domain_sub, limit=1)
                     if submitted_existing:
                         unit_name = self.env["operating.unit"].browse(org_unit_id).display_name
                         cycle_name = self.env["pbms.planning.cycle"].browse(vals.get("cycle_id")).name
@@ -5795,6 +7537,11 @@ class PbmsPlanningCategory(models.Model):
         return records
 
     def write(self, vals):
+        _validate_month_values_not_text(vals)
+        if "cpco_attachment_ids" in vals and not self.env.context.get("bypass_plan_lock"):
+            for rec in self:
+                if rec.state in ("committee_review", "ceo_approval", "approved", "rejected", "rejection_recommended", "ho_endorse", "cpco_endorse"):
+                    raise UserError(_("CPCO Attachments cannot be added or modified after the plan has been submitted to the Budget & Hiring Committee."))
         if "category" in vals and not self.env.context.get("bypass_plan_lock"):
             target_cat = vals["category"]
             for rec in self:
@@ -5853,7 +7600,23 @@ class PbmsPlanningCategory(models.Model):
                             cycle=cycle_name,
                         ))
 
+        target_keys = {
+            "m01", "m02", "m03", "m04", "m05", "m06",
+            "m07", "m08", "m09", "m10", "m11", "m12",
+            "opening_balance", "annual_total",
+            "quarter1_total", "quarter2_total", "quarter3_total", "quarter4_total"
+        }
+        if (target_keys & set(vals.keys())) and not self.env.context.get("skip_sync_lines") and not self.env.context.get("in_distribute_plan_sync"):
+            for rec in self:
+                cat_lines = rec.line_ids.filtered(lambda l: l.line_type == rec.category) if rec.line_ids else rec.env["pbms.plan.category.line"]
+                if len(cat_lines) == 1:
+                    sync_vals = {k: vals[k] for k in target_keys if k in vals}
+                    cat_lines.with_context(skip_sync_lines=True, bypass_plan_lock=True).sudo().write(sync_vals)
+                elif len(cat_lines) > 1 and "annual_total" in vals:
+                    rec.with_context(in_distribute_plan_sync=True)._distribute_plan_annual_total_proportionally()
+
         res = super().write(vals)
+
         if "org_unit_id" in vals or "category" in vals:
             for rec in self:
                 if (rec.category == "manpower" or rec.enable_manpower) and rec.org_unit_id and not rec.existing_manpower_summary_ids:
@@ -5896,72 +7659,184 @@ class PbmsPlanningCategory(models.Model):
 
     @api.model
     def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
-        if not self.env.context.get("skip_cleanup_district_cards"):
+        if (
+            self.env.context.get("cleanup_duplicate_district_cards")
+            and not self.env.context.get("skip_cleanup_district_cards")
+        ):
             try:
                 self.with_context(skip_cleanup_district_cards=True, skip_sync_category_records=True, bypass_plan_lock=True)._cleanup_duplicate_district_cards()
             except Exception:
                 pass
 
         user = self.env.user
+        has_id_filter = any(isinstance(leaf, (list, tuple)) and len(leaf) >= 2 and leaf[0] == "id" for leaf in (domain or []))
+        if not self.env.su and not bypass_access and not has_id_filter and not self.env.context.get("bypass_category_config_filter"):
+            Config = self.env.get("pbms.planning.config")
+            if Config is not None:
+                target_cats = set()
+                for leaf in (domain or []):
+                    if isinstance(leaf, (list, tuple)) and len(leaf) == 3 and leaf[0] == "category":
+                        if leaf[1] == "=" and leaf[2]:
+                            target_cats.add(leaf[2])
+                        elif leaf[1] == "in" and isinstance(leaf[2], (list, tuple, set)):
+                            target_cats.update(c for c in leaf[2] if c)
+                for cat in target_cats:
+                    if cat not in ("general_expense", "fixed_asset", "manpower"):
+                        disabled_ou_ids = Config.sudo().get_disabled_unit_ids_for_category(cat)
+                        if disabled_ou_ids:
+                            domain = expression.AND([domain, ["|", ("org_unit_type", "in", ("district_office", "head_office", "regional_office")), ("org_unit_id", "not in", disabled_ou_ids)]])
+
         # Scope filters for non-admin users
         if (
             not self.env.su
             and not bypass_access
+            and not has_id_filter
             and not self.env.context.get("bypass_approver_branch_filter")
             and not user._pbms_is_sppmd_admin()
             and not self.env.is_admin()
         ):
+            role_domains = []
             if user.has_group("bunna_pbms.group_pbms_approver"):
-                approver_domain = [
-                    "|",
-                    ("category", "not in", ("deposit", "customer_base", "fx", "digital_banking")),
-                    ("org_unit_type", "=", "head_office"),
-                ]
-                domain = expression.AND([domain, approver_domain])
-            elif user.has_group("bunna_pbms.group_pbms_ho_reviewer"):
-                # Head Office Functional Reviewers:
-                # 1. Mobilization categories (Deposit, Customer Base, FX, Digital):
-                #    view District Consolidated / HO plans (not individual branch plans).
-                # 2. General Expense and Fixed Asset:
-                #    branch plans must be approved by District Reviewer first before HO Reviewer can view.
-                # 3. Head Office units are directly visible to HO Reviewers.
-                ho_domain = [
-                    "|",
+                role_domains.append([
+                    "|", "|",
+                    ("category", "not in", ("deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding")),
+                    ("org_unit_type", "in", ("head_office", "district_office")),
+                    ("state", "in", ("district_endorsed", "ho_reviewed", "approved")),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_ho_reviewer") or user._pbms_is_ho_reviewer():
+                # Head Office Functional Reviewers see:
+                #  - Their own org unit plans
+                #  - Manpower plans bank-wide once approved by CEO (ho_endorse, cpco_endorse, approved)
+                #  - Branch GE/FA/CP/IB plans after district approval (district_approved/district_endorsed)
+                #  - HO/District/Regional plans (mobilization, GE/FA) at appropriate states
+                role_domains.append([
+                    "|", "|", "|", "|",
                     ("org_unit_id", "in", user._pbms_operating_unit_ids()),
-                    "|",
-                    ("org_unit_type", "=", "head_office"),
-                    "|",
                     "&",
-                    ("category", "in", ("deposit", "customer_base", "fx", "digital_banking")),
-                    ("org_unit_type", "in", ("district_office", "regional_office")),
+                        ("category", "=", "manpower"),
+                        ("state", "in", ("ho_endorse", "cpco_endorse", "approved")),
+                    "&",
+                        ("org_unit_type", "=", "head_office"),
+                        ("state", "in", ("submitted", "ho_reviewed", "committee_review", "board_ceo_approval", "approved", "info_requested", "returned")),
+                    "&",
+                        "&",
+                            ("org_unit_type", "in", ("district_office", "regional_office")),
+                            ("category", "in", ("deposit", "customer_base", "fx", "digital_banking")),
+                        ("state", "in", ("district_endorsed", "ho_reviewed", "approved")),
+                    "&",
+                        "&",
+                            ("category", "in", ("general_expense", "fixed_asset", "credit_portfolio", "initiative_budget", "loan_disbursement_collection", "loan_outstanding")),
+                            ("org_unit_type", "not in", ("head_office",)),
+                        ("state", "in", ("district_approved", "district_endorsed", "committee_review", "board_ceo_approval", "ho_reviewed", "approved")),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_respective_chief") or user._pbms_is_respective_chief():
+                chief_post_states = (
+                    "district_approved", "district_endorsed",
+                    "submitted", "ho_reviewed",
+                    "people_solutions_review", "cpco_review", "committee_review",
+                    "ceo_approval", "board_ceo_approval", "ho_endorse", "cpco_endorse",
+                    "approved", "rejected", "info_requested",
+                )
+                chief_scope_ou_ids = user._pbms_chief_scope_unit_ids()
+                sub_user_ids = user._pbms_chief_subordinate_user_ids()
+                user_ou_ids = user._pbms_operating_unit_ids()
+                direct_chief_criteria = [
                     "|",
-                    "&",
-                    ("category", "=", "manpower"),
-                    ("state", "in", ("ho_endorse", "cpco_endorse", "approved")),
-                    "&",
-                    ("category", "in", ("general_expense", "fixed_asset")),
-                    ("state", "in", ("district_approved", "district_endorsed", "committee_review", "board_ceo_approval", "ho_reviewed", "approved")),
+                    ("create_uid", "in", sub_user_ids),
+                    "|",
+                    ("submitted_by", "in", sub_user_ids),
+                    "|",
+                    ("district_id", "in", chief_scope_ou_ids),
+                    ("org_unit_id", "in", chief_scope_ou_ids),
                 ]
-                domain = expression.AND([domain, ho_domain])
-            elif user.has_group("bunna_pbms.group_pbms_respective_chief"):
-                child_unit_ids = user._pbms_child_operating_unit_ids()
                 chief_domain = [
+                    "&",
+                    ("category", "in", ("manpower", "general_expense", "fixed_asset", "credit_portfolio", "initiative_budget", "loan_disbursement_collection", "loan_outstanding")),
+                    "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
                     "|",
                     "&",
-                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
-                    ("org_unit_id", "not in", child_unit_ids),
+                    ("state", "=", "chief_review"),
+                    *direct_chief_criteria,
+                    # Post-chief_review: manpower gets full visibility (all states)
+                    # GE/FA gets visibility but NOT at district_approved for branch plans
+                    # (branch GE/FA in district_approved go to HO Functional Reviewer, not Chief)
+                    "|",
                     "&",
                     ("category", "=", "manpower"),
                     "&",
-                    ("org_unit_id", "in", child_unit_ids),
+                    ("state", "in", chief_post_states),
+                    *direct_chief_criteria,
+                    "&",
+                    ("category", "in", ("general_expense", "fixed_asset", "credit_portfolio", "initiative_budget", "loan_disbursement_collection", "loan_outstanding")),
+                    "&",
+                    ("org_unit_type", "=", "head_office"),
+                    "&",
+                    ("state", "in", chief_post_states),
+                    *direct_chief_criteria,
+                ]
+                role_domains.append(chief_domain)
+            if user.has_group("bunna_pbms.group_pbms_people_solutions"):
+                role_domains.append([
+                    "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    "&",
+                    ("category", "=", "manpower"),
                     ("state", "in", (
-                        "chief_review", "district_approved", "district_endorsed",
                         "people_solutions_review", "cpco_review", "committee_review",
                         "ceo_approval", "board_ceo_approval", "ho_endorse", "cpco_endorse",
-                        "approved", "rejected", "info_requested",
+                        "approved",
                     )),
-                ]
-                domain = expression.AND([domain, chief_domain])
+                ])
+            if user.has_group("bunna_pbms.group_pbms_cpco"):
+                role_domains.append([
+                    "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    "&",
+                    ("category", "=", "manpower"),
+                    ("state", "in", (
+                        "cpco_review", "committee_review",
+                        "ceo_approval", "board_ceo_approval", "ho_endorse", "cpco_endorse",
+                        "approved",
+                    )),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_budget_hiring_committee"):
+                role_domains.append([
+                    "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    "&",
+                    ("category", "in", ("manpower", "fixed_asset", "initiative_budget")),
+                    ("state", "in", (
+                        "committee_review", "ceo_approval", "board_ceo_approval",
+                        "ho_endorse", "cpco_endorse", "approved",
+                    )),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_ceo") or user._pbms_is_ceo():
+                role_domains.append([
+                    "|",
+                    ("state", "in", ("ceo_approval", "board_ceo_approval")),
+                    "|",
+                    ("ceo_approver_id", "=", user.id),
+                    "&",
+                    ("category", "=", "manpower"),
+                    ("state", "in", ("ho_endorse", "cpco_endorse", "approved", "rejected")),
+                ])
+            if user.has_group("bunna_pbms.group_pbms_district_reviewer"):
+                user_ou_ids = user._pbms_operating_unit_ids()
+                child_unit_ids = user._pbms_child_operating_unit_ids()
+                role_domains.append([
+                    "|",
+                    ("org_unit_id", "in", user_ou_ids),
+                    "|",
+                    ("district_id", "in", user_ou_ids),
+                    "|",
+                    ("org_unit_id", "in", child_unit_ids),
+                    ("org_unit_id.parent_unit", "in", user_ou_ids),
+                ])
+
+            if role_domains:
+                combined_role_domain = expression.OR(role_domains)
+                domain = expression.AND([domain, combined_role_domain])
 
         return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
 
@@ -6002,13 +7877,28 @@ class PbmsPlanningCategory(models.Model):
         """Open or create the active planning request for the current user's operating unit,
         opening the dedicated multi-tab Planning Request form with all category tabs."""
         user = self.env.user
-        unit_ids = user._pbms_operating_unit_ids()
         org_unit = False
-        if unit_ids:
-            org_unit = self.env["operating.unit"].browse(unit_ids[0])
-        elif hasattr(user, "default_operating_unit_id") and user.default_operating_unit_id:
+
+        # 1. Employee's own directly-assigned operating unit (most specific — unique per employee)
+        if hasattr(user, "employee_id") and user.employee_id:
+            emp = user.employee_id.sudo()
+            if hasattr(emp, "operating_unit_id") and emp.operating_unit_id:
+                org_unit = emp.operating_unit_id
+            elif hasattr(emp, "default_operating_unit_id") and emp.default_operating_unit_id:
+                org_unit = emp.default_operating_unit_id
+
+        # 2. User's own default operating unit
+        if not org_unit and hasattr(user, "default_operating_unit_id") and user.default_operating_unit_id:
             org_unit = user.default_operating_unit_id
-        else:
+
+        # 3. First entry from the access-permission list (may be shared across HO users)
+        if not org_unit:
+            unit_ids = user._pbms_operating_unit_ids()
+            if unit_ids:
+                org_unit = self.env["operating.unit"].browse(unit_ids[0])
+
+        # 4. Last resort: any unit
+        if not org_unit:
             org_unit = self.env["operating.unit"].search([], limit=1)
 
         cycle = self.env["pbms.planning.cycle"].search([("state", "=", "open")], limit=1)
@@ -6020,7 +7910,7 @@ class PbmsPlanningCategory(models.Model):
                     'type': 'ir.actions.client',
                     'tag': 'display_notification',
                     'params': {
-                        'title': _('Planning Cycle Not Open for Input'),
+                        'title': _('FY(the Planning year) Not Open for Input'),
                         'message': _(
                             "Planning cycle '%(name)s' is currently '%(state)s' and is not open for unit input. "
                             "Operating unit users (Branch & Head Office) cannot input or submit plan data until SPPMD officially opens the cycle for unit input."
@@ -6033,7 +7923,7 @@ class PbmsPlanningCategory(models.Model):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': _('No Planning Cycle Open'),
+                    'title': _('No FY(the Planning year) Open'),
                     'message': _('There is currently no active planning cycle open for plan and budget input.'),
                     'type': 'warning',
                     'sticky': False,
@@ -6043,43 +7933,46 @@ class PbmsPlanningCategory(models.Model):
         plan = False
         if org_unit and cycle:
             Config = self.env.get("pbms.planning.config")
-            unit_type = org_unit.work_unit_type
-            is_dist_or_ho = unit_type in ("district_office", "head_office")
-            if is_dist_or_ho:
-                RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
-                default_cat = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, org_unit)), "general_expense")
-                target_categories = [c for c in RESOURCE_CATS if Config.is_category_enabled(c, org_unit)] or RESOURCE_CATS
-            else:
-                default_cat = Config.get_default_category_for_unit(org_unit) if Config is not None else "deposit"
-                target_categories = [c for c in ITEMIZED_CATEGORIES if Config.is_category_enabled(c, org_unit)] if Config is not None else ITEMIZED_CATEGORIES
+            target_categories = [c for c in ITEMIZED_CATEGORIES if (Config is None or Config.is_category_enabled(c, org_unit))]
+            if not target_categories:
+                target_categories = ["general_expense", "manpower", "fixed_asset"]
+            default_cat = target_categories[0]
 
-            existing_plans = self.search([
+            existing_plans = self.sudo().search([
                 ("org_unit_id", "=", org_unit.id),
                 ("cycle_id", "=", cycle.id),
                 ("active", "=", True),
             ], order="id asc")
 
-            # Clean up / archive any active plans that belong to a disabled category and have NO lines or data (branches only)
-            if not is_dist_or_ho:
-                for ep in existing_plans:
-                    if Config is not None and not Config.is_category_enabled(ep.category, org_unit):
-                        has_ep_data = bool(ep.line_ids) or bool(getattr(ep, "_get_category_lines", lambda c: False)(ep.category)) or (getattr(ep, "annual_total", 0.0) or 0.0) > 0.0
-                        if not has_ep_data and ep.state in ("draft", "returned", "info_requested"):
-                            try:
-                                ep.sudo().with_context(bypass_plan_lock=True).unlink()
-                            except Exception:
-                                ep.sudo().with_context(bypass_plan_lock=True).write({"active": False})
+            # Clean up / archive any active plans that belong to a disabled category
+            MOBILIZATION_CATS = {"deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding"}
+            for ep in existing_plans:
+                unit_type = ep.org_unit_type or (ep.org_unit_id.work_unit_type if ep.org_unit_id else False)
+                is_dist_or_ho = unit_type in ("district_office", "head_office", "regional_office")
+                # District/HO overview plans for mobilization categories are valid consolidation plans and must not be archived
+                if is_dist_or_ho and ep.category in MOBILIZATION_CATS:
+                    continue
+                # Never archive plans that are already submitted, endorsed, or approved
+                if ep.state not in ("draft", "returned", "info_requested"):
+                    continue
+                is_disabled = (Config is not None and not Config.is_category_enabled(ep.category, org_unit))
+                if is_disabled:
+                    try:
+                        ep.sudo().with_context(bypass_plan_lock=True).unlink()
+                    except Exception:
+                        ep.sudo().with_context(bypass_plan_lock=True).write({"active": False})
 
             # Ensure an active plan exists for every enabled category for this operating unit
-            all_unit_plans = self.search([
+            all_unit_plans = self.sudo().search([
                 ("org_unit_id", "=", org_unit.id),
                 ("cycle_id", "=", cycle.id),
                 ("active", "=", True),
             ], order="id asc")
-            for cat in target_categories:
-                if Config is not None and Config.is_category_enabled(cat, org_unit):
+            has_submitted = any(p.state in ("submitted", "district_approved", "district_endorsed", "ho_reviewed", "approved") for p in all_unit_plans)
+            if not has_submitted:
+                for cat in target_categories:
                     if not all_unit_plans.filtered(lambda p: p.category == cat):
-                        new_card = self.sudo().create({
+                        new_card = self.sudo().with_context(bypass_plan_lock=True).create({
                             "org_unit_id": org_unit.id,
                             "cycle_id": cycle.id,
                             "company_id": org_unit.company_id.id if hasattr(org_unit, "company_id") and org_unit.company_id else self.env.company.id,
@@ -6089,7 +7982,7 @@ class PbmsPlanningCategory(models.Model):
                         all_unit_plans |= new_card
 
             # Re-fetch active plans that are actually enabled in configuration
-            enabled_plans = all_unit_plans.filtered(lambda p: p.category in target_categories and (Config is None or Config.is_category_enabled(p.category, org_unit)))
+            enabled_plans = all_unit_plans.filtered(lambda p: p.category in target_categories)
 
             # Smart Plan Selection:
             # 1. Prefer default_category from context if valid and enabled
@@ -6126,7 +8019,7 @@ class PbmsPlanningCategory(models.Model):
             # 5. Fallback: if all target plans are submitted or existing, open the existing plan safely
             if not plan and all_unit_plans:
                 resource_plans = all_unit_plans.filtered(lambda p: p.category in target_categories)
-                plan = resource_plans[0] if resource_plans else all_unit_plans[0]
+                plan = resource_plans[0] if resource_plans else False
 
             if not plan:
                 plan = self.sudo().create({
@@ -6177,6 +8070,8 @@ class PbmsPlanningCategory(models.Model):
                     'general_expense': 'bunna_pbms.view_pbms_planning_category_list_expense',
                     'deposit': 'bunna_pbms.view_pbms_planning_category_list_retail',
                     'customer_base': 'bunna_pbms.view_pbms_planning_category_list_retail',
+                    'loan_disbursement_collection': 'bunna_pbms.view_pbms_planning_category_list_retail',
+                    'loan_outstanding': 'bunna_pbms.view_pbms_planning_category_list_retail',
                     'fx': 'bunna_pbms.view_pbms_planning_category_list_fx',
                     'digital_banking': 'bunna_pbms.view_pbms_planning_category_list_digital',
                 }
@@ -6189,6 +8084,12 @@ class PbmsPlanningCategory(models.Model):
 
     def get_formview_id(self, access_uid=None):
         """Return category-specific form view which sets the matching category tab as default."""
+        is_req = self.is_planning_request or bool(self.env.context.get("is_planning_request"))
+        if is_req:
+            base_view = self.env.ref("bunna_pbms.view_pbms_planning_request_form", raise_if_not_found=False) or self.env.ref("bunna_pbms.view_pbms_planning_category_form", raise_if_not_found=False)
+            if base_view:
+                return base_view.id
+
         Config = self.env.get("pbms.planning.config")
         default_cat = Config.get_default_category_for_unit(self.org_unit_id) if (Config is not None and self.org_unit_id) else "deposit"
         cat = self.category or self.env.context.get("default_category") or default_cat
@@ -6202,52 +8103,66 @@ class PbmsPlanningCategory(models.Model):
         return super().get_formview_id(access_uid=access_uid)
 
     def read(self, fields=None, load="_classic_read"):
-        """Ensure all lines matching this card's category are attached to this card before reading for list/form views."""
-        if not self.env.context.get("skip_read_line_attach"):
-            Line = self.env["pbms.plan.category.line"].sudo()
-            for rec in self:
-                rec_real_id = rec._origin.id if isinstance(rec._origin.id, int) else (rec.id if isinstance(rec.id, int) else False)
-                if not rec_real_id:
-                    continue
-                if rec.org_unit_id and rec.cycle_id and rec.category:
-                    detached = Line.search([
-                        ("plan_id.org_unit_id", "=", rec.org_unit_id.id),
-                        ("plan_id.cycle_id", "=", rec.cycle_id.id),
-                        ("line_type", "=", rec.category),
-                        ("plan_id", "!=", rec_real_id),
-                    ])
-                    if detached:
-                        detached = detached.filtered(lambda l: getattr(l.plan_id, "is_planning_request", False) or l.plan_id.category != rec.category)
-                        if detached:
-                            detached.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({"plan_id": rec_real_id})
-
+        """Fast read without synchronous database mutation."""
         res = super().read(fields=fields, load=load)
         cat_field_map = {
             "deposit_line_ids": "deposit",
             "customer_base_line_ids": "customer_base",
             "fx_line_ids": "fx",
             "digital_banking_line_ids": "digital_banking",
+            "loan_disbursement_line_ids": "loan_disbursement_collection",
+            "loan_outstanding_line_ids": "loan_outstanding",
             "expense_line_ids": "general_expense",
             "manpower_line_ids": "manpower",
             "fixed_asset_line_ids": "fixed_asset",
+            "credit_portfolio_line_ids": "credit_portfolio",
+            "initiative_budget_line_ids": "initiative_budget",
         }
-        for rec, r_dict in zip(self, res):
-            if not rec.org_unit_id or not rec.cycle_id:
-                continue
-            is_req = getattr(rec, "is_planning_request", False) or self.env.context.get("is_planning_request")
-            for fname, cat in cat_field_map.items():
-                if fname in r_dict and not r_dict[fname]:
-                    if rec.category and rec.category != cat and not is_req:
-                        continue
+        # Check fallback lines if category line fields or existing workforce fields are requested
+        requested_cat_fields = [f for f in cat_field_map if (fields is None or f in fields)]
+        check_existing_emp = (fields is None or "existing_employee_line_ids" in fields)
+        check_existing_summary = (fields is None or "existing_manpower_summary_ids" in fields)
+
+        if requested_cat_fields or check_existing_emp or check_existing_summary:
+            for rec, r_dict in zip(self, res):
+                if not rec.org_unit_id or not rec.cycle_id:
+                    continue
+                # For dedicated single-category plans: only search for its own category field if empty
+                target_fnames = [
+                    f for f in requested_cat_fields
+                    if (not rec.category or cat_field_map[f] == rec.category) and f in r_dict and not r_dict[f]
+                ]
+                for fname in target_fnames:
+                    cat = cat_field_map[fname]
                     try:
                         sibling_lines = self.env["pbms.plan.category.line"].search([
-                            ("plan_id.org_unit_id", "=", rec.org_unit_id.id),
-                            ("plan_id.cycle_id", "=", rec.cycle_id.id),
+                            ("org_unit_id", "=", rec.org_unit_id.id),
+                            ("cycle_id", "=", rec.cycle_id.id),
                             ("line_type", "=", cat),
-                            ("plan_id.active", "=", True),
+                            ("active", "=", True),
                         ])
                         if sibling_lines:
                             r_dict[fname] = sibling_lines.ids
+                    except Exception:
+                        pass
+                if check_existing_emp and (not rec.category or rec.category == "manpower") and "existing_employee_line_ids" in r_dict and not r_dict["existing_employee_line_ids"]:
+                    try:
+                        emp_lines = self.env["pbms.existing.employee.line"].search([
+                            ("org_unit_id", "=", rec.org_unit_id.id),
+                            ("cycle_id", "=", rec.cycle_id.id),
+                        ])
+                        if emp_lines:
+                            r_dict["existing_employee_line_ids"] = emp_lines.ids
+                    except Exception:
+                        pass
+                if check_existing_summary and (not rec.category or rec.category == "manpower") and "existing_manpower_summary_ids" in r_dict and not r_dict["existing_manpower_summary_ids"]:
+                    try:
+                        sum_lines = self.env["pbms.existing.manpower.summary"].search([
+                            ("org_unit_id", "=", rec.org_unit_id.id),
+                            ("cycle_id", "=", rec.cycle_id.id),
+                        ])
+                        if sum_lines:
+                            r_dict["existing_manpower_summary_ids"] = sum_lines.ids
                     except Exception:
                         pass
         return res
@@ -6300,6 +8215,14 @@ class PbmsPlanningCategory(models.Model):
     def action_open_import_wizard(self):
         """Open the Excel import wizard pre-filled with this plan card's details."""
         self.ensure_one()
+        ctx_cat = (
+            self.env.context.get("target_category")
+            or self.env.context.get("active_category")
+            or self.env.context.get("active_tab_category")
+            or self.env.context.get("default_category")
+            or self.category
+            or "deposit"
+        )
         return {
             "name": _("Import from Excel"),
             "type": "ir.actions.act_window",
@@ -6310,7 +8233,7 @@ class PbmsPlanningCategory(models.Model):
                 "default_plan_id": self.id,
                 "default_cycle_id": self.cycle_id.id,
                 "default_org_unit_id": self.org_unit_id.id,
-                "default_format_type": self.category or "deposit",
+                "default_format_type": ctx_cat,
             },
         }
 
@@ -6488,30 +8411,47 @@ class PbmsPlanningCategory(models.Model):
             return sol_id, unit_name, district_name, broad_cat
 
         def get_banner_unit_title(plans, default_text="District and Head Office"):
-            if len(plans) == 1 and plans[0].org_unit_type in ("branch", "sub_branch", "service_center"):
-                return plans[0].org_unit_id.name or "Branch Plan"
+            if len(plans) == 1:
+                utype = plans[0].org_unit_type
+                uname = plans[0].org_unit_id.name or ""
+                if utype in ("branch", "sub_branch", "service_center"):
+                    return uname or "Branch Plan"
+                elif utype == "district_office":
+                    return uname or "District Office Plan"
+                elif utype in ("head_office", "regional_office"):
+                    return uname or "Head Office Plan"
             return default_text
 
-        # Target records: prioritize district/HO records if selected, otherwise export all selected plans (including branch plans)
-        consolidated_records = records.filtered(lambda p: p.org_unit_type in ("district_office", "head_office", "regional_office"))
-        target_records = consolidated_records if consolidated_records else records
+        # Export exactly the selected records — no filtering to district/HO only
+        target_records = records
+
+        # Check if a specific category was requested via context (e.g. from active tab or button context)
+        ctx_category = (
+            self.env.context.get("target_category")
+            or self.env.context.get("active_category")
+            or self.env.context.get("active_tab_category")
+            or self.env.context.get("export_category")
+            or self.env.context.get("default_category")
+        )
 
         # Group plans by category
         plans_by_cat = {}
         for rec in target_records:
-            cat = rec.category or "deposit"
+            cat = ctx_category or rec.category or "deposit"
             if cat not in plans_by_cat:
                 plans_by_cat[cat] = self.env["pbms.planning.category"]
             plans_by_cat[cat] |= rec
 
         for cat, cat_plans in plans_by_cat.items():
             if cat == "fixed_asset":
+                is_approved_fa = any(p.state == "approved" for p in cat_plans)
                 ws = wb.add_worksheet("Fixed Asset (BB-APF-27)")
                 ws.freeze_panes(6, 4)
-                ws.merge_range(0, 0, 0, 10, "Bunna Bank", fmt_bank_title)
-                ws.merge_range(1, 0, 1, 10, "Property and Equipment", fmt_doc_title)
-                ws.merge_range(2, 0, 2, 10, f"For the FY {clean_fy}", fmt_fy_title)
-                ws.merge_range(3, 0, 3, 10, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
+                fa_last_col = 12 if is_approved_fa else 10
+                ws.merge_range(0, 0, 0, fa_last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, fa_last_col, "Property and Equipment", fmt_doc_title)
+                ws.merge_range(2, 0, 2, fa_last_col, f"For the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, fa_last_col, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
                 ws.write(4, 0, "BB-APF-27", fmt_form_code)
 
                 headers = [
@@ -6519,13 +8459,19 @@ class PbmsPlanningCategory(models.Model):
                     "Fixed Asset Category*", "Item Description*", "Users Position or Purpose of the Item",
                     "Qty", "Estimated Unit Price", "Estimated Total Price"
                 ]
+                if is_approved_fa:
+                    headers += ["Approved Qty", "Approved Total Price"]
                 for ci, h in enumerate(headers):
                     ws.write(5, ci, h, fmt_th)
 
                 row_cur = 6
+                seen_line_ids = set()
                 for p in cat_plans:
-                    lines = p.fixed_asset_line_ids or p.line_ids.filtered(lambda l: l.line_type == "fixed_asset")
+                    lines = p._get_category_lines("fixed_asset") or p.fixed_asset_line_ids or p.line_ids.filtered(lambda l: l.line_type == "fixed_asset")
                     for l in lines:
+                        if l.id in seen_line_ids:
+                            continue
+                        seen_line_ids.add(l.id)
                         sol_id, unit_name, district_name, broad_cat = get_meta(l, p)
                         nat = "New" if (l.nature or "new") == "new" else "Replacement"
                         cat_name = l.category_id.name or ""
@@ -6546,6 +8492,11 @@ class PbmsPlanningCategory(models.Model):
                         ws.write(row_cur, 8, qty, fmt_cell_int)
                         ws.write(row_cur, 9, unit_price, fmt_cell_num_no_dec)
                         ws.write(row_cur, 10, tot_price, fmt_cell_num_no_dec)
+                        if is_approved_fa:
+                            appr_qty = int(round(l.approved_annual_total or 0))
+                            appr_price = float(l.approved_annual_total or 0.0) * unit_price
+                            ws.write(row_cur, 11, appr_qty, fmt_cell_int)
+                            ws.write(row_cur, 12, appr_price, fmt_cell_num_no_dec)
                         row_cur += 1
 
                 ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
@@ -6555,10 +8506,16 @@ class PbmsPlanningCategory(models.Model):
                     ws.write_formula(row_cur, 8, f"=SUM(I7:I{row_cur})", fmt_tot_int)
                     ws.write(row_cur, 9, "", fmt_tot_label)
                     ws.write_formula(row_cur, 10, f"=SUM(K7:K{row_cur})", fmt_tot_num)
+                    if is_approved_fa:
+                        ws.write_formula(row_cur, 11, f"=SUM(L7:L{row_cur})", fmt_tot_int)
+                        ws.write_formula(row_cur, 12, f"=SUM(M7:M{row_cur})", fmt_tot_num)
                 else:
                     ws.write(row_cur, 8, 0, fmt_tot_int)
                     ws.write(row_cur, 9, "", fmt_tot_label)
                     ws.write(row_cur, 10, 0.0, fmt_tot_num)
+                    if is_approved_fa:
+                        ws.write(row_cur, 11, 0, fmt_tot_int)
+                        ws.write(row_cur, 12, 0.0, fmt_tot_num)
 
                 ws.set_column(0, 0, 10)
                 ws.set_column(1, 1, 26)
@@ -6571,26 +8528,41 @@ class PbmsPlanningCategory(models.Model):
                 ws.set_column(8, 8, 10)
                 ws.set_column(9, 9, 18)
                 ws.set_column(10, 10, 20)
+                if is_approved_fa:
+                    ws.set_column(11, 11, 14)
+                    ws.set_column(12, 12, 20)
+
 
             elif cat == "general_expense":
+                is_approved_ge = any(p.state == "approved" for p in cat_plans)
+                ge_last_col = 20 if is_approved_ge else 19
                 ws = wb.add_worksheet("Expense (BB-APF-21)")
                 ws.freeze_panes(6, 5)
-                ws.merge_range(0, 0, 0, 18, "Bunna Bank", fmt_bank_title)
-                ws.merge_range(1, 0, 1, 18, "General Expense Budget", fmt_doc_title)
-                ws.merge_range(2, 0, 2, 18, f"for the FY {clean_fy}", fmt_fy_title)
-                ws.merge_range(3, 0, 3, 18, get_banner_unit_title(cat_plans, "District and Head Office (HO-DO)"), fmt_work_units_title)
+                ws.merge_range(0, 0, 0, ge_last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, ge_last_col, "General Expense Budget", fmt_doc_title)
+                ws.merge_range(2, 0, 2, ge_last_col, f"for the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, ge_last_col, get_banner_unit_title(cat_plans, "District and Head Office (HO-DO)"), fmt_work_units_title)
                 ws.write(4, 0, "BB-APF-21", fmt_form_code)
 
-                headers = ["Sol ID", "Work Units Name", "Districts Name", "Broad Category", "Description"] + month_headers + ["Annual", "Remark"]
+                headers = ["Sol ID", "Work Units Name", "Districts Name", "Broad Category", "Description", "Estimate"] + month_headers + ["Annual"]
+                if is_approved_ge:
+                    headers += ["Approved Target"]
+                headers += ["Remark"]
                 for ci, h in enumerate(headers):
                     ws.write(5, ci, h, fmt_th)
 
+                remark_col = 20 if is_approved_ge else 19
                 row_cur = 6
+                seen_line_ids = set()
                 for p in cat_plans:
-                    lines = p.expense_line_ids or p.line_ids.filtered(lambda l: l.line_type == "general_expense")
+                    lines = p._get_category_lines("general_expense") or p.expense_line_ids or p.line_ids.filtered(lambda l: l.line_type == "general_expense")
                     for l in lines:
+                        if l.id in seen_line_ids:
+                            continue
+                        seen_line_ids.add(l.id)
                         sol_id, unit_name, district_name, broad_cat = get_meta(l, p)
                         desc = l.expense_account_id.name or ""
+                        ob_val = l.opening_balance or 0.0
                         m_vals = [l.m01 or 0.0, l.m02 or 0.0, l.m03 or 0.0, l.m04 or 0.0, l.m05 or 0.0, l.m06 or 0.0,
                                   l.m07 or 0.0, l.m08 or 0.0, l.m09 or 0.0, l.m10 or 0.0, l.m11 or 0.0, l.m12 or 0.0]
                         ann = l.proposed_annual_total or l.annual_total or sum(m_vals)
@@ -6601,35 +8573,54 @@ class PbmsPlanningCategory(models.Model):
                         ws.write(row_cur, 2, district_name, fmt_cell_text)
                         ws.write(row_cur, 3, broad_cat, fmt_cell_text)
                         ws.write(row_cur, 4, desc, fmt_cell_text)
+                        ws.write(row_cur, 5, ob_val, fmt_cell_num_acc)
                         for mi, mv in enumerate(m_vals):
-                            ws.write(row_cur, 5 + mi, mv, fmt_cell_num_acc)
-                        ws.write(row_cur, 17, ann, fmt_tot_num if ann > 0 else fmt_cell_num_acc)
-                        ws.write(row_cur, 18, rem, fmt_cell_text)
+                            ws.write(row_cur, 6 + mi, mv, fmt_cell_num_acc)
+                        ws.write(row_cur, 18, ann, fmt_tot_num if ann > 0 else fmt_cell_num_acc)
+                        if is_approved_ge:
+                            appr_ann = l.approved_annual_total or 0.0
+                            ws.write(row_cur, 19, appr_ann, fmt_tot_num if appr_ann > 0 else fmt_cell_num_acc)
+                        ws.write(row_cur, remark_col, rem, fmt_cell_text)
                         row_cur += 1
 
                 ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
                 for ci in range(1, 5):
                     ws.write(row_cur, ci, "", fmt_tot_label)
                 if row_cur > 6:
-                    for ci in range(5, 18):
+                    for ci in range(5, 19):
                         c_letter = xlsxwriter.utility.xl_col_to_name(ci)
                         ws.write_formula(row_cur, ci, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                    if is_approved_ge:
+                        c_letter = xlsxwriter.utility.xl_col_to_name(19)
+                        ws.write_formula(row_cur, 19, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
                 else:
-                    for ci in range(5, 18):
+                    for ci in range(5, 19):
                         ws.write(row_cur, ci, 0.0, fmt_tot_num)
-                ws.write(row_cur, 18, "", fmt_tot_label)
+                    if is_approved_ge:
+                        ws.write(row_cur, 19, 0.0, fmt_tot_num)
+                ws.write(row_cur, remark_col, "", fmt_tot_label)
 
                 ws.set_column(0, 0, 10)
                 ws.set_column(1, 1, 24)
                 ws.set_column(2, 2, 18)
                 ws.set_column(3, 3, 16)
                 ws.set_column(4, 4, 26)
-                for ci in range(5, 17):
+                ws.set_column(5, 5, 20)
+                for ci in range(6, 18):
                     ws.set_column(ci, ci, 13)
-                ws.set_column(17, 17, 16)
-                ws.set_column(18, 18, 22)
+                ws.set_column(18, 18, 16)
+                if is_approved_ge:
+                    ws.set_column(19, 19, 16)
+                    ws.set_column(20, 20, 22)
+                else:
+                    ws.set_column(19, 19, 22)
+
 
             elif cat == "manpower":
+                is_approved_mp = any(p.state == "approved" for p in cat_plans)
+                is_branch_export = any(p.org_unit_type in ("branch", "sub_branch", "service_center") for p in cat_plans)
+                can_export_sourcing = bool(self.env.user._pbms_can_view_sourcing() and not is_branch_export)
+
                 ws = wb.add_worksheet("Manpower (BB-APF-19)")
                 ws.freeze_panes(6, 4)
 
@@ -6638,14 +8629,28 @@ class PbmsPlanningCategory(models.Model):
                     "Type of Position", "Type of Employment", "Job Title", "Job Grade", "Employee Category",
                     "Authorized Baseline", "Active Staff", "Vacancies",
                     "Qty", "Date Needed", "Reason for the Proposed", "Remarks / Details",
-                    "Jul", "Aug", "Sep", "Q1 (Jul-Sep)",
-                    "Oct", "Nov", "Dec", "Q2 (Oct-Dec)",
-                    "Jan", "Feb", "Mar", "Q3 (Jan-Mar)",
-                    "Apr", "May", "Jun", "Q4 (Apr-Jun)",
-                    "Annual Headcount", "Approved Target",
-                    "Promotion", "Transfer", "Lateral", "External Vacancy", "Total Sourced",
-                    "Base Salary", "Pension (11%)", "Annual Unit Cost", "Annual Total Cost"
+                    "Jul", "Aug", "Sep", "QI",
+                    "Oct", "Nov", "Dec", "QII",
+                    "Jan", "Feb", "Mar", "QIII",
+                    "Apr", "May", "Jun", "QIV",
+                    "Annual Headcount",
                 ]
+                col_approved = None
+                if is_approved_mp:
+                    col_approved = len(headers)
+                    headers.append("Approved Target")
+
+                col_sourcing_start = None
+                if can_export_sourcing:
+                    col_sourcing_start = len(headers)
+                    headers.extend(["Promotion", "Transfer", "Lateral", "External Vacancy", "Total Sourced"])
+
+                col_base_sal = len(headers)
+                col_pension = col_base_sal + 1
+                col_unit_cost = col_base_sal + 2
+                col_annual_cost = col_base_sal + 3
+                headers.extend(["Base Salary", "Pension (11%)", "Annual Unit Cost", "Annual Total Cost"])
+
                 last_col = len(headers) - 1
 
                 ws.merge_range(0, 0, 0, last_col, "Bunna Bank", fmt_bank_title)
@@ -6658,9 +8663,13 @@ class PbmsPlanningCategory(models.Model):
                     ws.write(5, ci, h, fmt_th)
 
                 row_cur = 6
+                seen_line_ids = set()
                 for p in cat_plans:
-                    lines = p.manpower_line_ids or p.line_ids.filtered(lambda l: l.line_type == "manpower")
+                    lines = p._get_category_lines("manpower") or p.manpower_line_ids or p.line_ids.filtered(lambda l: l.line_type == "manpower")
                     for l in lines:
+                        if l.id in seen_line_ids:
+                            continue
+                        seen_line_ids.add(l.id)
                         sol_id, unit_name, district_name, broad_cat = get_meta(l, p)
                         pos_type = (l.position_type_id.name if l.position_type_id else (dict(l._fields['position_type'].selection).get(l.position_type, 'New Position')))
                         emp_type = (dict(l._fields['employment_type'].selection).get(l.employment_type, l.employment_type.capitalize() if l.employment_type else 'Permanent')) if l.employment_type else 'Permanent'
@@ -6730,16 +8739,21 @@ class PbmsPlanningCategory(models.Model):
                         ws.write(row_cur, 30, m_vals["m12"], fmt_cell_int)
                         ws.write(row_cur, 31, q4, fmt_cell_int)
                         ws.write(row_cur, 32, annual_hc, fmt_cell_int)
-                        ws.write(row_cur, 33, appr_target, fmt_cell_int)
-                        ws.write(row_cur, 34, prom, fmt_cell_int)
-                        ws.write(row_cur, 35, trans, fmt_cell_int)
-                        ws.write(row_cur, 36, lat, fmt_cell_int)
-                        ws.write(row_cur, 37, ext, fmt_cell_int)
-                        ws.write(row_cur, 38, tot_sourced, fmt_cell_int)
-                        ws.write(row_cur, 39, base_sal, fmt_cell_num_acc)
-                        ws.write(row_cur, 40, pension, fmt_cell_num_acc)
-                        ws.write(row_cur, 41, unit_cost, fmt_cell_num_acc)
-                        ws.write(row_cur, 42, annual_cost, fmt_cell_num_acc)
+
+                        if col_approved is not None:
+                            ws.write(row_cur, col_approved, appr_target, fmt_cell_int)
+
+                        if can_export_sourcing:
+                            ws.write(row_cur, col_sourcing_start, prom, fmt_cell_int)
+                            ws.write(row_cur, col_sourcing_start + 1, trans, fmt_cell_int)
+                            ws.write(row_cur, col_sourcing_start + 2, lat, fmt_cell_int)
+                            ws.write(row_cur, col_sourcing_start + 3, ext, fmt_cell_int)
+                            ws.write(row_cur, col_sourcing_start + 4, tot_sourced, fmt_cell_int)
+
+                        ws.write(row_cur, col_base_sal, base_sal, fmt_cell_num_acc)
+                        ws.write(row_cur, col_pension, pension, fmt_cell_num_acc)
+                        ws.write(row_cur, col_unit_cost, unit_cost, fmt_cell_num_acc)
+                        ws.write(row_cur, col_annual_cost, annual_cost, fmt_cell_num_acc)
                         row_cur += 1
 
                 # TOTAL ROW
@@ -6754,9 +8768,19 @@ class PbmsPlanningCategory(models.Model):
                     20, 21, 22, 23,
                     24, 25, 26, 27,
                     28, 29, 30, 31,
-                    32, 33,
-                    34, 35, 36, 37, 38,
+                    32,
                 ]
+                if col_approved is not None:
+                    int_sum_cols.append(col_approved)
+                if can_export_sourcing:
+                    int_sum_cols.extend([
+                        col_sourcing_start,
+                        col_sourcing_start + 1,
+                        col_sourcing_start + 2,
+                        col_sourcing_start + 3,
+                        col_sourcing_start + 4,
+                    ])
+
                 for ci in int_sum_cols:
                     if row_cur > 6:
                         c_letter = xlsxwriter.utility.xl_col_to_name(ci)
@@ -6765,10 +8789,10 @@ class PbmsPlanningCategory(models.Model):
                         ws.write(row_cur, ci, 0, fmt_tot_int)
 
                 if row_cur > 6:
-                    c_letter = xlsxwriter.utility.xl_col_to_name(42)
-                    ws.write_formula(row_cur, 42, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                    c_letter = xlsxwriter.utility.xl_col_to_name(col_annual_cost)
+                    ws.write_formula(row_cur, col_annual_cost, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
                 else:
-                    ws.write(row_cur, 42, 0.0, fmt_tot_num)
+                    ws.write(row_cur, col_annual_cost, 0.0, fmt_tot_num)
 
                 col_widths = [
                     10, 24, 18, 16, 18, 18, 28, 12, 18,
@@ -6777,21 +8801,43 @@ class PbmsPlanningCategory(models.Model):
                     10, 10, 10, 14,
                     10, 10, 10, 14,
                     10, 10, 10, 14,
-                    18, 16,
-                    12, 12, 12, 16, 14,
-                    16, 16, 18, 20,
+                    18,
                 ]
+                if col_approved is not None:
+                    col_widths.append(16)
+                if can_export_sourcing:
+                    col_widths.extend([12, 12, 12, 16, 14])
+                col_widths.extend([16, 16, 18, 20])
+
                 for ci, w in enumerate(col_widths):
                     ws.set_column(ci, ci, w)
 
             elif cat in ("deposit", "customer_base"):
-                title = f"Deposit Plan by District and Deposit Type for the FY {clean_fy}" if cat == "deposit" else f"Customer Base Plan by District and Customer Type for the FY {clean_fy}"
+                is_approved_dc = any(p.state == "approved" for p in cat_plans)
+                # Determine title based on unit type of the plans being exported
+                if len(cat_plans) == 1:
+                    utype = cat_plans[0].org_unit_type
+                    if utype in ("branch", "sub_branch", "service_center"):
+                        group_label = "Branch"
+                    elif utype == "district_office":
+                        group_label = "District"
+                    else:
+                        group_label = "Head Office"
+                else:
+                    group_label = "District"
+                if cat == "deposit":
+                    title = f"Deposit Plan by {group_label} and Deposit Type for the FY {clean_fy}"
+                else:
+                    title = f"Customer Base Plan by {group_label} and Customer Type for the FY {clean_fy}"
                 sheet_name = "Deposit by District" if cat == "deposit" else "Customer Base by District"
                 ws = wb.add_worksheet(sheet_name)
                 ws.freeze_panes(2, 1)
-                ws.merge_range(0, 0, 0, 13, title, fmt_banner_sage)
+                dc_last_col = 15 if is_approved_dc else 14
+                ws.merge_range(0, 0, 0, dc_last_col, title, fmt_banner_sage)
 
-                headers = ["Row Labels"] + month_headers + ["Annual Target"]
+                headers = ["Row Labels", "Estimate"] + month_headers + ["Annual Target"]
+                if is_approved_dc:
+                    headers += ["Approved Target"]
                 for ci, h in enumerate(headers):
                     ws.write(1, ci, h, fmt_th)
 
@@ -6802,31 +8848,53 @@ class PbmsPlanningCategory(models.Model):
 
                 all_lines = cat_plans.mapped("deposit_line_ids" if cat == "deposit" else "customer_base_line_ids")
                 if not all_lines:
+                    all_lines = self.env["pbms.plan.category.line"].concat(*[p._get_category_lines(cat) for p in cat_plans])
+                if not all_lines:
                     all_lines = cat_plans.mapped("line_ids").filtered(lambda l: l.line_type == cat)
 
                 dist_dict = {}
+                dist_approved = {}
+                dist_ob = {}
                 for l in all_lines:
-                    dist = l.district_id or l.plan_id.district_id or (l.source_unit_id.parent_unit if l.source_unit_id else False) or l.org_unit_id
-                    dist_sol = dist.sol_id if dist and hasattr(dist, "sol_id") and dist.sol_id else (l.sol_id or 900)
-                    dist_name = dist.name if dist else "General District"
-                    dist_key = (dist_sol, dist_name)
+                    # Group by the plan's own org unit (branch, district, or HO)
+                    plan_rec = l.plan_id if hasattr(l, "plan_id") and l.plan_id else False
+                    if plan_rec and hasattr(plan_rec, "org_unit_id") and plan_rec.org_unit_id:
+                        plan_unit = plan_rec.org_unit_id
+                    elif hasattr(l, "source_unit_id") and l.source_unit_id:
+                        plan_unit = l.source_unit_id
+                    elif hasattr(l, "org_unit_id") and l.org_unit_id:
+                        plan_unit = l.org_unit_id
+                    else:
+                        plan_unit = False
+                    if plan_unit:
+                        g_sol = plan_unit.sol_id if hasattr(plan_unit, "sol_id") and plan_unit.sol_id else (l.sol_id or 900)
+                        g_name = plan_unit.name or "General Unit"
+                    else:
+                        g_sol = l.sol_id or 900
+                        g_name = "General Unit"
+                    dist_key = (g_sol, g_name)
                     if dist_key not in dist_dict:
                         dist_dict[dist_key] = {}
+                        dist_approved[dist_key] = {}
+                        dist_ob[dist_key] = {}
 
                     dtype = l.deposit_type_id
-                    raw_name = dtype.name or ""
-                    if (dtype and dtype.is_ifb) or "IFB" in raw_name.upper():
+                    raw_name = dtype.name or "" if dtype else ""
+                    if dtype and (dtype.is_ifb if hasattr(dtype, "is_ifb") else False) or "IFB" in raw_name.upper():
                         prod = "IFB"
-                    elif "DEMAND" in raw_name.upper() or (dtype and dtype.code == "DEM"):
+                    elif "DEMAND" in raw_name.upper() or (dtype and getattr(dtype, "code", "") == "DEM"):
                         prod = "Demand"
-                    elif "SAVING" in raw_name.upper() or (dtype and dtype.code == "SAV"):
+                    elif "SAVING" in raw_name.upper() or (dtype and getattr(dtype, "code", "") == "SAV"):
                         prod = "Saving"
                     else:
                         prod = raw_name or "Demand"
 
                     if prod not in dist_dict[dist_key]:
                         dist_dict[dist_key][prod] = [0.0] * 12
+                        dist_approved[dist_key][prod] = 0.0
+                        dist_ob[dist_key][prod] = 0.0
 
+                    dist_ob[dist_key][prod] += (l.opening_balance or 0.0)
                     dist_dict[dist_key][prod][0] += (l.m01 or 0.0)
                     dist_dict[dist_key][prod][1] += (l.m02 or 0.0)
                     dist_dict[dist_key][prod][2] += (l.m03 or 0.0)
@@ -6839,69 +8907,275 @@ class PbmsPlanningCategory(models.Model):
                     dist_dict[dist_key][prod][9] += (l.m10 or 0.0)
                     dist_dict[dist_key][prod][10] += (l.m11 or 0.0)
                     dist_dict[dist_key][prod][11] += (l.m12 or 0.0)
+                    if is_approved_dc:
+                        dist_approved[dist_key][prod] += (l.approved_annual_total or 0.0)
 
                 row_cur = 2
                 std_prods = ["Demand", "IFB", "Saving"]
+                grand_ob = 0.0
                 grand_months = [0.0] * 12
                 grand_annual = 0.0
+                grand_approved = 0.0
 
                 for (dsol, dname) in sorted(dist_dict.keys(), key=lambda x: (x[0], x[1])):
                     prod_data = dist_dict[(dsol, dname)]
+                    appr_data = dist_approved.get((dsol, dname), {})
+                    ob_data = dist_ob.get((dsol, dname), {})
                     dist_months = [0.0] * 12
                     for p_name, p_vals in prod_data.items():
                         for mi in range(12):
                             dist_months[mi] += p_vals[mi]
                     dist_annual = sum(dist_months)
+                    dist_appr_total = sum(appr_data.values())
+                    dist_ob_total = sum(ob_data.values())
 
                     ws.write(row_cur, 0, f"[-] {dsol} {dname.upper()}", fmt_dist_subtotal_label)
+                    ws.write(row_cur, 1, dist_ob_total, dist_val_fmt)
+                    grand_ob += dist_ob_total
                     for mi in range(12):
-                        ws.write(row_cur, 1 + mi, dist_months[mi], dist_val_fmt)
+                        ws.write(row_cur, 2 + mi, dist_months[mi], dist_val_fmt)
                         grand_months[mi] += dist_months[mi]
-                    ws.write(row_cur, 13, dist_annual, dist_val_fmt)
+                    ws.write(row_cur, 14, dist_annual, dist_val_fmt)
                     grand_annual += dist_annual
+                    if is_approved_dc:
+                        ws.write(row_cur, 15, dist_appr_total, dist_val_fmt)
+                        grand_approved += dist_appr_total
                     row_cur += 1
 
                     sorted_prods = [p for p in std_prods if p in prod_data] + [p for p in prod_data if p not in std_prods]
                     for p in sorted_prods:
                         p_vals = prod_data[p]
                         p_annual = sum(p_vals)
+                        p_ob = ob_data.get(p, 0.0)
                         ws.write(row_cur, 0, f"    {p}", fmt_cell_text_indent)
+                        ws.write(row_cur, 1, p_ob, val_fmt)
                         for mi in range(12):
-                            ws.write(row_cur, 1 + mi, p_vals[mi], val_fmt)
-                        ws.write(row_cur, 13, p_annual, val_fmt)
+                            ws.write(row_cur, 2 + mi, p_vals[mi], val_fmt)
+                        ws.write(row_cur, 14, p_annual, val_fmt)
+                        if is_approved_dc:
+                            ws.write(row_cur, 15, appr_data.get(p, 0.0), val_fmt)
                         row_cur += 1
 
                 ws.write(row_cur, 0, "Total", fmt_tot_label)
+                ws.write(row_cur, 1, grand_ob, tot_val_fmt)
                 for mi in range(12):
-                    ws.write(row_cur, 1 + mi, grand_months[mi], tot_val_fmt)
-                ws.write(row_cur, 13, grand_annual, tot_val_fmt)
+                    ws.write(row_cur, 2 + mi, grand_months[mi], tot_val_fmt)
+                ws.write(row_cur, 14, grand_annual, tot_val_fmt)
+                if is_approved_dc:
+                    ws.write(row_cur, 15, grand_approved, tot_val_fmt)
 
                 ws.set_column(0, 0, 32)
-                for ci in range(1, 13):
+                ws.set_column(1, 1, 18 if cat == "deposit" else 14)
+                for ci in range(2, 14):
                     ws.set_column(ci, ci, 14 if cat == "deposit" else 12)
-                ws.set_column(13, 13, 18 if cat == "deposit" else 16)
+                ws.set_column(14, 14, 18 if cat == "deposit" else 16)
+                if is_approved_dc:
+                    ws.set_column(15, 15, 18 if cat == "deposit" else 16)
+
+            elif cat == "credit_portfolio":
+                is_approved_cp = any(p.state == "approved" for p in cat_plans)
+                ws = wb.add_worksheet("Credit Portfolio (BB-APF-15)")
+                ws.freeze_panes(6, 4)
+                cp_last_col = 25 if is_approved_cp else 24
+                ws.merge_range(0, 0, 0, cp_last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, cp_last_col, "Credit Portfolio Plan", fmt_doc_title)
+                ws.merge_range(2, 0, 2, cp_last_col, f"For the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, cp_last_col, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
+                ws.write(4, 0, "BB-APF-15", fmt_form_code)
+
+                headers = [
+                    "Sol ID", "Work Unit Name", "Districts Name", "Broad Category",
+                    "Section", "Portfolio Item", "Totals Basis", "Estimate"
+                ] + month_headers + ["Q1", "Q2", "Q3", "Q4", "Annual Target"]
+                if is_approved_cp:
+                    headers += ["Approved Target"]
+                for ci, h in enumerate(headers):
+                    ws.write(5, ci, h, fmt_th)
+
+                row_cur = 6
+                seen_line_ids = set()
+                for p in cat_plans:
+                    lines = p._get_category_lines("credit_portfolio") or p.credit_portfolio_line_ids or p.line_ids.filtered(lambda l: l.line_type == "credit_portfolio")
+                    for l in lines:
+                        if l.id in seen_line_ids:
+                            continue
+                        seen_line_ids.add(l.id)
+                        sol_id, unit_name, district_name, broad_cat = get_meta(l, p)
+                        sec_label = dict(l._fields["credit_portfolio_section"].selection).get(l.credit_portfolio_section, "") if l.credit_portfolio_section else ""
+                        item_name = l.credit_portfolio_item_id.name if l.credit_portfolio_item_id else ""
+                        basis_label = dict(l._fields["totals_basis"].selection).get(l.totals_basis, "") if l.totals_basis else ""
+                        ob_val = l.opening_balance or 0.0
+                        m_vals = [l.m01 or 0.0, l.m02 or 0.0, l.m03 or 0.0, l.m04 or 0.0, l.m05 or 0.0, l.m06 or 0.0,
+                                  l.m07 or 0.0, l.m08 or 0.0, l.m09 or 0.0, l.m10 or 0.0, l.m11 or 0.0, l.m12 or 0.0]
+                        q1 = l.quarter1_total or 0.0
+                        q2 = l.quarter2_total or 0.0
+                        q3 = l.quarter3_total or 0.0
+                        q4 = l.quarter4_total or 0.0
+                        ann = l.annual_total or 0.0
+
+                        ws.write(row_cur, 0, sol_id, fmt_cell_int)
+                        ws.write(row_cur, 1, unit_name, fmt_cell_text)
+                        ws.write(row_cur, 2, district_name, fmt_cell_text)
+                        ws.write(row_cur, 3, broad_cat, fmt_cell_text)
+                        ws.write(row_cur, 4, sec_label, fmt_cell_text)
+                        ws.write(row_cur, 5, item_name, fmt_cell_text)
+                        ws.write(row_cur, 6, basis_label, fmt_cell_text)
+                        ws.write(row_cur, 7, ob_val, fmt_cell_num)
+                        for mi, mv in enumerate(m_vals):
+                            ws.write(row_cur, 8 + mi, mv, fmt_cell_num)
+                        ws.write(row_cur, 20, q1, fmt_cell_num)
+                        ws.write(row_cur, 21, q2, fmt_cell_num)
+                        ws.write(row_cur, 22, q3, fmt_cell_num)
+                        ws.write(row_cur, 23, q4, fmt_cell_num)
+                        ws.write(row_cur, 24, ann, fmt_tot_num)
+                        if is_approved_cp:
+                            appr_val = l.approved_annual_total or 0.0
+                            ws.write(row_cur, 25, appr_val, fmt_tot_num)
+                        row_cur += 1
+
+                ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
+                for ci in range(1, 7):
+                    ws.write(row_cur, ci, "", fmt_tot_label)
+                if row_cur > 6:
+                    for ci in range(7, 25):
+                        c_letter = xlsxwriter.utility.xl_col_to_name(ci)
+                        ws.write_formula(row_cur, ci, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                    if is_approved_cp:
+                        c_letter = xlsxwriter.utility.xl_col_to_name(25)
+                        ws.write_formula(row_cur, 25, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                else:
+                    for ci in range(7, 25):
+                        ws.write(row_cur, ci, 0.0, fmt_tot_num)
+                    if is_approved_cp:
+                        ws.write(row_cur, 25, 0.0, fmt_tot_num)
+
+                ws.set_column(0, 0, 10)
+                ws.set_column(1, 1, 24)
+                ws.set_column(2, 2, 18)
+                ws.set_column(3, 3, 16)
+                ws.set_column(4, 4, 18)
+                ws.set_column(5, 5, 28)
+                ws.set_column(6, 6, 18)
+                ws.set_column(7, 7, 18)
+                for ci in range(8, 24):
+                    ws.set_column(ci, ci, 13)
+                ws.set_column(24, 24, 16)
+                if is_approved_cp:
+                    ws.set_column(25, 25, 16)
+
+            elif cat == "initiative_budget":
+                is_approved_ib = any(p.state == "approved" for p in cat_plans)
+                ws = wb.add_worksheet("Initiative Budget")
+                ws.freeze_panes(6, 4)
+                ib_last_col = 7 if is_approved_ib else 6
+                ws.merge_range(0, 0, 0, ib_last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, ib_last_col, "Initiative Budget Plan", fmt_doc_title)
+                ws.merge_range(2, 0, 2, ib_last_col, f"For the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, ib_last_col, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
+
+                headers = [
+                    "Sol ID", "Work Unit Name", "Districts Name", "Broad Category",
+                    "Initiative Name", "Description / Justification", "Initiative Cost (ETB)"
+                ]
+                if is_approved_ib:
+                    headers += ["Approved Cost (ETB)"]
+                for ci, h in enumerate(headers):
+                    ws.write(5, ci, h, fmt_th)
+
+                row_cur = 6
+                seen_line_ids = set()
+                for p in cat_plans:
+                    lines = p._get_category_lines("initiative_budget") or p.initiative_budget_line_ids or p.line_ids.filtered(lambda l: l.line_type == "initiative_budget")
+                    for l in lines:
+                        if l.id in seen_line_ids:
+                            continue
+                        seen_line_ids.add(l.id)
+                        sol_id, unit_name, district_name, broad_cat = get_meta(l, p)
+                        iname = l.initiative_name or ""
+                        idesc = l.initiative_description or ""
+                        cost = l.initiative_cost or l.annual_total or 0.0
+
+                        ws.write(row_cur, 0, sol_id, fmt_cell_int)
+                        ws.write(row_cur, 1, unit_name, fmt_cell_text)
+                        ws.write(row_cur, 2, district_name, fmt_cell_text)
+                        ws.write(row_cur, 3, broad_cat, fmt_cell_text)
+                        ws.write(row_cur, 4, iname, fmt_cell_text)
+                        ws.write(row_cur, 5, idesc, fmt_cell_text)
+                        ws.write(row_cur, 6, cost, fmt_cell_num)
+                        if is_approved_ib:
+                            appr_cost = l.approved_annual_total or 0.0
+                            ws.write(row_cur, 7, appr_cost, fmt_cell_num)
+                        row_cur += 1
+
+                ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
+                for ci in range(1, 6):
+                    ws.write(row_cur, ci, "", fmt_tot_label)
+                if row_cur > 6:
+                    c_letter = xlsxwriter.utility.xl_col_to_name(6)
+                    ws.write_formula(row_cur, 6, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                    if is_approved_ib:
+                        c_letter = xlsxwriter.utility.xl_col_to_name(7)
+                        ws.write_formula(row_cur, 7, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                else:
+                    ws.write(row_cur, 6, 0.0, fmt_tot_num)
+                    if is_approved_ib:
+                        ws.write(row_cur, 7, 0.0, fmt_tot_num)
+
+                ws.set_column(0, 0, 10)
+                ws.set_column(1, 1, 24)
+                ws.set_column(2, 2, 18)
+                ws.set_column(3, 3, 16)
+                ws.set_column(4, 4, 28)
+                ws.set_column(5, 5, 36)
+                ws.set_column(6, 6, 20)
+                if is_approved_ib:
+                    ws.set_column(7, 7, 20)
 
             else:
-                # FX or Digital Banking
-                cat_title = "FX Mobilization" if cat == "fx" else "Digital Banking"
-                ws = wb.add_worksheet(cat_title)
+                # FX, Digital Banking, Loan Disbursement & Collection, Loan & Advances Outstanding
+                is_approved_fx = any(p.state == "approved" for p in cat_plans)
+                cat_titles = {
+                    "fx": "FX Mobilization",
+                    "digital_banking": "Digital Banking",
+                    "loan_disbursement_collection": "Loan Disbursement & Collection",
+                    "loan_outstanding": "Loan & Advances Outstanding",
+                }
+                cat_title = cat_titles.get(cat, (cat or "plan").replace("_", " ").title())
+                ws = wb.add_worksheet(cat_title[:31])
                 ws.freeze_panes(6, 4)
-                ws.merge_range(0, 0, 0, 16, "Bunna Bank", fmt_bank_title)
-                ws.merge_range(1, 0, 1, 16, cat_title, fmt_doc_title)
-                ws.merge_range(2, 0, 2, 16, f"For the FY {clean_fy}", fmt_fy_title)
-                ws.merge_range(3, 0, 3, 16, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
+                fx_last_col = 19 if is_approved_fx else 18
+                ws.merge_range(0, 0, 0, fx_last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, fx_last_col, cat_title, fmt_doc_title)
+                ws.merge_range(2, 0, 2, fx_last_col, f"For the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, fx_last_col, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
 
-                item_label = "FX Source" if cat == "fx" else "Digital Channel"
-                headers = ["Sol ID", "Work Unit Name", "Districts Name", "Broad Category", item_label] + month_headers + ["Annual Target"]
+                item_labels = {
+                    "fx": "FX Source",
+                    "digital_banking": "Digital Channel",
+                    "loan_disbursement_collection": "Loan Product",
+                    "loan_outstanding": "Loan Product",
+                }
+                item_label = item_labels.get(cat, "Product / Item")
+                headers = ["Sol ID", "Work Unit Name", "Districts Name", "Broad Category", item_label, "Estimate"] + month_headers + ["Annual Target"]
+                if is_approved_fx:
+                    headers += ["Approved Target"]
                 for ci, h in enumerate(headers):
                     ws.write(5, ci, h, fmt_th)
 
                 row_cur = 6
                 for p in cat_plans:
-                    lines = p.fx_line_ids if cat == "fx" else p.digital_banking_line_ids
+                    lines = p._get_category_lines(cat) or p.line_ids.filtered(lambda l: l.line_type == cat)
                     for l in lines:
                         sol_id, unit_name, district_name, broad_cat = get_meta(l, p)
-                        item_val = (l.fx_source_type.name if cat == "fx" else l.channel_id.name) or ""
+                        if cat == "fx":
+                            item_val = l.fx_source_type.name if l.fx_source_type else ""
+                        elif cat == "digital_banking":
+                            item_val = l.channel_id.name if l.channel_id else ""
+                        elif cat in ("loan_disbursement_collection", "loan_outstanding"):
+                            item_val = l.loan_product_id.name if hasattr(l, "loan_product_id") and l.loan_product_id else (l.other_justification or "Loan Product")
+                        else:
+                            item_val = getattr(l, "name", "") or ""
+                        ob_val = l.opening_balance or 0.0
                         m_vals = [l.m01 or 0.0, l.m02 or 0.0, l.m03 or 0.0, l.m04 or 0.0, l.m05 or 0.0, l.m06 or 0.0,
                                   l.m07 or 0.0, l.m08 or 0.0, l.m09 or 0.0, l.m10 or 0.0, l.m11 or 0.0, l.m12 or 0.0]
                         ann = l.proposed_annual_total or l.annual_total or sum(m_vals)
@@ -6911,30 +9185,42 @@ class PbmsPlanningCategory(models.Model):
                         ws.write(row_cur, 2, district_name, fmt_cell_text)
                         ws.write(row_cur, 3, broad_cat, fmt_cell_text)
                         ws.write(row_cur, 4, item_val, fmt_cell_text)
+                        ws.write(row_cur, 5, ob_val, fmt_cell_num)
                         for mi, mv in enumerate(m_vals):
-                            ws.write(row_cur, 5 + mi, mv, fmt_cell_num)
-                        ws.write(row_cur, 17, ann, fmt_tot_num)
+                            ws.write(row_cur, 6 + mi, mv, fmt_cell_num)
+                        ws.write(row_cur, 18, ann, fmt_tot_num)
+                        if is_approved_fx:
+                            appr_val = l.approved_annual_total or 0.0
+                            ws.write(row_cur, 19, appr_val, fmt_tot_num)
                         row_cur += 1
 
                 ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
                 for ci in range(1, 5):
                     ws.write(row_cur, ci, "", fmt_tot_label)
                 if row_cur > 6:
-                    for ci in range(5, 18):
+                    for ci in range(5, 19):
                         c_letter = xlsxwriter.utility.xl_col_to_name(ci)
                         ws.write_formula(row_cur, ci, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                    if is_approved_fx:
+                        c_letter = xlsxwriter.utility.xl_col_to_name(19)
+                        ws.write_formula(row_cur, 19, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
                 else:
-                    for ci in range(5, 18):
+                    for ci in range(5, 19):
                         ws.write(row_cur, ci, 0.0, fmt_tot_num)
+                    if is_approved_fx:
+                        ws.write(row_cur, 19, 0.0, fmt_tot_num)
 
                 ws.set_column(0, 0, 10)
                 ws.set_column(1, 1, 24)
                 ws.set_column(2, 2, 18)
                 ws.set_column(3, 3, 16)
                 ws.set_column(4, 4, 24)
-                for ci in range(5, 17):
+                ws.set_column(5, 5, 20)
+                for ci in range(6, 18):
                     ws.set_column(ci, ci, 13)
-                ws.set_column(17, 17, 16)
+                ws.set_column(18, 18, 16)
+                if is_approved_fx:
+                    ws.set_column(19, 19, 16)
 
         wb.close()
         output.seek(0)
@@ -6942,7 +9228,7 @@ class PbmsPlanningCategory(models.Model):
 
         if len(records) == 1:
             rec = records[0]
-            cat_name = (rec.category or "Plan").replace("_", " ").title().replace(" ", "_")
+            cat_name = (ctx_category or rec.category or "Plan").replace("_", " ").title().replace(" ", "_")
             unit_name = (rec.org_unit_id.name or "Unit").replace(" ", "_")
             cycle_str = (rec.cycle_id.name or "Cycle").replace(" ", "_").replace("/", "-")
             file_name = f"PBMS_{cat_name}_{unit_name}_{cycle_str}.xlsx"
@@ -7003,8 +9289,8 @@ class PbmsPlanningCategory(models.Model):
     def action_view_branch_details(self):
         """Action for Head Office Reviewer / District to inspect branch-by-branch details of a category in this district."""
         self.ensure_one()
-        target_category = self.env.context.get("target_category") or "deposit"
-        district = self.org_unit_id if self.org_unit_type == "district_office" else (self.district_id or self.org_unit_id)
+        target_category = self.env.context.get("target_category") or getattr(self, "category", False) or "deposit"
+        district = self.org_unit_id if self.org_unit_type in ("district_office", "regional_office", "area_office") else (self.district_id or False)
         category_titles = {
             "deposit": _("Deposit Mobilization"),
             "customer_base": _("Customer Base"),
@@ -7013,30 +9299,57 @@ class PbmsPlanningCategory(models.Model):
             "general_expense": _("General Expense Budget"),
             "manpower": _("Workforce / Manpower Plan"),
             "fixed_asset": _("Fixed Asset Requirement"),
+            "loan_disbursement_collection": _("Loan Disbursement & Collection"),
+            "loan_outstanding": _("Loan & Advances Outstanding"),
+            "credit_portfolio": _("Credit Portfolio (BB-APF-15)"),
+            "initiative_budget": _("Initiative Budget"),
         }
-        title = _("Branch Details - %s (%s)") % (category_titles.get(target_category, target_category), district.display_name if district else "")
-        list_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_drilldown_list", raise_if_not_found=False)
+        title = _("Branch Details - %s (%s)") % (category_titles.get(target_category, target_category), district.display_name if district else _("All Branches"))
+
+        category_view_map = {
+            "manpower": "bunna_pbms.view_pbms_plan_category_line_review_list_manpower",
+            "general_expense": "bunna_pbms.view_pbms_plan_category_line_review_list_expense",
+            "fixed_asset": "bunna_pbms.view_pbms_plan_category_line_review_list_fixed_asset",
+            "credit_portfolio": "bunna_pbms.view_pbms_plan_category_line_review_list_credit_portfolio",
+            "initiative_budget": "bunna_pbms.view_pbms_plan_category_line_review_list_initiative_budget",
+        }
+        list_view_xmlid = category_view_map.get(target_category, "bunna_pbms.view_pbms_plan_category_line_drilldown_list")
+        list_view = self.env.ref(list_view_xmlid, raise_if_not_found=False)
         pivot_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_drilldown_pivot", raise_if_not_found=False)
+        graph_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_drilldown_graph", raise_if_not_found=False)
+        form_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_form", raise_if_not_found=False)
+        search_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_review_search", raise_if_not_found=False) or self.env.ref("bunna_pbms.view_pbms_plan_category_line_search", raise_if_not_found=False)
+
         views = []
         if list_view:
             views.append((list_view.id, "list"))
         if pivot_view:
             views.append((pivot_view.id, "pivot"))
+        if graph_view:
+            views.append((graph_view.id, "graph"))
+        if form_view:
+            views.append((form_view.id, "form"))
+
+        domain = [
+            ("cycle_id", "=", self.cycle_id.id),
+            ("line_type", "=", target_category),
+            ("org_unit_type", "in", ("branch", "sub_branch", "service_center")),
+        ]
+        if district and self.org_unit_type in ("district_office", "regional_office", "area_office"):
+            domain.append(("district_id", "=", district.id))
 
         return {
             "name": title,
             "type": "ir.actions.act_window",
             "res_model": "pbms.plan.category.line",
-            "view_mode": "list,pivot,graph",
+            "view_mode": "list,pivot,graph,form",
             "views": views if views else False,
-            "domain": [
-                ("cycle_id", "=", self.cycle_id.id),
-                ("district_id", "=", district.id if district else False),
-                ("org_unit_type", "in", ("branch", "sub_branch")),
-                ("line_type", "=", target_category),
-            ],
+            "search_view_id": [search_view.id, search_view.name] if search_view else False,
+            "domain": domain,
             "context": {
                 "search_default_group_by_org_unit": 1,
+                "default_line_type": target_category,
+                "target_category": target_category,
                 "group_by": ["org_unit_id"],
             },
         }
@@ -7044,7 +9357,7 @@ class PbmsPlanningCategory(models.Model):
     def action_view_district_details(self):
         """Action for Final Approver / Head Office Reviewers to inspect district-by-district breakdown across all districts."""
         self.ensure_one()
-        target_category = self.env.context.get("target_category") or "deposit"
+        target_category = self.env.context.get("target_category") or getattr(self, "category", False) or "deposit"
         category_titles = {
             "deposit": _("Deposit Mobilization"),
             "customer_base": _("Customer Base"),
@@ -7053,29 +9366,53 @@ class PbmsPlanningCategory(models.Model):
             "general_expense": _("General Expense Budget"),
             "manpower": _("Workforce / Manpower Plan"),
             "fixed_asset": _("Fixed Asset Requirement"),
+            "loan_disbursement_collection": _("Loan Disbursement & Collection"),
+            "loan_outstanding": _("Loan & Advances Outstanding"),
+            "credit_portfolio": _("Credit Portfolio (BB-APF-15)"),
+            "initiative_budget": _("Initiative Budget"),
         }
         title = _("District Breakdown - %s") % category_titles.get(target_category, target_category)
-        list_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_drilldown_list", raise_if_not_found=False)
+
+        category_view_map = {
+            "manpower": "bunna_pbms.view_pbms_plan_category_line_review_list_manpower",
+            "general_expense": "bunna_pbms.view_pbms_plan_category_line_review_list_expense",
+            "fixed_asset": "bunna_pbms.view_pbms_plan_category_line_review_list_fixed_asset",
+            "credit_portfolio": "bunna_pbms.view_pbms_plan_category_line_review_list_credit_portfolio",
+            "initiative_budget": "bunna_pbms.view_pbms_plan_category_line_review_list_initiative_budget",
+        }
+        list_view_xmlid = category_view_map.get(target_category, "bunna_pbms.view_pbms_plan_category_line_drilldown_list")
+        list_view = self.env.ref(list_view_xmlid, raise_if_not_found=False)
         pivot_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_drilldown_pivot", raise_if_not_found=False)
+        graph_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_drilldown_graph", raise_if_not_found=False)
+        form_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_form", raise_if_not_found=False)
+        search_view = self.env.ref("bunna_pbms.view_pbms_plan_category_line_review_search", raise_if_not_found=False) or self.env.ref("bunna_pbms.view_pbms_plan_category_line_search", raise_if_not_found=False)
+
         views = []
         if list_view:
             views.append((list_view.id, "list"))
         if pivot_view:
             views.append((pivot_view.id, "pivot"))
+        if graph_view:
+            views.append((graph_view.id, "graph"))
+        if form_view:
+            views.append((form_view.id, "form"))
 
         return {
             "name": title,
             "type": "ir.actions.act_window",
             "res_model": "pbms.plan.category.line",
-            "view_mode": "list,pivot,graph",
+            "view_mode": "list,pivot,graph,form",
             "views": views if views else False,
+            "search_view_id": [search_view.id, search_view.name] if search_view else False,
             "domain": [
                 ("cycle_id", "=", self.cycle_id.id),
-                ("org_unit_type", "=", "district_office"),
+                ("org_unit_type", "in", ("district_office", "regional_office", "area_office")),
                 ("line_type", "=", target_category),
             ],
             "context": {
                 "search_default_group_by_org_unit": 1,
+                "default_line_type": target_category,
+                "target_category": target_category,
                 "group_by": ["org_unit_id"],
             },
         }
@@ -7099,23 +9436,44 @@ class PbmsPlanningCategory(models.Model):
     def _check_swift_head_office_only(self):
         for rec in self:
             if (rec.category == "fx" and rec.fx_source_type
-                    and rec.fx_source_type.code == "SWIFT"
+                    and rec.fx_source_type.code in ("SWIFT", "remittance_swift")
                     and rec.org_unit_id.work_unit_type != "head_office"):
                 raise ValidationError(_(
                     "Remittance-SWIFT targets are planned at Head Office / "
                     "corporate level only, not per branch or district."))
 
-    @api.constrains("plan_category", *MONTH_FIELDS)
+    @api.constrains("plan_category", "category", *MONTH_FIELDS)
     def _check_account_category_is_whole_number(self):
         for rec in self:
-            if rec.category == "deposit" and rec.plan_category == "account":
+            if (rec.category in ("deposit", "customer_base") and rec.plan_category == "account") or rec.category == "manpower":
                 for fname in MONTH_FIELDS:
                     val = getattr(rec, fname) or 0.0
                     if val != int(val):
                         raise ValidationError(_(
-                            "Account/customer-base targets must be whole numbers "
-                            "(got %(val)s for %(month)s).",
+                            "%(cat)s targets must be whole numbers (integers), got %(val)s for %(month)s.",
+                            cat=rec.plan_category_title or _("Plan"),
                             val=val, month=fname))
+
+    @api.constrains("return_reason", "district_comment", "chief_comment", "people_solutions_comment", "cpco_comment", "ho_comment", "committee_comment", "ceo_comment")
+    def _check_comments_not_pure_numbers(self):
+        fields_to_check = {
+            "return_reason": _("Return Reason"),
+            "district_comment": _("District Comment"),
+            "chief_comment": _("Chief Comment"),
+            "people_solutions_comment": _("People Solutions Comment"),
+            "cpco_comment": _("CPCO Comment"),
+            "ho_comment": _("Head Office Comment"),
+            "committee_comment": _("Committee Comment"),
+            "ceo_comment": _("CEO Comment"),
+        }
+        for rec in self:
+            for fname, label in fields_to_check.items():
+                val = getattr(rec, fname, False)
+                if val:
+                    s = str(val).strip()
+                    cleaned = s.replace(".", "").replace(",", "").replace("-", "").replace("+", "").replace(" ", "")
+                    if cleaned and cleaned.isdigit():
+                        raise ValidationError(_("Field '%s' cannot be purely numeric digits. Please enter a meaningful text explanation.") % label)
 
 
 
@@ -7150,14 +9508,15 @@ class PbmsPlanningCategory(models.Model):
                 ))
 
             # 2. If this record is in draft, check if another record for this unit & cycle & category is already submitted/approved
-            if rec.state in ("draft", "returned", "info_requested") and rec.category:
+            if rec.state in ("draft", "returned", "info_requested") and rec.category and not self.env.context.get("bypass_plan_lock"):
                 sub_domain = [
                     ("org_unit_id", "=", rec.org_unit_id.id),
                     ("cycle_id", "=", rec.cycle_id.id),
-                    ("category", "=", rec.category),
                     ("active", "=", True),
                     ("state", "in", ("submitted", "district_approved", "district_endorsed", "ho_reviewed", "approved")),
                 ]
+                if rec.org_unit_type not in ("branch", "sub_branch", "service_center"):
+                    sub_domain.append(("category", "=", rec.category))
                 if rec_id:
                     sub_domain.append(("id", "!=", rec_id))
                 submitted_plan = self.sudo().search(sub_domain, limit=1)
@@ -7226,6 +9585,8 @@ class PbmsPlanningCategory(models.Model):
             "base_type": line.base_type,
             "fx_source_type": line.fx_source_type,
             "channel_id": line.channel_id.id if line.channel_id else False,
+            "loan_product_id": line.loan_product_id.id if line.loan_product_id else False,
+            "loan_flow_type": line.loan_flow_type,
             "expense_account_id": line.expense_account_id.id if line.expense_account_id else False,
             "prior_year_actual": line.prior_year_actual,
             "is_office_rent": line.is_office_rent,
@@ -7309,11 +9670,12 @@ class PbmsPlanningCategory(models.Model):
             if target:
                 target.write(vals_to_write)
             else:
+                initial_state = "submitted" if dist_unit.work_unit_type == "district_office" else ("ho_reviewed" if dist_unit.work_unit_type == "head_office" else "draft")
                 create_vals = {
                     "category": category,
                     "cycle_id": cycle_id.id,
                     "org_unit_id": dist_unit.id,
-                    "state": "draft",
+                    "state": initial_state,
                     "active": True,
                 }
                 for f, v in zip(ident_fields, key):
@@ -7357,36 +9719,42 @@ class PbmsPlanningCategory(models.Model):
         the Mobilization Group: Deposit, Customer Base, FX, and Digital Banking.
         Direct pass categories (Manpower, General Expense, Fixed Asset) pass through
         directly to final approvers and do NOT pool into district plans."""
-        target_cat = getattr(self, "category", False) or "deposit"
-        if target_cat not in ("deposit", "customer_base", "fx", "digital_banking"):
-            # Direct pass group: no district consolidation
+        target_cat = self.env.context.get("target_category") or self.env.context.get("category") or getattr(self, "category", False) or "deposit"
+        if target_cat not in ("deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding"):
+            # Direct pass group (Manpower, General Expense, Fixed Asset): no district consolidation
             return False
 
-        district_plan = self.search([
+        district_plan = self.with_context(active_test=False).search([
             ("cycle_id", "=", cycle_id.id),
             ("org_unit_id", "=", district.id),
             ("category", "=", target_cat),
-            ("active", "=", True),
         ], limit=1)
         if not district_plan:
-            district_plan = self.create({
+            district_plan = self.with_context(bypass_plan_lock=True).create({
                 "cycle_id": cycle_id.id,
                 "org_unit_id": district.id,
                 "category": target_cat,
                 "state": "submitted",
                 "active": True,
             })
-        elif district_plan.state in ("draft", "returned", "info_requested"):
-            district_plan.with_context(bypass_plan_lock=True).write({"state": "submitted"})
+        else:
+            if not district_plan.active:
+                district_plan.with_context(bypass_plan_lock=True).write({"active": True})
+            if district_plan.state in ("draft", "returned", "info_requested"):
+                district_plan.with_context(bypass_plan_lock=True).write({"state": "submitted"})
 
-        # Fetch approved/submitted branch plans strictly for THIS category in this district
+        # Fetch approved branch plans in this district
         branch_plans = self.search([
             ("cycle_id", "=", cycle_id.id),
             ("district_id", "=", district.id),
             ("org_unit_id", "!=", district.id),
-            ("category", "=", target_cat),
             ("active", "=", True),
-            ("state", "in", ("submitted", "district_approved", "district_endorsed", "ho_reviewed", "approved")),
+            ("state", "in", (
+                "district_approved", "district_endorsed",
+                "chief_review", "people_solutions_review", "cpco_review",
+                "committee_review", "ceo_approval", "board_ceo_approval",
+                "ho_reviewed", "approved",
+            )),
         ])
         if not branch_plans:
             return district_plan
@@ -7555,6 +9923,81 @@ class PbmsPlanningCategory(models.Model):
                     **{f"proposed_{m}": vals[f"proposed_{m}"] for m in MONTH_FIELDS},
                 }))
 
+        elif target_cat == "loan_disbursement_collection":
+            ld_grouped = {}
+            for line in all_bp_lines:
+                prod_id = line.loan_product_id.id if line.loan_product_id else False
+                flow_type = line.loan_flow_type or "disbursement"
+                key = (prod_id, flow_type)
+                if not prod_id:
+                    continue
+                if key not in ld_grouped:
+                    ld_grouped[key] = {
+                        "opening_balance": 0.0,
+                        "proposed_opening_balance": 0.0,
+                        **{m: 0.0 for m in MONTH_FIELDS},
+                        **{f"proposed_{m}": 0.0 for m in MONTH_FIELDS},
+                    }
+                for m in MONTH_FIELDS:
+                    ld_grouped[key][m] += (getattr(line, m) or 0.0)
+                    prop_m = getattr(line, f"proposed_{m}")
+                    ld_grouped[key][f"proposed_{m}"] += (prop_m if prop_m else (getattr(line, m) or 0.0))
+
+            for (prod_id, flow_type), vals in ld_grouped.items():
+                tot_m = sum(vals[m] for m in MONTH_FIELDS)
+                tot_prop = sum(vals[f"proposed_{m}"] for m in MONTH_FIELDS)
+                lines_to_create.append((0, 0, {
+                    "line_type": "loan_disbursement_collection",
+                    "loan_product_id": prod_id,
+                    "loan_flow_type": flow_type,
+                    "source_unit_id": district.id,
+                    "sol_id": district_sol_id,
+                    "annual_total": tot_m,
+                    "proposed_annual_total": tot_prop if tot_prop else tot_m,
+                    "approved_annual_total": 0.0,
+                    "is_cascaded": False,
+                    **{m: vals[m] for m in MONTH_FIELDS},
+                    **{f"proposed_{m}": vals[f"proposed_{m}"] for m in MONTH_FIELDS},
+                }))
+
+        elif target_cat == "loan_outstanding":
+            lo_grouped = {}
+            for line in all_bp_lines:
+                prod_id = line.loan_product_id.id if line.loan_product_id else False
+                if not prod_id:
+                    continue
+                if prod_id not in lo_grouped:
+                    lo_grouped[prod_id] = {
+                        "opening_balance": 0.0,
+                        "proposed_opening_balance": 0.0,
+                        **{m: 0.0 for m in MONTH_FIELDS},
+                        **{f"proposed_{m}": 0.0 for m in MONTH_FIELDS},
+                    }
+                lo_grouped[prod_id]["opening_balance"] += (line.opening_balance or 0.0)
+                lo_grouped[prod_id]["proposed_opening_balance"] += (line.proposed_opening_balance or line.opening_balance or 0.0)
+                for m in MONTH_FIELDS:
+                    lo_grouped[prod_id][m] += (getattr(line, m) or 0.0)
+                    prop_m = getattr(line, f"proposed_{m}")
+                    lo_grouped[prod_id][f"proposed_{m}"] += (prop_m if prop_m else (getattr(line, m) or 0.0))
+
+            for prod_id, vals in lo_grouped.items():
+                tot_m = sum(vals[m] for m in MONTH_FIELDS)
+                tot_prop = sum(vals[f"proposed_{m}"] for m in MONTH_FIELDS)
+                lines_to_create.append((0, 0, {
+                    "line_type": "loan_outstanding",
+                    "loan_product_id": prod_id,
+                    "source_unit_id": district.id,
+                    "sol_id": district_sol_id,
+                    "opening_balance": vals["opening_balance"],
+                    "proposed_opening_balance": vals["proposed_opening_balance"],
+                    "annual_total": tot_m,
+                    "proposed_annual_total": tot_prop if tot_prop else tot_m,
+                    "approved_annual_total": 0.0,
+                    "is_cascaded": False,
+                    **{m: vals[m] for m in MONTH_FIELDS},
+                    **{f"proposed_{m}": vals[f"proposed_{m}"] for m in MONTH_FIELDS},
+                }))
+
         # Unlink only the lines for this specific category on the district plan
         dp_ctx = district_plan.with_context(bypass_plan_lock=True, skip_reviewer_check=True)
         if target_cat == "deposit":
@@ -7573,6 +10016,14 @@ class PbmsPlanningCategory(models.Model):
             dp_ctx.digital_banking_line_ids.unlink()
             if lines_to_create:
                 dp_ctx.write({"digital_banking_line_ids": lines_to_create})
+        elif target_cat == "loan_disbursement_collection":
+            dp_ctx.loan_disbursement_line_ids.unlink()
+            if lines_to_create:
+                dp_ctx.write({"loan_disbursement_line_ids": lines_to_create})
+        elif target_cat == "loan_outstanding":
+            dp_ctx.loan_outstanding_line_ids.unlink()
+            if lines_to_create:
+                dp_ctx.write({"loan_outstanding_line_ids": lines_to_create})
 
         # Ensure district plan is in 'submitted' state so district approver can endorse to HO
         if district_plan.state in ("draft", "returned", "info_requested"):
@@ -7590,7 +10041,7 @@ class PbmsPlanningCategory(models.Model):
         Direct pass categories (Expense, Fixed Asset, Manpower) are unit-specific requests
         sent directly to final approvers."""
         target_cat = getattr(self, "category", False) or "deposit"
-        if target_cat not in ("deposit", "customer_base", "fx", "digital_banking"):
+        if target_cat not in ("deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding"):
             return False
 
         ho_plan = self.search([
@@ -7609,12 +10060,13 @@ class PbmsPlanningCategory(models.Model):
             })
 
         # Fetch all active non-HO plans across the bank for THIS category
+        # Only district overview plans that have been endorsed to Head Office or already approved are consolidated
         source_plans = self.search([
             ("cycle_id", "=", cycle_id.id),
             ("org_unit_id", "!=", ho_unit.id),
             ("category", "=", target_cat),
             ("active", "=", True),
-            ("state", "in", ("submitted", "district_approved", "district_endorsed", "ho_reviewed", "approved")),
+            ("state", "in", ("district_endorsed", "ho_reviewed", "approved")),
         ])
         if not source_plans:
             return ho_plan
@@ -7800,10 +10252,359 @@ class PbmsPlanningCategory(models.Model):
             if db_create_vals:
                 ho_ctx.write({"digital_banking_line_ids": db_create_vals})
 
+        elif target_cat == "loan_disbursement_collection":
+            ld_lines = get_source_lines("loan_disbursement_collection")
+            ld_grouped = {}
+            for line in ld_lines:
+                prod_id = line.loan_product_id.id if line.loan_product_id else False
+                flow_type = line.loan_flow_type or "disbursement"
+                key = (prod_id, flow_type)
+                if not prod_id:
+                    continue
+                if key not in ld_grouped:
+                    ld_grouped[key] = {
+                        "opening_balance": 0.0,
+                        "proposed_opening_balance": 0.0,
+                        **{m: 0.0 for m in MONTH_FIELDS},
+                        **{f"proposed_{m}": 0.0 for m in MONTH_FIELDS},
+                    }
+                for m in MONTH_FIELDS:
+                    ld_grouped[key][m] += (getattr(line, m) or 0.0)
+                    prop_m = getattr(line, f"proposed_{m}")
+                    ld_grouped[key][f"proposed_{m}"] += (prop_m if prop_m else (getattr(line, m) or 0.0))
+
+            ho_ctx.loan_disbursement_line_ids.unlink()
+            ld_create_vals = []
+            for (prod_id, flow_type), vals in ld_grouped.items():
+                tot_m = sum(vals[m] for m in MONTH_FIELDS)
+                tot_prop = sum(vals[f"proposed_{m}"] for m in MONTH_FIELDS)
+                ld_create_vals.append((0, 0, {
+                    "line_type": "loan_disbursement_collection",
+                    "loan_product_id": prod_id,
+                    "loan_flow_type": flow_type,
+                    "annual_total": tot_m,
+                    "proposed_annual_total": tot_prop if tot_prop else tot_m,
+                    **{m: vals[m] for m in MONTH_FIELDS},
+                    **{f"proposed_{m}": vals[f"proposed_{m}"] for m in MONTH_FIELDS},
+                }))
+            if ld_create_vals:
+                ho_ctx.write({"loan_disbursement_line_ids": ld_create_vals})
+
+        elif target_cat == "loan_outstanding":
+            lo_lines = get_source_lines("loan_outstanding")
+            lo_grouped = {}
+            for line in lo_lines:
+                prod_id = line.loan_product_id.id if line.loan_product_id else False
+                if not prod_id:
+                    continue
+                if prod_id not in lo_grouped:
+                    lo_grouped[prod_id] = {
+                        "opening_balance": 0.0,
+                        "proposed_opening_balance": 0.0,
+                        **{m: 0.0 for m in MONTH_FIELDS},
+                        **{f"proposed_{m}": 0.0 for m in MONTH_FIELDS},
+                    }
+                lo_grouped[prod_id]["opening_balance"] += (line.opening_balance or 0.0)
+                lo_grouped[prod_id]["proposed_opening_balance"] += (line.proposed_opening_balance or line.opening_balance or 0.0)
+                for m in MONTH_FIELDS:
+                    lo_grouped[prod_id][m] += (getattr(line, m) or 0.0)
+                    prop_m = getattr(line, f"proposed_{m}")
+                    lo_grouped[prod_id][f"proposed_{m}"] += (prop_m if prop_m else (getattr(line, m) or 0.0))
+
+            ho_ctx.loan_outstanding_line_ids.unlink()
+            lo_create_vals = []
+            for prod_id, vals in lo_grouped.items():
+                tot_m = sum(vals[m] for m in MONTH_FIELDS)
+                tot_prop = sum(vals[f"proposed_{m}"] for m in MONTH_FIELDS)
+                lo_create_vals.append((0, 0, {
+                    "line_type": "loan_outstanding",
+                    "loan_product_id": prod_id,
+                    "opening_balance": vals["opening_balance"],
+                    "proposed_opening_balance": vals["proposed_opening_balance"],
+                    "annual_total": tot_m,
+                    "proposed_annual_total": tot_prop if tot_prop else tot_m,
+                    **{m: vals[m] for m in MONTH_FIELDS},
+                    **{f"proposed_{m}": vals[f"proposed_{m}"] for m in MONTH_FIELDS},
+                }))
+            if lo_create_vals:
+                ho_ctx.write({"loan_outstanding_line_ids": lo_create_vals})
+
         if hasattr(ho_plan, "_compute_category_summaries"):
             ho_plan._compute_category_summaries()
 
         return ho_plan
+
+    def action_save_plan(self):
+        """Explicit Save action to persist draft inputs and workflow edits.
+
+        Clicking this button triggers client-side form validation and save, persists 
+        all modified fields and requirement lines to the database, and returns a 
+        success notification to confirm the save.
+        """
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Plan Saved"),
+                "message": _("Your plan changes have been saved successfully."),
+                "type": "success",
+                "sticky": False,
+            },
+        }
+
+    def _pbms_write_header_months(self):
+        """Persist Jul-Jun header figures (sum of the plan's lines of its own
+        category) so list rows and group totals match the form."""
+        for plan in self.with_context(in_distribute_plan_sync=True, skip_sync_lines=True, bypass_plan_lock=True):
+            lines = plan.line_ids.filtered(lambda l: l.line_type == plan.category)
+            if not lines or plan.category == "fixed_asset":
+                continue
+            vals = {}
+            for m in MONTH_FIELDS:
+                vals[m] = sum((getattr(l, m) or getattr(l, "hc_%s" % m, 0) or 0.0) for l in lines)
+            plan.sudo().write(vals)
+
+    @api.model
+    def _pbms_resync_header_totals(self):
+        """Recompute the stored monthly / quarterly / annual / roll-up figures of
+        every plan from its requirement lines (same data the form view shows).
+        Plans saved before these computes existed can hold stale header values,
+        which made the list view (and its group / footer totals) disagree with
+        the form.  Safe to run repeatedly; called on module upgrade."""
+        import logging
+        log = logging.getLogger(__name__)
+        Line = self.env["pbms.plan.category.line"].sudo().with_context(
+            active_test=False, bypass_plan_lock=True, auto_balancing_sourcing=True)
+        for line in Line.search([("line_type", "=", "manpower")]):
+            vals = {}
+            for m in MONTH_FIELDS:
+                hc_val = getattr(line, "hc_%s" % m) or 0
+                if hc_val and not getattr(line, m):
+                    vals[m] = float(hc_val)
+            if vals:
+                line.write(vals)
+        plans = self.sudo().with_context(active_test=False, bypass_plan_lock=True).search([])
+        for i in range(0, len(plans), 200):
+            batch = plans[i:i + 200]
+            try:
+                with self.env.cr.savepoint():
+                    if hasattr(batch, "_compute_category_summaries"):
+                        batch._compute_category_summaries()
+                    batch._compute_totals()
+                    batch._compute_rollup_quarter_totals()
+                    batch._pbms_write_header_months()
+            except Exception:
+                log.exception("PBMS header resync failed for plans %s", batch.ids[:5])
+        return True
+
+    # ------------------------------------------------------------------
+    # Generic role-aware Bulk Approve
+    # ------------------------------------------------------------------
+    _BULK_FINANCIAL_CATEGORIES = (
+        "deposit", "customer_base", "fx", "digital_banking",
+        "loan_disbursement_collection", "loan_outstanding", "general_expense",
+        "credit_portfolio",
+    )
+
+    def _bulk_approve_next_action(self):
+        """Return the name of the approval method the CURRENT USER may run on
+        this plan in its CURRENT state, or False when the plan is not waiting
+        for this user.  Mirrors the buttons of the form view header, so bulk
+        approval can never do more than the user could do record by record
+        (each method still performs its own access checks)."""
+        self.ensure_one()
+        user = self.env.user
+        has = user.has_group
+        state, cat = self.state, self.category
+        is_admin = has("bunna_pbms.group_pbms_manager")
+        g_district = is_admin or has("bunna_pbms.group_pbms_district_reviewer")
+        g_ho = is_admin or has("bunna_pbms.group_pbms_ho_reviewer")
+        g_approver = is_admin or has("bunna_pbms.group_pbms_approver")
+        g_chief = is_admin or has("bunna_pbms.group_pbms_respective_chief") or has("bunna_pbms.group_pbms_ceo")
+        g_ps = is_admin or has("bunna_pbms.group_pbms_people_solutions")
+        g_cpco = is_admin or has("bunna_pbms.group_pbms_cpco")
+        g_committee = is_admin or has("bunna_pbms.group_pbms_budget_hiring_committee")
+        g_ceo = is_admin or has("bunna_pbms.group_pbms_ceo")
+
+        # Respective Chief stage (same for every category)
+        if state == "chief_review":
+            return "action_chief_approve_escalate" if (g_chief and self.can_chief_review) else False
+
+        if cat == "manpower":
+            if state in ("submitted", "info_requested"):
+                if g_district and not self.is_district_unit and not self.is_head_office_unit:
+                    return "action_district_approve_workforce"
+            elif state == "people_solutions_review" and g_ps:
+                return "action_people_solutions_escalate_cpco"
+            elif state == "cpco_review" and g_cpco:
+                return "action_cpco_submit_to_committee"
+            elif state == "committee_review" and g_committee:
+                return "action_committee_approve"
+            elif state == "ceo_approval" and g_ceo:
+                return "action_ceo_approve"
+            elif state == "ho_endorse" and g_ho:
+                return "action_ho_endorse_to_cpco"
+            elif state == "cpco_endorse" and g_cpco:
+                return "action_cpco_endorse_to_solutions"
+            return False
+
+        # District stage (branch plans -> "District Approve", district plans -> "Endorse to HO")
+        if g_district and not self.is_head_office_unit:
+            if self.is_district_unit:
+                if state in ("submitted", "district_approved", "info_requested"):
+                    return "action_district_approve"
+            elif state in ("submitted", "info_requested"):
+                return "action_district_approve"
+
+        if cat in ("fixed_asset", "initiative_budget"):
+            if state in ("submitted", "district_approved", "district_endorsed", "ho_reviewed") and g_ho:
+                return "action_submit_to_committee"
+            if state == "committee_review" and g_committee:
+                return "action_committee_approve_resource"
+            return False
+
+        if cat in self._BULK_FINANCIAL_CATEGORIES:
+            if g_ho and state in ("submitted", "district_approved", "district_endorsed",
+                                  "info_requested", "ho_reviewed"):
+                return "action_ho_approve"
+            if g_approver and state == "ho_reviewed":
+                return "action_approve"
+        return False
+
+    def action_bulk_approve(self):
+        """Approve / advance every selected plan that is waiting for the
+        current user's review stage.  Available to every PBMS privilege
+        except the plain Branch / Head Office user."""
+        user = self.env.user
+        allowed = (
+            "bunna_pbms.group_pbms_district_reviewer", "bunna_pbms.group_pbms_ho_reviewer",
+            "bunna_pbms.group_pbms_approver", "bunna_pbms.group_pbms_respective_chief",
+            "bunna_pbms.group_pbms_people_solutions", "bunna_pbms.group_pbms_cpco",
+            "bunna_pbms.group_pbms_budget_hiring_committee", "bunna_pbms.group_pbms_ceo",
+            "bunna_pbms.group_pbms_manager",
+        )
+        if not any(user.has_group(g) for g in allowed):
+            raise AccessError(_("Bulk approval is not available for Branch / Head Office users."))
+
+        done, skipped, errors = 0, 0, []
+        for rec in self:
+            method = rec._bulk_approve_next_action()
+            if not method:
+                skipped += 1
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    getattr(rec, method)()
+                done += 1
+            except (UserError, AccessError, ValidationError) as exc:
+                errors.append("%s: %s" % (rec.request_number or rec.display_name, exc.args[0] if exc.args else exc))
+
+        msg = _("%(done)s plan(s) approved / advanced.", done=done)
+        if skipped:
+            msg += "\n" + _("%(n)s skipped (not waiting for your review).", n=skipped)
+        if errors:
+            msg += "\n" + _("%(n)s could not be processed:\n%(details)s", n=len(errors), details="\n".join(errors[:5]))
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Bulk Approve"),
+                "message": msg,
+                "type": "success" if done and not errors else "warning",
+                "sticky": bool(errors),
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }
+
+    def action_bulk_ho_approve(self):
+        """Bulk HO approval for selected planning categories."""
+        count = 0
+        errors = []
+        for rec in self:
+            try:
+                if rec.category in ("deposit", "customer_base", "fx", "digital_banking", "loan_disbursement_collection", "loan_outstanding", "general_expense", "credit_portfolio"):
+                    if rec.state in ("draft", "returned", "info_requested", "submitted", "district_approved", "district_endorsed", "ho_reviewed"):
+                        rec.action_ho_approve()
+                        count += 1
+                elif rec.category == "manpower":
+                    if rec.state in ("submitted", "district_approved", "chief_reviewed", "people_solutions_reviewed", "ho_endorse"):
+                        rec.action_ho_endorse_to_cpco()
+                        count += 1
+                elif rec.category in ("fixed_asset", "initiative_budget"):
+                    if rec.state in ("submitted", "district_approved", "district_endorsed", "ho_reviewed"):
+                        rec.action_submit_to_committee()
+                        count += 1
+            except Exception as e:
+                errors.append(f"{rec.display_name or rec.request_number}: {str(e)}")
+
+        msg = _("%s plan(s) have been successfully processed/approved.") % count
+        if errors:
+            msg += "\n" + _("Some records could not be processed:\n%s") % "\n".join(errors[:5])
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Bulk Approval Complete"),
+                "message": msg,
+                "type": "success" if count > 0 else "warning",
+                "sticky": bool(errors),
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }
+
+    def action_bulk_district_approve(self):
+        """Bulk District approval for selected planning categories."""
+        count = 0
+        errors = []
+        for rec in self:
+            try:
+                if rec.state in ("submitted", "info_requested"):
+                    if rec.category == "manpower":
+                        rec.action_district_approve_workforce()
+                    else:
+                        rec.action_district_approve()
+                    count += 1
+            except Exception as e:
+                errors.append(f"{rec.display_name or rec.request_number}: {str(e)}")
+
+        msg = _("%s plan(s) have been approved by District.") % count
+        if errors:
+            msg += "\n" + _("Some records could not be processed:\n%s") % "\n".join(errors[:5])
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Bulk District Approval Complete"),
+                "message": msg,
+                "type": "success" if count > 0 else "warning",
+                "sticky": bool(errors),
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }
+
+    def action_bulk_delete(self):
+        """Bulk delete selected planning categories for SPPMD Administrator."""
+        user = self.env.user
+        if not (self.env.is_admin() or user._pbms_is_sppmd_admin()):
+            raise AccessError(_("Only the SPPMD Administrator can delete plans in bulk."))
+        records = self or self.browse(self.env.context.get("active_ids", []))
+        if not records:
+            return False
+        count = len(records)
+        records.unlink()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Deleted"),
+                "message": _("%s plan(s) deleted successfully.", count),
+                "sticky": False,
+                "type": "success",
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
 
     def _register_hook(self):
         super()._register_hook()

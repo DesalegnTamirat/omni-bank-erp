@@ -1,13 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
     <data noupdate="1">
-        <!-- =====================================================
-             EMPLOYEES PRIVILEGE GROUPS (shown on User form)
-             Sequence controls order in dropdown:
-               5  → User        (self-only access)
-               10 → Officer     (bank-wide, no delete)
-               20 → Administrator (bank-wide, full access)
-        ====================================================== -->
+
 
         <!-- User group — internal access, sees own records + coached employees.
              privilege_id is False so it does NOT appear in the Employees dropdown on the User form. -->
@@ -26,16 +20,51 @@
              <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('hr.group_hr_user'))]"/>
              <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
          </record>
-     </data>
+         <!-- =====================================================
+        CAREER PATH GROUPS
+   ====================================================== -->
+   <record id="module_category_career_path" model="ir.module.category">
+       <field name="name">Career Path</field>
+       <field name="description">Helps you manage employee career paths.</field>
+       <field name="sequence">15</field>
+   </record>
 
-     <!-- =====================================================
-          Applied on EVERY upgrade (outside noupdate)
-     ====================================================== -->
+   <record id="privilege_career_path" model="res.groups.privilege">
+       <field name="name">Career Path</field>
+       <field name="category_id" ref="module_category_career_path"/>
+       <field name="placeholder" eval="False"/>
+       <field name="sequence">15</field>
+   </record>
 
-     <!-- Restore "No" placeholder so standard employees show "No" / empty selection -->
-<!--     <record id="hr.res_groups_privilege_employees" model="res.groups.privilege">-->
-<!--         <field name="placeholder">No</field>-->
-<!--     </record>-->
+   <record id="group_career_path_employee" model="res.groups">
+       <field name="name">Employee</field>
+       <field name="privilege_id" ref="privilege_career_path"/>
+       <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+       <field name="sequence">10</field>
+   </record>
+
+   <!-- Automatically grant Career Path Employee to all base users -->
+   <record id="base.group_user" model="res.groups">
+       <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_career_path_employee'))]"/>
+   </record>
+
+   <record id="group_career_path_manager" model="res.groups">
+       <field name="name">Manager</field>
+       <field name="privilege_id" ref="privilege_career_path"/>
+       <field name="implied_ids" eval="[(4, ref('group_career_path_employee'))]"/>
+       <field name="sequence">20</field>
+   </record>
+
+   <record id="group_career_path_admin" model="res.groups">
+       <field name="name">Administrator</field>
+       <field name="privilege_id" ref="privilege_career_path"/>
+       <field name="implied_ids" eval="[(4, ref('group_career_path_manager'))]"/>
+       <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+       <field name="sequence">30</field>
+   </record>
+</data>
+
+
 
      <!-- Ensure group_hr_employee_user has no privilege_id so it is removed from the Employees dropdown -->
      <record id="group_hr_employee_user" model="res.groups">
@@ -54,11 +83,6 @@
         <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
     </record>
 
-    <!-- Default User Group implies group_hr_employee_user so that newly created users
-         automatically get the User role under Employees by default. -->
-    <record id="base.default_user_group" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
-    </record>
 
     <!-- Administrator implies Contract Manager (for contract access) -->
     <record id="hr.group_hr_manager" model="res.groups">

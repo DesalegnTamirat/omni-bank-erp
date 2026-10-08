@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- HR Reporting Wizard Form View -->
+    <record id="view_hr_reporting_wizard_form" model="ir.ui.view">
+        <field name="name">hr.reporting.wizard.form</field>
+        <field name="model">hr.reporting.wizard</field>
+        <field name="arch" type="xml">
+            <form string="HR Reporting &amp; Analytics Generator">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="report_type" string="Select HR Report Type"/>
+                        <h2><field name="report_type"/></h2>
+                    </div>
+                    <group string="Report Filters &amp; Parameters">
+                        <group string="Date Range">
+                            <field name="date_from" placeholder="From Date..."/>
+                            <field name="date_to" placeholder="To Date..."/>
+                        </group>
+                        <group string="Organizational Filters">
+                            <field name="department_id" options="{'no_create': True}"/>
+                            <field name="operating_unit_id" string="Branch / Operating Unit" options="{'no_create': True}"/>
+                            <field name="job_id" options="{'no_create': True}"/>
+                            <field name="grade_id" options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <group string="Demographic &amp; Status Filters">
+                        <group>
+                            <field name="gender"/>
+                        </group>
+                        <group>
+                            <field name="work_permit_status"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_report" string="Generate Interactive Report" type="object" class="btn-primary" icon="fa-area-chart"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for HR Reporting Wizard -->
+    <record id="action_hr_reporting_wizard" model="ir.actions.act_window">
+        <field name="name">HR Analytics &amp; Report Generator</field>
+        <field name="res_model">hr.reporting.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Pivot View: Headcount & Demographics -->
+    <record id="view_hr_employee_pivot_analytics" model="ir.ui.view">
+        <field name="name">hr.employee.pivot.analytics</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <pivot string="HR Headcount &amp; Demographics Analytics" sample="1">
+                <field name="department_id" type="row"/>
+                <field name="operating_unit_id" type="col"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Graph View: Headcount Analytics -->
+    <record id="view_hr_employee_graph_analytics" model="ir.ui.view">
+        <field name="name">hr.employee.graph.analytics</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <graph string="HR Headcount Distribution" type="bar" sample="1">
+                <field name="department_id" type="row"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Individual Window Actions for Quick Menu Access -->
+
+    <!-- 1. Headcount by Department -->
+    <record id="action_report_headcount_dept" model="ir.actions.act_window">
+        <field name="name">Headcount by Department</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_group_department': 1, 'pivot_measures': ['__count__']}</field>
+    </record>
+
+    <!-- 2. Headcount by Branch (Operating Unit) -->
+    <record id="action_report_headcount_branch" model="ir.actions.act_window">
+        <field name="name">Headcount by Branch (Operating Unit)</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_group_operating_unit': 1, 'pivot_measures': ['__count__']}</field>
+    </record>
+
+    <!-- 3. Headcount by Grade -->
+    <record id="action_report_headcount_grade" model="ir.actions.act_window">
+        <field name="name">Headcount by Grade</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_group_grade': 1, 'pivot_measures': ['__count__']}</field>
+    </record>
+
+    <!-- 4. Headcount by Position -->
+    <record id="action_report_headcount_position" model="ir.actions.act_window">
+        <field name="name">Headcount by Position</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_group_job': 1, 'pivot_measures': ['__count__']}</field>
+    </record>
+
+    <!-- 5. Gender Report -->
+    <record id="action_report_gender" model="ir.actions.act_window">
+        <field name="name">Gender Report</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_group_gender': 1, 'pivot_measures': ['__count__']}</field>
+    </record>
+
+    <!-- 6. Work Permit Expiry Report -->
+    <record id="action_report_work_permit_expiry" model="ir.actions.act_window">
+        <field name="name">Work Permit Expiry Report</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">list,pivot,graph</field>
+        <field name="domain">[('work_permit_status', 'in', ['expiring_soon', 'expired', 'valid'])]</field>
+        <field name="context">{'search_default_group_work_permit_status': 1}</field>
+    </record>
+</odoo>

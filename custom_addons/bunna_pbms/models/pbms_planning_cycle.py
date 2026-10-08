@@ -342,40 +342,26 @@ class PbmsPlanningCycle(models.Model):
             "bunna_pbms.group_pbms_cpco",
             "bunna_pbms.group_pbms_people_operations",
         )
+        group_ids = []
         for g_xmlid in group_xmlids:
-            g_users = self._get_users_with_group(g_xmlid)
-            if g_users:
-                users |= g_users
-
-        # 2. Operating Units: All Branches, Districts, and Head Offices
-        if "operating.unit" in self.env:
-            target_ous = self.env["operating.unit"].search([
-                ("active", "=", True),
-                ("work_unit_type", "in", ("branch", "district", "district_office", "head_office")),
-            ])
-            for ou in target_ous:
-                if hasattr(ou, "user_ids") and ou.user_ids:
-                    users |= ou.user_ids.filtered(lambda u: u.active)
-                if hasattr(ou, "manager_id") and ou.manager_id and getattr(ou.manager_id, "user_id", False):
-                    if ou.manager_id.user_id.active:
-                        users |= ou.manager_id.user_id
-
-            if hasattr(self.env["res.users"], "assigned_operating_unit_ids"):
-                ou_assigned = self.env["res.users"].search([
+            g = self.env.ref(g_xmlid, raise_if_not_found=False)
+            if g:
+                group_ids.append(g.id)
+        if group_ids:
+            try:
+                users |= self.env["res.users"].search([
+                    ("all_group_ids", "in", group_ids),
                     ("active", "=", True),
-                    ("assigned_operating_unit_ids", "in", target_ous.ids),
                 ])
-                if ou_assigned:
-                    users |= ou_assigned
-
-            if hasattr(self.env["res.users"], "default_operating_unit_id"):
-                ou_default = self.env["res.users"].search([
-                    ("active", "=", True),
-                    ("default_operating_unit_id", "in", target_ous.ids),
-                ])
-                if ou_default:
-                    users |= ou_default
-
+            except Exception:
+                try:
+                    users |= self.env["res.users"].search([
+                        ("groups_id", "in", group_ids),
+                        ("active", "=", True),
+                    ])
+                except Exception:
+                    for g_xmlid in group_xmlids:
+                        users |= self._get_users_with_group(g_xmlid)
         root_user = self.env.ref("base.user_root", raise_if_not_found=False)
         if root_user:
             users -= root_user
@@ -415,6 +401,113 @@ class PbmsPlanningCycle(models.Model):
                 except Exception as e:
                     _logger.warning("Failed to send cycle status email: %s", e)
 
+    def write(self, vals):
+        tracked_fields = {
+            "name": _("Cycle Name"),
+            "date_start": _("Cycle Start Date"),
+            "date_end": _("Cycle End Date"),
+            "branch_deadline": _("Branch Submission Deadline"),
+            "district_deadline": _("District Endorsement Deadline"),
+            "head_office_deadline": _("Head Office Review Deadline"),
+            "board_deadline": _("Board Approval Deadline"),
+            "workforce_window_start": _("Workforce Window Start Date"),
+            "workforce_window_end": _("Workforce Window Closing Date"),
+        }
+
+        has_tracked_changes = any(k in vals for k in tracked_fields)
+        old_values = {}
+        if has_tracked_changes and not self.env.context.get("skip_cycle_edit_notification"):
+            for cycle in self:
+                old_values[cycle.id] = {
+                    k: getattr(cycle, k) for k in tracked_fields if k in vals
+                }
+
+        res = super(PbmsPlanningCycle, self).write(vals)
+
+        if old_values and not self.env.context.get("skip_cycle_edit_notification"):
+            for cycle in self:
+                cycle_old = old_values.get(cycle.id, {})
+                changed_items = []
+                for fname, old_val in cycle_old.items():
+                    new_val = getattr(cycle, fname)
+                    if old_val != new_val:
+                        label = tracked_fields.get(fname, fname)
+                        old_str = self._format_field_val_for_notification(fname, old_val)
+                        new_str = self._format_field_val_for_notification(fname, new_val)
+                        changed_items.append((label, old_str, new_str))
+
+                if changed_items:
+                    cycle._notify_cycle_schedule_update(changed_items)
+
+        return res
+
+    def _format_field_val_for_notification(self, fname, val):
+        if not val:
+            return _("Not Set")
+        if isinstance(val, bool):
+            return str(val)
+        try:
+            field = self._fields.get(fname)
+            if field and field.type == "datetime":
+                return fields.Datetime.to_string(val)
+            if field and field.type == "date":
+                return fields.Date.to_string(val)
+        except Exception:
+            pass
+        return str(val)
+
+    def _notify_cycle_schedule_update(self, changed_items):
+        """Notify all planning participants when cycle dates, deadlines, or parameters are updated."""
+        for cycle in self:
+            change_lines = "".join(
+                f"<li><b>{label}:</b> {old_s} &rarr; <b style='color: #541718;'>{new_s}</b></li>"
+                for label, old_s, new_s in changed_items
+            )
+
+            deadline_summary = _(
+                "<br/><b>Updated Submission Deadlines:</b><br/>"
+                "• <b>Branch Submission:</b> %s<br/>"
+                "• <b>District Endorsement:</b> %s<br/>"
+                "• <b>Head Office Review:</b> %s<br/>"
+                "• <b>Board Approval:</b> %s"
+            ) % (
+                fields.Datetime.to_string(cycle.branch_deadline) if cycle.branch_deadline else _("TBA"),
+                fields.Datetime.to_string(cycle.district_deadline) if cycle.district_deadline else _("TBA"),
+                fields.Datetime.to_string(cycle.head_office_deadline) if cycle.head_office_deadline else _("TBA"),
+                fields.Datetime.to_string(cycle.board_deadline) if cycle.board_deadline else _("TBA"),
+            )
+
+            subject = _("Planning Cycle Schedule Updated: %s") % cycle.name
+            body = _(
+                "<b>Notice of Planning Cycle Update: %s</b><br/>"
+                "The following planning cycle parameters and deadlines have been updated by <b>%s</b>:<br/>"
+                "<ul>%s</ul>"
+                "%s"
+            ) % (
+                cycle.name,
+                self.env.user.name or _("Administrator"),
+                change_lines,
+                deadline_summary,
+            )
+
+            # 1. Post to chatter
+            cycle.message_post(body=body, subject=subject)
+
+            # 2. In-app Inbox Notification to all planning partners
+            partners = cycle._get_all_planning_partners()
+            cycle._send_inbox_notification(partners, subject, body)
+
+            # 3. Email Notification template
+            template = self.env.ref("bunna_pbms.mail_template_cycle_status_changed", raise_if_not_found=False)
+            if template:
+                try:
+                    template.send_mail(cycle.id, force_send=False, raise_exception=False, email_values={
+                        "subject": subject,
+                        "recipient_ids": [(4, pid) for pid in partners.ids],
+                    })
+                except Exception as e:
+                    _logger.warning("Failed to send cycle edit update email: %s", e)
+
     def action_start_budget_call(self):
         """Start budget call - Button: 'Start Budget Call'"""
         self.ensure_one()
@@ -445,9 +538,27 @@ class PbmsPlanningCycle(models.Model):
 
         _logger.info("Starting budget call for cycle %s (ID: %s)", self.name, self.id)
         self.write({'state': 'budget_call'})
+
+        deadline_lines = []
+        if self.branch_deadline:
+            deadline_lines.append(_("• <b>Branch Submission Deadline:</b> %s") % fields.Datetime.to_string(self.branch_deadline))
+        if self.district_deadline:
+            deadline_lines.append(_("• <b>District Endorsement Deadline:</b> %s") % fields.Datetime.to_string(self.district_deadline))
+        if self.head_office_deadline:
+            deadline_lines.append(_("• <b>Head Office Review Deadline:</b> %s") % fields.Datetime.to_string(self.head_office_deadline))
+        if self.board_deadline:
+            deadline_lines.append(_("• <b>Board Approval Deadline:</b> %s") % fields.Datetime.to_string(self.board_deadline))
+        deadlines_text = "<br/>".join(deadline_lines) if deadline_lines else _("Submission deadlines will be announced shortly.")
+
+        budget_call_msg = _(
+            "The annual Budget Call for <b>%s</b> has officially started.<br/>"
+            "All relevant Line Managers and Work Unit Heads are required to prepare and submit their plan and budget requests within the specified deadlines:<br/>"
+            "%s"
+        ) % (self.name, deadlines_text)
+
         self._notify_cycle_status_change(
             _("Budget Call Issued"),
-            _("The annual Budget Call has been officially issued. Units may begin reviewing baseline data."),
+            budget_call_msg,
         )
 
         return {
@@ -481,14 +592,6 @@ class PbmsPlanningCycle(models.Model):
                 _("Budget Year Opened for Unit Input"),
                 _("Planning cycle '%s' is now open for plan and budget input.<br/>%s") % (cycle.name, deadline_info),
             )
-
-            # In-app inbox notifications for all planning users across branches, districts, and head offices
-            target_users = cycle._get_all_planning_users()
-            summary = _("Plan Submission Window Open: %s") % cycle.name
-            note = _(
-                "Planning cycle <b>%s</b> is now open for plan and budget input.<br/>%s"
-            ) % (cycle.name, deadline_info)
-            cycle._send_inbox_notification(target_users, summary, note)
 
     def action_start_consolidation(self):
         self.write({"state": "consolidation"})
@@ -571,26 +674,41 @@ class PbmsPlanningCycle(models.Model):
         if not line or not line.org_unit_id:
             return False
         unit = line.org_unit_id
+        candidate = False
         if audience == "unit_manager":
             if hasattr(unit, "manager_id") and unit.manager_id and unit.manager_id.user_id:
-                return unit.manager_id.user_id
-            if hasattr(unit, "user_ids") and unit.user_ids:
-                return unit.user_ids[0]
-            return False
-        if audience == "district_reviewer":
+                candidate = unit.manager_id.user_id
+            elif hasattr(unit, "user_ids") and unit.user_ids:
+                candidate = unit.user_ids[0]
+        elif audience == "district_reviewer":
             district = line.district_id or (self.env["pbms.workflow.mixin"]._find_district_ancestor(unit) if hasattr(self.env["pbms.workflow.mixin"], "_find_district_ancestor") else False)
             if district:
                 if hasattr(district, "manager_id") and district.manager_id and district.manager_id.user_id:
-                    return district.manager_id.user_id
-                if hasattr(district, "user_ids") and district.user_ids:
-                    return district.user_ids[0]
-            return False
-        if audience == "ho_reviewer":
+                    candidate = district.manager_id.user_id
+                elif hasattr(district, "user_ids") and district.user_ids:
+                    candidate = district.user_ids[0]
+        elif audience == "ho_reviewer":
             if hasattr(unit, "manager_id") and unit.manager_id and unit.manager_id.user_id:
-                return unit.manager_id.user_id
-            if hasattr(unit, "user_ids") and unit.user_ids:
-                return unit.user_ids[0]
-            return False
+                candidate = unit.manager_id.user_id
+            elif hasattr(unit, "user_ids") and unit.user_ids:
+                candidate = unit.user_ids[0]
+
+        if candidate and candidate.active:
+            pbms_groups = (
+                "bunna_pbms.group_pbms_branch_user",
+                "bunna_pbms.group_pbms_district_reviewer",
+                "bunna_pbms.group_pbms_ho_reviewer",
+                "bunna_pbms.group_pbms_approver",
+                "bunna_pbms.group_pbms_manager",
+                "bunna_pbms.group_pbms_budget_hiring_committee",
+                "bunna_pbms.group_pbms_ceo",
+                "bunna_pbms.group_pbms_respective_chief",
+                "bunna_pbms.group_pbms_people_solutions",
+                "bunna_pbms.group_pbms_cpco",
+                "bunna_pbms.group_pbms_people_operations",
+            )
+            if any(candidate.has_group(g) for g in pbms_groups):
+                return candidate
         return False
 
     def _thread_to_store(self, store: Store, fields, *, request_list=None):

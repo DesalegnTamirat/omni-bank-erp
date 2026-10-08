@@ -15,7 +15,7 @@
 
         Includes strict Segregation of Duties (SoD) enforcement across approval hierarchies.
     """,
-    'author': 'EAD Team',
+    'author': 'Natnael ',
     'website': 'https://www.bunnabanksc.com',
     'depends': [
         'base',

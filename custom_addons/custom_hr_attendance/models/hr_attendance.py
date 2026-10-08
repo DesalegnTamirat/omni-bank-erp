@@ -35,20 +35,38 @@ class HrAttendance(models.Model):
     def _auto_init(self):
         res = super()._auto_init()
         # High-Speed Performance Indexes for 6,000 Concurrent Check-Ins
-        # 1. Partial Index for Open Attendance Sessions (Fast Checkout Resolution <= 0.1 ms)
+        # 1. Unique constraint & partial index: strictly at most one open attendance session per employee
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS hr_attendance_one_open_per_emp 
+            ON hr_attendance (employee_id) 
+            WHERE (check_out IS NULL);
+        """)
+        # 2. Partial Index for Open Attendance Sessions with check_in
         self.env.cr.execute("""
             CREATE INDEX IF NOT EXISTS hr_attendance_open_session_fast_idx 
             ON hr_attendance (employee_id, check_in) 
             WHERE (check_out IS NULL);
         """)
-        # 2. Composite Index for Daily Lateness Dashboard Queries
+        # 3. Composite Index for Daily Lateness Dashboard Queries
         self.env.cr.execute("""
             CREATE INDEX IF NOT EXISTS hr_attendance_daily_lateness_fast_idx 
             ON hr_attendance (date, employee_id, check_in_status);
         """)
-        # 3. Drop Redundant Duplicate Index on check_in_status
+        # 4. Composite index for date-range queries on attendance per employee
         self.env.cr.execute("""
-            DROP INDEX IF EXISTS hr_attendance_checkin_status_idx;
+            CREATE INDEX IF NOT EXISTS hr_attendance_employee_checkin_idx
+            ON hr_attendance (employee_id, check_in);
+        """)
+        # 5. Index on check_in_status
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS hr_attendance_checkin_status_idx
+            ON hr_attendance (check_in_status);
+        """)
+        # 6. Partial index on is_force_checkout for reporting queries
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS hr_attendance_force_checkout_idx
+            ON hr_attendance (employee_id)
+            WHERE is_force_checkout = TRUE;
         """)
         return res
 
@@ -175,6 +193,26 @@ class HrAttendance(models.Model):
             else:
                 rec.lunch_break_hours = 0.0
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        # Fast-path tracking suppression context unless mail tracking is explicitly enabled
+        if not self.env.context.get('enable_mail_tracking'):
+            self = self.with_context(
+                tracking_disable=True,
+                mail_create_nosubscribe=True,
+                mail_create_nolog=True,
+                mail_notrack=True
+            )
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if not self.env.context.get('enable_mail_tracking'):
+            self = self.with_context(
+                tracking_disable=True,
+                mail_notrack=True
+            )
+        return super().write(vals)
+
     @api.depends('check_in', 'check_out', 'lunch_break_hours')
     def _compute_worked_hours(self):
         """
@@ -183,14 +221,14 @@ class HrAttendance(models.Model):
         - Effective Check-Out = MIN(check_out, shift_end_time) (Late check-out or force checkout after shift end is excluded).
         - Worked Hours = MAX(0.0, Effective Check-Out - Effective Check-In - lunch_break_hours).
         """
-        params = self.env['ir.config_parameter'].sudo()
-        default_morning_time = float(params.get_param('hr_attendance.morning_time', 8.0))
-        default_exit_time = float(params.get_param('hr_attendance.exit_time', 17.0))
-        enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
-        enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
-        saturday_exit_time = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
-        enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
-        default_lunch_duration = float(params.get_param('hr_attendance.lunch_duration', 1.0)) if enable_lunch else 0.0
+        cfg = self.env['hr.employee']._get_attendance_config_params()
+        default_morning_time = cfg.get('morning_time', 8.0)
+        default_exit_time = cfg.get('exit_time', 17.0)
+        enable_saturday = cfg.get('enable_saturday_halfday', True)
+        enable_district_saturday = cfg.get('saturday_halfday_district', True)
+        saturday_exit_time = cfg.get('saturday_exit_time', 12.0)
+        enable_lunch = cfg.get('enable_lunch_break', False)
+        default_lunch_duration = cfg.get('lunch_duration', 1.0) if enable_lunch else 0.0
 
         for rec in self:
             if not rec.check_in or not rec.check_out:
@@ -224,17 +262,14 @@ class HrAttendance(models.Model):
                 if enable_saturday and check_in_local and check_in_local.weekday() == 5:
                     ou = emp.default_operating_unit_id if emp else None
                     unit_type = ou.work_unit_type if ou else False
-                    if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
+                    if unit_type in ('head_office', 'head_offices', 'ho') or (unit_type in ('district', 'district_office', 'regional_office') and enable_district_saturday) or not ou:
                         shift_end = saturday_exit_time
 
             # 2. Build Shift Start & Shift End Datetimes in Local Time
-            start_hour = int(shift_start)
-            start_min = int(round((shift_start - start_hour) * 60))
-            end_hour = int(shift_end)
-            end_min = int(round((shift_end - end_hour) * 60))
-
-            shift_start_dt = check_in_local.replace(hour=start_hour, minute=start_min, second=0, microsecond=0)
-            shift_end_dt = check_in_local.replace(hour=end_hour, minute=end_min, second=0, microsecond=0)
+            start_secs = int(round(float(shift_start) * 3600.0))
+            end_secs = int(round(float(shift_end) * 3600.0))
+            shift_start_dt = check_in_local.replace(hour=(start_secs % 86400) // 3600, minute=((start_secs % 3600) // 60), second=start_secs % 60, microsecond=0)
+            shift_end_dt = check_in_local.replace(hour=(end_secs % 86400) // 3600, minute=((end_secs % 3600) // 60), second=end_secs % 60, microsecond=0)
             if shift_end < shift_start:
                 shift_end_dt += datetime.timedelta(days=1)
 
@@ -278,14 +313,14 @@ class HrAttendance(models.Model):
         """
         Expected Hours = Total Scheduled Shift Duration (Shift End - Shift Start - Lunch Duration)
         """
-        params = self.env['ir.config_parameter'].sudo()
-        default_morning_time = float(params.get_param('hr_attendance.morning_time', 8.0))
-        default_exit_time = float(params.get_param('hr_attendance.exit_time', 17.0))
-        enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
-        enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
-        saturday_exit_time = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
-        enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
-        default_lunch_duration = float(params.get_param('hr_attendance.lunch_duration', 1.0)) if enable_lunch else 0.0
+        cfg = self.env['hr.employee']._get_attendance_config_params()
+        default_morning_time = cfg.get('morning_time', 8.0)
+        default_exit_time = cfg.get('exit_time', 17.0)
+        enable_saturday = cfg.get('enable_saturday_halfday', True)
+        enable_district_saturday = cfg.get('saturday_halfday_district', True)
+        saturday_exit_time = cfg.get('saturday_exit_time', 12.0)
+        enable_lunch = cfg.get('enable_lunch_break', False)
+        default_lunch_duration = cfg.get('lunch_duration', 1.0) if enable_lunch else 0.0
 
         for rec in self:
             emp = rec.employee_id
@@ -311,7 +346,7 @@ class HrAttendance(models.Model):
                 if enable_saturday and check_in_local and check_in_local.weekday() == 5:
                     ou = emp.default_operating_unit_id if emp else None
                     unit_type = ou.work_unit_type if ou else False
-                    if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
+                    if unit_type in ('head_office', 'head_offices', 'ho') or (unit_type in ('district', 'district_office', 'regional_office') and enable_district_saturday) or not ou:
                         shift_end = saturday_exit_time
 
             # Calculate shift lunch duration
@@ -553,6 +588,8 @@ class HrAttendance(models.Model):
     # ----------------------------------------------------------
     def _can_acknowledge(self, user):
         """Centralized permission check"""
+        if not user:
+            return False
         return any([
             user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user'),
             user.has_group('custom_hr_attendance.group_hr_attendance_it_driver_user'),
@@ -780,7 +817,7 @@ class HrAttendance(models.Model):
         # Trigger logic if reason or times change
         if any(f in vals for f in ['attendance_reason_ids', 'check_in', 'check_out']):
             for rec in self:
-                if rec.attendance_reason_ids:
+                if rec.sudo().attendance_reason_ids:
                     rec._compute_reason_type()
                     rec._apply_manager_logic()
 
@@ -791,7 +828,7 @@ class HrAttendance(models.Model):
                 if emp_user and emp_user.partner_id:
                     from markupsafe import Markup
                     mgr_name = self.env.user.name
-                    reasons_str = ", ".join(rec.attendance_reason_ids.mapped('name')) if rec.attendance_reason_ids else "N/A"
+                    reasons_str = ", ".join(rec.sudo().attendance_reason_ids.mapped('name')) if rec.sudo().attendance_reason_ids else "N/A"
                     c_date_str = rec.check_in.strftime('%Y-%m-%d') if rec.check_in else ''
                     body = Markup(
                         f"ℹ️ <b>Attendance Exception Acknowledged</b><br/>"
@@ -963,37 +1000,6 @@ class HrAttendance(models.Model):
                     })
 
 
-    # ============================================================
-    # DATABASE INDEXES — called once on module install / upgrade
-    # Partial and composite indexes for O(1) hot-path queries at
-    # 6,000+ concurrent check-ins without row-lock contention.
-    # ============================================================
-    def _auto_init(self):
-        res = super()._auto_init()
-        # Partial index: open attendance records (WHERE check_out IS NULL).
-        # Used by every check-out lookup — avoid full-table scans.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_employee_open_idx
-            ON hr_attendance (employee_id)
-            WHERE check_out IS NULL;
-        """)
-        # Composite index for date-range queries on attendance per employee.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_employee_checkin_idx
-            ON hr_attendance (employee_id, check_in);
-        """)
-        # Index on check_in_status for discipline counter queries.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_checkin_status_idx
-            ON hr_attendance (check_in_status);
-        """)
-        # Partial index on is_force_checkout for discipline and reporting queries.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_force_checkout_idx
-            ON hr_attendance (employee_id)
-            WHERE is_force_checkout = TRUE;
-        """)
-        return res
 
     # ============================================================
     # ATTENDANCE SIDE EFFECTS — HOT-PATH BRIDGE
@@ -1042,6 +1048,12 @@ class HrAttendance(models.Model):
                             (
                                 date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
                                 + (COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                                + CASE 
+                                    WHEN COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0) <= 
+                                         COALESCE(ha.shift_start_float, js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)
+                                    THEN INTERVAL '1 day'
+                                    ELSE INTERVAL '0 day'
+                                  END
                             ) AT TIME ZONE 'Africa/Addis_Ababa'
                         ) AT TIME ZONE 'UTC' AS shift_end_utc
                     FROM hr_attendance ha
@@ -1107,41 +1119,61 @@ class HrAttendance(models.Model):
             RETURNS void AS $$
             DECLARE
                 p_date DATE := (NOW() AT TIME ZONE 'Africa/Addis_Ababa')::date - INTERVAL '1 day';
+                v_isodow INTEGER := EXTRACT(ISODOW FROM p_date);
             BEGIN
+                -- 1. IDENTIFY FULL-DAY ABSENCES & RECORD APPROPRIATE PAYROLL PAYLOAD
                 INSERT INTO attendance_payroll_payload (
                     employee_id, effective_date, hours, payload_type, state, display_name, create_uid, write_uid, create_date, write_date
                 )
                 SELECT 
-                    emp.id AS employee_id, p_date AS effective_date, 8.0 AS hours, 'absence' AS payload_type, 'draft' AS state,
-                    'Absence Deduction - ' || emp.name || ' (' || p_date::text || ')' AS display_name,
+                    emp.id AS employee_id,
+                    p_date AS effective_date,
+                    CASE 
+                        WHEN v_isodow = 6 AND (ou.work_unit_type IN ('head_office', 'district_office') OR ou.work_unit_type IS NULL) THEN 4.0
+                        ELSE 8.0
+                    END AS hours,
+                    'absence' AS payload_type,
+                    'draft' AS state,
+                    CASE 
+                        WHEN v_isodow = 6 AND (ou.work_unit_type IN ('head_office', 'district_office') OR ou.work_unit_type IS NULL)
+                            THEN 'Saturday Half-Day Absence - ' || emp.name || ' (' || p_date::text || ')'
+                        ELSE 'Full Day Absence - ' || emp.name || ' (' || p_date::text || ')'
+                    END AS display_name,
                     1 AS create_uid, 1 AS write_uid, NOW() AS create_date, NOW() AS write_date
                 FROM hr_employee emp
+                LEFT JOIN operating_unit ou ON ou.id = emp.default_operating_unit_id
                 WHERE emp.active = TRUE
+                  -- No attendance record at all on this date
                   AND NOT EXISTS (
                       SELECT 1 FROM hr_attendance att
                       WHERE att.employee_id = emp.id
                         AND (att.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date = p_date
                         AND (att.active = TRUE OR att.active IS NULL)
                   )
+                  -- No validated full-day leave
                   AND NOT EXISTS (
                       SELECT 1 FROM hr_leave l
                       WHERE l.employee_id = emp.id
                         AND l.state = 'validate'
                         AND l.date_from::date <= p_date
                         AND l.date_to::date >= p_date
+                        AND (l.request_unit_half IS NOT TRUE AND COALESCE(l.number_of_days, 1.0) >= 1.0)
                   )
+                  -- No already created absence payload for this date
                   AND NOT EXISTS (
                       SELECT 1 FROM attendance_payroll_payload app
                       WHERE app.employee_id = emp.id
                         AND app.effective_date = p_date
                         AND app.payload_type = 'absence'
                   )
+                  -- Not a scheduled day off on roster
                   AND NOT EXISTS (
                       SELECT 1 FROM job_position_roster_exception_line rl
                       JOIN job_position_roster_exception r ON rl.roster_id = r.id
                       WHERE rl.employee_id = emp.id
                         AND r.active = TRUE AND r.status = 'active' AND rl.date = p_date AND rl.schedule_type = 'day_off'
                   )
+                  -- Not a scheduled day off on job position exception
                   AND NOT EXISTS (
                       SELECT 1 FROM job_position_exception jpe
                       WHERE jpe.employee_id = emp.id AND jpe.active = TRUE AND jpe.status = 'active'
@@ -1149,10 +1181,11 @@ class HrAttendance(models.Model):
                             SELECT 1 FROM job_position_roster_exception r2
                             WHERE r2.employee_id = emp.id AND r2.active = TRUE AND r2.status = 'active' AND r2.start_date <= p_date AND r2.end_date >= p_date
                         )
-                        AND (EXTRACT(ISODOW FROM p_date) = 7 OR jpe.day_off = p_date)
+                        AND (v_isodow = 7 OR jpe.day_off = p_date)
                   )
+                  -- Sunday is default off unless explicitly rostered
                   AND NOT (
-                      EXTRACT(ISODOW FROM p_date) = 7
+                      v_isodow = 7
                       AND NOT EXISTS (
                           SELECT 1 FROM job_position_roster_exception r3 WHERE r3.employee_id = emp.id AND r3.active = TRUE AND r3.status = 'active' AND r3.start_date <= p_date AND r3.end_date >= p_date
                       )
@@ -1160,6 +1193,54 @@ class HrAttendance(models.Model):
                           SELECT 1 FROM job_position_exception jpe2 WHERE jpe2.employee_id = emp.id AND jpe2.active = TRUE AND jpe2.status = 'active'
                       )
                   );
+
+                -- 2. IDENTIFY PARTIAL ABSENCES (MISSING HALF-DAY SESSION ON WEEKDAYS)
+                IF v_isodow BETWEEN 1 AND 5 THEN
+                    INSERT INTO attendance_payroll_payload (
+                        employee_id, effective_date, hours, payload_type, state, display_name, create_uid, write_uid, create_date, write_date
+                    )
+                    SELECT 
+                        emp.id AS employee_id,
+                        p_date AS effective_date,
+                        4.0 AS hours,
+                        'absence' AS payload_type,
+                        'draft' AS state,
+                        'Half Day Absence (Missing Session) - ' || emp.name || ' (' || p_date::text || ')',
+                        1 AS create_uid, 1 AS write_uid, NOW() AS create_date, NOW() AS write_date
+                    FROM hr_employee emp
+                    JOIN (
+                        SELECT 
+                            att.employee_id,
+                            COUNT(att.id) AS session_count,
+                            COALESCE(SUM(att.worked_hours), 0.0) AS total_worked
+                        FROM hr_attendance att
+                        WHERE (att.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date = p_date
+                          AND (att.active = TRUE OR att.active IS NULL)
+                        GROUP BY att.employee_id
+                    ) att_summary ON att_summary.employee_id = emp.id
+                    WHERE emp.active = TRUE
+                      AND att_summary.session_count = 1
+                      AND att_summary.total_worked <= 4.5
+                      AND NOT EXISTS (
+                          SELECT 1 FROM hr_leave l
+                          WHERE l.employee_id = emp.id
+                            AND l.state = 'validate'
+                            AND l.date_from::date <= p_date
+                            AND l.date_to::date >= p_date
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM attendance_payroll_payload app
+                          WHERE app.employee_id = emp.id
+                            AND app.effective_date = p_date
+                            AND app.payload_type = 'absence'
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM job_position_roster_exception_line rl
+                          JOIN job_position_roster_exception r ON rl.roster_id = r.id
+                          WHERE rl.employee_id = emp.id
+                            AND r.active = TRUE AND r.status = 'active' AND rl.date = p_date AND rl.schedule_type = 'day_off'
+                      );
+                END IF;
             END;
             $$ LANGUAGE plpgsql;
         """)

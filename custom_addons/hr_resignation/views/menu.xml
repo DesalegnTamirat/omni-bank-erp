@@ -11,7 +11,7 @@
               name="Dashboard"
               parent="menu_hr_resignation_root"
               action="action_hr_resignation_dashboard"
-              groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,hr_resignation.group_resignation_admin"
+              groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_auditor,hr_resignation.group_resignation_hr_manager,hr_resignation.group_resignation_admin"
               sequence="5"/>
 
     <menuitem id="menu_hr_resignation_my"
@@ -25,7 +25,7 @@
         Shown to users whose privilege is "Manager" OR "HR Manager" OR "POMD Officer" OR "Administrator".
         - Manager: sees only their own direct reports (via record rule)
         - HR Manager: also sees their direct reports (via separate record rule)
-        Both record rules use manager_id.user_id = user.id so each user
+        Both record rules use coach_id.user_id = user.id so each user
         only sees their own team regardless of their privilege level.
         POMD and Clearance Officers are excluded — they use their own menus.
     -->
@@ -47,37 +47,49 @@
               name="My Clearance Tasks"
               parent="menu_hr_resignation_root"
               action="hr_resignation.action_my_clearance_tasks"
-              groups="hr_resignation.group_clearance_officer,hr_resignation.group_resignation_manager"
               sequence="12"/>
 
+    <record id="menu_hr_resignation_clearance_tasks" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('hr_resignation.group_clearance_officer')])]"/>
+    </record>
+
+
+    <!-- Removed per user request
+    <menuitem id="menu_hr_resignation_settlement_all"
+              name="Final Settlements"
+              parent="menu_hr_resignation_root"
+              action="action_hr_settlement"
+              groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,hr_resignation.group_resignation_auditor"
+              sequence="15"/>
+    -->
+
     <menuitem id="menu_hr_resignation_all"
+
               name="All Resignation Requests"
               parent="menu_hr_resignation_root"
               action="action_hr_resignation_all"
-              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,base.group_system"
+              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_auditor,base.group_system"
               sequence="12"/>
 
 
     <menuitem id="menu_hr_resignation_reporting"
               name="Reporting"
               parent="menu_hr_resignation_root"
-              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_admin,hr.group_hr_manager"
-              active="False"
+              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_admin"
               sequence="80"/>
 
     <menuitem id="menu_hr_exit_analytics"
               name="Exit Interview Analytics"
               parent="menu_hr_resignation_reporting"
-              action="action_hr_exit_analytics"
-              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_admin,hr.group_hr_manager"
-              active="False"
+              action="action_exit_interview_dashboard"
+              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_admin"
               sequence="10"/>
 
     <!-- ── Configuration ──────────────────────────────────────────────── -->
     <menuitem id="menu_hr_resignation_config"
               name="Configuration"
               parent="menu_hr_resignation_root"
-              groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,hr_resignation.group_resignation_admin"
+              groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_auditor,hr_resignation.group_resignation_hr_manager,hr_resignation.group_resignation_admin"
               sequence="90"/>
 
     <menuitem id="menu_separation_type"
@@ -103,6 +115,5 @@
               parent="menu_hr_resignation_config"
               action="action_hr_resignation_tax_bracket"
               sequence="50"/>
-
 
 </odoo>

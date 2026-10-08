@@ -1,0 +1,592 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates>
+    <t t-name="bunna_helpdesk.HelpdeskDashboard">
+        <div class="o_bunna_helpdesk_dashboard container-fluid p-0">
+            <!-- ── Top Bunna Bank Brand Header (Sticky) ─────────────────────── -->
+            <div class="bunna-sticky-header">
+                <div class="bunna-header-banner d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <img
+                            src="/bunna_helpdesk/static/src/img/bunna_logo.png"
+                            alt="Bunna Bank Logo"
+                            class="bunna-logo-img"
+                        />
+                        <div>
+                            <div class="bunna-title">
+                                Bunna Bank Support &amp; Service Hub
+                            </div>
+                            <div class="bunna-subtitle">
+                                Customer Care, Branch Operations &amp; IT Service Management
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button
+                            class="btn btn-bunna-action d-flex align-items-center gap-2"
+                            t-on-click="() => this.createTicket()"
+                            title="Create a new ticket"
+                        >
+                            <i class="fa fa-plus-circle" />
+                            <span>New Ticket</span>
+                        </button>
+                        <button
+                            class="btn btn-bunna-outline"
+                            t-on-click="() => this.loadData()"
+                            title="Refresh metrics"
+                        >
+                            <i t-attf-class="fa fa-refresh #{ state.loading ? 'fa-spin' : '' }" />
+                        </button>
+                        <button
+                            class="btn btn-bunna-outline"
+                            t-on-click="() => this.toggleCollapse()"
+                            t-att-title="state.collapsed ? 'Expand Dashboard' : 'Collapse Dashboard'"
+                        >
+                            <i t-attf-class="fa #{ state.collapsed ? 'fa-chevron-down' : 'fa-chevron-up' }" />
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filter Toolbar (Inside Sticky Header, visible when expanded) -->
+                <div t-if="!state.collapsed" class="bunna-toolbar">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted fw-semibold" style="font-size: 0.8rem;">
+                            <i class="fa fa-calendar me-1" /> Period:
+                        </span>
+                        <div class="period-pill-group">
+                            <button
+                                t-attf-class="period-pill #{ state.period === 'all' ? 'active' : '' }"
+                                t-on-click="() => this.setPeriod('all')"
+                            >
+                                All Time
+                            </button>
+                            <button
+                                t-attf-class="period-pill #{ state.period === 'today' ? 'active' : '' }"
+                                t-on-click="() => this.setPeriod('today')"
+                            >
+                                Today
+                            </button>
+                            <button
+                                t-attf-class="period-pill #{ state.period === 'week' ? 'active' : '' }"
+                                t-on-click="() => this.setPeriod('week')"
+                            >
+                                This Week
+                            </button>
+                            <button
+                                t-attf-class="period-pill #{ state.period === 'month' ? 'active' : '' }"
+                                t-on-click="() => this.setPeriod('month')"
+                            >
+                                This Month
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-muted fw-semibold" style="font-size: 0.8rem;">
+                                <i class="fa fa-users me-1" /> Team:
+                            </span>
+                            <!-- First Dropdown: Grouping Mode (All Teams vs Individual) -->
+                            <div class="bunna-dropdown" t-att-class="{ 'dropdown-open': state.activeDropdown === 'grouping' }">
+                                <button
+                                    type="button"
+                                    class="bunna-dropdown-toggle"
+                                    t-on-click="(ev) => this.toggleDropdown('grouping', ev)"
+                                    title="Filter by All Teams or Individual Users"
+                                >
+                                    <span t-esc="currentGroupingModeLabel" />
+                                    <i class="fa fa-chevron-down bunna-dropdown-arrow" />
+                                </button>
+                                <div t-if="state.activeDropdown === 'grouping'" class="bunna-dropdown-menu">
+                                    <button
+                                        type="button"
+                                        class="bunna-dropdown-item"
+                                        t-att-class="{ 'selected': state.groupingMode === 'teams' }"
+                                        t-on-click="() => this.selectGroupingMode('teams')"
+                                    >
+                                        <span>All Teams</span>
+                                        <i t-if="state.groupingMode === 'teams'" class="fa fa-check item-icon" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="bunna-dropdown-item"
+                                        t-att-class="{ 'selected': state.groupingMode === 'individual' }"
+                                        t-on-click="() => this.selectGroupingMode('individual')"
+                                    >
+                                        <span>Individual</span>
+                                        <i t-if="state.groupingMode === 'individual'" class="fa fa-check item-icon" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Dropdown for Teams or Individual Users -->
+                            <t t-if="state.groupingMode === 'teams'">
+                                <div class="bunna-dropdown" t-att-class="{ 'dropdown-open': state.activeDropdown === 'team' }">
+                                    <button
+                                        type="button"
+                                        class="bunna-dropdown-toggle"
+                                        t-on-click="(ev) => this.toggleDropdown('team', ev)"
+                                        title="Select Team"
+                                    >
+                                        <span t-esc="currentTeamOrUserLabel" />
+                                        <i class="fa fa-chevron-down bunna-dropdown-arrow" />
+                                    </button>
+                                    <div t-if="state.activeDropdown === 'team'" class="bunna-dropdown-menu">
+                                        <t t-foreach="state.data.teams" t-as="team" t-key="team.id">
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.teamId === team.id }"
+                                                t-on-click="() => this.selectTeam(team.id)"
+                                            >
+                                                <span t-esc="team.name" />
+                                                <i t-if="state.teamId === team.id" class="fa fa-check item-icon" />
+                                            </button>
+                                        </t>
+                                    </div>
+                                </div>
+                            </t>
+                            <t t-if="state.groupingMode === 'individual'">
+                                <div class="bunna-dropdown" t-att-class="{ 'dropdown-open': state.activeDropdown === 'user' }">
+                                    <button
+                                        type="button"
+                                        class="bunna-dropdown-toggle"
+                                        t-on-click="(ev) => this.toggleDropdown('user', ev)"
+                                        title="Select Individual User"
+                                    >
+                                        <span t-esc="currentTeamOrUserLabel" />
+                                        <i class="fa fa-chevron-down bunna-dropdown-arrow" />
+                                    </button>
+                                    <div t-if="state.activeDropdown === 'user'" class="bunna-dropdown-menu">
+                                        <button
+                                            type="button"
+                                            class="bunna-dropdown-item"
+                                            t-att-class="{ 'selected': state.userId === 0 }"
+                                            t-on-click="() => this.selectUser(0)"
+                                        >
+                                            <span>All Users</span>
+                                            <i t-if="state.userId === 0" class="fa fa-check item-icon" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="bunna-dropdown-item"
+                                            t-att-class="{ 'selected': state.userId === -1 }"
+                                            t-on-click="() => this.selectUser(-1)"
+                                        >
+                                            <span>Unassigned Tickets</span>
+                                            <i t-if="state.userId === -1" class="fa fa-check item-icon" />
+                                        </button>
+                                        <t t-foreach="state.data.users" t-as="user" t-key="user.id">
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.userId === user.id }"
+                                                t-on-click="() => this.selectUser(user.id)"
+                                            >
+                                                <span t-esc="user.name" />
+                                                <i t-if="state.userId === user.id" class="fa fa-check item-icon" />
+                                            </button>
+                                        </t>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button
+                                class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+                                style="font-size: 0.78rem; border-radius: 6px;"
+                                t-on-click="() => this.openSlaAnalysis()"
+                            >
+                                <i class="fa fa-clock-o" style="color: #541718;" /> SLA Analysis
+                            </button>
+                            <button
+                                class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+                                style="font-size: 0.78rem; border-radius: 6px;"
+                                t-on-click="() => this.openSatisfactionAnalysis()"
+                            >
+                                <i class="fa fa-star" style="color: #726732;" /> CSAT Ratings
+                            </button>
+                            <button
+                                class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+                                style="font-size: 0.78rem; border-radius: 6px;"
+                                t-on-click="() => this.exportDashboardReport()"
+                                title="Export Bunna Bank Helpdesk Performance Report to Excel"
+                            >
+                                <i class="fa fa-file-excel-o" style="color: #425727;" /> Export Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Collapsible Body ─────────────────────────────────────────── -->
+            <div t-if="!state.collapsed" class="bunna-dashboard-content">
+                <!-- ── Interactive KPI Metric Cards ─────────────────────────── -->
+                <div class="kpi-cards-grid">
+                    <!-- Total Tickets -->
+                    <div
+                        class="bunna-kpi-card card-total"
+                        t-on-click="() => this.openTickets('total')"
+                        title="Click to view all tickets in this period"
+                    >
+                        <div class="kpi-icon-wrap">
+                            <i class="fa fa-ticket" />
+                        </div>
+                        <div class="kpi-value" t-esc="state.data.kpi.total" />
+                        <div class="kpi-label">Total Tickets</div>
+                        <div class="kpi-subtext">All created tickets</div>
+                    </div>
+
+                    <!-- Open / Active Tickets -->
+                    <div
+                        class="bunna-kpi-card card-open"
+                        t-on-click="() => this.openTickets('open')"
+                        title="Click to view active open tickets"
+                    >
+                        <div class="kpi-icon-wrap">
+                            <i class="fa fa-folder-open-o" />
+                        </div>
+                        <div class="kpi-value" t-esc="state.data.kpi.open" />
+                        <div class="kpi-label">Active / Open</div>
+                        <div class="kpi-subtext">Pending resolution</div>
+                    </div>
+
+                    <!-- Unassigned Tickets -->
+                    <div
+                        class="bunna-kpi-card card-unassigned"
+                        t-on-click="() => this.openTickets('unassigned')"
+                        title="Click to view unassigned tickets"
+                    >
+                        <div class="kpi-icon-wrap">
+                            <i class="fa fa-user-plus" />
+                        </div>
+                        <div class="kpi-value" t-esc="state.data.kpi.unassigned" />
+                        <div class="kpi-label">Unassigned</div>
+                        <div class="kpi-subtext">Needs agent assignment</div>
+                    </div>
+
+                    <!-- Unattended Tickets -->
+                    <div
+                        class="bunna-kpi-card card-unattended"
+                        t-on-click="() => this.openTickets('unattended')"
+                        title="Click to view unattended tickets"
+                    >
+                        <div class="kpi-icon-wrap">
+                            <i class="fa fa-bell-o" />
+                        </div>
+                        <div class="kpi-value" t-esc="state.data.kpi.unattended" />
+                        <div class="kpi-label">Unattended</div>
+                        <div class="kpi-subtext">No first response</div>
+                    </div>
+
+                    <!-- Urgent / High Priority -->
+                    <div
+                        class="bunna-kpi-card card-urgent"
+                        t-on-click="() => this.openTickets('urgent')"
+                        title="Click to view high and very high priority tickets"
+                    >
+                        <div class="kpi-icon-wrap">
+                            <i class="fa fa-fire" />
+                        </div>
+                        <div class="kpi-value" t-esc="state.data.kpi.urgent" />
+                        <div class="kpi-label">Critical / Urgent</div>
+                        <div class="kpi-subtext">High &amp; Very High priority</div>
+                    </div>
+
+                    <!-- SLA Breached -->
+                    <div
+                        class="bunna-kpi-card card-sla"
+                        t-on-click="() => this.openTickets('sla_failed')"
+                        title="Click to view SLA breached tickets"
+                    >
+                        <div class="kpi-icon-wrap">
+                            <i class="fa fa-exclamation-triangle" />
+                        </div>
+                        <div class="kpi-value" t-esc="state.data.kpi.sla_failed" />
+                        <div class="kpi-label">SLA Breached</div>
+                        <div class="kpi-subtext">Missed target deadlines</div>
+                    </div>
+
+                    <!-- NBE Complaints -->
+                    <div
+                        class="bunna-kpi-card card-nbe"
+                        t-on-click="() => this.openTickets('nbe_complaints')"
+                        title="Click to view NBE Regulatory Complaints"
+                    >
+                        <div class="kpi-icon-wrap" style="background: rgba(84, 23, 24, 0.08); color: #541718;">
+                            <i class="fa fa-shield" />
+                        </div>
+                        <div class="kpi-value" t-esc="state.data.kpi.nbe_complaints || 0" />
+                        <div class="kpi-label">NBE Complaints</div>
+                        <div class="kpi-subtext">Regulated Cases</div>
+                    </div>
+
+                    <!-- Escalated to 2nd Level -->
+                    <div
+                        class="bunna-kpi-card card-escalated"
+                        t-on-click="() => this.openTickets('escalated')"
+                        title="Click to view cases escalated to 2nd level units"
+                    >
+                        <div class="kpi-icon-wrap" style="background: rgba(193, 117, 64, 0.1); color: #C17540;">
+                            <i class="fa fa-level-up" />
+                        </div>
+                        <div class="kpi-value" t-esc="state.data.kpi.escalated || 0" />
+                        <div class="kpi-label">2nd-Level Escalated</div>
+                        <div class="kpi-subtext">Active OLA tracking</div>
+                    </div>
+
+                    <!-- Branch vs External Split -->
+                    <div
+                        class="bunna-kpi-card card-cust-type"
+                        t-on-click="() => this.openTickets('internal')"
+                        title="Click to view tickets originating from internal branches / work units"
+                    >
+                        <div class="kpi-icon-wrap" style="background: rgba(66, 87, 39, 0.1); color: #425727;">
+                            <i class="fa fa-building-o" />
+                        </div>
+                        <div class="kpi-value">
+                            <t t-esc="state.data.kpi.internal || 0" />
+                            <span style="font-size: 0.8rem; color: #888;"> / <t t-esc="state.data.kpi.external || 0" /></span>
+                        </div>
+                        <div class="kpi-label">Branch vs External</div>
+                        <div class="kpi-subtext">Internal / External split</div>
+                    </div>
+
+                    <!-- Customer Satisfaction CSAT -->
+                    <div
+                        class="bunna-kpi-card card-csat"
+                        t-on-click="() => this.openSatisfactionAnalysis()"
+                        title="Click to view customer satisfaction details"
+                    >
+                        <div class="kpi-icon-wrap">
+                            <i class="fa fa-smile-o" />
+                        </div>
+                        <div class="kpi-value">
+                            <t t-esc="state.data.kpi.rating_avg" />
+                            <span style="font-size: 0.95rem; color: #726732;"> / 5</span>
+                        </div>
+                        <div class="kpi-label">Satisfaction (CSAT)</div>
+                        <div class="kpi-subtext">
+                            <t t-esc="state.data.kpi.rating_count" /> ratings received
+                        </div>
+                    </div>
+
+                    <!-- Timesheet Hours -->
+                    <div
+                        class="bunna-kpi-card card-hours"
+                        t-on-click="() => this.openTickets('total')"
+                        title="Total hours logged on tickets"
+                    >
+                        <div class="kpi-icon-wrap">
+                            <i class="fa fa-hourglass-half" />
+                        </div>
+                        <div class="kpi-value">
+                            <t t-esc="state.data.kpi.total_hours" />
+                            <span style="font-size: 0.95rem; font-weight: normal;">h</span>
+                        </div>
+                        <div class="kpi-label">Logged Labor</div>
+                        <div class="kpi-subtext">Timesheet hours tracked</div>
+                    </div>
+                </div>
+
+                <!-- ── Section 1: Line Chart (Trends and Changes Over Time) ── -->
+                <div class="bunna-charts-row mb-3">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="bunna-panel chart-panel">
+                                <div class="panel-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="panel-title">
+                                            <i class="fa fa-line-chart" style="color: #541718;" /> Line Chart: Trends &amp; Changes Over Time
+                                        </span>
+                                        <span class="badge text-bg-light border text-muted small ms-1" style="font-size: 0.72rem;">
+                                            <t t-esc="state.period.toUpperCase()" />
+                                        </span>
+                                    </div>
+                                    <!-- Controls: Metric Stream Toggle -->
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button
+                                            type="button"
+                                            t-attf-class="btn btn-sm #{ state.trendMetric === 'all' ? 'btn-bunna-action' : 'btn-outline-secondary' }"
+                                            t-on-click="() => this.setTrendMetric('all')"
+                                            style="font-size: 0.75rem; padding: 3px 10px;"
+                                        >
+                                            All Streams
+                                        </button>
+                                        <button
+                                            type="button"
+                                            t-attf-class="btn btn-sm #{ state.trendMetric === 'created' ? 'btn-bunna-action' : 'btn-outline-secondary' }"
+                                            t-on-click="() => this.setTrendMetric('created')"
+                                            style="font-size: 0.75rem; padding: 3px 10px;"
+                                        >
+                                            Inflow
+                                        </button>
+                                        <button
+                                            type="button"
+                                            t-attf-class="btn btn-sm #{ state.trendMetric === 'closed' ? 'btn-bunna-action' : 'btn-outline-secondary' }"
+                                            t-on-click="() => this.setTrendMetric('closed')"
+                                            style="font-size: 0.75rem; padding: 3px 10px;"
+                                        >
+                                            Resolved
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Chart Summary Legend & Stats Bar -->
+                                <div class="d-flex flex-wrap gap-4 mb-2 pt-1 pb-2 border-bottom" style="font-size: 0.82rem;">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="trend-bullet-inflow" />
+                                        <span class="text-muted">Tickets Created:</span>
+                                        <strong class="text-dark" t-esc="state.data.trend.total_created || 0" />
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="trend-bullet-closed" />
+                                        <span class="text-muted">Resolved / Closed:</span>
+                                        <strong style="color: #425727;" t-esc="state.data.trend.total_closed || 0" />
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="trend-bullet-sla" />
+                                        <span class="text-muted">SLA Breached:</span>
+                                        <strong style="color: #C17540;" t-esc="state.data.trend.total_breached || 0" />
+                                    </div>
+                                </div>
+                                <div class="chart-canvas-container" style="position: relative; height: 280px; width: 100%;">
+                                    <canvas t-ref="trendChartCanvas" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Section 2: Bar & Column Charts + Pie & Donut Charts ── -->
+                <div class="bunna-charts-row">
+                    <div class="row g-3">
+                        <!-- Left: Bar and Column Charts (Compare Values Across Categories) -->
+                        <div class="col-12 col-lg-6">
+                            <div class="bunna-panel chart-panel h-100">
+                                <div class="panel-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <span class="panel-title">
+                                        <i class="fa fa-bar-chart" style="color: #C17540;" /> Bar &amp; Column Chart: Comparative Analysis
+                                    </span>
+                                    <!-- Selector: Teams vs Channels vs Stages -->
+                                    <div class="bunna-dropdown bunna-dropdown-sm" t-att-class="{ 'dropdown-open': state.activeDropdown === 'barMode' }">
+                                        <button
+                                            type="button"
+                                            class="bunna-dropdown-toggle"
+                                            t-on-click="(ev) => this.toggleDropdown('barMode', ev)"
+                                            title="Compare values across categories"
+                                        >
+                                            <span t-esc="currentBarModeLabel" />
+                                            <i class="fa fa-chevron-down bunna-dropdown-arrow" />
+                                        </button>
+                                        <div t-if="state.activeDropdown === 'barMode'" class="bunna-dropdown-menu">
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.barMode === 'teams' }"
+                                                t-on-click="() => this.selectBarMode('teams')"
+                                            >
+                                                <span>By Support Teams (Open vs Closed)</span>
+                                                <i t-if="state.barMode === 'teams'" class="fa fa-check item-icon" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.barMode === 'channels' }"
+                                                t-on-click="() => this.selectBarMode('channels')"
+                                            >
+                                                <span>By Omnichannel Source</span>
+                                                <i t-if="state.barMode === 'channels'" class="fa fa-check item-icon" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.barMode === 'stages' }"
+                                                t-on-click="() => this.selectBarMode('stages')"
+                                            >
+                                                <span>By Pipeline Stage</span>
+                                                <i t-if="state.barMode === 'stages'" class="fa fa-check item-icon" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-canvas-container" style="position: relative; height: 280px; width: 100%;">
+                                    <canvas t-ref="barChartCanvas" />
+                                </div>
+                                <div class="text-center text-muted small mt-2" style="font-size: 0.74rem;">
+                                    <i class="fa fa-hand-pointer-o me-1" style="color: #C17540;" /> Click any bar to open filtered tickets
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Pie and Donut Charts (Proportional Breakdowns) -->
+                        <div class="col-12 col-lg-6">
+                            <div class="bunna-panel chart-panel h-100">
+                                <div class="panel-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <span class="panel-title">
+                                        <i class="fa fa-pie-chart" style="color: #726732;" /> Pie &amp; Donut Chart: Proportional Breakdowns
+                                    </span>
+                                    <!-- Selector: Case Type vs Omnichannel vs Priorities vs Customer Types -->
+                                    <div class="bunna-dropdown bunna-dropdown-sm" t-att-class="{ 'dropdown-open': state.activeDropdown === 'pieMode' }">
+                                        <button
+                                            type="button"
+                                            class="bunna-dropdown-toggle"
+                                            t-on-click="(ev) => this.toggleDropdown('pieMode', ev)"
+                                            title="Display parts of a whole or proportional breakdowns"
+                                        >
+                                            <span t-esc="currentPieModeLabel" />
+                                            <i class="fa fa-chevron-down bunna-dropdown-arrow" />
+                                        </button>
+                                        <div t-if="state.activeDropdown === 'pieMode'" class="bunna-dropdown-menu">
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.pieMode === 'case_types' }"
+                                                t-on-click="() => this.selectPieMode('case_types')"
+                                            >
+                                                <span>By Case Type</span>
+                                                <i t-if="state.pieMode === 'case_types'" class="fa fa-check item-icon" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.pieMode === 'channels' }"
+                                                t-on-click="() => this.selectPieMode('channels')"
+                                            >
+                                                <span>By Omnichannel Source</span>
+                                                <i t-if="state.pieMode === 'channels'" class="fa fa-check item-icon" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.pieMode === 'priorities' }"
+                                                t-on-click="() => this.selectPieMode('priorities')"
+                                            >
+                                                <span>By Priority</span>
+                                                <i t-if="state.pieMode === 'priorities'" class="fa fa-check item-icon" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="bunna-dropdown-item"
+                                                t-att-class="{ 'selected': state.pieMode === 'customer_types' }"
+                                                t-on-click="() => this.selectPieMode('customer_types')"
+                                            >
+                                                <span>By Customer Type (Branch vs External)</span>
+                                                <i t-if="state.pieMode === 'customer_types'" class="fa fa-check item-icon" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-canvas-container" style="position: relative; height: 280px; width: 100%;">
+                                    <canvas t-ref="pieChartCanvas" />
+                                </div>
+                                <div class="text-center text-muted small mt-2" style="font-size: 0.74rem;">
+                                    <i class="fa fa-hand-pointer-o me-1" style="color: #C17540;" /> Click any slice to open filtered tickets
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

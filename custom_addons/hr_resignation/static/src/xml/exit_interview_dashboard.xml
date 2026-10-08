@@ -1,221 +1,387 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
-    <t t-name="hr_resignation.ExitInterviewDashboard">
-        <div class="o_action_manager">
-            <div class="o_content" style="overflow-y: auto;">
-                <div class="eid-app">
-                    <style>
-                        .eid-app {
-                            --paper: #F6F4EE;
-                            --ink: #1E2A26;
-                            --ink-soft: #4C5B55;
-                            --line: #DAD5C7;
-                            --primary: #2F5D50;
-                            --primary-soft: #E4ECE8;
-                            --gold: #B98A3D;
-                            --gold-soft: #F3E7D2;
-                            --rust: #A85341;
-                            --rust-soft: #F1E0DA;
-                            --sage: #6B8F71;
-                            --sage-soft: #E4EDE3;
-                            --card: #FFFFFF;
-                            --radius-card: 10px;
-                            --radius-pill: 999px;
-                            background: var(--paper);
-                            color: var(--ink);
-                            font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
-                            -webkit-font-smoothing: antialiased;
-                            padding: 28px 24px 80px;
-                            min-height: 100vh;
-                            box-sizing: border-box;
-                        }
-                        .eid-app * { box-sizing: border-box; }
-                        .eid-app h2, .eid-app h3 {
-                            font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
-                            font-weight: 600;
-                            margin: 0 0 6px 0;
-                            color: var(--ink);
-                        }
-                        /* DASHBOARD HEADER */
-                        .dash-head {
-                            display: flex; justify-content: space-between; align-items: flex-end;
-                            margin-bottom: 22px; flex-wrap: wrap; gap: 14px;
-                        }
-                        .dash-head .sub { color: var(--ink-soft); font-size: 13px; }
-                        
-                        /* KPIs */
-                        .kpi-row {
-                            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                            gap: 14px; margin-bottom: 22px;
-                        }
-                        .kpi {
-                            background: var(--card); border: 1px solid var(--line);
-                            border-radius: var(--radius-card); padding: 18px 20px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-                        }
-                        .kpi .val {
-                            font-family: "Source Serif 4", serif; font-size: 30px; font-weight: 600;
-                        }
-                        .kpi .lbl { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
-                        .kpi .delta {
-                            font-size: 12px; margin-top: 6px; display: inline-block;
-                            padding: 2px 8px; border-radius: 999px; font-weight: 500;
-                        }
-                        .delta.up { background: var(--sage-soft); color: var(--sage); }
-                        .delta.down { background: var(--rust-soft); color: var(--rust); }
-                        .delta.neutral { background: var(--primary-soft); color: var(--primary); }
+<t t-name="hr_resignation.ExitInterviewDashboard">
+<div class="eid_wrap">
 
-                        /* PANELS AND GRIDS */
-                        .chart-grid {
-                            display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-                            gap: 16px; margin-bottom: 16px;
-                        }
-                        .panel {
-                            background: var(--card); border: 1px solid var(--line);
-                            border-radius: var(--radius-card); padding: 20px 22px;
-                            display: flex; flex-direction: column;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-                        }
-                        .panel h3 { font-size: 15px; margin-bottom: 2px; }
-                        .panel .sub { font-size: 12px; color: var(--ink-soft); margin-bottom: 14px; }
-                        .chart-wrap { position: relative; flex-grow: 1; min-height: 250px; }
-                        
-                        /* LIKERT */
-                        .likert-bar-row {
-                            display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 13px;
-                        }
-                        .likert-bar-row .q-name {
-                            width: 220px; color: var(--ink-soft); flex-shrink: 0; line-height: 1.3;
-                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                        }
-                        .likert-bar-track {
-                            flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden;
-                        }
-                        .likert-bar-fill { height: 100%; background: var(--primary); border-radius: 4px; transition: width 0.5s ease; }
-                        .likert-bar-row .score { width: 32px; text-align: right; font-weight: 600; font-family: "Source Serif 4", serif;}
-                        
-                        /* THEMES */
-                        .theme-tags { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
-                        .theme-tag {
-                            display: flex; align-items: center; gap: 6px; background: var(--paper);
-                            border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 12.5px;
-                        }
-                        .theme-tag .n {
-                            background: var(--gold); color: #fff; font-size: 10.5px;
-                            padding: 1px 6px; border-radius: 999px; font-weight: 600;
-                        }
+<div class="eid_header">
+        <span class="eid_title">Exit Interview &#183; POMD</span>
+        <div class="eid_tabs">
+            <button t-att-class="state.view == 'dash' ? 'eid_tab active' : 'eid_tab'" t-on-click="() => this.state.view = 'dash'">Analytics dashboard</button>
+            
+            <button t-att-class="state.view == 'rep' ? 'eid_tab active' : 'eid_tab'" t-on-click="openReportTab">Employee report</button>
+        </div>
+    </div>
 
-                        .loading-spinner {
-                            text-align: center; padding: 100px; color: var(--ink-soft);
-                        }
-                    </style>
+<div t-if="state.view == 'dash'" class="eid_body">
 
-                    <t t-if="!state.dataLoaded">
-                        <div class="loading-spinner">
-                            <i class="fa fa-spinner fa-spin fa-2x"></i>
-                            <p class="mt-2">Analyzing feedback data...</p>
-                        </div>
+        <!-- Loading -->
+        <div t-if="state.loading" class="eid_loading">
+            <i class="fa fa-spinner fa-spin fa-2x" title="Loading"/> Loading analytics…
+        </div>
+
+        <t t-if="!state.loading">
+
+            <!-- ── Filters bar ── -->
+            <div class="eid_filters">
+
+                <!-- Operating Unit -->
+                <div class="eid_filter_group">
+                    <label class="eid_filter_lbl">Work units</label>
+                    <select class="eid_sel" t-on-change="onFilterChangeOU">
+                        <option value="all">All units</option>
+                        <t t-foreach="state.operating_units" t-as="ou" t-key="ou.value">
+                            <option t-att-value="ou.value" t-att-selected="state.f_ou == ou.value">
+                                <t t-esc="ou.label"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+
+                <!-- Position -->
+                <div class="eid_filter_group">
+                    <label class="eid_filter_lbl">Position</label>
+                    <select class="eid_sel" t-on-change="onFilterChangePos">
+                        <option value="all">All positions</option>
+                        <t t-foreach="state.positions" t-as="p" t-key="p.value">
+                            <option t-att-value="p.value" t-att-selected="state.f_pos == p.value">
+                                <t t-esc="p.label"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+
+                <!-- Separation type -->
+                <div class="eid_filter_group">
+                    <label class="eid_filter_lbl">Separation type</label>
+                    <select class="eid_sel" t-on-change="onFilterChangeSep">
+                        <option value="all">All types</option>
+                        <t t-foreach="state.sep_types" t-as="s" t-key="s.value">
+                            <option t-att-value="s.value" t-att-selected="state.f_sep == s.value">
+                                <t t-esc="s.label"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+
+                <span class="eid_lock">
+                    <i class="fa fa-lock" title="Anonymized"/> Anonymized · min. 5 responses per segment
+                </span>
+            </div>
+
+            <!-- ── KPI cards ── -->
+            <div class="eid_kpis">
+                <div class="eid_kpi eid_kpi_blue" style="cursor: pointer;" t-on-click="onKpiClickAll">
+                    <div class="eid_kpi_label">Interviews completed</div>
+                    <div class="eid_kpi_val"><t t-esc="state.kpis.total || 0"/></div>
+                    <div class="eid_kpi_sub">
+                        <span class="eid_badge_up">▲ <t t-esc="state.kpis.completion_pct || 0"/>%</span> completion rate
+                    </div>
+                </div>
+                <div class="eid_kpi eid_kpi_teal" style="cursor: pointer;" t-on-click="onKpiClickAll">
+                    <div class="eid_kpi_label">Avg. satisfaction</div>
+                    <div class="eid_kpi_val"><t t-esc="state.kpis.avg_sat || '—'"/> / 5</div>
+                    <div class="eid_kpi_sub">Overall experience rating</div>
+                </div>
+                <div class="eid_kpi eid_kpi_green" style="cursor: pointer;" t-on-click="onKpiClickRecommend">
+                    <div class="eid_kpi_label">Would recommend bank</div>
+                    <div class="eid_kpi_val"><t t-esc="state.kpis.recommend_pct || 0"/>%</div>
+                    <div class="eid_kpi_sub">Yes / No question</div>
+                </div>
+
+
+                <div class="eid_kpi eid_kpi_amber" style="cursor: pointer;" t-on-click="onKpiClickAll">
+                    <div class="eid_kpi_label">Avg. tenure at exit</div>
+                    <div class="eid_kpi_val"><t t-esc="state.kpis.avg_tenure || '—'"/></div>
+                    <div class="eid_kpi_sub"><t t-esc="state.kpis.avg_tenure_median || '—'"/></div>
+                </div>
+            </div>
+
+            <!-- ── Row 1: Bars + Donut ── -->
+            <div class="eid_row3">
+
+                <!-- Primary reason for leaving -->
+                <div class="eid_card">
+                    <div class="eid_card_tag">MULTIPLE CHOICE · SINGLE ANSWER</div>
+                    <div class="eid_card_title">Primary reason for leaving</div>
+                    <div class="eid_card_sub">Share of respondents</div>
+                    <t t-if="state.bars.length == 0">
+                        <div class="eid_empty mt12">No data available</div>
                     </t>
-                    <t t-else="">
-                        <div class="dash-head">
-                            <div>
-                                <h2 style="font-size:24px;">Exit Interview Insights</h2>
-                                <div class="sub">Dynamic HR Dashboard · Aggregated from all submitted interviews</div>
-                            </div>
-                            <div class="filters">
-                                <button class="btn btn-sm" style="background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px; color:var(--ink-soft);" disabled="disabled">
-                                    <i class="fa fa-filter"></i> Filters active automatically
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- KPIs -->
-                        <div class="kpi-row">
-                            <div class="kpi" style="cursor:pointer" t-on-click="() => this.openRecords([['state', '=', 'done']], 'Completed Exit Interviews')">
-                                <div class="val"><t t-esc="state.data.meta.total"/></div>
-                                <div class="lbl">Exit interviews completed</div>
-                            </div>
-                            <div class="kpi">
-                                <div class="val"><t t-esc="state.data.meta.avg_rating"/><span style="font-size:15px;color:var(--ink-soft);">/5</span></div>
-                                <div class="lbl">Avg. satisfaction across all metrics</div>
-                                <t t-if="state.data.meta.avg_rating_raw &gt; 0">
-                                    <span t-attf-class="delta {{state.data.meta.avg_rating_raw >= 3.5 ? 'up' : (state.data.meta.avg_rating_raw &lt; 2.5 ? 'down' : 'neutral')}}">
-                                        <t t-esc="state.data.meta.avg_rating_raw >= 3.5 ? 'On target' : (state.data.meta.avg_rating_raw &lt; 2.5 ? 'Below target' : 'Watch')"/>
-                                    </span>
-                                </t>
-                            </div>
-                            <div class="kpi">
-                                <div class="val"><t t-esc="state.data.meta.this_month"/></div>
-                                <div class="lbl">Interviews this month</div>
-                            </div>
-                            <div class="kpi">
-                                <div class="val"><t t-esc="state.data.meta.dept_count"/></div>
-                                <div class="lbl">Departments represented</div>
-                            </div>
-                        </div>
-
-                        <!-- Charts Grid -->
-                        <div class="chart-grid">
-                            <t t-foreach="state.data.charts" t-as="chart" t-key="chart.id">
-                                <div class="panel">
-                                    <h3><t t-esc="chart.title"/></h3>
-                                    <div class="sub"><t t-esc="chart.subtitle"/></div>
-                                    <div class="chart-wrap">
-                                        <canvas t-att-id="'eid_chart_' + chart.id"></canvas>
-                                    </div>
+                    <div class="eid_bars mt12">
+                        <t t-foreach="state.bars" t-as="b" t-key="b.l">
+                            <div class="eid_bar_row" style="cursor: pointer;" t-att-data-answer="b.l" t-on-click="onBarClick">
+                                <span class="eid_bar_lbl" t-att-title="b.l"><t t-esc="b.l"/></span>
+                                <div class="eid_bar_track">
+                                    <div class="eid_bar_fill eid_fill_teal" t-att-style="'width:' + b.v + '%'"/>
                                 </div>
-                            </t>
-                        </div>
-
-                        <!-- Likert and Themes Grid -->
-                        <div class="chart-grid" style="grid-template-columns: 1.3fr 1fr;">
-                            <div class="panel" style="min-height: 300px;">
-                                <h3>Sentiment &amp; Ratings, Averaged</h3>
-                                <div class="sub">1–5 scale · Higher is better</div>
-                                <div style="margin-top:6px; overflow-y: auto;">
-                                    <t t-if="state.data.likerts.length">
-                                        <t t-foreach="state.data.likerts" t-as="likert" t-key="likert_index">
-                                            <div class="likert-bar-row">
-                                                <div class="q-name" t-att-title="likert.label"><t t-esc="likert.label"/></div>
-                                                <div class="likert-bar-track">
-                                                    <div class="likert-bar-fill" t-attf-style="width:{{(likert.v/5)*100}}%; background:{{likert.v&lt;3?'#A85341':'#2F5D50'}};"></div>
-                                                </div>
-                                                <div class="score"><t t-esc="likert.v.toFixed(1)"/></div>
-                                            </div>
-                                        </t>
-                                    </t>
-                                    <t t-else="">
-                                        <p style="color:var(--ink-soft); font-size:13px; font-style:italic;">No rating data available.</p>
-                                    </t>
-                                </div>
-                            </div>
-                            <div class="panel">
-                                <h3>Recurring Feedback Themes</h3>
-                                <div class="sub">Extracted from open text responses</div>
-                                <div class="theme-tags">
-                                    <t t-if="state.data.themes.length">
-                                        <t t-foreach="state.data.themes" t-as="theme" t-key="theme_index">
-                                            <div class="theme-tag">
-                                                <t t-esc="theme.t"/> <span class="n"><t t-esc="theme.n"/></span>
-                                            </div>
-                                        </t>
-                                    </t>
-                                    <t t-else="">
-                                        <p style="color:var(--ink-soft); font-size:13px; font-style:italic;">No text feedback available.</p>
-                                    </t>
-                                </div>
-                            </div>
-                        </div>
-
-                        <t t-if="state.data.meta.total == 0">
-                            <div style="text-align:center; padding: 40px; color: var(--ink-soft); font-size: 14px; background:var(--card); border-radius:var(--radius-card); margin-top:20px;">
-                                <i class="fa fa-bar-chart fa-2x" style="display:block; margin-bottom:12px; color:var(--line);"/>
-                                No completed exit interviews found. Charts will populate once interviews are marked as <b>Done</b>.
+                                <span class="eid_bar_pct"><t t-esc="b.v"/>%</span>
                             </div>
                         </t>
+                    </div>
+                </div>
+
+                <!-- What would have kept you -->
+                <div class="eid_card">
+                    <div class="eid_card_tag">MULTIPLE CHOICE · MULTIPLE ANSWERS</div>
+                    <div class="eid_card_title">What would have kept you?</div>
+                    <div class="eid_card_sub">Respondents could tick several</div>
+                    <t t-if="state.keeps.length == 0">
+                        <div class="eid_empty mt12">No data available</div>
+                    </t>
+                    <div class="eid_bars mt12">
+                        <t t-foreach="state.keeps" t-as="b" t-key="b.l">
+                            <div class="eid_bar_row" style="cursor: pointer;" t-att-data-answer="b.l" t-on-click="onBarClick">
+                                <span class="eid_bar_lbl" t-att-title="b.l"><t t-esc="b.l"/></span>
+                                <div class="eid_bar_track">
+                                    <div class="eid_bar_fill eid_fill_amber" t-att-style="'width:' + b.v + '%'"/>
+                                </div>
+                                <span class="eid_bar_pct"><t t-esc="b.v"/>%</span>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- Where are you going next? Donut -->
+                <div class="eid_card">
+                    <div class="eid_card_tag">DROPDOWN</div>
+                    <div class="eid_card_title">Where are you going next?</div>
+                    <div class="eid_card_sub">Destination sector</div>
+                    <t t-if="state.donuts.length == 0">
+                        <div class="eid_empty mt12">No data available</div>
+                    </t>
+                    <t t-if="state.donuts.length > 0">
+                        <div class="eid_donut_wrap mt12">
+                            <div class="eid_ring" t-att-style="'background:conic-gradient(' + state.cg + ')'"/>
+                            <div class="eid_legend">
+                                <t t-foreach="state.donuts" t-as="d" t-key="d.l">
+                                    <div class="eid_leg_row" style="cursor: pointer;" t-att-data-answer="d.l" t-on-click="onBarClick">
+                                        <span class="eid_leg_dot" t-att-style="'background:' + d.c"/>
+                                        <span class="eid_leg_txt"><t t-esc="d.l"/> <b><t t-esc="d.v"/>%</b></span>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
                     </t>
                 </div>
             </div>
+
+            <!-- ── Row 2: Likert + Yes/No ── -->
+            <div class="eid_row2">
+
+                <!-- Satisfaction ratings Likert -->
+                <div class="eid_card">
+                    <div class="eid_card_tag">RATING SCALE · LIKERT 1–5</div>
+                    <div class="eid_card_title">Satisfaction ratings</div>
+                    <div class="eid_card_sub">Distribution + mean · 1 = very low, 5 = very high</div>
+                    <t t-if="state.likerts.length == 0">
+                        <div class="eid_empty mt12">No rating data available</div>
+                    </t>
+                    <div class="eid_likerts mt12">
+                        <t t-foreach="state.likerts" t-as="l" t-key="l.l">
+                            <div class="eid_lk_row" style="cursor: pointer;" t-att-data-question="l.l" t-on-click="onQuestionClick">
+                                <span class="eid_lk_lbl" t-att-title="l.l"><t t-esc="l.l"/></span>
+                                <div class="eid_lk_track">
+                                    <div class="eid_lk_seg" t-att-style="'width:' + l.vals[0] + '%;background:#b91c1c'"/>
+                                    <div class="eid_lk_seg" t-att-style="'width:' + l.vals[1] + '%;background:#ea580c'"/>
+                                    <div class="eid_lk_seg" t-att-style="'width:' + l.vals[2] + '%;background:#ca8a04'"/>
+                                    <div class="eid_lk_seg" t-att-style="'width:' + l.vals[3] + '%;background:#65a30d'"/>
+                                    <div class="eid_lk_seg" t-att-style="'width:' + l.vals[4] + '%;background:#15803d'"/>
+                                </div>
+                                <span class="eid_lk_mean"><t t-esc="l.m"/></span>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- Yes/No -->
+                <div class="eid_card">
+                    <div class="eid_card_tag">YES / NO</div>
+                    <div class="eid_card_title">Would you…</div>
+                    <div class="eid_card_sub">Green = Yes</div>
+                    <t t-if="state.yes_no.length == 0">
+                        <div class="eid_empty mt12">No Yes/No data available</div>
+                    </t>
+                    <div class="eid_yns mt12">
+                        <t t-foreach="state.yes_no" t-as="yn" t-key="yn.l">
+                            <div class="eid_yn_row" style="cursor: pointer;" t-att-data-question="yn.l" t-on-click="onQuestionClick">
+                                <span class="eid_yn_lbl" t-att-title="yn.l"><t t-esc="yn.l"/></span>
+                                <div class="eid_yn_track">
+                                    <div class="eid_yn_yes" t-att-style="'width:' + yn.yes + '%'"/>
+                                    <div class="eid_yn_no"  t-att-style="'width:' + yn.no  + '%'"/>
+                                </div>
+                                <span class="eid_yn_pct"><t t-esc="yn.yes"/>%</span>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Row 3: Top Themes + Quotes ── -->
+            <div class="eid_row2">
+
+                <!-- Top themes -->
+                <div class="eid_card">
+                    <div class="eid_card_tag">SHORT ANSWER</div>
+                    <div class="eid_card_title">Top themes</div>
+                    <div class="eid_card_sub">Auto-tagged keywords · count</div>
+                    <t t-if="state.themes.length == 0">
+                        <div class="eid_empty mt12">No text responses yet</div>
+                    </t>
+                    <div class="eid_chips mt12" style="max-height: 250px; overflow-y: auto; padding-right: 8px;">
+                        <t t-foreach="state.themes" t-as="th" t-key="th.t">
+                            <span t-att-class="'eid_chip eid_chip_' + th.size" style="cursor: pointer;" t-att-data-answer="th.t" t-on-click="onBarClick">
+                                <t t-esc="th.t"/> <b><t t-esc="th.n"/></b>
+                            </span>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- Open-ended quotes -->
+                <div class="eid_card" style="display: flex; flex-direction: column;">
+                    <div class="eid_card_tag">PARAGRAPH  OPEN-ENDED</div>
+                    <div class="eid_card_title">Comments &amp; feedback</div>
+                    <div class="eid_card_sub">Anonymized excerpts from text responses</div>
+                    <button class="btn btn-sm btn-outline-secondary mt12" t-on-click="() => this.openListView('text')">View All Text Responses</button>
+                    <t t-if="state.quotes.length == 0">
+                        <div class="eid_empty mt12">No open-ended responses yet</div>
+                    </t>
+                    <div class="eid_quotes mt12" style="max-height: 250px; overflow-y: auto; padding-right: 8px; flex-grow: 1;">
+                        <t t-foreach="state.quotes" t-as="q" t-key="q.id">
+                            <div class="eid_quote" style="padding: 10px; border-left: 4px solid #0f766e; background: #f8fafc; margin-bottom: 10px; border-radius: 4px;">"<t t-esc="q.text"/>"</div>
+                        </t>
+                    </div>
+                </div>
+            </div>
+
+        </t><!-- /!loading -->
+    </div><!-- /dash -->
+
+
+    <!-- ==================== INTERVIEW LIST ==================== -->
+    <div t-if="state.view == 'list'" class="eid_body">
+        <div class="eid_table_wrap">
+            <table class="eid_table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Position</th>
+                        <th>Department</th>
+                        <th>Interview Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-foreach="state.interviews" t-as="i" t-key="i.id">
+                        <tr class="eid_tr" t-on-click="() => this.openInterview(i.id)">
+                            <td>
+                                <div class="eid_tr_title"><t t-esc="i.name"/></div>
+                                <div class="eid_tr_sub"><t t-esc="i.emp_id"/></div>
+                            </td>
+                            <td><t t-esc="i.position"/></td>
+                            <td><t t-esc="i.department"/></td>
+                            <td><t t-esc="i.date"/></td>
+                            <td>
+                                <span t-att-class="i.state == 'done' ? 'eid_badge eid_badge_done' : 'eid_badge eid_badge_draft'">
+                                    <t t-esc="i.state"/>
+                                </span>
+                            </td>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
         </div>
-    </t>
+    </div><!-- /list -->
+
+
+
+
+    <!-- ==================== EMPLOYEE REPORT ==================== -->
+    <div t-if="state.view == 'rep'" class="eid_body" style="background: #f8fafc; padding: 20px;">
+        <div class="eid_rep_top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                
+                <select class="eid_sel eid_sel_emp" t-on-change="onChangeReportEmployee" style="padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; min-width: 250px;">
+                    <option value="">Select Employee...</option>
+                    <t t-foreach="state.interviews" t-as="inv" t-key="inv.id">
+                        <option t-att-value="inv.id" t-att-selected="state.cur_interview and state.cur_interview.emp_id == inv.emp_id">
+                            <t t-esc="inv.name"/>
+                        </option>
+                    </t>
+                </select>
+            </div>
+            <button class="btn btn-teal" style="background-color: #0f766e; color: white;" t-on-click="onPrintReport" t-if="state.cur_interview">
+                <i class="fa fa-print"/> Print / Save PDF
+            </button>
+        </div>
+
+        <div class="eid_rep_card" t-if="state.cur_interview" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 40px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 900px; margin: 0 auto;">
+            <div class="eid_rep_head" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                <div>
+                    <h2 style="margin: 0; font-weight: bold; color: #0f2537;">Exit Interview Report</h2>
+                    <span class="text-muted" style="font-size: 14px;">Separation &amp; Off-boarding &#183; Confidential</span>
+                </div>
+                <div class="eid_restricted" style="color: #dc2626; border: 1px solid #dc2626; padding: 2px 8px; font-size: 11px; font-weight: bold; border-radius: 4px;">RESTRICTED &#183; POMD ONLY</div>
+            </div>
+            <hr style="border-top: 1px solid #e2e8f0; margin-bottom: 25px;"/>
+            
+            <div class="eid_rep_grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; font-size: 12px; margin-bottom: 30px;">
+                <div><label style="color: #64748b; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">EMPLOYEE</label><div style="font-weight: 500;"><t t-esc="state.cur_interview.emp_name"/></div></div>
+                <div><label style="color: #64748b; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">EMPLOYEE ID</label><div style="font-weight: 500;"><t t-esc="state.cur_interview.emp_id"/></div></div>
+                <div><label style="color: #64748b; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">POSITION</label><div style="font-weight: 500;"><t t-esc="state.cur_interview.job"/></div></div>
+                <div><label style="color: #64748b; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">WORK UNIT</label><div style="font-weight: 500;"><t t-esc="state.cur_interview.dept"/></div></div>
+                
+                <div><label style="color: #64748b; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">BRANCH / DISTRICT</label><div style="font-weight: 500;"><t t-esc="state.cur_interview.branch"/></div></div>
+                <div><label style="color: #64748b; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">SEPARATION TYPE</label><div style="font-weight: 500;"><t t-esc="state.cur_interview.sep_type"/></div></div>
+                <div><label style="color: #64748b; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">TENURE</label><div style="font-weight: 500;"><t t-esc="state.cur_interview.tenure"/></div></div>
+                <div><label style="color: #64748b; font-size: 10px; text-transform: uppercase; margin-bottom: 2px;">LAST WORKING DAY</label><div style="font-weight: 500;"><t t-esc="state.cur_interview.last_day"/></div></div>
+            </div>
+
+            <!-- QUESTIONS: REASON -->
+            <h3 class="eid_section_title" style="color: #0f766e; font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #0f766e; padding-bottom: 5px; margin-bottom: 20px;">1 &#183; REASON FOR LEAVING</h3>
+            <t t-foreach="state.cur_interview.questions_reason" t-as="q" t-key="q.id">
+                <div class="eid_q_block" style="margin-bottom: 25px;">
+                    <div class="eid_q_title" style="font-weight: bold; margin-bottom: 10px; color: #1e293b;"><t t-esc="q.question"/> <span class="eid_q_type" style="font-size: 10px; font-weight: normal; color: #64748b; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 10px; margin-left: 8px;"><t t-esc="q.type_label"/></span></div>
+                    <div class="eid_q_ans">
+                        <t t-if="q.options.length &gt; 0 and q.type != 'dropdown'">
+                            <div class="eid_options_inline" style="display: flex; flex-wrap: wrap; gap: 15px;">
+                                <t t-foreach="q.options" t-as="opt" t-key="opt.name">
+                                    <label t-att-style="opt.selected ? 'color: #0f766e; font-weight: bold; display: flex; align-items: center; gap: 5px;' : 'color: #64748b; display: flex; align-items: center; gap: 5px;'">
+                                        <i t-if="q.type == 'custom'" t-att-class="opt.selected ? 'fa fa-dot-circle-o' : 'fa fa-circle-o'"/>
+                                        <i t-if="q.type == 'checkbox'" t-att-class="opt.selected ? 'fa fa-check-square' : 'fa fa-square-o'"/>
+                                        <t t-esc="opt.name"/>
+                                    </label>
+                                </t>
+                            </div>
+                        </t>
+                        <t t-if="q.type == 'dropdown'">
+                            <div class="eid_ans_box" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; display: inline-block; min-width: 200px; color: #1e293b;">
+                                <t t-esc="q.answer"/> <i class="fa fa-caret-down" style="float: right; color: #64748b; margin-top: 3px;"/>
+                            </div>
+                        </t>
+                        <t t-if="q.type == 'text'"><div class="eid_ans_box" style="padding: 10px; background: #f8fafc; border-left: 3px solid #0f766e; color: #334155;"><t t-esc="q.answer"/></div></t>
+                    </div>
+                </div>
+            </t>
+
+            <!-- QUESTIONS: RATINGS -->
+            <h3 class="eid_section_title" style="color: #0f766e; font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #0f766e; padding-bottom: 5px; margin-bottom: 20px; margin-top: 40px;">2 &#183; EXPERIENCE RATINGS</h3>
+            <t t-foreach="state.cur_interview.questions_rating" t-as="q" t-key="q.id">
+                 <div class="eid_q_block" style="margin-bottom: 20px;">
+                    <div class="eid_q_title" style="font-weight: bold; margin-bottom: 8px; color: #1e293b;"><t t-esc="q.question"/> <span class="eid_q_type" style="font-size: 10px; font-weight: normal; color: #64748b; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 10px; margin-left: 8px;"><t t-esc="q.type_label"/></span></div>
+                    <div class="eid_rating_row" style="display: flex; align-items: center; gap: 10px;">
+                        <t t-foreach="[1,2,3,4,5]" t-as="r" t-key="r">
+                            <div t-att-style="q.rating_val == r ? 'width: 28px; height: 28px; border-radius: 50%; background: #0f766e; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;' : 'width: 28px; height: 28px; border-radius: 50%; border: 1px solid #cbd5e1; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 12px;'">
+                                <t t-esc="r"/>
+                            </div>
+                        </t>
+                        <span style="font-size: 11px; color: #94a3b8; margin-left: 10px;">1 = very low &#183; 5 = very high</span>
+                    </div>
+                 </div>
+            </t>
+
+        </div>
+    </div>
+
+</div>
+</t>
 </templates>

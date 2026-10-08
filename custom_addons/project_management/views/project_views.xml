@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pm_project_form" model="ir.ui.view">
+        <field name="name">pm.project.form</field>
+        <field name="model">pm.project</field>
+        <field name="arch" type="xml">
+            <form string="Project">
+                <header>
+                    <button name="action_start_project" string="Start Project" type="object" class="btn-primary" invisible="status != 'draft'"/>
+                    <button name="action_complete_project" string="Mark Completed" type="object" class="btn-success" invisible="status != 'active'"/>
+                    <button name="action_hold_project" string="Put On Hold" type="object" class="btn-secondary" invisible="status != 'active'"/>
+                    <button name="action_reopen_project" string="Resume Project" type="object" class="btn-warning" invisible="status not in ('on_hold', 'completed')"/>
+                    <field name="status" widget="statusbar" statusbar_visible="draft,active,completed" options="{'clickable': '1'}"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_view_deliverables" icon="fa-cubes">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="deliverable_count"/>
+                                </span>
+                                <span class="o_stat_text">Deliverables</span>
+                            </div>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_view_milestones" icon="fa-flag">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="milestone_count"/>
+                                </span>
+                                <span class="o_stat_text">Milestones</span>
+                            </div>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_view_tasks" icon="fa-tasks">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="task_count"/>
+                                </span>
+                                <span class="o_stat_text">Tasks</span>
+                            </div>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_view_progress_updates" icon="fa-newspaper-o">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="progress_update_count"/>
+                                </span>
+                                <span class="o_stat_text">Updates</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" string="Project Name"/>
+                        <h1>
+                            <field name="name" readonly="status == 'completed'"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Governance &amp; Ownership">
+                            <field name="sponsor_user_id" string="Project Sponsor" widget="many2one_avatar_user" readonly="status == 'completed'"/>
+                            <field name="process_owner_id" string="Process Owner" widget="many2one_avatar_user" readonly="status == 'completed'"/>
+                            <field name="lead_office_id" string="Lead Office" options="{'no_create_edit': False}" readonly="status == 'completed'"/>
+                            <field name="manager_id" string="Project Manager" widget="many2one_avatar_user" options="{'no_create_edit': True}" readonly="status == 'completed'"/>
+                            <field name="initiative_id" string="Strategic Issues" options="{'no_create_edit': True}" readonly="status == 'completed'"/>
+                            <field name="project_type_id" string="Project Type" options="{'no_create_edit': False}" readonly="status == 'completed'"/>
+                            <field name="customer_id" invisible="1"/>
+                            <field name="tag_type" invisible="1"/>
+                        </group>
+                        <group string="Timeline, Capacity &amp; Health">
+                            <field name="date_start" required="1" readonly="status == 'completed'"/>
+                            <field name="date_end" required="1" readonly="status == 'completed'"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="estimated_cost" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="status == 'completed'"/>
+                            <field name="staff_required" readonly="status == 'completed'"/>
+                            <label for="health_state" string="Project Health"/>
+                            <div class="d-flex align-items-center gap-2">
+                                <field name="health_state" widget="project_state_selection" options="{'hide_label': false}"/>
+                                <button name="action_reset_health_auto" type="object" string="(Auto)"
+                                        title="Reset to automatic calculation based on progress and deadlines"
+                                        class="btn btn-sm btn-link text-muted p-0"
+                                        invisible="not is_health_manual"/>
+                            </div>
+                            <field name="is_health_manual" invisible="1"/>
+                            <field name="priority" widget="priority"/>
+                            <field name="progress_rate" widget="progressbar"/>
+                        </group>
+                    </group>
+                    
+                    <notebook>
+                        <!-- TAB 1: Description (FIRST TAB as per feedback) -->
+                        <page string="Description" name="project_description">
+                            <div class="p-2">
+                                <field name="description" readonly="status == 'completed'"/>
+                            </div>
+                        </page>
+
+                        <!-- TAB 2: Milestones (Next to Description) -->
+                        <page string="Milestones" name="project_milestones">
+                            <field name="milestone_ids" readonly="status == 'completed'" context="{'default_project_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="code" readonly="1" optional="show"/>
+                                    <field name="name" string="Milestone Name"/>
+                                    <field name="weight" string="Weight (%)"/>
+                                    <field name="date_start"/>
+                                    <field name="date_deadline"/>
+                                    <field name="deliverable_count" string="Deliverables" readonly="1"/>
+                                    <field name="task_count" string="Total Tasks" readonly="1" optional="show"/>
+                                    <field name="closed_task_count" string="Done Tasks" readonly="1" optional="show"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                    <field name="state" widget="badge"
+                                           decoration-info="state == 'draft'"
+                                           decoration-warning="state == 'in_progress'"
+                                           decoration-danger="state == 'at_risk'"
+                                           decoration-success="state == 'completed'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- TAB 3: Deliverables / Major Activities -->
+                        <page string="Deliverables" name="deliverables">
+                            <field name="deliverable_ids" readonly="status == 'completed'" context="{'default_project_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="code" readonly="1" optional="show"/>
+                                    <field name="name"/>
+                                    <field name="milestone_id" domain="[('project_id', '=', parent.id)]" options="{'no_create_edit': True}"/>
+                                    <field name="weight"/>
+                                    <field name="date_start"/>
+                                    <field name="date_deadline"/>
+                                    <field name="task_count"/>
+                                    <field name="closed_task_count"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                    <field name="state" widget="badge"
+                                           decoration-info="state == 'draft'"
+                                           decoration-warning="state == 'in_progress'"
+                                           decoration-danger="state == 'at_risk'"
+                                           decoration-success="state == 'completed'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- TAB 4: Tasks (Embedded Project Tasks) -->
+                        <page string="Tasks" name="project_tasks">
+                            <field name="task_ids" readonly="status == 'completed'" context="{'default_project_id': id, 'default_is_project_task': True}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="priority" widget="priority"/>
+                                    <field name="name" string="Task Title"/>
+                                    <field name="milestone_id" domain="[('project_id', '=', parent.id)]" options="{'no_create_edit': True}" optional="show"/>
+                                    <field name="deliverable_id" domain="[('project_id', '=', parent.id)]" options="{'no_create_edit': True}" optional="show"/>
+                                    <field name="user_ids" widget="many2many_avatar_user" string="Assignees"/>
+                                    <field name="weight" string="Weight (%)" optional="show"/>
+                                    <field name="date_start" optional="show"/>
+                                    <field name="date_deadline"/>
+                                    <field name="allocated_hours" widget="float_time" optional="show"/>
+                                    <field name="effective_hours" widget="float_time" optional="show"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                    <field name="stage_id" widget="badge"/>
+                                    <field name="state" widget="badge"
+                                           decoration-warning="state == 'in_progress'"
+                                           decoration-danger="state == 'blocked'"
+                                           decoration-success="state == 'done'"
+                                           decoration-info="state == 'pending'"/>
+                                    <field name="is_blocked" invisible="1"/>
+                                    <field name="is_closed" invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- TAB 5: Alignment -->
+                        <page string="Alignment" name="strategic_alignment">
+                            <group string="Corporate Strategy &amp; Alignment">
+                                <field name="strategic_source_id" options="{'no_create_edit': False}" readonly="status == 'completed'"/>
+                                <field name="strategic_objective_id" options="{'no_create_edit': False}" readonly="status == 'completed'"/>
+                            </group>
+                            <group string="Initiative Context" invisible="not initiative_id">
+                                <field name="initiative_description" string="Initiative Description"/>
+                            </group>
+                        </page>
+
+                        <!-- TAB 6: Assumptions -->
+                        <page string="Assumptions" name="assumptions">
+                            <field name="assumption_ids" readonly="status == 'completed'">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="category"/>
+                                    <field name="impact"/>
+                                    <field name="status"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- TAB 7: Skills -->
+                        <page string="Skills" name="required_skills">
+                            <field name="skill_ids" readonly="status == 'completed'">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="skill_level"/>
+                                    <field name="headcount"/>
+                                    <field name="assigned_count"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- TAB 8: Risks -->
+                        <page string="Risks" name="risks">
+                            <p class="text-muted small">Project Risk Register: Track identified risks, probability, impact severity, and mitigation plans.</p>
+                            <field name="risk_ids" readonly="status == 'completed'">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="category"/>
+                                    <field name="probability"/>
+                                    <field name="impact"/>
+                                    <field name="severity" decoration-danger="severity >= 9" decoration-warning="severity >= 4 and severity &lt; 9" decoration-success="severity &lt; 4"/>
+                                    <field name="mitigation"/>
+                                    <field name="owner_id"/>
+                                    <field name="status" widget="badge" decoration-danger="status == 'open'" decoration-warning="status == 'mitigated'" decoration-success="status == 'closed'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- TAB 9: Dependencies -->
+                        <page string="Dependencies" name="dependencies">
+                            <p class="text-muted small">Cross-project and external dependencies that impact project delivery.</p>
+                            <field name="dependency_ids" readonly="status == 'completed'">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="dependency_type"/>
+                                    <field name="dependent_project_id" options="{'no_create_edit': True}"/>
+                                    <field name="owner_id"/>
+                                    <field name="impact_level" widget="badge" decoration-danger="impact_level == 'critical'" decoration-warning="impact_level == 'medium'"/>
+                                    <field name="status" widget="badge" decoration-danger="status == 'pending'" decoration-warning="status == 'in_progress'" decoration-success="status == 'satisfied'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- TAB 10: Teams -->
+                        <page string="Teams" name="project_team">
+                            <field name="team_ids">
+                                <list editable="bottom">
+                                    <field name="user_id" widget="many2one_avatar_user"/>
+                                    <field name="role_id" options="{'no_create_edit': False, 'no_quick_create': False}"/>
+                                    <field name="notes" placeholder="Responsibilities / Notes"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- TAB 11: Progress Update -->
+                        <page string="Progress Update" name="progress_updates">
+                            <field name="progress_update_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="report_type" widget="badge"/>
+                                    <field name="report_date"/>
+                                    <field name="health_state" widget="badge"/>
+                                    <field name="progress_rate" widget="progressbar"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pm_project_kanban" model="ir.ui.view">
+        <field name="name">pm.project.kanban</field>
+        <field name="model">pm.project</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_dashboard" sample="1">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="manager_id"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="status"/>
+                <field name="health_state"/>
+                <field name="tag_type"/>
+                <field name="task_count"/>
+                <field name="closed_task_count"/>
+                <field name="progress_rate"/>
+                <field name="priority"/>
+                <field name="color"/>
+                <templates>
+                    <t t-name="card" class="p-3 mb-3 shadow-sm rounded border bg-white">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <strong class="o_kanban_record_title text-dark fs-5">
+                                <field name="name"/>
+                            </strong>
+                            <field name="priority" widget="priority"/>
+                        </div>
+                        <div class="text-muted small mb-2">
+                            <i class="fa fa-user me-1" title="Manager"/> <field name="manager_id"/>
+                        </div>
+                        <div class="text-muted small mb-3">
+                            <i class="fa fa-calendar me-1" title="Dates"/> <field name="date_start"/> &#10141; <field name="date_end"/>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-info text-dark">
+                                    <field name="tag_type"/>
+                                </span>
+                                <span class="badge bg-primary">
+                                    <field name="status"/>
+                                </span>
+                            </div>
+                            <field name="health_state" widget="project_state_selection"/>
+                        </div>
+                        <div class="row g-1 small text-muted mb-2 border-top pt-2">
+                            <div class="col-6">
+                                <span>Milestones: </span><strong class="text-dark"><field name="milestones_summary"/></strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                <span>Deliverables: </span><strong class="text-dark"><field name="deliverables_summary"/></strong>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1 small text-muted">
+                            <span><field name="closed_task_count"/>/<field name="task_count"/> Tasks</span>
+                            <span><field name="progress_rate" widget="integer"/>%</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar bg-primary" role="progressbar" t-att-style="'width: ' + record.progress_rate.raw_value + '%;'"/>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_pm_project_tree" model="ir.ui.view">
+        <field name="name">pm.project.list</field>
+        <field name="model">pm.project</field>
+        <field name="arch" type="xml">
+            <list string="Projects">
+                <field name="sequence" widget="handle"/>
+                <field name="priority" widget="priority" optional="show"/>
+                <field name="name"/>
+                <field name="code" optional="show"/>
+                <field name="initiative_id" optional="show"/>
+                <field name="manager_id"/>
+                <field name="customer_id" string="Sponsor" optional="show"/>
+                <field name="tag_type" optional="show"/>
+                <field name="date_start" optional="show"/>
+                <field name="date_end" optional="show"/>
+                <field name="estimated_cost" optional="show"/>
+                <field name="staff_required" optional="show"/>
+                <field name="deliverable_count" optional="show"/>
+                <field name="milestone_count" optional="show"/>
+                <field name="task_count" optional="show"/>
+                <field name="progress_rate" widget="progressbar"/>
+                <field name="status" widget="badge"/>
+                <field name="health_state" widget="project_state_selection" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pm_project_search" model="ir.ui.view">
+        <field name="name">pm.project.search</field>
+        <field name="model">pm.project</field>
+        <field name="arch" type="xml">
+            <search string="Search Projects">
+                <field name="name" string="Project"/>
+                <field name="code"/>
+                <field name="manager_id"/>
+                <field name="initiative_id"/>
+                <field name="strategic_source_id"/>
+                <filter name="active_projects" string="Active Projects" domain="[('status', '=', 'active')]"/>
+                <filter name="planning_projects" string="Planning" domain="[('status', '=', 'draft')]"/>
+                <filter name="on_track" string="On Track" domain="[('health_state', 'in', ['on_track', 'done'])]"/>
+                <filter name="at_risk" string="At Risk" domain="[('health_state', '=', 'at_risk')]"/>
+                <filter name="off_track" string="Off Track" domain="[('health_state', '=', 'off_track')]"/>
+                <group>
+                    <filter name="group_manager" string="Manager" context="{'group_by': 'manager_id'}"/>
+                    <filter name="group_initiative" string="Initiative" context="{'group_by': 'initiative_id'}"/>
+                    <filter name="group_source" string="Strategic Source" context="{'group_by': 'strategic_source_id'}"/>
+                    <filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
+                    <filter name="group_health" string="Health" context="{'group_by': 'health_state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pm_project" model="ir.actions.act_window">
+        <field name="name">Projects</field>
+        <field name="res_model">pm.project</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_pm_project_search"/>
+        <field name="context">{'search_default_active_projects': 1}</field>
+    </record>
+
+    <!-- Project Risk Form & Action -->
+    <record id="view_pm_project_risk_form" model="ir.ui.view">
+        <field name="name">pm.project.risk.form</field>
+        <field name="model">pm.project.risk</field>
+        <field name="arch" type="xml">
+            <form string="Project Risk">
+                <header>
+                    <field name="status" widget="statusbar" options="{'clickable': '1'}"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Risk Description"/>
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Project &amp; Classification">
+                            <field name="project_id" options="{'no_create_edit': True}"/>
+                            <field name="category"/>
+                            <field name="owner_id"/>
+                        </group>
+                        <group string="Risk Assessment &amp; Scoring">
+                            <field name="probability"/>
+                            <field name="impact"/>
+                            <field name="severity" readonly="1" decoration-danger="severity >= 9" decoration-warning="severity >= 4 and severity &lt; 9" decoration-success="severity &lt; 4"/>
+                        </group>
+                    </group>
+                    <group string="Mitigation Strategy &amp; Contingency Plan">
+                        <field name="mitigation"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pm_project_risk" model="ir.actions.act_window">
+        <field name="name">Project Risks</field>
+        <field name="res_model">pm.project.risk</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

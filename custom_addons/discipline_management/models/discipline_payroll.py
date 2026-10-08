@@ -6,10 +6,16 @@ from odoo.exceptions import UserError
 class DisciplinePayrollPenalty(models.Model):
     _name = 'discipline.payroll.penalty'
     _description = 'Disciplinary Payroll Salary Penalty Deduction'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread']
     _order = 'effective_date desc, id desc'
 
-    name = fields.Char(string='Penalty Reference', compute='_compute_name', store=True)
+    name = fields.Char(
+        string='Penalty Reference',
+        required=True,
+        copy=False,
+        readonly=True,
+        default=lambda self: _('New')
+    )
     case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, ondelete='cascade', tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True, tracking=True)
 
@@ -45,6 +51,13 @@ class DisciplinePayrollPenalty(models.Model):
     )
 
     effective_date = fields.Date(string='Effective Penalty Date', required=True, default=fields.Date.context_today, tracking=True)
+    payroll_month = fields.Selection(
+        related='case_id.payroll_month',
+        string='Target Payroll Month',
+        store=True,
+        readonly=False,
+        tracking=True
+    )
     state = fields.Selection([
         ('pending', 'Pending Transmission'),
         ('transferred', 'Transmitted to Payroll'),
@@ -54,20 +67,6 @@ class DisciplinePayrollPenalty(models.Model):
 
     payslip_reference = fields.Char(string='Payslip Ref / ID', tracking=True)
     notes = fields.Text(string='Integration Notes')
-
-    @api.depends('case_id.name', 'employee_id.name', 'penalty_type')
-    def _compute_name(self):
-        type_labels = {
-            'percentage': 'PCT',
-            'suspension_without_pay': 'SWP',
-            'managerial': 'MGR',
-        }
-        for rec in self:
-            if rec.case_id and rec.employee_id:
-                label = type_labels.get(rec.penalty_type, 'PEN')
-                rec.name = 'PENALTY/%s/%s/%s' % (label, rec.case_id.name, rec.employee_id.name)
-            else:
-                rec.name = 'PENALTY/NEW'
 
     def _get_employee_wage(self):
         """Helper: return current active contract basic wage, or 0."""
@@ -118,6 +117,8 @@ class DisciplinePayrollPenalty(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get('name', _('New')) == _('New'):
+                vals['name'] = self.env['ir.sequence'].sudo().next_by_code('discipline.payroll.penalty') or _('New')
             emp_id = vals.get('employee_id')
             if emp_id:
                 emp = self.env['hr.employee'].browse(emp_id)
@@ -181,3 +182,29 @@ class DisciplinePayrollPenalty(models.Model):
             'suspension_days': self.suspension_days,
             'managerial_days': self.managerial_days,
         }
+
+    @api.model
+    def get_pending_penalties(self, employee_id, date_from=None, date_to=None):
+        """Public API returning list of pending penalty records for an employee during payroll execution."""
+        # Just-in-time check: evaluate expired appeal window cases for this employee
+        today = fields.Date.today()
+        pending_cases = self.env['discipline.case'].search([
+            ('employee_id', '=', employee_id),
+            ('state', 'in', ['enforced', 'closed']),
+            ('deduction_status', '=', 'appeal_pending'),
+            ('appeal_deadline', '<', today),
+        ])
+        if pending_cases:
+            pending_cases._process_appeal_window_deductions()
+
+        domain = [
+            ('employee_id', '=', employee_id),
+            ('state', 'in', ['pending', 'transferred']),
+        ]
+        if date_from:
+            domain.append(('effective_date', '>=', date_from))
+        if date_to:
+            domain.append(('effective_date', '<=', date_to))
+        penalties = self.search(domain)
+        return [p.get_payroll_transmission_payload() for p in penalties]
+

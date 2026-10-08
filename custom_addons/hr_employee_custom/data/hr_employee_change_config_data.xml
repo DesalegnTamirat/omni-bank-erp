@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Rule: Name Change -->
+        <record id="config_rule_name" model="hr.employee.change.field.config">
+            <field name="name">Name Change Rule</field>
+            <field name="field_id" search="[('model', '=', 'hr.employee'), ('name', '=', 'name')]"/>
+            <field name="category">name</field>
+            <field name="requires_attachment" eval="True"/>
+            <field name="help_text">Legal Name Change Document or Official Evidence is required.</field>
+        </record>
+
+        <!-- Rule: Marital Status -->
+        <record id="config_rule_marital" model="hr.employee.change.field.config">
+            <field name="name">Marital Status Change Rule</field>
+            <field name="field_id" search="[('model', '=', 'hr.employee'), ('name', '=', 'marital')]"/>
+            <field name="category">marital</field>
+            <field name="requires_attachment" eval="True"/>
+            <field name="help_text">Marriage or Divorce Certificate is required.</field>
+        </record>
+
+        <!-- Rule: Private Phone (No Attachment Required) -->
+        <record id="config_rule_phone" model="hr.employee.change.field.config">
+            <field name="name">Phone Number Change Rule</field>
+            <field name="field_id" search="[('model', '=', 'hr.employee'), ('name', '=', 'private_phone')]"/>
+            <field name="category">contact</field>
+            <field name="requires_attachment" eval="False"/>
+            <field name="help_text">No supporting document required for phone number update.</field>
+        </record>
+    </data>
+</odoo>

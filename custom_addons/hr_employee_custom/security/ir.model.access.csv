@@ -7,6 +7,7 @@ access_hr_award_manager,hr.awards manager,model_hr_awards,base.group_system,1,1,
 access_hr_awards_hr_awards,hr_awards.hr_awards,model_hr_awards,hr.group_hr_user,1,1,1,0
 access_hr_awards_hr_manager,hr_awards.hr_manager,model_hr_awards,hr.group_hr_manager,1,1,1,1
 access_service_award_service_award,service_award.service_award,model_service_award,hr.group_hr_manager,1,1,1,1
+access_hr_reporting_wizard_all,hr.reporting.wizard.all,model_hr_reporting_wizard,,1,1,1,1
 access_recruitment_qualification,access.recruitment.qualification,model_recruitment_qualification,,1,1,1,0
 access_recruitment_experience,access.recruitment.experience,model_recruitment_experience,,1,1,1,0
 access_recruitment_competency,access.recruitment.competency,model_recruitment_competency,hr.group_hr_manager,1,1,1,1
@@ -223,4 +224,32 @@ access_hr_salary_breakup_officer,hr_salary_breakup officer,model_hr_salary_break
 access_non_monetary_benefits_officer,non_monetary_benefits officer,model_non_monetary_benefits,hr.group_hr_user,1,1,1,0
 access_pension_multi_record_officer,pension.multi.record officer,model_pension_multi_record,hr.group_hr_user,1,1,1,0
 access_hr_languages_officer,hr.languages officer,model_hr_languages,hr.group_hr_user,1,1,1,0
-access_hr_ability_languages_officer,hr.ability.languages officer,model_hr_ability_languages,hr.group_hr_user,1,1,1,0
+access_hr_ability_languages_officer,hr.ability.languages officer,model_hr_ability_languages,,1,1,1,0
+access_hr_career_track_emp,hr.career.track.emp,model_hr_career_track,hr_employee_custom.group_career_path_employee,1,0,0,0
+access_hr_career_track_mgr,hr.career.track.mgr,model_hr_career_track,hr_employee_custom.group_career_path_manager,1,1,1,1
+access_hr_career_path_emp,hr.career.path.emp,model_hr_career_path,hr_employee_custom.group_career_path_employee,1,0,0,0
+access_hr_career_path_mgr,hr.career.path.mgr,model_hr_career_path,hr_employee_custom.group_career_path_manager,1,1,1,1
+access_hr_career_path_node_emp,hr.career.path.node.emp,model_hr_career_path_node,hr_employee_custom.group_career_path_employee,1,0,0,0
+access_hr_career_path_node_mgr,hr.career.path.node.mgr,model_hr_career_path_node,hr_employee_custom.group_career_path_manager,1,1,1,1
+access_hr_career_aspiration_emp,hr.career.aspiration.emp,model_hr_career_aspiration,hr_employee_custom.group_career_path_employee,1,1,1,1
+access_hr_career_idp_emp,hr.career.idp.emp,model_hr_career_idp,hr_employee_custom.group_career_path_employee,1,1,1,1
+access_hr_career_idp_line_emp,hr.career.idp.line.emp,model_hr_career_idp_line,hr_employee_custom.group_career_path_employee,1,1,1,1
+access_hr_employee_career_plan_emp,hr.employee.career.plan.emp,model_hr_employee_career_plan,hr_employee_custom.group_career_path_employee,1,1,1,1
+access_hr_employee_change_config_user,hr.employee.change.field.config user,model_hr_employee_change_field_config,base.group_user,1,0,0,0
+access_hr_employee_change_config_mgr,hr.employee.change.field.config mgr,model_hr_employee_change_field_config,hr.group_hr_manager,1,1,1,1
+access_hr_employee_change_request_user,hr.employee.change.request user,model_hr_employee_change_request,base.group_user,1,1,1,0
+access_hr_employee_change_request_mgr,hr.employee.change.request mgr,model_hr_employee_change_request,hr.group_hr_user,1,1,1,1
+access_hr_employee_change_request_line_user,hr.employee.change.request.line user,model_hr_employee_change_request_line,base.group_user,1,1,1,0
+access_hr_employee_change_request_line_mgr,hr.employee.change.request.line mgr,model_hr_employee_change_request_line,hr.group_hr_user,1,1,1,1
+access_hr_employee_change_history_user,hr.employee.change.history user,model_hr_employee_change_history,base.group_user,1,0,0,0
+access_hr_employee_change_history_mgr,hr.employee.change.history mgr,model_hr_employee_change_history,hr.group_hr_user,1,1,1,1
+access_ir_model_fields_base_user,ir.model.fields base user,base.model_ir_model_fields,base.group_user,1,0,0,0
+access_hr_insurance_notification_user,hr.insurance.notification user,model_hr_insurance_notification,base.group_user,1,1,1,1
+access_hr_insurance_notification_mgr,hr.insurance.notification mgr,model_hr_insurance_notification,hr.group_hr_user,1,1,1,1
+access_hr_insurance_document_user,hr.insurance.document user,model_hr_insurance_document,base.group_user,1,1,1,1
+access_hr_insurance_record_user,hr.insurance.record user,model_hr_insurance_record,base.group_user,1,0,0,0
+access_hr_insurance_record_mgr,hr.insurance.record mgr,model_hr_insurance_record,hr.group_hr_user,1,1,1,1
+access_hr_insurance_reject_wizard_user,hr.insurance.reject.wizard user,model_hr_insurance_reject_wizard,base.group_user,1,1,1,1
+access_hr_insurance_return_wizard_user,hr.insurance.return.wizard user,model_hr_insurance_return_wizard,base.group_user,1,1,1,1
+
+

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Kanban View -->
+    <record id="view_performance_job_template_kanban" model="ir.ui.view">
+        <field name="name">performance.job.template.kanban</field>
+        <field name="model">performance.job.template</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" sample="1">
+                <field name="name"/>
+                <field name="operating_unit_id"/>
+                <field name="job_id"/>
+                <field name="work_unit_type"/>
+                <field name="is_branch_unit"/>
+                <field name="total_weight"/>
+                <field name="weight_status"/>
+                <field name="line_count"/>
+                <field name="perspective_summary"/>
+                <field name="active"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex flex-column gap-2 p-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h5 class="fw-bold mb-1" style="color: #1d2b32;">
+                                        <field name="job_id"/>
+                                    </h5>
+                                    <div class="text-muted small d-flex align-items-center gap-1">
+                                        <i class="fa fa-building-o text-secondary"/>
+                                        <field name="operating_unit_id"/>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span t-if="record.weight_status.raw_value == 'complete'" class="badge text-bg-success px-2 py-1">
+                                        <i class="fa fa-check-circle me-1"/>100% Complete
+                                    </span>
+                                    <span t-elif="record.weight_status.raw_value == 'exceeded'" class="badge text-bg-danger px-2 py-1">
+                                        <i class="fa fa-warning me-1"/><t t-esc="record.total_weight.value"/>%
+                                    </span>
+                                    <span t-else="" class="badge text-bg-warning px-2 py-1">
+                                        <i class="fa fa-hourglass-half me-1"/><t t-esc="record.total_weight.value"/>% Incomplete
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
+                                <span t-if="record.is_branch_unit.raw_value" class="badge rounded-pill text-bg-info text-white">
+                                    <i class="fa fa-sitemap me-1"/>All Branches
+                                </span>
+                                <span t-elif="record.work_unit_type.value" class="badge rounded-pill text-bg-secondary">
+                                    <field name="work_unit_type"/>
+                                </span>
+                                <span class="badge rounded-pill text-bg-light border text-dark">
+                                    <i class="fa fa-list-ol me-1"/><field name="line_count"/> KPIs
+                                </span>
+                            </div>
+
+                            <div class="small text-muted mt-1 border-top pt-2" t-if="record.perspective_summary.raw_value">
+                                <i class="fa fa-tags me-1 text-secondary"/>
+                                <span><field name="perspective_summary"/></span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- List View -->
+    <record id="view_performance_job_template_list" model="ir.ui.view">
+        <field name="name">performance.job.template.list</field>
+        <field name="model">performance.job.template</field>
+        <field name="arch" type="xml">
+            <list string="Job Position Scorecard Templates" decoration-muted="not active">
+                <field name="operating_unit_id" string="Work Unit"/>
+                <field name="work_unit_type" string="Unit Type" optional="show"/>
+                <field name="job_id" string="Job Position"/>
+                <field name="line_count" string="KPI Lines"/>
+                <field name="total_weight" string="Total Weight (%)" sum="Total Weight" decoration-success="total_weight == 100.0" decoration-danger="total_weight != 100.0"/>
+                <field name="weight_status" string="Status" widget="badge" decoration-success="weight_status == 'complete'" decoration-danger="weight_status == 'exceeded'" decoration-warning="weight_status == 'incomplete'"/>
+                <field name="is_branch_unit" string="Branch Cascade" widget="boolean_toggle" optional="show"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_performance_job_template_form" model="ir.ui.view">
+        <field name="name">performance.job.template.form</field>
+        <field name="model">performance.job.template</field>
+        <field name="arch" type="xml">
+            <form string="Job Position Scorecard Template">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Scorecard Template"/>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-lg-7">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body" style="border-left: 4px solid #1d2b32; background-color:#f4f6f8; padding: 14px 18px;">
+                                    <h6 class="mb-3 font-weight-bold" style="color:#1d2b32;">
+                                        <i class="fa fa-briefcase me-2"/>Position &amp; Work Unit
+                                    </h6>
+                                    <group>
+                                        <field name="operating_unit_id" string="Work Unit" options="{'no_create': True}" required="1"/>
+                                        <field name="job_id" string="Job Position" options="{'no_create': True}" required="1"/>
+                                        <field name="work_unit_type" readonly="1" invisible="not work_unit_type"/>
+                                        <field name="is_branch_unit" readonly="1" invisible="not is_branch_unit"/>
+                                        <field name="active"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-5">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body" style="border-left: 4px solid #425727; background-color:#f4f6f2; padding: 14px 18px;">
+                                    <h6 class="mb-3 font-weight-bold" style="color:#425727;">
+                                        <i class="fa fa-tachometer me-2"/>Scorecard Summary
+                                    </h6>
+                                    <group>
+                                        <field name="total_weight" string="Total Weight (%)" readonly="1" decoration-success="total_weight == 100.0" decoration-danger="total_weight != 100.0"/>
+                                        <field name="weight_status" string="Status" widget="badge" decoration-success="weight_status == 'complete'" decoration-danger="weight_status == 'exceeded'" decoration-warning="weight_status == 'incomplete'"/>
+                                        <field name="line_count" string="Total KPI Lines" readonly="1"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <notebook>
+                        <page string="Scorecard KPIs &amp; Measurements" name="template_lines">
+                            <field name="line_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="parent_measure_id" string="Operating Unit Measure" options="{'no_create': True}" required="1"/>
+                                    <field name="perspective_name" column_invisible="1"/>
+                                    <field name="perspective_id" string="Perspective" widget="badge"
+                                           decoration-success="perspective_name == 'Financial'"
+                                           decoration-warning="perspective_name in ('Stakeholder', 'Customer')"
+                                           decoration-info="perspective_name in ('Internal Process', 'Internal Business')"
+                                           decoration-primary="perspective_name in ('Learning &amp; Growth', 'Learning and Growth')"
+                                           options="{'no_create': True, 'no_open': True}"
+                                           readonly="1"/>
+                                    <field name="parent_objective_id" string="Strategic Objective" readonly="1"/>
+                                    <field name="name" string="Job Position Measure" required="1" placeholder="e.g. Deposit collection of 10M"/>
+                                    <field name="weight" string="Weight (%)" sum="Total Weight" required="1"/>
+                                    <field name="target_type" string="Target Type" required="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_performance_job_template_search" model="ir.ui.view">
+        <field name="name">performance.job.template.search</field>
+        <field name="model">performance.job.template</field>
+        <field name="arch" type="xml">
+            <search string="Search Position Scorecards">
+                <field name="operating_unit_id"/>
+                <field name="job_id"/>
+                <filter string="Complete (100%)" name="complete" domain="[('weight_status', '=', 'complete')]"/>
+                <filter string="Incomplete Weight" name="incomplete" domain="[('weight_status', '!=', 'complete')]"/>
+                <filter string="Branch Positions" name="branch_only" domain="[('is_branch_unit', '=', True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group name="group_by">
+                    <filter string="Work Unit" name="group_unit" context="{'group_by': 'operating_unit_id'}"/>
+                    <filter string="Job Position" name="group_job" context="{'group_by': 'job_id'}"/>
+                    <filter string="Work Unit Type" name="group_type" context="{'group_by': 'work_unit_type'}"/>
+                    <filter string="Weight Status" name="group_status" context="{'group_by': 'weight_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Window -->
+    <record id="action_performance_job_template" model="ir.actions.act_window">
+        <field name="name">Position Scorecard Templates</field>
+        <field name="res_model">performance.job.template</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_performance_job_template_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create the Master Scorecard Template for a Job Position in a Work Unit!
+            </p>
+            <p>
+                Select the Operating Unit Measure to cascade Perspective and Strategic Objective, then define the specific Job Position Measure and Weight.
+            </p>
+        </field>
+    </record>
+
+</odoo>

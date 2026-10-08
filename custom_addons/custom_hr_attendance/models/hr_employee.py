@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from odoo import models, fields, api
 
 
@@ -39,13 +39,21 @@ class HrEmployee(models.Model):
         """
         if not self:
             return
-        
+
+        valid_ids = [eid for eid in self.ids if isinstance(eid, int)]
+        if not valid_ids:
+            for emp in self:
+                emp.last_attendance_id = False
+                emp.last_check_in = False
+                emp.last_check_out = False
+            return
+
         self.env.cr.execute("""
             SELECT DISTINCT ON (employee_id) id, employee_id, check_in, check_out
             FROM hr_attendance
             WHERE employee_id IN %s
             ORDER BY employee_id, check_in DESC, id DESC
-        """, (tuple(self.ids),))
+        """, (tuple(valid_ids),))
         rows = self.env.cr.dictfetchall()
         att_map = {r['employee_id']: r for r in rows}
 

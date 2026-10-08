@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="bunna_succession_management.SuccessionDashboard" owl="1">
+        <div class="o_succ_dash_container">
+            <t t-if="state.loading">
+                <div class="o_succ_loading">
+                    <i class="fa fa-spinner fa-spin fa-3x"></i>
+                    <p>Loading Dashboard...</p>
+                </div>
+            </t>
+            <t t-else="">
+                <div class="o_succ_header">
+                    <h1>Succession &amp; Talent Dashboard</h1>
+                    <p>Strategic Workforce Planning Overview</p>
+                </div>
+                
+                <!-- KPI Cards Row 1 -->
+                <div class="row o_succ_kpi_row">
+                    <div class="col-md-3">
+                        <div class="o_succ_kpi_card o_card_primary" t-on-click="openCriticalPositions" style="cursor: pointer;">
+                            <div class="o_kpi_icon"><i class="fa fa-briefcase"></i></div>
+                            <div class="o_kpi_info">
+                                <h3><t t-esc="state.dashboardData.critical_positions_count"/></h3>
+                                <span>Critical Positions</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="o_succ_kpi_card o_card_success" t-on-click="openCandidates" style="cursor: pointer;">
+                            <div class="o_kpi_icon"><i class="fa fa-users"></i></div>
+                            <div class="o_kpi_info">
+                                <h3><t t-esc="state.dashboardData.total_candidates"/></h3>
+                                <span>Total Candidates</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="o_succ_kpi_card o_card_warning" t-on-click="openReadyNow" style="cursor: pointer;">
+                            <div class="o_kpi_icon"><i class="fa fa-star"></i></div>
+                            <div class="o_kpi_info">
+                                <h3><t t-esc="state.dashboardData.ready_now_count"/></h3>
+                                <span>Ready Now Successors</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <div class="o_succ_kpi_card" style="border-left-color: #714B67; cursor: pointer;" t-on-click="openIDPs">
+                            <div class="o_kpi_icon" style="color: #714B67;"><i class="fa fa-id-card-o"></i></div>
+                            <div class="o_kpi_info">
+                                <h3><t t-esc="state.dashboardData.total_idps_count"/></h3>
+                                <span>Individual Dev Plans (IDP)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI Cards Row 2 (Workforce & Assessments) -->
+                <div class="row o_succ_kpi_row mt-3">
+                    <div class="col-md-3">
+                        <div class="o_succ_kpi_card" style="border-left-color: #6c757d; cursor: pointer;" t-on-click="openDevPlans">
+                            <div class="o_kpi_icon text-secondary"><i class="fa fa-map-signs"></i></div>
+                            <div class="o_kpi_info">
+                                <h3><t t-esc="state.dashboardData.active_dev_plans_count"/></h3>
+                                <span>Active Development Plans</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="o_succ_kpi_card" style="border-left-color: #e3604f; cursor: pointer;" t-on-click="openTalentPools">
+                            <div class="o_kpi_icon text-danger"><i class="fa fa-users"></i></div>
+                            <div class="o_kpi_info">
+                                <h3><t t-esc="state.dashboardData.talent_pools_count"/></h3>
+                                <span>Active Talent Pools</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="o_succ_kpi_card" style="border-left-color: #28a745; cursor: pointer;" t-on-click="openDiscussions">
+                            <div class="o_kpi_icon text-success"><i class="fa fa-comments"></i></div>
+                            <div class="o_kpi_info">
+                                <h3><t t-esc="state.dashboardData.recent_discussions_count"/></h3>
+                                <span>Career Discussions</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <div class="o_succ_kpi_card" style="border-left-color: #17a2b8; cursor: pointer;" t-on-click="openAspirations">
+                            <div class="o_kpi_icon text-info"><i class="fa fa-compass"></i></div>
+                            <div class="o_kpi_info">
+                                <h3><t t-esc="state.dashboardData.total_aspirations_count"/></h3>
+                                <span>Career Aspirations</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row mt-4">
+                    <div class="col-md-6 mb-4">
+                        <div class="o_succ_panel h-100">
+                            <h4><i class="fa fa-bar-chart"></i> Readiness Pipeline</h4>
+                            <div class="o_succ_pipeline mt-4">
+                                <canvas id="readinessChart" style="height: 300px; width: 100%;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="o_succ_panel">
+                            <h4><i class="fa fa-shield"></i> Critical Positions at Risk</h4>
+                            <table class="table table-borderless table-hover o_succ_table">
+                                <thead>
+                                    <tr>
+                                        <th>Position</th>
+                                        <th>Succession Risk</th>
+                                        <th>Bench Strength</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="state.dashboardData.critical_list" t-as="pos" t-key="pos.id">
+                                        <tr>
+                                            <td class="fw-bold text_succ_slate"><t t-esc="pos.name"/></td>
+                                            <td>
+                                                <span t-attf-class="badge {{ pos.risk == 'high' ? 'bg_succ_maroon' : (pos.risk == 'medium' ? 'bg_succ_orange' : 'bg_succ_green') }}">
+                                                    <t t-esc="pos.risk.toUpperCase()"/>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="o_bench_pill">
+                                                    <t t-esc="pos.bench_strength"/> Candidates
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-if="!state.dashboardData.critical_list.length">
+                                        <tr><td colspan="3" class="text-center text-muted">No high risk positions found.</td></tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

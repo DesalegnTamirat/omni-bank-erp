@@ -26,6 +26,7 @@ Custom module to measure employee and work unit performance.
         'views/populate_corporate_appraisal_wizard.xml',
         'views/performance_objective_views.xml',
         'views/performance_job_objective.xml',
+        'views/performance_job_template_views.xml',
         'views/performance_job_measure_bulk_views.xml',
         'views/populate_t2_scorecard_wizard_views.xml',
         'views/automatic_scorecard_notify_wizard_views.xml',

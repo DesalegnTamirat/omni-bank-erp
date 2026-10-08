@@ -67,14 +67,15 @@ Core capabilities:
         "views/pbms_dashboard_views.xml",
         "views/pbms_exceptional_workforce_views.xml",
         "views/pbms_menus.xml",
+        "data/pbms_resync.xml",
         "report/pbms_consolidated_report.xml",
         "report/pbms_consolidated_report_templates.xml",
     ],
     "assets": {
         "web.assets_backend": [
             # Chart.js must load before pbms_dashboard.js, which calls the
-            # global `Chart` constructor.
-            "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js",
+            # global `Chart` constructor. Loaded locally from Odoo without external CDN.
+            ("include", "web.chartjs_lib"),
             "bunna_pbms/static/src/js/pbms_dashboard.js",
             "bunna_pbms/static/src/js/pbms_list_renderer_patch.js",
             "bunna_pbms/static/src/xml/**/*.xml",
