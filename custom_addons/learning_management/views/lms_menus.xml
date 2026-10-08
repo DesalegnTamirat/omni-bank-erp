@@ -7,6 +7,7 @@
                   name="Learning Management"
                   web_icon="learning_management,static/description/icon.png"
                   sequence="66"
+                  action="action_lms_my_enrollments"
                   groups="learning_management.group_lms_learner"/>
 
         <!-- 1. My Learning (Learner Self-Service) -->

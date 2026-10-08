@@ -2072,14 +2072,31 @@ class CompetencyAssessment(models.Model):
 
     def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None):
         """Ensure notification appears in standard Odoo notification channels:
-        1. Top Header Clock Icon (mail.activity)
-        2. Top Header Notifications Tray / Inbox (mail.notification with inbox type)
+        1. Live on-screen interactive toast notification (via bus.bus)
+        2. Top Header Clock Icon (mail.activity)
+        3. Top Header Notifications Tray / Inbox (mail.notification with inbox type)
         """
         if not target_user or not target_user.active:
             return
         rec_to_notify = (target_rec or self).sudo()
 
-        # 1. Top Header Clock Icon (Planned Activity)
+        # 1. Live Interactive Web Toast Notification (bus.bus)
+        if target_user.partner_id:
+            try:
+                self.env['bus.bus'].sudo()._sendone(
+                    target_user.partner_id,
+                    'simple_notification',
+                    {
+                        'type': 'info',
+                        'title': summary or _('Competency Notification'),
+                        'message': note or summary,
+                        'sticky': True,
+                    }
+                )
+            except Exception:
+                pass
+
+        # 2. Top Header Clock Icon (Planned Activity)
         try:
             rec_to_notify.activity_schedule(
                 'mail.mail_activity_data_todo',
@@ -2090,7 +2107,7 @@ class CompetencyAssessment(models.Model):
         except Exception:
             pass
 
-        # 2. Document Chatter Message & In-App Notification (authored by OdooBot / System)
+        # 3. Document Chatter Message & In-App Notification (authored by OdooBot / System)
         if target_user.partner_id:
             try:
                 odoobot = self.env.ref('base.partner_root', raise_if_not_found=False)
@@ -2119,6 +2136,7 @@ class CompetencyAssessment(models.Model):
                     })
             except Exception:
                 pass
+
 
     def action_submit(self):
         """Submit assessment: validates deadline, ratings completeness, and notifies supervisor."""
@@ -2290,21 +2308,49 @@ class CompetencyAssessment(models.Model):
                     draft_asms = all_emp_asms.filtered(lambda a: a.state == 'draft')
                     if all_emp_asms and not draft_asms and not any(all_emp_asms.mapped('is_fully_assessed_notified')):
                         emp_user = rec.sudo().employee_id.user_id
+                        cycle_name = rec.cycle_id.name or _('Current Cycle')
+                        assessor_names = ", ".join(filter(None, all_emp_asms.mapped(lambda a: a.assessor_id.name or a.employee_id.name)))
+                        target_rec = all_emp_asms.filtered(lambda a: a.assessment_type == 'self')[:1] or rec
+
+                        # 1. Notify the Employee
                         if emp_user:
-                            assessor_names = ", ".join(filter(None, all_emp_asms.mapped(lambda a: a.assessor_id.name or a.employee_id.name)))
-                            cycle_name = rec.cycle_id.name or _('Current Cycle')
-                            msg_text = Markup(_(
+                            emp_msg_text = Markup(_(
                                 "🎉 <b>360° Competency Evaluation Completed!</b><br/>"
                                 "All assigned assessors (%s) have completed and submitted your evaluations for cycle '<b>%s</b>'.<br/>"
                                 "Your full competency evaluation results and capability gap analysis are now available for you to review.<br/><br/>"
                                 "<a href='/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
                                 "👁️ View My Full Evaluation Results</a>"
                             )) % (escape(assessor_names or ''), escape(cycle_name))
-                            summary_str = _('360° Evaluation Completed: %s') % cycle_name
-                            note_str = _('All assigned assessors have completed your evaluations for cycle \'%s\'. You can now view your full evaluation results.') % cycle_name
-                            target_rec = all_emp_asms.filtered(lambda a: a.assessment_type == 'self')[:1] or rec
-                            rec._notify_user_inbox_and_activity(emp_user, summary_str, note_str, msg_text, target_rec=target_rec)
-                            all_emp_asms.with_context(force_write=True).write({'is_fully_assessed_notified': True})
+                            emp_summary = _('360° Evaluation Completed: %s') % cycle_name
+                            emp_note = _('All assigned assessors have completed your evaluations for cycle \'%s\'. You can now view your full evaluation results.') % cycle_name
+                            rec._notify_user_inbox_and_activity(emp_user, emp_summary, emp_note, emp_msg_text, target_rec=target_rec)
+
+                        # 2. Notify Coach / Supervisor
+                        coach_emp = rec.sudo().employee_id.coach_id or rec.sudo().employee_id.parent_id
+                        coach_user = coach_emp.user_id if (coach_emp and coach_emp.user_id) else False
+                        if coach_user and coach_user != emp_user:
+                            sup_eval_url = f"/web#id={target_rec.id}&model=competency.assessment"
+                            coach_msg_text = Markup(_(
+                                "🎉 <b>360° Competency Evaluation Completed for %s!</b><br/>"
+                                "All assigned assessors (%s) have completed evaluations for subordinate employee <b>%s</b> in cycle '<b>%s</b>'.<br/>"
+                                "Final capability gaps and multi-source ratings are now ready for review.<br/><br/>"
+                                "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
+                                "👁️ Review Final Assessment</a>"
+                            )) % (
+                                escape(rec.employee_id.name or ''),
+                                escape(assessor_names or ''),
+                                escape(rec.employee_id.name or ''),
+                                escape(cycle_name),
+                                sup_eval_url
+                            )
+                            coach_summary = _('360° Evaluation Completed: %s') % rec.employee_id.name
+                            coach_note = _('All assigned raters have completed 360° competency evaluations for employee %s (cycle \'%s\').') % (
+                                rec.employee_id.name, cycle_name
+                            )
+                            rec._notify_user_inbox_and_activity(coach_user, coach_summary, coach_note, coach_msg_text, target_rec=target_rec)
+
+                        all_emp_asms.with_context(force_write=True).write({'is_fully_assessed_notified': True})
+
 
     def compute_aggregate_360_ratings(self):
         return self.action_consolidate_multi_source()

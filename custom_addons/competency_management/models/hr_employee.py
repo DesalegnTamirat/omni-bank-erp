@@ -95,22 +95,14 @@ class HrEmployeeCompetency(models.Model):
     def _search_is_director_or_chief(self, operator, value):
         if operator not in ('=', '!='):
             return []
-        keywords = ['director', 'chief', 'vp', 'vice president', 'president']
-        candidate_domain = ['&', ('active', '=', True), '|', '|', '|']
-        kw_domain = ['|'] * (len(keywords) - 1)
-        for kw in keywords:
-            kw_domain.append(('job_id.name', 'ilike', kw))
-        candidate_domain.extend(kw_domain)
-        candidate_domain.append(('job_grade', 'in', ['15', '16', '17', 'XV', 'XVI', 'XVII', 'xv', 'xvi', 'xvii']))
-        candidate_domain.append(('job_id.name', 'ilike', 'grade 1'))
-        candidate_domain.append(('grade_id.grade_code', 'in', ['15', '16', '17', 'XV', 'XVI', 'XVII', 'xv', 'xvi', 'xvii']))
+        try:
+            candidates = self.env['hr.employee'].sudo().search([('active', '=', True)])
+            matched_ids = [e.id for e in candidates if e._check_is_director_or_chief()]
+        except Exception:
+            matched_ids = []
 
-        candidates = self.env['hr.employee'].sudo().search(candidate_domain)
-        matched_ids = [e.id for e in candidates if e._check_is_director_or_chief()]
         is_true = bool(value) if operator == '=' else not bool(value)
         return [('id', 'in', matched_ids)] if is_true else [('id', 'not in', matched_ids)]
-
-
 
     def _is_competency_scoped_context(self):
         ctx = self.env.context
@@ -180,11 +172,15 @@ class HrEmployeeCompetency(models.Model):
 
     @api.model
     def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
-        if self._is_competency_scoped_context():
-            return super(HrEmployeeCompetency, self.sudo()).web_search_read(
-                domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit
-            )
-        return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+        try:
+            with self.env.cr.savepoint():
+                if self._is_competency_scoped_context():
+                    return super(HrEmployeeCompetency, self.sudo()).web_search_read(
+                        domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit
+                    )
+                return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+        except Exception:
+            return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
 
     @api.depends('competency_assessment_ids', 'competency_assessment_ids.state', 'competency_assessment_ids.create_date', 'competency_assessment_ids.line_ids')
     def _compute_latest_competency_assessment(self):

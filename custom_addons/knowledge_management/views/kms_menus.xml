@@ -7,6 +7,7 @@
                   name="Knowledge Management"
                   web_icon="knowledge_management,static/description/icon.png"
                   sequence="65"
+                  action="action_kms_document_all"
                   groups="knowledge_management.group_kms_employee"/>
 
         <!-- 1. Governed Repository Menu -->

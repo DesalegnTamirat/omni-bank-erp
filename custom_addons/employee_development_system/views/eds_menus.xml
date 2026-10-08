@@ -6,6 +6,7 @@
         <menuitem id="menu_eds_root"
                   name="Employee Development"
                   web_icon="employee_development_system,static/description/icon.svg"
+                  action="action_eds_dashboard"
                   sequence="65"/>
 
         <!-- ══════════════════════════════════════════════════════════════ -->
