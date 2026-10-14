@@ -139,6 +139,12 @@
                   action="action_eds_session"
                   sequence="10"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_my_trainer_sessions"
+                  name="My Assigned Sessions"
+                  parent="menu_eds_delivery"
+                  action="action_eds_session_trainer"
+                  sequence="12"
+                  groups="employee_development_system.group_eds_trainer"/>
         <menuitem id="menu_eds_batches"
                   name="Batches / Cohorts"
                   parent="menu_eds_delivery"
@@ -180,7 +186,7 @@
                   parent="menu_eds_delivery"
                   action="action_eds_session_attendance"
                   sequence="70"
-                  groups="employee_development_system.group_eds_trainer"/>
+                  groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_delivery_certificates"
                   name="Issued Certificates"
                   parent="menu_eds_delivery"
@@ -221,7 +227,7 @@
                   parent="menu_eds_evaluations_root"
                   action="action_eds_assessment"
                   sequence="20"
-                  groups="employee_development_system.group_eds_trainer"/>
+                  groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_level2_learning_gain"
                   name="Learning Gain (Level 2)"
                   parent="menu_eds_evaluations_root"

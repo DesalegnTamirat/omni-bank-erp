@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-""" - Attendance & Delivery Tracking (/041/045, ...045).
+"""Attendance and delivery tracking (/041/045).
 
-Delivery-time models consumed by the trainer and L&D officer:
+Delivery-time records managed by L&D staff:
   - eds.session.attendance   per-participant attendance with computed per-program %
                              (feeds the 80% certification rule, )
   - eds.material             course training material with quality review +
@@ -350,8 +350,7 @@ class EdsAssessment(models.Model):
     assessment_date = fields.Date(string='Assessment Date', default=fields.Date.context_today)
     uploaded_by = fields.Many2one('res.users', string='Uploaded By',
                                   default=lambda self: self.env.user, readonly=True,
-                                  help='External trainers may upload scores '
-                                       '(/037).')
+                                  help='L&D staff member who entered or imported the score.')
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company',
                                  default=lambda self: self.env.company)

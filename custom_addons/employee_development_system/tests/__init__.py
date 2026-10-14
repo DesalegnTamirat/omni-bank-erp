@@ -14,3 +14,4 @@ from . import test_extended_form_pack
 from . import test_cycle_demand_vendor_matrix
 from . import test_navigation_and_approval
 from . import test_dashboard_security
+from . import test_trainer_access

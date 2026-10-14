@@ -111,6 +111,28 @@ class EdsTrainer(models.Model):
         'A trainer cannot be both an internal employee and an external partner!',
     )
 
+    def _grant_employee_trainer_role(self):
+        """The trainer role grants a personal session view, not delivery administration."""
+        group = self.env.ref('employee_development_system.group_eds_trainer')
+        users = self.filtered(
+            lambda trainer: trainer.state == 'active' and trainer.trainer_type == 'internal'
+            and trainer.employee_id.user_id).mapped('employee_id.user_id')
+        for user in users:
+            if group not in user.group_ids:
+                user.sudo().write({'group_ids': [(4, group.id)]})
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        trainers = super().create(vals_list)
+        trainers._grant_employee_trainer_role()
+        return trainers
+
+    def write(self, vals):
+        result = super().write(vals)
+        if {'employee_id', 'trainer_type', 'state'} & vals.keys():
+            self._grant_employee_trainer_role()
+        return result
+
     @api.depends('last_review_date', 'review_cycle_months', 'create_date')
     def _compute_next_review(self):
         today = date.today()

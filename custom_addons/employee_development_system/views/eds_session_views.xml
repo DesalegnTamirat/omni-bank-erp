@@ -333,7 +333,8 @@
                                 </div>
                             </button>
                             <button class="oe_stat_button" type="object"
-                                    name="action_view_attendance" icon="fa-check-square-o">
+                                    name="action_view_attendance" icon="fa-check-square-o"
+                                    groups="employee_development_system.group_eds_officer">
                                 <div class="o_stat_info">
                                     <field name="attendance_count" widget="statinfo" string="Attendance"/>
                                     <span class="o_stat_text">Session rate <field name="attendance_rate"/>%</span>
@@ -405,17 +406,18 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Attendance &amp; Roster" name="attendance">
+                            <page string="Attendance &amp; Roster" name="attendance"
+                                  groups="employee_development_system.group_eds_officer">
                                 <div class="mb-2">
                                     <button name="action_export_attendance_xlsx" string="Export Attendance Excel" type="object"
                                             class="btn btn-primary btn-sm me-2" icon="fa-file-excel-o"
-                                            groups="employee_development_system.group_eds_trainer,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                                     <button name="action_mark_all_attended" string="Mark All Attended" type="object"
                                             class="btn btn-success btn-sm me-2" icon="fa-check-circle"
-                                            groups="employee_development_system.group_eds_trainer,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                                     <button name="action_open_attendance_import" string="Import Attendance Excel / CSV" type="object"
                                             class="btn btn-secondary btn-sm" icon="fa-upload"
-                                            groups="employee_development_system.group_eds_trainer,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                            groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                                 </div>
                                 <field name="attendance_ids">
                                     <list editable="bottom">
@@ -455,7 +457,8 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Assessments" name="assessments">
+                            <page string="Assessments" name="assessments"
+                                  groups="employee_development_system.group_eds_officer">
                                 <field name="assessment_ids">
                                     <list editable="bottom">
                                         <field name="employee_id" domain="[('id', 'in', parent.enrolled_employee_ids)]" options="{'no_create': True}"/>
@@ -491,6 +494,78 @@
             <field name="res_model">eds.session</field>
             <field name="view_mode">list,form</field>
             <field name="search_view_id" ref="employee_development_system.view_eds_session_search"/>
+        </record>
+
+        <record id="view_eds_session_trainer_list" model="ir.ui.view">
+            <field name="name">eds.session.trainer.list</field>
+            <field name="model">eds.session</field>
+            <field name="priority" eval="30"/>
+            <field name="arch" type="xml">
+                <list string="My Assigned Sessions" create="false" edit="false" delete="false">
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="program_name"/>
+                    <field name="date_start"/>
+                    <field name="date_end"/>
+                    <field name="venue_id"/>
+                    <field name="status" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_session_trainer_form" model="ir.ui.view">
+            <field name="name">eds.session.trainer.form</field>
+            <field name="model">eds.session</field>
+            <field name="priority" eval="30"/>
+            <field name="arch" type="xml">
+                <form string="Assigned Training Session" create="false" edit="false" delete="false">
+                    <sheet>
+                        <group>
+                            <group string="Course">
+                                <field name="name"/>
+                                <field name="course_id"/>
+                                <field name="program_name"/>
+                                <field name="delivery_method"/>
+                                <field name="status" widget="badge"/>
+                            </group>
+                            <group string="Schedule">
+                                <field name="date_start"/>
+                                <field name="date_end"/>
+                                <field name="start_time" widget="float_time"/>
+                                <field name="duration_hours" widget="float_time"/>
+                                <field name="venue_id"/>
+                            </group>
+                        </group>
+                        <group string="Delivery Notes">
+                            <field name="notes"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_eds_session_trainer_search" model="ir.ui.view">
+            <field name="name">eds.session.trainer.search</field>
+            <field name="model">eds.session</field>
+            <field name="arch" type="xml">
+                <search string="My Assigned Sessions">
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <filter string="Scheduled" name="scheduled" domain="[('status', '=', 'scheduled')]"/>
+                    <filter string="Ongoing" name="ongoing" domain="[('status', '=', 'ongoing')]"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_eds_session_trainer" model="ir.actions.act_window">
+            <field name="name">My Assigned Sessions</field>
+            <field name="res_model">eds.session</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">['|', ('trainer_ids.employee_id.user_id', '=', uid), ('trainer_ids.external_partner_id.user_ids', 'in', [uid])]</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_session_trainer_search"/>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('employee_development_system.view_eds_session_trainer_list')}),
+                (0, 0, {'view_mode': 'form', 'view_id': ref('employee_development_system.view_eds_session_trainer_form')})]"/>
         </record>
 
     </data>

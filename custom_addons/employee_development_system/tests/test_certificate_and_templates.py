@@ -139,6 +139,14 @@ class TestCertificateAndTemplates(TransactionCase):
         # Verify Certificate PDF
         self.assertTrue(cert.file, "Certificate PDF binary must be populated")
         self.assertTrue(len(cert.file) > 100, "PDF file must be non-empty")
+        self.assertEqual(
+            cert.action_download_image()['url'],
+            '/my/certificates/download/%s/image' % cert.id,
+        )
+        self.assertEqual(
+            cert.action_download_pdf()['url'],
+            '/my/certificates/download/%s/pdf' % cert.id,
+        )
 
         # Verify Notification was posted with attachments
         messages = cert.message_ids

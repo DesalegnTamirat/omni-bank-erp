@@ -104,10 +104,10 @@
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                                 <span class="text-muted small"><i class="fa fa-calendar me-1"/> <t t-esc="record.issue_date.value"/></span>
                                 <div class="btn-group btn-group-sm">
-                                    <a t-if="record.state.raw_value == 'issued'" t-att-href="'/web/content/eds.certificate/' + record.id.raw_value + '/certificate_image/' + record.certificate_image_filename.raw_value + '?download=true'" class="btn btn-outline-danger" role="button" title="Download Image">
+                                    <a t-if="record.state.raw_value == 'issued'" t-att-href="'/my/certificates/download/' + record.id.raw_value + '/image'" class="btn btn-outline-danger" role="button" title="Download Image">
                                         <i class="fa fa-picture-o"/>
                                     </a>
-                                    <a t-if="record.state.raw_value == 'issued'" t-att-href="'/web/content/eds.certificate/' + record.id.raw_value + '/file/' + record.file_name.raw_value + '?download=true'" class="btn btn-outline-info" role="button" title="Download PDF">
+                                    <a t-if="record.state.raw_value == 'issued'" t-att-href="'/my/certificates/download/' + record.id.raw_value + '/pdf'" class="btn btn-outline-info" role="button" title="Download PDF">
                                         <i class="fa fa-file-pdf-o"/>
                                     </a>
                                 </div>

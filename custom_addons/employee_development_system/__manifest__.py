@@ -4,7 +4,7 @@
     'summary': "Classroom training management: TNA, curriculum, annual L&D plan, sessions, "
                "nomination, delivery, evaluation (L1-L4), certification, budget, sponsorship, "
                "staff education and internship.",
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.1.1',
     'category': 'Human Resources/Employee Development',
     'author': 'Desalegn & Abeza',
     'website': 'https://www.bunnabanksc.com',

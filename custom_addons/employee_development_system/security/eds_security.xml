@@ -42,7 +42,8 @@
             <field name="name">Trainer / Facilitator</field>
             <field name="sequence">30</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
-            <field name="comment">Session delivery, attendance and assessment scoring (segregated from nomination/approval).</field>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="comment">Employee-level access to assigned training sessions only. Attendance and assessment recording belongs to L&amp;D staff.</field>
         </record>
 
         <!-- Group: L&D Officer -->
@@ -243,6 +244,16 @@
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
+        <record id="rule_eds_trainer_self" model="ir.rule">
+            <field name="name">Trainer Own Profile</field>
+            <field name="model_id" ref="employee_development_system.model_eds_trainer"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('external_partner_id', '=', user.partner_id.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_trainer'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
         <record id="rule_eds_external_provider_staff" model="ir.rule">
             <field name="name">Provider Registry L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_external_provider"/>
@@ -301,6 +312,16 @@
             <field name="model_id" ref="employee_development_system.model_eds_session"/>
             <field name="domain_force">[('enrollment_ids.employee_id.user_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_session_assigned_trainer" model="ir.rule">
+            <field name="name">Trainer Assigned Sessions</field>
+            <field name="model_id" ref="employee_development_system.model_eds_session"/>
+            <field name="domain_force">['|', ('trainer_ids.employee_id.user_id', '=', user.id), ('trainer_ids.external_partner_id', '=', user.partner_id.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_trainer'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
@@ -449,8 +470,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- : attendance - employees read their own records; trainers record on
-             their assigned sessions; L&D staff manage the full sheet -->
+        <!-- Attendance and assessment records are restricted to L&amp;D staff. -->
         <record id="rule_eds_session_attendance_employee_own" model="ir.rule">
             <field name="name">Employee Own Attendance</field>
             <field name="model_id" ref="employee_development_system.model_eds_session_attendance"/>
@@ -462,11 +482,10 @@
             <field name="perm_unlink" eval="False"/>
         </record>
         <record id="rule_eds_session_attendance_staff" model="ir.rule">
-            <field name="name">Attendance Staff (Trainers &amp; L&amp;D)</field>
+            <field name="name">Attendance L&amp;D Staff</field>
             <field name="model_id" ref="employee_development_system.model_eds_session_attendance"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_trainer')),
-                                          (4, ref('employee_development_system.group_eds_officer'))]"/>
+            <field name="groups" eval="[(6, 0, [ref('employee_development_system.group_eds_officer')])]"/>
         </record>
         <record id="rule_eds_session_attendance_multi_company" model="ir.rule">
             <field name="name">Attendance Multi Company</field>
@@ -474,7 +493,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- daily feedback - employees read their own; trainers record -->
+        <!-- Daily feedback is managed by L&amp;D; employees may read their own. -->
         <record id="rule_eds_feedback_employee_own" model="ir.rule">
             <field name="name">Employee Own Feedback</field>
             <field name="model_id" ref="employee_development_system.model_eds_feedback"/>
@@ -486,11 +505,10 @@
             <field name="perm_unlink" eval="False"/>
         </record>
         <record id="rule_eds_feedback_staff" model="ir.rule">
-            <field name="name">Feedback Staff (Trainers &amp; L&amp;D)</field>
+            <field name="name">Feedback L&amp;D Staff</field>
             <field name="model_id" ref="employee_development_system.model_eds_feedback"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_trainer')),
-                                          (4, ref('employee_development_system.group_eds_officer'))]"/>
+            <field name="groups" eval="[(6, 0, [ref('employee_development_system.group_eds_officer')])]"/>
         </record>
         <record id="rule_eds_feedback_multi_company" model="ir.rule">
             <field name="name">Feedback Multi Company</field>
@@ -498,7 +516,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- assessments - employees read their own scores; trainers score -->
+        <!-- Assessment scores are managed by L&amp;D staff. -->
         <record id="rule_eds_assessment_employee_own" model="ir.rule">
             <field name="name">Employee Own Assessments</field>
             <field name="model_id" ref="employee_development_system.model_eds_assessment"/>
@@ -510,11 +528,10 @@
             <field name="perm_unlink" eval="False"/>
         </record>
         <record id="rule_eds_assessment_staff" model="ir.rule">
-            <field name="name">Assessment Staff (Trainers &amp; L&amp;D)</field>
+            <field name="name">Assessment L&amp;D Staff</field>
             <field name="model_id" ref="employee_development_system.model_eds_assessment"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_trainer')),
-                                          (4, ref('employee_development_system.group_eds_officer'))]"/>
+            <field name="groups" eval="[(6, 0, [ref('employee_development_system.group_eds_officer')])]"/>
         </record>
         <record id="rule_eds_assessment_multi_company" model="ir.rule">
             <field name="name">Assessment Multi Company</field>

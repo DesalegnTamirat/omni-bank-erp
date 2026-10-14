@@ -5,7 +5,7 @@ import io
 from datetime import date, timedelta
 from markupsafe import Markup, escape
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 try:
     from openpyxl import Workbook
@@ -381,17 +381,25 @@ class EdsSession(models.Model):
 
     # ── attendance & delivery tracking (/041/045) ──
     attendance_ids = fields.One2many(
-        'eds.session.attendance', 'session_id', string='Attendance Records')
+        'eds.session.attendance', 'session_id', string='Attendance Records',
+        groups='employee_development_system.group_eds_officer,employee_development_system.group_eds_executive')
     cost_ids = fields.One2many('eds.cost', 'session_id', string='Actual Costs')
-    attendance_count = fields.Integer(string='Attendance', compute='_compute_delivery_counts')
+    attendance_count = fields.Integer(
+        string='Attendance', compute='_compute_delivery_counts',
+        groups='employee_development_system.group_eds_officer,employee_development_system.group_eds_executive')
     attendance_rate = fields.Float(
         string='Session Attendance %', compute='_compute_attendance_rate', store=True,
         digits=(5, 2),
+        groups='employee_development_system.group_eds_officer,employee_development_system.group_eds_executive',
         help='Attended / recorded participants for this session.')
     feedback_ids = fields.One2many('eds.feedback', 'session_id', string='Daily Feedback')
     feedback_count = fields.Integer(string='Feedback', compute='_compute_delivery_counts')
-    assessment_ids = fields.One2many('eds.assessment', 'session_id', string='Assessments')
-    assessment_count = fields.Integer(string='Assessment Count', compute='_compute_delivery_counts')
+    assessment_ids = fields.One2many(
+        'eds.assessment', 'session_id', string='Assessments',
+        groups='employee_development_system.group_eds_officer,employee_development_system.group_eds_executive')
+    assessment_count = fields.Integer(
+        string='Assessment Count', compute='_compute_delivery_counts',
+        groups='employee_development_system.group_eds_officer,employee_development_system.group_eds_executive')
     international_training_ids = fields.One2many(
         'eds.international.training', 'session_id', string='International Training')
     international_training_count = fields.Integer(
@@ -581,6 +589,7 @@ class EdsSession(models.Model):
         return sessions
 
     def write(self, vals):
+        previous_trainers = {rec.id: set(rec.trainer_ids.ids) for rec in self} if 'trainer_ids' in vals else {}
         if 'status' in vals and not self.env.su:
             raise UserError(_('Use the session workflow actions to change its status.'))
         if vals.get('plan_line_id'):
@@ -633,6 +642,11 @@ class EdsSession(models.Model):
         if 'capacity' in vals:
             for rec in self:
                 rec._promote_waitlisted()
+        if 'trainer_ids' in vals:
+            for rec in self.filtered(lambda session: session.status in ('scheduled', 'ongoing', 'rescheduled')):
+                new_trainers = rec.trainer_ids.filtered(
+                    lambda trainer: trainer.id not in previous_trainers.get(rec.id, set()))
+                rec._notify_assigned_trainers(new_trainers)
         return res
 
     def _write_workflow_status(self, status):
@@ -833,13 +847,14 @@ class EdsSession(models.Model):
                 })
             rec.message_post(body=_('Session %s confirmed and scheduled.') % rec.name)
             rec.action_invite_selected()
+            rec._notify_assigned_trainers()
             rec._notify_assessment_coordinators(_('Record pre-training assessment scores before this session starts.'))
 
     def action_start(self):
         """Scheduled -> Ongoing: delivery has begun.
 
-        Attendance records are auto-created for every enrolled participant so the
-        trainer only marks who attended.
+        Attendance records are auto-created for every enrolled participant so
+        L&D staff can record who attended.
         """
         today = fields.Date.today()
         for rec in self:
@@ -867,7 +882,7 @@ class EdsSession(models.Model):
 
             rec._write_workflow_status('ongoing')
             rec._ensure_attendance_records()
-            rec.message_post(body=_('Session %s started - attendance sheet opened for the trainer.') % rec.name)
+            rec.message_post(body=_('Session %s started - attendance sheet opened for L&D staff.') % rec.name)
 
     def action_complete(self):
         """Ongoing -> Completed: delivery finished.
@@ -897,22 +912,45 @@ class EdsSession(models.Model):
             enrolled.write({'state': 'completed'})
             rec.enrollment_ids.filtered(lambda e: e.state == 'enrolled').write({'state': 'absent'})
 
-            present = len(rec.attendance_ids.filtered('attended'))
-            total = len(rec.attendance_ids)
             rec.message_post(
-                body=_('Session %s completed - attendance %d/%d recorded.') % (rec.name, present, total)
+                body=_('Session %s completed. L&D has recorded participant attendance.') % rec.name
             )
             rec._sync_plan_line_status()
             rec._distribute_completion_evaluations()
             rec._notify_assessment_coordinators(_('Record post-training assessment scores for completed participants.'))
 
     def _notify_assessment_coordinators(self, message):
-        """Prompt the assigned trainer and L&D organizer to record scored assessments."""
+        """Prompt L&D staff, never trainers, to record scored assessments."""
+        officer_group = self.env.ref('employee_development_system.group_eds_officer')
         for session in self:
-            partners = session.trainer_ids.mapped('employee_id.user_id.partner_id') | session.trainer_ids.mapped('external_partner_id')
-            if session.create_uid.partner_id:
+            users = officer_group.user_ids.filtered(
+                lambda user: session.company_id in user.company_ids and user.active)
+            partners = users.mapped('partner_id')
+            if (session.create_uid.has_group('employee_development_system.group_eds_officer')
+                    and session.create_uid.partner_id):
                 partners |= session.create_uid.partner_id
-            session.message_post(body=message, partner_ids=partners.ids)
+            if partners:
+                session.message_post(body=message, partner_ids=partners.ids)
+
+    def _notify_assigned_trainers(self, trainers=None):
+        """Tell registered trainers about their assigned course and schedule."""
+        for session in self:
+            assigned = trainers if trainers is not None else session.trainer_ids
+            partners = assigned.mapped('employee_id.user_id.partner_id') | assigned.mapped('external_partner_id')
+            if not partners:
+                continue
+            course_name = session.course_id.name or session.program_name or session.name
+            venue_name = session.venue_id.name or _('To be confirmed')
+            session.message_post(
+                body=_('You are assigned to deliver %s from %s to %s at %s. Open Training Delivery > My Assigned Sessions to view the schedule.') % (
+                    course_name, session.date_start, session.date_end, venue_name),
+                partner_ids=partners.ids,
+            )
+
+    def _require_ld_delivery_access(self):
+        if not self.env.su and not self.env.user.has_group(
+                'employee_development_system.group_eds_officer'):
+            raise AccessError(_('Only L&D staff may view or record attendance and assessment results.'))
 
     def _distribute_completion_evaluations(self):
         """Open the participant survey and the coach's later behavior review."""
@@ -960,9 +998,11 @@ class EdsSession(models.Model):
             rec._write_workflow_status('rescheduled')
             rec._notify_participants(_('Session %s has been rescheduled. Check the new dates.')
                                      % rec.name)
+            rec._notify_assigned_trainers()
 
     def action_mark_all_attended(self):
         """Quickly mark all roster records as attended."""
+        self._require_ld_delivery_access()
         for rec in self:
             rec._ensure_attendance_records()
             rec.attendance_ids.write({'attended': True})
@@ -970,6 +1010,7 @@ class EdsSession(models.Model):
 
     def action_open_attendance_import(self):
         """Open the spreadsheet attendance import wizard for this session."""
+        self._require_ld_delivery_access()
         self.ensure_one()
         return {
             'name': _('Import Attendance Data'),
@@ -999,6 +1040,7 @@ class EdsSession(models.Model):
                     'state': 'confirmed',
                 })
             rec.message_post(body=_('Session %s rescheduled and confirmed .') % rec.name)
+            rec._notify_assigned_trainers()
 
     def action_cancel(self):
         """Cancel the session, release the venue, cancel enrollments and notify ."""
@@ -1098,6 +1140,7 @@ class EdsSession(models.Model):
                 })
 
     def action_view_attendance(self):
+        self._require_ld_delivery_access()
         self.ensure_one()
         return {
             'name': _('Attendance'),
@@ -1109,6 +1152,7 @@ class EdsSession(models.Model):
         }
 
     def action_export_attendance_xlsx(self):
+        self._require_ld_delivery_access()
         self.ensure_one()
         if Workbook is None:
             raise UserError(_('The openpyxl library is needed to export Excel attendance.'))
@@ -1187,6 +1231,7 @@ class EdsSession(models.Model):
         }
 
     def action_view_assessments(self):
+        self._require_ld_delivery_access()
         self.ensure_one()
         return {
             'name': _('Pre/Post Assessments'),

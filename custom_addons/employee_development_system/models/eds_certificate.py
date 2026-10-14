@@ -468,7 +468,7 @@ class EdsCertificate(models.Model):
             self.generate_certificate_image()
         return {
             'type': 'ir.actions.act_url',
-            'url': f"/web/content/eds.certificate/{self.id}/certificate_image/{self.certificate_image_filename}?download=true",
+            'url': f"/my/certificates/download/{self.id}/image",
             'target': 'self',
         }
 
@@ -478,7 +478,7 @@ class EdsCertificate(models.Model):
             self.generate_certificate_pdf()
         return {
             'type': 'ir.actions.act_url',
-            'url': f"/web/content/eds.certificate/{self.id}/file/{self.file_name}?download=true",
+            'url': f"/my/certificates/download/{self.id}/pdf",
             'target': 'self',
         }
 
