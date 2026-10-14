@@ -140,10 +140,9 @@ class TestLmsPhase1Security(TransactionCase):
         # Authoritative duration is 100s. Attacker sends duration=1, current_time=10
         res = progress.update_progress(current_time=10, duration=1)
         self.assertFalse(res['is_completed'], "Lesson must NOT be completed when client spoofs short duration")
-        self.assertEqual(progress.max_watched_seconds, 10)
+        self.assertLessEqual(progress.max_watched_seconds, 5)
         self.assertNotEqual(progress.state, 'completed')
 
         # Attacker attempts to send current_time far beyond video_duration_seconds (e.g. 99999)
         res_spoof = progress.update_progress(current_time=99999, duration=100)
-        # Max valid time clamped to video_duration_seconds (100) + tolerance (5) = 105
-        self.assertLessEqual(progress.last_position_seconds, 105, "Current time must be clamped to authoritative duration + tolerance")
+        self.assertLessEqual(progress.last_position_seconds, 100, "Current time must be clamped to authoritative duration")

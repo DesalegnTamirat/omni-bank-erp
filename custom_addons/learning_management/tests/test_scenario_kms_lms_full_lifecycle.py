@@ -173,7 +173,7 @@ class TestKmsLmsFullLifecycleScenario(TransactionCase):
         res = doc.with_user(self.user_learner).action_download_watermarked()
         self.assertEqual(res['type'], 'ir.actions.act_url')
         self.assertIn(f"/kms/document/{doc.id}/download", res['url'])
-        self.assertEqual(doc.download_count, 1)
+        self.assertEqual(doc.download_count, 0)
 
         # Test view-only security restriction
         doc.write({'is_view_only': True})
@@ -203,6 +203,7 @@ class TestKmsLmsFullLifecycleScenario(TransactionCase):
             'pass_score_percentage': 80.0,
             'issue_certificate': True,
             'description': '<p>Comprehensive training on identifying money laundering typologies and PEPs.</p>',
+            'has_post_assessment': False,
             'learning_objectives': '<p>1. Detect suspicious cash structuring.<br/>2. Apply enhanced due diligence.</p>',
         })
         self.assertEqual(course.state, 'draft')

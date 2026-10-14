@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import base64
+import mimetypes
+import os
 import re
 import logging
 from datetime import datetime
@@ -63,6 +65,24 @@ class LmsController(http.Controller):
 
         return True, lesson, enrollment
 
+    @http.route(['/lms/lesson/<int:lesson_id>/document'], type='http', auth='user')
+    def download_lesson_document(self, lesson_id, **kwargs):
+        authorized, result, _enrollment = self._check_video_access(lesson_id)
+        if not authorized:
+            return result
+        lesson = result
+        if lesson.lesson_type != 'document' or not lesson.document_file:
+            return request.not_found()
+        filename = (lesson.document_filename or 'lesson-document').replace('"', '')
+        content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        content = base64.b64decode(lesson.document_file)
+        return Response(content, headers=[
+            ('Content-Type', content_type),
+            ('Content-Disposition', f'attachment; filename="{filename}"'),
+            ('Content-Length', str(len(content))),
+            ('Cache-Control', 'private, no-store'),
+        ])
+
     @http.route(['/lms/video/<int:lesson_id>/stream'], type='http', auth='user')
     def stream_lesson_video(self, lesson_id, **kwargs):
         """
@@ -80,37 +100,55 @@ class LmsController(http.Controller):
         if lesson.video_source_type == 'url' and lesson.video_url:
             return request.redirect(lesson.video_url)
 
-        if not lesson.video_file:
-            return request.not_found()
-
-        raw_data = base64.b64decode(lesson.video_file)
-        file_size = len(raw_data)
+        attachment = request.env['ir.attachment'].sudo().search([
+            ('res_model', '=', 'lms.lesson'), ('res_id', '=', lesson.id),
+            ('res_field', '=', 'video_file'),
+        ], limit=1)
+        if not attachment or not attachment.store_fname:
+            return Response('Video storage is not configured for streaming.', status=503)
+        file_path = attachment._full_path(attachment.store_fname)
+        if not os.path.isfile(file_path):
+            return Response('Video file is unavailable.', status=503)
+        file_size = attachment.file_size
         range_header = request.httprequest.headers.get('Range')
-
+        start, end = 0, file_size - 1
+        status = 200
         if range_header:
-            match = re.search(r'bytes=(\d+)-(\d*)', range_header)
-            if match:
+            match = re.fullmatch(r'bytes=(\d*)-(\d*)', range_header.strip())
+            if not match or not any(match.groups()):
+                return Response(status=416, headers=[('Content-Range', f'bytes */{file_size}')])
+            if match.group(1):
                 start = int(match.group(1))
                 end = int(match.group(2)) if match.group(2) else file_size - 1
-                length = end - start + 1
-                chunk = raw_data[start:end + 1]
-
-                headers = [
-                    ('Content-Type', 'video/mp4'),
-                    ('Content-Range', f'bytes {start}-{end}/{file_size}'),
-                    ('Accept-Ranges', 'bytes'),
-                    ('Content-Length', str(length)),
-                ]
-                return Response(chunk, status=206, headers=headers)
-
+            else:
+                suffix = int(match.group(2))
+                start = max(0, file_size - suffix)
+            if (not match.group(1) and not int(match.group(2))) or start >= file_size or end < start:
+                return Response(status=416, headers=[('Content-Range', f'bytes */{file_size}')])
+            end = min(end, file_size - 1)
+            status = 206
+        length = max(0, end - start + 1)
+        def chunks():
+            with open(file_path, 'rb') as video:
+                video.seek(start)
+                remaining = length
+                while remaining:
+                    data = video.read(min(1024 * 1024, remaining))
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
         headers = [
-            ('Content-Type', 'video/mp4'),
-            ('Content-Length', str(file_size)),
+            ('Content-Type', attachment.mimetype or 'video/mp4'),
+            ('Content-Length', str(length)),
             ('Accept-Ranges', 'bytes'),
+            ('Cache-Control', 'private, no-store'),
         ]
-        return Response(raw_data, status=200, headers=headers)
+        if status == 206:
+            headers.append(('Content-Range', f'bytes {start}-{end}/{file_size}'))
+        return Response(chunks(), status=status, headers=headers, direct_passthrough=True)
 
-    @http.route(['/lms/video/<int:lesson_id>/manifest.m3u8'], type='http', auth='user', cors='*')
+    @http.route(['/lms/video/<int:lesson_id>/manifest.m3u8'], type='http', auth='user')
     def get_video_manifest(self, lesson_id, **kwargs):
         """
         Adaptive HLS Streaming Manifest (FR-LMS-004, FR-LMS-005, NFR Performance/Mobile).
@@ -124,45 +162,9 @@ class LmsController(http.Controller):
         if lesson.video_source_type == 'url' and lesson.video_url:
             return request.redirect(lesson.video_url)
 
-        if not lesson.video_file:
-            return request.not_found()
-
-        raw_data = base64.b64decode(lesson.video_file)
-        file_size = len(raw_data)
-        duration = float(lesson.video_duration_seconds or (lesson.duration_minutes * 60) or 60.0)
-        target_duration = 10
-        num_segments = max(1, int(duration // target_duration))
-        chunk_size = max(1024, file_size // num_segments)
-        seg_dur = duration / num_segments
-
-        base_url = request.httprequest.url_root.rstrip('/')
-        stream_url = f"{base_url}/lms/video/{lesson.id}/stream"
-
-        lines = [
-            "#EXTM3U",
-            "#EXT-X-VERSION:4",
-            f"#EXT-X-TARGETDURATION:{int(target_duration) + 1}",
-            "#EXT-X-MEDIA-SEQUENCE:0",
-            "#EXT-X-PLAYLIST-TYPE:VOD",
-            "#EXT-X-INDEPENDENT-SEGMENTS",
-        ]
-
-        for i in range(num_segments):
-            offset = i * chunk_size
-            length = chunk_size if i < num_segments - 1 else (file_size - offset)
-            lines.append(f"#EXTINF:{seg_dur:.2f},")
-            lines.append(f"#EXT-X-BYTERANGE:{length}@{offset}")
-            lines.append(stream_url)
-
-        lines.append("#EXT-X-ENDLIST\n")
-        manifest_content = "\n".join(lines)
-
-        headers = [
-            ('Content-Type', 'application/vnd.apple.mpegurl'),
-            ('Content-Disposition', f'inline; filename="lesson_{lesson.id}_manifest.m3u8"'),
-            ('Cache-Control', 'no-cache, no-store, must-revalidate'),
-        ]
-        return Response(manifest_content, status=200, headers=headers)
+        # An MP4 file cannot be split into arbitrary HLS byte ranges. The player
+        # uses the authenticated HTTP Range endpoint until real HLS segments exist.
+        return Response('HLS packaging is not configured; use the stream endpoint.', status=501)
 
     @http.route(['/lms/video/<int:lesson_id>/player'], type='http', auth='user', website=True)
     def render_video_player(self, lesson_id, **kwargs):
@@ -196,7 +198,6 @@ class LmsController(http.Controller):
             'user_ip': user_ip,
             'timestamp': timestamp,
             'last_position': last_pos,
-            'manifest_url': f"/lms/video/{lesson.id}/manifest.m3u8",
             'stream_url': f"/lms/video/{lesson.id}/stream",
         }
         return request.render('learning_management.lesson_video_player', values)
@@ -228,7 +229,7 @@ class LmsController(http.Controller):
                 'employee_id': request.env.user.employee_id.id,
             })
 
-        result = progress.update_progress(current_time, duration)
+        result = progress.sudo().update_progress(current_time, duration)
         return {
             'status': 'success',
             'allowed_position': result['allowed_position'],

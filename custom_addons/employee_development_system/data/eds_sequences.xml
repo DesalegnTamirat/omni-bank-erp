@@ -290,5 +290,12 @@
             <field name="company_id" eval="False"/>
         </record>
 
+        <record id="seq_eds_hotel_selection" model="ir.sequence">
+            <field name="name">Hotel Selection Sequence</field>
+            <field name="code">eds.hotel.selection</field>
+            <field name="prefix">HOT/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
     </data>
 </odoo>

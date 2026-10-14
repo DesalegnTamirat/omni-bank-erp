@@ -14,7 +14,7 @@
     <template id="report_eds_vrs_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <t t-call="web.external_layout">
+                <t t-call="employee_development_system.report_eds_brand_layout">
                     <div class="page" style="font-family: Arial, sans-serif; font-size: 9.5pt; color: #333;">
                         <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
                             <table style="width: 100%;">
@@ -127,7 +127,7 @@
                                     <tr><td><span t-esc="'[X]' if o.catering_lunch else '[ ]'"/> Buffet Lunch &amp; Soft Drinks</td></tr>
                                     <tr><td><span t-esc="'[X]' if o.catering_afternoon_tea else '[ ]'"/> Afternoon Tea/Coffee &amp; Pastries</td></tr>
                                     <tr><td><span t-esc="'[X]' if o.catering_water else '[ ]'"/> Bottled Mineral Water throughout the day</td></tr>
-                                    <tr><td><strong>Menu:</strong> <span t-field="o.menu_type"/> | <strong>Dietary:</strong> <span t-field="o.special_dietary_needs or 'Standard'"/> | <strong>Pax:</strong> <strong t-field="o.catering_count"/></td></tr>
+                                    <tr><td><strong>Menu:</strong> <span t-field="o.menu_type"/> | <strong>Dietary:</strong> <span t-esc="o.special_dietary_needs or 'Standard'"/> | <strong>Pax:</strong> <strong t-field="o.catering_count"/></td></tr>
                                 </table>
                             </div>
                             <div class="col-5">
@@ -136,7 +136,7 @@
                                     <tr><td><strong>Required:</strong> <span t-esc="'Yes' if o.accommodation_required else 'No'"/></td></tr>
                                     <tr><td><strong>Rooms Required:</strong> <span t-field="o.rooms_required"/></td></tr>
                                     <tr><td><strong>Room Nights:</strong> <span t-field="o.room_nights"/></td></tr>
-                                    <tr><td><strong>Notes:</strong> <span t-field="o.accommodation_notes or 'None'"/></td></tr>
+                                    <tr><td><strong>Notes:</strong> <span t-esc="o.accommodation_notes or 'None'"/></td></tr>
                                 </table>
                             </div>
                         </div>

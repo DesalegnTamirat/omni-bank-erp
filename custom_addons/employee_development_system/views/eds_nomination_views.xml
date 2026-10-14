@@ -182,15 +182,19 @@
             <field name="name">eds.enrollment.list</field>
             <field name="model">eds.enrollment</field>
             <field name="arch" type="xml">
-                <list string="Session Enrollments">
+                <list string="Session Participants" default_order="source_count desc,id">
                     <field name="name"/>
                     <field name="session_id"/>
                     <field name="employee_id"/>
+                    <field name="source_summary"/>
+                    <field name="source_count"/>
+                    <field name="work_unit_id"/>
                     <field name="department_id"/>
-                    <field name="nomination_id"/>
+                    <field name="job_position_id"/>
+                    <field name="replacement_employee_id" optional="hide"/>
                     <field name="waitlist_position"/>
                     <field name="enrolled_date"/>
-                    <field name="state" widget="badge"/>
+                    <field name="state" widget="badge" decoration-success="state == 'completed'" decoration-danger="state == 'absent'"/>
                 </list>
             </field>
         </record>
@@ -203,13 +207,24 @@
                     <field name="name"/>
                     <field name="employee_id"/>
                     <field name="session_id"/>
+                    <field name="work_unit_id"/>
+                    <field name="department_id"/>
+                    <field name="job_position_id"/>
+                    <filter string="Invited" name="invited" domain="[('state','=','invited')]"/>
+                    <filter string="Suggested" name="suggested" domain="[('state','=','suggested')]"/>
+                    <filter string="Declined" name="declined" domain="[('state','=','declined')]"/>
                     <filter string="Enrolled" name="enrolled" domain="[('state','=','enrolled')]"/>
                     <filter string="Waitlisted" name="waitlisted" domain="[('state','=','waitlisted')]"/>
                     <filter string="Cancelled" name="cancelled" domain="[('state','=','cancelled')]"/>
+                    <filter string="Completed" name="completed" domain="[('state','=','completed')]"/>
+                    <filter string="Absent" name="absent" domain="[('state','=','absent')]"/>
                     <separator/>
                     <group name="group_by">
                         <filter string="Session" name="g_session" context="{'group_by':'session_id'}"/>
                         <filter string="Status" name="g_state" context="{'group_by':'state'}"/>
+                        <filter string="Work Unit" name="g_work_unit" context="{'group_by':'work_unit_id'}"/>
+                        <filter string="Department" name="g_department" context="{'group_by':'department_id'}"/>
+                        <filter string="Position" name="g_position" context="{'group_by':'job_position_id'}"/>
                     </group>
                 </search>
             </field>
@@ -221,8 +236,10 @@
             <field name="arch" type="xml">
                 <form string="Session Enrollment">
                     <header>
+                        <button name="action_open_response" string="Respond / Replace" type="object"
+                                class="oe_highlight" invisible="state != 'invited'"/>
                         <button name="action_cancel" string="Cancel Enrollment" type="object"
-                                invisible="state not in ('enrolled','waitlisted')"
+                                invisible="state not in ('suggested','invited','enrolled','waitlisted')"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
@@ -232,9 +249,20 @@
                                 <field name="name" readonly="1"/>
                                 <field name="session_id"/>
                                 <field name="employee_id"/>
+                                <field name="selected" invisible="state not in ('suggested','invited')"/>
+                                <field name="source_summary" readonly="1"/>
+                                <field name="source_count" readonly="1"/>
+                                <field name="work_unit_id" readonly="1"/>
+                                <field name="department_id" readonly="1"/>
+                                <field name="job_position_id" readonly="1"/>
                             </group>
                             <group>
-                                <field name="nomination_id" readonly="1"/>
+                                <field name="course_demand_employee_id" readonly="1"/>
+                                <field name="replacement_employee_id" readonly="1"/>
+                                <field name="replaces_enrollment_id" readonly="1"/>
+                                <field name="response_note" readonly="1"/>
+                                <field name="response_date" readonly="1"/>
+                                <field name="nomination_id" readonly="1" invisible="not nomination_id"/>
                                 <field name="enrolled_date"/>
                                 <field name="waitlist_position" invisible="state != 'waitlisted'"/>
                             </group>
@@ -246,10 +274,18 @@
         </record>
 
         <record id="action_eds_enrollment" model="ir.actions.act_window">
-            <field name="name">Enrollments</field>
+            <field name="name">Session Participants</field>
             <field name="res_model">eds.enrollment</field>
             <field name="view_mode">list,form</field>
             <field name="search_view_id" ref="employee_development_system.view_eds_enrollment_search"/>
+        </record>
+        <record id="action_eds_enrollment_my" model="ir.actions.act_window">
+            <field name="name">My Training Invitations</field>
+            <field name="res_model">eds.enrollment</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_enrollment_search"/>
+            <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+            <field name="context">{'search_default_invited': 1}</field>
         </record>
 
     </data>

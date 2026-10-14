@@ -20,7 +20,7 @@
                                 </div>
                                 <div>
                                     <h3 class="mb-0 text-white font-weight-bold">Bunna Bank | Learning &amp; Development Dashboard</h3>
-                                    <span class="small text-white-50">Enterprise Talent Development &amp; Training Analytics</span>
+                                    <span class="small text-white-50">Reporting year <field name="reporting_year"/> · <field name="reporting_company"/> · figures update when opened</span>
                                 </div>
                             </div>
                             <div class="text-end">
@@ -45,7 +45,7 @@
                                 <div class="col-md-3">
                                     <div class="card shadow-sm border-0 h-100 p-3 bg-white">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="text-muted small text-uppercase font-weight-bold">Total TNA Needs</span>
+                                            <span class="text-muted small text-uppercase font-weight-bold">Submitted TNA Needs</span>
                                             <i class="fa fa-pencil-square-o text-primary fs-4"/>
                                         </div>
                                         <h2 class="mb-1 font-weight-bold text-dark"><field name="total_tna_entries"/></h2>
@@ -68,7 +68,7 @@
                                         </div>
                                         <h2 class="mb-1 font-weight-bold text-dark"><field name="budget_utilization_pct"/>%</h2>
                                         <div class="small text-muted">
-                                            Spend: <field name="total_budget_spent" widget="monetary"/> / <field name="total_budget_allocated" widget="monetary"/>
+                                            Paid spend: <field name="total_budget_spent"/> / <field name="total_budget_allocated"/> (company currency; payment-date FX)
                                         </div>
                                         <div class="mt-3">
                                             <button name="action_open_annual_plans" type="object"
@@ -104,9 +104,12 @@
                                         <div class="small text-muted">
                                             <field name="total_enrolled_participants"/> Enrolled Participants
                                         </div>
+                                        <div class="small text-muted">
+                                            Based on <field name="bank_attendance_records_count"/> attendance records
+                                        </div>
                                         <div class="mt-3">
                                             <button name="action_open_nominations" type="object"
-                                                    string="Review Nominations" class="btn btn-sm btn-outline-info w-100"/>
+                                                    string="View Participants" class="btn btn-sm btn-outline-info w-100"/>
                                         </div>
                                     </div>
                                 </div>
@@ -142,7 +145,7 @@
                                             <div>
                                                 <span class="text-muted small text-uppercase font-weight-bold">Kirkpatrick Level 1</span>
                                                 <h3 class="mb-0 font-weight-bold text-dark"><field name="avg_level1_satisfaction"/>%</h3>
-                                                <span class="small text-muted">Participant Reaction Average</span>
+                                                <span class="small text-muted">Submitted response average</span>
                                             </div>
                                         </div>
                                         <div class="mt-3">
@@ -159,12 +162,9 @@
                                             </div>
                                             <div>
                                                 <span class="text-muted small text-uppercase font-weight-bold">Kirkpatrick Level 2</span>
-                                                <h3 class="mb-0 font-weight-bold text-dark">+<field name="avg_level2_learning_gain"/>%</h3>
-                                                <span class="small text-muted">Pre/Post Learning Gain</span>
+                                                <h3 class="mb-0 font-weight-bold text-dark"><field name="avg_level2_learning_gain"/> pp</h3>
+                                                <span class="small text-muted">Post score minus pre score</span>
                                             </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <field name="avg_level2_learning_gain" widget="progressbar"/>
                                         </div>
                                     </div>
                                 </div>
@@ -198,12 +198,12 @@
 
                                 <div class="col-md-3">
                                     <div class="card shadow-sm border-0 h-100 p-3 bg-white">
-                                        <span class="text-muted small text-uppercase font-weight-bold">Pending Nominations</span>
+                                        <span class="text-muted small text-uppercase font-weight-bold">Pending Invitations</span>
                                         <h2 class="mb-1 font-weight-bold text-warning"><field name="pending_team_nominations"/></h2>
-                                        <span class="small text-muted">Awaiting Manager Approval</span>
+                                        <span class="small text-muted">Team members awaiting response</span>
                                         <div class="mt-3">
                                             <button name="action_open_nominations" type="object"
-                                                    string="Approve Nominations" class="btn btn-sm btn-outline-warning w-100"/>
+                                                    string="Review Invitations" class="btn btn-sm btn-outline-warning w-100"/>
                                         </div>
                                     </div>
                                 </div>
@@ -224,7 +224,10 @@
                                     <div class="card shadow-sm border-0 h-100 p-3 bg-white">
                                         <span class="text-muted small text-uppercase font-weight-bold">Team Attendance</span>
                                         <h2 class="mb-1 font-weight-bold text-success"><field name="team_avg_attendance"/>%</h2>
-                                        <span class="small text-muted"><field name="team_certificates_count"/> Certificates Earned</span>
+                                        <span class="small text-muted">
+                                            Based on <field name="team_attendance_records_count"/> attendance records
+                                        </span>
+                                        <div class="small text-muted"><field name="team_certificates_count"/> Certificates Earned</div>
                                         <div class="mt-3">
                                             <button name="action_open_idps" type="object"
                                                     string="Review Team IDP Plans" class="btn btn-sm btn-outline-success w-100"/>
@@ -254,7 +257,7 @@
                                         <span class="small text-success font-weight-bold"><field name="my_approved_needs_count"/> Approved</span>
                                         <div class="mt-3">
                                             <button name="action_open_tna_entries" type="object"
-                                                    string="My Submissions" class="btn btn-sm btn-outline-primary w-100"/>
+                                                    string="My Training Needs" class="btn btn-sm btn-outline-primary w-100"/>
                                         </div>
                                     </div>
                                 </div>
@@ -263,7 +266,7 @@
                                     <div class="card shadow-sm border-0 h-100 p-3 bg-white">
                                         <span class="text-muted small text-uppercase font-weight-bold">Enrolled Sessions</span>
                                         <h2 class="mb-1 font-weight-bold text-dark"><field name="my_enrolled_sessions_count"/></h2>
-                                        <span class="small text-muted"><field name="my_attended_hours"/> Hours Completed</span>
+                                        <span class="small text-muted"><field name="my_attended_hours"/> Hours Recorded</span>
                                         <div class="mt-3">
                                             <button name="action_open_sessions" type="object"
                                                     string="My Sessions" class="btn btn-sm btn-outline-success w-100"/>
@@ -275,7 +278,9 @@
                                     <div class="card shadow-sm border-0 h-100 p-3 bg-white">
                                         <span class="text-muted small text-uppercase font-weight-bold">My Attendance Rate</span>
                                         <h2 class="mb-1 font-weight-bold text-dark"><field name="my_attendance_rate"/>%</h2>
-                                        <span class="small text-muted">Minimum 80% Required</span>
+                                        <span class="small text-muted">
+                                            Based on <field name="my_attendance_records_count"/> attendance records
+                                        </span>
                                         <div class="mt-2">
                                             <field name="my_attendance_rate" widget="progressbar"/>
                                         </div>

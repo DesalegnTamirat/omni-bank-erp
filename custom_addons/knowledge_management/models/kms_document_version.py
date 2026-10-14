@@ -10,7 +10,10 @@ class KmsDocumentVersion(models.Model):
 
     document_id = fields.Many2one('kms.document', string='Governed Document', required=True, ondelete='cascade', index=True)
     version_number = fields.Char(string='Version Number', required=True)
-    file_data = fields.Binary(string='Archived Document File', attachment=True, required=True)
+    file_data = fields.Binary(
+        string='Archived Document File', attachment=True, required=True,
+        groups='knowledge_management.group_kms_contributor',
+    )
     file_name = fields.Char(string='Filename')
     effective_date = fields.Date(string='Effective Date')
     change_summary = fields.Text(string='Revision Summary', required=True)

@@ -23,7 +23,7 @@
         <!-- 1. PLANNING & TNA                                             -->
         <!-- ══════════════════════════════════════════════════════════════ -->
         <menuitem id="menu_eds_planning"
-                  name="Planning &amp; TNA"
+                  name="Training Needs &amp; Plans"
                   parent="menu_eds_root"
                   sequence="10"
                   groups="employee_development_system.group_eds_employee"/>
@@ -39,6 +39,12 @@
                   parent="menu_eds_planning"
                   action="action_eds_tna_entry"
                   sequence="20"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_tna_work_unit_requests"
+                  name="Work Unit Requests"
+                  parent="menu_eds_planning"
+                  action="action_eds_tna_entry_work_unit"
+                  sequence="25"
                   groups="employee_development_system.group_eds_line_manager"/>
         <menuitem id="menu_eds_tna_my_submissions"
                   name="My Training Needs"
@@ -58,27 +64,38 @@
                   action="action_eds_annual_plan"
                   sequence="50"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_sourcing" name="Vendor &amp; Hotel Sourcing"
+                  parent="menu_eds_planning" sequence="55"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_course_vendor_selection"
+                  name="Local Training Vendors" parent="menu_eds_sourcing"
+                  action="action_eds_local_vendor_selection" sequence="10"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_international_vendors"
+                  name="International Training Vendors" parent="menu_eds_sourcing"
+                  action="action_eds_international_vendor_selection" sequence="20"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_local_hotels"
+                  name="Local Hotels" parent="menu_eds_sourcing"
+                  action="action_eds_local_hotel_selection" sequence="30"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_international_hotels"
+                  name="International Hotels" parent="menu_eds_sourcing"
+                  action="action_eds_international_hotel_selection" sequence="40"
+                  groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_budgets"
                   name="Annual L&amp;D Budgets"
                   parent="menu_eds_planning"
                   action="action_eds_budget"
                   sequence="60"
                   groups="employee_development_system.group_eds_officer"/>
-        <menuitem id="menu_eds_template_import"
-                  name="Import L&amp;D Templates"
-                  parent="menu_eds_planning"
-                  action="action_eds_template_import_wizard"
-                  sequence="70"
-                  groups="employee_development_system.group_eds_officer"/>
-
-
         <!-- ══════════════════════════════════════════════════════════════ -->
         <!-- 2. COURSES & CURRICULA                                        -->
         <!-- ══════════════════════════════════════════════════════════════ -->
         <menuitem id="menu_eds_curricula_root"
                   name="Courses &amp; Curricula"
-                  parent="menu_eds_root"
-                  sequence="20"
+                  parent="menu_eds_planning"
+                  sequence="45"
                   groups="employee_development_system.group_eds_officer"/>
 
         <menuitem id="menu_eds_courses"
@@ -129,20 +146,20 @@
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_nominations"
-                  name="Nominations &amp; Rosters"
+                  name="Session Participants"
                   parent="menu_eds_delivery"
-                  action="action_eds_nomination"
+                  action="action_eds_enrollment"
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_my_nominations"
-                  name="My Nominations"
+                  name="My Training Invitations"
                   parent="menu_eds_delivery"
-                  action="action_eds_nomination_my"
+                  action="action_eds_enrollment_my"
                   sequence="40"
                   groups="employee_development_system.group_eds_employee"/>
         <menuitem id="menu_eds_unscheduled_requests"
                   name="Unscheduled Training Requests"
-                  parent="menu_eds_delivery"
+                  parent="menu_eds_planning"
                   action="action_eds_unscheduled_request"
                   sequence="50"
                   groups="employee_development_system.group_eds_officer"/>
@@ -183,8 +200,8 @@
         <!-- ══════════════════════════════════════════════════════════════ -->
         <menuitem id="menu_eds_evaluations_root"
                   name="Evaluations &amp; Certificates"
-                  parent="menu_eds_root"
-                  sequence="40"
+                  parent="menu_eds_delivery"
+                  sequence="80"
                   groups="employee_development_system.group_eds_employee"/>
 
         <menuitem id="menu_eds_level1"
@@ -193,18 +210,36 @@
                   action="action_eds_evaluation_level1"
                   sequence="10"
                   groups="employee_development_system.group_eds_officer"/>
-        <menuitem id="menu_eds_post_assessment"
-                  name="Assessment Scores (Level 2)"
+        <menuitem id="menu_eds_my_feedback"
+                  name="My Training Feedback"
                   parent="menu_eds_evaluations_root"
-                  action="action_eds_evaluation_level2"
+                  action="action_eds_evaluation_level1_own"
+                  sequence="12"
+                  groups="employee_development_system.group_eds_employee"/>
+        <menuitem id="menu_eds_post_assessment"
+                  name="Pre/Post Assessment Scores"
+                  parent="menu_eds_evaluations_root"
+                  action="action_eds_assessment"
                   sequence="20"
                   groups="employee_development_system.group_eds_trainer"/>
+        <menuitem id="menu_eds_level2_learning_gain"
+                  name="Learning Gain (Level 2)"
+                  parent="menu_eds_evaluations_root"
+                  action="action_eds_evaluation_level2"
+                  sequence="25"
+                  groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_level3"
                   name="Behavior Application (Level 3)"
                   parent="menu_eds_evaluations_root"
                   action="action_eds_evaluation_level3"
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_my_team_reviews"
+                  name="My Team Behavior Reviews"
+                  parent="menu_eds_evaluations_root"
+                  action="action_eds_evaluation_level3_assigned"
+                  sequence="32"
+                  groups="employee_development_system.group_eds_line_manager"/>
         <menuitem id="menu_eds_level4"
                   name="Business Results &amp; ROI (Level 4)"
                   parent="menu_eds_evaluations_root"
@@ -334,6 +369,12 @@
                   action="action_eds_configuration"
                   sequence="10"
                   groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_template_import"
+                  name="Import L&amp;D Templates"
+                  parent="menu_eds_configuration_root"
+                  action="action_eds_template_import_wizard"
+                  sequence="15"
+                  groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_tna_priority_rules"
                   name="TNA Priority Rules"
                   parent="menu_eds_configuration_root"
@@ -353,10 +394,16 @@
                   sequence="40"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_trainers"
-                  name="Trainer Directory"
+                  name="Internal ToT Trainers"
                   parent="menu_eds_configuration_root"
-                  action="action_eds_trainer"
+                  action="action_eds_internal_trainer"
                   sequence="50"
+                  groups="employee_development_system.group_eds_officer"/>
+        <menuitem id="menu_eds_external_trainers"
+                  name="External Trainers"
+                  parent="menu_eds_configuration_root"
+                  action="action_eds_external_trainer"
+                  sequence="55"
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_providers"
                   name="Training Providers"
@@ -366,7 +413,7 @@
                   groups="employee_development_system.group_eds_officer"/>
         <menuitem id="menu_eds_provider_appraisals"
                   name="Provider Appraisals (EDS-F-13)"
-                  parent="menu_eds_configuration_root"
+                  parent="menu_eds_delivery"
                   action="action_eds_provider_performance_appraisal"
                   sequence="65"
                   groups="employee_development_system.group_eds_officer"/>
@@ -382,6 +429,20 @@
                   action="action_eds_lms_routing"
                   sequence="80"
                   groups="employee_development_system.group_eds_admin"/>
+
+        <!-- Retain XML IDs and existing bookmarks while hiding duplicate routes. -->
+        <record id="menu_eds_dashboard" model="ir.ui.menu">
+            <field name="active" eval="False"/>
+        </record>
+        <record id="menu_eds_tna_consolidations" model="ir.ui.menu">
+            <field name="active" eval="False"/>
+        </record>
+        <record id="menu_eds_delivery_certificates" model="ir.ui.menu">
+            <field name="active" eval="False"/>
+        </record>
+        <record id="menu_eds_my_certificates_delivery" model="ir.ui.menu">
+            <field name="active" eval="False"/>
+        </record>
 
     </data>
 </odoo>

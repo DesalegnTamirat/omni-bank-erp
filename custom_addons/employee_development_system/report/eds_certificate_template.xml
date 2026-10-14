@@ -3,6 +3,17 @@
     <template id="report_eds_certificate_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
+                <t t-set="is_preview" t-value="o._name != 'eds.certificate'"/>
+                <t t-set="session" t-value="o if o._name == 'eds.session' else (o.session_id if o._name == 'eds.certificate' else False)"/>
+                <t t-set="course" t-value="o if o._name == 'eds.course' else (o.course_id if o._name == 'eds.certificate' else o.course_id)"/>
+                <t t-set="employee_name" t-value="o.employee_id.name if not is_preview else 'SAMPLE EMPLOYEE NAME'"/>
+                <t t-set="course_name" t-value="(course and course.name) or (session and session.program_name) or 'Training Program'"/>
+                <t t-set="dates_text" t-value="o.training_dates_text if not is_preview else ((str(session.date_start.date()) + ' to ' + str(session.date_end.date())) if session and session.date_start and session.date_end else 'TRAINING DATES')"/>
+                <t t-set="certificate_title" t-value="o.certificate_title or (course and course.certificate_title) or 'CERTIFICATE OF PARTICIPATION'"/>
+                <t t-set="body_template" t-value="o.certificate_body_text or (course and course.certificate_body_text) or 'For completing the training titled {course_name} conducted from {dates_text}.'"/>
+                <t t-set="body_text" t-value="body_template.replace('{employee_name}', employee_name).replace('{course_name}', course_name).replace('{dates_text}', dates_text)"/>
+                <t t-set="signatory_name" t-value="(o.signatory_name if not is_preview else o.certificate_signatory_name) or (course and course.certificate_signatory_name) or 'Director, PPDD'"/>
+                <t t-set="signatory_title" t-value="(o.signatory_title if not is_preview else o.certificate_signatory_title) or (course and course.certificate_signatory_title) or 'Director, People Performance &amp; Development'"/>
                 <div class="article" style="page-break-after: always; margin: 0; padding: 0; font-family: 'DejaVu Serif', 'Georgia', serif; background-color: #ffffff;">
                     <style>
                         @page {
@@ -12,8 +23,7 @@
                         .cert-wrapper {
                             position: relative;
                             width: 100%;
-                            height: 100vh;
-                            min-height: 680px;
+                            height: 245mm;
                             box-sizing: border-box;
                             text-align: center;
                             background-image: url('/employee_development_system/static/src/img/eds_certificate_bg.png');
@@ -30,6 +40,20 @@
                             font-size: 14px;
                             font-weight: bold;
                             color: #1a1a1a;
+                        }
+                        .cert-heading {
+                            position: absolute;
+                            top: 65px;
+                            left: 22%;
+                            width: 56%;
+                            height: 135px;
+                            padding: 70px 0 0;
+                            box-sizing: border-box;
+                            background: #f8f8fa;
+                            color: #1e1e1e;
+                            font-size: 19px;
+                            font-weight: bold;
+                            text-transform: uppercase;
                         }
                         .cert-subtitle {
                             margin-top: 175px;
@@ -53,7 +77,7 @@
                         }
                         .cert-signatures {
                             position: absolute;
-                            bottom: 120px;
+                            bottom: 205px;
                             left: 0;
                             width: 100%;
                             padding: 0 75px;
@@ -92,14 +116,15 @@
                             right: 40px;
                             font-family: 'DejaVu Sans', sans-serif;
                             font-size: 10px;
-                            color: #888888;
+                            color: #ffffff;
                         }
                     </style>
 
                     <div class="cert-wrapper">
+                        <div class="cert-heading"><span t-esc="certificate_title"/></div>
                         <!-- Certificate Number -->
                         <div class="cert-cno">
-                            CNO: <span t-esc="o.code"/>
+                            CNO: <span t-esc="o.code if not is_preview else 'PREVIEW'"/>
                         </div>
 
                         <!-- Subtitle -->
@@ -109,35 +134,42 @@
 
                         <!-- Participant Name -->
                         <div class="cert-recipient">
-                            <span t-esc="o.employee_id.name"/>
+                            <span t-esc="employee_name"/>
                         </div>
 
                         <!-- Completion Statement -->
                         <div class="cert-body">
-                            For completing the training titled “<strong t-esc="o.course_id.name or (o.session_id and o.session_id.program_name) or 'Training Program'"/>” conducted from <span t-esc="o.training_dates_text or '2026'"/>.
+                            <span t-esc="body_text"/>
                         </div>
 
                         <!-- Signatures -->
                         <div class="cert-signatures">
                             <div class="sig-block-left">
                                 <div class="sig-line"></div>
-                                <div class="sig-name">Prepared by: <span t-esc="o.prepared_by_name or 'Talent Development Specialist'"/></div>
-                                <div class="sig-title">[<span t-esc="o.prepared_by_title or 'Talent Development Specialist'"/>]</div>
+                                <div class="sig-name">Prepared by: <span t-esc="o.prepared_by_name if not is_preview else 'Talent Development Specialist'"/></div>
+                                <div class="sig-title">[<span t-esc="o.prepared_by_title if not is_preview else 'Talent Development Specialist'"/>]</div>
                             </div>
                             <div class="sig-block-right">
                                 <div class="sig-line"></div>
-                                <div class="sig-name">Approved by: <span t-esc="o.signatory_name or 'Director, PPDD'"/></div>
-                                <div class="sig-title">[<span t-esc="o.signatory_title or 'Director, People Performance &amp; Development'"/>]</div>
+                                <div class="sig-name">Approved by: <span t-esc="signatory_name"/></div>
+                                <div class="sig-title">[<span t-esc="signatory_title"/>]</div>
                             </div>
                         </div>
 
                         <!-- Verification Footer -->
-                        <div class="cert-verify-footer" t-if="o.verification_token">
+                        <div class="cert-verify-footer" t-if="not is_preview and o.verification_token">
                             Verify: <span t-esc="o.verification_url"/>
                         </div>
+                        <div class="cert-verify-footer" t-if="is_preview">PREVIEW — NOT VALID FOR CERTIFICATION</div>
                     </div>
                 </div>
             </t>
         </t>
+    </template>
+    <template id="report_eds_course_certificate_preview">
+        <t t-call="employee_development_system.report_eds_certificate_document"/>
+    </template>
+    <template id="report_eds_session_certificate_preview">
+        <t t-call="employee_development_system.report_eds_certificate_document"/>
     </template>
 </odoo>

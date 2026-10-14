@@ -36,12 +36,12 @@ class KmsCategory(models.Model):
                 rec.complete_name = rec.name
 
     def _compute_document_count(self):
-        doc_data = self.env['kms.document'].read_group(
-            [('category_id', 'in', self.ids)],
-            ['category_id'],
-            ['category_id']
+        doc_data = self.env['kms.document']._read_group(
+            domain=[('category_id', 'in', self.ids)],
+            groupby=['category_id'],
+            aggregates=['__count'],
         )
-        mapped_data = {data['category_id'][0]: data['category_id_count'] for data in doc_data}
+        mapped_data = {category.id: count for category, count in doc_data}
         for rec in self:
             rec.document_count = mapped_data.get(rec.id, 0)
 

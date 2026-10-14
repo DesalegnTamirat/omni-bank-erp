@@ -122,6 +122,20 @@ class TestLmsPhase2Gates(TransactionCase):
         session = self.LmsExamSession.browse(action['res_id'])
         self.assertEqual(session.state, 'in_progress')
         self.assertEqual(session.employee_id.id, self.learner_employee.id)
+        line = session.line_ids[:1]
+        with self.assertRaises(AccessError):
+            line.with_user(self.learner_user).write({'points_earned': 10.0})
+        other_question = self.LmsQuestion.create({
+            'name': 'Other question', 'question_text': '<p>Other</p>',
+        })
+        other_answer = self.LmsQuestionAnswer.create({
+            'question_id': other_question.id, 'answer_text': 'Unrelated answer',
+            'is_correct': True,
+        })
+        with self.assertRaises(UserError):
+            line.with_user(self.learner_user).write({
+                'selected_answer_ids': [(6, 0, [other_answer.id])],
+            })
 
     def test_05_pre_assessment_gating(self):
         """Fix 5: Course content access blocked until pre-assessment passed."""
@@ -222,6 +236,11 @@ class TestLmsPhase2Gates(TransactionCase):
             'instructor_id': self.instructor_employee.id,
             'state': 'published',
             'description': '<p>Course description</p>',
+            'has_post_assessment': False,
+        })
+        self.LmsLesson.create({
+            'name': 'Level 1 reading', 'course_id': course_a.id,
+            'lesson_type': 'text', 'html_content': '<p>Read this lesson.</p>',
         })
         course_b = self.LmsCourse.create({
             'name': 'Level 2 Course B',
@@ -277,7 +296,7 @@ class TestLmsPhase2Gates(TransactionCase):
         self.assertEqual(resp.status_code, 403)
 
         # Now complete Course A
-        enrollment_a.action_mark_completed_and_certify(90.0)
+        enrollment_a.lesson_progress_ids.mark_completed()
         self.assertEqual(enrollment_a.state, 'completed')
 
         # Course B must now be unlocked
@@ -440,6 +459,8 @@ class TestLmsPhase2Gates(TransactionCase):
             'html_content': '<p>Content</p>',
         })
         # Publish v1
+        course_v1.write({'has_post_assessment': False})
+        course_v1.with_user(self.manager_user).action_submit_for_review()
         course_v1.with_user(self.manager_user).action_publish()
         self.assertEqual(course_v1.state, 'published')
         self.assertTrue(course_v1.is_latest_version)
@@ -455,6 +476,7 @@ class TestLmsPhase2Gates(TransactionCase):
         self.assertEqual(course_v2.previous_version_id.id, course_v1.id)
 
         # Publish v2
+        course_v2.with_user(self.manager_user).action_submit_for_review()
         course_v2.with_user(self.manager_user).action_publish()
         self.assertEqual(course_v2.state, 'published')
         self.assertTrue(course_v2.is_latest_version)
@@ -495,3 +517,38 @@ class TestLmsPhase2Gates(TransactionCase):
         messages = enrollment_overdue.message_ids
         overdue_notif = messages.filtered(lambda m: "MANDATORY TRAINING OVERDUE" in (m.body or ''))
         self.assertTrue(overdue_notif, "Overdue warning message should be posted to chatter")
+
+    def test_13_direct_completion_and_video_field_access_are_blocked(self):
+        course = self.LmsCourse.create({
+            'name': 'Protected Completion Course',
+            'category_id': self.category.id,
+            'instructor_id': self.instructor_employee.id,
+            'description': '<p>Required reading</p>',
+            'state': 'published',
+            'has_post_assessment': False,
+            'issue_certificate': False,
+        })
+        lesson = self.LmsLesson.create({
+            'name': 'Required Reading', 'course_id': course.id,
+            'lesson_type': 'text', 'html_content': '<p>Read this.</p>',
+        })
+        enrollment = self.LmsEnrollment.create({
+            'employee_id': self.learner_employee.id, 'course_id': course.id,
+        })
+        with self.assertRaises(AccessError):
+            enrollment.with_user(self.learner_user).write({'state': 'completed'})
+        with self.assertRaises(UserError):
+            enrollment.with_user(self.learner_user).action_mark_completed_and_certify()
+        with self.assertRaises(AccessError):
+            enrollment.lesson_progress_ids.with_user(self.learner_user).write({'state': 'completed'})
+        video = self.LmsLesson.create({
+            'name': 'Protected Video', 'course_id': course.id,
+            'lesson_type': 'video', 'video_file': b'AA==',
+            'is_mandatory': False,
+        })
+        with self.assertRaises(AccessError):
+            video.with_user(self.learner_user).read(['video_file'])
+        enrollment.lesson_progress_ids.filtered(lambda progress: progress.lesson_id == lesson).with_user(
+            self.learner_user
+        ).mark_completed()
+        self.assertEqual(enrollment.state, 'completed')

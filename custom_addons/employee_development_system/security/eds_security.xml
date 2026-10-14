@@ -80,6 +80,65 @@
             <field name="comment">Read-only executive dashboards and learning analytics (CPCO / SMC).</field>
         </record>
 
+        <record id="rule_eds_manager_work_unit_employee_read" model="ir.rule">
+            <field name="name">EDS Work Unit Leader Employee Directory</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="domain_force">[('default_operating_unit_id', 'in', user.env['eds.hr.compat'].get_managed_operating_units().ids)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_eds_level1_employee_own" model="ir.rule">
+            <field name="name">EDS feedback: employee own</field>
+            <field name="model_id" ref="model_eds_evaluation_level1"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_employee'))]"/>
+        </record>
+        <record id="rule_eds_level1_staff" model="ir.rule">
+            <field name="name">EDS feedback: L&amp;D staff</field>
+            <field name="model_id" ref="model_eds_evaluation_level1"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_level1_line_employee_own" model="ir.rule">
+            <field name="name">EDS feedback answers: employee own</field>
+            <field name="model_id" ref="model_eds_evaluation_level1_line"/>
+            <field name="domain_force">[('evaluation_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_employee'))]"/>
+        </record>
+        <record id="rule_eds_level1_line_staff" model="ir.rule">
+            <field name="name">EDS feedback answers: L&amp;D staff</field>
+            <field name="model_id" ref="model_eds_evaluation_level1_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_level3_manager_own" model="ir.rule">
+            <field name="name">EDS behavior review: assigned manager</field>
+            <field name="model_id" ref="model_eds_evaluation_level3"/>
+            <field name="domain_force">[('manager_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_line_manager'))]"/>
+        </record>
+        <record id="rule_eds_level3_staff" model="ir.rule">
+            <field name="name">EDS behavior review: L&amp;D staff</field>
+            <field name="model_id" ref="model_eds_evaluation_level3"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_level3_line_manager_own" model="ir.rule">
+            <field name="name">EDS behavior answers: assigned manager</field>
+            <field name="model_id" ref="model_eds_evaluation_level3_line"/>
+            <field name="domain_force">[('evaluation_id.manager_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_line_manager'))]"/>
+        </record>
+        <record id="rule_eds_level3_line_staff" model="ir.rule">
+            <field name="name">EDS behavior answers: L&amp;D staff</field>
+            <field name="model_id" ref="model_eds_evaluation_level3_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_eds_officer'))]"/>
+        </record>
     </data>
 
     <!-- Record Rules -->
@@ -237,6 +296,32 @@
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
+        <record id="rule_eds_session_employee_participant" model="ir.rule">
+            <field name="name">Employee Sessions With Own Invitation</field>
+            <field name="model_id" ref="employee_development_system.model_eds_session"/>
+            <field name="domain_force">[('enrollment_ids.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_session_manager_participants" model="ir.rule">
+            <field name="name">Manager Sessions With Team Invitation</field>
+            <field name="model_id" ref="employee_development_system.model_eds_session"/>
+            <field name="domain_force">['|', ('enrollment_ids.employee_id.parent_id.user_id', '=', user.id), ('enrollment_ids.employee_id.coach_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_session_executive" model="ir.rule">
+            <field name="name">Executive Company Sessions</field>
+            <field name="model_id" ref="employee_development_system.model_eds_session"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_executive'))]"/>
+        </record>
         <record id="rule_eds_batch_staff" model="ir.rule">
             <field name="name">Batches L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_batch"/>
@@ -277,6 +362,11 @@
             <field name="name">Session Multi Company</field>
             <field name="model_id" ref="employee_development_system.model_eds_session"/>
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_cost_multi_company" model="ir.rule">
+            <field name="name">Session Costs Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_cost"/>
+            <field name="domain_force">[('session_id.company_id', 'in', company_ids)]</field>
         </record>
         <record id="rule_eds_batch_multi_company" model="ir.rule">
             <field name="name">Batch Multi Company</field>
@@ -342,6 +432,16 @@
             <field name="model_id" ref="employee_development_system.model_eds_enrollment"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_enrollment_line_manager_team" model="ir.rule">
+            <field name="name">Line Manager / Coach Team Invitations</field>
+            <field name="model_id" ref="employee_development_system.model_eds_enrollment"/>
+            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
         </record>
         <record id="rule_eds_enrollment_multi_company" model="ir.rule">
             <field name="name">Enrollment Multi Company</field>

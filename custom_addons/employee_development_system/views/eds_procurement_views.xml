@@ -651,5 +651,119 @@
             <field name="view_mode">list,form</field>
         </record>
 
+        <!-- ══════════════ Course Vendor Selection & Evaluation (Requirement 14) ══════════════ -->
+
+        <record id="view_eds_course_vendor_selection_list" model="ir.ui.view">
+            <field name="name">eds.course.vendor.selection.list</field>
+            <field name="model">eds.course.vendor.selection</field>
+            <field name="arch" type="xml">
+                <list string="Course Vendor Selections">
+                    <field name="name"/>
+                    <field name="annual_plan_id"/>
+                    <field name="program_name"/>
+                    <field name="delivery_method" widget="badge"/>
+                    <field name="currency_id"/>
+                    <field name="course_id" optional="hide"/>
+                    <field name="template_type" widget="badge"/>
+                    <field name="vendor_count" string="Bidding Vendors"/>
+                    <field name="awarded_vendor_id"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_course_vendor_selection_form" model="ir.ui.view">
+            <field name="name">eds.course.vendor.selection.form</field>
+            <field name="model">eds.course.vendor.selection</field>
+            <field name="arch" type="xml">
+                <form string="Course Vendor Selection &amp; Evaluation">
+                    <header>
+                        <button name="action_start_evaluation" string="Start Evaluation" type="object"
+                                class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_mark_awarded" string="Complete Sourcing" type="object"
+                                class="btn-success" invisible="state != 'evaluation'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,evaluation,awarded"/>
+                    </header>
+                    <sheet>
+                        <div class="alert alert-info mb-3" role="alert">
+                            <h5 class="fw-semibold mb-1"><i class="fa fa-balance-scale me-1" title="Vendor sourcing"/> Post-Plan Course Vendor Sourcing</h5>
+                            <div>Select an approved plan program. Its catalog course fills automatically when applicable. Score each vendor from 0 to 10 against the five HR matrix criteria. The technical criteria carry 70 points and require at least 40 points before the financial score counts. Upload the award letter before award and the signed contract before marking the contract signed. The winning provider fills linked sessions.</div>
+                        </div>
+                        <group>
+                            <group string="Program &amp; Plan Context">
+                                <field name="name" readonly="1" invisible="name == 'New'"/>
+                                <field name="annual_plan_id" options="{'no_create': True}"/>
+                                <field name="plan_line_id" options="{'no_create': True}" domain="[('plan_id', '=', annual_plan_id)]"/>
+                                <field name="program_name" readonly="1"/>
+                                <field name="course_id" readonly="1"/>
+                                <field name="delivery_method" readonly="1"/>
+                                <field name="awarded_vendor_id" readonly="1"/>
+                            </group>
+                            <group string="Evaluation Weighting Template">
+                                <field name="template_type"/>
+                                <field name="technical_weight" readonly="template_type != 'custom'"/>
+                                <field name="financial_weight" readonly="template_type != 'custom'"/>
+                                <field name="currency_id" options="{'no_create': True}"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Bidding Vendors &amp; Scores" name="vendors">
+                                <field name="line_ids">
+                                    <list editable="bottom">
+                                        <field name="vendor_id" options="{'no_create': True}"/>
+                                        <field name="trainer_id" optional="show" options="{'no_open': False}" domain="[('trainer_type','=','external'),('external_provider_id','=',vendor_id),('state','=','active')]"/>
+                                        <field name="vendor_name" optional="show"/>
+                                        <field name="quality_score" string="Quality /10"/>
+                                        <field name="experience_score" string="Experience /10"/>
+                                        <field name="scalability_score" string="Delivery /10"/>
+                                        <field name="demo_score" string="Demo /10"/>
+                                        <field name="price_score" string="Financial /10"/>
+                                        <field name="price_quoted" string="Quoted Price"/>
+                                        <field name="currency_id" options="{'no_create': True}"/>
+                                        <field name="technical_score" string="Tech %" readonly="1"/>
+                                        <field name="technical_threshold_met" string="Technical Gate" readonly="1"/>
+                                        <field name="financial_score" string="Financial %" readonly="1" optional="hide"/>
+                                        <field name="total_score" string="Total Weighted Score" class="fw-bold text-primary"/>
+                                        <field name="status" widget="badge" readonly="1" decoration-success="status in ('awarded', 'contract')" decoration-danger="status == 'rejected'"/>
+                                        <field name="award_attachment" filename="award_filename" widget="binary" string="Award Letter"/>
+                                        <field name="award_filename" column_invisible="True"/>
+                                        <field name="contract_attachment" filename="contract_filename" widget="binary" string="Signed Contract"/>
+                                        <field name="contract_filename" column_invisible="True"/>
+                                        <button name="action_award" string="Award" type="object" class="btn btn-sm btn-outline-success" invisible="status in ('awarded', 'contract') or not technical_threshold_met"/>
+                                        <button name="action_contract" string="Sign Contract" type="object" class="btn btn-sm btn-outline-primary" invisible="status != 'awarded'"/>
+                                        <button name="action_reject" string="Reject" type="object" class="btn btn-sm btn-outline-danger" invisible="status == 'rejected'"/>
+                                        <field name="notes" optional="hide"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Sourcing Objectives &amp; Notes">
+                                <field name="notes" placeholder="Describe the sourcing strategy, objectives, or provider requirements..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_course_vendor_selection" model="ir.actions.act_window">
+            <field name="name">Course Vendor Selection</field>
+            <field name="res_model">eds.course.vendor.selection</field>
+            <field name="view_mode">list,form</field>
+        </record>
+        <record id="action_eds_local_vendor_selection" model="ir.actions.act_window">
+            <field name="name">Local Training Providers</field>
+            <field name="res_model">eds.course.vendor.selection</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('delivery_method','=','local_external')]</field>
+        </record>
+        <record id="action_eds_international_vendor_selection" model="ir.actions.act_window">
+            <field name="name">International Training Providers</field>
+            <field name="res_model">eds.course.vendor.selection</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('delivery_method','=','international')]</field>
+        </record>
+
     </data>
 </odoo>

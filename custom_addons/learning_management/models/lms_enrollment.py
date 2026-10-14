@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from markupsafe import Markup, escape
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 class LmsEnrollment(models.Model):
@@ -144,6 +144,11 @@ class LmsEnrollment(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+            if any(set(vals) & {'state', 'completion_date', 'post_assessment_passed',
+                                'pre_assessment_passed', 'final_score_percentage', 'certificate_id'}
+                   for vals in vals_list):
+                raise AccessError(_('Learners cannot set enrollment completion fields.'))
         records = super(LmsEnrollment, self).create(vals_list)
         todo_activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
         for rec in records:
@@ -181,6 +186,15 @@ class LmsEnrollment(models.Model):
                     user_id=rec.user_id.id,
                 )
         return records
+
+    def write(self, vals):
+        protected = {'state', 'completion_date', 'post_assessment_passed',
+                     'pre_assessment_passed', 'final_score_percentage', 'certificate_id',
+                     'threshold_50_notified', 'threshold_100_notified'}
+        if (protected.intersection(vals) and not self.env.su
+                and not self.env.user.has_group('learning_management.group_lms_manager')):
+            raise AccessError(_('Learners cannot alter enrollment completion fields.'))
+        return super().write(vals)
 
     def _initialize_lesson_progress(self):
         """Pre-populates lesson progress entries for each lesson in the course."""
@@ -237,35 +251,78 @@ class LmsEnrollment(models.Model):
             if rec.course_id.has_pre_assessment and not rec.pre_assessment_passed:
                 raise UserError(_("You must pass the pre-assessment before accessing course content."))
             if rec.state == 'enrolled':
-                rec.write({'state': 'in_progress'})
+                rec.sudo().write({'state': 'in_progress'})
 
     def action_mark_completed_and_certify(self, score_pct=100.0):
         """Invoked when learner completes all lessons and passes post-assessment."""
         for rec in self:
+            if rec.state == 'completed':
+                continue
+            if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+                if rec.employee_id != self.env.user.employee_id:
+                    raise AccessError(_('You may only complete your own enrollment.'))
+            if rec.course_id.state != 'published':
+                raise UserError(_('Only published courses can be completed.'))
+            if rec.state == 'failed' or rec.is_locked:
+                raise UserError(_('This enrollment cannot be completed in its current state.'))
+            if rec.course_id.has_pre_assessment and not rec.pre_assessment_passed:
+                raise UserError(_('The pre-course assessment must be passed first.'))
+            required = rec.course_id.lesson_ids.filtered('is_mandatory')
+            completed = rec.lesson_progress_ids.filtered(
+                lambda p: p.state == 'completed' and p.lesson_id in required
+            ).mapped('lesson_id')
+            if not rec.lesson_progress_ids.filtered(lambda p: p.state == 'completed'):
+                raise UserError(_('Complete a course lesson before certification.'))
+            if required - completed:
+                raise UserError(_('Complete all mandatory lessons before certification.'))
+            if rec.course_id.has_post_assessment:
+                assessment = rec.course_id.post_assessment_id
+                exam_domain = [
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('enrollment_id', '=', rec.id),
+                    ('assessment_id.course_id', '=', rec.course_id.id),
+                    ('assessment_id.assessment_type', '=', 'post_course'),
+                    ('state', '=', 'passed'),
+                ]
+                if assessment:
+                    exam_domain.append(('assessment_id', '=', assessment.id))
+                passed_exam = self.env['lms.exam.session'].sudo().search(
+                    exam_domain, order='end_time desc, id desc', limit=1
+                )
+                if not passed_exam:
+                    raise UserError(_('Pass the post-course assessment before certification.'))
+                score_pct = passed_exam.score_percentage
+            else:
+                score_pct = 100.0
             today = fields.Date.context_today(self)
-            rec.write({
+            rec.sudo().write({
                 'state': 'completed',
                 'completion_date': today,
                 'final_score_percentage': score_pct,
                 'post_assessment_passed': True,
             })
             self.env['lms.enrollment'].invalidate_model(['is_locked'])
-            rec._check_progress_milestones()
+            rec.sudo()._check_progress_milestones()
             rec.message_post(body=_('Course completed successfully with score of %.1f%%.') % score_pct)
 
             # Issue Certificate (FR-LMS-018)
             if rec.course_id.issue_certificate and not rec.certificate_id:
-                cert = self.env['lms.certificate'].issue_certificate(rec, score_pct)
-                rec.write({'certificate_id': cert.id})
+                cert = self.env['lms.certificate'].sudo().issue_certificate(rec.sudo(), score_pct)
+                rec.sudo().write({'certificate_id': cert.id})
 
             # Award Gamification Points (FR-REC-001)
             if rec.employee_id and rec.employee_id.user_id:
-                self.env['lms.gamification.point'].award_points(
+                self.env['lms.gamification.point'].sudo().award_points(
                     rec.employee_id.user_id,
                     points=50 if score_pct >= 90 else 30,
                     source='course_complete',
                     description=f'Completed course: {rec.course_id.name} ({score_pct:.1f}%)'
                 )
+            if self.env.registry.get('eds.lms.routing'):
+                routings = self.env['eds.lms.routing'].sudo().search([
+                    ('lms_ref', '=', str(rec.course_id.id)), ('sync_state', '=', 'synced'),
+                ])
+                routings.action_reconcile_lms()
 
     @api.model
     def cron_send_overdue_reminders(self):
@@ -354,6 +411,7 @@ class LmsLessonProgress(models.Model):
     max_watched_seconds = fields.Integer(string='Max Legitimate Watched Second', default=0)
     last_position_seconds = fields.Integer(string='Resume Timestamp (Seconds)', default=0)
     total_seconds_watched = fields.Integer(string='Cumulative Time Spent (Seconds)', default=0)
+    last_heartbeat_at = fields.Datetime(string='Last Video Heartbeat', copy=False)
     watch_percentage = fields.Float(string='Watched %', compute='_compute_watch_percentage', store=True)
 
     date_completed = fields.Datetime(string='Completion Timestamp', readonly=True)
@@ -362,6 +420,21 @@ class LmsLessonProgress(models.Model):
         'UNIQUE(enrollment_id, lesson_id)',
         'Lesson progress record must be unique per enrollment!'
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+            raise AccessError(_('Lesson progress is created by enrollment only.'))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        protected = {'state', 'employee_id', 'enrollment_id', 'lesson_id',
+                     'max_watched_seconds', 'last_position_seconds',
+                     'total_seconds_watched', 'last_heartbeat_at', 'date_completed'}
+        if (protected.intersection(vals) and not self.env.su
+                and not self.env.user.has_group('learning_management.group_lms_manager')):
+            raise AccessError(_('Lesson progress is updated by the learning workflow only.'))
+        return super().write(vals)
 
     @api.depends('max_watched_seconds', 'lesson_id.video_duration_seconds')
     def _compute_watch_percentage(self):
@@ -379,22 +452,25 @@ class LmsLessonProgress(models.Model):
         """
         self.ensure_one()
         auth_duration = self.lesson_id.video_duration_seconds or 600
-        tolerance = 5  # Allow small buffer for player clock drift
-        max_valid_time = auth_duration + tolerance
-
-        # Clamp client current_time to non-negative and not exceeding nominal duration + tolerance
-        current_time = max(0, min(int(current_time), max_valid_time))
-
-        # Anti-skip guard: cannot jump more than 10 seconds ahead of max_watched_seconds
-        if current_time > self.max_watched_seconds + 10 and self.lesson_id.prevent_fast_forward:
+        try:
+            current_time = max(0, min(int(float(current_time)), auth_duration))
+        except (TypeError, ValueError, OverflowError):
+            raise UserError(_('Invalid video position.'))
+        now = fields.Datetime.now()
+        elapsed = max(0, (now - self.last_heartbeat_at).total_seconds()) if self.last_heartbeat_at else 5
+        credit = min(10, int(elapsed))
+        # The server clock, not the client playback position, bounds credited progress.
+        if current_time > self.max_watched_seconds + credit and self.lesson_id.prevent_fast_forward:
             allowed_pos = self.max_watched_seconds
         else:
             allowed_pos = current_time
             if current_time > self.max_watched_seconds:
-                self.max_watched_seconds = min(current_time, auth_duration)
+                advanced = min(current_time - self.max_watched_seconds, credit)
+                self.max_watched_seconds += advanced
+                self.total_seconds_watched += advanced
 
         self.last_position_seconds = allowed_pos
-        self.total_seconds_watched += 5
+        self.last_heartbeat_at = now
 
         if self.state == 'not_started':
             self.state = 'in_progress'
@@ -412,14 +488,33 @@ class LmsLessonProgress(models.Model):
 
     def mark_completed(self):
         for rec in self:
-            rec.write({
+            if not self.env.su and rec.employee_id != self.env.user.employee_id:
+                raise AccessError(_('You can only complete your own lessons.'))
+            if rec.lesson_id.lesson_type == 'video':
+                duration = rec.lesson_id.video_duration_seconds or 600
+                required_seconds = duration * (rec.lesson_id.min_watch_percentage or 90.0) / 100.0
+                if rec.max_watched_seconds < required_seconds:
+                    raise UserError(_('Watch the required portion of the video first.'))
+            if rec.lesson_id.lesson_type == 'quiz':
+                if not rec.lesson_id.assessment_id:
+                    raise UserError(_('Configure an assessment for this quiz lesson.'))
+                passed = self.env['lms.exam.session'].sudo().search_count([
+                    ('enrollment_id', '=', rec.enrollment_id.id),
+                    ('assessment_id', '=', rec.lesson_id.assessment_id.id),
+                    ('state', '=', 'passed'),
+                ])
+                if not passed:
+                    raise UserError(_('Pass the lesson quiz before completing it.'))
+            if rec.state == 'completed':
+                continue
+            rec.sudo().write({
                 'state': 'completed',
                 'date_completed': fields.Datetime.now()
             })
             if rec.enrollment_id.state == 'enrolled':
-                rec.enrollment_id.write({'state': 'in_progress'})
+                rec.enrollment_id.sudo().write({'state': 'in_progress'})
             # Trigger milestone checks on enrollment (50% / 100%)
-            rec.enrollment_id._check_progress_milestones()
+            rec.enrollment_id.sudo()._check_progress_milestones()
             # If all lessons completed and course has no post-assessment, certify now
             all_done = all(lp.state == 'completed' for lp in rec.enrollment_id.lesson_progress_ids)
             if all_done and not rec.enrollment_id.course_id.has_post_assessment:

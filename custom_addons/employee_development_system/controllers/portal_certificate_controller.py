@@ -30,7 +30,7 @@ class PortalCertificateController(http.Controller):
         """Secure download endpoint for PDF or PNG certificate assets."""
         user = request.env.user
         cert = request.env['eds.certificate'].sudo().browse(cert_id)
-        if not cert.exists():
+        if not cert.exists() or cert.state != 'issued' or file_type not in ('pdf', 'image'):
             return request.not_found()
 
         # Security check: User must own the certificate or belong to EDS Officer/Manager/Admin/Executive group
@@ -40,7 +40,8 @@ class PortalCertificateController(http.Controller):
         is_admin = user.has_group('employee_development_system.group_eds_admin')
         is_executive = user.has_group('employee_development_system.group_eds_executive')
 
-        if not (is_owner or is_officer or is_manager or is_admin or is_executive):
+        same_company = cert.employee_id.company_id in user.company_ids
+        if not same_company or not (is_owner or is_officer or is_manager or is_admin or is_executive):
             raise AccessError(_("You are not authorized to download this certificate."))
 
         if file_type == 'image':

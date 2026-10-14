@@ -225,13 +225,15 @@ class EdsTemplateImportWizard(models.TransientModel):
                 'competency_id': comp.id if comp else False,
                 'target_audience': audience,
                 'target_participant_count': pax_int,
+                'template_participant_count': pax_int,
+                'request_level': 'work_unit',
                 'competency_level': req_level,
                 'urgency': urgency,
                 'delivery_mode': delivery_mode,
                 'quarter': quarter,
                 'hr_target_quarter': quarter,
                 'justification': remark or f"TNA requirement for {work_unit_name}",
-                'state': 'submitted',
+                'state': 'draft',
             }
             TnaEntry.create(vals)
             created += 1

@@ -111,7 +111,10 @@ class KmsDocument(models.Model):
     change_summary = fields.Text(string='Revision Notes / Changelog')
 
     # Document File & Full-Text Content
-    file_data = fields.Binary(string='Document File', attachment=True)
+    file_data = fields.Binary(
+        string='Document File', attachment=True,
+        groups='knowledge_management.group_kms_contributor',
+    )
     file_name = fields.Char(string='Filename')
     file_size = fields.Integer(string='File Size (Bytes)', compute='_compute_file_metadata', store=True)
     mimetype = fields.Char(string='MIME Type', compute='_compute_file_metadata', store=True)
@@ -163,6 +166,8 @@ class KmsDocument(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get('state', 'draft') != 'draft' and not self.env.su:
+                raise AccessError(_('New documents must start as drafts.'))
             if vals.get('code', _('New')) == _('New'):
                 vals['code'] = self.env['ir.sequence'].next_by_code('kms.document') or _('New')
         records = super(KmsDocument, self).create(vals_list)
@@ -171,17 +176,68 @@ class KmsDocument(models.Model):
         return records
 
     def write(self, vals):
-        if 'state' in vals and vals['state'] in ('approved', 'published', 'archived'):
-            if not self.env.user.has_group('knowledge_management.group_kms_manager') and not self.env.su:
-                raise AccessError(_("Only KMS Managers can publish or archive documents."))
-        return super(KmsDocument, self).write(vals)
+        target = vals.get('state')
+        if target:
+            if target == 'approved' and self.ids:
+                self.env.cr.execute(
+                    'SELECT id FROM kms_document WHERE id IN %s ORDER BY id FOR UPDATE',
+                    (tuple(self.ids),),
+                )
+                self.invalidate_recordset(['state'])
+            if target == 'approved' and not (
+                self.env.su or self.env.user.has_group('knowledge_management.group_kms_reviewer')
+            ):
+                raise AccessError(_('Only KMS reviewers may approve documents.'))
+            if target == 'archived' and not (
+                self.env.su or self.env.user.has_group('knowledge_management.group_kms_manager')
+            ):
+                raise AccessError(_('Only KMS managers may archive documents.'))
+            allowed = {
+                'draft': {'review'}, 'review': {'draft', 'approved'},
+                'approved': {'review', 'archived'}, 'archived': set(),
+            }
+            for rec in self:
+                if target != rec.state and target not in allowed.get(rec.state, set()):
+                    raise UserError(_('Invalid document transition: %s to %s.') % (rec.state, target))
+                if target == 'approved' and not rec.sudo().file_data:
+                    raise UserError(_('A document file is required for approval.'))
+            if target == 'approved':
+                vals = dict(vals, date_approved=vals.get('date_approved') or fields.Datetime.now(),
+                            is_latest_version=True)
+            elif target == 'archived':
+                vals = dict(vals, is_latest_version=False)
+        result = super(KmsDocument, self).write(vals)
+        if target == 'approved':
+            for rec in self:
+                if not self.env['kms.document.version'].sudo().search_count([
+                    ('document_id', '=', rec.id), ('version_number', '=', rec.version),
+                ]):
+                    self.env['kms.document.version'].sudo().create({
+                        'document_id': rec.id, 'version_number': rec.version,
+                        'file_data': rec.sudo().file_data, 'file_name': rec.file_name,
+                        'effective_date': rec.effective_date,
+                        'change_summary': rec.change_summary or _('Initial approval'),
+                        'approved_by_id': self.env.user.employee_id.id or False,
+                    })
+                if rec.previous_version_id and rec.previous_version_id.state == 'approved':
+                    rec.previous_version_id.sudo().write({
+                        'state': 'archived', 'is_latest_version': False,
+                    })
+        return result
 
     @api.depends('file_data', 'file_name')
     def _compute_file_metadata(self):
+        persisted_ids = [rec.id for rec in self if isinstance(rec.id, int)]
+        attachments = self.env['ir.attachment'].sudo().search([
+            ('res_model', '=', 'kms.document'), ('res_id', 'in', persisted_ids),
+            ('res_field', '=', 'file_data'),
+        ]) if persisted_ids else self.env['ir.attachment'].browse()
+        sizes = {attachment.res_id: attachment.file_size for attachment in attachments}
         for rec in self:
-            if rec.file_data:
-                raw = base64.b64decode(rec.file_data)
-                rec.file_size = len(raw)
+            encoded = rec.sudo().file_data if rec.id not in sizes else False
+            has_file = rec.id in sizes or bool(encoded)
+            if has_file:
+                rec.file_size = sizes[rec.id] if rec.id in sizes else len(base64.b64decode(encoded))
                 fname = (rec.file_name or '').lower()
                 if fname.endswith('.pdf'):
                     rec.mimetype = 'application/pdf'
@@ -242,6 +298,8 @@ class KmsDocument(models.Model):
     # Lifecycle Actions
     def action_submit_for_review(self):
         for rec in self:
+            if rec.state != 'draft':
+                raise UserError(_('Only draft documents can be submitted.'))
             if not rec.file_data:
                 raise UserError(_('Cannot submit a document without an uploaded file.'))
             rec.write({'state': 'review'})
@@ -271,23 +329,12 @@ class KmsDocument(models.Model):
 
     def action_approve(self):
         for rec in self:
-            # Snapshot previous version if this is an update
-            if rec.version_ids:
-                pass  # Version snapshots already managed
+            if rec.state != 'review':
+                raise UserError(_('Only documents under review can be approved.'))
             rec.write({
                 'state': 'approved',
                 'date_approved': fields.Datetime.now(),
                 'is_latest_version': True
-            })
-            # Create a snapshot in kms.document.version
-            self.env['kms.document.version'].create({
-                'document_id': rec.id,
-                'version_number': rec.version,
-                'file_data': rec.file_data,
-                'file_name': rec.file_name,
-                'effective_date': rec.effective_date,
-                'change_summary': rec.change_summary or _('Initial approval'),
-                'approved_by_id': self.env.user.employee_id.id if self.env.user.employee_id else False,
             })
             action_link = f"/web#id={rec.id}&model=kms.document"
             msg_text = _('Document %s (%s) approved and published to the active repository.') % (rec.name, rec.code)
@@ -312,6 +359,8 @@ class KmsDocument(models.Model):
 
     def action_reject(self):
         for rec in self:
+            if rec.state != 'review':
+                raise UserError(_('Only documents under review can be returned to draft.'))
             rec.write({'state': 'draft'})
             action_link = f"/web#id={rec.id}&model=kms.document"
             msg_text = _('Document %s (%s) rejected and returned to draft.') % (rec.name, rec.code)
@@ -328,6 +377,8 @@ class KmsDocument(models.Model):
 
     def action_archive(self):
         for rec in self:
+            if rec.state != 'approved':
+                raise UserError(_('Only approved documents can be archived.'))
             rec.write({'state': 'archived', 'is_latest_version': False})
             rec.message_post(body=_('Document archived and superseded.'))
             rec._log_audit_action('archive', 'Document archived')
@@ -335,6 +386,8 @@ class KmsDocument(models.Model):
     def action_create_new_version(self):
         """Creates a revision draft with incremented version number (FR-KMS-004)."""
         self.ensure_one()
+        if self.state != 'approved':
+            raise UserError(_('Only approved documents can be revised.'))
         current_ver = self.version or '1.0'
         try:
             parts = current_ver.split('.')
@@ -378,7 +431,7 @@ class KmsDocument(models.Model):
     def action_download_watermarked(self):
         """Action handler that triggers download through secure watermarked controller."""
         self.ensure_one()
-        if not self.file_data:
+        if not self.sudo().file_data:
             raise UserError(_('No file is attached to this document.'))
 
         # Check view-only security
@@ -391,17 +444,13 @@ class KmsDocument(models.Model):
             if not any(g in user_groups for g in self.allowed_download_group_ids) and not self.env.user.has_group('knowledge_management.group_kms_manager'):
                 raise AccessError(_('Your assigned role does not have download permissions for this document.'))
 
-        # Log audit record
-        self._log_audit_action('download', 'Document downloaded by user')
-        self.sudo().write({'download_count': self.download_count + 1})
-
         return {
             'type': 'ir.actions.act_url',
             'url': f'/kms/document/{self.id}/download',
             'target': 'self',
         }
 
-    def _log_audit_action(self, action_type, details=None):
+    def _log_audit_action(self, action_type, details=None, strict=False):
         for rec in self:
             try:
                 emp = self.env.user.employee_id
@@ -416,6 +465,8 @@ class KmsDocument(models.Model):
                 })
             except Exception as e:
                 _logger.warning("Could not log KMS audit entry: %s", e)
+                if strict:
+                    raise
 
     def init(self):
         super().init()
@@ -431,12 +482,13 @@ class KmsDocument(models.Model):
         if not query:
             return []
         try:
-            self.env.cr.execute("""
-                SELECT id FROM kms_document
-                WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
-                      @@ websearch_to_tsquery('english', %s)
-            """, (query,))
-            ids = [r[0] for r in self.env.cr.fetchall()]
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    SELECT id FROM kms_document
+                    WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
+                          @@ websearch_to_tsquery('english', %s)
+                """, (query,))
+                ids = [r[0] for r in self.env.cr.fetchall()]
         except Exception:
             self.env.cr.execute("""
                 SELECT id FROM kms_document
@@ -469,8 +521,9 @@ class KmsDocument(models.Model):
                 ORDER BY rank DESC, id DESC
                 LIMIT %s
             """
-            self.env.cr.execute(sql, (q, q, limit))
-            rows = self.env.cr.fetchall()
+            with self.env.cr.savepoint():
+                self.env.cr.execute(sql, (q, q, limit))
+                rows = self.env.cr.fetchall()
         except Exception:
             sql_fallback = """
                 SELECT id, ts_rank(

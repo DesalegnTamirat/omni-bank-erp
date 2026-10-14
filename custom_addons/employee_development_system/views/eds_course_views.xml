@@ -13,11 +13,10 @@
                     <field name="name"/>
                     <field name="program_category" optional="show"/>
                     <field name="target_audience" optional="show"/>
-                    <field name="delivery_place" optional="hide"/>
                     <field name="category" widget="badge"/>
                     <field name="competency_count" string="Competencies"/>
                     <field name="target_pillar_summary" optional="show"/>
-                    <field name="delivery_method"/>
+                    <field name="recommended_source" string="Suggested Source" optional="hide"/>
                     <field name="duration_days"/>
                     <field name="version"/>
                     <field name="current_curriculum_id"/>
@@ -40,7 +39,7 @@
                     <group name="group_by">
                         <filter string="Category" name="group_category" context="{'group_by':'category'}"/>
                         <filter string="Status" name="group_status" context="{'group_by':'status'}"/>
-                        <filter string="Delivery Method" name="group_delivery" context="{'group_by':'delivery_method'}"/>
+                        <filter string="Suggested Source" name="group_delivery" context="{'group_by':'recommended_source'}"/>
                     </group>
                 </search>
             </field>
@@ -111,6 +110,33 @@
             </field>
         </record>
 
+        <record id="view_eds_course_pms_line_form" model="ir.ui.view">
+            <field name="name">eds.course.pms.line.form</field>
+            <field name="model">eds.course.pms.line</field>
+            <field name="arch" type="xml">
+                <form string="PMS Individual Measurement Mapping">
+                    <sheet>
+                        <group>
+                            <group string="Measurement Details">
+                                <field name="job_measure_id"/>
+                                <field name="job_objective_id"/>
+                                <field name="job_id"/>
+                                <field name="operating_unit_id"/>
+                            </group>
+                            <group string="Trigger &amp; Weight">
+                                <field name="target_type"/>
+                                <field name="min_threshold"/>
+                                <field name="weight_pct"/>
+                            </group>
+                        </group>
+                        <group string="Developmental Scope &amp; Notes">
+                            <field name="notes" placeholder="Specify gap triggers and development focus for this metric..."/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
         <record id="view_eds_course_form" model="ir.ui.view">
             <field name="name">eds.course.form</field>
             <field name="model">eds.course</field>
@@ -137,16 +163,13 @@
                     </header>
                     <sheet>
                         <div class="oe_button_box" colspan="2">
-                            <button class="oe_stat_button" icon="fa-bookmark">
-                                <field name="competency_count" widget="statinfo" string="Competencies"/>
-                            </button>
-                            <button name="%(employee_development_system.action_eds_curriculum)d"
-                                     type="action" class="oe_stat_button" icon="fa-book"
+                            <button name="action_view_curriculums"
+                                     type="object" class="oe_stat_button" icon="fa-book"
                                      groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="curriculum_count" widget="statinfo" string="Curriculums"/>
                             </button>
-                            <button name="%(employee_development_system.action_eds_course_development_request)d"
-                                     type="action" class="oe_stat_button" icon="fa-gears"
+                            <button name="action_view_development_requests"
+                                     type="object" class="oe_stat_button" icon="fa-gears"
                                      groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="development_request_count" widget="statinfo" string="Dev Requests"/>
                             </button>
@@ -164,8 +187,6 @@
                                 <field name="category" readonly="status != 'draft'"/>
                                 <field name="program_category" readonly="status != 'draft'"/>
                                 <field name="target_audience" readonly="status != 'draft'"/>
-                                <field name="delivery_place" readonly="status != 'draft'"/>
-                                <field name="delivery_method" readonly="status != 'draft'"/>
                                 <field name="duration_days" readonly="status != 'draft'"/>
                                 <field name="version" readonly="1"/>
                             </group>
@@ -221,13 +242,28 @@
                                     </list>
                                 </field>
                             </page>
+                            <page string="PMS Measurements" name="pms_mapping">
+                                <field name="pms_measure_line_ids" readonly="status != 'draft'">
+                                    <list editable="bottom">
+                                        <field name="job_measure_id"/>
+                                        <field name="job_objective_id" optional="show"/>
+                                        <field name="job_id" optional="show"/>
+                                        <field name="operating_unit_id" optional="show"/>
+                                        <field name="target_type" optional="show"/>
+                                        <field name="min_threshold"/>
+                                        <field name="weight_pct"/>
+                                        <field name="notes" placeholder="Developmental focus / target metric gap..."/>
+                                    </list>
+                                </field>
+                            </page>
                             <page string="Learning Outcomes" name="learning_outcomes">
                                 <div class="alert alert-info" role="alert" invisible="learning_outcomes">
-                                    Click <strong>Auto-Compile Learning Outcomes</strong> in the header to automatically assemble structured course learning objectives and demonstrated behavioral indicators from the mapped competencies.
+                                    Click <strong>Auto-Compile Learning Outcomes</strong> in the header to assemble outcomes from the mapped competencies and PMS measurements.
                                 </div>
                                 <field name="learning_outcomes" widget="html" readonly="status != 'draft'"/>
                             </page>
                             <page string="Certificate Template" name="certificate_config">
+                                <button name="action_preview_certificate" string="Preview Certificate PDF" type="object" icon="fa-file-pdf-o" class="btn-secondary"/>
                                 <group>
                                     <group string="Certificate Wording">
                                         <field name="certificate_title" readonly="status != 'draft'"/>

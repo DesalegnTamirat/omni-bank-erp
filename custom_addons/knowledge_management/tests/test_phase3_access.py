@@ -124,16 +124,23 @@ class TestKmsPhase3Access(TransactionCase):
             'classification_id': self.class_pub.id,
             'owner_id': self.emp_hr.id,
             'state': 'draft',
+            'file_data': b'JVBERi0xLjQK',
         })
+        doc.action_submit_for_review()
         # Employee cannot set state to approved/archived
         with self.assertRaises(AccessError):
             doc.with_user(self.user_hr).write({'state': 'approved'})
         with self.assertRaises(AccessError):
             doc.with_user(self.user_hr).write({'state': 'archived'})
 
-        # KMS Manager CAN set state to approved/archived
-        doc.with_user(self.user_kms_mgr).write({'state': 'approved'})
+        # KMS Manager approves through the governed workflow, creating a snapshot.
+        doc.with_user(self.user_kms_mgr).action_approve()
         self.assertEqual(doc.state, 'approved')
+        self.assertEqual(len(doc.version_ids), 1)
+        with self.assertRaises(AccessError):
+            doc.with_user(self.user_hr).read(['file_data'])
+        with self.assertRaises(AccessError):
+            doc.version_ids.with_user(self.user_hr).read(['file_data'])
         doc.with_user(self.user_kms_mgr).write({'state': 'archived'})
         self.assertEqual(doc.state, 'archived')
 

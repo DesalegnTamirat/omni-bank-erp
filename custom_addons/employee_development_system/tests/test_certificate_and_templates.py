@@ -107,11 +107,10 @@ class TestCertificateAndTemplates(TransactionCase):
             'assessment_type': 'post',
             'score': 88.0,
         })
-        self.env['eds.evaluation.level2'].create({
-            'session_id': self.session.id,
-            'employee_id': self.employee.id,
-            'post_assessment_id': post_ass.id,
-        })
+        level2 = self.env['eds.evaluation.level2'].search([
+            ('session_id', '=', self.session.id), ('employee_id', '=', self.employee.id),
+        ])
+        self.assertEqual(level2.post_assessment_id, post_ass)
 
         # Create certificate record
         cert = self.env['eds.certificate'].with_user(self.officer_user).create({
@@ -193,11 +192,10 @@ class TestCertificateAndTemplates(TransactionCase):
             'assessment_type': 'post',
             'score': 90.0,
         })
-        self.env['eds.evaluation.level2'].create({
-            'session_id': self.session.id,
-            'employee_id': self.employee.id,
-            'post_assessment_id': post_ass3.id,
-        })
+        level2 = self.env['eds.evaluation.level2'].search([
+            ('session_id', '=', self.session.id), ('employee_id', '=', self.employee.id),
+        ])
+        self.assertEqual(level2.post_assessment_id, post_ass3)
         cert = self.env['eds.certificate'].with_user(self.officer_user).create({
             'employee_id': self.employee.id,
             'session_id': self.session.id,

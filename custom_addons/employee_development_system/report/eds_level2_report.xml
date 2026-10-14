@@ -14,7 +14,7 @@
     <template id="report_eds_level2_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <t t-call="web.external_layout">
+                <t t-call="employee_development_system.report_eds_brand_layout">
                     <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
                         <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
                             <table style="width: 100%;">
@@ -42,15 +42,15 @@
                             <tbody>
                                 <tr>
                                     <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Session Code:</td>
-                                    <td style="width: 30%;"><span t-esc="o.session_id.code or o.session_id.name"/></td>
+                                    <td style="width: 30%;"><span t-esc="o.session_id.name"/></td>
                                     <td style="width: 20%; background-color: #f5f5f5; font-weight: bold;">Program Title:</td>
                                     <td style="width: 30%;"><span t-field="o.session_id.course_id.name"/></td>
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Trainer / Assessor:</td>
-                                    <td><span t-esc="o.trainer_assessor_name or o.session_id.trainer_id.name or 'Assessor'"/></td>
+                                    <td><span t-esc="o.trainer_assessor_name or ', '.join(o.session_id.trainer_ids.mapped('name')) or 'Assessor'"/></td>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Pass Mark (%):</td>
-                                    <td><strong t-esc="'%.1f%%' % o.passing_score"/></td>
+                                    <td><strong t-esc="'{:.1f}%'.format(o.passing_score)"/></td>
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Total Marks (Test):</td>
@@ -85,14 +85,14 @@
                                     <td><span t-esc="o.employee_id.barcode or 'N/A'"/></td>
                                     <td>
                                         <span t-esc="'%.1f / %.1f' % (o.pre_test_score, o.total_marks)"/><br/>
-                                        <small class="text-muted">(<span t-esc="'%.1f%%' % o.pre_test_pct"/>)</small>
+                                        <small class="text-muted">(<span t-esc="'{:.1f}%'.format(o.pre_test_pct)"/>)</small>
                                     </td>
                                     <td>
                                         <strong t-esc="'%.1f / %.1f' % (o.post_test_score, o.total_marks)"/><br/>
-                                        <small class="text-muted">(<strong t-esc="'%.1f%%' % o.post_test_pct"/>)</small>
+                                        <small class="text-muted">(<strong t-esc="'{:.1f}%'.format(o.post_test_pct)"/>)</small>
                                     </td>
                                     <td style="color: #006600; font-weight: bold;">
-                                        <span t-esc="'+%.1f%%' % o.learning_gain if o.learning_gain &gt; 0 else '%.1f%%' % o.learning_gain"/>
+                                        <span t-esc="'{:+.1f}%'.format(o.learning_gain)"/>
                                     </td>
                                     <td>
                                         <t t-if="o.passed">
@@ -124,7 +124,7 @@
                                 <tr>
                                     <td style="width: 33%; vertical-align: top;">
                                         <strong>Trainer / Assessor:</strong><br/>
-                                        Name: <span t-esc="o.trainer_assessor_name or o.session_id.trainer_id.name or '___________________'"/><br/>
+                                        Name: <span t-esc="o.trainer_assessor_name or ', '.join(o.session_id.trainer_ids.mapped('name')) or '___________________'"/><br/>
                                         Signature: ___________________<br/>
                                         Date: ___________________
                                     </td>

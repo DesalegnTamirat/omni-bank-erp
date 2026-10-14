@@ -198,7 +198,7 @@ class EdsNomination(models.Model):
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Only draft nominations can be submitted.'))
-            rec._check_submission_rules
+            rec._check_submission_rules()
             rec.state = 'submitted'
             rec._notify(_('Nomination %s submitted for approval .') % rec.name)
             manager_user = rec.employee_id.parent_id.user_id if rec.employee_id.parent_id else False
@@ -427,7 +427,7 @@ class EdsEnrollment(models.Model):
     _name = 'eds.enrollment'
     _description = 'Session Enrollment'
     _inherit = ['mail.thread', 'mail.activity.mixin']
-    _order = 'session_id, waitlist_position, id'
+    _order = 'session_id, source_count desc, waitlist_position, id'
     _rec_name = 'name'
 
     name = fields.Char(string='Reference', required=True, readonly=True, copy=False,
@@ -436,15 +436,32 @@ class EdsEnrollment(models.Model):
                                  ondelete='cascade', index=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True, index=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position',
-                                      related='employee_id.job_position', readonly=True)
+                                      related='employee_id.job_position', readonly=True, store=True)
     department_id = fields.Many2one('hr.department', string='Department',
-                                    related='employee_id.department_id', readonly=True)
+                                    related='employee_id.department_id', readonly=True, store=True)
+    work_unit_id = fields.Many2one('operating.unit', string='Work Unit',
+                                   related='employee_id.default_operating_unit_id', readonly=True, store=True)
+    course_demand_employee_id = fields.Many2one(
+        'eds.tna.cycle.course.employee', string='TNA Course Demand', ondelete='set null')
+    source_summary = fields.Char(string='Why Suggested', readonly=True)
+    source_count = fields.Integer(string='Source Types', readonly=True)
+    selected = fields.Boolean(string='Invite', default=True,
+                              help='Selected participants receive an invitation when the schedule is confirmed.')
+    response_note = fields.Text(string='Response / Replacement Reason', readonly=True)
+    response_date = fields.Datetime(string='Response Date', readonly=True)
+    replacement_employee_id = fields.Many2one('hr.employee', string='Replacement Employee', readonly=True)
+    replaces_enrollment_id = fields.Many2one('eds.enrollment', string='Replaces', readonly=True)
     nomination_id = fields.Many2one('eds.nomination', string='Nomination', ondelete='cascade')
     state = fields.Selection([
+        ('suggested', 'Suggested'),
+        ('invited', 'Invitation Sent'),
         ('enrolled', 'Enrolled'),
         ('waitlisted', 'Waitlisted'),
+        ('declined', 'Declined'),
+        ('replaced', 'Replaced'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
+        ('absent', 'Absent / Did Not Complete'),
     ], string='Status', default='enrolled', required=True, tracking=True)
     enrolled_date = fields.Date(string='Enrolled Date', default=fields.Date.context_today)
     waitlist_position = fields.Integer(string='Waitlist Position', default=0)
@@ -453,11 +470,11 @@ class EdsEnrollment(models.Model):
     @api.constrains('session_id', 'employee_id', 'state')
     def _check_unique_active_enrollment(self):
         for rec in self:
-            if rec.session_id and rec.employee_id and rec.state != 'cancelled':
+            if rec.session_id and rec.employee_id and rec.state not in ('cancelled', 'declined', 'replaced'):
                 domain = [
                     ('session_id', '=', rec.session_id.id),
                     ('employee_id', '=', rec.employee_id.id),
-                    ('state', '!=', 'cancelled'),
+                    ('state', 'not in', ('cancelled', 'declined', 'replaced')),
                     ('id', '!=', rec.id),
                 ]
                 if self.search_count(domain) > 0:
@@ -471,11 +488,53 @@ class EdsEnrollment(models.Model):
                     'eds.enrollment') or _('New')
         return super().create(vals_list)
 
+    def _send_invitation_notice(self):
+        for rec in self:
+            partner = rec.employee_id.work_contact_id or rec.employee_id.user_id.partner_id
+            if not partner:
+                continue
+            session = rec.session_id
+            venue = session.venue_id
+            details = [
+                _('Course: %s') % (session.course_id.name or session.program_name or ''),
+                _('Date and time: %s to %s') % (session.date_start, session.date_end),
+                _('Venue: %s') % (venue.name if venue else _('To be confirmed')),
+            ]
+            if venue and (venue.location or venue.address):
+                details.append(_('Location: %s') % (venue.location or venue.address))
+            link = '/web#id=%s&model=eds.enrollment' % rec.id
+            body = Markup('<p>%s</p><p>%s</p><p><a href="%s">%s</a></p>') % (
+                escape(_('You are invited to a training session. Please accept or decline.')),
+                Markup('<br/>').join(escape(item) for item in details),
+                escape(link), escape(_('Open invitation')),
+            )
+            rec.sudo().message_post(body=body, partner_ids=partner.ids)
+
+    def action_invite(self):
+        for rec in self:
+            if rec.state != 'suggested' or rec.session_id.status not in ('scheduled', 'rescheduled'):
+                continue
+            rec.write({'state': 'invited', 'enrolled_date': fields.Date.context_today(self)})
+            rec._send_invitation_notice()
+
+    def action_open_response(self):
+        self.ensure_one()
+        if self.state != 'invited':
+            raise UserError(_('Only pending invitations can be answered or replaced.'))
+        return {
+            'name': _('Respond to Training Invitation'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.enrollment.response.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_enrollment_id': self.id},
+        }
+
     def action_cancel(self):
         """Cancel the enrollment (withdrawal / decline / session cancellation) and promote."""
         sessions = self.mapped('session_id')
         for rec in self:
-            if rec.state in ('cancelled', 'completed'):
+            if rec.state in ('cancelled', 'completed', 'absent'):
                 continue
             rec.write({'state': 'cancelled'})
             if rec.nomination_id:

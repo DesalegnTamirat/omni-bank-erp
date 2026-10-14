@@ -23,8 +23,8 @@ class EdsReportTna(models.Model):
     total_entries = fields.Integer(string='Total Requested Entries', readonly=True)
 
     def init(self):
-        tools.drop_view_if_exists(self._cr, 'eds_report_tna')
-        self._cr.execute("""
+        tools.drop_view_if_exists(self.env.cr, 'eds_report_tna')
+        self.env.cr.execute("""
             CREATE OR REPLACE VIEW eds_report_tna AS (
                 SELECT
                     min(e.id) as id,
@@ -72,8 +72,8 @@ class EdsReportAnnualPlan(models.Model):
     total_lines = fields.Integer(string='Count', readonly=True)
 
     def init(self):
-        tools.drop_view_if_exists(self._cr, 'eds_report_annual_plan')
-        self._cr.execute("""
+        tools.drop_view_if_exists(self.env.cr, 'eds_report_annual_plan')
+        self.env.cr.execute("""
             CREATE OR REPLACE VIEW eds_report_annual_plan AS (
                 SELECT
                     l.id as id,
@@ -107,8 +107,8 @@ class EdsReportDelivery(models.Model):
     attendance_percentage = fields.Float(string='Attendance Percentage (%)', readonly=True)
 
     def init(self):
-        tools.drop_view_if_exists(self._cr, 'eds_report_delivery')
-        self._cr.execute("""
+        tools.drop_view_if_exists(self.env.cr, 'eds_report_delivery')
+        self.env.cr.execute("""
             CREATE OR REPLACE VIEW eds_report_delivery AS (
                 SELECT
                     a.id as id,
@@ -135,8 +135,8 @@ class EdsReportEvaluation(models.Model):
     l2_passed = fields.Boolean(string='L2 Passed', readonly=True)
 
     def init(self):
-        tools.drop_view_if_exists(self._cr, 'eds_report_evaluation')
-        self._cr.execute("""
+        tools.drop_view_if_exists(self.env.cr, 'eds_report_evaluation')
+        self.env.cr.execute("""
             CREATE OR REPLACE VIEW eds_report_evaluation AS (
                 SELECT
                     row_number() OVER (ORDER BY s.id, e.id) as id,
@@ -166,8 +166,8 @@ class EdsReportTranscript(models.Model):
     certificate_code = fields.Char(string='Certificate Code', readonly=True)
 
     def init(self):
-        tools.drop_view_if_exists(self._cr, 'eds_report_transcript')
-        self._cr.execute("""
+        tools.drop_view_if_exists(self.env.cr, 'eds_report_transcript')
+        self.env.cr.execute("""
             CREATE OR REPLACE VIEW eds_report_transcript AS (
                 SELECT
                     c.id as id,

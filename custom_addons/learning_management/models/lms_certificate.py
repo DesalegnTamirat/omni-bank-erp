@@ -6,7 +6,7 @@ import logging
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -75,6 +75,10 @@ class LmsCertificate(models.Model):
 
     certificate_pdf = fields.Binary(string='Certificate PDF File', attachment=True)
     certificate_filename = fields.Char(string='Certificate Filename')
+    delivery_state = fields.Selection([
+        ('pending', 'Pending'), ('complete', 'Complete'), ('error', 'Needs Retry'),
+    ], default='pending', readonly=True, string='PDF / HR Delivery')
+    delivery_error = fields.Text(string='Delivery Error', readonly=True)
 
     @api.depends('verification_code')
     def _compute_verification_url(self):
@@ -90,7 +94,7 @@ class LmsCertificate(models.Model):
         """Issues certificate, calculates expiry, generates hash, and bridges to core HR."""
         course = enrollment.course_id
         today = date.today()
-        months = course.certificate_validity_months or 12
+        months = course.certificate_validity_months
         exp_date = today + relativedelta(months=months) if months > 0 else False
 
         # Generate unique verification hash
@@ -112,52 +116,77 @@ class LmsCertificate(models.Model):
             'certificate_filename': f"Bunna_Cert_{cert_num.replace('/', '_')}.pdf",
         })
 
-        # Render QWeb certificate PDF immediately upon issuance (FR-LMS-014, NFR-LMS-004)
-        try:
-            pdf_bytes, _ = self.env['ir.actions.report']._render_qweb_pdf(
-                'learning_management.report_lms_certificate',
-                [cert.id]
-            )
-            if pdf_bytes:
-                cert.certificate_pdf = base64.b64encode(pdf_bytes)
-        except Exception as e:
-            _logger.error("Could not generate certificate PDF for cert %s: %s", cert.id, e)
-            cert.message_post(body=_('Warning: Could not pre-render certificate PDF: %s') % e)
-
-        # Bridge 1: Automatically push to core HR hr.training.history (FR-LMS-022)
-        try:
-            th = self.env['hr.training.history'].create({
-                'employee_id': enrollment.employee_id.id,
-                'training_name': course.name,
-                'training_type': 'Online E-Learning (LMS)',
-                'institution_name': 'Bunna Bank S.C. E-Academy',
-                'start_date': enrollment.enrollment_date,
-                'end_date': today,
-                'status': 'completed',
-                'comments': f"Certified online with score of {score_pct:.1f}%. Cert No: {cert_num}",
-            })
-            cert.hr_training_history_id = th.id
-        except Exception as e:
-            cert.message_post(body=_('Warning: Could not link to hr.training.history: %s') % e)
-
-        # Bridge 2: Attach to hr.employee.document (FR-LMS-022)
-        try:
-            doc_type = self.env['hr.document.type'].search([('name', 'ilike', 'Training')], limit=1)
-            if not doc_type:
-                doc_type = self.env['hr.document.type'].search([], limit=1)
-
-            if doc_type:
-                emp_doc = self.env['hr.employee.document'].create({
-                    'name': f"Training Certificate - {course.name}",
-                    'employee_ref': enrollment.employee_id.id,
-                    'document_type': doc_type.id,
-                    'description': f"Issued by Bunna LMS on {today}. Verification Code: {vcode}",
-                })
-                cert.hr_employee_document_id = emp_doc.id
-        except Exception as e:
-            cert.message_post(body=_('Warning: Could not link to hr.employee.document: %s') % e)
-
+        cert.action_retry_delivery()
         return cert
+
+    def action_retry_delivery(self):
+        """Finish missing PDF and HR artifacts without creating duplicates."""
+        if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+            raise AccessError(_('Only LMS managers may retry certificate delivery.'))
+        for cert in self:
+            errors = []
+            if not cert.certificate_pdf:
+                try:
+                    with self.env.cr.savepoint():
+                        pdf_bytes, _ = self.env['ir.actions.report']._render_qweb_pdf(
+                            'learning_management.report_lms_certificate', [cert.id]
+                        )
+                        if not pdf_bytes:
+                            raise UserError(_('The certificate report returned an empty PDF.'))
+                        cert.sudo().certificate_pdf = base64.b64encode(pdf_bytes)
+                except Exception as exc:
+                    _logger.exception('Certificate %s PDF rendering failed', cert.id)
+                    errors.append(_('PDF: %s') % exc)
+            if not cert.hr_training_history_id:
+                try:
+                    with self.env.cr.savepoint():
+                        enrollment = cert.enrollment_id
+                        history = self.env['hr.training.history'].sudo().create({
+                            'employee_id': cert.employee_id.id,
+                            'training_name': cert.course_id.name,
+                            'training_type': 'Online E-Learning (LMS)',
+                            'institution_name': 'Bunna Bank S.C. E-Academy',
+                            'start_date': enrollment.enrollment_date if enrollment else cert.issue_date,
+                            'end_date': cert.issue_date,
+                            'status': 'completed',
+                            'comments': _('Certified online with score %.1f%%. Cert No: %s') % (
+                                cert.score_percentage, cert.name),
+                        })
+                        cert.sudo().hr_training_history_id = history.id
+                except Exception as exc:
+                    _logger.exception('Certificate %s HR history sync failed', cert.id)
+                    errors.append(_('HR history: %s') % exc)
+            if not cert.hr_employee_document_id:
+                try:
+                    with self.env.cr.savepoint():
+                        if not cert.certificate_pdf:
+                            raise UserError(_('Render the certificate PDF before creating the HR document.'))
+                        doc_type = self.env['hr.document.type'].sudo().search(
+                            [('name', 'ilike', 'Training')], limit=1
+                        ) or self.env['hr.document.type'].sudo().search([], limit=1)
+                        if not doc_type:
+                            raise UserError(_('Configure an HR training document type.'))
+                        employee_document = self.env['hr.employee.document'].sudo().create({
+                            'name': _('Training Certificate - %s') % cert.course_id.name,
+                            'employee_ref': cert.employee_id.id,
+                            'document_type': doc_type.id,
+                            'description': _('Issued by LMS on %s. Verification: %s') % (
+                                cert.issue_date, cert.verification_code),
+                            'attachment': cert.certificate_pdf or False,
+                            'attachment_filename': cert.certificate_filename,
+                        })
+                        cert.sudo().hr_employee_document_id = employee_document.id
+                except Exception as exc:
+                    _logger.exception('Certificate %s HR document sync failed', cert.id)
+                    errors.append(_('HR document: %s') % exc)
+            cert.sudo().write({
+                'delivery_state': 'error' if errors else 'complete',
+                'delivery_error': '\n'.join(errors) if errors else False,
+            })
+
+    @api.model
+    def cron_retry_delivery(self):
+        self.sudo().search([('delivery_state', '!=', 'complete')], limit=100).action_retry_delivery()
 
     @api.model
     def cron_check_certificate_expiry(self):

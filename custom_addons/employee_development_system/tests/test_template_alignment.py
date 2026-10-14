@@ -85,12 +85,20 @@ class TestTemplateAlignment(TransactionCase):
 
         # Quarter is computed from 2026-08 (August = Q1 in Bunna fiscal calendar)
         self.assertEqual(line.quarter, 'q1')
-        # Total provider cost = 30 * 1200 = 36,000
-        self.assertAlmostEqual(line.total_provider_cost, 36000.0)
-        # Total venue cost = 30 * 3 * 800 = 72,000
-        self.assertAlmostEqual(line.total_venue_cost, 72000.0)
-        # Total budget = 36000 + 72000 = 108,000
-        self.assertAlmostEqual(line.budget_allocated, 108000.0)
+        # Workbook prices are per participant per session.
+        self.assertAlmostEqual(line.total_provider_cost, 72000.0)
+        self.assertAlmostEqual(line.total_venue_cost, 144000.0)
+        self.assertAlmostEqual(line.budget_allocated, 216000.0)
+
+        line.write({'est_provider_cost_per_pax': 0.0, 'est_venue_cost_per_pax_day': 0.0})
+        self.assertEqual(line.budget_allocated, 0.0)
+        line.write({'budget_allocated': 75000.0})
+        self.assertEqual(line.budget_allocated, 75000.0)
+        expense = line.budget_line_ids[0]
+        expense.write({'unit_price': 100.0, 'is_per_employee': True, 'is_general': False})
+        self.assertEqual(line.budget_allocated, 3000.0)
+        expense.unit_price = 0.0
+        self.assertEqual(line.budget_allocated, 75000.0)
 
     def test_04_calendar_generation_populates_template_fields(self):
         """Verify action_generate_calendar maps target_audience, planned_participants, etc."""
@@ -114,15 +122,18 @@ class TestTemplateAlignment(TransactionCase):
             'fiscal_year': '2026',
             'state': 'draft',
         })
+        self.cycle._sync_course_demand()
         plan.action_generate_calendar()
 
         # Check line created for the course
         lines = plan.line_ids.filtered(lambda l: l.course_id == self.course)
-        self.assertTrue(lines, "Plan line should be generated from active course / approved TNA")
+        self.assertTrue(lines, "Plan line should be generated from selected course demand")
         line = lines[0]
         self.assertEqual(line.program_category, 'compliance')
         self.assertEqual(line.target_audience, 'all_staff')
-        self.assertEqual(line.planned_participants, 25)
+        # No employees were selected on this legacy estimated-headcount entry.
+        # Demand planning counts actual people, not the old estimate.
+        self.assertEqual(line.planned_participants, 0)
 
     def test_05_template_import_wizard(self):
         """Test multi-sheet excel template import wizard."""
@@ -188,13 +199,15 @@ class TestTemplateAlignment(TransactionCase):
         act_tna = dashboard.action_open_tna_entries()
         self.assertEqual(act_tna['res_model'], 'eds.tna.entry')
         act_sess = dashboard.action_open_sessions()
-        self.assertEqual(act_sess['res_model'], 'eds.session')
-        act_plan = dashboard.action_open_annual_plans()
-        self.assertEqual(act_plan['res_model'], 'eds.annual.plan')
+        self.assertEqual(act_sess['res_model'],
+                         'eds.session' if dashboard.role_persona == 'admin' else 'eds.enrollment')
+        if dashboard.role_persona == 'admin':
+            act_plan = dashboard.action_open_annual_plans()
+            self.assertEqual(act_plan['res_model'], 'eds.annual.plan')
         act_cert = dashboard.action_open_certificates()
         self.assertEqual(act_cert['res_model'], 'eds.certificate')
         act_nom = dashboard.action_open_nominations()
-        self.assertEqual(act_nom['res_model'], 'eds.nomination')
+        self.assertEqual(act_nom['res_model'], 'eds.enrollment')
         act_idp = dashboard.action_open_idps()
         self.assertEqual(act_idp['res_model'], 'eds.idp')
         act_spons = dashboard.action_open_sponsorships()

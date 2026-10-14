@@ -2,7 +2,7 @@
 {
     'name': "Bunna Knowledge Management System (KMS)",
     'summary': "Governed document repository, digital library, tacit knowledge capture, Communities of Practice, and SME directory.",
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'category': 'Human Resources/Knowledge',
     'author': 'Bunna Bank S.C.',
     'website': 'https://www.bunnabanksc.com',

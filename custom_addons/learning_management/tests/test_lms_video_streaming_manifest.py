@@ -71,17 +71,10 @@ class TestLmsVideoStreamingManifest(HttpCase):
         })
 
     def test_01_hls_manifest_authorized(self):
-        """Verify enrolled employee receives valid HLS VOD manifest with byte ranges."""
+        """An unsegmented MP4 must not be advertised as valid HLS."""
         self.authenticate('video_test_learner@bunnabank.et', 'LearnerPassword123!')
         resp = self.url_open(f'/lms/video/{self.lesson.id}/manifest.m3u8')
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn('application/vnd.apple.mpegurl', resp.headers.get('Content-Type', ''))
-        content = resp.text
-        self.assertIn('#EXTM3U', content)
-        self.assertIn('#EXT-X-TARGETDURATION', content)
-        self.assertIn('#EXT-X-BYTERANGE:', content)
-        self.assertIn('#EXT-X-ENDLIST', content)
-        self.assertIn(f'/lms/video/{self.lesson.id}/stream', content)
+        self.assertEqual(resp.status_code, 501)
 
     def test_02_manifest_unauthorized(self):
         """Verify non-enrolled user receives HTTP 403 Access Denied."""

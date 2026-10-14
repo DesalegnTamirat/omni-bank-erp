@@ -6,6 +6,13 @@ from odoo import fields
 @tagged('post_install', '-at_install', 'eds', 'operational_pack')
 class TestOperationalFormPack(TransactionCase):
 
+    def _assert_branded_report_renders(self, action, record):
+        html, _ = self.env['ir.actions.report']._render_qweb_html(
+            action['report_name'], [record.id],
+        )
+        self.assertIn(b'BUNNA BANK S.C.', html)
+        self.assertIn(b'data:image/png;base64', html)
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -148,6 +155,7 @@ class TestOperationalFormPack(TransactionCase):
         action = survey.action_print_form()
         self.assertEqual(action.get('type'), 'ir.actions.report')
         self.assertEqual(action.get('report_name'), 'employee_development_system.report_eds_level1_document')
+        self._assert_branded_report_renders(action, survey)
 
     def test_02_level2_pre_post_assessment_sheet(self):
         """Test EDS-F-03 Level 2 Pre/Post scoring formulas and report action."""
@@ -172,6 +180,7 @@ class TestOperationalFormPack(TransactionCase):
         action = l2.action_print_form()
         self.assertEqual(action.get('type'), 'ir.actions.report')
         self.assertEqual(action.get('report_name'), 'employee_development_system.report_eds_level2_document')
+        self._assert_branded_report_renders(action, l2)
 
     def test_03_level3_behavioral_form(self):
         """Test EDS-F-04 Level 3 Behavioral Application Form and report action."""
@@ -243,6 +252,7 @@ class TestOperationalFormPack(TransactionCase):
         action = vrs.action_print_vrs()
         self.assertEqual(action.get('type'), 'ir.actions.report')
         self.assertEqual(action.get('report_name'), 'employee_development_system.report_eds_vrs_document')
+        self._assert_branded_report_renders(action, vrs)
 
     def test_05_trainer_profile_pack(self):
         """Test EDS-F-06 Trainer Profile registration, sub-tables and report action."""

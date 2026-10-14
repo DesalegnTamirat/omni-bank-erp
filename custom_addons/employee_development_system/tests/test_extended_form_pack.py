@@ -6,6 +6,13 @@ from odoo import fields
 @tagged('post_install', '-at_install', 'eds', 'extended_pack')
 class TestExtendedFormPack(TransactionCase):
 
+    def _assert_branded_report_renders(self, action, record):
+        html, _ = self.env['ir.actions.report']._render_qweb_html(
+            action['report_name'], [record.id],
+        )
+        self.assertIn(b'BUNNA BANK S.C.', html)
+        self.assertIn(b'data:image/png;base64', html)
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -67,6 +74,7 @@ class TestExtendedFormPack(TransactionCase):
         report_action = l4.action_print_form()
         self.assertIsNotNone(report_action)
         self.assertEqual(report_action.get('type'), 'ir.actions.report')
+        self._assert_branded_report_renders(report_action, l4)
 
     def test_02_eds_f_12_knowledge_sharing(self):
         """Test EDS-F-12 Knowledge Sharing Debrief workflow, sequence, and PDF action."""
@@ -125,6 +133,7 @@ class TestExtendedFormPack(TransactionCase):
         report_action = appraisal.action_print_appraisal()
         self.assertIsNotNone(report_action)
         self.assertEqual(report_action.get('type'), 'ir.actions.report')
+        self._assert_branded_report_renders(report_action, appraisal)
 
     def test_04_eds_f_14_internship_clearance_appraisal(self):
         """Test EDS-F-14 Internship Appraisal and Exit Clearance fields and PDF action."""

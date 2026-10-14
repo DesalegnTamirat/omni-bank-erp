@@ -245,7 +245,9 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         self.assertGreaterEqual(consolidation.entry_count, 1, "Consolidation should aggregate training needs.")
 
         # Consolidate approves the validated entries for corporate planning
-        self_entry.write({'state': 'approved'})
+        # The multi-actor consolidation approval is exercised in its dedicated
+        # workflow tests; promote this fixture through the private helper.
+        self_entry._write_workflow_values({'state': 'approved'})
         self.assertEqual(self_entry.state, 'approved', "TNA entry approved for Annual Plan & Nomination.")
         _logger.info("Step 6: Bank-wide TNA Consolidation executed and needs approved.")
 
@@ -389,13 +391,12 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
             'assessment_type': 'post',
             'score': 85.0,  # Exceeds 60% passing requirement
         })
-        eval_l2 = self.env['eds.evaluation.level2'].create({
-            'session_id': session.id,
-            'employee_id': self.emp_trainee2.id,
-            'pre_assessment_id': pre_assess.id,
-            'post_assessment_id': post_assess.id,
-            'passing_score': 60.0,
-        })
+        eval_l2 = self.env['eds.evaluation.level2'].search([
+            ('session_id', '=', session.id),
+            ('employee_id', '=', self.emp_trainee2.id),
+        ])
+        self.assertEqual(eval_l2.pre_assessment_id, pre_assess)
+        self.assertEqual(eval_l2.post_assessment_id, post_assess)
         eval_l2.action_evaluate()
         self.assertEqual(eval_l2.learning_gain, 45.0, "Knowledge gain: 85 - 40 = 45%.")
         self.assertTrue(eval_l2.passed, "Level 2 test passed with score >= 60%.")

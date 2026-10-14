@@ -26,6 +26,10 @@
                                 <field name="eds_tna_approval_deadline_month"/>
                                 <field name="eds_tna_approval_deadline_day"/>
                             </setting>
+                            <setting string="Max TNA Courses per Employee"
+                                     help="Maximum number of training courses an individual staff member can choose in a TNA cycle (default: 3).">
+                                <field name="eds_max_tna_courses_per_employee"/>
+                            </setting>
                         </block>
 
                         <block title="Nomination Approval Chain " name="eds_nomination_chain">

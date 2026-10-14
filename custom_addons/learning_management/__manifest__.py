@@ -2,7 +2,7 @@
 {
     'name': "Bunna Learning Management System (LMS)",
     'summary': "Structured digital training platform, secure video streaming, learning paths, quizzes, automated certification, and compliance analytics.",
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'category': 'Human Resources/Learning',
     'author': 'Bunna Bank S.C.',
     'website': 'https://www.bunnabanksc.com',

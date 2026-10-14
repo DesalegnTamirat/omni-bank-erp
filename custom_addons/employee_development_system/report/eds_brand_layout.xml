@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Keep EDS PDFs independent of the company logo stored in ir.attachment. -->
+    <template id="report_eds_brand_layout">
+        <t t-call="web.basic_layout">
+            <div class="header" style="font-family: Arial, sans-serif; font-size: 11px;">
+                <table style="width: 100%; border-bottom: 2px solid #541718; padding-bottom: 4px;">
+                    <tr>
+                        <td style="width: 26%; vertical-align: middle;">
+                            <img t-att-src="'data:image/png;base64,%s' % o.env['competency.assessment'].get_bunna_logo_base64()"
+                                 style="max-height: 48px; width: auto;" alt="Bunna Bank S.C."/>
+                        </td>
+                        <td style="width: 48%; text-align: center; vertical-align: middle;">
+                            <div style="font-size: 15px; font-weight: bold; color: #541718;">BUNNA BANK S.C.</div>
+                            <div style="font-size: 10px; color: #726732;">Bank of the Visionaries</div>
+                            <div style="font-size: 10px; color: #1d2b32;">Employee Development System</div>
+                        </td>
+                        <td style="width: 26%; text-align: right; vertical-align: middle; font-size: 9px; color: #64748b;">
+                            Generated: <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="footer" style="border-top: 1px solid #cbd5e1; padding-top: 4px; font-family: Arial, sans-serif; font-size: 8.5px; color: #64748b;">
+                <table style="width: 100%;">
+                    <tr>
+                        <td>Bunna Bank S.C. | People Performance &amp; Development</td>
+                        <td style="text-align: right;">Page <span class="page"/> of <span class="topage"/></td>
+                    </tr>
+                </table>
+            </div>
+            <t t-out="0"/>
+        </t>
+    </template>
+</odoo>

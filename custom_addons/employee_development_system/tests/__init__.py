@@ -11,3 +11,6 @@ from . import test_template_alignment
 from . import test_certificate_and_templates
 from . import test_operational_form_pack
 from . import test_extended_form_pack
+from . import test_cycle_demand_vendor_matrix
+from . import test_navigation_and_approval
+from . import test_dashboard_security

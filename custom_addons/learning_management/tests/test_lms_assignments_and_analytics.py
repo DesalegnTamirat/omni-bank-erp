@@ -52,6 +52,7 @@ class TestLmsAssignmentsAndAnalytics(TransactionCase):
             'description': '<p>Analytics Course Description</p>',
             'state': 'published',
             'is_mandatory': True,
+            'has_post_assessment': False,
         })
         cls.lesson1 = cls.LmsLesson.create({
             'name': 'Lesson 1: Intro',
@@ -59,6 +60,7 @@ class TestLmsAssignmentsAndAnalytics(TransactionCase):
             'sequence': 10,
             'video_duration_seconds': 120,
             'min_watch_percentage': 80.0,
+            'lesson_type': 'text',
         })
         cls.lesson2 = cls.LmsLesson.create({
             'name': 'Lesson 2: Advanced',
@@ -66,6 +68,7 @@ class TestLmsAssignmentsAndAnalytics(TransactionCase):
             'sequence': 20,
             'video_duration_seconds': 180,
             'min_watch_percentage': 80.0,
+            'lesson_type': 'text',
         })
 
     def test_01_enrollment_creation_activity_and_chatter(self):
@@ -131,7 +134,7 @@ class TestLmsAssignmentsAndAnalytics(TransactionCase):
         lp2 = enrollment.lesson_progress_ids.filtered(lambda lp: lp.lesson_id == self.lesson2)
         lp2.write({'total_seconds_watched': 180})
         lp2.mark_completed()
-        enrollment.action_mark_completed_and_certify(score_pct=95.0)
+        self.assertEqual(enrollment.state, 'completed')
         self.env.flush_all()
         report_records = self.env['lms.engagement.report'].search([('course_id', '=', self.course.id)])
         self.assertTrue(report_records)

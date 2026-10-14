@@ -204,6 +204,7 @@ class TestLmsPhase5E2E(TransactionCase):
         self.assertEqual(course.state, 'review')
 
         # Step 7: Publish
+        course.write({'has_post_assessment': False})
         course.with_user(self.user_lms_mgr).action_publish()
         self.assertEqual(course.state, 'published')
         self.assertTrue(course.is_latest_version)
@@ -219,6 +220,7 @@ class TestLmsPhase5E2E(TransactionCase):
         self.assertEqual(course_v2.previous_version_id.id, course.id)
 
         # Publishing v2 auto-archives v1
+        course_v2.with_user(self.user_lms_mgr).action_submit_for_review()
         course_v2.with_user(self.user_lms_mgr).action_publish()
         self.assertEqual(course_v2.state, 'published')
         course.invalidate_recordset(['state', 'is_latest_version'])
@@ -411,6 +413,11 @@ class TestLmsPhase5E2E(TransactionCase):
             'pass_score_percentage': 70.0,
             'instructions': '<p>Select all correct answers.</p>',
         })
+        course.write({'post_assessment_id': exam.id})
+        self.LmsLesson.create({
+            'name': 'Financial Crime Reading', 'course_id': course.id,
+            'lesson_type': 'text', 'html_content': '<p>Read before the exam.</p>',
+        })
 
         # Question 1: Multiple choice (2 correct answers)
         q_multi = self.LmsQuestion.create({
@@ -440,6 +447,7 @@ class TestLmsPhase5E2E(TransactionCase):
             'course_id': course.id,
             'state': 'in_progress',
         })
+        enrollment.lesson_progress_ids.mark_completed()
 
         session = self.LmsExamSession.create_session_for_learner(exam, self.emp_learner1, enrollment)
         lines = session.line_ids

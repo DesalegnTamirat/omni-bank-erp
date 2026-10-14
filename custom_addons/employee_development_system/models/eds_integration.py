@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
+from odoo.exceptions import UserError
+import logging
+
+_logger = logging.getLogger(__name__)
 
 class EdsIntegrationLog(models.Model):
     _name = 'eds.integration.log'
@@ -45,19 +49,118 @@ class EdsLmsRouting(models.Model):
     ], string='Sync State', default='pending', tracking=True)
     lms_completion_pct = fields.Float(string='LMS Completion Rate (%)', default=0.0)
     last_sync_date = fields.Datetime(string='Last Sync Date')
+    sync_error = fields.Text(string='Last Sync Error', readonly=True)
 
     def action_sync_to_lms(self):
         for rec in self:
-            # Contract/Interface stub for LMS Sync
-            rec.sync_state = 'synced'
-            rec.last_sync_date = fields.Datetime.now()
-            self.env['eds.integration.log'].create({
-                'name': f"LMS-SYNC-{rec.course_id.code}",
-                'system': 'lms',
-                'direction': 'outbound',
-                'status': 'success',
-                'details': f"Course {rec.course_id.name} payload queued for LMS sync dispatch.",
+            if not self.env.registry.get('lms.course'):
+                raise UserError(_('Install Learning Management before syncing EDS courses.'))
+            if not self.env.user.has_group('employee_development_system.group_eds_manager') and not self.env.su:
+                raise UserError(_('Only an EDS manager may sync courses to LMS.'))
+            try:
+                with self.env.cr.savepoint():
+                    self.env.cr.execute('SELECT id FROM eds_lms_routing WHERE id = %s FOR UPDATE', (rec.id,))
+                    category = self.env['lms.category'].sudo().search([('code', '=', 'EDS_IMPORT')], limit=1)
+                    if not category:
+                        category = self.env['lms.category'].sudo().create({
+                            'name': _('EDS Routed Courses'), 'code': 'EDS_IMPORT',
+                        })
+                    instructor = rec.course_id.create_uid.employee_id or self.env.user.employee_id
+                    if not instructor:
+                        raise UserError(_('Assign an employee account to the course owner before LMS sync.'))
+                    values = {
+                        'name': rec.course_id.name,
+                        'category_id': category.id,
+                        'description': rec.course_id.description or rec.course_id.name,
+                        'instructor_id': instructor.id,
+                        'estimated_duration_hours': (rec.course_id.duration_days or 1) * 8,
+                        'target_department_ids': [(6, 0, rec.course_id.department_ids.ids)],
+                        'target_job_ids': [(6, 0, rec.course_id.target_audience_ids.ids)],
+                    }
+                    lms_course = self.env['lms.course'].sudo().browse(
+                        int(rec.lms_ref) if rec.lms_ref and rec.lms_ref.isdigit() else 0
+                    ).exists()
+                    if lms_course:
+                        if lms_course.state == 'draft':
+                            lms_course.write(values)
+                    else:
+                        lms_course = self.env['lms.course'].sudo().create(values)
+                    rec._sync_lms_enrollments(lms_course)
+                    rec.write({
+                        'lms_ref': str(lms_course.id),
+                        'sync_state': 'synced',
+                        'sync_error': False,
+                        'last_sync_date': fields.Datetime.now(),
+                    })
+                    self.env['eds.integration.log'].sudo().create({
+                        'name': f'LMS-SYNC-{rec.course_id.code}',
+                        'system': 'lms', 'direction': 'outbound', 'status': 'success',
+                        'details': _('EDS course %s synced to LMS course %s.') % (rec.course_id.name, lms_course.code),
+                    })
+            except Exception as exc:
+                _logger.exception('EDS to LMS synchronization failed for routing %s', rec.id)
+                rec.write({'sync_state': 'error', 'sync_error': str(exc)})
+                self.env['eds.integration.log'].sudo().create({
+                    'name': f'LMS-SYNC-{rec.course_id.code}',
+                    'system': 'lms', 'direction': 'outbound', 'status': 'failed',
+                    'details': str(exc),
+                })
+
+    def _sync_lms_enrollments(self, lms_course):
+        self.ensure_one()
+        if not self.session_id:
+            return 0
+        Enrollment = self.env['lms.enrollment'].sudo()
+        created = 0
+        for eds_enrollment in self.session_id.enrollment_ids.filtered(
+            lambda enrollment: enrollment.state in ('enrolled', 'completed')
+        ):
+            existing = Enrollment.search([
+                ('course_id', '=', lms_course.id),
+                ('employee_id', '=', eds_enrollment.employee_id.id),
+            ], limit=1)
+            if existing:
+                continue
+            Enrollment.create({
+                'course_id': lms_course.id,
+                'employee_id': eds_enrollment.employee_id.id,
+                'is_mandatory': self.course_id.category == 'technical_compliance',
+                'due_date': fields.Date.to_date(self.session_id.date_end) if self.session_id.date_end else False,
             })
+            created += 1
+        return created
+
+    def action_sync_assignments(self):
+        if not self.env.su and not self.env.user.has_group('employee_development_system.group_eds_manager'):
+            raise UserError(_('Only an EDS manager may sync LMS participants.'))
+        for rec in self:
+            if not rec.lms_ref or not rec.lms_ref.isdigit():
+                raise UserError(_('Sync the EDS course to LMS first.'))
+            lms_course = self.env['lms.course'].sudo().browse(int(rec.lms_ref)).exists()
+            if not lms_course:
+                raise UserError(_('The linked LMS course no longer exists.'))
+            count = rec._sync_lms_enrollments(lms_course)
+            rec.action_reconcile_lms()
+            rec.message_post(body=_('%d participant(s) enrolled in LMS.') % count)
+
+    def action_reconcile_lms(self):
+        """Refresh completion metrics from the actual linked LMS enrollment records."""
+        if not self.env.registry.get('lms.enrollment'):
+            return
+        for rec in self:
+            if not rec.lms_ref or not rec.lms_ref.isdigit():
+                continue
+            course_id = int(rec.lms_ref)
+            Enrollment = self.env['lms.enrollment'].sudo()
+            domain = [('course_id', '=', course_id)]
+            if rec.session_id:
+                employee_ids = rec.session_id.enrollment_ids.filtered(
+                    lambda enrollment: enrollment.state in ('enrolled', 'completed')
+                ).mapped('employee_id').ids
+                domain.append(('employee_id', 'in', employee_ids))
+            total = Enrollment.search_count(domain)
+            completed = Enrollment.search_count(domain + [('state', '=', 'completed')])
+            rec.sudo().write({'lms_completion_pct': 100.0 * completed / total if total else 0.0})
 
 class EdsPayrollPayload(models.Model):
     _name = 'eds.payroll.payload'

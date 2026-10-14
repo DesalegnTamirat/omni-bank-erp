@@ -8,11 +8,12 @@
             <field name="model">eds.competency.gap.import</field>
             <field name="arch" type="xml">
                 <form string="Pull Competency Gaps from Closed Assessment Cycle">
-                    <div class="alert alert-info" role="alert">
+                    <field name="ingestion_done" invisible="1"/>
+                    <div class="alert alert-info" role="alert" invisible="ingestion_done">
                         <span class="fa fa-info-circle me-1" title="Information" aria-hidden="true"/>
                         <strong>Direct Competency Gap Ingestion:</strong> Select a finalized (closed) Competency Assessment Cycle. The system will automatically identify all employees with competency gaps and generate corresponding TNA entries with no file upload required.
                     </div>
-                    <group>
+                    <group invisible="ingestion_done">
                         <group>
                             <field name="cycle_id" readonly="1" options="{'no_open': True}"/>
                             <field name="competency_cycle_id" options="{'no_create': True, 'no_open': True}"/>
@@ -23,14 +24,20 @@
                             <field name="department_id" options="{'no_create': True}"/>
                         </group>
                     </group>
-                    <div invisible="not result_log">
-                        <group string="Ingestion Results">
-                            <field name="result_log" nolabel="1" readonly="1" widget="text"/>
+                    <group string="Ingestion Results" invisible="not ingestion_done">
+                        <div class="alert alert-success" role="status">
+                            <strong>Competency gap scan complete.</strong> Review the outcome below, then close this window.
+                        </div>
+                        <group>
+                            <field name="scanned_count" readonly="1"/>
+                            <field name="created_count" readonly="1"/>
+                            <field name="skipped_count" readonly="1"/>
                         </group>
-                    </div>
+                        <field name="result_log" nolabel="1" readonly="1" widget="text"/>
+                    </group>
                     <footer>
                         <button name="action_pull_competency_gaps" string="Pull Competency Gaps"
-                                type="object" class="btn-primary" invisible="result_log"/>
+                                type="object" class="btn-primary" invisible="ingestion_done"/>
                         <button string="Close" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>

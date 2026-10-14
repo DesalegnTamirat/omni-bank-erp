@@ -8,6 +8,7 @@ from . import eds_curriculum
 from . import eds_trainer
 from . import eds_provider
 from . import eds_procurement
+from . import eds_hotel_sourcing
 from . import eds_annual_plan
 from . import eds_session
 from . import eds_delivery

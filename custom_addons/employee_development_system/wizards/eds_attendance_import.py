@@ -55,6 +55,9 @@ class EdsAttendanceImport(models.TransientModel):
         except Exception as e:
             raise ValidationError(_("Failed to open Excel workbook: %s") % str(e))
 
+        if wb.worksheets and str(wb.worksheets[0].cell(7, 1).value or '').strip() == 'Employee ID':
+            return self._import_eds_roster(wb.worksheets[0])
+
         AttendanceModel = self.env['eds.session.attendance']
         EmployeeModel = self.env['hr.employee'].sudo()
         SessionModel = self.env['eds.session']
@@ -169,8 +172,7 @@ class EdsAttendanceImport(models.TransientModel):
                     if s_val is not None and str(s_val).strip() not in ('', '0', 'absent', 'a', 'false'):
                         present_slots += 1
 
-                # If no slot markers filled in, treat employee row as present by default (full attendance)
-                att_pct = (present_slots / total_slots * 100.0) if present_slots > 0 else 100.0
+                att_pct = present_slots / total_slots * 100.0
 
                 existing = AttendanceModel.search([
                     ('session_id', '=', session.id),
@@ -179,7 +181,7 @@ class EdsAttendanceImport(models.TransientModel):
 
                 if existing:
                     existing.write({
-                        'attended': True,
+                        'attended': bool(present_slots),
                         'attendance_percentage': att_pct,
                         'attendance_date': fields.Date.today(),
                     })
@@ -187,7 +189,7 @@ class EdsAttendanceImport(models.TransientModel):
                     AttendanceModel.create({
                         'session_id': session.id,
                         'employee_id': emp.id,
-                        'attended': True,
+                        'attended': bool(present_slots),
                         'attendance_percentage': att_pct,
                         'attendance_date': fields.Date.today(),
                     })
@@ -204,6 +206,74 @@ class EdsAttendanceImport(models.TransientModel):
             'res_id': self.id,
             'view_mode': 'form',
             'target': 'new',
+        }
+
+    def _import_eds_roster(self, sheet):
+        """Round-trip the dated XLSX sheet exported from a session."""
+        session_ref = str(sheet.cell(2, 2).value or '').strip()
+        session = self.session_id or self.env['eds.session'].search([('name', '=', session_ref)], limit=1)
+        if not session or session.name != session_ref:
+            raise ValidationError(_('The attendance sheet does not match the selected session.'))
+        dated_columns = []
+        for column in range(6, sheet.max_column + 1):
+            raw = sheet.cell(7, column).value
+            if not raw:
+                continue
+            if isinstance(raw, datetime):
+                attendance_date = raw.date()
+            else:
+                try:
+                    attendance_date = fields.Date.to_date(raw)
+                except (TypeError, ValueError):
+                    raise ValidationError(_('Column %s has an invalid attendance date.') % column)
+            if not attendance_date:
+                raise ValidationError(_('Column %s has an invalid attendance date.') % column)
+            dated_columns.append((column, attendance_date))
+        if not dated_columns:
+            raise ValidationError(_('Add at least one dated attendance column.'))
+
+        eligible = set(session.enrollment_ids.filtered(
+            lambda row: row.state in ('enrolled', 'completed')).mapped('employee_id').ids)
+        attendance_model = self.env['eds.session.attendance']
+        processed = 0
+        for row in range(8, sheet.max_row + 1):
+            raw_id = sheet.cell(row, 1).value
+            if raw_id in (None, ''):
+                continue
+            try:
+                employee_id = int(raw_id)
+            except (TypeError, ValueError):
+                raise ValidationError(_('Row %s has an invalid employee ID.') % row)
+            if employee_id not in eligible:
+                raise ValidationError(_('Row %s employee is not enrolled in this session.') % row)
+            for column, attendance_date in dated_columns:
+                raw = sheet.cell(row, column).value
+                if raw in (None, ''):
+                    continue
+                value = str(raw).strip().casefold()
+                if value in ('present', 'p', 'yes', 'y', '1', 'true'):
+                    attended = True
+                elif value in ('absent', 'a', 'no', 'n', '0', 'false'):
+                    attended = False
+                else:
+                    raise ValidationError(_('Row %s, column %s must say Present or Absent.') % (row, column))
+                existing = attendance_model.search([
+                    ('session_id', '=', session.id),
+                    ('employee_id', '=', employee_id),
+                    ('attendance_date', '=', attendance_date),
+                ], limit=1)
+                if existing:
+                    existing.attended = attended
+                else:
+                    attendance_model.create({
+                        'session_id': session.id, 'employee_id': employee_id,
+                        'attendance_date': attendance_date, 'attended': attended,
+                    })
+                processed += 1
+        self.result_log = _('%s dated attendance cells imported for session %s.') % (processed, session.name)
+        return {
+            'type': 'ir.actions.act_window', 'res_model': 'eds.attendance.import',
+            'res_id': self.id, 'view_mode': 'form', 'target': 'new',
         }
 
     def _import_csv_attendance(self, data):

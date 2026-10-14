@@ -82,6 +82,42 @@ class TestEdsConstraints(TransactionCase):
                 'state': 'enrolled',
             })
 
+    def test_session_completion_preserves_absent_enrollment(self):
+        absent_employee = self.env['hr.employee'].create({'name': 'Absent Participant'})
+        present = self.env['eds.enrollment'].create({
+            'session_id': self.session.id, 'employee_id': self.employee.id,
+        })
+        absent = self.env['eds.enrollment'].create({
+            'session_id': self.session.id, 'employee_id': absent_employee.id,
+        })
+        self.env['eds.session.attendance'].create({
+            'session_id': self.session.id, 'employee_id': self.employee.id, 'attended': True,
+        })
+        self.env['eds.session.attendance'].create({
+            'session_id': self.session.id, 'employee_id': absent_employee.id, 'attended': False,
+        })
+        self.session.write({
+            'date_start': date.today() - timedelta(days=1),
+            'date_end': date.today(), 'status': 'ongoing',
+        })
+        self.session.action_complete()
+        self.assertEqual(present.state, 'completed')
+        self.assertEqual(absent.state, 'absent')
+
+    def test_eds_lms_routing_is_idempotent_when_lms_is_installed(self):
+        if not self.env.registry.get('lms.course'):
+            self.skipTest('Learning Management is not installed in this database')
+        self.env['hr.employee'].create({
+            'name': 'LMS Routing Owner', 'user_id': self.manager_user.id,
+        })
+        routing = self.env['eds.lms.routing'].create({'course_id': self.course.id})
+        routing.with_user(self.manager_user).action_sync_to_lms()
+        self.assertEqual(routing.sync_state, 'synced', routing.sync_error)
+        linked_id = int(routing.lms_ref)
+        self.assertTrue(self.env['lms.course'].browse(linked_id).exists())
+        routing.with_user(self.manager_user).action_sync_to_lms()
+        self.assertEqual(int(routing.lms_ref), linked_id)
+
     def test_b5_reissue_certificate_after_void(self):
         """B5: Test that certificate re-issuance is allowed after voiding a prior certificate."""
         cert1 = self.env['eds.certificate'].create({

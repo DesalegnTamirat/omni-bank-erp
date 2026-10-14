@@ -65,9 +65,9 @@ class EdsSessionAttendance(models.Model):
     company_id = fields.Many2one('res.company', string='Company',
                                  default=lambda self: self.env.company)
 
-    _session_employee_uniq = models.Constraint(
-        'UNIQUE(session_id, employee_id)',
-        'Attendance is already recorded for this participant on this session!',
+    _session_employee_date_uniq = models.Constraint(
+        'UNIQUE(session_id, employee_id, attendance_date)',
+        'Attendance is already recorded for this participant on this session date!',
     )
 
     @api.constrains('session_id', 'employee_id')
@@ -364,6 +364,36 @@ class EdsAssessment(models.Model):
         'CHECK(score >= 0 AND score <= 100)',
         'The assessment score must be between 0 and 100!',
     )
+
+    def _sync_level2_evaluation(self):
+        """Keep the learning-gain record linked to entered pre/post scores."""
+        evaluation_model = self.env['eds.evaluation.level2'].sudo()
+        for assessment in self.filtered(lambda row: row.assessment_type in ('pre', 'post')):
+            evaluation = evaluation_model.search([
+                ('session_id', '=', assessment.session_id.id),
+                ('employee_id', '=', assessment.employee_id.id),
+            ], limit=1)
+            field_name = 'pre_assessment_id' if assessment.assessment_type == 'pre' else 'post_assessment_id'
+            if evaluation:
+                evaluation.write({field_name: assessment.id})
+            else:
+                evaluation_model.create({
+                    'session_id': assessment.session_id.id,
+                    'employee_id': assessment.employee_id.id,
+                    field_name: assessment.id,
+                })
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records._sync_level2_evaluation()
+        return records
+
+    def write(self, vals):
+        result = super().write(vals)
+        if {'session_id', 'employee_id', 'assessment_type'} & vals.keys():
+            self._sync_level2_evaluation()
+        return result
 
     @api.constrains('session_id', 'employee_id')
     def _check_employee_enrolled(self):

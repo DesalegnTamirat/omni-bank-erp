@@ -25,10 +25,11 @@ class EdsPmsGapImport(models.TransientModel):
         help='Optionally limit PMS gap ingestion to a specific appraisal period (e.g. Q1, Q2, Semi-Annual, Annual).'
     )
     max_score_threshold = fields.Float(
-        string='Maximum Score Threshold (%)',
+        string='Default Measurement Gap Threshold (%)',
         default=75.0,
         required=True,
-        help='Only pull appraisals where the overall performance score is strictly below this percentage (e.g. 75%).'
+        help='Include an individual measurement below this threshold even when no course mapping exists. '
+             'Mapped courses use their configured gap threshold.'
     )
     state_filter = fields.Selection([
         ('confirmed', 'Confirmed Appraisals Only'),
@@ -46,6 +47,10 @@ class EdsPmsGapImport(models.TransientModel):
         help='Optionally limit gap ingestion to employees in a specific department.'
     )
     result_log = fields.Text(string='Ingestion Summary', readonly=True)
+    ingestion_done = fields.Boolean(readonly=True)
+    scanned_count = fields.Integer(string='Appraisals Scanned', readonly=True)
+    created_count = fields.Integer(string='Needs Created', readonly=True)
+    skipped_count = fields.Integer(string='Already Present', readonly=True)
 
     @api.onchange('operating_unit_id')
     def _onchange_operating_unit_id(self):
@@ -62,12 +67,14 @@ class EdsPmsGapImport(models.TransientModel):
     def action_pull_pms_gaps(self):
         """Query PMS appraisals below threshold and generate TNA entries."""
         self.ensure_one()
+        if self.ingestion_done:
+            raise ValidationError(_("This ingestion has already been completed. Close this result and open a new pull to run again."))
+        if self.cycle_id.state not in ('draft', 'collecting'):
+            raise ValidationError(_("PMS gaps can only be pulled into a draft or collecting TNA cycle."))
         if 't3.appraisal' not in self.env:
             raise UserError(_("Performance Management (PMS) module is not installed."))
 
         domain = [
-            ('employee_score', '>', 0.0),
-            ('employee_score', '<', self.max_score_threshold),
             ('employee_id.active', '=', True),
         ]
         if self.state_filter == 'confirmed':
@@ -86,15 +93,21 @@ class EdsPmsGapImport(models.TransientModel):
 
         appraisals = self.env['t3.appraisal'].sudo().search(domain)
         if not appraisals:
+            self.ingestion_done = True
+            self.scanned_count = 0
             self.result_log = _(
-                "Scan complete. No PMS appraisals found matching the gap criteria (Score < %.1f%% in states: %s)."
-            ) % (self.max_score_threshold, self.state_filter)
+                "Scan complete. No PMS appraisals found for the selected period and states (%s)."
+            ) % self.state_filter
             return self._return_view()
 
         TnaEntryModel = self.env['eds.tna.entry'].sudo()
-        existing_pms_emps = set(
-            self.cycle_id.entry_ids.filtered(lambda e: e.source == 'pms' and e.employee_id).mapped('employee_id.id')
-        )
+        PmsCourseLine = self.env['eds.course.pms.line'].sudo()
+        existing_keys = {
+            (entry.employee_id.id, entry.pms_measure_id.id if entry.pms_measure_id
+             else (entry.pms_kpi_reference or '').strip().lower())
+            for entry in self.cycle_id.entry_ids
+            if entry.source == 'pms' and entry.employee_id
+        }
 
         success_count = 0
         skipped_count = 0
@@ -104,74 +117,106 @@ class EdsPmsGapImport(models.TransientModel):
             if not emp:
                 continue
 
-            if emp.id in existing_pms_emps:
-                skipped_count += 1
-                continue
-            existing_pms_emps.add(emp.id)
-
-            # Analyze appraisal lines for lowest metric and recommendations
-            appraised_lines = appraisal.line_ids.filtered(lambda l: l.appraised == 'yes')
-            lowest_line = appraised_lines.sorted('accomplishment_percent')[:1] if appraised_lines else False
-
-            recom_lines = appraised_lines.filtered(lambda l: l.recommendations)
-            recom_texts = [l.recommendations.strip() for l in recom_lines if l.recommendations.strip()]
-            recom_summary = " | ".join(recom_texts) if recom_texts else ""
-
-            score = round(appraisal.employee_score, 1)
-            severity = 'critical' if score < 50.0 else ('high' if score < 65.0 else 'medium')
-
-            if lowest_line and lowest_line.job_measure_id:
-                prog_name = _("Performance Improvement: %s") % lowest_line.job_measure_id.name
-                metric_detail = _("Lowest Metric: %s (%.1f%% achieved).") % (
-                    lowest_line.job_measure_id.name, lowest_line.accomplishment_percent
-                )
-            else:
-                prog_name = _("Performance Enhancement Program")
-                metric_detail = ""
-
-            recom_part = _(" Recommendations: %s.") % recom_summary if recom_summary else ""
-
-            justification = _(
-                "PMS Appraisal Gap Diagnostic from Appraisal '%s' (FY: %s, Period: %s). "
-                "Overall Score: %.1f%% (%s). %s%s"
-            ) % (
-                appraisal.name,
-                appraisal.fiscal_year_id.name if appraisal.fiscal_year_id else 'N/A',
-                appraisal.appraisal_period_id.name if appraisal.appraisal_period_id else 'N/A',
-                score,
-                appraisal.performance_rating or 'Below Target',
-                metric_detail,
-                recom_part
+            appraised_lines = appraisal.line_ids.filtered(
+                lambda l: l.appraised == 'yes' and (l.job_measure_id or l.appraisal_criteria)
             )
 
             work_unit = appraisal.operating_unit_id or self.env['eds.hr.compat'].get_employee_operating_unit(emp)
             job = appraisal.job_id or self.env['eds.hr.compat'].get_employee_job(emp)
 
-            TnaEntryModel.create({
-                'cycle_id': self.cycle_id.id,
-                'employee_id': emp.id,
-                'work_unit_id': work_unit.id if work_unit else False,
-                'department_id': appraisal.department_id.id if appraisal.department_id else (emp.department_id.id if emp.department_id else False),
-                'job_position_id': job.id if job else False,
-                'proposed_program': prog_name,
-                'urgency': severity,
-                'priority_score': max(1.0, round(100.0 - score, 1)),
-                'source': 'pms',
-                'delivery_mode': 'classroom',
-                'justification': justification,
-                'state': 'submitted',
-            })
-            success_count += 1
+            for line in appraised_lines:
+                measure = line.job_measure_id
+                measure_name = measure.name if measure else (line.appraisal_criteria or '').strip()
+                if not measure and measure_name:
+                    measure_domain = [('name', '=ilike', measure_name)]
+                    if job:
+                        measure_domain.append(('job_id', '=', job.id))
+                    if work_unit:
+                        measure_domain.append(('operating_unit_id', '=', work_unit.id))
+                    measure = self.env['performance.job.measure'].sudo().search(
+                        measure_domain, limit=1)
+                mappings = PmsCourseLine.search([
+                    ('job_measure_id', '=', measure.id),
+                    ('course_id.status', 'in', ('active', 'draft')),
+                ]) if measure else PmsCourseLine.browse()
+                line_score = round(line.accomplishment_percent, 1)
+                rating = (line.appraisal_rating or '').strip()
+                unsatisfactory = rating.casefold() == 'unsatisfactory'
+                applicable = mappings.filtered(
+                    lambda mapping: unsatisfactory or line_score < mapping.min_threshold)
+                if not unsatisfactory and line_score >= self.max_score_threshold and not applicable:
+                    continue
+                key = (emp.id, measure.id if measure else measure_name.lower())
+                if key in existing_keys:
+                    skipped_count += 1
+                    continue
+                existing_keys.add(key)
+
+                # Match configured courses for this PMS measurement
+                pms_courses = applicable.mapped('course_id')
+                severity = 'critical' if line_score < 50.0 else ('high' if line_score < 65.0 else 'medium')
+
+                recom_text = line.recommendations.strip() if line.recommendations else ""
+                recom_part = _(" Recommendations: %s.") % recom_text if recom_text else ""
+
+                prog_name = pms_courses[0].name if len(pms_courses) == 1 else (_("Performance Improvement: %s") % measure_name)
+
+                justification = _(
+                    "PMS Individual Measurement Gap from Appraisal '%s' (FY: %s, Period: %s). "
+                    "Metric: %s (Accomplishment: %.1f%%, Target: %.1f).%s"
+                ) % (
+                    appraisal.name,
+                    appraisal.fiscal_year_id.name if appraisal.fiscal_year_id else 'N/A',
+                    appraisal.appraisal_period_id.name if appraisal.appraisal_period_id else 'N/A',
+                    measure_name,
+                    line_score,
+                    line.target or 0.0,
+                    recom_part
+                )
+
+                TnaEntryModel.create({
+                    'cycle_id': self.cycle_id.id,
+                    'request_level': 'individual',
+                    'employee_id': emp.id,
+                    'work_unit_id': work_unit.id if work_unit else False,
+                    'department_id': appraisal.department_id.id if appraisal.department_id else (emp.department_id.id if emp.department_id else False),
+                    'job_position_id': job.id if job else False,
+                    'pms_measure_id': measure.id if measure else False,
+                    'pms_measurement_name': measure_name,
+                    'pms_kpi_reference': measure_name,
+                    'pms_appraisal_score': line_score,
+                    'pms_appraisal_rating': rating,
+                    'pms_target_type': line.appraisal_type or (measure.target_type if measure else ''),
+                    'pms_target_value': line.target or 0.0,
+                    'pms_actual_value': line.uploaded_value or 0.0,
+                    'course_id': pms_courses[0].id if len(pms_courses) == 1 else False,
+                    'suggested_course_ids': [(6, 0, pms_courses.ids)],
+                    'proposed_program': prog_name,
+                    'urgency': severity,
+                    'gap_severity': severity,
+                    'priority_score': max(1.0, round(100.0 - line_score, 1)),
+                    'source': 'pms',
+                    'delivery_mode': 'classroom',
+                    'justification': justification,
+                    'state': 'submitted',
+                })
+                success_count += 1
 
         summary = _(
             "PMS Performance Gap Ingestion Complete:\n"
             "- Appraisals Scanned: %d\n"
-            "- Successfully Created TNA Entries: %d\n"
+            "- Successfully Created TNA Entries (Measurement Gaps): %d\n"
             "- Skipped (Already Present): %d\n"
             "- Max Score Threshold Applied: %.1f%%"
         ) % (len(appraisals), success_count, skipped_count, self.max_score_threshold)
 
-        self.result_log = summary
+        self.write({
+            'ingestion_done': True,
+            'scanned_count': len(appraisals),
+            'created_count': success_count,
+            'skipped_count': skipped_count,
+            'result_log': summary,
+        })
         self.cycle_id.message_post(body=_(
             "Diagnostic Ingestion: %d PMS performance gap entries pulled into cycle '%s'."
         ) % (success_count, self.cycle_id.name))

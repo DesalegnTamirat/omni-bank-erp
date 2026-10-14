@@ -14,7 +14,7 @@
     <template id="report_eds_level3_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <t t-call="web.external_layout">
+                <t t-call="employee_development_system.report_eds_brand_layout">
                     <div class="page" style="font-family: Arial, sans-serif; font-size: 10pt; color: #333;">
                         <div style="border-bottom: 2px solid #003366; padding-bottom: 6px; margin-bottom: 12px;">
                             <table style="width: 100%;">
@@ -94,7 +94,7 @@
                                         <td><span t-esc="cl.behavior_description or cl.comment or '-'"/></td>
                                         <td style="text-align: center;"><span t-field="cl.observed_level"/></td>
                                         <td style="text-align: center;">
-                                            <strong t-esc="cl.frequency_rating or '4'"/> / 5 (<span t-esc="'%.0f%%' % cl.score_pct"/>)
+                                            <strong t-esc="cl.frequency_rating or '4'"/> / 5 (<span t-esc="'{:.0f}%'.format(cl.score_pct)"/>)
                                         </td>
                                     </tr>
                                     <t t-set="c_seq" t-value="c_seq + 1"/>

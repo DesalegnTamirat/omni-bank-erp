@@ -191,15 +191,16 @@
                                             <!-- Video Source Option (File vs URL) -->
                                             <group string="Internal Video Hosting (FR-LMS-004)" invisible="lesson_type != 'video'">
                                                 <field name="video_source_type"/>
-                                                <field name="video_file" filename="video_filename" invisible="video_source_type != 'file'"/>
+                                                <field name="video_file" filename="video_filename" invisible="video_source_type != 'file'" groups="learning_management.group_lms_instructor"/>
                                                 <field name="video_filename" invisible="1"/>
                                                 <field name="video_url" invisible="video_source_type != 'url'" placeholder="https://media.bunnabanksc.com/videos/module1.mp4"/>
                                             </group>
 
                                             <!-- Document Option -->
                                             <group string="Document / Slide Material" invisible="lesson_type != 'document'">
-                                                <field name="document_file" filename="document_filename"/>
+                                                <field name="document_file" filename="document_filename" groups="learning_management.group_lms_instructor"/>
                                                 <field name="document_filename" invisible="1"/>
+                                                <button name="action_open_document" string="Open Lesson Document" type="object" class="btn-secondary" invisible="not document_filename"/>
                                             </group>
 
                                             <!-- Text Option -->

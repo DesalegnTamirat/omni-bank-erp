@@ -172,7 +172,9 @@ class EdsCertificate(models.Model):
                 ('employee_id', 'in', emp_ids),
             ])
             for att in attendances:
-                attendance_map[(att.session_id.id, att.employee_id.id)] = att
+                key = (att.session_id.id, att.employee_id.id)
+                total, present = attendance_map.get(key, (0, 0))
+                attendance_map[key] = (total + 1, present + int(att.attended))
 
             l2_evals = self.env['eds.evaluation.level2'].sudo().search([
                 ('session_id', 'in', session_ids),
@@ -193,8 +195,9 @@ class EdsCertificate(models.Model):
             req_l2 = rule.require_level2_pass if rule else True
             min_l2 = rule.min_level2_score if rule else 60.0
 
-            attendance = attendance_map.get((rec.session_id.id, rec.employee_id.id))
-            att_pct = attendance.attendance_percentage if attendance else 0.0
+            total_days, present_days = attendance_map.get(
+                (rec.session_id.id, rec.employee_id.id), (0, 0))
+            att_pct = round(present_days * 100.0 / total_days, 2) if total_days else 0.0
 
             l2_eval = l2_map.get((rec.session_id.id, rec.employee_id.id))
             post_score = l2_eval.post_score if l2_eval else 0.0
@@ -271,6 +274,18 @@ class EdsCertificate(models.Model):
         font_sign_label = self._get_font("DejaVuSans-Bold", 12)
         font_sign_val = self._get_font("DejaVuSans", 11)
 
+        # Cover the fixed heading in the Bunna background so the course or
+        # session certificate title is reflected in the downloadable image.
+        title = (self.certificate_title or _('Certificate of Participation')).upper()
+        draw.rectangle((195, 83, 665, 132), fill=(250, 250, 250))
+        for size in (20, 18, 16, 14):
+            title_font = self._get_font('DejaVuSerif-Bold', size)
+            title_width = draw.textbbox((0, 0), title, font=title_font)[2]
+            if title_width <= 450:
+                break
+        draw.text((205 + (450 - title_width) / 2, 99), title,
+                  fill=color_text, font=title_font)
+
         # 1. CNO (Top right)
         cno_text = f"CNO: {self.code}"
         bbox_cno = draw.textbbox((0, 0), cno_text, font=font_cno)
@@ -292,7 +307,8 @@ class EdsCertificate(models.Model):
         # 4. Training Title and Dates
         course_name = self.course_id.name or (self.session_id and self.session_id.program_name) or _("Training Course")
         dates_text = self.training_dates_text or ""
-        body_text = f"For completing the training titled “{course_name}” conducted from {dates_text}."
+        body_text = self.certificate_body_text or (
+            f"For completing the training titled “{course_name}” conducted from {dates_text}.")
         
         words = body_text.split()
         lines = []

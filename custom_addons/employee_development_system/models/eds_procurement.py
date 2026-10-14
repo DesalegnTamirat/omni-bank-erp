@@ -2,7 +2,7 @@
 from datetime import date, datetime
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 class EdsVenueRequirement(models.Model):
@@ -193,7 +193,7 @@ class EdsRfp(models.Model):
         domain="[('pre_qualified', '=', True)]",
         help='Pre-qualified providers the RFP is issued to.')
     proposal_ids = fields.One2many('eds.vendor.proposal', 'rfp_id', string='Proposals')
-    proposal_count = fields.Integer(string='Proposals', compute='_compute_proposal_count')
+    proposal_count = fields.Integer(string='Proposal Count', compute='_compute_proposal_count')
     issuance_date = fields.Date(string='Issuance Date', readonly=True)
     receipt_opened_date = fields.Datetime(string='Receipts Opened At', readonly=True)
     awarded_proposal_id = fields.Many2one('eds.vendor.proposal', string='Awarded Proposal',
@@ -564,7 +564,7 @@ class EdsVendorEvaluationLine(models.Model):
     evaluation_id = fields.Many2one('eds.vendor.evaluation', string='Evaluation',
                                     required=True, ondelete='cascade')
     sequence = fields.Integer(string='Order', default=10)
-    criterion_id = fields.Many2one('eds.evaluation.criteria', string='Criterion')
+    criterion_id = fields.Many2one('eds.evaluation.criteria', string='Criterion Template')
     name = fields.Char(string='Criterion', required=True)
     weight = fields.Float(string='Weight (%)', default=10.0, required=True)
     score = fields.Float(string='Score (0-100)', default=0.0, required=True)
@@ -735,3 +735,318 @@ class EdsTrainingContractVersion(models.Model):
     date = fields.Datetime(string='Date', default=fields.Datetime.now)
     created_by_id = fields.Many2one('res.users', string='Created By',
                                     default=lambda self: self.env.user)
+
+
+class EdsCourseVendorSelection(models.Model):
+    """Post-Plan Course Vendor Sourcing & Evaluation (/031/033).
+
+    Allows sourcing multiple vendors for an approved planned course,
+    applying technical/functional and financial percentage scoring templates,
+    tracking vendor status (Awarded with file upload, Contract with attachment, Pending, Rejected),
+    and automatically sorting proposals by highest total weighted value.
+    """
+    _name = 'eds.course.vendor.selection'
+    _description = 'Course Vendor Selection & Evaluation'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _order = 'id desc'
+    _rec_name = 'name'
+
+    name = fields.Char(string='Reference', required=True, readonly=True, copy=False, default=lambda self: _('New'))
+    annual_plan_id = fields.Many2one(
+        'eds.annual.plan', string='Approved Annual Plan', required=True, tracking=True,
+        domain="[('state', 'in', ('published', 'amended'))]")
+    plan_line_id = fields.Many2one(
+        'eds.annual.plan.line', string='Approved Plan Program', required=True, tracking=True,
+        domain="[('plan_id', '=', annual_plan_id)]")
+    course_id = fields.Many2one(
+        'eds.course', string='Catalog Course', tracking=True,
+        help='Filled from the approved plan program when it uses a catalog course.')
+    program_name = fields.Char(related='plan_line_id.program_name', string='Program Name')
+    delivery_method = fields.Selection(related='plan_line_id.delivery_method',
+                                       string='Delivery Type', store=True)
+    template_type = fields.Selection([
+        ('standard_70_30', 'Standard (70% Technical/Functional, 30% Financial)'),
+        ('specialized_80_20', 'High Specialization (80% Technical/Functional, 20% Financial)'),
+        ('balanced_50_50', 'Balanced (50% Technical, 50% Financial)'),
+        ('custom', 'Custom Weighting'),
+    ], string='Evaluation Template', default='standard_70_30', required=True, tracking=True)
+    technical_weight = fields.Float(string='Technical / Functional Weight (%)', default=70.0)
+    financial_weight = fields.Float(string='Financial / Price Weight (%)', default=30.0)
+
+    line_ids = fields.One2many(
+        'eds.course.vendor.line', 'selection_id', string='Vendor Proposals & Bids')
+    vendor_count = fields.Integer(string='Vendors Count', compute='_compute_vendor_count')
+    awarded_vendor_id = fields.Many2one(
+        'eds.external.provider', string='Awarded Vendor', compute='_compute_awarded_vendor', store=True)
+    currency_id = fields.Many2one(
+        'res.currency', string='Bid Currency', required=True,
+        default=lambda self: self.env.company.currency_id,
+        help='International sourcing defaults to USD; another currency can be selected.')
+    state = fields.Selection([
+        ('draft', 'Draft Sourcing'),
+        ('evaluation', 'Under Evaluation'),
+        ('awarded', 'Awarded / Contracted'),
+    ], string='Status', default='draft', required=True, tracking=True)
+    notes = fields.Text(string='Sourcing Notes & Objectives')
+
+    @api.onchange('template_type')
+    def _onchange_template_type(self):
+        if self.template_type == 'standard_70_30':
+            self.technical_weight = 70.0
+            self.financial_weight = 30.0
+        elif self.template_type == 'specialized_80_20':
+            self.technical_weight = 80.0
+            self.financial_weight = 20.0
+        elif self.template_type == 'balanced_50_50':
+            self.technical_weight = 50.0
+            self.financial_weight = 50.0
+
+    @api.onchange('plan_line_id')
+    def _onchange_plan_line_id(self):
+        self.course_id = self.plan_line_id.course_id
+        self.currency_id = self._currency_for_plan_line(self.plan_line_id)
+
+    @api.model
+    def _currency_for_plan_line(self, plan_line):
+        if plan_line and plan_line.delivery_method == 'international':
+            return self.env['res.currency'].search([('name', '=', 'USD')], limit=1) or self.env.company.currency_id
+        return self.env.company.currency_id
+
+    @api.onchange('annual_plan_id')
+    def _onchange_annual_plan_id(self):
+        if self.plan_line_id.plan_id != self.annual_plan_id:
+            self.plan_line_id = False
+            self.course_id = False
+        if self.annual_plan_id and not self.plan_line_id and len(self.annual_plan_id.line_ids) == 1:
+            self.plan_line_id = self.annual_plan_id.line_ids
+            self.course_id = self.plan_line_id.course_id
+            self.currency_id = self._currency_for_plan_line(self.plan_line_id)
+
+    @api.depends('line_ids')
+    def _compute_vendor_count(self):
+        for rec in self:
+            rec.vendor_count = len(rec.line_ids)
+
+    @api.depends('line_ids.status', 'line_ids.vendor_id')
+    def _compute_awarded_vendor(self):
+        for rec in self:
+            awarded = rec.line_ids.filtered(lambda l: l.status in ('awarded', 'contract'))[:1]
+            rec.awarded_vendor_id = awarded.vendor_id if awarded else False
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('name', _('New')) == _('New'):
+                vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.course.vendor.selection') or _('New')
+            if vals.get('plan_line_id') and 'course_id' not in vals:
+                vals['course_id'] = self.env['eds.annual.plan.line'].browse(vals['plan_line_id']).course_id.id or False
+            if vals.get('plan_line_id') and not vals.get('currency_id'):
+                vals['currency_id'] = self._currency_for_plan_line(
+                    self.env['eds.annual.plan.line'].browse(vals['plan_line_id'])).id
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if vals.get('plan_line_id') and 'course_id' not in vals:
+            vals = dict(vals, course_id=self.env['eds.annual.plan.line'].browse(vals['plan_line_id']).course_id.id or False)
+        if vals.get('plan_line_id') and 'currency_id' not in vals:
+            vals = dict(vals, currency_id=self._currency_for_plan_line(
+                self.env['eds.annual.plan.line'].browse(vals['plan_line_id'])).id)
+        return super().write(vals)
+
+    def _sync_awarded_vendor_to_sessions(self):
+        for rec in self:
+            if not rec.awarded_vendor_id or not rec.plan_line_id:
+                continue
+            sessions = self.env['eds.session'].search([
+                ('plan_line_id', '=', rec.plan_line_id.id),
+                ('status', 'not in', ('completed', 'cancelled')),
+                ('awarded_provider_id', '=', False),
+            ])
+            sessions.write({'awarded_provider_id': rec.awarded_vendor_id.id})
+            winner = rec.line_ids.filtered(lambda line: line.status in ('awarded', 'contract'))[:1]
+            if winner.trainer_id:
+                for session in self.env['eds.session'].search([
+                        ('plan_line_id', '=', rec.plan_line_id.id),
+                        ('status', 'not in', ('completed', 'cancelled'))]):
+                    if not session.trainer_ids:
+                        session.trainer_ids = winner.trainer_id
+
+    def action_start_evaluation(self):
+        for rec in self:
+            if rec.state != 'draft':
+                raise UserError(_('Only draft sourcing records can start evaluation.'))
+            if rec.annual_plan_id.state not in ('published', 'amended'):
+                raise UserError(_('Vendor sourcing requires an approved Annual Plan.'))
+            if not rec.line_ids:
+                raise UserError(_('Add at least one vendor before starting evaluation.'))
+            rec.state = 'evaluation'
+
+    def action_mark_awarded(self):
+        for rec in self:
+            if rec.state != 'evaluation':
+                raise UserError(_('Only evaluations can be completed.'))
+            if not rec.line_ids.filtered(lambda line: line.status in ('awarded', 'contract')):
+                raise UserError(_('Award a qualified vendor before completing sourcing.'))
+            rec.state = 'awarded'
+
+    @api.constrains('annual_plan_id', 'plan_line_id', 'course_id', 'technical_weight', 'financial_weight')
+    def _check_plan_and_weights(self):
+        for rec in self:
+            if rec.annual_plan_id and rec.annual_plan_id.state not in ('published', 'amended'):
+                raise ValidationError(_('Vendor sourcing requires an approved Annual Plan.'))
+            if rec.plan_line_id and (rec.plan_line_id.plan_id != rec.annual_plan_id
+                                     or rec.plan_line_id.course_id != rec.course_id):
+                raise ValidationError(_('The selected program must belong to the chosen Annual Plan; its catalog course must match.'))
+            if rec.technical_weight < 0 or rec.financial_weight < 0 or abs(
+                    rec.technical_weight + rec.financial_weight - 100.0) > 0.01:
+                raise ValidationError(_('Technical and financial weights must total 100%.'))
+
+
+class EdsCourseVendorLine(models.Model):
+    """Vendor line inside course vendor sourcing (/031/033).
+
+    Calculates weighted total score from technical/functional % and financial %.
+    Sorted by total_score desc.
+    """
+    _name = 'eds.course.vendor.line'
+    _description = 'Course Vendor Evaluation Line'
+    _order = 'total_score desc, id'
+
+    selection_id = fields.Many2one(
+        'eds.course.vendor.selection', string='Vendor Selection', required=True, ondelete='cascade', index=True)
+    vendor_id = fields.Many2one(
+        'eds.external.provider', string='Vendor / Training Provider')
+    trainer_id = fields.Many2one(
+        'eds.trainer', string='Proposed Trainer',
+        domain="[('trainer_type','=','external'),('external_provider_id','=',vendor_id),('state','=','active')]",
+        help='Optional named trainer from this provider; the session may choose a different trainer.')
+    vendor_name = fields.Char(string='Vendor Name')
+    price_quoted = fields.Monetary(
+        string='Quoted Price', currency_field='currency_id', default=0.0)
+    currency_id = fields.Many2one('res.currency', string='Bid Currency', required=True,
+                                  default=lambda self: self.env.company.currency_id)
+    quality_score = fields.Float(string='Technical Quality & Relevance (0-10)')
+    experience_score = fields.Float(string='Firm & Trainer Experience (0-10)')
+    scalability_score = fields.Float(string='Delivery & Scalability (0-10)')
+    demo_score = fields.Float(string='Demo Presentation (0-10)')
+    price_score = fields.Float(string='Financial Proposal (0-10)')
+    technical_score = fields.Float(
+        string='Technical / Functional Score (0-100)', compute='_compute_template_scores', store=True)
+    financial_score = fields.Float(
+        string='Financial Score (0-100)', compute='_compute_template_scores', store=True)
+    technical_threshold_met = fields.Boolean(
+        string='Technical Gate Met', compute='_compute_template_scores', store=True)
+    total_score = fields.Float(
+        string='Total Score', compute='_compute_total_score', store=True)
+
+    status = fields.Selection([
+        ('pending', 'Pending'),
+        ('awarded', 'Awarded'),
+        ('contract', 'Contract Signed'),
+        ('rejected', 'Rejected'),
+    ], string='Status', default='pending', required=True)
+
+    award_attachment = fields.Binary(string='Award File Upload', attachment=True)
+    award_filename = fields.Char(string='Award Filename')
+    contract_attachment = fields.Binary(string='Contract Attachment', attachment=True)
+    contract_filename = fields.Char(string='Contract Filename')
+    notes = fields.Char(string='Remarks / Evaluation Summary')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('selection_id') and not vals.get('currency_id'):
+                vals['currency_id'] = self.env['eds.course.vendor.selection'].browse(
+                    vals['selection_id']).currency_id.id
+        return super().create(vals_list)
+
+    @api.onchange('selection_id')
+    def _onchange_selection_currency(self):
+        if self.selection_id:
+            self.currency_id = self.selection_id.currency_id
+
+    @api.onchange('vendor_id')
+    def _onchange_vendor_id(self):
+        if self.vendor_id and not self.vendor_name:
+            self.vendor_name = self.vendor_id.name
+        if self.trainer_id and self.trainer_id.external_provider_id != self.vendor_id:
+            self.trainer_id = False
+
+    @api.onchange('quality_score', 'experience_score', 'scalability_score', 'demo_score', 'price_score')
+    def _onchange_score_range(self):
+        fields_to_check = ('quality_score', 'experience_score', 'scalability_score',
+                           'demo_score', 'price_score')
+        invalid = [field for field in fields_to_check if getattr(self, field) < 0 or getattr(self, field) > 10]
+        for field in invalid:
+            setattr(self, field, 0.0)
+        if invalid:
+            return {'warning': {
+                'title': _('Invalid vendor score'),
+                'message': _('Each vendor criterion must be scored from 0 to 10. Invalid entries were reset to zero.'),
+            }}
+
+    @api.depends('quality_score', 'experience_score', 'scalability_score', 'demo_score',
+                 'price_score', 'selection_id.technical_weight')
+    def _compute_template_scores(self):
+        for rec in self:
+            # Source matrix: 30% quality, 20% experience, 10% scalability,
+            # 10% demonstration, 30% financial; each input is scored 0-10.
+            technical_points = (rec.quality_score * 3 + rec.experience_score * 2
+                                + rec.scalability_score + rec.demo_score)
+            rec.technical_score = technical_points / 70.0 * 100.0
+            rec.financial_score = rec.price_score * 10.0
+            rec.technical_threshold_met = technical_points >= 40.0
+
+    @api.constrains('quality_score', 'experience_score', 'scalability_score',
+                    'demo_score', 'price_score', 'vendor_id', 'trainer_id', 'selection_id')
+    def _check_vendor_scores(self):
+        for rec in self:
+            scores = (rec.quality_score, rec.experience_score, rec.scalability_score,
+                      rec.demo_score, rec.price_score)
+            if any(score < 0 or score > 10 for score in scores):
+                raise ValidationError(_('Vendor matrix scores must be between 0 and 10.'))
+            if rec.vendor_id and self.search_count([
+                    ('selection_id', '=', rec.selection_id.id), ('vendor_id', '=', rec.vendor_id.id),
+                    ('id', '!=', rec.id)]):
+                raise ValidationError(_('A vendor may appear only once in a course selection.'))
+            if rec.trainer_id and (rec.trainer_id.trainer_type != 'external' or
+                                   rec.trainer_id.external_provider_id != rec.vendor_id):
+                raise ValidationError(_('The proposed trainer must belong to the selected provider.'))
+
+    @api.depends('technical_score', 'financial_score', 'technical_threshold_met', 'selection_id.technical_weight',
+                 'selection_id.financial_weight')
+    def _compute_total_score(self):
+        for rec in self:
+            t_w = rec.selection_id.technical_weight
+            f_w = rec.selection_id.financial_weight
+            sum_w = t_w + f_w
+            if sum_w > 0 and rec.technical_threshold_met:
+                rec.total_score = round((rec.technical_score * t_w + rec.financial_score * f_w) / sum_w, 2)
+            else:
+                rec.total_score = 0.0
+
+    def action_award(self):
+        for rec in self:
+            if rec.selection_id.state != 'evaluation' or not rec.technical_threshold_met:
+                raise UserError(_('Only a vendor passing the technical gate can be awarded.'))
+            if not rec.vendor_id:
+                raise UserError(_('Select a registered training provider before awarding.'))
+            if rec.selection_id.line_ids.filtered(
+                    lambda line: line.id != rec.id and line.status in ('awarded', 'contract')):
+                raise UserError(_('Another vendor is already awarded for this course.'))
+            if not rec.award_attachment:
+                raise UserError(_('Upload the award letter before awarding this vendor.'))
+            rec.status = 'awarded'
+            rec.selection_id.state = 'awarded'
+            rec.selection_id._sync_awarded_vendor_to_sessions()
+
+    def action_contract(self):
+        for rec in self:
+            if rec.status != 'awarded' or not rec.contract_attachment:
+                raise UserError(_('Upload the signed contract for the awarded vendor first.'))
+            rec.status = 'contract'
+            rec.selection_id.state = 'awarded'
+
+    def action_reject(self):
+        for rec in self:
+            rec.status = 'rejected'

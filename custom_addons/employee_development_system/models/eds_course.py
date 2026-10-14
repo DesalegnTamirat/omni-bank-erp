@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import date
+from markupsafe import Markup, escape
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -74,6 +75,11 @@ class EdsCourse(models.Model):
     competency_line_ids = fields.One2many(
         'eds.course.competency.line', 'course_id', string='Competency Mapping',
         help='Course-to-competency mapping with required proficiency.')
+    pms_measure_line_ids = fields.One2many(
+        'eds.course.pms.line', 'course_id', string='PMS Measurement Mapping',
+        help='Course-to-PMS individual measurement mapping with trigger gap threshold.')
+    pms_measure_count = fields.Integer(
+        string='Mapped PMS Measures', compute='_compute_pms_measure_count', store=True)
     curriculum_ids = fields.One2many('eds.curriculum', 'course_id', string='Curriculum Versions')
     current_curriculum_id = fields.Many2one(
         'eds.curriculum', string='Current Curriculum', compute='_compute_current_curriculum')
@@ -99,6 +105,11 @@ class EdsCourse(models.Model):
     certificate_signatory_name = fields.Char(string='Authorized Signatory Name')
     certificate_signatory_title = fields.Char(string='Authorized Signatory Title', default='Director - People Performance & Development')
 
+    def action_preview_certificate(self):
+        self.ensure_one()
+        return self.env.ref(
+            'employee_development_system.action_report_eds_course_certificate_preview').report_action(self)
+
     # Linked Evaluation & Assessment Instruments
     level1_instrument_id = fields.Many2one(
         'eds.evaluation.instrument', string='Level 1 Reaction Questionnaire',
@@ -119,7 +130,7 @@ class EdsCourse(models.Model):
     development_request_ids = fields.One2many(
         'eds.course.development.request', 'course_id', string='Development Requests')
     development_request_count = fields.Integer(
-        string='Development Requests', compute='_compute_counts')
+        string='Development Request Count', compute='_compute_counts')
     curriculum_count = fields.Integer(string='Curriculums', compute='_compute_counts')
 
     # training materials with approval gate
@@ -276,17 +287,28 @@ class EdsCourse(models.Model):
             pillar_names = [p.capitalize() for p in pillars if p]
             rec.target_pillar_summary = ", ".join(pillar_names) if pillar_names else _("Not Specified")
 
-    def action_generate_learning_objectives(self):
-        """Auto-compile course description, syllabus, and expected behavioral learning outcomes from mapped competencies."""
+    @api.depends('pms_measure_line_ids')
+    def _compute_pms_measure_count(self):
         for rec in self:
-            if not rec.competency_line_ids:
-                raise UserError(_("Please map at least one competency to this course before generating learning outcomes."))
+            rec.pms_measure_count = len(rec.pms_measure_line_ids)
+
+    def action_generate_learning_objectives(self):
+        """Compile outcomes from the competencies and PMS measures mapped to this course."""
+        for rec in self:
+            if not rec.competency_line_ids and not rec.pms_measure_line_ids:
+                raise UserError(_("Map a competency or PMS measurement before generating learning outcomes."))
             
             outcomes_html = ["<div class='o_eds_learning_outcomes' style='font-family: inherit; line-height: 1.6;'>"]
-            outcomes_html.append("<div class='alert alert-info mb-3'><strong>%s:</strong> %s</div>" % (
-                _("Course Curriculum Competency Alignment"),
-                _("Upon completion of this course, participants will demonstrate the following proficiency standards aligned with the Bunna Bank Competency Framework.")
-            ))
+            if rec.competency_line_ids:
+                outcomes_html.append("<div class='alert alert-info mb-3'><strong>%s:</strong> %s</div>" % (
+                    _("Course Curriculum Competency Alignment"),
+                    _("Upon completion of this course, participants will demonstrate the following proficiency standards aligned with the Bunna Bank Competency Framework.")
+                ))
+            if rec.pms_measure_line_ids:
+                outcomes_html.append("<div class='alert alert-info mb-3'><strong>%s:</strong> %s</div>" % (
+                    _("PMS Measurement Alignment"),
+                    _("Participants will improve the mapped performance measures and practice the listed development focus areas.")
+                ))
             
             for line in rec.competency_line_ids:
                 comp = line.competency_id
@@ -296,22 +318,56 @@ class EdsCourse(models.Model):
                 
                 outcomes_html.append("<div style='margin-bottom: 14px; padding: 12px 16px; background: #ffffff; border: 1px solid #e0e0e0; border-left: 5px solid #726732; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>")
                 outcomes_html.append("<div class='d-flex justify-content-between align-items-center mb-1'>")
-                outcomes_html.append("<h5 style='margin:0; color: #1d2b32;'><strong>%s</strong> <span style='font-size: 12px; color: #666;'>[%s]</span></h5>" % (comp.name, pillar_label))
-                outcomes_html.append("<span class='badge bg-primary' style='font-size: 12px; padding: 4px 8px;'>Target: %s</span>" % lvl_label)
+                outcomes_html.append("<h5 style='margin:0; color: #1d2b32;'><strong>%s</strong> <span style='font-size: 12px; color: #666;'>[%s]</span></h5>" % (escape(comp.name), escape(pillar_label)))
+                outcomes_html.append("<span class='badge bg-primary' style='font-size: 12px; padding: 4px 8px;'>Target: %s</span>" % escape(lvl_label))
                 outcomes_html.append("</div>")
                 
                 comp_desc = getattr(comp, 'definition', False) or getattr(comp, 'description', False)
                 if comp_desc:
-                    outcomes_html.append("<p style='margin: 4px 0 8px 0; font-size: 13px; color: #555;'><em>%s</em></p>" % comp_desc)
+                    outcomes_html.append("<p style='margin: 4px 0 8px 0; font-size: 13px; color: #555;'><em>%s</em></p>" % escape(comp_desc))
                 if line.behavioral_indicators:
                     outcomes_html.append("<div style='font-size: 13px; color: #222; background: #fdfdfd; padding: 8px 12px; border-radius: 4px; border: 1px dashed #d5d5d5;'>")
-                    outcomes_html.append("<strong>%s:</strong><br/>%s" % (_("Demonstrated Behavioral Indicators"), line.behavioral_indicators.replace('\n', '<br/>')))
+                    outcomes_html.append("<strong>%s:</strong><br/>%s" % (_("Demonstrated Behavioral Indicators"), escape(line.behavioral_indicators).replace('\n', Markup('<br/>'))))
                     outcomes_html.append("</div>")
+                outcomes_html.append("</div>")
+            for line in rec.pms_measure_line_ids:
+                measure = line.job_measure_id
+                outcomes_html.append("<div style='margin-bottom: 14px; padding: 12px 16px; background: #ffffff; border: 1px solid #e0e0e0; border-left: 5px solid #425727; border-radius: 6px;'>")
+                outcomes_html.append("<h5 style='margin:0 0 8px;'><strong>%s</strong> <span style='font-size: 12px; color: #666;'>(%s)</span></h5>" % (
+                    escape(measure.name), escape(_("PMS Measurement"))))
+                outcomes_html.append("<p>%s: %s. %s: %.1f%%.</p>" % (
+                    escape(_("Target Type")), escape(dict(measure._fields['target_type'].selection).get(measure.target_type, measure.target_type)),
+                    escape(_("Gap Trigger")), line.min_threshold))
+                if line.notes:
+                    outcomes_html.append("<p>%s</p>" % escape(line.notes))
                 outcomes_html.append("</div>")
             
             outcomes_html.append("</div>")
             rec.learning_outcomes = "".join(outcomes_html)
-            rec.message_post(body=_("Course learning objectives and behavioral indicators successfully auto-compiled from %d mapped competencies.") % len(rec.competency_line_ids))
+            rec.message_post(body=_("Course learning outcomes compiled from %d competencies and %d PMS measurements.") % (
+                len(rec.competency_line_ids), len(rec.pms_measure_line_ids)))
+
+    def action_view_curriculums(self):
+        self.ensure_one()
+        return {
+            'name': _('Curriculums for %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.curriculum',
+            'view_mode': 'list,form',
+            'domain': [('course_id', '=', self.id)],
+            'context': {'default_course_id': self.id},
+        }
+
+    def action_view_development_requests(self):
+        self.ensure_one()
+        return {
+            'name': _('Development Requests for %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.course.development.request',
+            'view_mode': 'list,form',
+            'domain': [('course_id', '=', self.id)],
+            'context': {'default_course_id': self.id},
+        }
 
     def action_view_materials(self):
         self.ensure_one()
@@ -422,6 +478,39 @@ class EdsCourseCompetencyLine(models.Model):
             'views': [(self.env.ref('employee_development_system.view_eds_course_competency_line_form').id, 'form')],
             'target': 'new',
         }
+
+
+class EdsCoursePmsLine(models.Model):
+    """Course -> PMS individual measurement mapping with developmental threshold."""
+    _name = 'eds.course.pms.line'
+    _description = 'Course PMS Measurement Mapping Line'
+    _order = 'course_id, job_measure_id'
+
+    course_id = fields.Many2one('eds.course', string='Course', required=True, ondelete='cascade')
+    job_measure_id = fields.Many2one(
+        'performance.job.measure', string='Individual Measurement', required=True, ondelete='cascade',
+        help='Individual measurement metric from the PMS module.')
+    job_objective_id = fields.Many2one(
+        related='job_measure_id.job_objective_id', string='Strategic KPI', readonly=True, store=True)
+    job_id = fields.Many2one(
+        related='job_measure_id.job_id', string='Job Position', readonly=True, store=True)
+    operating_unit_id = fields.Many2one(
+        related='job_measure_id.operating_unit_id', string='Work Unit', readonly=True, store=True)
+    target_type = fields.Selection(
+        related='job_measure_id.target_type', string='Target Type', readonly=True, store=True)
+    min_threshold = fields.Float(
+        string='Gap Trigger Threshold (%)', default=75.0,
+        help='If an employee evaluates below this accomplishment percentage, this course is recommended.')
+    weight_pct = fields.Float(string='Weight in Course (%)', default=100.0)
+    notes = fields.Text(string='Developmental Scope / Learning Focus')
+
+    @api.constrains('course_id', 'job_measure_id')
+    def _check_unique_course_measure(self):
+        for rec in self:
+            if rec.course_id and rec.job_measure_id:
+                domain = [('course_id', '=', rec.course_id.id), ('job_measure_id', '=', rec.job_measure_id.id), ('id', '!=', rec.id)]
+                if self.search_count(domain) > 0:
+                    raise ValidationError(_("The PMS measurement '%s' is already mapped to this course.") % rec.job_measure_id.name)
 
 
 class EdsCourseDevelopmentRequest(models.Model):
@@ -571,7 +660,7 @@ class EdsCourseDevelopmentRequest(models.Model):
         })
         self.write({'course_id': course.id, 'state': 'done'})
         for entry in self.tna_entry_ids:
-            entry.write({'state': 'converted', 'converted_course_ref': course.code})
+            entry._write_workflow_values({'state': 'converted', 'converted_course_ref': course.code})
         self.message_post(
             body=_('Course %s created from development request %s.') % (course.code, self.name))
         return {

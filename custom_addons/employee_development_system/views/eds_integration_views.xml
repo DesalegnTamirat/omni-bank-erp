@@ -45,6 +45,32 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <record id="view_eds_lms_routing_form" model="ir.ui.view">
+        <field name="name">eds.lms.routing.form</field>
+        <field name="model">eds.lms.routing</field>
+        <field name="arch" type="xml">
+            <form string="EDS to LMS Routing">
+                <header>
+                    <button name="action_sync_to_lms" string="Sync to LMS" type="object" class="btn-primary" groups="employee_development_system.group_eds_manager"/>
+                    <button name="action_sync_assignments" string="Sync Participants" type="object" invisible="sync_state != 'synced' or not session_id" groups="employee_development_system.group_eds_manager"/>
+                    <button name="action_reconcile_lms" string="Refresh Completion" type="object" invisible="sync_state != 'synced'"/>
+                    <field name="sync_state" widget="statusbar" statusbar_visible="pending,synced,error"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="course_id"/>
+                        <field name="session_id"/>
+                        <field name="delivery_mode"/>
+                        <field name="lms_ref" readonly="1"/>
+                        <field name="lms_completion_pct" widget="progressbar" readonly="1"/>
+                        <field name="last_sync_date" readonly="1"/>
+                        <field name="sync_error" readonly="1" invisible="sync_state != 'error'"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
     <!-- Payroll Payload Views -->
     <record id="view_eds_payroll_payload_tree" model="ir.ui.view">
         <field name="name">eds.payroll.payload.tree</field>

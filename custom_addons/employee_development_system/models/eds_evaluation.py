@@ -149,6 +149,14 @@ class EdsEvaluationLevel1(models.Model):
         for rec in self:
             if not rec.line_ids:
                 raise ValidationError(_("Please fill in responses before submitting."))
+            for line in rec.line_ids:
+                answer_type = line.question_id.question_type
+                if answer_type in ('scale_1_5', 'scale_1_10') and not line.rating_val:
+                    raise ValidationError(_("Answer every rating question before submitting."))
+                if answer_type == 'yes_no' and not line.yes_no_val:
+                    raise ValidationError(_("Answer every yes/no question before submitting."))
+                if answer_type == 'text' and not line.text_val:
+                    raise ValidationError(_("Answer every text question before submitting."))
             rec.state = 'submitted'
             rec.submitted_date = fields.Date.context_today(self)
             rec.message_post(body=_("Level 1 feedback submitted by %s with score %.1f%%.") % (rec.employee_id.name, rec.overall_score))
@@ -164,7 +172,7 @@ class EdsEvaluationLevel1Line(models.Model):
 
     evaluation_id = fields.Many2one('eds.evaluation.level1', string='Level 1 Evaluation', ondelete='cascade')
     question_id = fields.Many2one('eds.evaluation.instrument.question', string='Question', required=True)
-    rating_val = fields.Integer(string='Rating Value (1-5)', default=5)
+    rating_val = fields.Integer(string='Rating Value', default=0)
     yes_no_val = fields.Selection([('yes', 'Yes'), ('no', 'No')], string='Yes/No Response')
     text_val = fields.Text(string='Comments')
     score_pct = fields.Float(string='Score (%)', compute='_compute_score_pct', store=True)

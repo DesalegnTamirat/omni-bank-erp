@@ -100,14 +100,36 @@ class LmsCourse(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get('state', 'draft') != 'draft' and not self.env.su:
+                raise AccessError(_('New courses must start as drafts.'))
             if vals.get('code', _('New')) == _('New'):
                 vals['code'] = self.env['ir.sequence'].next_by_code('lms.course') or _('New')
         return super(LmsCourse, self).create(vals_list)
 
     def write(self, vals):
-        if 'state' in vals and vals['state'] in ('published', 'archived'):
-            if not self.env.user.has_group('learning_management.group_lms_manager') and not self.env.su:
-                raise AccessError(_("Only LMS Managers can publish or archive courses."))
+        target = vals.get('state')
+        if target:
+            allowed = {
+                'draft': {'review'}, 'review': {'draft', 'published'},
+                'published': {'review', 'archived'}, 'archived': set(),
+            }
+            for rec in self:
+                if target != rec.state and target not in allowed.get(rec.state, set()):
+                    raise UserError(_('Invalid course transition: %s to %s.') % (rec.state, target))
+                if target == 'published' and not rec.lesson_ids:
+                    raise UserError(_('Add at least one lesson before publishing.'))
+                if target == 'published' and rec.has_post_assessment and not rec.post_assessment_id:
+                    raise UserError(_('Configure the post-course assessment before publishing.'))
+                if target == 'published' and rec.has_pre_assessment and not rec.pre_assessment_id:
+                    raise UserError(_('Configure the pre-course assessment before publishing.'))
+            if target in ('published', 'archived') and not (
+                self.env.su or self.env.user.has_group('learning_management.group_lms_manager')
+            ):
+                raise AccessError(_('Only LMS managers can publish or archive courses.'))
+            if target == 'published':
+                vals = dict(vals, is_latest_version=True)
+            elif target == 'archived':
+                vals = dict(vals, is_latest_version=False)
         return super(LmsCourse, self).write(vals)
 
     @api.depends('lesson_ids', 'lesson_ids.duration_minutes')
@@ -127,6 +149,8 @@ class LmsCourse(models.Model):
     # Lifecycle Actions
     def action_submit_for_review(self):
         for rec in self:
+            if rec.state != 'draft':
+                raise UserError(_('Only draft courses can be submitted.'))
             if not rec.lesson_ids:
                 raise UserError(_('Please add at least one lesson before submitting this course for review.'))
             rec.write({'state': 'review'})
@@ -134,6 +158,8 @@ class LmsCourse(models.Model):
 
     def action_publish(self):
         for rec in self:
+            if rec.state != 'review':
+                raise UserError(_('Only reviewed courses can be published.'))
             rec.write({'state': 'published', 'is_latest_version': True})
             # FR-LMS-011: Automatically retire/archive superseded version so learners cannot self-enroll/view older version
             if rec.previous_version_id and rec.previous_version_id.state != 'archived':
@@ -150,6 +176,8 @@ class LmsCourse(models.Model):
     def action_create_new_version(self):
         """Creates an updated course version and archives older for historical audit (FR-LMS-011)."""
         self.ensure_one()
+        if self.state != 'published':
+            raise UserError(_('Only published courses can be revised.'))
         current_ver = self.version or '1.0'
         try:
             parts = current_ver.split('.')
@@ -165,6 +193,25 @@ class LmsCourse(models.Model):
             'revision_notes': _('Revision based on %s (v%s)') % (self.code, self.version),
             'is_latest_version': False,
         })
+        assessment_map = {}
+        assessments = self.pre_assessment_id | self.post_assessment_id | self.lesson_ids.mapped('assessment_id')
+        for assessment in assessments:
+            assessment_map[assessment.id] = assessment.copy({'course_id': new_course.id}).id
+        new_course.write({
+            'pre_assessment_id': assessment_map.get(self.pre_assessment_id.id, False),
+            'post_assessment_id': assessment_map.get(self.post_assessment_id.id, False),
+        })
+        # A revision must carry its curriculum; One2many records are not copied
+        # automatically by the ORM.
+        section_map = {}
+        for section in self.section_ids:
+            section_map[section.id] = section.copy({'course_id': new_course.id}).id
+        for lesson in self.lesson_ids:
+            lesson.copy({
+                'course_id': new_course.id,
+                'section_id': section_map.get(lesson.section_id.id, False),
+                'assessment_id': assessment_map.get(lesson.assessment_id.id, False),
+            })
         self.message_post(body=_('Initiated new course version: %s (v%s)') % (new_course.code, new_ver))
         return {
             'name': _('Course Revision'),
@@ -235,7 +282,10 @@ class LmsLesson(models.Model):
         ('url', 'Internal Media Server / Stream URL'),
     ], string='Video Hosting Source', default='file')
 
-    video_file = fields.Binary(string='Video File (MP4/WebM)', attachment=True)
+    video_file = fields.Binary(
+        string='Video File (MP4/WebM)', attachment=True,
+        groups='learning_management.group_lms_instructor',
+    )
     video_filename = fields.Char(string='Video Filename')
     video_url = fields.Char(string='Internal Streaming Endpoint URL', help='https://media.bunnabanksc.com/videos/aml_part1.mp4')
     video_duration_seconds = fields.Integer(string='Video Length (Seconds)', default=600)
@@ -252,7 +302,10 @@ class LmsLesson(models.Model):
     )
 
     # Document / Slide Material
-    document_file = fields.Binary(string='Slide Deck / PDF Document', attachment=True)
+    document_file = fields.Binary(
+        string='Slide Deck / PDF Document', attachment=True,
+        groups='learning_management.group_lms_instructor',
+    )
     document_filename = fields.Char(string='Document Filename')
 
     # Rich Text Material
@@ -265,3 +318,13 @@ class LmsLesson(models.Model):
         'CHECK(min_watch_percentage >= 0 AND min_watch_percentage <= 100)',
         'Minimum watch percentage must be between 0% and 100%!'
     )
+
+    def action_open_document(self):
+        self.ensure_one()
+        if self.lesson_type != 'document':
+            raise UserError(_('This lesson does not contain a document.'))
+        return {
+            'type': 'ir.actions.act_url',
+            'url': '/lms/lesson/%s/document' % self.id,
+            'target': 'new',
+        }

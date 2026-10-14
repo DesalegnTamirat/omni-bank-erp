@@ -37,6 +37,10 @@ class EdsCompetencyGapImport(models.TransientModel):
         help='Optionally limit gap ingestion to employees in a specific department.'
     )
     result_log = fields.Text(string='Ingestion Summary', readonly=True)
+    ingestion_done = fields.Boolean(readonly=True)
+    scanned_count = fields.Integer(string='Gaps Matched', readonly=True)
+    created_count = fields.Integer(string='Needs Created', readonly=True)
+    skipped_count = fields.Integer(string='Already Present', readonly=True)
 
     @api.onchange('operating_unit_id')
     def _onchange_operating_unit_id(self):
@@ -53,6 +57,10 @@ class EdsCompetencyGapImport(models.TransientModel):
     def action_pull_competency_gaps(self):
         """Query assessment lines from the selected closed cycle and generate TNA entries."""
         self.ensure_one()
+        if self.ingestion_done:
+            raise ValidationError(_("This ingestion has already been completed. Close this result and open a new pull to run again."))
+        if self.cycle_id.state not in ('draft', 'collecting'):
+            raise ValidationError(_("Competency gaps can only be pulled into a draft or collecting TNA cycle."))
         if not self.competency_cycle_id:
             raise ValidationError(_("Please select a closed Competency Assessment Cycle."))
         if self.competency_cycle_id.state != 'closed':
@@ -73,6 +81,8 @@ class EdsCompetencyGapImport(models.TransientModel):
 
         assessment_lines = self.env['competency.assessment.line'].sudo().search(domain)
         if not assessment_lines:
+            self.ingestion_done = True
+            self.scanned_count = 0
             self.result_log = _(
                 "Scan complete for closed cycle '%s'. No assessment lines found matching the gap criteria (min gap >= %d)."
             ) % (self.competency_cycle_id.name, self.min_gap)
@@ -106,19 +116,33 @@ class EdsCompetencyGapImport(models.TransientModel):
             work_unit = line.operating_unit_id or self.env['eds.hr.compat'].get_employee_operating_unit(emp)
             job = line.job_id or self.env['eds.hr.compat'].get_employee_job(emp)
 
+            comp_courses = self.env['eds.course.competency.line'].sudo().search([
+                ('competency_id', '=', line.competency_id.id),
+                ('required_level', '>=', str(line.required_level or '1')),
+                ('course_id.status', 'in', ('active', 'draft'))
+            ]).mapped('course_id')
+
+            prog_name = comp_courses[0].name if len(comp_courses) == 1 else (_("%s Mastery Program") % line.competency_id.name)
+
             TnaEntryModel.create({
                 'cycle_id': self.cycle_id.id,
+                'request_level': 'individual',
                 'employee_id': emp.id,
                 'work_unit_id': work_unit.id if work_unit else False,
                 'department_id': line.department_id.id if line.department_id else (emp.department_id.id if emp.department_id else False),
                 'job_position_id': job.id if job else False,
                 'competency_id': line.competency_id.id,
+                'competency_level': {
+                    '1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert',
+                }.get(str(line.required_level), 'intermediate'),
                 'competency_gap_level_diff': gap_val,
+                'course_id': comp_courses[0].id if len(comp_courses) == 1 else False,
+                'suggested_course_ids': [(6, 0, comp_courses.ids)],
                 'gap_severity': severity,
                 'urgency': severity,
                 'source': 'competency_gap',
                 'delivery_mode': 'classroom',
-                'proposed_program': _("%s Mastery Program") % line.competency_id.name,
+                'proposed_program': prog_name,
                 'justification': _(
                     "Competency Gap diagnostic from Closed Assessment Cycle '%s'. Required Level: %s, Current Level: %s (Gap: %d)."
                 ) % (self.competency_cycle_id.name, line.required_level or '2', line.current_level or '1', gap_val),
@@ -134,7 +158,13 @@ class EdsCompetencyGapImport(models.TransientModel):
             "- Minimum Gap Threshold Applied: %d"
         ) % (self.competency_cycle_id.name, success_count, skipped_count, self.min_gap)
 
-        self.result_log = summary
+        self.write({
+            'ingestion_done': True,
+            'scanned_count': len(assessment_lines),
+            'created_count': success_count,
+            'skipped_count': skipped_count,
+            'result_log': summary,
+        })
         self.cycle_id.message_post(body=_(
             "Diagnostic Ingestion: %d competency gap entries pulled from closed cycle '%s'."
         ) % (success_count, self.competency_cycle_id.name))

@@ -2,7 +2,7 @@
 import random
 from datetime import datetime, timedelta
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 class LmsExamSession(models.Model):
@@ -54,6 +54,21 @@ class LmsExamSession(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+            for vals in vals_list:
+                if vals.get('state', 'in_progress') != 'in_progress' or any(
+                    key in vals for key in ('score_points', 'max_points', 'score_percentage', 'is_passed', 'end_time')
+                ):
+                    raise AccessError(_('Exam results are set by grading only.'))
+                if vals.get('employee_id') != self.env.user.employee_id.id:
+                    raise AccessError(_('You may only start your own exam.'))
+                if vals.get('enrollment_id'):
+                    enrollment = self.env['lms.enrollment'].browse(vals['enrollment_id'])
+                    assessment = self.env['lms.assessment'].browse(vals.get('assessment_id'))
+                    if (enrollment.employee_id != self.env.user.employee_id
+                            or enrollment.course_id != assessment.course_id
+                            or enrollment.state in ('completed', 'failed')):
+                        raise AccessError(_('The exam must belong to your active course enrollment.'))
         for vals in vals_list:
             assessment_id = vals.get('assessment_id')
             employee_id = vals.get('employee_id')
@@ -112,9 +127,23 @@ class LmsExamSession(models.Model):
 
         return session
 
+    def write(self, vals):
+        protected = {'state', 'score_points', 'max_points', 'score_percentage',
+                     'is_passed', 'employee_id', 'assessment_id', 'enrollment_id',
+                     'end_time', 'attempt_number'}
+        if (protected.intersection(vals) and not self.env.su
+                and not self.env.user.has_group('learning_management.group_lms_manager')):
+            raise AccessError(_('Exam results are set by grading only.'))
+        return super().write(vals)
+
     def action_submit_and_grade(self):
         """Auto-evaluates question answers, calculates percentage, and determines pass/fail (FR-LMS-017)."""
         for rec in self:
+            if rec.state != 'in_progress':
+                raise UserError(_('This exam has already been submitted.'))
+            if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+                if rec.employee_id != self.env.user.employee_id:
+                    raise AccessError(_('You may only submit your own exam.'))
             total_earned = 0.0
             total_available = 0.0
 
@@ -131,14 +160,14 @@ class LmsExamSession(models.Model):
                 else:  # multiple_choice
                     is_correct = (correct_ids == selected_ids)
 
-                line.is_correct = is_correct
-                line.points_earned = weight if is_correct else 0.0
-                total_earned += line.points_earned
+                earned = weight if is_correct else 0.0
+                line.sudo().write({'is_correct': is_correct, 'points_earned': earned})
+                total_earned += earned
 
             score_pct = (total_earned / total_available * 100.0) if total_available > 0 else 0.0
             passed = score_pct >= rec.assessment_id.pass_score_percentage
 
-            rec.write({
+            rec.sudo().write({
                 'score_points': total_earned,
                 'max_points': total_available,
                 'score_percentage': score_pct,
@@ -157,7 +186,7 @@ class LmsExamSession(models.Model):
             # Pre-course diagnostic assessment handling (FR-LMS-013)
             if enrollment and rec.assessment_id.assessment_type == 'pre_course':
                 if passed:
-                    enrollment.write({'pre_assessment_passed': True})
+                    enrollment.sudo().write({'pre_assessment_passed': True})
                     enrollment.message_post(body=_('Pre-course diagnostic assessment passed with score %.1f%%.') % score_pct)
                 else:
                     enrollment.message_post(body=_('Pre-course diagnostic assessment failed with score %.1f%% (Passing threshold: %.1f%%).') % (score_pct, rec.assessment_id.pass_score_percentage))
@@ -172,7 +201,7 @@ class LmsExamSession(models.Model):
                     ('state', 'in', ['passed', 'failed']),
                 ])
                 if rec.assessment_id.max_attempts > 0 and attempts >= rec.assessment_id.max_attempts:
-                    enrollment.write({'state': 'failed'})
+                    enrollment.sudo().write({'state': 'failed'})
 
 
 class LmsExamSessionLine(models.Model):
@@ -186,3 +215,24 @@ class LmsExamSessionLine(models.Model):
     selected_answer_ids = fields.Many2many('lms.question.answer', string='Selected Options')
     is_correct = fields.Boolean(string='Is Correct', default=False)
     points_earned = fields.Float(string='Points Earned', default=0.0)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+            raise AccessError(_('Exam questions are assigned by the exam workflow.'))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+            if set(vals) != {'selected_answer_ids'}:
+                raise AccessError(_('Only answer selection can be changed during an exam.'))
+            for line in self:
+                if (line.session_id.state != 'in_progress'
+                        or line.session_id.employee_id != self.env.user.employee_id):
+                    raise AccessError(_('You may only answer your own active exam.'))
+        result = super().write(vals)
+        if 'selected_answer_ids' in vals:
+            for line in self:
+                if line.sudo().selected_answer_ids - line.sudo().question_id.answer_ids:
+                    raise UserError(_('Selected answers must belong to the exam question.'))
+        return result

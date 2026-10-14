@@ -88,7 +88,7 @@
                         <button name="action_approve" string="Approve &amp; Publish" type="object" class="btn-success" invisible="state != 'review'" groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
                         <button name="action_reject" string="Return to Draft" type="object" class="btn-secondary" invisible="state != 'review'" groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
                         <button name="action_create_new_version" string="Initiate Revision (New Version)" type="object" class="btn-outline-primary" invisible="state != 'approved'" groups="knowledge_management.group_kms_contributor,knowledge_management.group_kms_manager"/>
-                        <button name="action_download_watermarked" string="Download Watermarked PDF" type="object" class="btn-info" invisible="not file_data or is_view_only"/>
+                        <button name="action_download_watermarked" string="Download Protected Copy" type="object" class="btn-info" invisible="not file_size or is_view_only"/>
                         <button name="action_archive" string="Archive / Supersede" type="object" class="btn-outline-danger" invisible="state != 'approved'" groups="knowledge_management.group_kms_manager"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,review,approved,archived"/>
                     </header>
@@ -100,12 +100,12 @@
                             <button name="action_view_versions" type="object" class="oe_stat_button" icon="fa-history">
                                 <field name="version" string="Version" widget="statinfo"/>
                             </button>
-                            <button class="oe_stat_button" icon="fa-eye">
+                            <div class="oe_stat_button" role="status">
                                 <field name="view_count" string="Views" widget="statinfo"/>
-                            </button>
-                            <button class="oe_stat_button" icon="fa-download">
+                            </div>
+                            <div class="oe_stat_button" role="status">
                                 <field name="download_count" string="Downloads" widget="statinfo"/>
-                            </button>
+                            </div>
                         </div>
 
                         <div class="oe_title">
@@ -149,7 +149,7 @@
                         <notebook>
                             <page string="Document File &amp; Overview">
                                 <group>
-                                    <field name="file_data" filename="file_name" widget="binary"/>
+                                    <field name="file_data" filename="file_name" widget="binary" groups="knowledge_management.group_kms_contributor"/>
                                     <field name="file_name" invisible="1"/>
                                     <field name="file_size" string="Size (Bytes)" readonly="1"/>
                                     <field name="mimetype" readonly="1"/>

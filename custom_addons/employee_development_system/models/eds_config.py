@@ -41,6 +41,11 @@ class ResConfigSettings(models.TransientModel):
         default=31,
         config_parameter='eds.tna_approval_deadline_day',
         help='Day of the TNA approval deadline. Default: 31.')
+    eds_max_tna_courses_per_employee = fields.Integer(
+        string='Max TNA Courses per Employee',
+        default=3,
+        config_parameter='eds.max_tna_courses_per_employee',
+        help='Maximum number of distinct training courses an individual employee may request in a single TNA cycle.')
 
     # Delivery (/040)
     eds_default_class_capacity = fields.Integer(

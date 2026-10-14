@@ -68,6 +68,13 @@ class TestEdsTnaPmsPull(TransactionCase):
         self.assertEqual(len(entries), 1, "Should have created exactly one TNA entry from the low PMS appraisal.")
         entry = entries[0]
         self.assertEqual(entry.source, 'pms')
+        self.assertEqual(entry.pms_measurement_name, 'Loan Documentation Accuracy')
+        self.assertEqual(entry.competency_or_measurement, 'Loan Documentation Accuracy')
+        self.assertEqual(entry.pms_appraisal_score, 58.0)
+        self.assertEqual(entry.pms_target_value, 100.0)
+        self.assertEqual(entry.pms_actual_value, 58.0)
+        self.assertTrue(wizard.ingestion_done)
+        self.assertGreaterEqual(wizard.created_count, 1)
         self.assertEqual(entry.urgency, 'high')  # 50 <= 58 < 65 -> high
         self.assertGreater(entry.priority_score, 0.0)
         self.assertIn("Loan Documentation", entry.justification)

@@ -308,9 +308,9 @@ class EdsTrainerEducation(models.Model):
     institution_name = fields.Char(string='Institution / Awarding Body')
     year_obtained = fields.Char(string='Year Obtained')
     # Backward compatibility aliases
-    qualification = fields.Char(related='degree_title', readonly=False)
-    institution = fields.Char(related='institution_name', readonly=False)
-    year = fields.Char(related='year_obtained', readonly=False)
+    qualification = fields.Char(string='Legacy Qualification Alias', related='degree_title', readonly=False)
+    institution = fields.Char(string='Legacy Institution Alias', related='institution_name', readonly=False)
+    year = fields.Char(string='Legacy Year Alias', related='year_obtained', readonly=False)
 
 
 class EdsTrainerExpertise(models.Model):
@@ -330,8 +330,8 @@ class EdsTrainerExpertise(models.Model):
     ], string='Target Participant Level', default='intermediate', required=True)
     years_experience = fields.Float(string='Years of Experience in Domain', default=1.0)
     # Backward compatibility aliases
-    topic = fields.Char(related='course_topics', readonly=False)
-    level = fields.Selection(related='target_level', readonly=False)
+    topic = fields.Char(string='Legacy Topic Alias', related='course_topics', readonly=False)
+    level = fields.Selection(string='Legacy Level Alias', related='target_level', readonly=False)
     language = fields.Char(string='Language', default='English / Amharic')
 
 
@@ -348,7 +348,7 @@ class EdsTrainerDeliveryHistory(models.Model):
     participant_count = fields.Integer(string='Participants')
     participant_rating = fields.Float(string='Avg. Rating (/5)', default=4.5)
     # Backward compatibility aliases
-    program_name = fields.Char(related='program_title', readonly=False)
-    client_year = fields.Char(related='client_organization', readonly=False)
-    participants_count = fields.Integer(related='participant_count', readonly=False)
-    avg_rating = fields.Float(related='participant_rating', readonly=False)
+    program_name = fields.Char(string='Legacy Program Alias', related='program_title', readonly=False)
+    client_year = fields.Char(string='Legacy Client Alias', related='client_organization', readonly=False)
+    participants_count = fields.Integer(string='Legacy Participant Count Alias', related='participant_count', readonly=False)
+    avg_rating = fields.Float(string='Legacy Rating Alias', related='participant_rating', readonly=False)

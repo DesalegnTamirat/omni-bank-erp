@@ -136,7 +136,8 @@ class EdsCost(models.Model):
     _description = 'EDS Session Actual Cost Entry'
     _inherit = ['mail.thread']
 
-    session_id = fields.Many2one('eds.session', string='Training Session', required=True, ondelete='cascade')
+    session_id = fields.Many2one('eds.session', string='Training Session', required=True,
+                                 ondelete='cascade', index=True)
     budget_line_id = fields.Many2one('eds.budget.line', string='Budget Line')
     currency_id = fields.Many2one('res.currency', default=lambda self: self.env.company.currency_id)
     amount = fields.Monetary(string='Actual Cost Amount', currency_field='currency_id', required=True)
@@ -145,8 +146,22 @@ class EdsCost(models.Model):
         ('committed', 'Committed'),
         ('paid', 'Paid & Reconciled'),
     ], string='Payment State', default='draft', required=True, tracking=True)
+    payment_date = fields.Date(string='Payment Date', index=True,
+                               help='Date used to convert a paid foreign-currency cost into the reporting currency.')
     finance_reference = fields.Char(string='Finance Reference / Payment Voucher No.', tracking=True)
     notes = fields.Text(string='Notes / Receipt Details')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('payment_state') == 'paid' and not vals.get('payment_date'):
+                vals['payment_date'] = fields.Date.context_today(self)
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if vals.get('payment_state') == 'paid' and not vals.get('payment_date'):
+            vals = dict(vals, payment_date=fields.Date.context_today(self))
+        return super().write(vals)
 
 class EdsLearningPartner(models.Model):
     _name = 'eds.learning.partner'

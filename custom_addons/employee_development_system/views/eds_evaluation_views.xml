@@ -156,6 +156,12 @@
         <field name="res_model">eds.evaluation.level1</field>
         <field name="view_mode">list,form</field>
     </record>
+    <record id="action_eds_evaluation_level1_own" model="ir.actions.act_window">
+        <field name="name">My Training Feedback</field>
+        <field name="res_model">eds.evaluation.level1</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+    </record>
 
     <!-- Level 2 Evaluation Views -->
     <record id="view_eds_evaluation_level2_tree" model="ir.ui.view">
@@ -329,6 +335,12 @@
         <field name="name">Level 3 Behavioral Assessments</field>
         <field name="res_model">eds.evaluation.level3</field>
         <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_eds_evaluation_level3_assigned" model="ir.actions.act_window">
+        <field name="name">My Team Behavior Reviews</field>
+        <field name="res_model">eds.evaluation.level3</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('manager_id.user_id', '=', uid)]</field>
     </record>
 
     <!-- Level 4 Evaluation Views -->

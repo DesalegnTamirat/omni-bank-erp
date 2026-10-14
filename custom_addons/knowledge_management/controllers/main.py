@@ -29,8 +29,7 @@ class KmsDocumentController(http.Controller):
         doc = request.env['kms.document'].browse(doc_id)
 
         try:
-            doc.check_access_rights('read')
-            doc.check_access_rule('read')
+            doc.check_access('read')
         except AccessError:
             return request.render('http_routing.403', {'message': _('Access Denied: You do not have permission to access this document.')})
 
@@ -49,10 +48,10 @@ class KmsDocumentController(http.Controller):
                 doc._log_audit_action('access_denied', 'Download blocked: Role not permitted')
                 return request.render('http_routing.403', {'message': _('Your assigned role does not have download permissions for this document.')})
 
-        if not doc.file_data:
+        if not doc.sudo().file_data:
             return request.not_found()
 
-        raw_bytes = base64.b64decode(doc.file_data)
+        raw_bytes = base64.b64decode(doc.sudo().file_data)
         filename = doc.file_name or f"KMS_Document_{doc.code}.pdf"
         mimetype = doc.mimetype or 'application/pdf'
 
@@ -77,6 +76,7 @@ class KmsDocumentController(http.Controller):
                 raw_bytes = watermarked_bytes
             except Exception as e:
                 _logger.error("Error applying watermark to doc %s: %s", doc.id, e)
+                return Response(_('Protected download is temporarily unavailable.'), status=503)
 
         # Determine active session ID or explicit token for session-binding (FR-KMS-016)
         session_id = None
@@ -100,8 +100,12 @@ class KmsDocumentController(http.Controller):
             mimetype = 'application/octet-stream'
 
         # Log download audit event
-        doc._log_audit_action('download', f"Downloaded by {user.name} (encrypted={is_encrypted})")
-        doc.sudo().write({'download_count': doc.download_count + 1})
+        doc._log_audit_action('download', f"Downloaded by {user.name} (encrypted={is_encrypted})", strict=True)
+        request.env.cr.execute(
+            'UPDATE kms_document SET download_count = COALESCE(download_count, 0) + 1 WHERE id = %s',
+            (doc.id,),
+        )
+        doc.invalidate_recordset(['download_count'])
 
         headers = [
             ('Content-Type', mimetype),
@@ -121,15 +125,17 @@ class KmsDocumentController(http.Controller):
         doc = request.env['kms.document'].browse(doc_id)
 
         try:
-            doc.check_access_rights('read')
-            doc.check_access_rule('read')
+            doc.check_access('read')
         except AccessError:
             return request.render('http_routing.403', {'message': _('Access Denied: You do not have permission to view this document.')})
 
-        if not doc.exists() or not doc.file_data:
+        if not doc.exists() or not doc.sudo().file_data:
             return request.not_found()
 
-        raw_bytes = base64.b64decode(doc.file_data)
+        if not doc.is_pdf:
+            return Response(_('Inline viewing is available for PDF documents only.'), status=415)
+
+        raw_bytes = base64.b64decode(doc.sudo().file_data)
         filename = doc.file_name or "document.pdf"
         mimetype = doc.mimetype or 'application/pdf'
 
@@ -169,10 +175,15 @@ class KmsDocumentController(http.Controller):
                 raw_bytes = add_watermark_to_pdf(raw_bytes, watermark_lines)
             except Exception as e:
                 _logger.error("Error applying watermark for inline view of doc %s: %s", doc.id, e)
+                return Response(_('Protected document view is temporarily unavailable.'), status=503)
 
         # Log view audit event
-        doc._log_audit_action('view', f"Viewed inline by {user.name}")
-        doc.sudo().write({'view_count': doc.view_count + 1})
+        doc._log_audit_action('view', f"Viewed inline by {user.name}", strict=True)
+        request.env.cr.execute(
+            'UPDATE kms_document SET view_count = COALESCE(view_count, 0) + 1 WHERE id = %s',
+            (doc.id,),
+        )
+        doc.invalidate_recordset(['view_count'])
 
         headers = [
             ('Content-Type', mimetype),

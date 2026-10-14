@@ -1,13 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="paperformat_eds_certificate" model="report.paperformat">
+        <field name="name">Bunna Training Certificate Landscape</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">0</field>
+        <field name="margin_bottom">0</field>
+        <field name="margin_left">0</field>
+        <field name="margin_right">0</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
     <record id="action_report_eds_certificate" model="ir.actions.report">
         <field name="name">Completion Certificate PDF</field>
         <field name="model">eds.certificate</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">employee_development_system.report_eds_certificate_document</field>
         <field name="report_file">employee_development_system.report_eds_certificate_document</field>
+        <field name="paperformat_id" ref="paperformat_eds_certificate"/>
         <field name="print_report_name">'Certificate_%s' % (object.code)</field>
         <field name="binding_model_id" ref="model_eds_certificate"/>
         <field name="binding_type">report</field>
+    </record>
+    <record id="action_report_eds_course_certificate_preview" model="ir.actions.report">
+        <field name="name">Course Certificate Preview</field>
+        <field name="model">eds.course</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_course_certificate_preview</field>
+        <field name="report_file">employee_development_system.report_eds_course_certificate_preview</field>
+        <field name="paperformat_id" ref="paperformat_eds_certificate"/>
+        <field name="print_report_name">'Certificate_Preview_%s' % (object.name)</field>
+    </record>
+    <record id="action_report_eds_session_certificate_preview" model="ir.actions.report">
+        <field name="name">Session Certificate Preview</field>
+        <field name="model">eds.session</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">employee_development_system.report_eds_session_certificate_preview</field>
+        <field name="report_file">employee_development_system.report_eds_session_certificate_preview</field>
+        <field name="paperformat_id" ref="paperformat_eds_certificate"/>
+        <field name="print_report_name">'Certificate_Preview_%s' % (object.name)</field>
     </record>
 </odoo>

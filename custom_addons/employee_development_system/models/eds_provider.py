@@ -50,7 +50,7 @@ class EdsExternalProvider(models.Model):
         string='Performance History',
         help='Post-training vendor/venue evaluations.')
     contract_ids = fields.One2many('eds.training.contract', 'provider_id', string='Contracts')
-    contract_count = fields.Integer(string='Contracts', compute='_compute_contract_count')
+    contract_count = fields.Integer(string='Contract Count', compute='_compute_contract_count')
     trainer_ids = fields.One2many('eds.trainer', 'external_provider_id', string='External Trainers')
     contact_name = fields.Char(string='Contact Person')
     phone = fields.Char(string='Phone Number')

@@ -166,7 +166,7 @@
                             </page>
                             <page string="Duplicates &amp; Non-Training Review">
                                 <div class="alert alert-info mb-3" role="alert">
-                                    <i class="fa fa-info-circle me-1"/> <strong>Consolidated Screening &amp; Exclusion:</strong>
+                                    <i class="fa fa-info-circle me-1" title="Consolidation information"/> <strong>Consolidated Screening &amp; Exclusion:</strong>
                                     All flagged duplicates, operational/process non-training items, and excluded requests are brought together into this single unified review list.
                                     Review each item once: exclude non-viable items with a justification, clear screening flags to retain legitimate training needs, or restore previously excluded items before final SMC approval.
                                 </div>

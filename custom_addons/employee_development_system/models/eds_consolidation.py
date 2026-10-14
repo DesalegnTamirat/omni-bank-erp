@@ -159,7 +159,7 @@ class EdsTnaConsolidation(models.Model):
         'eds.tna.entry', 'consolidation_id', string='Training Needs')
     entry_count = fields.Integer(string='Needs', compute='_compute_counts')
     duplicate_count = fields.Integer(string='Duplicates', compute='_compute_counts')
-    non_training_count = fields.Integer(string='Non-Training Items', compute='_compute_counts')
+    non_training_count = fields.Integer(string='Non-Training Item Count', compute='_compute_counts')
     excluded_count = fields.Integer(string='Excluded', compute='_compute_counts')
     flagged_count = fields.Integer(string='Flagged & Excluded', compute='_compute_counts')
     # Review sub-tabs: computed subsets of entry_ids for the form pages
@@ -294,6 +294,8 @@ class EdsTnaConsolidation(models.Model):
         """
         candidates = self.entry_ids.filtered(lambda e: e.state in ('submitted', 'validated'))
         candidates.write({'is_duplicate': False, 'duplicate_of_id': False})
+        candidates.filtered(lambda e: e.exclusion_type == 'duplicate').write(
+            {'exclusion_type': False})
         seen = {}
         for entry in candidates:
             if not entry.employee_id or not entry.competency_id:
@@ -404,6 +406,15 @@ class EdsTnaConsolidation(models.Model):
             rec._require_manager()
             if rec.state != 'smc_approval':
                 raise UserError(_('Only consolidations under SMC approval can be approved.'))
+            unresolved = rec.entry_ids.filtered(
+                lambda entry: entry.state in ('submitted', 'validated')
+                and (entry.is_duplicate or entry.exclusion_type)
+            )
+            if unresolved:
+                raise UserError(_(
+                    'Resolve %d flagged training needs before final approval: '
+                    'exclude each invalid need with a reason or clear its screening flags.')
+                    % len(unresolved))
             rec.approver_id = self.env.user.id
             rec._check_segregation()
             rec.write({
@@ -411,8 +422,11 @@ class EdsTnaConsolidation(models.Model):
                 'approved_by_id': self.env.user.id,
                 'approval_date': fields.Datetime.now(),
             })
-            for entry in rec.entry_ids.filtered(lambda e: e.state in ('submitted', 'validated') and not e.is_duplicate):
-                entry.write({'state': 'approved'})
+            for entry in rec.entry_ids.filtered(
+                lambda e: e.state in ('submitted', 'validated')
+                and not e.is_duplicate and not e.exclusion_type
+            ):
+                entry._write_workflow_values({'state': 'approved'})
             rec._log_approval_step('smc_approval', 'approved', _('Final approval by SMC'))
             rec.message_post(body=_('Consolidation %s approved by SMC. Needs are locked for curriculum planning.')
                              % rec.name)
@@ -422,7 +436,7 @@ class EdsTnaConsolidation(models.Model):
         """When all consolidations of a cycle are SMC-approved, approve the cycle too."""
         cycle = consolidation.cycle_id
         if cycle.state == 'under_approval' and cycle.consolidation_ids:
-            if all(c.state == 'approved' for c in cycle.consolidation_ids):
+            if all(c.state in ('approved', 'locked') for c in cycle.consolidation_ids):
                 cycle.action_approve()
 
     def action_lock(self):
@@ -496,7 +510,7 @@ class EdsTnaConsolidation(models.Model):
                 created_courses.append(existing_course)
 
             for entry in entries:
-                entry.write({
+                entry._write_workflow_values({
                     'state': 'converted',
                     'converted_course_ref': existing_course.name,
                 })

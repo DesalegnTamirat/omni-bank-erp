@@ -17,7 +17,7 @@
             <field name="name">Employee View Documents by Classification</field>
             <field name="model_id" ref="knowledge_management.model_kms_document"/>
             <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
-            <field name="domain_force">['|',
+            <field name="domain_force">['&amp;', ('state', '=', 'approved'), '|',
     ('classification', 'in', ['public', 'internal']),
     '|',
         '&amp;',
@@ -33,6 +33,38 @@
             ('classification', '=', 'restricted'),
             ('authorized_employee_ids.user_id', '=', user.id)
 ]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Version files inherit the visibility of their approved parent document. -->
+        <record id="rule_kms_document_version_employee_read" model="ir.rule">
+            <field name="name">Employee View Approved Document Versions</field>
+            <field name="model_id" ref="knowledge_management.model_kms_document_version"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">['&amp;', ('document_id.state', '=', 'approved'), '|',
+                ('document_id.classification', 'in', ['public', 'internal']),
+                '|',
+                    '&amp;', ('document_id.classification', '=', 'confidential'),
+                        '&amp;', '|', ('document_id.department_id', '=', False),
+                                      ('document_id.department_id', '=', user.employee_id.department_id.id),
+                            '|', ('document_id.operating_unit_id', '=', False),
+                                 ('document_id.operating_unit_id', '=', user.employee_id.default_operating_unit_id.id),
+                    '&amp;', ('document_id.classification', '=', 'restricted'),
+                        ('document_id.authorized_employee_ids.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_kms_document_version_manager" model="ir.rule">
+            <field name="name">KMS Manager View All Versions</field>
+            <field name="model_id" ref="knowledge_management.model_kms_document_version"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_manager')), (4, ref('knowledge_management.group_kms_auditor'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>

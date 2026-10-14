@@ -256,3 +256,25 @@ class EdsHrCompat(models.AbstractModel):
                     domain.extend(ou_parts)
 
         return domain
+
+    @api.model
+    def get_managed_operating_units(self, user=None):
+        """Units led by the employee, including descendants led through a parent unit."""
+        user = user or self.env.user
+        employee = user.employee_id or self.env['hr.employee'].sudo().search(
+            [('user_id', '=', user.id)], limit=1)
+        Unit = self.env['operating.unit'].sudo()
+        if not employee:
+            return Unit.browse()
+        direct = Unit.search([('manager_id', '=', employee.id)])
+        department_ids = self.env['hr.department'].sudo().search(
+            [('manager_id', '=', employee.id)]).ids
+        if department_ids:
+            direct |= Unit.search([('department', 'in', department_ids)])
+        managed = direct
+        frontier = direct
+        while frontier:
+            children = Unit.search([('parent_unit', 'in', frontier.ids)]) - managed
+            managed |= children
+            frontier = children
+        return managed

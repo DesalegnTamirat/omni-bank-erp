@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_hotel_selection_list" model="ir.ui.view">
+        <field name="name">eds.hotel.selection.list</field>
+        <field name="model">eds.hotel.selection</field>
+        <field name="arch" type="xml">
+            <list string="Hotel Selections">
+                <field name="name"/>
+                <field name="annual_plan_id"/>
+                <field name="program_name"/>
+                <field name="delivery_method" widget="badge"/>
+                <field name="currency_id"/>
+                <field name="awarded_venue_id"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_eds_hotel_selection_form" model="ir.ui.view">
+        <field name="name">eds.hotel.selection.form</field>
+        <field name="model">eds.hotel.selection</field>
+        <field name="arch" type="xml">
+            <form string="Hotel / Venue Selection">
+                <header>
+                    <button name="action_start_evaluation" string="Start Evaluation" type="object"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="alert">Select one approved plan program, compare hotel bids in one currency, and award the winner. Facility/service is 60% and price is 40%; the lowest positive quote receives the full price score. The winner fills linked sessions and their venue booking.</div>
+                    <group>
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="plan_line_id" options="{'no_create': True}"/>
+                            <field name="annual_plan_id" readonly="1"/>
+                            <field name="program_name" readonly="1"/>
+                            <field name="delivery_method" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" options="{'no_create': True}"/>
+                            <field name="awarded_venue_id" readonly="1"/>
+                            <field name="notes"/>
+                        </group>
+                    </group>
+                    <field name="bid_ids">
+                        <list editable="bottom" default_order="total_score desc">
+                            <field name="venue_id" options="{'no_create': True}"/>
+                            <field name="technical_score" string="Facility /10"/>
+                            <field name="price_quoted"/>
+                            <field name="currency_id" options="{'no_create': True}"/>
+                            <field name="financial_score" readonly="1"/>
+                            <field name="total_score" readonly="1"/>
+                            <field name="status" widget="badge" readonly="1"/>
+                            <field name="award_attachment" filename="award_filename" widget="binary"/>
+                            <field name="award_filename" column_invisible="True"/>
+                            <field name="contract_attachment" filename="contract_filename" widget="binary" optional="hide"/>
+                            <field name="contract_filename" column_invisible="True"/>
+                            <button name="action_award" string="Award" type="object"
+                                    invisible="status == 'awarded'"/>
+                            <button name="action_reject" string="Reject" type="object"
+                                    invisible="status in ('rejected','awarded')"/>
+                        </list>
+                    </field>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_eds_local_hotel_selection" model="ir.actions.act_window">
+        <field name="name">Local Hotel Selection</field>
+        <field name="res_model">eds.hotel.selection</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('delivery_method','in',('internal','local_external'))]</field>
+    </record>
+    <record id="action_eds_international_hotel_selection" model="ir.actions.act_window">
+        <field name="name">International Hotel Selection</field>
+        <field name="res_model">eds.hotel.selection</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('delivery_method','=','international')]</field>
+    </record>
+</odoo>

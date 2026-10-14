@@ -63,46 +63,31 @@
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
-                        <div class="oe_button_box">
-                            <button class="oe_stat_button" icon="fa-star" type="object"
-                                    name="action_mark_reviewed"
-                                    invisible="state != 'active'"
-                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"
-                                    help="Record a periodic review.">
-                                <div class="o_stat_info">
-                                    <field name="avg_rating" widget="statinfo" string="Avg Rating"/>
-                                    <span class="o_stat_text">Next review <field name="next_review_date"/></span>
-                                </div>
-                            </button>
-                            <div class="o_stat_info">
-                                <field name="tot_certified" widget="statinfo" string="ToT Certified"/>
-                                <span class="o_stat_text">Certifications</span>
-                            </div>
-                        </div>
                         <group>
                             <group string="Trainer Profile &amp; Contact">
                                 <field name="trainer_type"/>
                                 <field name="trainer_id_code"/>
-                                <field name="employee_id" invisible="trainer_type != 'internal'"/>
+                                <field name="employee_id" invisible="trainer_type != 'internal'" required="trainer_type == 'internal'"/>
                                 <field name="external_partner_id" invisible="trainer_type != 'external'"/>
                                 <field name="external_provider_id" invisible="trainer_type != 'external'"/>
-                                <field name="name"/>
-                                <field name="organization_name"/>
+                                <field name="name" readonly="trainer_type == 'internal' and employee_id"/>
+                                <field name="organization_name" invisible="trainer_type != 'external'"/>
                                 <field name="job_title"/>
                                 <field name="phone"/>
                                 <field name="email"/>
-                                <field name="address"/>
+                                <field name="address" invisible="trainer_type != 'external'"/>
                             </group>
-                            <group string="Experience &amp; Vetting">
-                                <field name="banking_experience_years"/>
-                                <field name="trainer_experience_years"/>
-                                <field name="institutions_worked_with"/>
-                                <field name="competency_ids" widget="many2many_tags"/>
+                            <group string="Qualifications &amp; Review">
                                 <field name="tot_certified"/>
-                                <field name="review_cycle_months"/>
-                                <field name="last_review_date"/>
+                                <field name="avg_rating" readonly="1"/>
+                                <field name="rating_count" readonly="1"/>
+                                <field name="banking_experience_years" invisible="trainer_type != 'external'"/>
+                                <field name="trainer_experience_years"/>
+                                <field name="institutions_worked_with" invisible="trainer_type != 'external'"/>
+                                <field name="competency_ids" widget="many2many_tags"/>
+                                <field name="review_cycle_months" invisible="trainer_type != 'internal'"/>
+                                <field name="last_review_date" invisible="trainer_type != 'internal'"/>
                                 <field name="next_review_date" readonly="1"/>
-                                <field name="review_overdue"/>
                             </group>
                         </group>
                         <notebook>
@@ -215,6 +200,22 @@
             <field name="res_model">eds.trainer</field>
             <field name="view_mode">list,form</field>
             <field name="search_view_id" ref="employee_development_system.view_eds_trainer_search"/>
+        </record>
+        <record id="action_eds_internal_trainer" model="ir.actions.act_window">
+            <field name="name">Internal ToT Trainers</field>
+            <field name="res_model">eds.trainer</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_trainer_search"/>
+            <field name="domain">[('trainer_type','=','internal')]</field>
+            <field name="context">{'default_trainer_type': 'internal'}</field>
+        </record>
+        <record id="action_eds_external_trainer" model="ir.actions.act_window">
+            <field name="name">External Trainers</field>
+            <field name="res_model">eds.trainer</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_trainer_search"/>
+            <field name="domain">[('trainer_type','=','external')]</field>
+            <field name="context">{'default_trainer_type': 'external'}</field>
         </record>
 
         <!-- ══════════════ External Provider Registry (/036) ══════════════ -->
