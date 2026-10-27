@@ -36,7 +36,7 @@ class CompetencyCoverageReport(models.Model):
                     END AS mapping_status,
                     approved_map.version AS active_version,
                     COALESCE((
-                        SELECT COUNT(DISTINCT l.competency_id)
+                        SELECT COUNT(l.id)
                         FROM competency_role_mapping_line l
                         JOIN competency_role_mapping m ON l.mapping_id = m.id
                         WHERE m.job_position_id = j.id AND m.state = 'approved'

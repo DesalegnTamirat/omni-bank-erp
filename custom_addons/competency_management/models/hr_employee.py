@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
 from datetime import timedelta
-from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 
 
@@ -157,31 +156,25 @@ class HrEmployeeCompetency(models.Model):
 
     def web_read(self, specification):
         if self._is_competency_scoped_context():
-            return super(HrEmployeeCompetency, self.sudo()).web_read(specification)
+            self = self.sudo()
         return super().web_read(specification)
 
     def read(self, fields=None, load='_classic_read'):
         if self._is_competency_scoped_context():
-            return super(HrEmployeeCompetency, self.sudo()).read(fields=fields, load=load)
+            self = self.sudo()
         return super().read(fields=fields, load=load)
 
     @api.model
     def name_search(self, name='', domain=None, operator='ilike', limit=100, **kwargs):
         if self._is_competency_scoped_context():
-            return super(HrEmployeeCompetency, self.sudo()).name_search(name=name, domain=domain, operator=operator, limit=limit, **kwargs)
+            self = self.sudo()
         return super().name_search(name=name, domain=domain, operator=operator, limit=limit, **kwargs)
 
     @api.model
     def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
-        try:
-            with self.env.cr.savepoint():
-                if self._is_competency_scoped_context():
-                    return super(HrEmployeeCompetency, self.sudo()).web_search_read(
-                        domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit
-                    )
-                return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
-        except Exception:
-            return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+        if self._is_competency_scoped_context():
+            self = self.sudo()
+        return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
 
     @api.depends('competency_assessment_ids', 'competency_assessment_ids.state', 'competency_assessment_ids.create_date', 'competency_assessment_ids.line_ids')
     def _compute_latest_competency_assessment(self):
@@ -305,15 +298,11 @@ class HrEmployeeCompetency(models.Model):
             try:
                 has_assessment = emp.competency_assessment_ids.filtered(lambda a: a.state in ('approved', 'locked'))
                 if not has_assessment and emp.parent_id.user_id:
-                    supervisor = emp.parent_id.user_id
-                    summary = _('REMINDER: Baseline Competency Assessment Due Soon for %s') % emp.name
-                    note = _('3-Month Baseline Assessment deadline for %s is on %s (14 days remaining).') % (
-                        emp.name, emp.baseline_assessment_deadline
-                    )
-                    self.env['competency.assessment']._notify_user_inbox_and_activity(
-                        supervisor, summary, note, Markup('<p>%s</p>') % escape(note),
-                        target_rec=emp,
-                        event_key='baseline:%s:%s:%s' % (emp.id, supervisor.id, emp.baseline_assessment_deadline),
+                    emp.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('REMINDER: Baseline Competency Assessment Due Soon for %s') % emp.name,
+                        note=_('3-Month Baseline Assessment deadline for %s is on %s (14 days remaining).') % (emp.name, emp.baseline_assessment_deadline),
+                        user_id=emp.parent_id.user_id.id,
                     )
             except Exception:
                 pass

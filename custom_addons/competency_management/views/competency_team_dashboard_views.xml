@@ -7,7 +7,7 @@
             <field name="model">competency.assessment.line</field>
             <field name="arch" type="xml">
                 <pivot string="Team Competency Gap Analysis">
-                    <field name="employee_id" type="row"/>
+                    <field name="assessment_id" type="row"/>
                     <field name="competency_id" type="col"/>
                     <field name="gap" type="measure"/>
                 </pivot>
@@ -57,8 +57,7 @@
             <field name="res_model">competency.assessment.line</field>
             <field name="view_mode">graph,pivot,list</field>
             <field name="search_view_id" ref="view_competency_assessment_line_search"/>
-            <field name="domain">[('is_primary_reporting_line', '=', True)]</field>
-            <field name="context">{'search_default_below_required': 1, 'search_default_filter_current_cycle': 1}</field>
+            <field name="context">{'search_default_below_required': 1}</field>
         </record>
     </data>
 </odoo>

@@ -262,13 +262,10 @@ class CompetencyRoleMapping(models.Model):
                     "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
                     "👉 View Role-Competency Mapping</a></div>"
                 )) % (escape(rec.job_position_id.name or ''), escape(str(rec.version or '1.0')), mapping_url)
-                summary = _('Competency Expectations Updated: %s') % (rec.job_position_id.name or rec.mapping_name)
-                note = _('The competency mapping for %s was approved at version %s.') % (
-                    rec.job_position_id.name or '', rec.version or '1.0'
-                )
-                self.env['competency.assessment']._notify_user_inbox_and_activity(
-                    u, summary, note, msg, target_rec=rec,
-                    event_key='role_mapping:%s:%s:%s' % (rec.id, rec.version or '', u.id),
+                rec.message_post(
+                    body=msg,
+                    partner_ids=[u.partner_id.id],
+                    subtype_xmlid='mail.mt_comment'
                 )
 
     def action_archive(self):

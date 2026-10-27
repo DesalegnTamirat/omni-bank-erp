@@ -1,5 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_competency_notification_employee,competency.notification employee,model_competency_notification,competency_management.group_competency_employee,1,0,0,0
 access_competency_rating_model_employee,competency.rating.model employee,model_competency_rating_model,competency_management.group_competency_employee,1,0,0,0
 access_competency_rating_model_officer,competency.rating.model officer,model_competency_rating_model,competency_management.group_competency_officer,1,1,1,0
 access_competency_rating_model_admin,competency.rating.model admin,model_competency_rating_model,competency_management.group_competency_admin,1,1,1,1
@@ -79,6 +78,7 @@ access_employee_grade_competency_user,employee.grade competency user,hr_employee
 access_competency_director_peer_config_employee,competency.director.peer.config employee,model_competency_director_peer_config,competency_management.group_competency_employee,1,0,0,0
 access_competency_director_peer_config_officer,competency.director.peer.config officer,model_competency_director_peer_config,competency_management.group_competency_officer,1,1,1,0
 access_competency_director_peer_config_admin,competency.director.peer.config admin,model_competency_director_peer_config,competency_management.group_competency_admin,1,1,1,1
+access_competency_data_validator_admin,competency.data.validator admin,model_competency_data_validator,competency_management.group_competency_admin,1,1,1,1
 access_ir_actions_act_window_view_base_user,ir.actions.act_window.view base user,base.model_ir_actions_act_window_view,base.group_user,1,0,0,0
 
 

@@ -449,46 +449,6 @@ class CompetencyReportWizard(models.TransientModel):
             domain.append(('supervisor_avg', '>', 0))
         return domain
 
-    def _get_unique_report_lines(self, domain=None, apply_result_filters=True):
-        """Choose one line per employee/cycle/competency, including stale flags."""
-        self.ensure_one()
-        domain = list(domain if domain is not None else self._build_line_domain())
-        result_filters = [
-            term for term in domain
-            if isinstance(term, (list, tuple)) and term[0] in (
-                'achievement_status', 'current_level', 'required_level',
-            )
-        ]
-        domain = [
-            term for term in domain
-            if term != ('is_primary_reporting_line', '=', True)
-            and term not in result_filters
-        ]
-        candidate_lines = self.env['competency.assessment.line'].sudo().search(domain)
-        selected = {}
-        for line in candidate_lines:
-            if not line.assessment_id.active:
-                continue
-            key = (line.employee_id.id, line.cycle_id.id, line.competency_id.id)
-            rank = (
-                not line.is_primary_reporting_line,
-                line.assessment_id.assessment_type != 'self',
-                line.assessment_id.assessment_type not in ('supervisor', 'team'),
-                line.id,
-            )
-            if key not in selected or rank < selected[key][0]:
-                selected[key] = (rank, line.id)
-        lines = self.env['competency.assessment.line'].sudo().browse(
-            [line_id for _, line_id in selected.values()]
-        ).sorted(key=lambda l: (
-            l.employee_id.name or '', l.competency_id.name or '', l.id,
-        ))
-        if apply_result_filters:
-            for field_name, operator, value in result_filters:
-                if operator == '=':
-                    lines = lines.filtered(lambda l: l[field_name] == value)
-        return lines
-
     def action_generate_report(self):
         """Primary action: Generate Report based on Export Format & Report Type selections."""
         self.ensure_one()
@@ -558,24 +518,29 @@ class CompetencyReportWizard(models.TransientModel):
             }
 
         elif self.report_type == 'individual':
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            if self.operating_unit_ids:
+                asm_domain.extend([
+                    '|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids),
+                    ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
+                ])
+            if self.job_ids:
+                asm_domain.append(('job_id', 'in', self.job_ids.ids))
+            if self.employee_ids:
+                asm_domain.append(('employee_id', 'in', self.employee_ids.ids))
+            if self.stage_filter and self.stage_filter != 'all':
+                asm_domain.append(('state', '=', self.stage_filter))
+
             return {
                 'type': 'ir.actions.act_window',
                 'name': _('Individual Employee Competency Profiles'),
-                'res_model': 'competency.assessment.line',
+                'res_model': 'competency.assessment',
                 'view_mode': 'list,form,pivot,graph',
-                'views': [
-                    (self.env.ref('competency_management.view_competency_assessment_line_report_list').id, 'list'),
-                    (self.env.ref('competency_management.view_competency_assessment_line_report_form').id, 'form'),
-                    (self.env.ref('competency_management.view_competency_assessment_line_report_pivot').id, 'pivot'),
-                    (self.env.ref('competency_management.view_competency_assessment_line_report_graph').id, 'graph'),
-                ],
-                'domain': self._build_line_domain(),
+                'domain': asm_domain,
                 'context': {
-                    'group_by': ['employee_id'],
-                    'search_default_filter_primary_reporting': 1,
-                    'create': False,
-                    'edit': False,
-                    'delete': False,
+                    'group_by': ['department_id'],
                 },
                 'target': 'current',
             }
@@ -619,7 +584,8 @@ class CompetencyReportWizard(models.TransientModel):
         else:
             w_self, w_peer, w_sub, w_sup, w_team = 2.0, 1.0, 1.0, 3.0, 0.0
 
-        lines = self._get_unique_report_lines(apply_result_filters=False)
+        line_domain = self._build_line_domain()
+        lines = self.env['competency.assessment.line'].sudo().search(line_domain)
 
         rows = []
         rating_filter = self.assessment_type_filter or 'all'
@@ -743,54 +709,6 @@ class CompetencyReportWizard(models.TransientModel):
             })
         return rows
 
-    def _get_individual_profile_rows(self, default_to_self=False):
-        """Build one consolidated profile per employee from official cycle lines."""
-        self.ensure_one()
-        domain = self._build_line_domain()
-        if default_to_self and not any((
-            self.employee_ids, self.department_ids, self.operating_unit_ids,
-            self.job_ids, self.grade_ids, self.competency_ids,
-        )):
-            employee = self.env.user.employee_id
-            if employee:
-                domain.append(('employee_id', '=', employee.id))
-        lines = self._get_unique_report_lines(domain)
-        by_employee = {}
-        for line in sorted(lines, key=lambda l: (
-            l.employee_id.id,
-            l.assessment_id.assessment_type != 'self',
-            l.id,
-        )):
-            if line.employee_id and line.competency_id:
-                by_employee.setdefault(line.employee_id.id, {}).setdefault(
-                    line.competency_id.id, line
-                )
-
-        rows = []
-        for employee_id, by_competency in by_employee.items():
-            employee = self.env['hr.employee'].sudo().browse(employee_id)
-            profile_lines = list(by_competency.values())
-            assessment = min(profile_lines, key=lambda l: (
-                l.assessment_id.assessment_type != 'self', l.assessment_id.id,
-            )).assessment_id
-            operating_unit = (
-                getattr(employee, 'default_operating_unit_id', False)
-                or getattr(employee, 'operating_unit_id', False)
-                or getattr(employee.department_id, 'operating_unit_id', False)
-            )
-            scores = [float(l.weighted_current_level or l.current_level or 0) for l in profile_lines]
-            rated_gaps = [float(l.gap) for l in profile_lines if l.current_level_num]
-            rows.append({
-                'assessment': assessment,
-                'employee': employee,
-                'operating_unit': operating_unit,
-                'total_competencies': len(profile_lines),
-                'gap_count': sum(1 for gap in rated_gaps if gap > 0),
-                'average_gap': round(sum(rated_gaps) / len(rated_gaps), 2) if rated_gaps else 0.0,
-                'overall_score': round(sum(scores) / len(scores), 2) if scores else 0.0,
-            })
-        return sorted(rows, key=lambda row: (row['employee'].name or '', row['employee'].id))
-
     def action_export_csv(self):
         """Action: Export report dataset as CSV file matching selected report_type."""
         self.ensure_one()
@@ -863,22 +781,36 @@ class CompetencyReportWizard(models.TransientModel):
                 ])
 
         elif self.report_type == 'individual':
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            if self.operating_unit_ids:
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+            if self.job_ids:
+                asm_domain.append(('job_id', 'in', self.job_ids.ids))
+            if self.employee_ids:
+                asm_domain.append(('employee_id', 'in', self.employee_ids.ids))
+            if self.stage_filter and self.stage_filter != 'all':
+                asm_domain.append(('state', '=', self.stage_filter))
+
+            asms = self.env['competency.assessment'].sudo().search(asm_domain)
             writer.writerow([
                 'Cycle', 'Assessment Ref', 'Staff ID', 'Employee Name', 'Department', 'Operating Unit',
                 'Job Position', 'Total Competencies', 'Gap Count', 'Average Gap', 'Overall Score', 'Status'
             ])
-            for profile in self._get_individual_profile_rows():
-                a = profile['assessment']
-                employee = profile['employee']
-                operating_unit = profile['operating_unit']
-                emp_code = getattr(employee, 'staff_id', False) or getattr(employee, 'employee_code', False) or getattr(employee, 'identification_id', False) or str(employee.id)
+            for a in asms:
+                emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.employee_id, 'operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
+                ou_name = emp_ou.name if emp_ou else 'N/A'
+                tot_comps = len(a.line_ids)
+                gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
+                overall_score = round(sum([float(l.weighted_current_level or l.current_level or 0) for l in a.line_ids]) / tot_comps, 2) if tot_comps else 0.0
+                emp_code = getattr(a.employee_id, 'staff_id', False) or getattr(a.employee_id, 'employee_code', False) or getattr(a.employee_id, 'identification_id', False) or str(a.employee_id.id)
                 writer.writerow([
-                    self.cycle_id.name, a.name, emp_code, employee.name,
-                    employee.department_id.name if employee.department_id else 'N/A',
-                    operating_unit.name if operating_unit else 'N/A',
-                    a.job_id.name if a.job_id else 'N/A',
-                    profile['total_competencies'], profile['gap_count'], profile['average_gap'],
-                    profile['overall_score'], dict(a._fields['state'].selection).get(a.state, a.state)
+                    self.cycle_id.name, a.name, emp_code, a.employee_id.name,
+                    a.department_id.name if a.department_id else 'N/A',
+                    ou_name, a.job_id.name if a.job_id else 'N/A',
+                    tot_comps, gap_cnt, round(a.average_gap or 0.0, 2),
+                    overall_score, dict(a._fields['state'].selection).get(a.state, a.state)
                 ])
 
         elif self.report_type == 'campaign_progress':
@@ -1314,6 +1246,19 @@ class CompetencyReportWizard(models.TransientModel):
         elif self.report_type == 'individual':
             worksheet = workbook.add_worksheet('Employee Profiles')
             start_row = self._setup_worksheet_header(worksheet, workbook, 'Employee Competency Assessment Profile Roster')
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            if self.operating_unit_ids:
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+            if self.job_ids:
+                asm_domain.append(('job_id', 'in', self.job_ids.ids))
+            if self.employee_ids:
+                asm_domain.append(('employee_id', 'in', self.employee_ids.ids))
+            if self.stage_filter and self.stage_filter != 'all':
+                asm_domain.append(('state', '=', self.stage_filter))
+
+            asms = self.env['competency.assessment'].sudo().search(asm_domain)
             headers = [
                 'Cycle', 'Assessment Ref', 'Staff ID', 'Employee Name', 'Department', 'Operating Unit',
                 'Job Position', 'Total Competencies', 'Gap Count', 'Average Gap', 'Overall Score', 'Status'
@@ -1322,21 +1267,23 @@ class CompetencyReportWizard(models.TransientModel):
                 worksheet.write(start_row, col_num, header, header_format)
                 worksheet.set_column(col_num, col_num, 18)
 
-            for row_num, profile in enumerate(self._get_individual_profile_rows(), start=start_row + 1):
-                a = profile['assessment']
-                employee = profile['employee']
-                operating_unit = profile['operating_unit']
+            for row_num, a in enumerate(asms, start=start_row + 1):
+                emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.employee_id, 'operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
+                ou_name = emp_ou.name if emp_ou else 'N/A'
+                tot_comps = len(a.line_ids)
+                gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
+                overall_score = round(sum([float(l.weighted_current_level or l.current_level or 0) for l in a.line_ids]) / tot_comps, 2) if tot_comps else 0.0
                 worksheet.write(row_num, 0, self.cycle_id.name, cell_format)
                 worksheet.write(row_num, 1, a.name, cell_format)
-                worksheet.write(row_num, 2, employee.id, cell_format)
-                worksheet.write(row_num, 3, employee.name, cell_format)
-                worksheet.write(row_num, 4, employee.department_id.name if employee.department_id else 'N/A', cell_format)
-                worksheet.write(row_num, 5, operating_unit.name if operating_unit else 'N/A', cell_format)
+                worksheet.write(row_num, 2, a.employee_id.id, cell_format)
+                worksheet.write(row_num, 3, a.employee_id.name, cell_format)
+                worksheet.write(row_num, 4, a.department_id.name if a.department_id else 'N/A', cell_format)
+                worksheet.write(row_num, 5, ou_name, cell_format)
                 worksheet.write(row_num, 6, a.job_id.name if a.job_id else 'N/A', cell_format)
-                worksheet.write(row_num, 7, profile['total_competencies'], cell_format)
-                worksheet.write(row_num, 8, profile['gap_count'], cell_format)
-                worksheet.write(row_num, 9, profile['average_gap'], num_format)
-                worksheet.write(row_num, 10, profile['overall_score'], num_format)
+                worksheet.write(row_num, 7, tot_comps, cell_format)
+                worksheet.write(row_num, 8, gap_cnt, cell_format)
+                worksheet.write(row_num, 9, round(a.average_gap or 0.0, 2), num_format)
+                worksheet.write(row_num, 10, overall_score, num_format)
                 worksheet.write(row_num, 11, dict(a._fields['state'].selection).get(a.state, a.state), cell_format)
 
         elif self.report_type == 'campaign_progress':
@@ -1398,10 +1345,19 @@ class CompetencyReportWizard(models.TransientModel):
         """Action: Print QWeb PDF report."""
         self.ensure_one()
         if self.report_type == 'individual':
-            profile_rows = self._get_individual_profile_rows(default_to_self=True)[:30]
-            asms = self.env['competency.assessment'].sudo().browse([
-                row['assessment'].id for row in profile_rows
-            ])
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.employee_ids:
+                asm_domain.append(('employee_id', 'in', self.employee_ids.ids))
+            elif self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            elif self.operating_unit_ids:
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+            else:
+                emp = self.env.user.employee_id
+                if emp:
+                    asm_domain.append(('employee_id', '=', emp.id))
+
+            asms = self.env['competency.assessment'].sudo().search(asm_domain, limit=30)
             if not asms:
                 raise UserError(_("No assessment found matching the selected filters for cycle %s.") % self.cycle_id.name)
             return self.env.ref('competency_management.action_report_competency_assessment_individual').report_action(asms)
@@ -1483,7 +1439,8 @@ class CompetencyReportWizard(models.TransientModel):
         mapped_count = len(set(mapped_job_ids))
         coverage_pct = round((mapped_count / total_jobs * 100), 1) if total_jobs else 0.0
         
-        lines = self._get_unique_report_lines()
+        line_domain = self._build_line_domain()
+        lines = self.env['competency.assessment.line'].search(line_domain)
         high_gap_lines = lines.filtered(lambda l: l.gap_priority == 'high')
         
         comp_gap_counts = {}

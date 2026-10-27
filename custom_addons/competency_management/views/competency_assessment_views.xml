@@ -160,14 +160,29 @@
                             <h3 style="color: #1d2b32; border-bottom: 2px solid #541718; padding-bottom: 5px;">
                                 📖 Proficiency Level Behavioral Indicators (Levels 1 to 4)
                             </h3>
-                            <p class="text-muted">Select the behavioral indicator that best matches your current proficiency. You can also use the rating, remarks, and attachment fields below.</p>
+                            <p class="text-muted">Review the expected behaviors for each level below before selecting your current proficiency rating.</p>
                         </div>
 
-                        <div class="o_competency_rating_choices">
-                            <field name="indicator_level_1" widget="competency_level_picker" options="{'level': '1'}" readonly="1" nolabel="1"/>
-                            <field name="indicator_level_2" widget="competency_level_picker" options="{'level': '2'}" readonly="1" nolabel="1"/>
-                            <field name="indicator_level_3" widget="competency_level_picker" options="{'level': '3'}" readonly="1" nolabel="1"/>
-                            <field name="indicator_level_4" widget="competency_level_picker" options="{'level': '4'}" readonly="1" nolabel="1"/>
+                        <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fcfbfa; border-left: 5px solid #726732; border-radius: 4px;">
+                                <h4 style="color: #726732; margin-top: 0; margin-bottom: 6px;">🟡 Level 1 — Basic</h4>
+                                <field name="indicator_level_1" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #f8f9fa; border-left: 5px solid #1d2b32; border-radius: 4px;">
+                                <h4 style="color: #1d2b32; margin-top: 0; margin-bottom: 6px;">🔵 Level 2 — Intermediate</h4>
+                                <field name="indicator_level_2" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fdf8f5; border-left: 5px solid #c17540; border-radius: 4px;">
+                                <h4 style="color: #c17540; margin-top: 0; margin-bottom: 6px;">🟠 Level 3 — Advanced</h4>
+                                <field name="indicator_level_3" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="padding: 12px 15px; background-color: #faf4f5; border-left: 5px solid #541718; border-radius: 4px;">
+                                <h4 style="color: #541718; margin-top: 0; margin-bottom: 6px;">🔴 Level 4 — Expert</h4>
+                                <field name="indicator_level_4" readonly="1" nolabel="1"/>
+                            </div>
                         </div>
 
                         <field name="is_deadline_passed" invisible="1"/>
@@ -270,9 +285,10 @@
                                     <list create="false" delete="false" editable="bottom" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
                                         <field name="state" column_invisible="True"/>
-                                        <field name="competency_id" widget="competency_guide_link" readonly="1" string="Core Competency"/>
+                                        <field name="competency_id" readonly="1" string="Core Competency"/>
+                                        <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="current_level"/>
+                                        <field name="current_level" required="1"/>
                                         <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
@@ -285,9 +301,10 @@
                                     <list create="false" delete="false" editable="bottom" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
                                         <field name="state" column_invisible="True"/>
-                                        <field name="competency_id" widget="competency_guide_link" readonly="1" string="Leadership Competency"/>
+                                        <field name="competency_id" readonly="1" string="Leadership Competency"/>
+                                        <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="current_level"/>
+                                        <field name="current_level" required="1"/>
                                         <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
@@ -300,9 +317,10 @@
                                     <list create="false" delete="false" editable="bottom" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
                                         <field name="state" column_invisible="True"/>
-                                        <field name="competency_id" widget="competency_guide_link" readonly="1" string="Technical Competency"/>
+                                        <field name="competency_id" readonly="1" string="Technical Competency"/>
+                                        <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="current_level"/>
+                                        <field name="current_level" required="1"/>
                                         <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
@@ -399,7 +417,7 @@
                 <list string="My Competency Evaluation Results" create="false" edit="false" delete="false" default_order="cycle_id desc, id desc">
                     <field name="cycle_id"/>
                     <field name="employee_id" options="{'no_open': True, 'no_create': True}"/>
-                    <field name="competency_id" widget="competency_guide_link" options="{'method': 'action_open_evaluation_detail'}"/>
+                    <field name="competency_id"/>
                     <field name="functional_domain"/>
                     <field name="pillar" widget="badge"/>
                     <field name="self_rating" string="Self Rating"/>
@@ -502,7 +520,7 @@
                     <field name="department_id"/>
                     <field name="job_id"/>
                     <field name="grade_id"/>
-                    <field name="competency_id" widget="competency_guide_link" options="{'method': 'action_open_report_detail'}"/>
+                    <field name="competency_id"/>
                     <field name="functional_domain"/>
                     <field name="pillar" widget="badge"/>
                     <field name="self_rating" optional="show" column_invisible="context.get('assessment_type_filter') and context.get('assessment_type_filter') not in ('all', 'self')"/>

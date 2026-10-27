@@ -3,10 +3,11 @@ from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 
 
-class CompetencyDataValidator(models.AbstractModel):
+class CompetencyDataValidator(models.Model):
     """Data Quality Automation & Governance Validator for Competency Data."""
     _name = 'competency.data.validator'
     _description = 'Competency Data Quality & Governance Validator'
+    _auto = False  # No DB table created — keeps it lightweight
 
     @api.model
     def _cron_validate_competency_data_quality(self):
@@ -27,10 +28,13 @@ class CompetencyDataValidator(models.AbstractModel):
             )) % (
                 len(unmapped_jobs), escape(", ".join(unmapped_jobs[:10]) or "None")
             )
-            summary = _("Data Quality Audit Alert: Competency Management")
-            note = _("%d active job role(s) have no approved competency mapping.") % len(unmapped_jobs)
-            for admin in admins.filtered(lambda user: user.active and user.partner_id):
-                self.env['competency.assessment']._notify_user_inbox_and_activity(
-                    admin, summary, note, body,
-                    event_key='data_quality:%s:%s' % (fields.Date.context_today(self), admin.id),
-                )
+            partner_ids = admins.mapped('partner_id').ids
+            if partner_ids:
+                try:
+                    self.env['mail.thread'].message_notify(
+                        partner_ids=partner_ids,
+                        subject=_("Data Quality Audit Alert: Competency Management"),
+                        body=body
+                    )
+                except Exception:
+                    pass
