@@ -24,9 +24,9 @@ class EdsAttendanceImport(models.TransientModel):
     def action_download_template(self):
         """Return sample CSV template format."""
         sample_csv = (
-            "session_ref,employee_badge,attendance_date,attended,notes\n"
-            "SES/2026/0001,EMP001,2026-10-12,1,Present on time\n"
-            "SES/2026/0001,EMP002,2026-10-12,0,Sick leave\n"
+            "session_ref,employee_badge,attendance_date,attendance_slot,attended,notes\n"
+            "SES/2026/0001,EMP001,2026-10-12,day,Present,Present on time\n"
+            "SES/2026/0001,EMP002,2026-10-12,day,Absent,Sick leave\n"
         )
         return {
             'type': 'ir.actions.act_url',
@@ -65,6 +65,7 @@ class EdsAttendanceImport(models.TransientModel):
         success_count = 0
         skipped_count = 0
         errors = []
+        accepted_ids_by_session = {}
 
         for sname in wb.sheetnames:
             ws = wb[sname]
@@ -163,37 +164,46 @@ class EdsAttendanceImport(models.TransientModel):
                     skipped_count += 1
                     continue
 
-                # Calculate attended slots
-                present_slots = 0
-                total_slots = len(slot_cols) if slot_cols else 1
-                for sc in slot_cols:
-                    s_val = ws.cell(r, sc).value
-                    # Count non-empty signatures or presence marks
-                    if s_val is not None and str(s_val).strip() not in ('', '0', 'absent', 'a', 'false'):
-                        present_slots += 1
+                if session.id not in accepted_ids_by_session:
+                    accepted_ids_by_session[session.id] = set(
+                        session._accepted_attendance_enrollments().mapped('employee_id').ids)
+                if emp.id not in accepted_ids_by_session[session.id]:
+                    errors.append(_("Sheet '%s' Row %d: %s has not accepted this session.")
+                                  % (sname, r, emp.name))
+                    skipped_count += 1
+                    continue
 
-                att_pct = present_slots / total_slots * 100.0
-
-                existing = AttendanceModel.search([
-                    ('session_id', '=', session.id),
-                    ('employee_id', '=', emp.id)
-                ], limit=1)
-
-                if existing:
-                    existing.write({
-                        'attended': bool(present_slots),
-                        'attendance_percentage': att_pct,
-                        'attendance_date': fields.Date.today(),
-                    })
+                configured_slots = session._attendance_slots()
+                if session.attendance_mode == 'split':
+                    if len(slot_cols) != len(configured_slots):
+                        raise ValidationError(_(
+                            'The morning/afternoon columns do not match this session schedule. '
+                            'Export its attendance sheet and mark that sheet instead.'))
+                    marks = [(column, day, slot) for column, (day, slot, _hours)
+                             in zip(slot_cols, configured_slots)]
                 else:
-                    AttendanceModel.create({
-                        'session_id': session.id,
-                        'employee_id': emp.id,
-                        'attended': bool(present_slots),
-                        'attendance_percentage': att_pct,
-                        'attendance_date': fields.Date.today(),
-                    })
-                success_count += 1
+                    # Legacy sign-in sheets have no dated slot headers. Their signatures
+                    # represent the first scheduled daily attendance mark only.
+                    marks = [(slot_cols, configured_slots[0][0], 'day')] if configured_slots else []
+                for source, day, slot in marks:
+                    values = [ws.cell(r, column).value for column in source] if isinstance(source, list) else [ws.cell(r, source).value]
+                    if not any(value is not None and str(value).strip() for value in values):
+                        continue
+                    attended = any(str(value or '').strip().casefold() not in
+                                   ('', '0', 'absent', 'a', 'false', 'no') for value in values)
+                    existing = AttendanceModel.search([
+                        ('session_id', '=', session.id), ('employee_id', '=', emp.id),
+                        ('attendance_date', '=', day), ('attendance_slot', '=', slot),
+                    ], limit=1)
+                    if existing:
+                        existing.attended = attended
+                    else:
+                        AttendanceModel.create({
+                            'session_id': session.id, 'employee_id': emp.id,
+                            'attendance_date': day, 'attendance_slot': slot,
+                            'attended': attended,
+                        })
+                    success_count += 1
 
         summary = _("Excel Import Completed: %d participant attendance records processed, %d skipped.") % (success_count, skipped_count)
         if errors:
@@ -228,13 +238,28 @@ class EdsAttendanceImport(models.TransientModel):
                     raise ValidationError(_('Column %s has an invalid attendance date.') % column)
             if not attendance_date:
                 raise ValidationError(_('Column %s has an invalid attendance date.') % column)
-            dated_columns.append((column, attendance_date))
+            slot_label = str(sheet.cell(6, column).value or 'Daily').strip().casefold()
+            slot = {'daily': 'day', 'day': 'day', 'morning': 'morning',
+                    'afternoon': 'afternoon'}.get(slot_label)
+            if not slot:
+                raise ValidationError(_('Column %s has an invalid attendance period.') % column)
+            dated_columns.append((column, attendance_date, slot))
         if not dated_columns:
             raise ValidationError(_('Add at least one dated attendance column.'))
+        expected = {(day, slot) for day, slot, _hours in session._attendance_slots()}
+        actual = [(day, slot) for _column, day, slot in dated_columns]
+        if set(actual) != expected or len(actual) != len(expected):
+            raise ValidationError(_(
+                'The attendance dates or periods do not match this session schedule. '
+                'Export a fresh attendance sheet.'))
 
-        eligible = set(session.enrollment_ids.filtered(
-            lambda row: row.state in ('enrolled', 'completed')).mapped('employee_id').ids)
-        attendance_model = self.env['eds.session.attendance']
+        eligible = set(session._accepted_attendance_enrollments().mapped('employee_id').ids)
+        attendance_model = self.env['eds.session.attendance'].with_context(
+            eds_defer_attendance_refresh=True)
+        existing = {(record.employee_id.id, record.attendance_date, record.attendance_slot): record
+                    for record in attendance_model.search([('session_id', '=', session.id)])}
+        new_records = []
+        seen_employees = set()
         processed = 0
         for row in range(8, sheet.max_row + 1):
             raw_id = sheet.cell(row, 1).value
@@ -246,7 +271,10 @@ class EdsAttendanceImport(models.TransientModel):
                 raise ValidationError(_('Row %s has an invalid employee ID.') % row)
             if employee_id not in eligible:
                 raise ValidationError(_('Row %s employee is not enrolled in this session.') % row)
-            for column, attendance_date in dated_columns:
+            if employee_id in seen_employees:
+                raise ValidationError(_('Employee ID %s appears more than once in the sheet.') % employee_id)
+            seen_employees.add(employee_id)
+            for column, attendance_date, slot in dated_columns:
                 raw = sheet.cell(row, column).value
                 if raw in (None, ''):
                     continue
@@ -257,19 +285,21 @@ class EdsAttendanceImport(models.TransientModel):
                     attended = False
                 else:
                     raise ValidationError(_('Row %s, column %s must say Present or Absent.') % (row, column))
-                existing = attendance_model.search([
-                    ('session_id', '=', session.id),
-                    ('employee_id', '=', employee_id),
-                    ('attendance_date', '=', attendance_date),
-                ], limit=1)
-                if existing:
-                    existing.attended = attended
+                key = (employee_id, attendance_date, slot)
+                if key in existing:
+                    existing[key].attended = attended
                 else:
-                    attendance_model.create({
+                    new_records.append({
                         'session_id': session.id, 'employee_id': employee_id,
-                        'attendance_date': attendance_date, 'attended': attended,
+                        'attendance_date': attendance_date, 'attendance_slot': slot,
+                        'attended': attended,
                     })
                 processed += 1
+        if new_records:
+            attendance_model.create(new_records)
+        if seen_employees:
+            self.env['eds.session.attendance']._refresh_program_attendance({
+                (employee_id, session.id) for employee_id in seen_employees})
         self.result_log = _('%s dated attendance cells imported for session %s.') % (processed, session.name)
         return {
             'type': 'ir.actions.act_window', 'res_model': 'eds.attendance.import',
@@ -286,7 +316,8 @@ class EdsAttendanceImport(models.TransientModel):
         success_count = 0
         skipped_count = 0
         errors = []
-        AttendanceModel = self.env['eds.session.attendance']
+        AttendanceModel = self.env['eds.session.attendance'].with_context(
+            eds_defer_attendance_refresh=True)
         EmployeeModel = self.env['hr.employee'].sudo()
         SessionModel = self.env['eds.session']
 
@@ -323,13 +354,24 @@ class EdsAttendanceImport(models.TransientModel):
         existing_att_map = {}
         if session_ids:
             for att in AttendanceModel.search([('session_id', 'in', session_ids)]):
-                existing_att_map[(att.session_id.id, att.employee_id.id)] = att
+                existing_att_map[(att.session_id.id, att.employee_id.id,
+                                  att.attendance_date, att.attendance_slot)] = att
 
         new_vals_list = []
+        seen_keys = set()
+        affected_pairs = set()
+        allowed_slots = {session.id: {(day, slot) for day, slot, _hours
+                                      in session._attendance_slots()}
+                         for session in session_map.values()}
+        accepted_employee_ids = {
+            session.id: set(session._accepted_attendance_enrollments().mapped('employee_id').ids)
+            for session in session_map.values()
+        }
         for line_no, row in enumerate(rows, start=2):
             session_ref = row.get('session_ref', '').strip()
             badge = row.get('employee_badge', '').strip()
             date_str = row.get('attendance_date', '').strip()
+            slot = row.get('attendance_slot', '').strip().casefold()
             attended_str = row.get('attended', '').strip().lower()
 
             session = session_map.get(session_ref) or self.session_id
@@ -344,24 +386,53 @@ class EdsAttendanceImport(models.TransientModel):
                 skipped_count += 1
                 continue
 
-            att_date = fields.Date.today()
-            if date_str:
+            if employee.id not in accepted_employee_ids.get(session.id, set()):
+                errors.append(_('Row %d: Employee %s has not accepted this session.')
+                              % (line_no, employee.name))
+                skipped_count += 1
+                continue
+
+            try:
+                att_date = (datetime.strptime(date_str, '%Y-%m-%d').date()
+                            if date_str else None)
+            except ValueError:
                 try:
-                    att_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    att_date = datetime.strptime(date_str, '%d/%m/%Y').date()
                 except ValueError:
-                    try:
-                        att_date = datetime.strptime(date_str, '%d/%m/%Y').date()
-                    except ValueError:
-                        pass
-
-            is_attended = attended_str in ('1', 'true', 'yes', 'present', 'y')
-
-            existing_att = existing_att_map.get((session.id, employee.id))
+                    errors.append(_('Row %d has an invalid attendance date.') % line_no)
+                    skipped_count += 1
+                    continue
+            if not att_date:
+                errors.append(_('Row %d needs an attendance date.') % line_no)
+                skipped_count += 1
+                continue
+            if not slot:
+                slot = 'day'
+            if (att_date, slot) not in allowed_slots.get(session.id, set()):
+                errors.append(_(
+                    'Row %d date or period does not match the session attendance schedule.') % line_no)
+                skipped_count += 1
+                continue
+            if attended_str in ('1', 'true', 'yes', 'present', 'y', 'p'):
+                is_attended = True
+            elif attended_str in ('0', 'false', 'no', 'absent', 'n', 'a'):
+                is_attended = False
+            else:
+                errors.append(_('Row %d must say Present or Absent.') % line_no)
+                skipped_count += 1
+                continue
+            key = (session.id, employee.id, att_date, slot)
+            if key in seen_keys:
+                errors.append(_('Row %d repeats an attendance mark in this file.') % line_no)
+                skipped_count += 1
+                continue
+            seen_keys.add(key)
+            affected_pairs.add((employee.id, session.id))
+            existing_att = existing_att_map.get(key)
             if existing_att:
                 existing_att.write({
                     'attended': is_attended,
-                    'attendance_date': att_date,
-                    'attendance_percentage': 100.0 if is_attended else 0.0,
+                    'notes': row.get('notes', '').strip(),
                 })
                 success_count += 1
             else:
@@ -369,13 +440,16 @@ class EdsAttendanceImport(models.TransientModel):
                     'session_id': session.id,
                     'employee_id': employee.id,
                     'attendance_date': att_date,
+                    'attendance_slot': slot,
                     'attended': is_attended,
-                    'attendance_percentage': 100.0 if is_attended else 0.0,
+                    'notes': row.get('notes', '').strip(),
                 })
                 success_count += 1
 
         if new_vals_list:
             AttendanceModel.create(new_vals_list)
+        if affected_pairs:
+            self.env['eds.session.attendance']._refresh_program_attendance(affected_pairs)
 
         summary = _("CSV Import Completed: %d attendance records processed, %d skipped.") % (success_count, skipped_count)
         if errors:

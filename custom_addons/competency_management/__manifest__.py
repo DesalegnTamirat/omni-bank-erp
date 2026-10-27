@@ -2,7 +2,7 @@
 {
     'name': "Competency Management System",
     'summary': "Competency dictionary, job role mapping, 360 evaluations, and TNA gap analytics.",
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.3',
     'category': 'Human Resources/Competency',
     'author': 'Desalegn & Abeza',
     'website': 'https://www.bunnabanksc.com',
@@ -48,13 +48,17 @@ Features:
         'wizards/competency_multi_cycle_report_wizard_views.xml',
         'views/competency_dashboard_snapshot_views.xml',
         'views/competency_skills_test_views.xml',
+        'views/competency_notification_views.xml',
         'views/competency_menus.xml',
     ],
     'assets': {
         'web.assets_backend': [
             'competency_management/static/src/scss/competency_dashboard.scss',
+            'competency_management/static/src/scss/competency_rating.scss',
             'competency_management/static/src/js/competency_dashboard.js',
+            'competency_management/static/src/js/competency_rating.js',
             'competency_management/static/src/xml/competency_dashboard.xml',
+            'competency_management/static/src/xml/competency_rating.xml',
         ],
     },
     'installable': True,

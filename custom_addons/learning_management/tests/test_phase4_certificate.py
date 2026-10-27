@@ -13,6 +13,14 @@ class TestLmsPhase4Certificate(TransactionCase):
         cls.LmsEnrollment = cls.env['lms.enrollment']
         cls.LmsCertificate = cls.env['lms.certificate']
 
+        cls.reviewer = cls.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'Certificate Course Reviewer',
+            'login': 'cert_reviewer@bunna.et',
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref('learning_management.group_lms_manager').id,
+            ])],
+        })
         cls.user = cls.env['res.users'].create({
             'name': 'Cert Learner',
             'login': 'cert_learner@bunna.et',
@@ -29,9 +37,19 @@ class TestLmsPhase4Certificate(TransactionCase):
             'category_id': cls.category.id,
             'description': '<p>Course Syllabus and Overview</p>',
             'instructor_id': cls.employee.id,
+            'reviewer_id': cls.reviewer.id,
+            'has_post_assessment': False,
             'pass_score_percentage': 80.0,
             'certificate_validity_months': 12,
         })
+        cls.env['lms.lesson'].create({
+            'name': 'AML Certification Reading',
+            'course_id': cls.course.id,
+            'lesson_type': 'text',
+            'html_content': '<p>AML policy and controls.</p>',
+        })
+        cls.course.action_submit_for_review()
+        cls.course.with_user(cls.reviewer).action_publish()
         cls.enrollment = cls.LmsEnrollment.create({
             'employee_id': cls.employee.id,
             'course_id': cls.course.id,
@@ -53,3 +71,10 @@ class TestLmsPhase4Certificate(TransactionCase):
         self.assertTrue(len(raw_pdf) > 100, 'Certificate PDF must contain rendered bytes')
         self.assertTrue(raw_pdf.startswith(b'%PDF') or raw_pdf.startswith(b'<!DOCTYPE html>'),
                         'Rendered content must be a valid PDF format or rendered QWeb HTML document')
+        self.assertEqual(cert.delivery_state, 'complete')
+        self.assertTrue(cert.hr_training_history_id)
+        self.assertTrue(cert.hr_employee_document_id)
+        self.assertEqual(
+            cert.hr_employee_document_id.document_type_id,
+            self.env.ref('learning_management.lms_hr_training_document_type'),
+        )

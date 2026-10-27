@@ -269,28 +269,19 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
             'status': 'planned',
         })
         self.assertEqual(annual_plan.line_count, 1, "Plan should register the line.")
-        self.assertEqual(annual_plan.budget_total, 75000.0, "Budget total should sum planned line costs.")
+        expected_total = plan_line.budget_currency_id._convert(
+            75000.0, annual_plan.budget_currency_id, annual_plan.company_id,
+            plan_line.scheduled_date or fields.Date.context_today(annual_plan))
+        self.assertAlmostEqual(annual_plan.budget_total, expected_total,
+                               msg="Budget total should convert planned line costs to the company currency.")
         _logger.info("Step 7: Annual L&D Plan assembled and budgeted.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 8: Training Logistics: Venues, Awarded Hotels/Vendors, Sessions
         # ─────────────────────────────────────────────────────────────────────
-        # Manual entry of hotel venue profile (as per user domain feedback)
-        venue_hotel = self.env['eds.venue'].create({
-            'name': 'Skylight Hotel Addis Ababa',
-            'venue_type': 'hotel',
-            'capacity': 40,
-            'has_catering': True,
-            'has_lodging': True,
-        })
-        # Manual vendor profile
-        vendor_provider = self.env['eds.external.provider'].create({
-            'name': 'Ethiopian Institute of Banking & Finance (EIBF)',
-            'category': 'local',
-            'service_offerings': 'Credit Risk & Financial Modeling',
-        })
-
-        # Schedule delivery cohort & session with awarded venue and vendor
+        # This plan line is internal. External awards are supplied by their
+        # sourcing records, so the session must not accept manually entered
+        # provider or hotel awards.
         batch = self.env['eds.batch'].create({
             'name': 'Batch 01 - Credit Appraisal 2026',
             'course_id': course_credit.id,
@@ -303,13 +294,11 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
             'date_start': fields.Datetime.now() + timedelta(days=5),
             'date_end': fields.Datetime.now() + timedelta(days=8),
             'capacity': 30,
-            'awarded_venue_id': venue_hotel.id,
-            'awarded_provider_id': vendor_provider.id,
             'certificate_title': 'Certificate of Credit Appraisal Mastery',
         })
-        self.assertEqual(session.awarded_venue_id, venue_hotel, "Hotel profile assigned to session.")
-        self.assertEqual(session.awarded_provider_id, vendor_provider, "Vendor profile assigned to session.")
-        _logger.info("Step 8: Logistics, venue, vendor, and session configured.")
+        self.assertFalse(session.awarded_venue_id)
+        self.assertFalse(session.awarded_provider_id)
+        _logger.info("Step 8: Internal session configured.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 9: Trainee Nomination & Automated Enrollment Allocation
@@ -335,20 +324,28 @@ class TestEdsScenarioFullLifecycle(TransactionCase):
         self.assertEqual(nomination.state, 'approved', "Nomination final approval complete.")
         self.assertTrue(nomination.enrollment_id, "Approved nomination automatically creates enrollment.")
         self.assertEqual(nomination.enrollment_id.state, 'enrolled', "Enrollment auto-assigned seat.")
+        nomination.with_user(self.user_trainee2).action_employee_accept()
+        self.assertEqual(nomination.employee_confirmed, 'confirmed')
         _logger.info("Step 9: Staff nomination approved and enrolled into session.")
 
         # ─────────────────────────────────────────────────────────────────────
         # STEP 10: Attendance Tracking (Meets 80% Minimum Threshold)
         # ─────────────────────────────────────────────────────────────────────
         # Record session attendance (100% attendance)
-        attendance = self.env['eds.session.attendance'].create({
-            'session_id': session.id,
-            'employee_id': self.emp_trainee2.id,
-            'attended': True,
-            'hours_attended': 24.0,
-        })
-        self.assertEqual(attendance.attendance_percentage, 100.0, "Program attendance should be 100%.")
-        self.assertTrue(attendance.meets_min_attendance, "Meets the >=80% certification attendance threshold.")
+        attendance = self.env['eds.session.attendance'].create([
+            {
+                'session_id': session.id,
+                'employee_id': self.emp_trainee2.id,
+                'attendance_date': day,
+                'attendance_slot': slot,
+                'attended': True,
+            }
+            for day, slot, _hours in session._attendance_slots()
+        ])
+        self.assertEqual(set(attendance.mapped('attendance_percentage')), {100.0},
+                         "Session attendance should be 100%.")
+        self.assertTrue(all(attendance.mapped('meets_min_attendance')),
+                        "Meets the >=80% certification attendance threshold.")
         _logger.info("Step 10: Session attendance recorded and verified (100%).")
 
         # ─────────────────────────────────────────────────────────────────────

@@ -3,6 +3,8 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from datetime import timedelta
 
+from .eds_action_notification import clear_action_activities, notify_action, role_users
+
 class EdsSponsorship(models.Model):
     _name = 'eds.sponsorship'
     _description = 'EDS Certification Sponsorship & Bond Management'
@@ -41,7 +43,7 @@ class EdsSponsorship(models.Model):
         currency_field='currency_id',
         readonly=True, tracking=True)
 
-    # EDS-F-15 Sponsorship Application & Scoring Matrix
+    # Sponsorship Application & Scoring Matrix
     application_date = fields.Date(string='Application Date', default=fields.Date.context_today)
     institution_name = fields.Char(string='University / Educational Institution')
     field_of_study = fields.Char(string='Field of Study / Degree Title')
@@ -49,7 +51,7 @@ class EdsSponsorship(models.Model):
     tenure_score = fields.Float(string='Service Tenure Score (Max 30 pts)', default=25.0)
     performance_score = fields.Float(string='PMS Performance Score (Max 40 pts)', default=35.0)
     strategic_alignment_score = fields.Float(string='Strategic Need Score (Max 30 pts)', default=25.0)
-    total_matrix_score = fields.Float(string='Total Matrix Score (/100)', compute='_compute_total_matrix_score', store=True)
+    total_matrix_score = fields.Float(string='Total Matrix Score', compute='_compute_total_matrix_score', store=True)
     committee_decision = fields.Selection([
         ('recommended', 'Recommended for Full Sponsorship'),
         ('waitlisted', 'Waitlisted for Next Cohort'),
@@ -64,7 +66,7 @@ class EdsSponsorship(models.Model):
             rec.total_matrix_score = (rec.tenure_score or 0.0) + (rec.performance_score or 0.0) + (rec.strategic_alignment_score or 0.0)
 
     def action_print_application_form(self):
-        """Prints official Form EDS-F-15 Staff Sponsorship Application & Scoring Matrix PDF."""
+        """Prints official Form Staff Sponsorship Application & Scoring Matrix PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_sponsorship_application').report_action(self)
 
@@ -131,6 +133,10 @@ class EdsSponsorship(models.Model):
             if not rec.eligible:
                 raise ValidationError(_("Employee does not meet the minimum 12 months continuous service requirement (Current: %d months).") % rec.service_months)
             rec.state = 'eligibility_check'
+            notify_action(rec, role_users(rec, 'group_eds_manager'),
+                          _('Approve sponsorship'),
+                          _('Sponsorship %s for %s is eligible and awaits approval.')
+                          % (rec.name, rec.employee_id.name))
 
     def action_approve(self):
         for rec in self:
@@ -138,6 +144,15 @@ class EdsSponsorship(models.Model):
             if rec.state != 'eligibility_check':
                 raise UserError(_("Only sponsorships with verified eligibility can be approved."))
             rec.state = 'approved'
+            clear_action_activities(rec)
+            notify_action(rec, role_users(rec, 'group_eds_officer'),
+                          _('Activate approved sponsorship'),
+                          _('Sponsorship %s is approved. Attach the signed bond and activate it.')
+                          % rec.name)
+            notify_action(rec, rec.employee_id.user_id,
+                          _('Sponsorship approved'),
+                          _('Your sponsorship for %s has been approved.') % rec.program_name,
+                          action_required=False)
 
     def action_activate_bond(self):
         for rec in self:
@@ -151,6 +166,12 @@ class EdsSponsorship(models.Model):
                 rec.bond_start_date = fields.Date.context_today(self)
             if not rec.bond_end_date and rec.bond_duration_months:
                 rec.bond_end_date = rec.bond_start_date + timedelta(days=int(30.4375 * rec.bond_duration_months))
+            clear_action_activities(rec)
+            notify_action(rec, rec.employee_id.user_id,
+                          _('Sponsorship bond active'),
+                          _('Your sponsorship bond for %s is active through %s.')
+                          % (rec.program_name, rec.bond_end_date or _('the agreed date')),
+                          action_required=False)
 
     def action_mark_breached(self, breach_reason=None):
         for rec in self:
@@ -196,6 +217,11 @@ class EdsSponsorship(models.Model):
             rec.message_post(body=_("Bond marked as breached (Reason: %s, Policy: %s). Calculated recovery: %s. Payroll payload %s generated.") % (
                 rec.breach_reason, rec.recovery_policy, recovery_amt, payload.name
             ))
+            notify_action(rec, rec.employee_id.user_id,
+                          _('Sponsorship bond status changed'),
+                          _('Your sponsorship bond for %s was marked breached. Recorded recovery: %s %s. Contact L&D for details.')
+                          % (rec.program_name, rec.currency_id.name, recovery_amt),
+                          action_required=False)
 
 class EdsSponsorshipRepaymentLine(models.Model):
     _name = 'eds.sponsorship.repayment.line'

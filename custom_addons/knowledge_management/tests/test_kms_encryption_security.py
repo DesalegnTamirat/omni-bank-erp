@@ -2,6 +2,7 @@
 import base64
 import time
 from cryptography.fernet import InvalidToken
+from werkzeug.http import parse_options_header
 from odoo.tests.common import TransactionCase
 from odoo.addons.knowledge_management.utils.encryption import (
     get_kms_server_secret,
@@ -144,11 +145,14 @@ class TestKmsEncryptionSecurity(TransactionCase):
 
         controller = KmsDocumentController()
         dummy_req = DummyRequest(self.env, self.user_alice, session_sid="SESS-ALICE-SEC-01")
+        dummy_req.httprequest.headers['X-KMS-Token'] = 'client-chosen-header'
         from unittest.mock import patch
         with patch('odoo.addons.knowledge_management.controllers.main.request', dummy_req):
-            res = controller.kms_download_document(doc.id)
+            res = controller.kms_download_document(doc.id, token='client-chosen-query')
             self.assertEqual(dict(res.headers).get('X-KMS-Encrypted'), '1')
-            self.assertTrue(dict(res.headers).get('Content-Disposition').endswith('.docx.enc"'))
+            disposition, options = parse_options_header(dict(res.headers).get('Content-Disposition', ''))
+            self.assertEqual(disposition, 'attachment')
+            self.assertEqual(options.get('filename'), 'facility_application.docx.enc')
 
             # Verify downloaded bytes can be decrypted with Alice's session
             downloaded = res.get_data()

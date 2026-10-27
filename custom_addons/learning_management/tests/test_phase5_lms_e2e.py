@@ -293,13 +293,22 @@ class TestLmsPhase5E2E(TransactionCase):
         })
 
         # Learner 1 in Kazanchis branch -> Completed
-        self.LmsEnrollment.create({
+        completed_enrollment = self.LmsEnrollment.create({
             'employee_id': self.emp_learner1.id,
             'course_id': course.id,
             'is_mandatory': True,
             'state': 'completed',
             'completion_date': fields.Date.context_today(self),
         })
+        certificate = self.LmsCertificate.create({
+            'name': 'TEST-COMPLIANCE-CERT',
+            'employee_id': self.emp_learner1.id,
+            'course_id': course.id,
+            'enrollment_id': completed_enrollment.id,
+            'issue_date': fields.Date.context_today(self),
+            'state': 'valid',
+        })
+        completed_enrollment.certificate_id = certificate
 
         # Learner 2 in Piassa branch -> In Progress & Overdue
         self.LmsEnrollment.create({
@@ -542,6 +551,14 @@ class TestLmsPhase5E2E(TransactionCase):
             self.assertEqual(res_valid.values.get('learner_name'), self.emp_learner1.name)
             self.assertEqual(res_valid.values.get('course_name'), course.name)
 
+        # A certificate past its expiry is invalid even before the daily cron runs.
+        cert.write({'expiry_date': fields.Date.context_today(cert) - timedelta(days=1)})
+        self.assertEqual(cert.state, 'valid')
+        with patch('odoo.addons.learning_management.controllers.main.request', dummy_req):
+            res_expired = controller.verify_certificate(cert.verification_code)
+            self.assertEqual(res_expired.template, 'learning_management.certificate_verify_success')
+            self.assertFalse(res_expired.values.get('is_valid'))
+
         # 2. Test with invalid/tampered verification code -> returns not found template
         with patch('odoo.addons.learning_management.controllers.main.request', dummy_req):
             res_invalid = controller.verify_certificate("INVALID-FAKE-HASH")
@@ -642,7 +659,7 @@ class TestLmsPhase5E2E(TransactionCase):
         with patch('odoo.addons.learning_management.controllers.main.request', dummy_req_full):
             res_full = controller.stream_lesson_video(lesson.id)
             self.assertEqual(res_full.status_code, 200)
-            self.assertEqual(len(res_full.get_data()), 500)
+            self.assertEqual(len(b''.join(res_full.response)), 500)
 
         # 2. Request partial content (Range: bytes=0-99) -> HTTP 206
         headers_range = {'Range': 'bytes=0-99'}
@@ -650,7 +667,7 @@ class TestLmsPhase5E2E(TransactionCase):
         with patch('odoo.addons.learning_management.controllers.main.request', dummy_req_range):
             res_partial = controller.stream_lesson_video(lesson.id)
             self.assertEqual(res_partial.status_code, 206)
-            self.assertEqual(len(res_partial.get_data()), 100)
+            self.assertEqual(len(b''.join(res_partial.response)), 100)
             headers_dict = dict(res_partial.headers)
             self.assertEqual(headers_dict.get('Content-Range'), 'bytes 0-99/500')
             self.assertEqual(headers_dict.get('Content-Length'), '100')

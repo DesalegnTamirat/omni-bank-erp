@@ -2,6 +2,23 @@
 <odoo>
     <data>
 
+        <record id="view_lms_lesson_learner_form" model="ir.ui.view">
+            <field name="name">lms.lesson.learner.form</field>
+            <field name="model">lms.lesson</field>
+            <field name="arch" type="xml">
+                <form string="Reading Lesson" create="0" edit="0" delete="0">
+                    <sheet>
+                        <h1><field name="name" readonly="1"/></h1>
+                        <group>
+                            <field name="course_id" readonly="1"/>
+                            <field name="duration_minutes" readonly="1"/>
+                        </group>
+                        <field name="html_content" widget="html" readonly="1" nolabel="1"/>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
         <!-- ========================================================= -->
         <!-- LMS COURSE LIST VIEW                                      -->
         <!-- ========================================================= -->
@@ -106,7 +123,7 @@
                                     <span class="o_stat_text">Learners</span>
                                 </div>
                             </button>
-                            <button class="oe_stat_button" icon="fa-check-circle">
+                            <button name="action_view_completed_enrollments" type="object" class="oe_stat_button" icon="fa-check-circle">
                                 <div class="o_field_widget o_stat_info">
                                     <span class="o_stat_value"><field name="total_completed"/></span>
                                     <span class="o_stat_text">Completed</span>
@@ -114,50 +131,51 @@
                             </button>
                         </div>
 
-                        <field name="cover_image" widget="image" class="oe_avatar" options="{'preview_image': 'cover_image', 'size': [90, 90]}"/>
+                        <field name="cover_image" widget="image" class="oe_avatar" options="{'preview_image': 'cover_image', 'size': [90, 90]}" readonly="state != 'draft'"/>
 
                         <div class="oe_title">
                             <label for="code" string="Course Code"/>
                             <h2><field name="code" readonly="1"/></h2>
                             <label for="name" string="Course Title"/>
-                            <h1><field name="name" placeholder="e.g. Anti-Money Laundering &amp; CFT Compliance Masterclass"/></h1>
+                            <h1><field name="name" placeholder="e.g. Anti-Money Laundering &amp; CFT Compliance Masterclass" readonly="state != 'draft'"/></h1>
                         </div>
 
                         <group>
                             <group string="Classification &amp; Structure">
-                                <field name="category_id" options="{'no_create': True}"/>
-                                <field name="instructor_id" widget="many2one_avatar_employee"/>
-                                <field name="is_mandatory"/>
-                                <field name="estimated_duration_hours"/>
-                                <field name="version"/>
+                                <field name="category_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+                                <field name="instructor_id" widget="many2one_avatar_employee" readonly="state != 'draft'"/>
+                                <field name="reviewer_id" widget="many2one_avatar_user" groups="learning_management.group_lms_instructor,learning_management.group_lms_manager" readonly="state != 'draft'"/>
+                                <field name="is_mandatory" readonly="state != 'draft'"/>
+                                <field name="estimated_duration_hours" readonly="state != 'draft'"/>
+                                <field name="version" readonly="state != 'draft'"/>
                             </group>
                             <group string="Target Audience &amp; Competencies">
-                                <field name="target_department_ids" widget="many2many_tags" placeholder="All Departments (Blank)"/>
-                                <field name="target_job_ids" widget="many2many_tags" placeholder="All Roles (Blank)"/>
-                                <field name="target_grade_ids" widget="many2many_tags" placeholder="All Grades (Blank)"/>
-                                <field name="competency_ids" widget="many2many_tags" placeholder="Competencies Developed"/>
+                                <field name="target_department_ids" widget="many2many_tags" placeholder="All Departments (Blank)" readonly="state != 'draft'"/>
+                                <field name="target_job_ids" widget="many2many_tags" placeholder="All Roles (Blank)" readonly="state != 'draft'"/>
+                                <field name="target_grade_ids" widget="many2many_tags" placeholder="All Grades (Blank)" readonly="state != 'draft'"/>
+                                <field name="competency_ids" widget="many2many_tags" placeholder="Competencies Developed" readonly="state != 'draft'"/>
                             </group>
                         </group>
 
                         <group string="Examination &amp; Certification Policies (FR-LMS-012, FR-LMS-018)">
                             <group>
-                                <field name="pass_score_percentage"/>
-                                <field name="has_pre_assessment"/>
-                                <field name="pre_assessment_id" invisible="not has_pre_assessment"/>
-                                <field name="has_post_assessment"/>
-                                <field name="post_assessment_id" invisible="not has_post_assessment"/>
+                                <field name="pass_score_percentage" readonly="state != 'draft'"/>
+                                <field name="has_pre_assessment" readonly="state != 'draft'"/>
+                                <field name="pre_assessment_id" invisible="not has_pre_assessment" groups="learning_management.group_lms_instructor" readonly="state != 'draft'"/>
+                                <field name="has_post_assessment" readonly="state != 'draft'"/>
+                                <field name="post_assessment_id" invisible="not has_post_assessment" groups="learning_management.group_lms_instructor" readonly="state != 'draft'"/>
                             </group>
                             <group>
-                                <field name="issue_certificate"/>
-                                <field name="certificate_template_id" invisible="not issue_certificate"/>
-                                <field name="certificate_validity_months" invisible="not issue_certificate"/>
+                                <field name="issue_certificate" readonly="state != 'draft'"/>
+                                <field name="certificate_template_id" invisible="not issue_certificate" readonly="state != 'draft'"/>
+                                <field name="certificate_validity_months" invisible="not issue_certificate" readonly="state != 'draft'"/>
                                 <field name="active" invisible="1"/>
                             </group>
                         </group>
 
                         <notebook>
                             <page string="Curriculum &amp; Lessons (FR-LMS-004 to FR-LMS-009)">
-                                <field name="lesson_ids">
+                                <field name="lesson_ids" readonly="state != 'draft'">
                                     <list>
                                         <field name="sequence" widget="handle"/>
                                         <field name="name" string="Lesson Title"/>
@@ -193,7 +211,7 @@
                                                 <field name="video_source_type"/>
                                                 <field name="video_file" filename="video_filename" invisible="video_source_type != 'file'" groups="learning_management.group_lms_instructor"/>
                                                 <field name="video_filename" invisible="1"/>
-                                                <field name="video_url" invisible="video_source_type != 'url'" placeholder="https://media.bunnabanksc.com/videos/module1.mp4"/>
+                                                <field name="video_url" invisible="video_source_type != 'url'" placeholder="https://media.bunnabanksc.com/videos/module1.mp4" groups="learning_management.group_lms_instructor"/>
                                             </group>
 
                                             <!-- Document Option -->
@@ -218,7 +236,7 @@
                             </page>
 
                             <page string="Curriculum Sections / Modules">
-                                <field name="section_ids">
+                                <field name="section_ids" readonly="state != 'draft'">
                                     <list editable="bottom">
                                         <field name="sequence" widget="handle"/>
                                         <field name="name" string="Section / Chapter Name"/>
@@ -229,15 +247,15 @@
 
                             <page string="Description &amp; Learning Outcomes">
                                 <group string="Overview">
-                                    <field name="description"/>
+                                    <field name="description" readonly="state != 'draft'"/>
                                 </group>
                                 <group string="Learning Objectives">
-                                    <field name="learning_objectives"/>
+                                    <field name="learning_objectives" readonly="state != 'draft'"/>
                                 </group>
                             </page>
 
                             <page string="Revision Changelog (FR-LMS-011)">
-                                <field name="revision_notes" placeholder="Detailed notes on what changed in this version..."/>
+                                <field name="revision_notes" placeholder="Detailed notes on what changed in this version..." readonly="state != 'draft'"/>
                             </page>
                         </notebook>
                     </sheet>
@@ -257,6 +275,7 @@
                     <field name="name" string="Course Title / Code" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
                     <field name="category_id"/>
                     <field name="instructor_id"/>
+                    <field name="reviewer_id"/>
                     <field name="competency_ids"/>
                     <filter name="filter_published" string="Published &amp; Active" domain="[('state', '=', 'published')]"/>
                     <filter name="filter_mandatory" string="Mandatory Courses" domain="[('is_mandatory', '=', True)]"/>

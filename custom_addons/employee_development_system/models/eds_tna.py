@@ -5,21 +5,24 @@ from markupsafe import Markup, escape
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import float_round
+
+from .eds_action_notification import notify_action, notify_employee_batch, role_users
 
 
 class EdsTnaCycle(models.Model):
-    """Annual Bank-wide Training Needs Assessment cycle (/002/009).
-
-    Default start 1 April, submission window 10 working days,
-    approval deadline 31 May - all configurable in EDS settings.
-    """
+    """Training needs collection cycle; close collection before annual planning."""
     _name = 'eds.tna.cycle'
     _description = 'TNA Cycle'
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'id desc'
     _rec_name = 'name'
+    _rec_names_search = ['cycle_title', 'name']
 
     name = fields.Char(string='Reference', required=True, readonly=True, copy=False, default=lambda self: _('New'))
+    cycle_title = fields.Char(
+        string='Cycle Name', tracking=True,
+        help='Optional descriptive name shown alongside the TNA reference.')
     year = fields.Char(string='Assessment Year', required=True, index=True,
                        default=lambda self: str(fields.Date.context_today(self).year),
                        readonly=True, tracking=True)
@@ -45,11 +48,48 @@ class EdsTnaCycle(models.Model):
     state = fields.Selection([
         ('draft', 'Draft'),
         ('collecting', 'Collecting Needs'),
-        ('consolidating', 'Consolidating'),
-        ('under_approval', 'Under Approval'),
-        ('approved', 'Approved'),
-        ('locked', 'Locked'),
+        ('closed', 'Closed'),
     ], string='Status', default='draft', tracking=True)
+    announcement_state = fields.Selection([
+        ('idle', 'Not Scheduled'), ('pending', 'Waiting to Send'),
+        ('sending', 'Sending'), ('done', 'Sent'),
+    ], default='idle', readonly=True, copy=False, string='Employee Announcement')
+    announcement_cursor = fields.Integer(readonly=True, copy=False, default=0)
+    announcement_sent_count = fields.Integer(
+        string='Employees Notified', readonly=True, copy=False, default=0)
+    collection_opened_by_id = fields.Many2one(
+        'res.users', readonly=True, copy=False, string='Opened By')
+    restrict_tna_courses = fields.Boolean(
+        string='Only Selected Catalog Courses', tracking=True,
+        help='Offer only the selected catalog courses for individual and work-unit requests. '
+             'Competency and PMS gaps are still recorded, but only matching selected courses '
+             'can enter this cycle’s course demand and plan.')
+    request_course_ids = fields.Many2many(
+        'eds.course', 'eds_tna_cycle_request_course_rel', 'cycle_id', 'course_id',
+        string='Courses Available in This Cycle', domain=[('status', '=', 'active')],
+        help='Catalog courses available to request and to recommend from competency or PMS gaps in this cycle.')
+    restrict_tna_audience = fields.Boolean(
+        string='Only Selected Employees', tracking=True,
+        help='Restrict this cycle to employees matching all selected department, work unit, '
+             'job position and employee filters. Leave off to offer it to all employees.')
+    target_department_ids = fields.Many2many(
+        'hr.department', 'eds_tna_cycle_department_rel', 'cycle_id', 'department_id',
+        string='Departments')
+    target_work_unit_ids = fields.Many2many(
+        'operating.unit', 'eds_tna_cycle_unit_rel', 'cycle_id', 'unit_id',
+        string='Work Units')
+    target_job_position_ids = fields.Many2many(
+        'hr.job', 'eds_tna_cycle_job_rel', 'cycle_id', 'job_id',
+        string='Job Positions')
+    target_employee_ids = fields.Many2many(
+        'hr.employee', 'eds_tna_cycle_employee_rel', 'cycle_id', 'employee_id',
+        string='Specific Employees')
+    available_target_unit_ids = fields.Many2many(
+        'operating.unit', compute='_compute_target_options')
+    available_target_job_ids = fields.Many2many(
+        'hr.job', compute='_compute_target_options')
+    available_target_employee_ids = fields.Many2many(
+        'hr.employee', compute='_compute_target_options')
     entry_ids = fields.One2many('eds.tna.entry', 'cycle_id', string='Training Needs')
     entry_count = fields.Integer(string='Training Need Count', compute='_compute_entry_count')
     individual_entry_ids = fields.One2many(
@@ -80,13 +120,121 @@ class EdsTnaCycle(models.Model):
     employee_sub_count = fields.Integer(string='Self-Submissions', compute='_compute_source_breakdown')
     manager_sub_count = fields.Integer(string='Manager Requests', compute='_compute_source_breakdown')
     days_until_deadline = fields.Integer(
-        string='Days Until Approval Deadline', compute='_compute_days_until_deadline')
+        string='Days Until Submission Deadline', compute='_compute_days_until_deadline')
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    # consolidations per cycle (-010)
+    @api.depends('name', 'cycle_title')
+    def _compute_display_name(self):
+        for cycle in self:
+            title = (cycle.cycle_title or '').strip()
+            cycle.display_name = '%s (%s)' % (title, cycle.name) if title else cycle.name
+
+    def _require_cycle_staff(self):
+        if self.env.su or any(self.env.user.has_group(
+                'employee_development_system.' + group) for group in (
+                    'group_eds_officer', 'group_eds_manager', 'group_eds_admin')):
+            return
+        raise UserError(_('Only L&D staff may open, close or plan from a TNA cycle.'))
+
+    def _target_employee_domain(self, include_explicit=True):
+        """Apply the selected audience as an intersection, using indexed HR fields."""
+        self.ensure_one()
+        domain = [('active', '=', True)]
+        if not self.restrict_tna_audience:
+            return domain
+        compat = self.env['eds.hr.compat']
+        domain += compat.get_employee_domain(
+            department=self.target_department_ids,
+            operating_unit=self.target_work_unit_ids)
+        jobs = self.target_job_position_ids.ids
+        if jobs:
+            fields_available = self.env['hr.employee']._fields
+            if 'job_position' in fields_available and 'job_id' in fields_available:
+                domain += ['|', ('job_position', 'in', jobs), ('job_id', 'in', jobs)]
+            elif 'job_position' in fields_available:
+                domain.append(('job_position', 'in', jobs))
+            else:
+                domain.append(('job_id', 'in', jobs))
+        if include_explicit and self.target_employee_ids:
+            domain.append(('id', 'in', self.target_employee_ids.ids))
+        return domain
+
+    def _is_employee_targeted(self, employee):
+        self.ensure_one()
+        if not self.restrict_tna_audience:
+            return True
+        if not employee or not employee.active:
+            return False
+        return bool(self.env['hr.employee'].sudo().search_count(
+            [('id', '=', employee.id)] + self._target_employee_domain()))
+
+    def _target_relation_domain(self, relation='employee_id'):
+        """Push audience filtering into diagnostic queries instead of one query per gap."""
+        return [
+            (f'{relation}.{part[0]}', part[1], part[2]) if isinstance(part, tuple)
+            else part for part in self._target_employee_domain()
+        ]
+
+    @api.depends('restrict_tna_audience', 'target_department_ids',
+                 'target_work_unit_ids', 'target_job_position_ids', 'state')
+    def _compute_target_options(self):
+        compat = self.env['eds.hr.compat']
+        Employee = self.env['hr.employee'].sudo()
+        Unit = self.env['operating.unit'].sudo()
+        Job = self.env['hr.job'].sudo()
+        for cycle in self:
+            if not cycle.restrict_tna_audience or cycle.state != 'draft':
+                cycle.available_target_unit_ids = Unit.browse()
+                cycle.available_target_job_ids = Job.browse()
+                cycle.available_target_employee_ids = Employee.browse()
+                continue
+            if cycle.target_department_ids:
+                department_employees = Employee.search([
+                    ('active', '=', True),
+                    ('department_id', 'in', cycle.target_department_ids.ids),
+                ])
+                units = department_employees.mapped('default_operating_unit_id')
+                if 'operating_unit_id' in Employee._fields:
+                    units |= department_employees.mapped('operating_unit_id')
+                cycle.available_target_unit_ids = units
+            else:
+                cycle.available_target_unit_ids = Unit.browse()
+            base_domain = [('active', '=', True)] + compat.get_employee_domain(
+                department=cycle.target_department_ids,
+                operating_unit=cycle.target_work_unit_ids)
+            if cycle.target_department_ids or cycle.target_work_unit_ids:
+                employees = Employee.search(base_domain)
+                cycle.available_target_job_ids = employees.mapped('job_position') | employees.mapped('job_id')
+            else:
+                cycle.available_target_job_ids = Job.browse()
+            if (cycle.target_department_ids or cycle.target_work_unit_ids
+                    or cycle.target_job_position_ids):
+                cycle.available_target_employee_ids = Employee.search(
+                    cycle._target_employee_domain(include_explicit=False))
+            else:
+                cycle.available_target_employee_ids = Employee.browse()
+
+    @api.onchange('restrict_tna_audience')
+    def _onchange_restrict_tna_audience(self):
+        if not self.restrict_tna_audience:
+            self.target_department_ids = False
+            self.target_work_unit_ids = False
+            self.target_job_position_ids = False
+            self.target_employee_ids = False
+
+    @api.onchange('target_department_ids', 'target_work_unit_ids', 'target_job_position_ids')
+    def _onchange_target_hierarchy(self):
+        if self.target_department_ids:
+            self.target_work_unit_ids &= self.available_target_unit_ids
+        if self.target_department_ids or self.target_work_unit_ids:
+            self.target_job_position_ids &= self.available_target_job_ids
+        if self.target_department_ids or self.target_work_unit_ids or self.target_job_position_ids:
+            self.target_employee_ids &= self.available_target_employee_ids
+
+    # consolidations per cycle
     consolidation_ids = fields.One2many(
         'eds.tna.consolidation', 'cycle_id', string='Consolidations')
     consolidation_count = fields.Integer(
@@ -125,6 +273,11 @@ class EdsTnaCycle(models.Model):
             'context': {'default_cycle_id': self.id},
         }
 
+    def _filter_cycle_courses(self, courses):
+        """Keep diagnoses but offer only selected courses in a restricted cycle."""
+        self.ensure_one()
+        return courses & self.request_course_ids if self.restrict_tna_courses else courses
+
     def action_pull_competency_gaps(self):
         """Auto-pull diagnosed gaps from the Competency Assessment framework into this TNA cycle."""
         self.ensure_one()
@@ -136,13 +289,29 @@ class EdsTnaCycle(models.Model):
 
         AssessmentLine = self.env['competency.assessment.line']
 
-        # Query all active assessment lines with below proficiency
+        # Use the latest closed competency cycle and its consolidated line for
+        # each employee/competency. Raw 360 rater lines can disagree on the gap
+        # and must not independently create training needs.
+        AssessmentCycle = self.env['competency.assessment.cycle'].sudo()
+        latest_cycle = AssessmentCycle.search([
+            ('state', '=', 'closed'),
+            ('active', '=', True),
+            ('period_end', '!=', False),
+        ], order='period_end desc, id desc', limit=1)
+        if not latest_cycle:
+            latest_cycle = AssessmentCycle.search([
+                ('state', '=', 'closed'),
+                ('active', '=', True),
+            ], order='id desc', limit=1)
+
         gap_lines = AssessmentLine.sudo().search([
-            '|',
+            ('cycle_id', '=', latest_cycle.id if latest_cycle else 0),
+            ('is_primary_reporting_line', '=', True),
+            ('active', '=', True),
             ('tna_measure', '=', 'below'),
             ('gap', '>', 0),
             ('employee_id.active', '=', True),
-        ])
+        ] + self._target_relation_domain())
 
         created_count = 0
         existing_keys = set(
@@ -170,6 +339,7 @@ class EdsTnaCycle(models.Model):
                 ('required_level', '>=', str(line.required_level or '1')),
                 ('course_id.status', 'in', ('active', 'draft'))
             ]).mapped('course_id')
+            comp_courses = self._filter_cycle_courses(comp_courses)
             prog_name = comp_courses[0].name if len(comp_courses) == 1 else (_("%s Mastery Program") % line.competency_id.name)
 
             emp = line.employee_id
@@ -267,21 +437,30 @@ class EdsTnaCycle(models.Model):
             ('is_duplicate', '=', False),
             ('exclusion_type', '=', False),
         ])
+        targeted_employee_ids = (set(self.env['hr.employee'].sudo().search(
+            self._target_employee_domain()).ids)
+            if self.restrict_tna_audience else None)
 
         course_data = {}
 
         for entry in entries:
             target_courses = Course.browse()
-            if entry.request_level == 'individual' and entry.source == 'manual' and entry.requested_course_ids:
-                target_courses |= entry.requested_course_ids
-            elif entry.source in ('competency_gap', 'pms') and entry.suggested_course_ids:
-                target_courses |= entry.suggested_course_ids
-            elif entry.course_id:
-                target_courses |= entry.course_id
-            elif entry.suggested_course_ids:
-                target_courses |= entry.suggested_course_ids
-            elif entry.recommended_course_id:
-                target_courses |= entry.recommended_course_id
+            # A possible match for a proposed custom course is only a review
+            # hint; it must not add a second course to demand automatically.
+            if not entry.is_custom_course:
+                if entry.request_level == 'individual' and entry.source == 'manual' and entry.requested_course_ids:
+                    target_courses |= entry.requested_course_ids
+                elif entry.source in ('competency_gap', 'pms') and entry.suggested_course_ids:
+                    target_courses |= entry.suggested_course_ids
+                elif entry.course_id:
+                    target_courses |= entry.course_id
+
+            if self.restrict_tna_courses:
+                target_courses = self._filter_cycle_courses(target_courses)
+                if not target_courses:
+                    # Keep the original diagnostic visible for review, but do
+                    # not invent an unselected course or free-text plan line.
+                    continue
 
             if entry.request_level == 'work_unit':
                 emps = entry.work_unit_employee_ids
@@ -298,7 +477,12 @@ class EdsTnaCycle(models.Model):
             if entry.is_custom_course and entry.custom_course_title:
                 c_keys.append(('custom', False, entry.custom_course_title, 1, 'internal'))
             elif not c_keys:
-                name = entry.proposed_program or (entry.competency_id and entry.competency_id.name) or (entry.pms_measure_id and entry.pms_measure_id.name) or _('Unassigned Program')
+                name = (entry.proposed_program or (entry.competency_id and entry.competency_id.name)
+                        or (entry.pms_measure_id and entry.pms_measure_id.name))
+                if not name or not name.strip():
+                    # Historical requests without a course or program title are
+                    # still visible as needs, but cannot become a plan program.
+                    continue
                 c_keys.append(('custom', False, name, 1, 'internal'))
 
             for c_key in c_keys:
@@ -323,6 +507,8 @@ class EdsTnaCycle(models.Model):
                 slot = course_data[dict_key]
                 slot['request_ids'].add(entry.id)
                 employee_ids = set(emps.ids)
+                if targeted_employee_ids is not None:
+                    employee_ids &= targeted_employee_ids
                 if entry.source == 'competency_gap':
                     slot['competency_ids'].update(employee_ids)
                 elif entry.source == 'pms':
@@ -341,7 +527,14 @@ class EdsTnaCycle(models.Model):
         }
         retained = CourseLine.browse()
         for key, data in course_data.items():
-            emp_ids = list(data['employee_ids'])
+            line = existing.get(key)
+            excluded_ids = ({demand.employee_id.id for demand in line.employee_demand_ids
+                             if demand.excluded_from_planning} if line else set())
+            eligible_ids = data['employee_ids'] - excluded_ids
+            eligible_request_ids = set().union(*(
+                data['employee_evidence'].get(employee_id, set())
+                for employee_id in eligible_ids)) if eligible_ids else set()
+            emp_ids = list(eligible_ids)
             vals = {
                 'cycle_id': self.id,
                 'course_id': data['course_id'],
@@ -349,21 +542,20 @@ class EdsTnaCycle(models.Model):
                 'duration_days': data['duration_days'],
                 'delivery_method': data['delivery_method'],
                 'target_quarter': data['target_quarter'],
-                'count_individual': len(data['individual_ids']),
-                'count_work_unit': len(data['work_unit_ids']),
-                'count_competency': len(data['competency_ids']),
-                'count_pms': len(data['pms_ids']),
-                'request_count': len(data['request_ids']),
+                'count_individual': len(data['individual_ids'] & eligible_ids),
+                'count_work_unit': len(data['work_unit_ids'] & eligible_ids),
+                'count_competency': len(data['competency_ids'] & eligible_ids),
+                'count_pms': len(data['pms_ids'] & eligible_ids),
+                'request_count': len(eligible_request_ids),
                 'total_employees': len(emp_ids),
                 'employee_ids': [(6, 0, emp_ids)],
             }
-            line = existing.get(key)
             if line:
                 updates = {field: vals[field] for field in (
-                    'course_name', 'count_individual', 'count_work_unit',
+                    'course_name', 'delivery_method', 'count_individual', 'count_work_unit',
                     'count_competency', 'count_pms', 'request_count',
                     'total_employees') if line[field] != vals[field]}
-                if set(line.employee_ids.ids) != data['employee_ids']:
+                if set(line.employee_ids.ids) != eligible_ids:
                     updates['employee_ids'] = vals['employee_ids']
                 if updates:
                     line.write(updates)
@@ -417,12 +609,19 @@ class EdsTnaCycle(models.Model):
     def action_go_to_planning(self):
         """Convert selected course demands into Annual L&D Plan lines and navigate to Planning."""
         self.ensure_one()
+        self._require_cycle_staff()
+        if self.state != 'closed':
+            raise UserError(_('Close this TNA cycle after collecting needs before sending its courses to planning.'))
+        if self.year != str(fields.Date.context_today(self).year):
+            raise UserError(_('This cycle belongs to %s. Create the annual plan for that assessment year instead.') % self.year)
         if self.course_demand_dirty or not self.course_demand_last_sync:
             self._sync_course_demand()
 
-        selected_courses = self.course_summary_ids.filtered('selected_for_planning')
+        selected_courses = self.course_summary_ids.filtered(
+            lambda line: line.selected_for_planning and line.total_employees > 0)
         if not selected_courses:
-            raise UserError(_("Select at least one course in Course Demand before going to planning."))
+            raise UserError(_(
+                "Select at least one course with eligible employees in Course Demand before going to planning."))
 
         Plan = self.env['eds.annual.plan']
         plan_domain = [
@@ -438,36 +637,22 @@ class EdsTnaCycle(models.Model):
                 'fiscal_year': self.year,
                 'company_id': self.company_id.id,
                 'notes': _("Initialized from TNA Cycle %s.") % self.name,
+                'restrict_tna_cycles': True,
+                'selected_tna_cycle_ids': [(6, 0, self.ids)],
+            })
+        else:
+            existing_cycles = (
+                plan.line_ids.mapped('course_demand_ids.cycle_id')
+                | plan.line_ids.mapped('course_demand_id.cycle_id'))
+            plan.write({
+                'restrict_tna_cycles': True,
+                'selected_tna_cycle_ids': [(6, 0, (
+                    plan.selected_tna_cycle_ids | existing_cycles | self).ids)],
             })
 
-        existing_course_ids = set(plan.line_ids.mapped('course_id.id'))
-        existing_names = set(plan.line_ids.mapped('program_name'))
+        plan._add_course_demands(selected_courses)
 
-        for c_summary in selected_courses:
-            if c_summary.course_id and c_summary.course_id.id in existing_course_ids:
-                continue
-            if c_summary.course_name in existing_names:
-                continue
-
-            participants = c_summary.total_employees
-            line_vals = {
-                'plan_id': plan.id,
-                'course_demand_id': c_summary.id,
-                'course_id': c_summary.course_id.id if c_summary.course_id else False,
-                'program_name': c_summary.course_name,
-                'duration_days': c_summary.duration_days or 1,
-                'planned_participants': participants,
-                'quarter': c_summary.target_quarter or 'q1',
-                'delivery_method': c_summary.delivery_method or 'internal',
-            }
-            plan_line = self.env['eds.annual.plan.line'].create(line_vals)
-            plan_line._init_default_budget_lines()
-
-            if c_summary.course_id:
-                existing_course_ids.add(c_summary.course_id.id)
-            existing_names.add(c_summary.course_name)
-
-        self.message_post(body=_("Created/updated Annual L&D Plan %s with %d courses from cycle demand.") % (plan.name, len(selected_courses)))
+        self.message_post(body=_("Created/updated Annual L&D Plan %s with %d courses selected from this TNA cycle.") % (plan.name, len(selected_courses)))
 
         return {
             'type': 'ir.actions.act_window',
@@ -480,33 +665,27 @@ class EdsTnaCycle(models.Model):
 
     @api.model
     def _cron_tna_deadline_reminder(self):
-        """remind pending approvers before the approval deadline; escalate if breached.
-
-        Runs daily (eds.cron_tna_deadline_reminder). Notifies the L&D Manager group via chatter
-        once per 7-day window; once the deadline is breached the escalation text is used.
-        """
+        """Remind L&D staff to close collecting cycles near their submission deadline."""
         today = date.today()
         cycles = self.search([
-            ('state', 'in', ('collecting', 'consolidating', 'under_approval')),
-            ('approval_deadline', '!=', False),
+            ('state', '=', 'collecting'),
+            ('submission_end_date', '!=', False),
         ])
         manager_group = self.env.ref('employee_development_system.group_eds_manager', raise_if_not_found=False)
         recipients = manager_group.user_ids if manager_group else self.env['res.users']
         partner_ids = recipients.filtered('partner_id').mapped('partner_id').ids
         for cycle in cycles:
-            days_left = (cycle.approval_deadline - today).days
+            days_left = (cycle.submission_end_date - today).days
             if days_left > 14:
                 continue
             if cycle.last_reminder_date and (today - cycle.last_reminder_date).days < 7:
                 continue
             if days_left >= 0:
-                msg_text = _('Reminder: TNA cycle %s must be approved by %s - %d days left.'
-                             ' Pending approvers: PPDD Validation, Director PPDD, CPCO, SMC.') % (
-                    cycle.name, cycle.approval_deadline, days_left)
+                msg_text = _('TNA cycle %s closes for requests on %s - %d days left. Review the collected needs and close the cycle when collection is complete.') % (
+                    cycle.name, cycle.submission_end_date, days_left)
             else:
-                msg_text = _('DEADLINE BREACHED: TNA cycle %s approval deadline (%s) has been'
-                             ' missed by %d days. Escalated for senior management review.') % (
-                    cycle.name, cycle.approval_deadline, -days_left)
+                msg_text = _('TNA cycle %s passed its submission deadline (%s) by %d days. Close the collection cycle when the needs are ready for planning.') % (
+                    cycle.name, cycle.submission_end_date, -days_left)
 
             action_link = f"/web#id={cycle.id}&model=eds.tna.cycle"
             body = Markup(f"""<p>{escape(msg_text)}</p>
@@ -551,11 +730,11 @@ class EdsTnaCycle(models.Model):
         for rec in self:
             rec.entry_count = len(rec.entry_ids)
 
-    @api.depends('approval_deadline')
+    @api.depends('submission_end_date')
     def _compute_days_until_deadline(self):
         today = date.today()
         for rec in self:
-            rec.days_until_deadline = (rec.approval_deadline - today).days if rec.approval_deadline else 0
+            rec.days_until_deadline = (rec.submission_end_date - today).days if rec.submission_end_date else 0
 
     @api.model
     def _get_int_param(self, key, default):
@@ -586,6 +765,52 @@ class EdsTnaCycle(models.Model):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.tna.cycle') or _('New')
         return super().create(vals_list)
 
+    def write(self, vals):
+        if {'restrict_tna_courses', 'request_course_ids', 'restrict_tna_audience',
+                'target_department_ids', 'target_work_unit_ids',
+                'target_job_position_ids', 'target_employee_ids'} & vals.keys():
+            if any(cycle.state != 'draft' for cycle in self):
+                raise UserError(_(
+                    'Cycle courses and employee audience can only be changed while the TNA cycle is a draft.'))
+        if {'restrict_tna_audience', 'target_department_ids', 'target_work_unit_ids',
+                'target_job_position_ids', 'target_employee_ids'} & vals.keys():
+            if any(cycle.entry_ids for cycle in self):
+                raise UserError(_(
+                    'Set the employee audience before pulling gaps or entering training needs. '
+                    'This cycle already has training needs.'))
+        return super().write(vals)
+
+    @api.constrains('state', 'restrict_tna_courses', 'request_course_ids')
+    def _check_request_course_selection(self):
+        for cycle in self:
+            if cycle.state != 'draft' and cycle.restrict_tna_courses and not cycle.request_course_ids:
+                raise ValidationError(_(
+                    'Select at least one catalog course before opening a restricted TNA cycle.'))
+
+    @api.constrains('state', 'restrict_tna_audience', 'target_department_ids',
+                    'target_work_unit_ids', 'target_job_position_ids', 'target_employee_ids')
+    def _check_target_audience(self):
+        for cycle in self:
+            if not cycle.restrict_tna_audience:
+                continue
+            if cycle.state != 'draft' and not (
+                    cycle.target_department_ids or cycle.target_work_unit_ids
+                    or cycle.target_job_position_ids or cycle.target_employee_ids):
+                raise ValidationError(_('Select at least one employee audience filter before opening this restricted cycle.'))
+            if cycle.target_department_ids and cycle.target_work_unit_ids:
+                for unit in cycle.target_work_unit_ids:
+                    domain = self.env['eds.hr.compat'].get_employee_domain(
+                        department=cycle.target_department_ids, operating_unit=unit)
+                    if not self.env['hr.employee'].sudo().search_count(
+                            [('active', '=', True)] + domain):
+                        raise ValidationError(_('Each selected work unit must belong to a selected department.'))
+            if cycle.target_employee_ids:
+                matched = self.env['hr.employee'].sudo().search(
+                    [('id', 'in', cycle.target_employee_ids.ids)]
+                    + cycle._target_employee_domain(include_explicit=False))
+                if set(matched.ids) != set(cycle.target_employee_ids.ids):
+                    raise ValidationError(_('Specific employees must match the selected department, work unit and job position filters.'))
+
     def web_read(self, specification):
         if 'course_summary_ids' in specification or 'course_summary_count' in specification:
             for cycle in self:
@@ -593,13 +818,22 @@ class EdsTnaCycle(models.Model):
                     cycle.sudo()._sync_course_demand()
         return super().web_read(specification)
 
-    # ── Workflow (/008/009/010) ──────────────────────────────────────
+    # ── Workflow ──────────────────────────────────────
     def action_start_collection(self):
-        """Draft -> Collecting (opens the submission window, /002)."""
+        """Draft -> Collecting (opens the submission window)."""
+        self._require_cycle_staff()
         today = fields.Date.today()
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Only draft TNA cycles can start collection.'))
+            rec._check_target_audience()
+            if rec.restrict_tna_courses:
+                if not rec.request_course_ids:
+                    raise UserError(_(
+                        'Select at least one catalog course before opening a restricted TNA cycle.'))
+                if rec.request_course_ids.filtered(lambda course: course.status != 'active'):
+                    raise UserError(_(
+                        'Only active catalog courses may be offered for TNA requests.'))
             if rec.submission_end_date and rec.submission_end_date < today:
                 raise UserError(_(
                     "Cannot start collection: Submission End Date (%s) has already passed. "
@@ -607,81 +841,100 @@ class EdsTnaCycle(models.Model):
                 ) % rec.submission_end_date)
             if rec.start_date and rec.start_date > today:
                 rec.start_date = today
-            rec.state = 'collecting'
+            rec.write({
+                'state': 'collecting', 'announcement_state': 'pending',
+                'announcement_cursor': 0, 'announcement_sent_count': 0,
+                'collection_opened_by_id': self.env.user.id,
+            })
             rec.message_post(body=_('TNA cycle %s opened for collection. Submission window: %s to %s.')
                              % (rec.name, rec.start_date, rec.submission_end_date))
+        if self:
+            self._trigger_cycle_announcements()
+
+    def _trigger_cycle_announcements(self):
+        cron = self.env.ref(
+            'employee_development_system.cron_eds_tna_cycle_announcement',
+            raise_if_not_found=False)
+        if cron:
+            cron.sudo()._trigger()
+
+    def action_announce_existing_collection(self):
+        """Queue a one-time notice for a cycle opened before announcements existed."""
+        self._require_cycle_staff()
+        for cycle in self:
+            if cycle.state != 'collecting' or cycle.announcement_state != 'idle':
+                raise UserError(_('Only an unannounced collecting cycle can be announced.'))
+            if cycle.submission_end_date and cycle.submission_end_date < fields.Date.today():
+                raise UserError(_('This cycle has passed its submission deadline.'))
+            cycle.write({
+                'announcement_state': 'pending',
+                'announcement_cursor': 0,
+                'announcement_sent_count': 0,
+                'collection_opened_by_id': self.env.user.id,
+            })
+            cycle.message_post(body=_('Employee announcements queued for this open TNA cycle.'))
+        if self:
+            self._trigger_cycle_announcements()
+
+    @api.model
+    def _cron_send_cycle_announcements(self, batch_size=500, max_batches=2):
+        """Send opening notices in bounded batches without delaying cycle creation."""
+        cycle = self.sudo().search([
+            ('state', '=', 'collecting'),
+            ('announcement_state', 'in', ('pending', 'sending')),
+        ], order='id', limit=1)
+        if not cycle:
+            return True
+        action = self.env.ref(
+            'employee_development_system.action_eds_tna_entry_own',
+            raise_if_not_found=False)
+        for _batch in range(max_batches):
+            employees = self.env['hr.employee'].sudo().search(
+                cycle._target_employee_domain() + [
+                    ('company_id', '=', cycle.company_id.id),
+                    ('id', '>', cycle.announcement_cursor),
+                ], order='id', limit=batch_size)
+            if not employees:
+                cycle.write({'announcement_state': 'done'})
+                break
+            message = _(
+                'TNA cycle %s is open. Submit your training needs by %s in My Training Needs.') % (
+                    cycle.name, cycle.submission_end_date or _('the closing date'))
+            actor = cycle.collection_opened_by_id or self.env.user
+            sent = notify_employee_batch(
+                cycle.with_user(actor).sudo(), employees,
+                _('Training needs collection is open'), message,
+                action_id=action.id if action else None)
+            cycle.write({
+                'announcement_state': 'sending',
+                'announcement_cursor': employees[-1].id,
+                'announcement_sent_count': cycle.announcement_sent_count + sent,
+            })
+            if len(employees) < batch_size:
+                cycle.write({'announcement_state': 'done'})
+                break
+        return True
 
     def action_finish_collection(self):
-        """Collecting -> Consolidating."""
+        """Collecting -> Closed. This is the only cycle completion step."""
+        self._require_cycle_staff()
         for rec in self:
-            if not rec.entry_ids:
-                raise UserError(_('No training needs were submitted for this cycle.'))
-            rec.state = 'consolidating'
-            rec.message_post(body=_('TNA cycle %s moved to consolidation.') % rec.name)
-
-    def action_submit_for_approval(self):
-        """Consolidating -> Under Approval (PPDD validation -> Director review ->
-        CPCO endorsement -> SMC final approval; stages are tracked via chatter/approval log)."""
-        for rec in self:
-            if rec.state != 'consolidating':
-                raise UserError(_('Only consolidating TNA cycles can be submitted for approval.'))
-            if not rec.consolidation_ids:
-                raise UserError(_(
-                    'Consolidate the training needs before submitting this cycle for approval.'))
-            outstanding = rec.entry_ids.filtered(
-                lambda entry: entry.state in ('submitted', 'validated')
-                and not entry.consolidation_id and not entry.exclusion_type)
-            if outstanding:
-                raise UserError(_(
-                    '%d training needs are not in a consolidation. Re-run consolidation before submitting.')
-                    % len(outstanding))
-            rec.state = 'under_approval'
-            rec.message_post(
-                body=_('TNA %s submitted for approval (PPDD Validation -> Director PPDD -> CPCO -> SMC).')
+            if rec.state != 'collecting':
+                raise UserError(_('Only a cycle collecting needs can be closed.'))
+            rec.state = 'closed'
+            if rec.announcement_state in ('pending', 'sending'):
+                rec.announcement_state = 'done'
+            rec._sync_course_demand()
+            rec.message_post(body=_('TNA cycle %s closed for collection. Select courses in Course Demand, then go to planning.') % rec.name)
+            notify_action(
+                rec, role_users(rec, 'group_eds_officer'),
+                _('Review closed TNA demand'),
+                _('TNA cycle %s is closed. Select the courses to include in the annual plan.')
                 % rec.name)
-            if all(consolidation.state in ('approved', 'locked')
-                   for consolidation in rec.consolidation_ids):
-                rec.action_approve()
-
-    def action_approve(self):
-        """Under Approval -> Approved (approved TNA becomes the official source)."""
-        for rec in self:
-            if rec.state != 'under_approval':
-                raise UserError(_('Only cycles under approval can be approved.'))
-            if not rec.consolidation_ids or any(
-                consolidation.state not in ('approved', 'locked')
-                for consolidation in rec.consolidation_ids
-            ):
-                raise UserError(_(
-                    'The TNA cycle can be approved only after all its consolidations are approved.'))
-            rec.write({
-                'state': 'approved',
-                'approved_by_id': self.env.user.id,
-                'approval_date': fields.Datetime.now(),
-            })
-            rec.message_post(body=_('TNA cycle %s approved. Approved needs are locked for curriculum planning.')
-                             % rec.name)
-
-    def action_lock(self):
-        """Approved -> Locked ( control)."""
-        for rec in self:
-            if rec.state != 'approved':
-                raise UserError(_('Only approved TNA cycles can be locked.'))
-            rec.state = 'locked'
-            rec.message_post(body=_('TNA cycle %s locked. Modifications require a documented change request.')
-                             % rec.name)
-
-    def action_unlock(self):
-        """Locked -> Approved (admin only, documented change request)."""
-        self.ensure_one()
-        if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('Only EDS Administrators can unlock a locked TNA cycle.'))
-        self.state = 'approved'
-        self.message_post(body=_('TNA cycle %s unlocked with a documented change request.') % self.name)
 
 
 class EdsTnaEntry(models.Model):
-    """A single training need within a cycle (/004, ..005, )."""
+    """A single training need within a cycle."""
     _name = 'eds.tna.entry'
     _description = 'TNA Training Need Entry'
     _inherit = ['mail.thread']
@@ -709,6 +962,13 @@ class EdsTnaEntry(models.Model):
     cycle_id = fields.Many2one(
         'eds.tna.cycle', string='TNA Cycle', required=True, ondelete='cascade', index=True,
         domain=[('state', '=', 'collecting')], tracking=True)
+    available_cycle_ids = fields.Many2many(
+        'eds.tna.cycle', compute='_compute_available_cycles',
+        string='Cycles Available to Request')
+    restrict_request_courses = fields.Boolean(
+        related='cycle_id.restrict_tna_courses', readonly=True)
+    allowed_request_course_ids = fields.Many2many(
+        'eds.course', related='cycle_id.request_course_ids', readonly=True)
     work_unit_id = fields.Many2one(
         'operating.unit', string='Work Unit', default=_default_work_unit_id, tracking=True)
     department_id = fields.Many2one(
@@ -726,21 +986,50 @@ class EdsTnaEntry(models.Model):
         string='Selected Employees (Work Unit)',
         help='Employees nominated by the work unit leader for this course.')
     allowed_work_unit_ids = fields.Many2many(
-        'operating.unit', compute='_compute_allowed_work_units',
+        'operating.unit', compute='_compute_work_unit_request_scope',
         string='Work Units I Manage')
+    allowed_department_ids = fields.Many2many(
+        'hr.department', compute='_compute_work_unit_request_scope',
+        string='Departments I Manage')
+    available_work_unit_ids = fields.Many2many(
+        'operating.unit', compute='_compute_available_work_units',
+        string='Work Units in Selected Department')
+    can_request_work_unit = fields.Boolean(compute='_compute_work_unit_request_scope')
+    can_choose_department = fields.Boolean(compute='_compute_work_unit_request_scope')
+    can_choose_work_unit = fields.Boolean(compute='_compute_available_work_units')
     eligible_work_unit_employee_ids = fields.Many2many(
         'hr.employee', compute='_compute_eligible_work_unit_employees',
         string='Eligible Work Unit Employees')
 
     @api.depends_context('uid')
-    def _compute_allowed_work_units(self):
-        units = (self.env['operating.unit'].search([])
-                 if self.env.su or self.env.user.has_group('employee_development_system.group_eds_officer')
-                 else self.env['eds.hr.compat'].get_managed_operating_units())
+    def _compute_work_unit_request_scope(self):
+        if self.env.su or self.env.user.has_group('employee_development_system.group_eds_officer'):
+            units = self.env['operating.unit'].search([('active', '=', True)])
+            departments = self.env['hr.department'].search([('active', '=', True)])
+        else:
+            units, departments = self.env['eds.hr.compat'].get_managed_training_scope()
+            units = units.filtered('active')
+            departments = departments.filtered('active')
         for rec in self:
             rec.allowed_work_unit_ids = units
+            rec.allowed_department_ids = departments
+            rec.can_request_work_unit = bool(units)
+            rec.can_choose_department = len(departments) > 1
 
-    @api.depends('request_level', 'work_unit_id', 'department_id', 'job_position_id')
+    @api.depends('department_id', 'allowed_work_unit_ids', 'allowed_department_ids')
+    def _compute_available_work_units(self):
+        compat = self.env['eds.hr.compat']
+        for rec in self:
+            units = compat.get_available_work_units_for_department(
+                rec.allowed_work_unit_ids, rec.department_id,
+                rec.allowed_department_ids)
+            rec.available_work_unit_ids = units
+            rec.can_choose_work_unit = len(units) > 1
+
+    @api.depends('request_level', 'work_unit_id', 'cycle_id',
+                 'cycle_id.restrict_tna_audience', 'cycle_id.target_employee_ids',
+                 'cycle_id.target_department_ids', 'cycle_id.target_work_unit_ids',
+                 'cycle_id.target_job_position_ids')
     def _compute_eligible_work_unit_employees(self):
         Employee = self.env['hr.employee'].sudo()
         for rec in self:
@@ -748,10 +1037,35 @@ class EdsTnaEntry(models.Model):
                 rec.eligible_work_unit_employee_ids = Employee.browse()
                 continue
             domain = self.env['eds.hr.compat'].get_employee_domain(
-                department=rec.department_id, operating_unit=rec.work_unit_id,
-                job=rec.job_position_id)
+                operating_unit=rec.work_unit_id)
+            if rec.cycle_id:
+                domain += rec.cycle_id._target_employee_domain()
             rec.eligible_work_unit_employee_ids = Employee.search(
                 [('active', '=', True)] + domain)
+
+    @api.depends('request_level', 'employee_id', 'work_unit_id')
+    @api.depends_context('uid')
+    def _compute_available_cycles(self):
+        cycles = self.env['eds.tna.cycle'].search([('state', '=', 'collecting')])
+        compat = self.env['eds.hr.compat']
+        managed_units = self.env['operating.unit']
+        if not (self.env.su or self.env.user.has_group(
+                'employee_development_system.group_eds_officer')):
+            managed_units, _departments = compat.get_managed_training_scope()
+        for rec in self:
+            if rec.request_level == 'work_unit':
+                units = rec.work_unit_id or managed_units
+                if not units and (self.env.su or self.env.user.has_group(
+                        'employee_development_system.group_eds_officer')):
+                    units = self.env['operating.unit'].search([('active', '=', True)])
+                rec.available_cycle_ids = cycles.filtered(lambda cycle: bool(units) and bool(
+                    self.env['hr.employee'].sudo().search_count(
+                        compat.get_employee_domain(operating_unit=units)
+                        + cycle._target_employee_domain())))
+            else:
+                employee = rec.employee_id or rec._default_employee_id()
+                rec.available_cycle_ids = cycles.filtered(
+                    lambda cycle: cycle._is_employee_targeted(employee))
     competency_id = fields.Many2one(
         'competency.competency', string='Competency',
         help='Linked to the approved competency framework .', tracking=True)
@@ -777,10 +1091,12 @@ class EdsTnaEntry(models.Model):
         ('mlm', 'MLM (Middle Level Management)'),
         ('below_mlm', 'Staff Below MLM'),
         ('all_staff', 'All Staff'),
-    ], string='Target Group / Audience', default='all_staff', tracking=True)
+    ], string='Target Group / Audience', default='all_staff', tracking=True,
+        help='Legacy category from imported HR TNA templates. Employee selection and course demand use the actual employee or nominated work-unit employees, not this category.')
     target_participant_count = fields.Integer(
-        string='Number of Participants', default=1, compute='_compute_participant_count', store=True, readonly=False,
-        help='Planned participant headcount for this training need.')
+        string='Number of Participants', compute='_compute_participant_count',
+        store=True, readonly=True,
+        help='Number of selected work-unit employees, or the individual employee on this need.')
     template_participant_count = fields.Integer(
         string='HR Template Estimated Participants', readonly=True,
         help='Original headcount from the imported HR TNA template. Select actual employees before submitting the work-unit request.')
@@ -813,6 +1129,10 @@ class EdsTnaEntry(models.Model):
     is_custom_course = fields.Boolean(string='Course Not in Catalog', default=False, tracking=True)
     custom_course_title = fields.Char(string='Custom Course Title', tracking=True)
     custom_course_description = fields.Text(string='What the Course is About / Content Summary')
+    catalog_status = fields.Selection([
+        ('catalog', 'Catalog Course'),
+        ('outside_catalog', 'Outside Catalog'),
+    ], string='Catalog Status', compute='_compute_catalog_status')
     quarter = fields.Selection([
         ('q1', 'Q1 Jul-Sep'),
         ('q2', 'Q2 Oct-Dec'),
@@ -842,6 +1162,9 @@ class EdsTnaEntry(models.Model):
 
     priority_score = fields.Float(string='Priority Score', compute='_compute_priority_score', store=True)
     justification = fields.Text(string='Justification', required=True)
+    course_request_display = fields.Char(
+        string='Course(s)', compute='_compute_course_request_display',
+        help='The requested catalog courses, one legacy catalog course, or a work-unit proposed course.')
     proposed_program = fields.Char(
         string='Proposed Program / Course',
         compute='_compute_proposed_program',
@@ -857,7 +1180,14 @@ class EdsTnaEntry(models.Model):
     suggested_course_ids = fields.Many2many(
         'eds.course', 'eds_tna_entry_suggested_courses_rel', 'entry_id', 'course_id',
         string='Suggested Courses', compute='_compute_suggested_courses', store=True, readonly=False,
-        help='All courses integrated with this competency gap or PMS measurement gap.')
+        help='Courses integrated with this gap that are offered in the selected TNA cycle.')
+    cycle_course_status = fields.Selection([
+        ('offered', 'Offered in Cycle'),
+        ('not_offered', 'No Selected Course'),
+        ('mapped', 'Catalog Match'),
+        ('unmapped', 'No Catalog Match'),
+    ], string='Cycle Course Match', compute='_compute_cycle_course_status',
+        help='A diagnosis remains visible even when none of its mapped courses are selected for this cycle; it does not enter course demand.')
     competency_gap_level_diff = fields.Integer(string='Competency Gap (Levels)', default=0,
                                                help='Difference between job required proficiency and employee current rating.')
     pms_kpi_reference = fields.Char(string='PMS KPI / Objective Ref', help='Performance evaluation objective or KPI code.')
@@ -875,9 +1205,9 @@ class EdsTnaEntry(models.Model):
         'eds.course', string='Catalog Matching Course', compute='_compute_recommended_course', store=True,
         help='Automatically matched course from the Course Catalog addressing this diagnosed competency.')
     course_match_status = fields.Selection([
-        ('exact', 'Catalog Exact Match'),
-        ('higher', 'Related Tier Match'),
-        ('no_course', 'New Course Development Required'),
+        ('exact', 'Catalog Name Match'),
+        ('higher', 'Possible Catalog Match'),
+        ('no_course', 'No Catalog Match'),
     ], string='Catalog Match Status', compute='_compute_recommended_course', store=True)
 
     state = fields.Selection([
@@ -897,7 +1227,7 @@ class EdsTnaEntry(models.Model):
     company_currency_id = fields.Many2one('res.currency', related='company_id.currency_id', readonly=True)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    # ── Consolidation & Prioritization (/007) ──
+    # ── Consolidation & Prioritization ──
     consolidation_id = fields.Many2one(
         'eds.tna.consolidation', string='Consolidation',
         ondelete='set null', index=True, copy=False, tracking=True)
@@ -933,6 +1263,14 @@ class EdsTnaEntry(models.Model):
             else:
                 rec.target_participant_count = 1 if rec.employee_id else 0
 
+    @api.depends('request_level', 'is_custom_course', 'course_id')
+    def _compute_catalog_status(self):
+        for rec in self:
+            rec.catalog_status = (
+                'outside_catalog' if rec.is_custom_course else
+                'catalog' if rec.request_level == 'work_unit' and rec.course_id else False
+            )
+
     @api.depends('competency_id', 'pms_measure_id', 'pms_measurement_name',
                  'pms_kpi_reference', 'proposed_program', 'source')
     def _compute_competency_or_measurement(self):
@@ -952,15 +1290,19 @@ class EdsTnaEntry(models.Model):
             else:
                 rec.competency_or_measurement = rec.proposed_program or _('General Training Need')
 
-    @api.depends('competency_id', 'competency_level', 'pms_measure_id', 'pms_appraisal_score',
-                 'course_id', 'requested_course_ids')
+    @api.depends('source', 'competency_id', 'competency_level', 'pms_measure_id',
+                 'pms_appraisal_score', 'pms_appraisal_rating', 'course_id',
+                 'cycle_id.restrict_tna_courses',
+                 'cycle_id.request_course_ids')
     def _compute_suggested_courses(self):
         Course = self.env['eds.course']
         for rec in self:
             courses = Course.browse()
+            if rec.source not in ('competency_gap', 'pms'):
+                rec.suggested_course_ids = [(6, 0, [])]
+                continue
             if rec.course_id:
                 courses |= rec.course_id
-            courses |= rec.requested_course_ids
             if rec.competency_id:
                 target_level = {
                     'basic': '1', 'intermediate': '2', 'advanced': '3', 'expert': '4',
@@ -972,20 +1314,41 @@ class EdsTnaEntry(models.Model):
                 ])
                 courses |= comp_lines.mapped('course_id')
             if rec.pms_measure_id:
-                pms_lines = self.env['eds.course.pms.line'].search([
+                pms_domain = [
                     ('job_measure_id', '=', rec.pms_measure_id.id),
-                    ('min_threshold', '>', rec.pms_appraisal_score),
                     ('course_id.status', 'in', ('active', 'draft'))
-                ])
+                ]
+                if (rec.pms_appraisal_rating or '').strip().casefold() != 'unsatisfactory':
+                    pms_domain.append(('min_threshold', '>', rec.pms_appraisal_score))
+                pms_lines = self.env['eds.course.pms.line'].search(pms_domain)
                 courses |= pms_lines.mapped('course_id')
+            if rec.cycle_id:
+                courses = rec.cycle_id._filter_cycle_courses(courses)
             rec.suggested_course_ids = [(6, 0, courses.ids)]
 
-    @api.depends('gap_severity')
+    @api.depends('source', 'cycle_id.restrict_tna_courses',
+                 'cycle_id.request_course_ids', 'suggested_course_ids',
+                 'course_id', 'recommended_course_id')
+    def _compute_cycle_course_status(self):
+        for rec in self:
+            if rec.source not in ('competency_gap', 'pms'):
+                rec.cycle_course_status = False
+                continue
+            courses = rec.suggested_course_ids | rec.course_id | rec.recommended_course_id
+            if rec.cycle_id and rec.cycle_id.restrict_tna_courses:
+                rec.cycle_course_status = (
+                    'offered' if rec.cycle_id._filter_cycle_courses(courses)
+                    else 'not_offered')
+            else:
+                rec.cycle_course_status = 'mapped' if courses else 'unmapped'
+
+    @api.depends('gap_severity', 'urgency', 'source')
     def _compute_score_gap_severity(self):
-        """Map the gap severity selection onto the 0-100 scoring scale."""
+        """Use diagnosed gap severity, or request urgency when no gap was measured."""
         weights = {'critical': 100.0, 'high': 75.0, 'medium': 50.0, 'low': 25.0}
         for rec in self:
-            rec.score_gap_severity = weights.get(rec.gap_severity, 50.0)
+            severity = rec.urgency if rec.source == 'manual' else rec.gap_severity
+            rec.score_gap_severity = weights.get(severity, 50.0)
 
     @api.depends('source')
     def _compute_score_regulatory(self):
@@ -1009,31 +1372,68 @@ class EdsTnaEntry(models.Model):
     def _compute_proposed_program(self):
         for rec in self:
             if rec.is_custom_course and rec.custom_course_title:
-                names = rec.requested_course_ids.mapped('name') + [rec.custom_course_title]
-                rec.proposed_program = ', '.join(names)
+                rec.proposed_program = rec.custom_course_title
             elif not rec.is_custom_course and rec.course_id:
                 rec.proposed_program = rec.course_id.name
             elif not rec.is_custom_course and rec.requested_course_ids:
-                rec.proposed_program = ', '.join(rec.requested_course_ids.mapped('name'))
+                # A single request can select several independent courses; it is
+                # not itself a combined course or session title.
+                rec.proposed_program = (
+                    rec.requested_course_ids.name if len(rec.requested_course_ids) == 1 else False
+                )
             elif not rec.proposed_program:
                 rec.proposed_program = False
 
-    @api.depends('course_id', 'is_custom_course', 'custom_course_title', 'competency_id', 'proposed_program')
+    @api.depends('requested_course_ids.name', 'course_id.name', 'is_custom_course',
+                 'custom_course_title', 'proposed_program')
+    def _compute_course_request_display(self):
+        for rec in self:
+            if rec.is_custom_course and rec.custom_course_title:
+                rec.course_request_display = _('%s (outside catalog)') % rec.custom_course_title
+            elif rec.requested_course_ids:
+                rec.course_request_display = ', '.join(rec.requested_course_ids.mapped('name'))
+            elif rec.course_id:
+                rec.course_request_display = rec.course_id.name
+            else:
+                rec.course_request_display = rec.proposed_program or False
+
+    @api.depends('request_level', 'source', 'course_id', 'requested_course_ids',
+                 'is_custom_course', 'custom_course_title', 'competency_id', 'proposed_program',
+                 'suggested_course_ids', 'cycle_id.restrict_tna_courses',
+                 'cycle_id.request_course_ids')
     def _compute_recommended_course(self):
         Course = self.env['eds.course']
         for rec in self:
+            restricted = bool(rec.cycle_id and rec.cycle_id.restrict_tna_courses)
+            allowed_ids = rec.cycle_id.request_course_ids.ids if restricted else []
+            if rec.request_level == 'individual' and rec.source == 'manual':
+                rec.recommended_course_id = False
+                rec.course_match_status = False
+                continue
+            if rec.source in ('competency_gap', 'pms'):
+                # Diagnostic recommendations must be backed by the configured
+                # competency or PMS mapping, never a similar course title.
+                mapped_course = rec.suggested_course_ids[:1]
+                rec.recommended_course_id = mapped_course or False
+                rec.course_match_status = 'exact' if mapped_course else 'no_course'
+                continue
             # 1. Direct Catalog Course Selection
-            if not rec.is_custom_course and rec.course_id:
+            if not rec.is_custom_course and rec.course_id and (
+                    not restricted or rec.course_id.id in allowed_ids):
                 rec.recommended_course_id = rec.course_id
                 rec.course_match_status = 'exact'
                 continue
 
             # 2. Match via Diagnosed Competency
             if rec.competency_id:
-                course_line = self.env['eds.course.competency.line'].search([
+                line_domain = [
                     ('competency_id', '=', rec.competency_id.id),
                     ('course_id.status', 'in', ('active', 'draft'))
-                ], limit=1)
+                ]
+                if restricted:
+                    line_domain.append(('course_id', 'in', allowed_ids))
+                course_line = self.env['eds.course.competency.line'].search(
+                    line_domain, limit=1)
                 if course_line:
                     rec.recommended_course_id = course_line.course_id
                     rec.course_match_status = 'exact'
@@ -1053,18 +1453,17 @@ class EdsTnaEntry(models.Model):
             for term in search_terms:
                 if not term or len(term) < 3:
                     continue
-                c_exact = Course.search([
+                name_domain = [
                     ('status', 'in', ('active', 'draft')),
-                    ('name', '=ilike', term)
-                ], limit=1)
+                ]
+                if restricted:
+                    name_domain.append(('id', 'in', allowed_ids))
+                c_exact = Course.search(name_domain + [('name', '=ilike', term)], limit=1)
                 if c_exact:
                     matched_course = c_exact
                     is_exact = True
                     break
-                c_search = Course.search([
-                    ('status', 'in', ('active', 'draft')),
-                    ('name', 'ilike', term)
-                ], limit=1)
+                c_search = Course.search(name_domain + [('name', 'ilike', term)], limit=1)
                 if c_search:
                     matched_course = c_search
                     is_exact = False
@@ -1091,6 +1490,29 @@ class EdsTnaEntry(models.Model):
             self.recommended_course_id = False
             self.course_match_status = 'no_course'
 
+    @api.onchange('cycle_id')
+    def _onchange_cycle_request_courses(self):
+        if not self.cycle_id or not self.cycle_id.restrict_tna_courses or self.source != 'manual':
+            return
+        allowed = self.cycle_id.request_course_ids
+        removed = self.requested_course_ids - allowed
+        changed = bool(removed)
+        if self.course_id and self.course_id not in allowed:
+            self.course_id = False
+            changed = True
+        if removed:
+            self.requested_course_ids = self.requested_course_ids & allowed
+        if self.is_custom_course:
+            self.is_custom_course = False
+            self.custom_course_title = False
+            self.custom_course_description = False
+            changed = True
+        if changed:
+            return {'warning': {
+                'title': _('Courses Updated'),
+                'message': _('Courses outside this cycle’s selected catalog were removed from the request.'),
+            }}
+
     @api.onchange('urgency')
     def _onchange_urgency(self):
         if self.urgency:
@@ -1100,6 +1522,8 @@ class EdsTnaEntry(models.Model):
     def _onchange_custom_course(self):
         if self.is_custom_course:
             self.course_id = False
+            if not self.custom_course_title and self.template_participant_count and self.proposed_program:
+                self.custom_course_title = self.proposed_program
             if self.custom_course_title:
                 self.proposed_program = self.custom_course_title
                 term = self.custom_course_title.strip()
@@ -1173,6 +1597,32 @@ class EdsTnaEntry(models.Model):
         weighted = sum(rule.weight * self._criterion_score(rule.criteria) for rule in rules)
         return round(min(weighted / total_weight, 100.0), 2)
 
+    @api.onchange('request_level')
+    def _onchange_request_level(self):
+        if self.request_level == 'work_unit':
+            self.source = 'manual'
+            self.employee_id = False
+            self.job_position_id = False
+            departments = self.allowed_department_ids
+            if len(departments) == 1:
+                self.department_id = departments
+            elif self._selected_record_id(self.department_id) not in departments.ids:
+                self.department_id = False
+            units = self.available_work_unit_ids
+            if len(units) == 1:
+                self.work_unit_id = units
+            elif self._selected_record_id(self.work_unit_id) not in units.ids:
+                self.work_unit_id = False
+        elif self.request_level == 'individual':
+            self.work_unit_employee_ids = False
+            self.employee_id = self._default_employee_id()
+            self._onchange_employee_id()
+
+    @staticmethod
+    def _selected_record_id(record):
+        """Use the database ID when an onchange wraps a selection in a NewId."""
+        return record._origin.id or record.id
+
     @api.onchange('department_id')
     def _onchange_department_id(self):
         """Top of hierarchy: Department -> Operating Unit -> Job Position.
@@ -1183,6 +1633,14 @@ class EdsTnaEntry(models.Model):
         - If no department selected:
           All operating units and jobs are available.
         """
+        if self.request_level == 'work_unit':
+            units = self.available_work_unit_ids
+            if self._selected_record_id(self.work_unit_id) not in units.ids:
+                self.work_unit_id = units if len(units) == 1 else False
+            self.job_position_id = False
+            self.work_unit_employee_ids &= self.eligible_work_unit_employee_ids
+            return {'domain': {'work_unit_id': [('id', 'in', units.ids)]}}
+
         ou_domain = self.env['eds.hr.compat'].get_operating_unit_domain(departments=self.department_id)
         if self.department_id:
             if self.work_unit_id and not self.env['eds.hr.compat'].is_operating_unit_in_departments(self.work_unit_id, self.department_id):
@@ -1202,6 +1660,13 @@ class EdsTnaEntry(models.Model):
         """Middle of hierarchy: Operating Unit -> Job Position.
         Filter job position and employee based on selected work unit and department.
         """
+        if self.request_level == 'work_unit':
+            if self._selected_record_id(self.work_unit_id) not in self.available_work_unit_ids.ids:
+                self.work_unit_id = False
+            self.job_position_id = False
+            self.work_unit_employee_ids &= self.eligible_work_unit_employee_ids
+            return
+
         if self.work_unit_id and not self.department_id:
             if hasattr(self.work_unit_id, 'department') and self.work_unit_id.department:
                 self.department_id = self.work_unit_id.department
@@ -1240,6 +1705,8 @@ class EdsTnaEntry(models.Model):
     @api.onchange('employee_id')
     def _onchange_employee_id(self):
         """Populate job, department, and work unit from employee."""
+        if self.request_level == 'work_unit':
+            return
         if self.employee_id:
             job = self.env['eds.hr.compat'].get_employee_job(self.employee_id)
             if job:
@@ -1250,10 +1717,49 @@ class EdsTnaEntry(models.Model):
             if ou:
                 self.work_unit_id = ou
 
-    @api.onchange('work_unit_id', 'department_id', 'job_position_id')
+    @api.onchange('work_unit_id', 'department_id')
     def _onchange_work_unit_employee_scope(self):
         if self.request_level == 'work_unit':
             self.work_unit_employee_ids &= self.eligible_work_unit_employee_ids
+
+    @api.onchange('cycle_id', 'course_id', 'work_unit_employee_ids', 'request_level')
+    def _onchange_repeat_work_unit_nomination(self):
+        """Inform the requester without blocking another valid group request."""
+        if (self.request_level != 'work_unit' or self.source != 'manual'
+                or not self.cycle_id or not self.course_id
+                or not self.work_unit_employee_ids):
+            return
+        employee_ids = set((self.work_unit_employee_ids._origin
+                            or self.work_unit_employee_ids).ids)
+        if not employee_ids:
+            return
+        domain = [
+            ('cycle_id', '=', (self.cycle_id._origin or self.cycle_id).id),
+            ('course_id', '=', (self.course_id._origin or self.course_id).id),
+            ('request_level', '=', 'work_unit'),
+            ('source', '=', 'manual'),
+            ('state', 'not in', ('draft', 'excluded')),
+            ('is_duplicate', '=', False),
+            ('exclusion_type', '=', False),
+            ('work_unit_employee_ids', 'in', list(employee_ids)),
+        ]
+        if self._origin:
+            domain.append(('id', '!=', self._origin.id))
+        earlier = self.env['eds.tna.entry'].sudo().search(domain)
+        repeated_ids = employee_ids & set(earlier.mapped('work_unit_employee_ids').ids)
+        if not repeated_ids:
+            return
+        names = self.env['hr.employee'].sudo().browse(sorted(repeated_ids)).mapped('name')
+        display = ', '.join(names[:3])
+        if len(names) > 3:
+            display += _(' and %d more') % (len(names) - 3)
+        return {'warning': {
+            'title': _('Already Nominated for This Course'),
+            'message': _(
+                '%s already appears in another submitted work-unit request for this '
+                'course and cycle. You may submit this request. Course Demand will '
+                'count each employee once and use the highest Work Unit priority score.') % display,
+        }}
 
     @api.constrains('cycle_id', 'employee_id', 'competency_id', 'course_id', 'pms_measure_id', 'request_level')
     def _check_duplicate_need(self):
@@ -1282,12 +1788,44 @@ class EdsTnaEntry(models.Model):
                     _('A training need for employee %s with this course/competency/measurement already exists in this cycle.')
                     % rec.employee_id.name)
 
+    @api.constrains('cycle_id', 'source', 'request_level', 'employee_id',
+                    'work_unit_employee_ids', 'state')
+    def _check_cycle_audience(self):
+        for rec in self:
+            cycle = rec.cycle_id
+            if not cycle:
+                continue
+            if (not self.env.su and rec.source == 'manual'
+                    and rec.state == 'draft' and cycle.state != 'collecting'):
+                raise ValidationError(_('Choose a TNA cycle that is open for collection.'))
+            if not cycle.restrict_tna_audience:
+                continue
+            if rec.request_level == 'individual' and rec.employee_id:
+                if not cycle._is_employee_targeted(rec.employee_id):
+                    raise ValidationError(_('%s is outside the selected employee audience for this TNA cycle.') % rec.employee_id.name)
+            elif rec.request_level == 'work_unit' and rec.work_unit_employee_ids:
+                matched = self.env['hr.employee'].sudo().search(
+                    [('id', 'in', rec.work_unit_employee_ids.ids)]
+                    + cycle._target_employee_domain())
+                if set(matched.ids) != set(rec.work_unit_employee_ids.ids):
+                    raise ValidationError(_('Every nominated employee must match this TNA cycle’s selected audience.'))
+
     @api.constrains('cycle_id', 'employee_id', 'request_level', 'source', 'state',
                     'requested_course_ids', 'course_id', 'is_custom_course', 'work_unit_employee_ids', 'work_unit_id')
     def _check_max_individual_courses(self):
         max_courses_param = max(1, int(self.env['ir.config_parameter'].sudo().get_param(
             'eds.max_tna_courses_per_employee', '3')))
         for rec in self:
+            if rec.source == 'manual' and rec.cycle_id.restrict_tna_courses:
+                allowed = rec.cycle_id.request_course_ids
+                selected = rec.requested_course_ids | rec.course_id
+                if selected - allowed:
+                    raise ValidationError(_(
+                        'This TNA cycle only accepts its selected catalog courses. '
+                        'Choose a course from the cycle’s available courses.'))
+                if rec.is_custom_course:
+                    raise ValidationError(_(
+                        'Courses outside the catalog are not available in this restricted TNA cycle.'))
             if rec.state == 'excluded':
                 continue
             if rec.request_level == 'individual' and rec.source == 'manual' and rec.is_custom_course:
@@ -1301,15 +1839,14 @@ class EdsTnaEntry(models.Model):
                 elif not rec.course_id:
                     raise ValidationError(_('Select one catalog course for this work-unit request.'))
                 employee_domain = self.env['eds.hr.compat'].get_employee_domain(
-                    department=rec.department_id, operating_unit=rec.work_unit_id,
-                    job=rec.job_position_id)
+                    operating_unit=rec.work_unit_id) + rec.cycle_id._target_employee_domain()
                 Employee = self.env['hr.employee'].sudo()
                 eligible_ids = set(Employee.search([
                     ('id', 'in', rec.work_unit_employee_ids.ids),
                 ] + employee_domain).ids)
                 if eligible_ids != set(rec.work_unit_employee_ids.ids):
                     raise ValidationError(_(
-                        'Every nominated employee must match the selected work unit, department, and job position.'))
+                        'Every selected employee must belong to the selected work unit.'))
             if rec.request_level == 'individual' and rec.employee_id and rec.cycle_id and rec.source == 'manual':
                 chosen_count = len(rec.requested_course_ids) + bool(rec.is_custom_course and rec.custom_course_title)
                 if not chosen_count and rec.course_id:
@@ -1334,17 +1871,32 @@ class EdsTnaEntry(models.Model):
                         'Employee %s already has an individual TNA submission for cycle %s. Edit that request to add courses.')
                         % (rec.employee_id.name, rec.cycle_id.name))
 
-    @api.constrains('request_level', 'source', 'employee_id', 'work_unit_id', 'cycle_id')
+    @api.constrains('request_level', 'source', 'employee_id', 'work_unit_id',
+                    'department_id', 'cycle_id')
     def _check_manual_request_scope(self):
+        for rec in self:
+            if rec.request_level == 'work_unit' and rec.source != 'manual':
+                raise ValidationError(_(
+                    'Work-unit requests are submitted directly by a unit leader; choose Individual for imported diagnostic gaps.'))
         if self.env.su or self.env.user.has_group('employee_development_system.group_eds_officer'):
             return
-        managed_units = self.env['eds.hr.compat'].get_managed_operating_units()
+        compat = self.env['eds.hr.compat']
+        managed_units, managed_departments = compat.get_managed_training_scope()
         for rec in self.filtered(lambda entry: entry.source == 'manual'):
             if rec.cycle_id.state != 'collecting':
                 raise ValidationError(_('Training needs can only be submitted to a cycle open for collection.'))
             if rec.request_level == 'work_unit':
                 if rec.work_unit_id not in managed_units:
                     raise ValidationError(_('You may submit a work-unit request only for a unit you lead.'))
+                if managed_departments:
+                    if rec.department_id not in managed_departments:
+                        raise ValidationError(_(
+                            'Select a department within your reporting responsibility.'))
+                    available_units = compat.get_available_work_units_for_department(
+                        managed_units, rec.department_id, managed_departments)
+                    if rec.work_unit_id not in available_units:
+                        raise ValidationError(_(
+                            'The selected work unit is outside the chosen department in your reporting scope.'))
             elif rec.employee_id.user_id != self.env.user:
                 raise ValidationError(_('An individual TNA request must be for your own employee record.'))
 
@@ -1362,6 +1914,10 @@ class EdsTnaEntry(models.Model):
                     if {'is_duplicate', 'exclusion_type', 'duplicate_of_id', 'validated_by',
                             'validation_date', 'consolidation_id', 'converted_course_ref'} & vals.keys():
                         raise UserError(_('Screening and approval fields are managed by L&D.'))
+            if vals.get('request_level', 'individual') == 'work_unit':
+                vals['job_position_id'] = False
+                vals['employee_id'] = False
+                vals.pop('target_participant_count', None)
             if (vals.get('request_level', 'individual') == 'individual'
                     and vals.get('source', 'manual') == 'manual' and vals.get('employee_id')):
                 employee = self.env['hr.employee'].sudo().browse(vals['employee_id'])
@@ -1381,6 +1937,10 @@ class EdsTnaEntry(models.Model):
         return records
 
     def write(self, vals):
+        if (vals.get('request_level') == 'work_unit'
+                or (self and all(rec.request_level == 'work_unit' for rec in self))):
+            vals = dict(vals, job_position_id=False)
+            vals.pop('target_participant_count', None)
         if not self.env.su:
             if 'state' in vals:
                 raise UserError(_('Use the training need workflow actions to change its status.'))
@@ -1456,6 +2016,7 @@ class EdsTnaEntry(models.Model):
                 raise UserError(_('Only draft entries can be submitted.'))
             if rec.source == 'manual' and rec.cycle_id.state != 'collecting':
                 raise UserError(_('This TNA cycle is not open for collection.'))
+            rec._check_cycle_audience()
             rec._check_manual_request_scope()
             rec._write_workflow_values({'state': 'submitted'})
             rec.message_post(body=_('Training need %s submitted.') % rec.name)
@@ -1560,7 +2121,7 @@ class EdsTnaEntry(models.Model):
 
 
 class EdsTnaCycleCourseLine(models.Model):
-    """Aggregated course demand line on TNA Cycle (/002/009).
+    """Aggregated course demand line on TNA Cycle.
 
     Groups training demands from individual requests, work-unit level requests,
     competency assessment gaps, and PMS individual measurement gaps.
@@ -1574,6 +2135,10 @@ class EdsTnaCycleCourseLine(models.Model):
         'eds.tna.cycle', string='TNA Cycle', ondelete='cascade', required=True, index=True)
     course_id = fields.Many2one(
         'eds.course', string='Course Catalog Item', ondelete='set null')
+    catalog_status = fields.Selection([
+        ('catalog', 'Catalog Course'),
+        ('outside_catalog', 'Outside Catalog'),
+    ], string='Catalog Status', compute='_compute_catalog_status')
     course_name = fields.Char(string='Course / Program Name', required=True)
     duration_days = fields.Integer(string='Duration (Days)', default=1)
     delivery_method = fields.Selection([
@@ -1607,6 +2172,11 @@ class EdsTnaCycleCourseLine(models.Model):
     )
     remarks = fields.Char(string='Remarks')
 
+    @api.depends('course_id')
+    def _compute_catalog_status(self):
+        for rec in self:
+            rec.catalog_status = 'catalog' if rec.course_id else 'outside_catalog'
+
     def action_open_employee_demand(self):
         self.ensure_one()
         return {
@@ -1624,12 +2194,21 @@ class EdsTnaCycleCourseEmployee(models.Model):
 
     _name = 'eds.tna.cycle.course.employee'
     _description = 'Course Demand Employee'
-    _order = 'overall_priority_score desc, source_count desc, evidence_count desc, id'
+    _order = 'overall_priority_score desc, source_count desc, id'
     _rec_name = 'employee_id'
 
     course_line_id = fields.Many2one('eds.tna.cycle.course.line', required=True,
                                      ondelete='cascade', index=True)
     employee_id = fields.Many2one('hr.employee', required=True, index=True)
+    excluded_from_planning = fields.Boolean(
+        string='Invalidated', default=False, index=True,
+        help='Keep the original TNA evidence visible, but exclude this employee '
+             'from this course’s planning count and suggested session participants.')
+    exclusion_reason = fields.Text(string='Invalidation Reason', readonly=True)
+    excluded_by_id = fields.Many2one('res.users', string='Invalidated By', readonly=True)
+    excluded_on = fields.Datetime(string='Invalidated On', readonly=True)
+    restored_by_id = fields.Many2one('res.users', string='Restored By', readonly=True)
+    restored_on = fields.Datetime(string='Restored On', readonly=True)
     work_unit_id = fields.Many2one('operating.unit', related='employee_id.default_operating_unit_id', store=True)
     department_id = fields.Many2one('hr.department', related='employee_id.department_id', store=True)
     job_position_id = fields.Many2one('hr.job', related='employee_id.job_position', store=True)
@@ -1638,12 +2217,158 @@ class EdsTnaCycleCourseEmployee(models.Model):
     evidence_count = fields.Integer(compute='_compute_sources', store=True)
     source_summary = fields.Char(compute='_compute_sources', store=True)
     overall_priority_score = fields.Float(
-        string='Overall Weighted Priority', compute='_compute_overall_priority_score', store=True,
-        help='Highest weighted TNA priority score plus five points for each additional independent source, capped at 100.')
+        string='Overall Weighted Priority', compute='_compute_overall_priority_score',
+        store=True, digits=(6, 0),
+        help='Use the highest Work Unit request score for repeat nominations and average '
+             'distinct evidence within other source types, then average those source types. '
+             'Add five points per additional independent source type and round to a whole number, capped at 100.')
+    need_severity = fields.Selection([
+        ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'),
+        ('critical', 'Critical'),
+    ], string='Highest Need Severity', compute='_compute_need_severity', store=True,
+        help='Highest severity among this employee’s individual, work-unit, competency, and PMS evidence for the course.')
     from_individual = fields.Boolean(compute='_compute_sources', store=True)
     from_work_unit = fields.Boolean(compute='_compute_sources', store=True)
     from_competency = fields.Boolean(compute='_compute_sources', store=True)
     from_pms = fields.Boolean(compute='_compute_sources', store=True)
+
+    def write(self, vals):
+        decision_fields = {
+            'excluded_from_planning', 'exclusion_reason', 'excluded_by_id',
+            'excluded_on', 'restored_by_id', 'restored_on',
+        }
+        if (decision_fields.intersection(vals) and not self.env.su
+                and not self.env.context.get('eds_demand_review_action')):
+            raise UserError(_(
+                'Use Invalidate or Restore to change a course candidate’s planning status.'))
+        return super().write(vals)
+
+    def _require_lnd_review(self):
+        if self.env.su or any(self.env.user.has_group(
+                'employee_development_system.' + group) for group in (
+                    'group_eds_officer', 'group_eds_manager', 'group_eds_admin')):
+            return
+        raise UserError(_('Only L&D staff may invalidate or restore course candidates.'))
+
+    def _linked_plan_lines(self):
+        course_lines = self.mapped('course_line_id')
+        if not course_lines:
+            return self.env['eds.annual.plan.line']
+        return self.env['eds.annual.plan.line'].search([
+            '|', ('course_demand_id', 'in', course_lines.ids),
+            ('course_demand_ids', 'in', course_lines.ids),
+        ])
+
+    def _check_reviewable(self):
+        self._require_lnd_review()
+        plan_lines = self._linked_plan_lines()
+        if plan_lines.filtered(lambda line: line.plan_id.state != 'draft'):
+            raise UserError(_(
+                'This course already belongs to a plan under review or published. '
+                'Change the plan through its review or amendment workflow first.'))
+        active_enrollments = self.env['eds.enrollment'].search([
+            ('course_demand_employee_id', 'in', self.ids),
+            ('state', 'not in', ('suggested', 'cancelled', 'declined', 'replaced')),
+        ])
+        if plan_lines:
+            active_enrollments |= self.env['eds.enrollment'].search([
+                ('session_id.plan_line_id', 'in', plan_lines.ids),
+                ('employee_id', 'in', self.mapped('employee_id').ids),
+                ('state', 'not in', ('suggested', 'cancelled', 'declined', 'replaced')),
+            ])
+        if active_enrollments:
+            raise UserError(_(
+                'One or more selected employees already have a training invitation or '
+                'attendance record. Resolve those session participants before invalidating them.'))
+        return plan_lines
+
+    def _refresh_planning_after_review(self, plan_lines):
+        for cycle in self.mapped('course_line_id.cycle_id'):
+            cycle._sync_course_demand()
+        for line in plan_lines:
+            demands = line.course_demand_ids | line.course_demand_id
+            eligible = demands.filtered(
+                lambda demand: demand.selected_for_planning and demand.total_employees > 0)
+            if not eligible:
+                if (line.session_ids or line.budget_allocated or line.manual_budget_allocated
+                        or line.status != 'planned'):
+                    raise UserError(_(
+                        'Removing all candidates would leave plan line %s with a session, '
+                        'budget or delivery progress. Resolve that plan line first.') % line.program_name)
+                line.unlink()
+                continue
+            line.planned_participants = len(set(eligible.mapped('employee_ids').ids))
+            valid_employee_ids = set(eligible.mapped('employee_ids').ids)
+            valid_rows = eligible.mapped('employee_demand_ids').filtered(
+                lambda row: not row.excluded_from_planning)
+            for session in line.session_ids:
+                for enrollment in session.enrollment_ids.filtered(
+                        lambda row: row.state == 'suggested'):
+                    if enrollment.employee_id.id not in valid_employee_ids:
+                        # Screening removes a suggestion because its demand is no
+                        # longer eligible. It is not a manual roster omission: a
+                        # later restore must be able to suggest the employee again.
+                        enrollment.with_context(eds_replacing_source=True).unlink()
+                    elif enrollment.course_demand_employee_id.excluded_from_planning:
+                        replacement = valid_rows.filtered(
+                            lambda row: row.employee_id == enrollment.employee_id)[:1]
+                        if replacement:
+                            enrollment.course_demand_employee_id = replacement
+
+    def action_open_invalidate_wizard(self):
+        self._require_lnd_review()
+        selected = self.filtered(lambda row: not row.excluded_from_planning)
+        if not selected:
+            raise UserError(_('Select at least one eligible employee to invalidate.'))
+        return {
+            'name': _('Invalidate Course Candidates'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.tna.demand.invalidate.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_demand_ids': [(6, 0, selected.ids)]},
+        }
+
+    def action_invalidate_with_reason(self, reason):
+        self._require_lnd_review()
+        reason = (reason or '').strip()
+        if not reason:
+            raise UserError(_('Enter a reason for invalidating these course candidates.'))
+        selected = self.filtered(lambda row: not row.excluded_from_planning)
+        if not selected:
+            raise UserError(_('No eligible employees were selected.'))
+        plan_lines = selected._check_reviewable()
+        selected.with_context(eds_demand_review_action=True).write({
+            'excluded_from_planning': True,
+            'exclusion_reason': reason,
+            'excluded_by_id': self.env.user.id,
+            'excluded_on': fields.Datetime.now(),
+        })
+        selected._refresh_planning_after_review(plan_lines)
+        for course_line in selected.mapped('course_line_id'):
+            count = len(selected.filtered(lambda row: row.course_line_id == course_line))
+            course_line.cycle_id.message_post(body=Markup('<p>%s</p>') % escape(_(
+                '%d employees invalidated for %s. Reason: %s')
+                % (count, course_line.course_name, reason)))
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    def action_restore(self):
+        self._require_lnd_review()
+        selected = self.filtered('excluded_from_planning')
+        if not selected:
+            raise UserError(_('Select at least one invalidated employee to restore.'))
+        plan_lines = selected._check_reviewable()
+        selected.with_context(eds_demand_review_action=True).write({
+            'excluded_from_planning': False,
+            'restored_by_id': self.env.user.id,
+            'restored_on': fields.Datetime.now(),
+        })
+        selected._refresh_planning_after_review(plan_lines)
+        for course_line in selected.mapped('course_line_id'):
+            count = len(selected.filtered(lambda row: row.course_line_id == course_line))
+            course_line.cycle_id.message_post(body=Markup('<p>%s</p>') % escape(_(
+                '%d employees restored for %s.') % (count, course_line.course_name)))
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     @api.depends('evidence_ids', 'evidence_ids.entry_id.source', 'evidence_ids.entry_id.request_level')
     def _compute_sources(self):
@@ -1663,13 +2388,33 @@ class EdsTnaCycleCourseEmployee(models.Model):
             rec.from_competency = 'competency' in sources
             rec.from_pms = 'pms' in sources
 
-    @api.depends('evidence_ids.entry_id.priority_score', 'source_count')
+    @api.depends('evidence_ids', 'evidence_ids.entry_id.priority_score',
+                 'evidence_ids.source_kind', 'source_count')
     def _compute_overall_priority_score(self):
         for rec in self:
-            scores = rec.evidence_ids.mapped('entry_id.priority_score')
-            rec.overall_priority_score = min(
-                100.0, round((max(scores) if scores else 0.0) +
-                             max(0, rec.source_count - 1) * 5.0, 2))
+            by_source = {}
+            for evidence in rec.evidence_ids:
+                by_source.setdefault(evidence.source_kind, []).append(
+                    evidence.entry_id.priority_score)
+            if not by_source:
+                rec.overall_priority_score = 0.0
+                continue
+            source_averages = [
+                max(scores) if source_kind == 'work_unit' else sum(scores) / len(scores)
+                for source_kind, scores in by_source.items()
+            ]
+            rec.overall_priority_score = min(100.0, float_round(
+                sum(source_averages) / len(source_averages)
+                + max(0, len(by_source) - 1) * 5.0,
+                precision_digits=0))
+
+    @api.depends('evidence_ids', 'evidence_ids.need_severity')
+    def _compute_need_severity(self):
+        rank = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
+        for rec in self:
+            levels = [level for level in rec.evidence_ids.mapped('need_severity')
+                      if level in rank]
+            rec.need_severity = max(levels, key=lambda level: rank[level]) if levels else False
 
 
 class EdsTnaCycleCourseEvidence(models.Model):
@@ -1686,6 +2431,11 @@ class EdsTnaCycleCourseEvidence(models.Model):
         ('individual', 'Individual TNA'), ('work_unit', 'Work Unit TNA'),
         ('competency', 'Competency'), ('pms', 'PMS'),
     ], compute='_compute_source_kind', store=True)
+    need_severity = fields.Selection([
+        ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'),
+        ('critical', 'Critical'),
+    ], string='Need Severity', compute='_compute_need_severity', store=True,
+        help='Manual request urgency, diagnosed competency level gap, or PMS gap severity.')
     competency_id = fields.Many2one(related='entry_id.competency_id', store=True)
     competency_level = fields.Selection(related='entry_id.competency_level', store=True)
     competency_gap_level_diff = fields.Integer(related='entry_id.competency_gap_level_diff', store=True)
@@ -1710,3 +2460,16 @@ class EdsTnaCycleCourseEvidence(models.Model):
                 rec.source_kind = 'work_unit'
             else:
                 rec.source_kind = 'individual'
+
+    @api.depends('entry_id.source', 'entry_id.urgency', 'entry_id.gap_severity',
+                 'entry_id.competency_gap_level_diff')
+    def _compute_need_severity(self):
+        for rec in self:
+            entry = rec.entry_id
+            if entry.source == 'manual':
+                rec.need_severity = entry.urgency or 'medium'
+            elif entry.source == 'competency_gap' and entry.competency_gap_level_diff > 0:
+                gap = entry.competency_gap_level_diff
+                rec.need_severity = 'critical' if gap >= 3 else ('high' if gap == 2 else 'medium')
+            else:
+                rec.need_severity = entry.gap_severity or 'medium'

@@ -4,6 +4,9 @@ from datetime import date, datetime
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
+from .eds_currency_policy import currency_for_delivery, validate_delivery_currency
+from .eds_action_notification import clear_action_activities, notify_action, notify_role_action
+
 
 class EdsVenueRequirement(models.Model):
     """Standardized Venue Requirement Specification (VRS).
@@ -29,7 +32,8 @@ class EdsVenueRequirement(models.Model):
     duration_days = fields.Integer(string='Duration (Days)', compute='_compute_duration_days', store=True, readonly=False)
     target_audience = fields.Char(string='Target Audience')
     preferred_location = fields.Char(string='Preferred Location / City', related='location_preference', readonly=False)
-    estimated_budget = fields.Monetary(string='Estimated Budget (ETB)', currency_field='currency_id')
+    estimated_budget = fields.Monetary(string='Estimated Budget', currency_field='currency_id')
+    delivery_method = fields.Selection(related='session_id.delivery_method', readonly=True)
 
     @api.depends('date_start', 'date_end')
     def _compute_duration_days(self):
@@ -38,7 +42,8 @@ class EdsVenueRequirement(models.Model):
                 rec.duration_days = max(1, (rec.date_end - rec.date_start).days + 1)
             else:
                 rec.duration_days = 1
-    currency_id = fields.Many2one('res.currency', string='Currency', default=lambda self: self.env.company.currency_id)
+    currency_id = fields.Many2one('res.currency', string='Currency',
+                                  default=lambda self: currency_for_delivery(self.env, 'local'))
 
     # 2. Room & Seating
     seating_layout = fields.Selection([
@@ -105,14 +110,41 @@ class EdsVenueRequirement(models.Model):
     rfp_ids = fields.One2many('eds.rfp', 'venue_requirement_id', string='RFPs')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
+    @api.onchange('session_id')
+    def _onchange_session_currency(self):
+        method = self.session_id.delivery_method if self.session_id else 'local'
+        if method != 'international' or not self.currency_id or self.currency_id.name == 'ETB':
+            self.currency_id = currency_for_delivery(self.env, method)
+
+    def write(self, vals):
+        vals = dict(vals)
+        if 'session_id' in vals and 'currency_id' not in vals:
+            method = (self.env['eds.session'].browse(vals['session_id']).delivery_method
+                      if vals['session_id'] else 'local')
+            vals['currency_id'] = currency_for_delivery(self.env, method).id
+        if {'session_id', 'currency_id'} & vals.keys():
+            for requirement in self:
+                method = ((self.env['eds.session'].browse(vals['session_id']).delivery_method
+                           if vals['session_id'] else 'local')
+                          if 'session_id' in vals else requirement.delivery_method or 'local')
+                validate_delivery_currency(self.env, method,
+                                           vals.get('currency_id', requirement.currency_id.id))
+        return super().write(vals)
+
     def action_print_vrs(self):
-        """Prints official Form EDS-F-05 Venue Requirement Specification PDF."""
+        """Prints official Form Venue Requirement Specification PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_vrs').report_action(self)
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            method = (self.env['eds.session'].browse(vals['session_id']).delivery_method
+                      if vals.get('session_id') else 'local')
+            if vals.get('currency_id'):
+                validate_delivery_currency(self.env, method, vals['currency_id'])
+            else:
+                vals['currency_id'] = currency_for_delivery(self.env, method).id
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code(
                     'eds.venue.requirement') or _('New')
@@ -128,6 +160,10 @@ class EdsVenueRequirement(models.Model):
             rec.state = 'submitted'
             rec.message_post(body=_('VRS %s submitted for Director PPDD approval.')
                              % rec.name)
+            notify_role_action(
+                rec, 'group_eds_director', None,
+                _('Approve venue requirements'),
+                _('Venue requirements %s need Director approval.') % rec.name)
 
     def action_director_approve(self):
         for rec in self:
@@ -139,23 +175,30 @@ class EdsVenueRequirement(models.Model):
                        'approval_date': fields.Datetime.now()})
             rec.message_post(body=_('VRS %s approved by Director PPDD - RFP may now be initiated '
                                     '().') % rec.name)
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid, _('Venue requirements approved'),
+                _('Venue requirements %s are approved. You may initiate the RFP.') % rec.name)
 
     def action_return_draft(self):
         for rec in self:
+            rec._require_director_authority()
             if rec.state != 'submitted':
                 raise UserError(_('Only submitted VRS documents can be returned.'))
             rec.state = 'draft'
             rec.message_post(body=_('VRS %s returned to the officer for amendment.') % rec.name)
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid, _('Venue requirements returned'),
+                _('Venue requirements %s were returned for amendment.') % rec.name)
 
     def _require_director_authority(self):
-        if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
-                or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('The Director - PPDD approval step requires L&D Manager authority '
-                              '().'))
+        if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_director')):
+            raise UserError(_('The Director PPDD approval step requires the EDS Director role.'))
 
 
 class EdsRfp(models.Model):
-    """Structured Request for Proposal for training vendors and venues (/031).
+    """Structured Request for Proposal for training vendors and venues.
 
     Lightweight state machine (draft -> issued -> receiving -> evaluation -> awarded)
     with two-envelope proposal registration, configurable minimum number of qualified
@@ -185,7 +228,7 @@ class EdsRfp(models.Model):
     submission_deadline = fields.Date(string='Submission Deadline', required=True, tracking=True)
     min_providers = fields.Integer(
         string='Minimum Providers', compute='_compute_min_providers', store=True,
-        help='Configurable minimum number of qualified providers to issue to (default >= 3, ).')
+        help='Configurable minimum number of qualified providers to issue to (default >= 3).')
     min_providers_met = fields.Boolean(string='Minimum Providers Met', compute='_compute_min_providers', store=True)
     provider_ids = fields.Many2many(
         'eds.external.provider', 'eds_rfp_provider_rel', 'rfp_id', 'provider_id',
@@ -238,7 +281,7 @@ class EdsRfp(models.Model):
             raise UserError(_('You do not have the required authority for this step.'))
 
     def action_issue(self):
-        """Draft -> Issued: validate venue approval and minimum provider count (/037)."""
+        """Draft -> Issued: validate venue approval and minimum provider count."""
         for rec in self:
             rec._require_group('group_eds_officer')
             if rec.state != 'draft':
@@ -262,7 +305,7 @@ class EdsRfp(models.Model):
             if rec.state != 'issued':
                 raise UserError(_('Only issued RFPs can start receiving proposals.'))
             rec.state = 'receiving'
-            rec.message_post(body=_('RFP %s opened for proposal submission (two-envelope, ).')
+            rec.message_post(body=_('RFP %s opened for proposal submission (two-envelope).')
                              % rec.name)
 
     def action_close_receiving(self):
@@ -296,6 +339,12 @@ class EdsRfp(models.Model):
                 'proposal_id': rec.awarded_proposal_id.id,
                 'combined_score': rec.awarded_proposal_id.combined_score,
             })
+            notify_role_action(
+                last_contract, 'group_eds_officer', 'group_eds_admin',
+                _('Route awarded contract to Legal'),
+                _('RFP %s was awarded to %s. Review contract %s and send it for Legal review.')
+                % (rec.name, rec.awarded_proposal_id.provider_id.name,
+                   last_contract.name))
         if last_contract:
             return {
                 'type': 'ir.actions.act_window',
@@ -429,7 +478,7 @@ class EdsVendorProposal(models.Model):
 
 
 class EdsEvaluationCriteria(models.Model):
-    """Configurable weighted evaluation criteria templates (/033)."""
+    """Configurable weighted evaluation criteria templates."""
     _name = 'eds.evaluation.criteria'
     _description = 'Evaluation Criteria Template'
     _order = 'evaluation_type, sequence, id'
@@ -446,7 +495,7 @@ class EdsEvaluationCriteria(models.Model):
 
 
 class EdsVendorEvaluation(models.Model):
-    """Weighted evaluation of a vendor proposal (/033).
+    """Weighted evaluation of a vendor proposal.
 
     Technical and financial evaluations are separate records; a technical evaluation
     below the configured minimum threshold blocks financial evaluation.
@@ -516,7 +565,7 @@ class EdsVendorEvaluation(models.Model):
         return super().create(vals_list)
 
     def _default_criteria(self):
-        """Seed default criteria lines from the configurable template (/033)."""
+        """Seed default criteria lines from the configurable template."""
         self.ensure_one()
         criteria = self.env['eds.evaluation.criteria'].search(
             [('evaluation_type', '=', self.evaluation_type)])
@@ -539,6 +588,10 @@ class EdsVendorEvaluation(models.Model):
                 raise UserError(_('Add criteria scores before submitting the evaluation.'))
             rec.state = 'submitted'
             rec.message_post(body=_('Evaluation %s submitted for approval.') % rec.name)
+            notify_role_action(
+                rec, 'group_eds_manager', 'group_eds_admin',
+                _('Approve provider evaluation'),
+                _('Provider evaluation %s needs approval.') % rec.name)
 
     def action_approve(self):
         for rec in self:
@@ -548,6 +601,11 @@ class EdsVendorEvaluation(models.Model):
             rec.state = 'approved'
             rec.message_post(body=_('Evaluation %s approved - total score %s%%.')
                              % (rec.name, rec.total_score))
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid, _('Provider evaluation approved'),
+                _('Provider evaluation %s is approved.') % rec.name,
+                action_required=False)
 
     def _require_evaluation_approver(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
@@ -596,12 +654,13 @@ class EdsTrainingContract(models.Model):
     proposal_id = fields.Many2one('eds.vendor.proposal', string='Awarded Proposal', readonly=True)
     provider_id = fields.Many2one('eds.external.provider', string='Provider', required=True,
                                   tracking=True)
+    provider_category = fields.Selection(related='provider_id.category', readonly=True)
     course_id = fields.Many2one('eds.course', string='Training Program', tracking=True)
     combined_score = fields.Float(string='Combined Score (%)', readonly=True,
                                   help='Snapshot of the winning proposal score.')
     contract_amount = fields.Monetary(string='Contract Amount', tracking=True)
     currency_id = fields.Many2one('res.currency', string='Currency',
-                                  default=lambda self: self.env.company.currency_id)
+                                  default=lambda self: currency_for_delivery(self.env, 'local'))
     start_date = fields.Date(string='Start Date')
     end_date = fields.Date(string='End Date')
     version = fields.Char(string='Version', default='v1.0', readonly=True)
@@ -625,10 +684,36 @@ class EdsTrainingContract(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            provider = self.env['eds.external.provider'].browse(vals.get('provider_id'))
+            method = provider.category or 'local'
+            if vals.get('currency_id'):
+                validate_delivery_currency(self.env, method, vals['currency_id'])
+            else:
+                vals['currency_id'] = currency_for_delivery(self.env, method).id
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code(
                     'eds.training.contract') or _('New')
         return super().create(vals_list)
+
+    @api.onchange('provider_id')
+    def _onchange_provider_currency(self):
+        method = self.provider_id.category or 'local'
+        if method != 'international' or not self.currency_id or self.currency_id.name == 'ETB':
+            self.currency_id = currency_for_delivery(self.env, method)
+
+    def write(self, vals):
+        vals = dict(vals)
+        if 'provider_id' in vals and 'currency_id' not in vals:
+            provider = self.env['eds.external.provider'].browse(vals['provider_id'])
+            vals['currency_id'] = currency_for_delivery(self.env, provider.category or 'local').id
+        if {'provider_id', 'currency_id'} & vals.keys():
+            for contract in self:
+                provider = (self.env['eds.external.provider'].browse(vals['provider_id'])
+                            if vals.get('provider_id') else contract.provider_id)
+                validate_delivery_currency(
+                    self.env, provider.category or 'local',
+                    vals.get('currency_id', contract.currency_id.id))
+        return super().write(vals)
 
     def _require_group(self, group_xml_id):
         if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)
@@ -645,6 +730,10 @@ class EdsTrainingContract(models.Model):
             rec.state = 'legal_review'
             rec.message_post(body=_('Contract %s routed to the Legal Directorate for review '
                                     '().') % rec.name)
+            notify_role_action(
+                rec, 'group_eds_manager', 'group_eds_admin',
+                _('Review training contract'),
+                _('Training contract %s needs legal review.') % rec.name)
 
     def action_legal_approve(self):
         """Legal Review -> Approved (or Revision with a new version)."""
@@ -657,6 +746,10 @@ class EdsTrainingContract(models.Model):
                                   '().'))
             rec.write({'state': 'approved', 'legal_reviewer_id': self.env.user.id})
             rec.message_post(body=_('Contract %s approved by Legal.') % rec.name)
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid, _('Training contract approved'),
+                _('Training contract %s is approved and ready for signature.') % rec.name)
 
     def action_request_revision(self):
         """Legal Review -> Revision: capture legal comments and bump the version."""
@@ -675,6 +768,11 @@ class EdsTrainingContract(models.Model):
             rec.write({'state': 'revision', 'version': new_version})
             rec.message_post(body=_('Contract %s returned with legal comments - version %s '
                                     '().') % (rec.name, new_version))
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid, _('Training contract returned'),
+                _('Training contract %s was returned for revision: %s')
+                % (rec.name, rec.legal_comments))
 
     def action_resubmit(self):
         """Revision -> Legal Review: the updated version goes back to Legal."""
@@ -684,6 +782,10 @@ class EdsTrainingContract(models.Model):
                 raise UserError(_('Only contracts under revision can be resubmitted.'))
             rec.state = 'legal_review'
             rec.message_post(body=_('Revised contract %s resubmitted to Legal.') % rec.name)
+            notify_role_action(
+                rec, 'group_eds_manager', 'group_eds_admin',
+                _('Review revised training contract'),
+                _('Revised training contract %s needs legal review.') % rec.name)
 
     def action_record_signature(self):
         """Approved -> Signed: record the authorized signature."""
@@ -696,6 +798,7 @@ class EdsTrainingContract(models.Model):
             rec.write({'state': 'signed', 'signature_date': date.today()})
             rec.message_post(body=_('Contract %s signed by %s.')
                              % (rec.name, rec.signed_by or 'authorized signatory'))
+            clear_action_activities(rec)
 
     def action_activate(self):
         for rec in self:
@@ -738,7 +841,7 @@ class EdsTrainingContractVersion(models.Model):
 
 
 class EdsCourseVendorSelection(models.Model):
-    """Post-Plan Course Vendor Sourcing & Evaluation (/031/033).
+    """Post-Plan Course Vendor Sourcing & Evaluation.
 
     Allows sourcing multiple vendors for an approved planned course,
     applying technical/functional and financial percentage scoring templates,
@@ -752,18 +855,39 @@ class EdsCourseVendorSelection(models.Model):
     _rec_name = 'name'
 
     name = fields.Char(string='Reference', required=True, readonly=True, copy=False, default=lambda self: _('New'))
+    source_type = fields.Selection([
+        ('annual_plan', 'Approved Annual Plan'),
+        ('unscheduled', 'Approved Unscheduled Request'),
+    ], string='Sourcing Source', default='annual_plan', required=True, tracking=True)
     annual_plan_id = fields.Many2one(
-        'eds.annual.plan', string='Approved Annual Plan', required=True, tracking=True,
+        'eds.annual.plan', string='Approved Annual Plan', tracking=True,
         domain="[('state', 'in', ('published', 'amended'))]")
     plan_line_id = fields.Many2one(
-        'eds.annual.plan.line', string='Approved Plan Program', required=True, tracking=True,
-        domain="[('plan_id', '=', annual_plan_id)]")
+        'eds.annual.plan.line', string='Approved Plan Program', tracking=True,
+        domain="[('plan_id', '=', annual_plan_id), ('is_addendum', '=', False)]")
+    unscheduled_request_id = fields.Many2one(
+        'eds.unscheduled.request', string='Approved Unscheduled Request', tracking=True,
+        domain="[('state', '=', 'approved'), ('course_id', '!=', False)]", index=True)
     course_id = fields.Many2one(
         'eds.course', string='Catalog Course', tracking=True,
         help='Filled from the approved plan program when it uses a catalog course.')
-    program_name = fields.Char(related='plan_line_id.program_name', string='Program Name')
-    delivery_method = fields.Selection(related='plan_line_id.delivery_method',
-                                       string='Delivery Type', store=True)
+    program_name = fields.Char(compute='_compute_program_name', string='Program Name')
+    delivery_method = fields.Selection([
+        ('internal', 'Internal / ToT'),
+        ('local_external', 'Local External'),
+        ('international', 'International'),
+    ], string='Delivery Chosen for Execution', required=True,
+        help='May differ from the approved plan. Sessions use this delivery type after sourcing is completed.')
+    planned_delivery_method = fields.Selection(
+        selection=[('internal', 'Internal / ToT'), ('local_external', 'Local External'),
+                   ('international', 'International')], compute='_compute_planned_delivery_method',
+        string='Planned Delivery', readonly=True)
+    delivery_override = fields.Boolean(
+        string='Change Delivery Type', tracking=True,
+        help='Enable to change the delivery type approved for this program. A reason is required.')
+    delivery_change_reason = fields.Char(
+        string='Reason for Delivery Change',
+        help='Explain why the execution delivery type differs from the approved plan.')
     template_type = fields.Selection([
         ('standard_70_30', 'Standard (70% Technical/Functional, 30% Financial)'),
         ('specialized_80_20', 'High Specialization (80% Technical/Functional, 20% Financial)'),
@@ -780,7 +904,7 @@ class EdsCourseVendorSelection(models.Model):
         'eds.external.provider', string='Awarded Vendor', compute='_compute_awarded_vendor', store=True)
     currency_id = fields.Many2one(
         'res.currency', string='Bid Currency', required=True,
-        default=lambda self: self.env.company.currency_id,
+        default=lambda self: currency_for_delivery(self.env, 'internal'),
         help='International sourcing defaults to USD; another currency can be selected.')
     state = fields.Selection([
         ('draft', 'Draft Sourcing'),
@@ -788,6 +912,38 @@ class EdsCourseVendorSelection(models.Model):
         ('awarded', 'Awarded / Contracted'),
     ], string='Status', default='draft', required=True, tracking=True)
     notes = fields.Text(string='Sourcing Notes & Objectives')
+
+    @api.depends('source_type', 'plan_line_id.program_name', 'unscheduled_request_id.course_id.name')
+    def _compute_program_name(self):
+        for rec in self:
+            rec.program_name = (rec.unscheduled_request_id.course_id.name
+                                if rec.source_type == 'unscheduled' else rec.plan_line_id.program_name)
+
+    @api.depends('source_type', 'plan_line_id.delivery_method', 'unscheduled_request_id.delivery_method')
+    def _compute_planned_delivery_method(self):
+        for rec in self:
+            rec.planned_delivery_method = (rec.unscheduled_request_id.delivery_method
+                                           if rec.source_type == 'unscheduled'
+                                           else rec.plan_line_id.delivery_method)
+
+    @api.onchange('source_type')
+    def _onchange_source_type(self):
+        self.annual_plan_id = False
+        self.plan_line_id = False
+        self.unscheduled_request_id = False
+        self.course_id = False
+
+    @api.onchange('unscheduled_request_id')
+    def _onchange_unscheduled_request_id(self):
+        request = self.unscheduled_request_id
+        self.plan_line_id = request.plan_line_ids[:1] if request else False
+        self.annual_plan_id = request.annual_plan_id if request else False
+        self.course_id = request.course_id if request else False
+        if request:
+            self.delivery_override = False
+            self.delivery_change_reason = False
+            self.delivery_method = request.delivery_method
+            self.currency_id = currency_for_delivery(self.env, request.delivery_method)
 
     @api.onchange('template_type')
     def _onchange_template_type(self):
@@ -803,23 +959,45 @@ class EdsCourseVendorSelection(models.Model):
 
     @api.onchange('plan_line_id')
     def _onchange_plan_line_id(self):
+        if self.source_type != 'annual_plan':
+            return
         self.course_id = self.plan_line_id.course_id
+        self.delivery_override = False
+        self.delivery_change_reason = False
+        self.delivery_method = self.plan_line_id.delivery_method
         self.currency_id = self._currency_for_plan_line(self.plan_line_id)
+
+    @api.onchange('delivery_override')
+    def _onchange_delivery_override(self):
+        if not self.delivery_override:
+            self.delivery_method = self.planned_delivery_method
+            self.delivery_change_reason = False
+            if self.delivery_method:
+                self.currency_id = currency_for_delivery(self.env, self.delivery_method)
+
+    @api.onchange('delivery_method')
+    def _onchange_delivery_method(self):
+        if self.delivery_method:
+            self.currency_id = currency_for_delivery(self.env, self.delivery_method)
 
     @api.model
     def _currency_for_plan_line(self, plan_line):
-        if plan_line and plan_line.delivery_method == 'international':
-            return self.env['res.currency'].search([('name', '=', 'USD')], limit=1) or self.env.company.currency_id
-        return self.env.company.currency_id
+        return plan_line.budget_currency_id if plan_line else currency_for_delivery(self.env, 'internal')
 
     @api.onchange('annual_plan_id')
     def _onchange_annual_plan_id(self):
+        if self.source_type != 'annual_plan':
+            return
         if self.plan_line_id.plan_id != self.annual_plan_id:
             self.plan_line_id = False
             self.course_id = False
-        if self.annual_plan_id and not self.plan_line_id and len(self.annual_plan_id.line_ids) == 1:
-            self.plan_line_id = self.annual_plan_id.line_ids
+        regular_lines = self.annual_plan_id.line_ids.filtered(lambda line: not line.is_addendum)
+        if self.annual_plan_id and not self.plan_line_id and len(regular_lines) == 1:
+            self.plan_line_id = regular_lines
             self.course_id = self.plan_line_id.course_id
+            self.delivery_override = False
+            self.delivery_change_reason = False
+            self.delivery_method = self.plan_line_id.delivery_method
             self.currency_id = self._currency_for_plan_line(self.plan_line_id)
 
     @api.depends('line_ids')
@@ -830,80 +1008,179 @@ class EdsCourseVendorSelection(models.Model):
     @api.depends('line_ids.status', 'line_ids.vendor_id')
     def _compute_awarded_vendor(self):
         for rec in self:
-            awarded = rec.line_ids.filtered(lambda l: l.status in ('awarded', 'contract'))[:1]
+            awarded = rec.line_ids.filtered(lambda l: l.status == 'awarded')[:1]
             rec.awarded_vendor_id = awarded.vendor_id if awarded else False
+
+    def _sourcing_source_domain(self):
+        self.ensure_one()
+        if self.source_type == 'unscheduled':
+            return [('source_type', '=', 'unscheduled'),
+                    ('unscheduled_request_id', '=', self.unscheduled_request_id.id)]
+        if self.annual_plan_id and self.course_id:
+            return [('source_type', '=', 'annual_plan'),
+                    ('annual_plan_id', '=', self.annual_plan_id.id),
+                    ('course_id', '=', self.course_id.id)]
+        return [('source_type', '=', 'annual_plan'),
+                ('plan_line_id', '=', self.plan_line_id.id)]
+
+    @api.constrains('source_type', 'annual_plan_id', 'plan_line_id', 'course_id',
+                    'unscheduled_request_id', 'state')
+    def _check_unique_sourcing_source(self):
+        for rec in self:
+            if rec.source_type == 'unscheduled':
+                source, table = rec.unscheduled_request_id, 'eds_unscheduled_request'
+            else:
+                source, table = rec.annual_plan_id, 'eds_annual_plan'
+            if not source:
+                continue  # The source validation reports the missing approved record.
+            self.env.cr.execute('SELECT id FROM %s WHERE id = %%s FOR UPDATE' % table, [source.id])
+            if self.sudo().search_count(rec._sourcing_source_domain() + [('id', '!=', rec.id)]):
+                raise ValidationError(_(
+                    'This approved course or request already has provider sourcing. '
+                    'Add other provider bids to the existing sourcing record.'))
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.course.vendor.selection') or _('New')
+            if vals.get('source_type') == 'unscheduled' and vals.get('unscheduled_request_id'):
+                request = self.env['eds.unscheduled.request'].browse(vals['unscheduled_request_id'])
+                vals['annual_plan_id'] = request.annual_plan_id.id or False
+                vals['plan_line_id'] = request.plan_line_ids[:1].id or False
+                vals['course_id'] = request.course_id.id or False
+                vals.setdefault('delivery_method', request.delivery_method)
             if vals.get('plan_line_id') and 'course_id' not in vals:
                 vals['course_id'] = self.env['eds.annual.plan.line'].browse(vals['plan_line_id']).course_id.id or False
+            if vals.get('plan_line_id') and not vals.get('delivery_method'):
+                vals['delivery_method'] = self.env['eds.annual.plan.line'].browse(vals['plan_line_id']).delivery_method
             if vals.get('plan_line_id') and not vals.get('currency_id'):
-                vals['currency_id'] = self._currency_for_plan_line(
-                    self.env['eds.annual.plan.line'].browse(vals['plan_line_id'])).id
+                vals['currency_id'] = currency_for_delivery(self.env, vals['delivery_method']).id
+            if vals.get('delivery_method') and not vals.get('currency_id'):
+                vals['currency_id'] = currency_for_delivery(self.env, vals['delivery_method']).id
+            if vals.get('delivery_method') and vals.get('currency_id'):
+                validate_delivery_currency(self.env, vals['delivery_method'], vals['currency_id'])
         return super().create(vals_list)
 
     def write(self, vals):
+        vals = dict(vals)
+        source_fields = {'source_type', 'annual_plan_id', 'plan_line_id',
+                         'unscheduled_request_id', 'delivery_method',
+                         'delivery_override', 'delivery_change_reason'}
+        if source_fields & vals.keys() and any(rec.state != 'draft' for rec in self):
+            raise UserError(_('The sourcing source and delivery choice cannot change after evaluation starts.'))
+        if vals.get('unscheduled_request_id'):
+            request = self.env['eds.unscheduled.request'].browse(vals['unscheduled_request_id'])
+            vals.update({'source_type': 'unscheduled',
+                         'annual_plan_id': request.annual_plan_id.id or False,
+                         'plan_line_id': request.plan_line_ids[:1].id or False,
+                         'course_id': request.course_id.id or False})
+            vals.setdefault('delivery_method', request.delivery_method)
         if vals.get('plan_line_id') and 'course_id' not in vals:
             vals = dict(vals, course_id=self.env['eds.annual.plan.line'].browse(vals['plan_line_id']).course_id.id or False)
+        if vals.get('plan_line_id') and 'delivery_method' not in vals:
+            vals = dict(vals, delivery_method=self.env['eds.annual.plan.line'].browse(vals['plan_line_id']).delivery_method)
         if vals.get('plan_line_id') and 'currency_id' not in vals:
-            vals = dict(vals, currency_id=self._currency_for_plan_line(
-                self.env['eds.annual.plan.line'].browse(vals['plan_line_id'])).id)
+            vals = dict(vals, currency_id=currency_for_delivery(self.env, vals['delivery_method']).id)
+        elif vals.get('delivery_method') and 'currency_id' not in vals:
+            vals = dict(vals, currency_id=currency_for_delivery(self.env, vals['delivery_method']).id)
+        if {'plan_line_id', 'currency_id', 'delivery_method'} & vals.keys():
+            for rec in self:
+                validate_delivery_currency(self.env, vals.get('delivery_method', rec.delivery_method),
+                                           vals.get('currency_id', rec.currency_id.id))
         return super().write(vals)
 
     def _sync_awarded_vendor_to_sessions(self):
         for rec in self:
-            if not rec.awarded_vendor_id or not rec.plan_line_id:
-                continue
-            sessions = self.env['eds.session'].search([
-                ('plan_line_id', '=', rec.plan_line_id.id),
-                ('status', 'not in', ('completed', 'cancelled')),
-                ('awarded_provider_id', '=', False),
-            ])
-            sessions.write({'awarded_provider_id': rec.awarded_vendor_id.id})
-            winner = rec.line_ids.filtered(lambda line: line.status in ('awarded', 'contract'))[:1]
-            if winner.trainer_id:
-                for session in self.env['eds.session'].search([
-                        ('plan_line_id', '=', rec.plan_line_id.id),
-                        ('status', 'not in', ('completed', 'cancelled'))]):
-                    if not session.trainer_ids:
-                        session.trainer_ids = winner.trainer_id
+            source_domain = ([('unscheduled_request_id', '=', rec.unscheduled_request_id.id)]
+                             if rec.source_type == 'unscheduled' else
+                             [('plan_line_id', '=', rec.plan_line_id.id), ('source_type', '=', 'annual_plan')])
+            sessions = self.env['eds.session'].search(source_domain + [('status', '=', 'draft')])
+            for session in sessions:
+                session._sync_sourcing_from_plan_line()
 
     def action_start_evaluation(self):
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Only draft sourcing records can start evaluation.'))
-            if rec.annual_plan_id.state not in ('published', 'amended'):
+            if rec.delivery_method == 'internal':
+                raise UserError(_('Internal delivery does not require vendor evaluation. Confirm internal delivery instead.'))
+            if rec.source_type == 'unscheduled':
+                if rec.unscheduled_request_id.state != 'approved':
+                    raise UserError(_('Vendor sourcing requires an approved unscheduled request.'))
+            elif rec.annual_plan_id.state not in ('published', 'amended'):
                 raise UserError(_('Vendor sourcing requires an approved Annual Plan.'))
             if not rec.line_ids:
                 raise UserError(_('Add at least one vendor before starting evaluation.'))
+            expected_category = 'international' if rec.delivery_method == 'international' else 'local'
+            if rec.line_ids.filtered(lambda line: line.vendor_id and line.vendor_id.category != expected_category):
+                raise UserError(_('Remove provider bids that do not match the selected delivery type.'))
             rec.state = 'evaluation'
 
     def action_mark_awarded(self):
         for rec in self:
-            if rec.state != 'evaluation':
-                raise UserError(_('Only evaluations can be completed.'))
-            if not rec.line_ids.filtered(lambda line: line.status in ('awarded', 'contract')):
+            winner = rec.line_ids.filtered(lambda line: line.status == 'awarded')[:1]
+            if rec.delivery_method != 'internal' and not winner:
                 raise UserError(_('Award a qualified vendor before completing sourcing.'))
-            rec.state = 'awarded'
+            if rec.delivery_method == 'internal' and winner:
+                raise UserError(_('An awarded provider cannot be used with internal delivery. Select external delivery instead.'))
+            if winner and winner.vendor_id.category != (
+                    'international' if rec.delivery_method == 'international' else 'local'):
+                raise UserError(_('The awarded provider category must match the chosen delivery type.'))
+            changed = rec.state != 'awarded'
+            if changed and rec.delivery_method != rec.planned_delivery_method:
+                if not rec.delivery_override or not rec.delivery_change_reason:
+                    raise UserError(_('Enable Change Delivery Type and explain why the approved delivery type is changing.'))
+            related_sessions = (self.env['eds.session'].search([
+                ('unscheduled_request_id', '=', rec.unscheduled_request_id.id)])
+                if rec.source_type == 'unscheduled' else rec.plan_line_id.session_ids)
+            if changed and related_sessions.filtered(
+                    lambda session: session.status not in ('draft', 'cancelled')
+                    and session.delivery_method != rec.delivery_method):
+                raise UserError(_('A session has already been scheduled with a different delivery type. Resolve that schedule before changing delivery.'))
+            if changed:
+                rec.state = 'awarded'
+            rec._sync_awarded_vendor_to_sessions()
+            if changed and rec.delivery_method != rec.planned_delivery_method:
+                source = rec.unscheduled_request_id if rec.source_type == 'unscheduled' else rec.annual_plan_id
+                source.message_post(body=_('Delivery for %s changed from %s to %s: %s') % (
+                    rec.program_name,
+                    dict(rec._fields['planned_delivery_method'].selection).get(rec.planned_delivery_method),
+                    dict(rec._fields['delivery_method'].selection).get(rec.delivery_method),
+                    rec.delivery_change_reason))
 
-    @api.constrains('annual_plan_id', 'plan_line_id', 'course_id', 'technical_weight', 'financial_weight')
+    @api.constrains('source_type', 'annual_plan_id', 'plan_line_id', 'unscheduled_request_id',
+                    'course_id', 'technical_weight', 'financial_weight',
+                    'delivery_method', 'delivery_override', 'delivery_change_reason')
     def _check_plan_and_weights(self):
         for rec in self:
-            if rec.annual_plan_id and rec.annual_plan_id.state not in ('published', 'amended'):
-                raise ValidationError(_('Vendor sourcing requires an approved Annual Plan.'))
-            if rec.plan_line_id and (rec.plan_line_id.plan_id != rec.annual_plan_id
-                                     or rec.plan_line_id.course_id != rec.course_id):
-                raise ValidationError(_('The selected program must belong to the chosen Annual Plan; its catalog course must match.'))
+            if rec.source_type == 'unscheduled':
+                request = rec.unscheduled_request_id
+                if not request or request.state != 'approved' or rec.course_id != request.course_id:
+                    raise ValidationError(_('Select an approved unscheduled request and its catalog course.'))
+                if rec.plan_line_id and rec.plan_line_id.unscheduled_request_id != request:
+                    raise ValidationError(_('The addendum program must belong to the unscheduled request.'))
+                if rec.annual_plan_id != request.annual_plan_id:
+                    raise ValidationError(_('The annual plan must match the unscheduled request.'))
+            else:
+                if rec.unscheduled_request_id or not rec.annual_plan_id or not rec.plan_line_id:
+                    raise ValidationError(_('Select an approved annual plan and one of its regular programs.'))
+                if rec.annual_plan_id.state not in ('published', 'amended'):
+                    raise ValidationError(_('Vendor sourcing requires an approved Annual Plan.'))
+                if (rec.plan_line_id.plan_id != rec.annual_plan_id or rec.plan_line_id.is_addendum
+                        or rec.plan_line_id.course_id != rec.course_id):
+                    raise ValidationError(_('The selected program must belong to the chosen Annual Plan; its catalog course must match.'))
             if rec.technical_weight < 0 or rec.financial_weight < 0 or abs(
                     rec.technical_weight + rec.financial_weight - 100.0) > 0.01:
                 raise ValidationError(_('Technical and financial weights must total 100%.'))
+            if rec.delivery_method != rec.planned_delivery_method:
+                if not rec.delivery_override or not (rec.delivery_change_reason or '').strip():
+                    raise ValidationError(_(
+                        'Enable Change Delivery Type and enter a reason before changing the approved delivery type.'))
 
 
 class EdsCourseVendorLine(models.Model):
-    """Vendor line inside course vendor sourcing (/031/033).
+    """Vendor line inside course vendor sourcing.
 
     Calculates weighted total score from technical/functional % and financial %.
     Sorted by total_score desc.
@@ -914,6 +1191,9 @@ class EdsCourseVendorLine(models.Model):
 
     selection_id = fields.Many2one(
         'eds.course.vendor.selection', string='Vendor Selection', required=True, ondelete='cascade', index=True)
+    delivery_category = fields.Selection(
+        [('local', 'Local'), ('international', 'International')],
+        compute='_compute_delivery_category', string='Provider Category')
     vendor_id = fields.Many2one(
         'eds.external.provider', string='Vendor / Training Provider')
     trainer_id = fields.Many2one(
@@ -924,7 +1204,7 @@ class EdsCourseVendorLine(models.Model):
     price_quoted = fields.Monetary(
         string='Quoted Price', currency_field='currency_id', default=0.0)
     currency_id = fields.Many2one('res.currency', string='Bid Currency', required=True,
-                                  default=lambda self: self.env.company.currency_id)
+                                  default=lambda self: currency_for_delivery(self.env, 'internal'))
     quality_score = fields.Float(string='Technical Quality & Relevance (0-10)')
     experience_score = fields.Float(string='Firm & Trainer Experience (0-10)')
     scalability_score = fields.Float(string='Delivery & Scalability (0-10)')
@@ -940,25 +1220,57 @@ class EdsCourseVendorLine(models.Model):
         string='Total Score', compute='_compute_total_score', store=True)
 
     status = fields.Selection([
-        ('pending', 'Pending'),
+        ('draft', 'Draft'),
         ('awarded', 'Awarded'),
-        ('contract', 'Contract Signed'),
         ('rejected', 'Rejected'),
-    ], string='Status', default='pending', required=True)
+    ], string='Status', default='draft', required=True)
 
-    award_attachment = fields.Binary(string='Award File Upload', attachment=True)
+    award_attachment = fields.Binary(string='Award Letter (Optional)', attachment=True)
     award_filename = fields.Char(string='Award Filename')
-    contract_attachment = fields.Binary(string='Contract Attachment', attachment=True)
+    contract_attachment = fields.Binary(string='Signed Contract (Optional)', attachment=True)
     contract_filename = fields.Char(string='Contract Filename')
     notes = fields.Char(string='Remarks / Evaluation Summary')
 
+    @api.depends('selection_id.delivery_method')
+    @api.depends_context('default_delivery_category')
+    def _compute_delivery_category(self):
+        for line in self:
+            method = line.selection_id.delivery_method
+            line.delivery_category = (
+                'international' if method == 'international' else 'local'
+            ) if method else self.env.context.get('default_delivery_category', 'local')
+
     @api.model_create_multi
     def create(self, vals_list):
+        self._lock_vendor_selections(vals.get('selection_id') for vals in vals_list)
         for vals in vals_list:
             if vals.get('selection_id') and not vals.get('currency_id'):
                 vals['currency_id'] = self.env['eds.course.vendor.selection'].browse(
                     vals['selection_id']).currency_id.id
+            if vals.get('selection_id') and vals.get('currency_id'):
+                selection = self.env['eds.course.vendor.selection'].browse(vals['selection_id'])
+                validate_delivery_currency(self.env, selection.delivery_method, vals['currency_id'])
         return super().create(vals_list)
+
+    def write(self, vals):
+        if {'selection_id', 'vendor_id', 'status'} & vals.keys():
+            self._lock_vendor_selections(
+                list(self.mapped('selection_id').ids) + [vals.get('selection_id')])
+        if {'selection_id', 'currency_id'} & vals.keys():
+            for rec in self:
+                selection = (self.env['eds.course.vendor.selection'].browse(vals['selection_id'])
+                             if vals.get('selection_id') else rec.selection_id)
+                validate_delivery_currency(self.env, selection.delivery_method,
+                                           vals.get('currency_id', rec.currency_id.id))
+        return super().write(vals)
+
+    def _lock_vendor_selections(self, selection_ids):
+        """Serialize bid edits before checking duplicate vendors or awards."""
+        for selection_id in sorted({int(value) for value in selection_ids if value}):
+            self.env.cr.execute(
+                'SELECT id FROM eds_course_vendor_selection WHERE id = %s FOR UPDATE',
+                [selection_id],
+            )
 
     @api.onchange('selection_id')
     def _onchange_selection_currency(self):
@@ -1009,9 +1321,29 @@ class EdsCourseVendorLine(models.Model):
                     ('selection_id', '=', rec.selection_id.id), ('vendor_id', '=', rec.vendor_id.id),
                     ('id', '!=', rec.id)]):
                 raise ValidationError(_('A vendor may appear only once in a course selection.'))
+            if rec.vendor_id and rec.selection_id.delivery_method != 'internal':
+                expected_category = ('international' if rec.selection_id.delivery_method == 'international'
+                                     else 'local')
+                if rec.vendor_id.category != expected_category:
+                    raise ValidationError(_('The provider must match the selected delivery type.'))
             if rec.trainer_id and (rec.trainer_id.trainer_type != 'external' or
                                    rec.trainer_id.external_provider_id != rec.vendor_id):
                 raise ValidationError(_('The proposed trainer must belong to the selected provider.'))
+
+    @api.constrains('selection_id', 'status')
+    def _check_one_awarded_vendor(self):
+        for rec in self.filtered(lambda line: line.status == 'awarded'):
+            if self.search_count([
+                    ('selection_id', '=', rec.selection_id.id),
+                    ('status', '=', 'awarded'), ('id', '!=', rec.id)]):
+                raise ValidationError(_('Only one vendor can be awarded for a course selection.'))
+
+    def init(self):
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS eds_vendor_bid_award_unique
+                ON eds_course_vendor_line (selection_id)
+             WHERE status = 'awarded'
+        """)
 
     @api.depends('technical_score', 'financial_score', 'technical_threshold_met', 'selection_id.technical_weight',
                  'selection_id.financial_weight')
@@ -1027,26 +1359,32 @@ class EdsCourseVendorLine(models.Model):
 
     def action_award(self):
         for rec in self:
-            if rec.selection_id.state != 'evaluation' or not rec.technical_threshold_met:
-                raise UserError(_('Only a vendor passing the technical gate can be awarded.'))
+            if rec.status != 'draft':
+                raise UserError(_('Only a draft vendor bid can be awarded.'))
+            if rec.selection_id.delivery_method == 'internal':
+                raise UserError(_('Choose local external or international delivery before awarding a provider.'))
+            if rec.vendor_id and rec.vendor_id.category != (
+                    'international' if rec.selection_id.delivery_method == 'international' else 'local'):
+                raise UserError(_('The provider category must match the chosen delivery type.'))
+            if rec.selection_id.state not in ('draft', 'evaluation'):
+                raise UserError(_('This sourcing record already has a final award.'))
+            if not rec.technical_threshold_met:
+                raise UserError(_(
+                    'Score the vendor first. At least 40 of the 70 technical points are required before awarding.'))
             if not rec.vendor_id:
                 raise UserError(_('Select a registered training provider before awarding.'))
-            if rec.selection_id.line_ids.filtered(
-                    lambda line: line.id != rec.id and line.status in ('awarded', 'contract')):
+            # Serialize concurrent awards on the parent before checking the winner.
+            self.env.cr.execute(
+                'SELECT id FROM eds_course_vendor_selection WHERE id = %s FOR UPDATE',
+                [rec.selection_id.id])
+            if self.search_count([
+                    ('selection_id', '=', rec.selection_id.id),
+                    ('status', '=', 'awarded'), ('id', '!=', rec.id)]):
                 raise UserError(_('Another vendor is already awarded for this course.'))
-            if not rec.award_attachment:
-                raise UserError(_('Upload the award letter before awarding this vendor.'))
             rec.status = 'awarded'
-            rec.selection_id.state = 'awarded'
-            rec.selection_id._sync_awarded_vendor_to_sessions()
-
-    def action_contract(self):
-        for rec in self:
-            if rec.status != 'awarded' or not rec.contract_attachment:
-                raise UserError(_('Upload the signed contract for the awarded vendor first.'))
-            rec.status = 'contract'
-            rec.selection_id.state = 'awarded'
 
     def action_reject(self):
         for rec in self:
+            if rec.status != 'draft':
+                raise UserError(_('Only a draft vendor bid can be rejected.'))
             rec.status = 'rejected'

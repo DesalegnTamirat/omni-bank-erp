@@ -1,0 +1,111 @@
+.o_competency_guide_link {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #541718;
+    cursor: pointer;
+    display: block;
+    font: inherit;
+    font-weight: 600;
+    padding: 0;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    width: 100%;
+
+    &:hover,
+    &:focus-visible {
+        color: #842f36;
+        text-decoration-thickness: 2px;
+    }
+}
+
+.o_competency_mapping_field {
+    align-items: baseline;
+    display: flex;
+    gap: 8px;
+    width: 100%;
+
+    .o_competency_guide_link {
+        flex: 1;
+    }
+}
+
+.o_competency_mapping_change {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: #726732;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.o_competency_rating_choices {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 20px;
+
+    .o_field_widget {
+        display: block;
+        width: 100%;
+    }
+}
+
+.o_competency_level_choice {
+    appearance: none;
+    background: #fcfbfa;
+    border: 1px solid #dee2e6;
+    border-left: 5px solid #726732;
+    border-radius: 6px;
+    color: #1d2b32;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    text-align: left;
+    width: 100%;
+
+    &[data-level="2"] { border-left-color: #1d2b32; }
+    &[data-level="3"] { border-left-color: #c17540; }
+    &[data-level="4"] { border-left-color: #541718; }
+
+    &:not(:disabled):hover,
+    &:not(:disabled):focus-visible {
+        border-color: #541718;
+        box-shadow: 0 0 0 2px rgba(84, 23, 24, 0.16);
+    }
+
+    &.is-selected {
+        background: #faf4f5;
+        box-shadow: inset 0 0 0 1px #541718;
+    }
+
+    &.is-readonly {
+        cursor: default;
+    }
+
+    .o_competency_level_choice_title {
+        color: #726732;
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    &[data-level="2"] .o_competency_level_choice_title { color: #1d2b32; }
+    &[data-level="3"] .o_competency_level_choice_title { color: #a66132; }
+    &[data-level="4"] .o_competency_level_choice_title { color: #541718; }
+
+    .o_competency_level_choice_indicator {
+        font-size: 13.5px;
+        line-height: 1.6;
+        white-space: pre-line;
+    }
+
+    .o_competency_level_choice_hint {
+        color: #541718;
+        font-size: 12px;
+        font-weight: 600;
+    }
+}

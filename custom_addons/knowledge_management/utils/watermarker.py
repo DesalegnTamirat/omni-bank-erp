@@ -71,5 +71,5 @@ def add_watermark_to_pdf(pdf_bytes, text_lines):
         return output_stream.getvalue()
 
     except Exception as e:
-        _logger.warning("Failed to apply PDF watermark: %s. Returning raw bytes.", e)
-        return pdf_bytes
+        _logger.exception("Failed to apply PDF watermark")
+        raise

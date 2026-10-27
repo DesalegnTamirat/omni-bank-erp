@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Unscheduled Training Requests (/076) ══════════════ -->
+        <!-- ══════════════ Unscheduled Training Requests ══════════════ -->
 
         <record id="view_eds_unscheduled_request_list" model="ir.ui.view">
             <field name="name">eds.unscheduled.request.list</field>
@@ -14,7 +14,6 @@
                     <field name="department_id" optional="show"/>
                     <field name="work_unit_id" optional="hide"/>
                     <field name="course_id"/>
-                    <field name="program_name"/>
                     <field name="reason" widget="badge"/>
                     <field name="requested_date_start"/>
                     <field name="estimated_cost" sum="Estimated"/>
@@ -59,20 +58,26 @@
                         <button name="action_submit" string="Submit for Approval" type="object"
                                 class="oe_highlight" invisible="state != 'draft'"
                                 groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_lnd_approve" string="L&amp;D Approve" type="object"
+                        <button name="action_lnd_approve" string="Team Leader Approve" type="object"
                                 class="oe_highlight" invisible="state != 'submitted'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_team_leader"/>
                         <button name="action_director_approve" string="Director PPDD Approve"
                                 type="object" class="oe_highlight" invisible="state != 'lnd_approved'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_director"/>
                         <button name="action_approve" string="Final Approval" type="object"
                                 class="oe_highlight" invisible="state != 'director_approved'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_chief"/>
                         <button name="action_reject" string="Reject" type="object"
                                 invisible="state not in ('submitted','lnd_approved','director_approved')"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_print_form" string="Print Request Form (EDS-F-09)" type="object" icon="fa-print"
+                                groups="employee_development_system.group_eds_team_leader,employee_development_system.group_eds_director,employee_development_system.group_eds_chief"/>
+                        <button name="action_print_form" string="Print Request Form" type="object" icon="fa-print"
                                 groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_open_provider_sourcing" string="Provider Sourcing" type="object"
+                                invisible="state != 'approved'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_open_hotel_sourcing" string="Hotel Sourcing" type="object"
+                                invisible="state != 'approved'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
@@ -86,8 +91,11 @@
                             </group>
                             <group string="Training">
                                 <field name="course_id" options="{'no_create': True}"/>
-                                <field name="program_name"/>
                                 <field name="delivery_mode"/>
+                                <field name="delivery_method"/>
+                                <field name="currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                                <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
+                                        invisible="delivery_method != 'international'"/>
                                 <field name="reason"/>
                                 <field name="requested_date_start"/>
                                 <field name="requested_date_end"/>

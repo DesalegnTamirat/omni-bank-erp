@@ -4,7 +4,7 @@ from odoo.exceptions import UserError
 
 
 class EdsAssessmentCenterBatch(models.Model):
-    """Assessment Center exercise batch & candidate evaluation (FREDS060 - FREDS061)."""
+    """Assessment Center exercise batch and candidate evaluation."""
     _name = 'eds.assessment.center.batch'
     _description = 'Assessment Center Batch'
     _inherit = ['mail.thread', 'mail.activity.mixin']

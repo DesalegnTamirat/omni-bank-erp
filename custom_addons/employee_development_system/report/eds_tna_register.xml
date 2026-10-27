@@ -27,7 +27,7 @@
                             <div class="row mt16 mb16">
                                 <div class="col-4"><strong>Cycle Start:</strong> <span t-field="cycle.start_date"/></div>
                                 <div class="col-4"><strong>Submission End:</strong> <span t-field="cycle.submission_end_date"/></div>
-                                <div class="col-4"><strong>Approval Deadline:</strong> <span t-field="cycle.approval_deadline"/></div>
+                                <div class="col-4"><strong>Submission Deadline:</strong> <span t-field="cycle.submission_end_date"/></div>
                             </div>
 
                             <t t-set="units" t-value="cycle.entry_ids.mapped('work_unit_id')"/>

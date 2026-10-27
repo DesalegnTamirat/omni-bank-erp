@@ -35,7 +35,7 @@ class TestRecognitionEnginePhase5(TransactionCase):
 
     def test_01_polymorphic_points_ledger(self):
         # 1. KMS Contribution points
-        pt_kms = self.RecognitionPoint.award_points(
+        pt_kms = self.RecognitionPoint._award_points(
             user=self.user1,
             points=20,
             source_module='kms',
@@ -50,7 +50,7 @@ class TestRecognitionEnginePhase5(TransactionCase):
         self.assertEqual(pt_kms.points, 20)
 
         # 2. LMS Learning points
-        pt_lms = self.RecognitionPoint.award_points(
+        pt_lms = self.RecognitionPoint._award_points(
             user=self.user2,
             points=30,
             source_module='lms',

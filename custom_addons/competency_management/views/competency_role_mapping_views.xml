@@ -152,8 +152,7 @@
                                     <field name="indicator_level_2" column_invisible="True"/>
                                     <field name="indicator_level_3" column_invisible="True"/>
                                     <field name="indicator_level_4" column_invisible="True"/>
-                                    <field name="competency_id"/>
-                                    <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
+                                    <field name="competency_id" widget="competency_mapping_guide"/>
                                     <field name="pillar" widget="badge" readonly="1"/>
                                     <field name="override_default"/>
                                     <field name="required_proficiency" readonly="is_matrix_configured and not override_default"/>

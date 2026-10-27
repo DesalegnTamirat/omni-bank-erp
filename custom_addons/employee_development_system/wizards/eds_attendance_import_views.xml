@@ -10,7 +10,7 @@
                     <sheet>
                         <div class="alert alert-info" role="alert">
                             <span class="fa fa-info-circle me-1" title="Information" aria-hidden="true"/> <b>Branch / Classroom Attendance Bulk Ingestion:</b><br/>
-                            Upload sign-in sheet in CSV format. Columns supported: <code>session_ref, employee_badge, attendance_date, attended, notes</code>.
+                            Export the session's Excel roster, mark each date and period Present or Absent, then import it here. CSV columns: <code>session_ref, employee_badge, attendance_date, attendance_slot, attended, notes</code>. Use <code>day</code>, <code>morning</code>, or <code>afternoon</code> as the session requires.
                         </div>
                         <group>
                             <group>

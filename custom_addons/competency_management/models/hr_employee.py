@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 from datetime import timedelta
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 
 
@@ -304,11 +305,15 @@ class HrEmployeeCompetency(models.Model):
             try:
                 has_assessment = emp.competency_assessment_ids.filtered(lambda a: a.state in ('approved', 'locked'))
                 if not has_assessment and emp.parent_id.user_id:
-                    emp.activity_schedule(
-                        'mail.mail_activity_data_todo',
-                        summary=_('REMINDER: Baseline Competency Assessment Due Soon for %s') % emp.name,
-                        note=_('3-Month Baseline Assessment deadline for %s is on %s (14 days remaining).') % (emp.name, emp.baseline_assessment_deadline),
-                        user_id=emp.parent_id.user_id.id,
+                    supervisor = emp.parent_id.user_id
+                    summary = _('REMINDER: Baseline Competency Assessment Due Soon for %s') % emp.name
+                    note = _('3-Month Baseline Assessment deadline for %s is on %s (14 days remaining).') % (
+                        emp.name, emp.baseline_assessment_deadline
+                    )
+                    self.env['competency.assessment']._notify_user_inbox_and_activity(
+                        supervisor, summary, note, Markup('<p>%s</p>') % escape(note),
+                        target_rec=emp,
+                        event_key='baseline:%s:%s:%s' % (emp.id, supervisor.id, emp.baseline_assessment_deadline),
                     )
             except Exception:
                 pass

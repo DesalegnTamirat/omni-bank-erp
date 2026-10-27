@@ -39,7 +39,7 @@
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <button name="action_reject" string="Reject" type="object" invisible="status in ['completed', 'rejected']"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_print_clearance_form" string="Print Clearance &amp; Appraisal (EDS-F-14)" type="object" icon="fa-print"
+                    <button name="action_print_clearance_form" string="Print Clearance &amp; Appraisal" type="object" icon="fa-print"
                             groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="status" widget="statusbar" statusbar_visible="received,notified,accepted,placed,ongoing,completed"/>
                 </header>
@@ -64,7 +64,7 @@
                             <field name="end_date"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Scanned Application Letter">
                             <group>
                                 <field name="scanned_application" filename="scanned_filename"/>
@@ -82,7 +82,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Exit Clearance &amp; Final Appraisal (EDS-F-14)" name="clearance">
+                        <page string="Exit Clearance &amp; Final Appraisal" name="clearance">
                             <group>
                                 <group string="Institutional Exit Clearance">
                                     <field name="clearance_id_badge"/>

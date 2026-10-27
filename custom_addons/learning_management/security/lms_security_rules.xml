@@ -39,7 +39,9 @@
             <field name="name">Learner View Published Courses</field>
             <field name="model_id" ref="learning_management.model_lms_course"/>
             <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
-            <field name="domain_force">['|', '&amp;', ('state', '=', 'published'), ('is_latest_version', '=', True), ('instructor_id.user_id', '=', user.id)]</field>
+            <!-- An explicit enrollment remains visible if the employee changes roles.
+                 Otherwise every configured audience dimension must match. -->
+            <field name="domain_force">['|', ('instructor_id.user_id', '=', user.id), '&amp;', ('active', '=', True), '|', '&amp;', ('state', '=', 'archived'), ('enrollment_ids', 'any', [('user_id', '=', user.id), ('state', 'in', ('enrolled', 'in_progress', 'completed'))]), '&amp;', '&amp;', ('state', '=', 'published'), ('is_latest_version', '=', True), '|', ('enrollment_ids', 'any', [('user_id', '=', user.id)]), '&amp;', '&amp;', '|', ('target_department_ids', '=', False), ('target_department_ids', 'in', user.employee_id.department_id.ids), '|', ('target_job_ids', '=', False), ('target_job_ids', 'in', user.employee_id.job_id.ids), '|', ('target_grade_ids', '=', False), ('target_grade_ids', 'in', user.employee_id.job_id.grade.ids)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
@@ -56,6 +58,69 @@
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
             <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Curriculum and assessments are only visible to assigned learners.
+             The instructor rule also covers managers, who inherit that group. -->
+        <record id="rule_lms_section_learner" model="ir.rule">
+            <field name="name">Learner Assigned Published Course Sections</field>
+            <field name="model_id" ref="learning_management.model_lms_course_section"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
+            <field name="domain_force">['&amp;', ('course_id.active', '=', True), '&amp;', '|', ('course_id.state', '=', 'archived'), '&amp;', ('course_id.state', '=', 'published'), ('course_id.is_latest_version', '=', True), ('course_id.enrollment_ids', 'any', [('user_id', '=', user.id), ('state', 'in', ('enrolled', 'in_progress', 'completed')), '|', ('course_id.has_pre_assessment', '=', False), ('pre_assessment_passed', '=', True)])]</field>
+        </record>
+        <record id="rule_lms_section_instructor" model="ir.rule">
+            <field name="name">Instructor All Course Sections</field>
+            <field name="model_id" ref="learning_management.model_lms_course_section"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_instructor'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+        <record id="rule_lms_lesson_learner" model="ir.rule">
+            <field name="name">Learner Assigned Published Lessons</field>
+            <field name="model_id" ref="learning_management.model_lms_lesson"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
+            <field name="domain_force">['&amp;', ('course_id.active', '=', True), '&amp;', '|', ('course_id.state', '=', 'archived'), '&amp;', ('course_id.state', '=', 'published'), ('course_id.is_latest_version', '=', True), ('course_id.enrollment_ids', 'any', [('user_id', '=', user.id), ('state', 'in', ('enrolled', 'in_progress', 'completed')), '|', ('course_id.has_pre_assessment', '=', False), ('pre_assessment_passed', '=', True)])]</field>
+        </record>
+        <record id="rule_lms_lesson_instructor" model="ir.rule">
+            <field name="name">Instructor All Lessons</field>
+            <field name="model_id" ref="learning_management.model_lms_lesson"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_instructor'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+        <record id="rule_lms_assessment_learner" model="ir.rule">
+            <field name="name">Learner Published Course Assessments</field>
+            <field name="model_id" ref="learning_management.model_lms_assessment"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
+            <field name="domain_force">['&amp;', ('course_id.active', '=', True), '&amp;', '|', ('course_id.state', '=', 'archived'), '&amp;', ('course_id.state', '=', 'published'), ('course_id.is_latest_version', '=', True), ('course_id.enrollment_ids', 'any', [('user_id', '=', user.id), ('state', 'in', ('enrolled', 'in_progress', 'completed'))])]</field>
+        </record>
+        <record id="rule_lms_assessment_instructor" model="ir.rule">
+            <field name="name">Instructor All Assessments</field>
+            <field name="model_id" ref="learning_management.model_lms_assessment"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_instructor'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+        <record id="rule_lms_progress_learner" model="ir.rule">
+            <field name="name">Learner Own Lesson Progress</field>
+            <field name="model_id" ref="learning_management.model_lms_lesson_progress"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_lms_progress_manager" model="ir.rule">
+            <field name="name">Manager All Lesson Progress</field>
+            <field name="model_id" ref="learning_management.model_lms_lesson_progress"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+        <record id="rule_lms_points_learner" model="ir.rule">
+            <field name="name">Learner Own Learning Points</field>
+            <field name="model_id" ref="learning_management.model_lms_gamification_point"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_lms_points_manager" model="ir.rule">
+            <field name="name">Manager All Learning Points</field>
+            <field name="model_id" ref="learning_management.model_lms_gamification_point"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
         </record>
 
         <!-- ========================================================= -->

@@ -50,7 +50,7 @@
                             <field name="end_date"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Partnership Scope &amp; Cooperation" name="scope">
                             <field name="scope_of_partnership" placeholder="Describe the educational, training, accreditation, or research cooperation areas..."/>
                         </page>

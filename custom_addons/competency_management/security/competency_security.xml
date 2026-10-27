@@ -60,6 +60,13 @@
     <!-- Record Rules -->
     <data noupdate="0">
 
+        <!-- Seen Inbox items disappear from Odoo's unread list; history remains private. -->
+        <record id="rule_competency_notification_own" model="ir.rule">
+            <field name="name">My Competency Notifications Only</field>
+            <field name="model_id" ref="competency_management.model_competency_notification"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+        </record>
+
         <!-- Assessment: employee sees only own records where they are the assessor (self-assessment or assigned evaluations) -->
         <record id="rule_competency_assessment_employee_own" model="ir.rule">
             <field name="name">Employee Own Competency Assessments</field>

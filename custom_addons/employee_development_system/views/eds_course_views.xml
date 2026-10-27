@@ -173,12 +173,6 @@
                                      groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
                                 <field name="development_request_count" widget="statinfo" string="Dev Requests"/>
                             </button>
-                            <button name="action_view_materials" type="object"
-                                     class="oe_stat_button" icon="fa-folder-open"
-                                     groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
-                                <field name="material_count" widget="statinfo" string="Materials"/>
-                                <span class="o_stat_text">Approval gate</span>
-                            </button>
                         </div>
                         <group>
                             <group string="Course">
@@ -204,27 +198,13 @@
                             </group>
                         </group>
                         <group string="Sourcing Recommendation">
-                            <field name="recommended_source" readonly="status != 'draft'"/>
-                            <field name="sourcing_justification" readonly="status != 'draft'"/>
-                            <field name="sourcing_state" widget="badge"/>
-                            <field name="sourcing_decision"
-                                   invisible="sourcing_state != 'director_review'"/>
-                            <field name="sourcing_decision_date" readonly="1"
-                                   invisible="not sourcing_decision_date"/>
-                            <field name="sourcing_decided_by_id" readonly="1"
-                                   invisible="not sourcing_decided_by_id"/>
-                            <button name="action_submit_sourcing" string="Submit Sourcing Recommendation"
-                                    type="object" class="oe_highlight"
-                                    invisible="sourcing_state != 'draft' or status == 'retired'"
-                                    groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                            <button name="action_record_sourcing_decision" string="Record Director Decision"
-                                    type="object" invisible="sourcing_state != 'director_review'"
-                                    groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                            <field name="recommended_source"/>
+                            <field name="sourcing_justification"/>
                         </group>
                         <group string="Course Definition / Summary">
                             <field name="description" placeholder="Provide general definition, target competencies and objectives..." readonly="status != 'draft'"/>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Competency Standards" name="competency_mapping">
                                 <field name="competency_line_ids" readonly="status != 'draft'">
                                     <list editable="bottom">
@@ -283,15 +263,24 @@
                                 </group>
                             </page>
                             <page string="Training Materials" name="materials">
-                                <field name="material_ids" readonly="status == 'retired'">
-                                    <list editable="bottom">
-                                        <field name="name" readonly="1"/>
+                                <div class="alert alert-info py-2" role="note">
+                                    Add or edit files in the Materials form, then Save. This list shows saved materials only. Slides, manuals and handouts can be uploaded up to 25 MB; videos use links. Shared materials appear on assigned sessions and accepted participants' invitations.
+                                </div>
+                                <button name="action_view_materials" string="Add / Manage Materials" type="object"
+                                        class="btn-primary mb-2" icon="fa-folder-open"
+                                        groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                <field name="material_ids" readonly="1">
+                                    <list create="false" edit="false" delete="false">
+                                        <field name="name" readonly="1" optional="hide"/>
                                         <field name="title"/>
-                                        <field name="material_type"/>
-                                        <field name="version"/>
-                                        <field name="is_approved" string="Approved"/>
-                                        <field name="quality_state" widget="badge"/>
-                                        <field name="approval_state" widget="badge"/>
+                                        <field name="material_type" readonly="1"/>
+                                        <field name="visibility" readonly="1"/>
+                                        <field name="source_kind" readonly="1"/>
+                                        <field name="filename" string="Attached File" readonly="1"/>
+                                        <field name="resource_url" string="Resource Link" widget="url" readonly="1" optional="hide"/>
+                                        <button name="action_open_source" string="Open" type="object" icon="fa-external-link"
+                                                invisible="(source_kind == 'attachment' and not filename) or (source_kind == 'link' and not resource_url)"/>
+                                        <field name="version" optional="hide"/>
                                     </list>
                                 </field>
                             </page>

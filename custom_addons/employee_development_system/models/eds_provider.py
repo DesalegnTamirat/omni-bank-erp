@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
+
+from .eds_currency_policy import currency_for_delivery, validate_delivery_currency
 
 
 class EdsExternalProvider(models.Model):
     """Approved database of local / international training providers.
 
     Carries accreditation, service offerings, pre-qualification, historical
-    performance rating (computed from post-training evaluations, ),
+    performance rating (computed from post-training evaluations),
     contractual information and eligibility records.
     """
     _name = 'eds.external.provider'
@@ -18,12 +21,12 @@ class EdsExternalProvider(models.Model):
     name = fields.Char(string='Provider Name', required=True, tracking=True)
     code = fields.Char(string='Provider Code', readonly=True, copy=False,
                        default=lambda self: _('New'))
-    partner_id = fields.Many2one('res.partner', string='Partner')
     category = fields.Selection([
         ('local', 'Local Provider'),
         ('international', 'International Provider'),
     ], string='Category', default='local', required=True, tracking=True)
     country_id = fields.Many2one('res.country', string='Country')
+    city = fields.Char(string='City')
     provider_type = fields.Selection([
         ('university', 'University / Academic Institute'),
         ('consultancy', 'Consultancy Firm'),
@@ -34,9 +37,12 @@ class EdsExternalProvider(models.Model):
         ('other', 'Other'),
     ], string='Provider Type', default='consultancy', tracking=True)
     currency_id = fields.Many2one('res.currency', string='Currency',
-                                  default=lambda self: self.env.company.currency_id)
+                                  default=lambda self: currency_for_delivery(self.env, 'local'))
     rate_per_session = fields.Monetary(string='Indicative Rate per Session', currency_field='currency_id')
-    accreditation = fields.Char(string='Accreditation Status')
+    accreditation = fields.Char(
+        string='Accreditation / License Details',
+        help='Optional accreditation, professional license, or registration details. '
+             'This is information only; Pre-Qualified controls sourcing eligibility.')
     service_offerings = fields.Text(string='Service Offerings')
     pre_qualified = fields.Boolean(
         string='Pre-Qualified', tracking=True,
@@ -80,17 +86,40 @@ class EdsExternalProvider(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            category = vals.get('category') or 'local'
+            if category == 'local':
+                vals['country_id'] = False
+            if vals.get('currency_id'):
+                validate_delivery_currency(self.env, category, vals['currency_id'])
+            else:
+                vals['currency_id'] = currency_for_delivery(self.env, category).id
             if vals.get('code', _('New')) == _('New'):
                 vals['code'] = self.env['ir.sequence'].sudo().next_by_code(
                     'eds.external.provider') or _('New')
         return super().create(vals_list)
 
-    def action_toggle_qualified(self):
-        for rec in self:
-            rec.pre_qualified = not rec.pre_qualified
-            rec.message_post(body=_('Provider %s pre-qualification set to %s.')
-                             % (rec.name, rec.pre_qualified))
+    @api.onchange('category')
+    def _onchange_category_currency(self):
+        if self.category == 'local':
+            self.country_id = False
+        if self.category != 'international' or not self.currency_id or self.currency_id.name == 'ETB':
+            self.currency_id = currency_for_delivery(self.env, self.category)
 
+    def write(self, vals):
+        vals = dict(vals)
+        if vals.get('category') == 'local':
+            vals['country_id'] = False
+        elif (vals.get('country_id') and vals.get('category') != 'international'
+              and any(provider.category == 'local' for provider in self)):
+            raise ValidationError(_('Country applies only to international providers.'))
+        if 'category' in vals and 'currency_id' not in vals:
+            vals['currency_id'] = currency_for_delivery(self.env, vals['category']).id
+        if {'category', 'currency_id'} & vals.keys():
+            for provider in self:
+                validate_delivery_currency(
+                    self.env, vals.get('category', provider.category),
+                    vals.get('currency_id', provider.currency_id.id))
+        return super().write(vals)
 
 class EdsProviderPerformanceHistory(models.Model):
     """Post-training evaluation of a provider or venue.
@@ -155,7 +184,7 @@ class EdsProviderPerformanceHistory(models.Model):
     approved_by_tl = fields.Char(string='Approved by (Team Leader, L&D)')
 
     def action_print_appraisal(self):
-        """Prints official Form EDS-F-13 Provider Performance Appraisal PDF."""
+        """Prints official Form Provider Performance Appraisal PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_vendor_appraisal').report_action(self)
     _check_provider_or_venue_required = models.Constraint(

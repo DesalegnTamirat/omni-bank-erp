@@ -91,7 +91,8 @@ class EdsPmsGapImport(models.TransientModel):
         if self.department_id:
             domain.append(('department_id', '=', self.department_id.id))
 
-        appraisals = self.env['t3.appraisal'].sudo().search(domain)
+        appraisals = self.env['t3.appraisal'].sudo().search(
+            domain + self.cycle_id._target_relation_domain())
         if not appraisals:
             self.ingestion_done = True
             self.scanned_count = 0
@@ -153,7 +154,8 @@ class EdsPmsGapImport(models.TransientModel):
                 existing_keys.add(key)
 
                 # Match configured courses for this PMS measurement
-                pms_courses = applicable.mapped('course_id')
+                pms_courses = self.cycle_id._filter_cycle_courses(
+                    applicable.mapped('course_id'))
                 severity = 'critical' if line_score < 50.0 else ('high' if line_score < 65.0 else 'medium')
 
                 recom_text = line.recommendations.strip() if line.recommendations else ""

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Re-run on module upgrades; the method upserts rules by model. -->
+    <function model="lms.course" name="_configure_lms_audit_rules"/>
+</odoo>

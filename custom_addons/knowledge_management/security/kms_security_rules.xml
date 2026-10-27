@@ -9,7 +9,7 @@
         <!-- 1. Employee: Can view approved documents based on classification hierarchy -->
         <!--
             Intended Boolean Structure:
-            classification in ('public', 'internal')
+            classification in ('public', 'internal') AND department/branch scope matches
             OR (classification = 'confidential' AND (department_id = False OR department_id = user.employee_id.department_id.id))
             OR (classification = 'restricted' AND authorized_employee_ids.user_id = user.id)
         -->
@@ -18,7 +18,11 @@
             <field name="model_id" ref="knowledge_management.model_kms_document"/>
             <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
             <field name="domain_force">['&amp;', ('state', '=', 'approved'), '|',
-    ('classification', 'in', ['public', 'internal']),
+    '&amp;',
+        ('classification', 'in', ['public', 'internal']),
+        '&amp;',
+            '|', ('department_id', '=', False), ('department_id', '=', user.employee_id.department_id.id),
+            '|', ('operating_unit_id', '=', False), ('operating_unit_id', '=', user.employee_id.default_operating_unit_id.id),
     '|',
         '&amp;',
             ('classification', '=', 'confidential'),
@@ -45,7 +49,11 @@
             <field name="model_id" ref="knowledge_management.model_kms_document_version"/>
             <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
             <field name="domain_force">['&amp;', ('document_id.state', '=', 'approved'), '|',
-                ('document_id.classification', 'in', ['public', 'internal']),
+                '&amp;', ('document_id.classification', 'in', ['public', 'internal']),
+                    '&amp;', '|', ('document_id.department_id', '=', False),
+                                  ('document_id.department_id', '=', user.employee_id.department_id.id),
+                        '|', ('document_id.operating_unit_id', '=', False),
+                             ('document_id.operating_unit_id', '=', user.employee_id.default_operating_unit_id.id),
                 '|',
                     '&amp;', ('document_id.classification', '=', 'confidential'),
                         '&amp;', '|', ('document_id.department_id', '=', False),
@@ -88,7 +96,12 @@
             <field name="name">Reviewer Manage Department Documents</field>
             <field name="model_id" ref="knowledge_management.model_kms_document"/>
             <field name="groups" eval="[(4, ref('knowledge_management.group_kms_reviewer'))]"/>
-            <field name="domain_force">['&amp;', '|', ('department_id', '=', False), ('department_id', '=', user.employee_id.department_id.id), '|', ('operating_unit_id', '=', False), ('operating_unit_id', '=', user.employee_id.default_operating_unit_id.id)]</field>
+            <field name="domain_force">['&amp;',
+                '&amp;', '|', ('department_id', '=', False), ('department_id', '=', user.employee_id.department_id.id),
+                     '|', ('operating_unit_id', '=', False), ('operating_unit_id', '=', user.employee_id.default_operating_unit_id.id),
+                '|', ('classification', '!=', 'restricted'),
+                     '|', ('authorized_employee_ids.user_id', '=', user.id),
+                          '|', ('reviewer_id.user_id', '=', user.id), ('approver_id.user_id', '=', user.id)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
@@ -131,7 +144,7 @@
             <field name="domain_force">[('user_id', '=', user.id)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="True"/>
+            <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
         </record>
 
@@ -143,8 +156,134 @@
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="True"/>
+            <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Participation grants visibility; only a track participant may edit it. -->
+        <record id="rule_kms_mentoring_participant" model="ir.rule">
+            <field name="name">Mentoring tracks for participants</field>
+            <field name="model_id" ref="knowledge_management.model_kms_mentoring_track"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">['|', ('mentor_id.user_id', '=', user.id), ('mentee_id.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_kms_mentoring_manager" model="ir.rule">
+            <field name="name">KMS managers manage all mentoring tracks</field>
+            <field name="model_id" ref="knowledge_management.model_kms_mentoring_track"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+        <record id="rule_kms_milestone_participant" model="ir.rule">
+            <field name="name">Mentoring milestones for participants</field>
+            <field name="model_id" ref="knowledge_management.model_kms_mentoring_milestone"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">['|', ('mentoring_id.mentor_id.user_id', '=', user.id), ('mentoring_id.mentee_id.user_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_kms_milestone_manager" model="ir.rule">
+            <field name="name">KMS managers manage all mentoring milestones</field>
+            <field name="model_id" ref="knowledge_management.model_kms_mentoring_milestone"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_kms_session_employee_read" model="ir.rule">
+            <field name="name">Employees read knowledge sessions</field>
+            <field name="model_id" ref="knowledge_management.model_kms_knowledge_session"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_kms_session_contributor_write" model="ir.rule">
+            <field name="name">Session participants edit their sessions</field>
+            <field name="model_id" ref="knowledge_management.model_kms_knowledge_session"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_contributor'))]"/>
+            <field name="domain_force">['|', ('expert_id.user_id', '=', user.id), ('facilitator_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="False"/>
+        </record>
+        <record id="rule_kms_session_manager" model="ir.rule">
+            <field name="name">KMS managers manage all knowledge sessions</field>
+            <field name="model_id" ref="knowledge_management.model_kms_knowledge_session"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_kms_lesson_employee_read" model="ir.rule">
+            <field name="name">Employees read validated lessons</field>
+            <field name="model_id" ref="knowledge_management.model_kms_lesson_learned"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">[('state', '=', 'reviewed')]</field>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_kms_lesson_contributor" model="ir.rule">
+            <field name="name">Contributors manage their own lessons</field>
+            <field name="model_id" ref="knowledge_management.model_kms_lesson_learned"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_contributor'))]"/>
+            <field name="domain_force">[('author_id.user_id', '=', user.id)]</field>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_kms_lesson_reviewer" model="ir.rule">
+            <field name="name">Reviewers manage lessons in their department</field>
+            <field name="model_id" ref="knowledge_management.model_kms_lesson_learned"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_reviewer'))]"/>
+            <field name="domain_force">['|', ('department_id', '=', False), ('department_id', '=', user.employee_id.department_id.id)]</field>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_kms_lesson_manager" model="ir.rule">
+            <field name="name">KMS managers manage all lessons</field>
+            <field name="model_id" ref="knowledge_management.model_kms_lesson_learned"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_kms_topic_employee_read" model="ir.rule">
+            <field name="name">Employees read forum topics</field>
+            <field name="model_id" ref="knowledge_management.model_kms_forum_topic"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_kms_topic_author_write" model="ir.rule">
+            <field name="name">Forum authors manage their topics</field>
+            <field name="model_id" ref="knowledge_management.model_kms_forum_topic"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">[('author_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_kms_topic_manager" model="ir.rule">
+            <field name="name">KMS managers manage all forum topics</field>
+            <field name="model_id" ref="knowledge_management.model_kms_forum_topic"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+        <record id="rule_kms_post_employee_read" model="ir.rule">
+            <field name="name">Employees read forum answers</field>
+            <field name="model_id" ref="knowledge_management.model_kms_forum_post"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_kms_post_author_write" model="ir.rule">
+            <field name="name">Forum authors manage their answers</field>
+            <field name="model_id" ref="knowledge_management.model_kms_forum_post"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
+            <field name="domain_force">[('author_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_kms_post_manager" model="ir.rule">
+            <field name="name">KMS managers manage all forum answers</field>
+            <field name="model_id" ref="knowledge_management.model_kms_forum_post"/>
+            <field name="groups" eval="[(4, ref('knowledge_management.group_kms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
         </record>
 
     </data>

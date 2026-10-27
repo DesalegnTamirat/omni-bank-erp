@@ -41,10 +41,12 @@
                         <group string="Budget Classification">
                             <field name="fiscal_year"/>
                             <field name="category"/>
-                            <field name="currency_id" invisible="1"/>
+                            <field name="currency_id" readonly="category in ('internal','local_external','in_house_class','in_house_elearning')" context="{'active_test': False}"/>
+                            <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
+                                    invisible="category != 'international'"/>
                         </group>
                         <group string="Budget Allocation &amp; Variance">
-                            <field name="allocated" string="Approved Budget (ETB)"/>
+                            <field name="allocated" string="Approved Budget"/>
                             <field name="total_estimated" string="Estimated Total (Q1–Q4)"/>
                             <field name="budget_variance" string="Variance (Approved − Estimated)"/>
                             <field name="committed"/>
@@ -64,7 +66,7 @@
                             <field name="unallocated"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Program Budget Lines">
                             <field name="line_ids">
                                 <list editable="bottom">
@@ -144,7 +146,7 @@
                             <field name="performance_rating"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Signed MoU Document">
                             <group>
                                 <field name="mou_document" filename="mou_filename"/>

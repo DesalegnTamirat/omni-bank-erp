@@ -16,7 +16,7 @@
                     <field name="author_id" widget="many2one_avatar_employee"/>
                     <field name="post_count" string="Replies"/>
                     <field name="upvote_count" string="Upvotes"/>
-                    <field name="is_solved" string="Answered" widget="boolean_toggle"/>
+                    <field name="is_solved" string="Answered" readonly="1"/>
                     <field name="state" widget="badge" decoration-success="state == 'solved'" decoration-info="state == 'open'" decoration-muted="state == 'closed'"/>
                 </list>
             </field>
@@ -33,7 +33,7 @@
                     <header>
                         <button name="action_upvote" string="Upvote Question (+1)" type="object" class="btn-outline-primary" icon="fa-thumbs-up"/>
                         <button name="action_close" string="Close Discussion" type="object" class="btn-secondary" invisible="state == 'closed'"/>
-                        <field name="state" widget="statusbar"/>
+                        <field name="state" widget="statusbar" readonly="1"/>
                     </header>
                     <sheet>
                         <widget name="web_ribbon" title="Solved" bg_color="text-bg-success" invisible="not is_solved"/>
@@ -50,7 +50,7 @@
                             <group>
                                 <field name="author_id" widget="many2one_avatar_employee"/>
                                 <field name="upvote_count" readonly="1"/>
-                                <field name="is_pinned"/>
+                                <field name="is_pinned" groups="knowledge_management.group_kms_manager"/>
                             </group>
                         </group>
                         <group string="Question Description &amp; Details">

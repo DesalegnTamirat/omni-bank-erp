@@ -12,7 +12,7 @@
                          name="employee_development_system"
                          groups="employee_development_system.group_eds_officer">
 
-                        <block title="TNA Cycle (/002/009)" name="eds_tna_cycle">
+                        <block title="TNA Cycle" name="eds_tna_cycle">
                             <setting string="TNA Cycle Start Month"
                                      help="Month (1-12) when the annual TNA cycle starts. Default: 4 (April).">
                                 <field name="eds_tna_cycle_start_month"/>
@@ -43,7 +43,7 @@
                             </setting>
                         </block>
 
-                        <block title="Delivery Rules (/040)" name="eds_delivery_rules">
+                        <block title="Delivery Rules" name="eds_delivery_rules">
                             <setting string="Default Session Capacity"
                                      help="Default class size for training sessions (BRD: 25-30).">
                                 <field name="eds_default_class_capacity"/>
@@ -55,6 +55,11 @@
                             <setting string="Level 2 Pass Threshold (%)"
                                      help="Pass mark for pre/post learning assessments (recommended default 60).">
                                 <field name="eds_level2_pass_threshold"/>
+                            </setting>
+                            <setting string="Level 3 Manager Review Delay"
+                                     help="Notify the line manager this long after session completion. Use minutes for a short test; default is 60 days.">
+                                <field name="eds_level3_delay_value"/>
+                                <field name="eds_level3_delay_unit"/>
                             </setting>
                         </block>
 
@@ -77,7 +82,7 @@
                             </setting>
                         </block>
 
-                        <block title="Sponsorship &amp; Partnerships (/069)" name="eds_finance">
+                        <block title="Sponsorship &amp; Partnerships" name="eds_finance">
                             <setting string="Sponsorship Minimum Service (Months)"
                                      help="Minimum continuous service for certification sponsorship eligibility (default 12).">
                                 <field name="eds_sponsorship_min_service_months"/>
@@ -88,17 +93,17 @@
                             </setting>
                         </block>
 
-                        <block title="Procurement &amp; Vendors (/032/034)" name="eds_procurement">
+                        <block title="Procurement &amp; Vendors" name="eds_procurement">
                             <setting string="Minimum Providers per RFP"
-                                     help="Minimum number of qualified providers an RFP must be issued to (, default >= 3).">
+                                     help="Minimum number of qualified providers an RFP must be issued to (default 3).">
                                 <field name="eds_rfp_min_providers"/>
                             </setting>
                             <setting string="Technical Minimum Threshold (%)"
-                                     help="Minimum technical qualification threshold before the financial evaluation is permitted (, default 70).">
+                                     help="Minimum technical qualification threshold before the financial evaluation is permitted (default 70).">
                                 <field name="eds_technical_min_threshold"/>
                             </setting>
                             <setting string="Technical / Financial Weight (%)"
-                                     help="Weight of the technical score in the combined award score; financial is 100 minus this (, default 70/30).">
+                                     help="Weight of the technical score in the combined award score; financial is 100 minus this (default 70/30).">
                                 <field name="eds_technical_financial_blend"/>
                             </setting>
                         </block>
@@ -108,12 +113,59 @@
             </field>
         </record>
 
+        <record id="eds_settings_view_form" model="ir.ui.view">
+            <field name="name">eds.settings.view.form</field>
+            <field name="model">eds.settings</field>
+            <field name="arch" type="xml">
+                <form string="EDS Settings">
+                    <sheet>
+                        <group string="TNA Cycle" col="2">
+                            <field name="eds_tna_cycle_start_month"/>
+                            <field name="eds_tna_submission_days"/>
+                            <field name="eds_tna_approval_deadline_month"/>
+                            <field name="eds_tna_approval_deadline_day"/>
+                            <field name="eds_max_tna_courses_per_employee"/>
+                        </group>
+                        <group string="Nomination Approval Chain" col="2">
+                            <field name="eds_nomination_require_line_manager"/>
+                            <field name="eds_nomination_require_budget"/>
+                        </group>
+                        <group string="Delivery Rules" col="2">
+                            <field name="eds_default_class_capacity"/>
+                            <field name="eds_min_attendance_pct"/>
+                            <field name="eds_level2_pass_threshold"/>
+                        </group>
+                        <group string="Post-Training Assessment Timing" col="2">
+                            <field name="eds_level3_delay_value"/>
+                            <field name="eds_level3_delay_unit"/>
+                        </group>
+                        <group string="Service Level Agreements (Working Days)" col="2">
+                            <field name="eds_course_mapping_sla_days"/>
+                            <field name="eds_curriculum_sla_days"/>
+                            <field name="eds_calendar_sla_days"/>
+                            <field name="eds_level1_report_sla_days"/>
+                        </group>
+                        <group string="Sponsorship and Partnerships" col="2">
+                            <field name="eds_sponsorship_min_service_months"/>
+                            <field name="eds_partnership_min_score"/>
+                        </group>
+                        <group string="Procurement and Vendors" col="2">
+                            <field name="eds_rfp_min_providers"/>
+                            <field name="eds_technical_min_threshold"/>
+                            <field name="eds_technical_financial_blend"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
         <record id="action_eds_configuration" model="ir.actions.act_window">
             <field name="name">EDS Settings</field>
-            <field name="res_model">res.config.settings</field>
+            <field name="res_model">eds.settings</field>
             <field name="view_mode">form</field>
+            <field name="view_id" ref="eds_settings_view_form"/>
             <field name="target">current</field>
-            <field name="context">{'module': 'employee_development_system', 'bin_size': False}</field>
+            <field name="context">{}</field>
         </record>
 
     </data>

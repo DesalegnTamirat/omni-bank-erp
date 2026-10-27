@@ -6,7 +6,7 @@ class TestKmsLdapTotpSecurity(TransactionCase):
     """
     FR-SYS-001, FR-SYS-002: Security governance tests for Active Directory / LDAP and TOTP MFA.
     Verifies:
-    1. Bunna Bank Active Directory / LDAP configuration record is populated.
+    1. LDAP integration remains available for administrator configuration.
     2. Privileged administrative roles have mandatory TOTP MFA enforced.
     3. Regular employees do not have mandatory TOTP MFA enforced.
     4. Compliance check method correctly validates TOTP readiness.
@@ -25,15 +25,10 @@ class TestKmsLdapTotpSecurity(TransactionCase):
 
         cls.user_regular = cls.env.ref('base.user_root')
 
-    def test_01_bunna_ldap_configuration_record_exists(self):
-        """FR-SYS-001: Active Directory LDAP configuration record is present with proper security parameters."""
-        ldap_rec = self.CompanyLdap.search([('ldap_server', '=', 'ldap.bunnabanksc.com')], limit=1)
-        self.assertTrue(ldap_rec, "Bunna Bank AD/LDAP record should exist in res.company.ldap")
-        self.assertEqual(ldap_rec.ldap_server_port, 389)
-        self.assertTrue(ldap_rec.create_user, "LDAP user auto-provisioning must be enabled")
-        self.assertTrue(ldap_rec.ldap_tls, "TLS encryption must be enabled for LDAP")
-        self.assertIn("sAMAccountName", ldap_rec.ldap_filter)
-        self.assertIn("ou=BankStaff", ldap_rec.ldap_base)
+    def test_01_ldap_configuration_is_environment_specific(self):
+        """FR-SYS-001: KMS supports LDAP without requiring a bundled connection."""
+        self.assertIn('ldap_tls', self.CompanyLdap._fields)
+        self.assertIn('ldap_binddn', self.CompanyLdap._fields)
 
     def test_02_privileged_role_enforces_totp_mfa(self):
         """FR-SYS-002: KMS Manager role triggers mandatory TOTP MFA enforcement flag."""

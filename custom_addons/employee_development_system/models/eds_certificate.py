@@ -10,6 +10,8 @@ from PIL import Image, ImageDraw, ImageFont
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 
+from .eds_action_notification import notify_action, push_action_popup
+
 _logger = logging.getLogger(__name__)
 
 
@@ -183,10 +185,25 @@ class EdsCertificate(models.Model):
             for l2 in l2_evals:
                 l2_map[(l2.session_id.id, l2.employee_id.id)] = l2
 
+        accepted_by_session = {
+            session.id: set(session.sudo()._accepted_attendance_enrollments().mapped('employee_id').ids)
+            for session in self.mapped('session_id')
+        }
+        periods_by_session = {
+            session.id: len(session._attendance_slots())
+            for session in self.mapped('session_id')
+        }
+
         for rec in self:
             if not rec.session_id or not rec.employee_id:
                 rec.is_eligible = False
                 rec.eligibility_reason = _("Missing session or participant data.")
+                continue
+
+            if rec.employee_id.id not in accepted_by_session.get(rec.session_id.id, set()):
+                rec.is_eligible = False
+                rec.eligibility_reason = _(
+                    'The employee has not accepted this training session.')
                 continue
 
             category = rec.course_id.category if rec.course_id else 'developmental'
@@ -195,9 +212,12 @@ class EdsCertificate(models.Model):
             req_l2 = rule.require_level2_pass if rule else True
             min_l2 = rule.min_level2_score if rule else 60.0
 
-            total_days, present_days = attendance_map.get(
+            recorded_periods, present_periods = attendance_map.get(
                 (rec.session_id.id, rec.employee_id.id), (0, 0))
-            att_pct = round(present_days * 100.0 / total_days, 2) if total_days else 0.0
+            scheduled_periods = periods_by_session[rec.session_id.id]
+            total_periods = max(recorded_periods, scheduled_periods)
+            att_pct = (round(present_periods * 100.0 / total_periods, 2)
+                       if total_periods else 0.0)
 
             l2_eval = l2_map.get((rec.session_id.id, rec.employee_id.id))
             post_score = l2_eval.post_score if l2_eval else 0.0
@@ -421,13 +441,19 @@ class EdsCertificate(models.Model):
             })
             attachments.append(att_pdf.id)
 
-        self.message_post(
+        self.with_context(eds_popup_managed=True).message_post(
             body=body_html,
             partner_ids=partner_ids,
             attachment_ids=attachments,
             message_type='notification',
             subtype_xmlid='mail.mt_comment',
+            author_id=self.env.user.partner_id.id,
         )
+        if self.employee_id.user_id:
+            push_action_popup(
+                self, self.employee_id.user_id,
+                _('Certificate issued'),
+                _('Your certificate for %s is ready to view or download.') % course_name)
 
     def action_issue(self):
         for rec in self:
@@ -461,6 +487,18 @@ class EdsCertificate(models.Model):
                 raise UserError(_("Only issued certificates can be voided."))
             rec.state = 'void'
             rec.message_post(body=_("Certificate %s voided.") % rec.code)
+            message = _(
+                'Your certificate %s for %s has been voided. Contact L&D if you need clarification.'
+            ) % (rec.code, rec.course_id.name or
+                 (rec.session_id and rec.session_id.program_name) or _('training'))
+            if rec.employee_id.user_id:
+                notify_action(rec, rec.employee_id.user_id,
+                              _('Training certificate voided'), message,
+                              action_required=False)
+            elif rec.employee_id.work_contact_id:
+                rec.message_post(body=message,
+                                 partner_ids=rec.employee_id.work_contact_id.ids,
+                                 author_id=self.env.user.partner_id.id)
 
     def action_download_image(self):
         self.ensure_one()

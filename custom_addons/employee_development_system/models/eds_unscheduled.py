@@ -2,9 +2,12 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
+from .eds_currency_policy import currency_for_delivery, validate_delivery_currency
+from .eds_action_notification import clear_action_activities, notify_action
+
 
 class EdsUnscheduledRequest(models.Model):
-    """Ad-hoc / unscheduled training request (/076, ).
+    """Ad-hoc / unscheduled training request.
 
     Classroom training must originate from the approved TNA; any unscheduled request
     is the documented exception - it requires a mandatory justification and L&D
@@ -29,7 +32,10 @@ class EdsUnscheduledRequest(models.Model):
     course_id = fields.Many2one('eds.course', string='Training Program',
                                 domain=[('status', 'in', ('draft', 'active'))])
     program_name = fields.Char(string='Program Name',
-                               help='Free-text program when it is not in the course catalog.')
+                               readonly=True, help='Catalog course name retained for reports.')
+    plan_line_ids = fields.One2many(
+        'eds.annual.plan.line', 'unscheduled_request_id',
+        string='Approved Addendum Programs', readonly=True)
     proposed_dates_text = fields.Char(string='Proposed Dates Text')
     participant_count = fields.Integer(string='No. of Participants', default=1)
     preferred_provider = fields.Char(string='Preferred Provider')
@@ -63,11 +69,19 @@ class EdsUnscheduledRequest(models.Model):
 
     requested_date_start = fields.Date(string='Requested Start Date')
     requested_date_end = fields.Date(string='Requested End Date')
+    delivery_method = fields.Selection([
+        ('internal', 'Internal Delivery'),
+        ('local_external', 'Local External'),
+        ('international', 'International'),
+    ], string='Delivery Source', default='internal', required=True)
+    currency_id = fields.Many2one(
+        'res.currency', string='Cost Currency', required=True,
+        default=lambda self: currency_for_delivery(self.env, 'internal'))
     estimated_cost = fields.Monetary(string='Estimated Cost',
-                                     currency_field='company_currency_id')
+                                     currency_field='currency_id')
     cost_per_participant = fields.Monetary(
         string='Cost per Participant',
-        currency_field='company_currency_id',
+        currency_field='currency_id',
         compute='_compute_cost_per_participant',
         store=True)
 
@@ -111,9 +125,37 @@ class EdsUnscheduledRequest(models.Model):
     decision_comments = fields.Text(string='Committee / Approver Comments')
 
     def action_print_form(self):
-        """Prints official Form EDS-F-09 Unscheduled Training Request PDF."""
+        """Prints official Form Unscheduled Training Request PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_unscheduled').report_action(self)
+
+    def action_open_provider_sourcing(self):
+        self.ensure_one()
+        if self.state != 'approved':
+            raise UserError(_('Approve the unscheduled request before sourcing a provider.'))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Training Provider Sourcing'),
+            'res_model': 'eds.course.vendor.selection',
+            'view_mode': 'list,form',
+            'domain': [('unscheduled_request_id', '=', self.id)],
+            'context': {'default_source_type': 'unscheduled',
+                        'default_unscheduled_request_id': self.id},
+        }
+
+    def action_open_hotel_sourcing(self):
+        self.ensure_one()
+        if self.state != 'approved':
+            raise UserError(_('Approve the unscheduled request before sourcing a hotel.'))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Hotel / Venue Sourcing'),
+            'res_model': 'eds.hotel.selection',
+            'view_mode': 'list,form',
+            'domain': [('unscheduled_request_id', '=', self.id)],
+            'context': {'default_source_type': 'unscheduled',
+                        'default_unscheduled_request_id': self.id},
+        }
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
@@ -125,6 +167,8 @@ class EdsUnscheduledRequest(models.Model):
     rejected_reason = fields.Text(string='Rejection Reason')
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
+    lnd_reviewer_id = fields.Many2one('res.users', string='L&D Reviewer', readonly=True)
+    director_reviewer_id = fields.Many2one('res.users', string='Director Reviewer', readonly=True)
     company_currency_id = fields.Many2one('res.currency', related='company_id.currency_id',
                                           readonly=True)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
@@ -133,6 +177,13 @@ class EdsUnscheduledRequest(models.Model):
     def _onchange_course_id(self):
         if self.course_id:
             self.program_name = self.course_id.name
+            self.delivery_method = self.course_id.recommended_source or 'internal'
+            self._onchange_delivery_currency()
+
+    @api.onchange('delivery_method')
+    def _onchange_delivery_currency(self):
+        if self.delivery_method != 'international' or not self.currency_id or self.currency_id.name == 'ETB':
+            self.currency_id = currency_for_delivery(self.env, self.delivery_method)
 
     @api.onchange('department_id')
     def _onchange_department_id(self):
@@ -211,13 +262,49 @@ class EdsUnscheduledRequest(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        vals_list = [dict(vals) for vals in vals_list]
         for vals in vals_list:
+            if vals.get('course_id'):
+                vals['program_name'] = self.env['eds.course'].browse(vals['course_id']).name
+            method = vals.get('delivery_method') or 'internal'
+            if vals.get('currency_id'):
+                validate_delivery_currency(self.env, method, vals['currency_id'])
+            else:
+                vals['currency_id'] = currency_for_delivery(self.env, method).id
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code(
                     'eds.unscheduled.request') or _('New')
         return super().create(vals_list)
 
-    # ── Workflow (/076) ──────────────────────────────────────────────
+    def write(self, vals):
+        vals = dict(vals)
+        if 'course_id' in vals:
+            vals['program_name'] = (
+                self.env['eds.course'].browse(vals['course_id']).name
+                if vals['course_id'] else False)
+        else:
+            vals.pop('program_name', None)
+        if 'delivery_method' in vals and 'currency_id' not in vals:
+            vals['currency_id'] = currency_for_delivery(self.env, vals['delivery_method']).id
+        if {'delivery_method', 'currency_id'} & vals.keys():
+            for rec in self:
+                validate_delivery_currency(
+                    self.env, vals.get('delivery_method', rec.delivery_method),
+                    vals.get('currency_id', rec.currency_id.id))
+        return super().write(vals)
+
+    # ── Workflow ──────────────────────────────────────────────
+    def _notify_review_role(self, role, title, message):
+        self.ensure_one()
+        group = self.env.ref('employee_development_system.' + role)
+        recipients = group.sudo().user_ids.filtered(
+            lambda user: user.active and not user.share and self.company_id in user.company_ids
+            and user.id != self.env.user.id)
+        if not recipients:
+            raise UserError(_('No eligible reviewer is assigned to the EDS role for %s.') % title)
+        clear_action_activities(self)
+        notify_action(self, recipients, title, message)
+
     def action_submit(self):
         """Draft -> Submitted: request enters the approval chain."""
         for rec in self:
@@ -228,42 +315,62 @@ class EdsUnscheduledRequest(models.Model):
                                   'requests.'))
             rec.state = 'submitted'
             rec.message_post(body=_('Unscheduled request %s submitted for L&D approval '
-                                    '().') % rec.name)
+                                    'review.') % rec.name)
+            rec._notify_review_role(
+                'group_eds_team_leader', _('Review unplanned training'),
+                _('Unplanned training request %s needs Team Leader review.') % rec.name)
 
     def action_lnd_approve(self):
         """Submitted -> L&D Approved."""
         for rec in self:
-            rec._require_manager()
+            rec._require_approval_role('group_eds_team_leader', _('Team Leader'))
             if rec.state != 'submitted':
                 raise UserError(_('Only submitted requests can be approved by L&D.'))
             rec.state = 'lnd_approved'
+            rec.lnd_reviewer_id = self.env.user
             rec.message_post(body=_('Unscheduled request %s approved by L&D.') % rec.name)
+            rec._notify_review_role(
+                'group_eds_director', _('Review unplanned training'),
+                _('Unplanned training request %s needs Director review.') % rec.name)
 
     def action_director_approve(self):
         """L&D Approved -> Director PPDD Approved."""
         for rec in self:
-            rec._require_manager()
+            rec._require_approval_role('group_eds_director', _('Director PPDD'))
             if rec.state != 'lnd_approved':
                 raise UserError(_('Only L&D-approved requests can move to Director PPDD.'))
             rec.state = 'director_approved'
+            rec.director_reviewer_id = self.env.user
             rec.message_post(body=_('Unscheduled request %s approved by Director PPDD.')
                              % rec.name)
+            rec._notify_review_role(
+                'group_eds_chief', _('Approve unplanned training'),
+                _('Unplanned training request %s needs final approval.') % rec.name)
 
     def action_approve(self):
         """Director PPDD Approved -> Approved: append the addendum line to the annual plan
-        and create its draft session (/076)."""
+        and create its draft session."""
         for rec in self:
-            rec._require_manager()
+            rec._require_approval_role('group_eds_chief', _('Chief'))
             if rec.state != 'director_approved':
                 raise UserError(_('Only Director-approved requests can be finally approved.'))
+            if not rec.course_id:
+                raise UserError(_(
+                    'Add the training program to the course catalog and select it before approving this request.'))
             rec.write({
                 'state': 'approved',
                 'approved_by_id': self.env.user.id,
                 'approval_date': fields.Datetime.now(),
             })
             rec._append_addendum()
+            clear_action_activities(rec)
             rec.message_post(body=_('Unscheduled request %s approved - appended to the annual '
                                     'plan as an addendum.') % rec.name)
+            notify_action(
+                rec, rec.create_uid | rec.director_reviewer_id | rec.lnd_reviewer_id,
+                _('Unplanned training approved'),
+                _('Unplanned training request %s was approved and added to the annual plan.') % rec.name,
+                action_required=False)
 
     def _append_addendum(self):
         """Create an addendum plan line (and its session) on the target annual plan."""
@@ -275,9 +382,11 @@ class EdsUnscheduledRequest(models.Model):
             plan.action_amend()
         line = self.env['eds.annual.plan.line'].create({
             'plan_id': plan.id,
-            'course_id': self.course_id.id if self.course_id else False,
-            'program_name': self.program_name or (self.course_id.name if self.course_id else ''),
-            'delivery_method': 'internal' if self.delivery_mode == 'classroom' else 'local_external',
+            'course_id': self.course_id.id,
+            'program_name': self.course_id.name,
+            'unscheduled_request_id': self.id,
+            'delivery_method': self.delivery_method,
+            'budget_currency_id': self.currency_id.id,
             'budget_allocated': self.estimated_cost or 0.0,
             'is_addendum': True,
         })
@@ -288,13 +397,24 @@ class EdsUnscheduledRequest(models.Model):
         for rec in self:
             if rec.state not in ('submitted', 'lnd_approved', 'director_approved'):
                 raise UserError(_('Only pending requests can be rejected.'))
+            role = {
+                'submitted': ('group_eds_team_leader', _('Team Leader')),
+                'lnd_approved': ('group_eds_director', _('Director PPDD')),
+                'director_approved': ('group_eds_chief', _('Chief')),
+            }[rec.state]
+            rec._require_approval_role(*role)
             if not rec.rejected_reason:
                 raise UserError(_('A rejection reason is required.'))
             rec.state = 'rejected'
+            clear_action_activities(rec)
             rec.message_post(body=_('Unscheduled request %s rejected: %s')
                              % (rec.name, rec.rejected_reason))
+            notify_action(
+                rec, rec.create_uid | rec.director_reviewer_id | rec.lnd_reviewer_id,
+                _('Unplanned training rejected'),
+                _('Unplanned training request %s was rejected: %s') % (rec.name, rec.rejected_reason),
+                action_required=False)
 
-    def _require_manager(self):
-        if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
-                or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('This approval step requires L&D Manager authority.'))
+    def _require_approval_role(self, role_xml_id, role_name):
+        if not (self.env.su or self.env.user.has_group('employee_development_system.' + role_xml_id)):
+            raise UserError(_('This approval step requires the EDS %s role.') % role_name)

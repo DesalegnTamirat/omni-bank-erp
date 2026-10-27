@@ -7,13 +7,8 @@
             <field name="arch" type="xml">
                 <form string="Return Annual L&amp;D Plan">
                     <sheet>
-                        <div class="alert alert-warning mb-3" role="alert">
-                            <h5 class="fw-semibold mb-1"><i class="fa fa-reply me-1" title="Return plan"/> Return Annual L&amp;D Plan for Revision</h5>
-                            <div>You are returning this plan back in the workflow. Please specify the destination stage and explain your remarks / justification clearly. All relevant authors will be notified.</div>
-                        </div>
                         <group>
-                            <field name="plan_id" readonly="1"/>
-                            <field name="target_state" widget="radio"/>
+                            <field name="plan_id" invisible="1"/>
                             <field name="reason" required="1" placeholder="Write the justification or required corrections here..."/>
                         </group>
                     </sheet>

@@ -42,7 +42,7 @@ class TestRecognitionGamificationLeaderboard(TransactionCase):
         ICP = self.env['ir.config_parameter'].sudo()
         ICP.set_param('knowledge_management.points_document_publish', '35')
 
-        pt = self.env['kms.contributor.point'].award_points(
+        pt = self.env['kms.contributor.point']._award_points(
             user=self.user_admin,
             source='document_publish',
             description='Test config points override',
@@ -52,7 +52,7 @@ class TestRecognitionGamificationLeaderboard(TransactionCase):
 
         # Test fallback when param is cleared
         ICP.set_param('knowledge_management.points_document_publish', '')
-        pt2 = self.env['kms.contributor.point'].award_points(
+        pt2 = self.env['kms.contributor.point']._award_points(
             user=self.user_admin,
             source='document_publish',
             description='Test default fallback',
@@ -63,13 +63,13 @@ class TestRecognitionGamificationLeaderboard(TransactionCase):
         """Verify crossing 50, 200, 500, 1000 points triggers milestone check and chatter."""
         self.env['kms.contributor.point'].search([('user_id', '=', self.user_admin.id)]).unlink()
 
-        self.env['kms.contributor.point'].award_points(
+        self.env['kms.contributor.point']._award_points(
             user=self.user_admin,
             points=40,
             source='manual_award',
             description='Initial 40 pts',
         )
-        self.env['kms.contributor.point'].award_points(
+        self.env['kms.contributor.point']._award_points(
             user=self.user_admin,
             points=15,
             source='manual_award',

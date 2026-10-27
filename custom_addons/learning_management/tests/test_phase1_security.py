@@ -146,3 +146,22 @@ class TestLmsPhase1Security(TransactionCase):
         # Attacker attempts to send current_time far beyond video_duration_seconds (e.g. 99999)
         res_spoof = progress.update_progress(current_time=99999, duration=100)
         self.assertLessEqual(progress.last_position_seconds, 100, "Current time must be clamped to authoritative duration")
+
+    def test_04_learner_heartbeat_uses_authorized_workflow(self):
+        enrollment = self.LmsEnrollment.create({
+            'employee_id': self.learner_employee.id,
+            'course_id': self.course.id,
+        })
+        progress = enrollment.lesson_progress_ids.filtered(lambda row: row.lesson_id == self.lesson)
+
+        with self.assertRaises(AccessError):
+            progress.with_user(self.learner_user).write({'max_watched_seconds': 100})
+        with self.assertRaises(AccessError):
+            enrollment.with_user(self.learner_user).write({'state': 'in_progress'})
+
+        result = progress.with_user(self.learner_user).update_progress(current_time=5, duration=1)
+        self.assertFalse(result['is_completed'])
+        self.assertEqual(progress.max_watched_seconds, 5)
+        self.assertEqual(progress.total_seconds_watched, 5)
+        self.assertEqual(progress.state, 'in_progress')
+        self.assertEqual(enrollment.state, 'in_progress')

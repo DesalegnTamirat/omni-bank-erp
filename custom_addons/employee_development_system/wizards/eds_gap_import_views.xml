@@ -11,7 +11,7 @@
                     <field name="ingestion_done" invisible="1"/>
                     <div class="alert alert-info" role="alert" invisible="ingestion_done">
                         <span class="fa fa-info-circle me-1" title="Information" aria-hidden="true"/>
-                        <strong>Direct Competency Gap Ingestion:</strong> Select a finalized (closed) Competency Assessment Cycle. The system will automatically identify all employees with competency gaps and generate corresponding TNA entries with no file upload required.
+                        <strong>Direct Competency Gap Ingestion:</strong> Select a finalized (closed) Competency Assessment Cycle. Gap means required level minus current level. A minimum of 2 pulls employees at least two levels below their required proficiency. Only positive gaps are training needs.
                     </div>
                     <group invisible="ingestion_done">
                         <group>

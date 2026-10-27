@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+
+from .eds_action_notification import clear_action_activities, notify_action
 from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 
 class EdsEvaluationInstrument(models.Model):
     _name = 'eds.evaluation.instrument'
@@ -82,11 +85,11 @@ class EdsEvaluationLevel1(models.Model):
     course_id = fields.Many2one('eds.course', related='session_id.course_id', string='Course', store=True)
     employee_id = fields.Many2one('hr.employee', string='Participant', required=True, index=True, tracking=True)
     instrument_id = fields.Many2one('eds.evaluation.instrument', string='Evaluation Instrument')
-    submitted_date = fields.Date(string='Submission Date', default=fields.Date.context_today)
+    submitted_date = fields.Date(string='Submission Date', readonly=True)
     report_sla_deadline = fields.Date(string='Report SLA Deadline (7 Days)', compute='_compute_sla_deadline', store=True)
     overall_score = fields.Float(string='Overall Score (%)', compute='_compute_overall_score', store=True)
     state = fields.Selection([
-        ('distributed', 'Distributed'),
+        ('distributed', 'Draft'),
         ('submitted', 'Submitted'),
         ('consolidated', 'Consolidated'),
     ], string='Status', default='distributed', required=True, tracking=True)
@@ -94,7 +97,7 @@ class EdsEvaluationLevel1(models.Model):
     general_comments = fields.Text(string='General Comments & Suggestions')
     recommend_to_others = fields.Selection([('yes', 'Yes'), ('no', 'No'), ('maybe', 'Maybe')], string='Would recommend course?')
     
-    # EDS-F-02 Standard Form Fields
+    # Standard Form Fields
     most_valuable_feedback = fields.Text(string='What was most valuable about this program?')
     improvement_suggestions = fields.Text(string='What should be improved? Suggested future training topics?')
     score_content = fields.Float(string='Content Score (%)', compute='_compute_category_scores', store=True)
@@ -102,6 +105,18 @@ class EdsEvaluationLevel1(models.Model):
     score_venue = fields.Float(string='Venue & Food Score (%)', compute='_compute_category_scores', store=True)
     score_objective = fields.Float(string='Objectives & Overall Score (%)', compute='_compute_category_scores', store=True)
     is_anonymous = fields.Boolean(string='Submit Anonymously', default=False, help='If checked, participant name and badge are suppressed on reports.')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        evaluations = super().create(vals_list)
+        self.env['eds.trainer.feedback'].sync_from_level1(evaluations)
+        return evaluations
+
+    def write(self, vals):
+        result = super().write(vals)
+        if {'state', 'submitted_date', 'session_id', 'employee_id', 'is_anonymous'} & vals.keys():
+            self.env['eds.trainer.feedback'].sync_from_level1(self)
+        return result
 
     @api.constrains('session_id', 'employee_id')
     def _check_unique_session_participant(self):
@@ -145,6 +160,29 @@ class EdsEvaluationLevel1(models.Model):
             rec.score_venue = avg_cat(['venue'])
             rec.score_objective = avg_cat(['objective', 'impact'])
 
+    def action_generate_questions(self):
+        """Load the published questionnaire without replacing existing answers."""
+        for rec in self:
+            if rec.state != 'distributed':
+                raise ValidationError(_("Questions can only be generated for draft feedback."))
+            instrument = (rec.instrument_id
+                          or rec.line_ids[:1].question_id.instrument_id
+                          or rec.session_id.course_id.level1_instrument_id
+                          or self.env.ref('employee_development_system.inst_level1_standard',
+                                          raise_if_not_found=False))
+            if not instrument or instrument.state != 'published' or not instrument.question_ids:
+                raise ValidationError(_(
+                    "No published feedback questionnaire is available for this course. "
+                    "Ask L&D to configure one."))
+            existing_question_ids = set(rec.line_ids.mapped('question_id').ids)
+            missing = instrument.question_ids.filtered(
+                lambda question: question.id not in existing_question_ids)
+            if missing:
+                rec.write({
+                    'instrument_id': instrument.id,
+                    'line_ids': [(0, 0, {'question_id': question.id}) for question in missing],
+                })
+
     def action_submit_feedback(self):
         for rec in self:
             if not rec.line_ids:
@@ -159,10 +197,11 @@ class EdsEvaluationLevel1(models.Model):
                     raise ValidationError(_("Answer every text question before submitting."))
             rec.state = 'submitted'
             rec.submitted_date = fields.Date.context_today(self)
+            clear_action_activities(rec)
             rec.message_post(body=_("Level 1 feedback submitted by %s with score %.1f%%.") % (rec.employee_id.name, rec.overall_score))
 
     def action_print_form(self):
-        """Prints official Form EDS-F-02 Reaction Survey PDF."""
+        """Prints official Form Reaction Survey PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_level1').report_action(self)
 
@@ -202,7 +241,7 @@ class EdsEvaluationLevel2(models.Model):
     pre_score = fields.Float(string='Pre Score (%)', related='pre_assessment_id.score', store=True)
     post_score = fields.Float(string='Post Score (%)', related='post_assessment_id.score', store=True)
     
-    # EDS-F-03 Standard Pre/Post Scoring & Signatories
+    # Standard Pre/Post Scoring & Signatories
     total_marks = fields.Float(string='Total Marks (Test)', default=100.0)
     pre_test_score = fields.Float(string='Pre-test Raw Score', default=0.0)
     post_test_score = fields.Float(string='Post-test Raw Score', default=0.0)
@@ -233,36 +272,55 @@ class EdsEvaluationLevel2(models.Model):
                         rec.employee_id.name, rec.session_id.name
                     ))
 
-    @api.depends('pre_test_score', 'post_test_score', 'total_marks', 'pre_score', 'post_score')
+    @api.depends('pre_test_score', 'post_test_score', 'total_marks', 'pre_score',
+                 'post_score', 'pre_assessment_id', 'post_assessment_id')
     def _compute_test_percentages(self):
         for rec in self:
             tm = rec.total_marks or 100.0
-            if rec.pre_test_score > 0:
+            # A linked assessment is the official result whether its answers
+            # were entered by the employee, by L&D, or through the template.
+            # Keep raw marks as a fallback for older Level-2-only records.
+            if rec.pre_assessment_id:
+                rec.pre_test_pct = rec.pre_score
+            elif rec.pre_test_score > 0:
                 rec.pre_test_pct = round((rec.pre_test_score / tm) * 100.0, 2)
             else:
-                rec.pre_test_pct = rec.pre_score or 0.0
+                rec.pre_test_pct = 0.0
 
-            if rec.post_test_score > 0:
+            if rec.post_assessment_id:
+                rec.post_test_pct = rec.post_score
+            elif rec.post_test_score > 0:
                 rec.post_test_pct = round((rec.post_test_score / tm) * 100.0, 2)
             else:
-                rec.post_test_pct = rec.post_score or 0.0
+                rec.post_test_pct = 0.0
 
-    @api.depends('pre_test_pct', 'post_test_pct', 'pre_score', 'post_score')
+    @api.depends('pre_test_pct', 'post_test_pct')
     def _compute_learning_gain(self):
         for rec in self:
-            pre = rec.pre_test_pct if rec.pre_test_pct else (rec.pre_score or 0.0)
-            post = rec.post_test_pct if rec.post_test_pct else (rec.post_score or 0.0)
-            rec.learning_gain = round(post - pre, 2)
+            rec.learning_gain = round(rec.post_test_pct - rec.pre_test_pct, 2)
 
-    @api.depends('post_test_pct', 'post_score', 'passing_score')
+    @api.depends('post_test_pct', 'passing_score')
     def _compute_passed(self):
         for rec in self:
-            post = rec.post_test_pct if rec.post_test_pct else (rec.post_score or 0.0)
-            rec.passed = post >= rec.passing_score
+            rec.passed = rec.post_test_pct >= rec.passing_score
             rec.objective_achieved = rec.passed
 
     def action_evaluate(self):
         for rec in self:
+            if not rec.pre_assessment_id or not rec.post_assessment_id:
+                raise ValidationError(_(
+                    "Record and grade both the pre- and post-assessment questions "
+                    "before completing the Level 2 evaluation."
+                ))
+            pending = (rec.pre_assessment_id | rec.post_assessment_id).filtered(
+                lambda assessment: assessment.entry_method != 'score_only'
+                and assessment.state != 'graded'
+            )
+            if pending:
+                raise ValidationError(_(
+                    "Grade every answer in the pre- and post-assessments "
+                    "before completing the Level 2 evaluation."
+                ))
             rec.state = 'evaluated'
             rec.message_post(body=_("Level 2 evaluation completed: Pre %.1f%%, Post %.1f%%, Gain %.1f%%, Passed: %s.") % (
                 rec.pre_test_pct, rec.post_test_pct, rec.learning_gain, rec.passed
@@ -272,7 +330,7 @@ class EdsEvaluationLevel2(models.Model):
                 rec._flag_tna_gap_candidate()
 
     def action_print_form(self):
-        """Prints official Form EDS-F-03 Assessment Sheet PDF."""
+        """Prints official Form Assessment Sheet PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_level2').report_action(self)
 
@@ -300,6 +358,11 @@ class EdsEvaluationLevel3(models.Model):
     employee_id = fields.Many2one('hr.employee', string='Participant', required=True, index=True, tracking=True)
     manager_id = fields.Many2one('hr.employee', string='Line Manager / Assessor', required=True, tracking=True)
     due_date = fields.Date(string='Assessment Due Date', required=True, tracking=True)
+    notification_at = fields.Datetime(
+        string='Manager Notification At', index=True, readonly=True, copy=False,
+        help='The manager is notified when this time is reached. Set when the session is completed.')
+    notification_sent_at = fields.Datetime(
+        string='Manager Notified At', readonly=True, copy=False)
     completed_date = fields.Date(string='Completion Date')
     behavior_score = fields.Float(string='Behavioral Application Score (%)', compute='_compute_behavior_score', store=True)
     status = fields.Selection([
@@ -311,11 +374,12 @@ class EdsEvaluationLevel3(models.Model):
     line_ids = fields.One2many('eds.evaluation.level3.line', 'evaluation_id', string='Competency Observations')
     observation_notes = fields.Text(string='Manager Behavioral Observation & Evidence')
 
-    # EDS-F-04 Standard Form Fields
+    # Standard Form Fields
     evaluation_period = fields.Selection([
         ('30_days', '30 Days'),
         ('60_days', '60 Days'),
         ('90_days', '90 Days'),
+        ('custom', 'Configured Interval'),
     ], string='Evaluation Period', default='60_days', required=True, tracking=True)
     overall_result = fields.Selection([
         ('significant_improvement', 'Significant Improvement'),
@@ -332,6 +396,41 @@ class EdsEvaluationLevel3(models.Model):
     sign_trainee_name = fields.Char(string='Trainee Acknowledgement')
     sign_officer_name = fields.Char(string='L&D Officer (Received)')
 
+    @api.model
+    def _configured_notification_time(self, completed_at=None):
+        """Return the review reminder time from the EDS delay settings."""
+        params = self.env['ir.config_parameter'].sudo()
+        try:
+            value = int(params.get_param('eds.level3_delay_value', '60'))
+        except (TypeError, ValueError):
+            value = 60
+        unit = params.get_param('eds.level3_delay_unit', 'days')
+        if value < 1 or unit not in ('minutes', 'hours', 'days', 'weeks', 'months'):
+            value, unit = 60, 'days'
+        completed_at = fields.Datetime.to_datetime(completed_at or fields.Datetime.now())
+        delay = relativedelta(months=value) if unit == 'months' else timedelta(**{unit: value})
+        return completed_at + delay, ('60_days' if (value, unit) == (60, 'days') else 'custom')
+
+    @api.model
+    def _cron_notify_due_level3(self, batch_size=200):
+        """Send each due manager review once; leave older, already-alerted rows alone."""
+        due = self.sudo().search([
+            ('notification_at', '!=', False),
+            ('notification_at', '<=', fields.Datetime.now()),
+            ('notification_sent_at', '=', False),
+            ('status', 'in', ('pending', 'in_progress')),
+            ('manager_id.user_id', '!=', False),
+            ('manager_id.user_id.active', '=', True),
+        ], order='notification_at, id', limit=batch_size)
+        for review in due:
+            user = review.manager_id.user_id
+            if not user or not user.active:
+                continue
+            message = _('Please review %s’s on-the-job application of %s.') % (
+                review.employee_id.name, review.session_id.name)
+            if notify_action(review, user, _('Review training impact'), message):
+                review.notification_sent_at = fields.Datetime.now()
+
     @api.depends('line_ids.score_pct')
     def _compute_behavior_score(self):
         for rec in self:
@@ -346,10 +445,11 @@ class EdsEvaluationLevel3(models.Model):
                 raise ValidationError(_("Please score at least one target competency observation line."))
             rec.status = 'completed'
             rec.completed_date = fields.Date.context_today(self)
+            clear_action_activities(rec)
             rec.message_post(body=_("Level 3 behavioral evaluation completed by manager %s with score %.1f%%.") % (rec.manager_id.name, rec.behavior_score))
 
     def action_print_form(self):
-        """Prints official Form EDS-F-04 Behavioral Evaluation PDF."""
+        """Prints official Form Behavioral Evaluation PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_level3').report_action(self)
 
@@ -427,7 +527,7 @@ class EdsEvaluationLevel4(models.Model):
     sign_executive = fields.Char(string='Executive Management Sign-Off')
 
     def action_print_form(self):
-        """Prints official Form EDS-F-11 Level 4 Impact & ROI Assessment PDF."""
+        """Prints official Form Level 4 Impact & ROI Assessment PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_level4').report_action(self)
 

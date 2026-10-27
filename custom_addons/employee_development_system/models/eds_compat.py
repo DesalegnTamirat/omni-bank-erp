@@ -259,22 +259,111 @@ class EdsHrCompat(models.AbstractModel):
 
     @api.model
     def get_managed_operating_units(self, user=None):
-        """Units led by the employee, including descendants led through a parent unit."""
+        """Units led through HR managers or the employee reporting hierarchy."""
+        return self.get_managed_training_scope(user=user)[0]
+
+    @api.model
+    def get_managed_training_scope(self, user=None):
+        """Return the work units and departments an employee can represent.
+
+        Imported HR records often lack unit manager or department links. The
+        formal employee.parent_id hierarchy supplies those assignments;
+        coaching relationships do not grant management authority.
+        """
         user = user or self.env.user
-        employee = user.employee_id or self.env['hr.employee'].sudo().search(
-            [('user_id', '=', user.id)], limit=1)
+        Employee = self.env['hr.employee'].sudo()
         Unit = self.env['operating.unit'].sudo()
+        Department = self.env['hr.department'].sudo()
+        employee = Employee.search([('user_id', '=', user.id)], limit=1)
         if not employee:
-            return Unit.browse()
-        direct = Unit.search([('manager_id', '=', employee.id)])
-        department_ids = self.env['hr.department'].sudo().search(
-            [('manager_id', '=', employee.id)]).ids
-        if department_ids:
-            direct |= Unit.search([('department', 'in', department_ids)])
-        managed = direct
-        frontier = direct
+            return Unit.browse(), Department.browse()
+
+        reports = Employee.search([
+            ('id', 'child_of', employee.id), ('id', '!=', employee.id),
+            ('active', '=', True),
+        ])
+        direct_departments = Department.search([('manager_id', '=', employee.id)])
+        managed_departments = (Department.search([('id', 'child_of', direct_departments.ids)])
+                               if direct_departments else Department.browse())
+        managed = Unit.search([('manager_id', '=', employee.id)])
+        if managed_departments:
+            managed |= Unit.search([('department', 'in', managed_departments.ids)])
+            managed |= managed_departments.mapped('operating_unit_id')
+            department_staff = Employee.search([
+                ('department_id', 'in', managed_departments.ids),
+                ('active', '=', True),
+            ])
+            managed |= department_staff.mapped('default_operating_unit_id')
+            if 'operating_unit_id' in Employee._fields:
+                managed |= department_staff.mapped('operating_unit_id')
+        report_units = reports.mapped('default_operating_unit_id')
+        if 'operating_unit_id' in Employee._fields:
+            report_units |= reports.mapped('operating_unit_id')
+        # A supervisor below another employee in the same unit is not the
+        # unit's leader. Explicit unit/department managers remain authorized.
+        ancestor = employee.parent_id
+        visited_ancestors = set()
+        while ancestor and report_units and ancestor.id not in visited_ancestors:
+            visited_ancestors.add(ancestor.id)
+            ancestor_unit = self.get_employee_operating_unit(ancestor)
+            if ancestor_unit:
+                report_units -= ancestor_unit
+            if 'operating_unit_id' in Employee._fields:
+                report_units -= ancestor.operating_unit_id
+            ancestor = ancestor.parent_id
+        managed |= report_units
+        frontier = managed
         while frontier:
             children = Unit.search([('parent_unit', 'in', frontier.ids)]) - managed
             managed |= children
             frontier = children
-        return managed
+
+        managed_departments |= reports.mapped('department_id')
+        managed_departments |= managed.mapped('department')
+        if managed:
+            managed_departments |= Department.search([
+                ('operating_unit_id', 'in', managed.ids)])
+            own_unit = self.get_employee_operating_unit(employee)
+            if employee.department_id and own_unit in managed:
+                managed_departments |= employee.department_id
+        return managed, managed_departments
+
+    @api.model
+    def get_managed_departments(self, user=None):
+        return self.get_managed_training_scope(user=user)[1]
+
+    @api.model
+    def get_managed_employee_read_domain(self):
+        """Permit a leader to choose employees in managed units in the UI."""
+        units = self.get_managed_operating_units()
+        unit_domain = self.get_employee_domain(operating_unit=units)
+        own_employee = [('user_id', '=', self.env.user.id)]
+        return ['|'] + own_employee + unit_domain if unit_domain else own_employee
+
+    @api.model
+    def get_available_work_units_for_department(self, units, department,
+                                                allowed_departments=None):
+        """Map a permitted department to permitted units using HR assignments."""
+        if not department or not units:
+            return units
+        # Many2many values on an unsaved Odoo form are NewId records. Search
+        # domains need their persisted originals.
+        units = units._origin or units
+        department = department._origin or department
+        if allowed_departments:
+            allowed_departments = allowed_departments._origin or allowed_departments
+        Unit = self.env['operating.unit'].sudo()
+        unit_domain = self.get_operating_unit_domain(departments=department)
+        matched = (Unit.search([('id', 'in', units.ids)] + unit_domain)
+                   if unit_domain else Unit.browse())
+        Employee = self.env['hr.employee'].sudo()
+        employees = Employee.search(self.get_employee_domain(
+            department=department, operating_unit=units))
+        matched |= employees.mapped('default_operating_unit_id') & units
+        if 'operating_unit_id' in Employee._fields:
+            matched |= employees.mapped('operating_unit_id') & units
+        if not matched and allowed_departments and len(allowed_departments) == 1:
+            # A legacy unit without a department link still belongs to the
+            # leader's one permitted department.
+            matched = units
+        return matched

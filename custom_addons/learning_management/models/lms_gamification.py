@@ -36,7 +36,7 @@ class LmsGamificationPoint(models.Model):
             rec.employee_id = rec.user_id.employee_id.id if rec.user_id and rec.user_id.employee_id else False
 
     @api.model
-    def award_points(self, user, points=None, source='course_complete', description=None):
+    def _award_points(self, user, points=None, source='course_complete', description=None):
         """Helper to create point ledger entries safely with configurable points and milestone checks."""
         if not user:
             return False
@@ -60,10 +60,15 @@ class LmsGamificationPoint(models.Model):
         employee = user.employee_id
         pts_before = 0
         if employee:
-            pts_before = sum(self.search([('employee_id', '=', employee.id)]).mapped('points'))
+            self.flush_model(['employee_id', 'points'])
+            self.env.cr.execute(
+                'SELECT COALESCE(SUM(points), 0) FROM lms_gamification_point WHERE employee_id = %s',
+                (employee.id,),
+            )
+            pts_before = self.env.cr.fetchone()[0]
 
         try:
-            self.env['recognition.point'].sudo().award_points(
+            self.env['recognition.point'].sudo()._award_points(
                 user=user,
                 points=points,
                 source_module='lms',
@@ -158,24 +163,29 @@ class LmsMonthlyScorer(models.Model):
         first_day = (today - relativedelta(months=1)).replace(day=1)
         last_day = today.replace(day=1) - relativedelta(days=1)
 
-        enrollments = self.env['lms.enrollment'].search([
-            ('completion_date', '>=', first_day),
-            ('completion_date', '<=', last_day),
-            ('state', '=', 'completed')
-        ])
+        # A monthly job may be retried; keep one award and aggregate in SQL so
+        # the worker does not materialize every completion in Python.
+        self.env.cr.execute('SELECT pg_advisory_xact_lock(%s, %s)', (-2026, int(first_day.strftime('%Y%m'))))
+        existing = self.search([('period_date', '=', first_day)], limit=1)
+        self.env['lms.enrollment'].flush_model(
+            ['employee_id', 'completion_date', 'state', 'final_score_percentage']
+        )
+        self.env.cr.execute("""
+            SELECT employee_id,
+                   AVG(CASE WHEN final_score_percentage > 0
+                            THEN final_score_percentage ELSE 100.0 END) AS average_score,
+                   COUNT(*) AS courses_completed
+              FROM lms_enrollment
+             WHERE completion_date BETWEEN %s AND %s
+               AND state = 'completed'
+             GROUP BY employee_id
+             ORDER BY average_score DESC, courses_completed DESC, employee_id ASC
+             LIMIT 1
+        """, (first_day, last_day))
+        winner = self.env.cr.fetchone()
 
-        emp_scores = {}
-        for en in enrollments:
-            emp_id = en.employee_id.id
-            if emp_id not in emp_scores:
-                emp_scores[emp_id] = {'scores': [], 'count': 0}
-            emp_scores[emp_id]['scores'].append(en.final_score_percentage or 100.0)
-            emp_scores[emp_id]['count'] += 1
-
-        if emp_scores:
-            best_emp_id = max(emp_scores.keys(), key=lambda e: (sum(emp_scores[e]['scores']) / len(emp_scores[e]['scores']), emp_scores[e]['count']))
-            avg = sum(emp_scores[best_emp_id]['scores']) / len(emp_scores[best_emp_id]['scores'])
-            count = emp_scores[best_emp_id]['count']
+        if winner and not existing:
+            best_emp_id, avg, count = winner
             emp = self.env['hr.employee'].browse(best_emp_id)
 
             rec = self.create({

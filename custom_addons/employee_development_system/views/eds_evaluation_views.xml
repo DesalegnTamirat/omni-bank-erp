@@ -41,7 +41,7 @@
                             <field name="active"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Questions">
                             <field name="question_ids">
                                 <list editable="bottom">
@@ -74,7 +74,7 @@
         <field name="name">eds.evaluation.level1.tree</field>
         <field name="model">eds.evaluation.level1</field>
         <field name="arch" type="xml">
-            <list string="Level 1 Feedback">
+            <list string="Level 1 Feedback" create="false">
                 <field name="session_id"/>
                 <field name="course_id"/>
                 <field name="employee_id"/>
@@ -90,20 +90,20 @@
         <field name="name">eds.evaluation.level1.form</field>
         <field name="model">eds.evaluation.level1</field>
         <field name="arch" type="xml">
-            <form string="Level 1 Participant Feedback">
+            <form string="Level 1 Participant Feedback" create="false">
                 <header>
                     <button name="action_submit_feedback" string="Submit Feedback" type="object" class="oe_highlight" invisible="state != 'distributed'"
                             groups="employee_development_system.group_eds_employee"/>
-                    <button name="action_print_form" string="Print Reaction Survey (EDS-F-02)" type="object" icon="fa-print"
+                    <button name="action_print_form" string="Print Reaction Survey" type="object" icon="fa-print"
                             groups="employee_development_system.group_eds_employee,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="distributed,submitted,consolidated"/>
                 </header>
                 <sheet>
                     <group>
                         <group>
-                            <field name="session_id"/>
+                            <field name="session_id" readonly="1"/>
                             <field name="course_id"/>
-                            <field name="employee_id"/>
+                            <field name="employee_id" readonly="1"/>
                         </group>
                         <group>
                             <field name="submitted_date"/>
@@ -113,11 +113,14 @@
                             <field name="recommend_to_others"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Responses">
-                            <field name="line_ids">
-                                <list editable="bottom">
-                                    <field name="question_id"/>
+                            <button name="action_generate_questions" string="Generate Questions"
+                                    type="object" class="btn-secondary"
+                                    invisible="state != 'distributed'"/>
+                            <field name="line_ids" readonly="state != 'distributed'">
+                                <list editable="bottom" create="false" delete="false">
+                                    <field name="question_id" readonly="1"/>
                                     <field name="rating_val"/>
                                     <field name="yes_no_val"/>
                                     <field name="score_pct" widget="progressbar"/>
@@ -125,8 +128,8 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Sub-Scores &amp; Qualitative Feedback (EDS-F-02)">
-                            <group string="Category Scores (EDS-F-02)">
+                        <page string="Sub-Scores &amp; Qualitative Feedback">
+                            <group string="Category Scores">
                                 <group>
                                     <field name="score_content" widget="progressbar"/>
                                     <field name="score_trainer" widget="progressbar"/>
@@ -155,12 +158,14 @@
         <field name="name">Level 1 Participant Feedback</field>
         <field name="res_model">eds.evaluation.level1</field>
         <field name="view_mode">list,form</field>
+        <field name="context">{'create': False}</field>
     </record>
     <record id="action_eds_evaluation_level1_own" model="ir.actions.act_window">
         <field name="name">My Training Feedback</field>
         <field name="res_model">eds.evaluation.level1</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="context">{'create': False}</field>
     </record>
 
     <!-- Level 2 Evaluation Views -->
@@ -189,7 +194,7 @@
                 <header>
                     <button name="action_evaluate" string="Complete Evaluation" type="object" class="oe_highlight" invisible="state != 'draft'"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_print_form" string="Print Assessment Sheet (EDS-F-03)" type="object" icon="fa-print"
+                    <button name="action_print_form" string="Print Assessment Sheet" type="object" icon="fa-print"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
                 </header>
@@ -201,24 +206,29 @@
                             <field name="employee_id"/>
                         </group>
                         <group string="Assessment Results">
-                            <field name="pre_score"/>
-                            <field name="post_score"/>
-                            <field name="learning_gain"/>
+                            <field name="pre_assessment_id" readonly="1"/>
+                            <field name="post_assessment_id" readonly="1"/>
+                            <field name="pre_score" readonly="1"/>
+                            <field name="post_score" readonly="1"/>
+                            <field name="learning_gain" readonly="1"/>
                             <field name="passing_score"/>
-                            <field name="passed"/>
+                            <field name="passed" readonly="1"/>
                         </group>
                     </group>
-                    <notebook>
-                        <page string="EDS-F-03 Standard Scoring &amp; Signatories">
-                            <group string="Raw Test Marks &amp; Gain (EDS-F-03)">
+                    <notebook class="o_eds_notebook">
+                        <page string="Standard Scoring &amp; Signatories">
+                            <group string="Raw Test Marks &amp; Gain">
+                                <div class="alert alert-info" role="alert" colspan="2">
+                                    Linked pre/post assessments are the official scores. Enter question answers and grade them on each assessment. Raw marks below remain for older records without linked assessments.
+                                </div>
                                 <group>
                                     <field name="total_marks"/>
-                                    <field name="pre_test_score"/>
-                                    <field name="post_test_score"/>
+                                    <field name="pre_test_score" readonly="pre_assessment_id"/>
+                                    <field name="post_test_score" readonly="post_assessment_id"/>
                                 </group>
                                 <group>
-                                    <field name="pre_test_pct"/>
-                                    <field name="post_test_pct"/>
+                                    <field name="pre_test_pct" readonly="1"/>
+                                    <field name="post_test_pct" readonly="1"/>
                                     <field name="remarks"/>
                                 </group>
                             </group>
@@ -254,6 +264,7 @@
                 <field name="session_id"/>
                 <field name="employee_id"/>
                 <field name="manager_id"/>
+                <field name="notification_at"/>
                 <field name="due_date"/>
                 <field name="behavior_score" widget="progressbar"/>
                 <field name="status" widget="badge" decoration-warning="status == 'pending'" decoration-danger="status == 'overdue'" decoration-success="status == 'completed'"/>
@@ -269,7 +280,7 @@
                 <header>
                     <button name="action_submit_level3" string="Submit Manager Assessment" type="object" class="oe_highlight" invisible="status == 'completed'"
                             groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_print_form" string="Print Impact Form (EDS-F-04)" type="object" icon="fa-print"
+                    <button name="action_print_form" string="Print Impact Form" type="object" icon="fa-print"
                             groups="employee_development_system.group_eds_line_manager,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="status" widget="statusbar" statusbar_visible="pending,in_progress,completed,overdue"/>
                 </header>
@@ -283,11 +294,13 @@
                         </group>
                         <group>
                             <field name="due_date"/>
+                            <field name="notification_at"/>
+                            <field name="notification_sent_at"/>
                             <field name="completed_date"/>
                             <field name="behavior_score" widget="progressbar"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Competency Observations">
                             <field name="line_ids">
                                 <list editable="bottom">
@@ -303,7 +316,7 @@
                         <page string="Observation Evidence">
                             <field name="observation_notes" placeholder="Enter detailed workplace behavior evidence..."/>
                         </page>
-                        <page string="Behavioral Impact &amp; Sign-Off (EDS-F-04)">
+                        <page string="Behavioral Impact &amp; Sign-Off">
                             <group string="Impact Evaluation">
                                 <group>
                                     <field name="evaluation_period"/>
@@ -368,7 +381,7 @@
                 <header>
                     <button name="action_evaluate" string="Publish Impact Assessment" type="object" class="oe_highlight" invisible="state != 'draft'"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    <button name="action_print_form" string="Print Level 4 Report (EDS-F-11)" type="object" icon="fa-print"
+                    <button name="action_print_form" string="Print Level 4 Report" type="object" icon="fa-print"
                             groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
                 </header>
@@ -390,7 +403,7 @@
                             <field name="evaluator_id"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Evaluated Business KPIs">
                             <field name="kpi_ids">
                                 <list editable="bottom">

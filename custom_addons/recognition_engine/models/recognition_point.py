@@ -45,7 +45,7 @@ class RecognitionPoint(models.Model):
             rec.employee_id = rec.user_id.employee_id.id if rec.user_id and rec.user_id.employee_id else False
 
     @api.model
-    def award_points(self, user, points, source_module, source_action,
+    def _award_points(self, user, points, source_module, source_action,
                      source_model=None, source_res_id=None, description=None):
         """Helper to create unified point ledger entries safely."""
         if not user or not points:

@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Evaluation Criteria Templates (/033) ══════════════ -->
+        <!-- ══════════════ Evaluation Criteria Templates ══════════════ -->
 
         <record id="view_eds_evaluation_criteria_list" model="ir.ui.view">
             <field name="name">eds.evaluation.criteria.list</field>
@@ -72,11 +72,11 @@
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_director_approve" string="Director PPDD Approve"
                                 type="object" class="oe_highlight" invisible="state != 'submitted'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_director"/>
                         <button name="action_return_draft" string="Return to Draft" type="object"
                                 invisible="state != 'submitted'"
-                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_print_vrs" string="Print VRS Form (EDS-F-05)" type="object" icon="fa-print"
+                                groups="employee_development_system.group_eds_director"/>
+                        <button name="action_print_vrs" string="Print VRS Form" type="object" icon="fa-print"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,submitted,director_approved,rfp_initiated"/>
@@ -95,11 +95,14 @@
                                 <field name="date_end"/>
                                 <field name="location_preference"/>
                                 <field name="estimated_budget"/>
-                                <field name="currency_id" invisible="1"/>
+                                <field name="delivery_method" invisible="1"/>
+                                <field name="currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                                <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
+                                        invisible="delivery_method != 'international'"/>
                             </group>
                         </group>
-                        <notebook>
-                            <page string="Seating &amp; Technical AV (EDS-F-05)">
+                        <notebook class="o_eds_notebook">
+                            <page string="Seating &amp; Technical AV">
                                 <group string="Room &amp; Seating Layout">
                                     <group>
                                         <field name="seating_layout"/>
@@ -157,7 +160,7 @@
                                 </group>
                             </page>
                             <page string="Vetting &amp; Sign-Off">
-                                <group string="Sign-Off (EDS-F-05)">
+                                <group string="Sign-Off">
                                     <group>
                                         <field name="prepared_by"/>
                                         <field name="reviewed_by"/>
@@ -186,7 +189,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Vendor Proposal (Two-Envelope, ) ══════════════ -->
+        <!-- ══════════════ Vendor Proposal (Two-Envelope) ══════════════ -->
 
         <record id="view_eds_vendor_proposal_list" model="ir.ui.view">
             <field name="name">eds.vendor.proposal.list</field>
@@ -240,7 +243,7 @@
                                 <field name="financial_envelope_name" invisible="1"/>
                             </group>
                         </group>
-                        <group string="Evaluation Results (/034)">
+                        <group string="Evaluation Results">
                             <field name="technical_score_id"/>
                             <field name="financial_score_id"/>
                             <field name="technical_score"/>
@@ -260,7 +263,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Vendor Evaluation (/033/034) ══════════════ -->
+        <!-- ══════════════ Vendor Evaluation ══════════════ -->
 
         <record id="view_eds_vendor_evaluation_list" model="ir.ui.view">
             <field name="name">eds.vendor.evaluation.list</field>
@@ -337,7 +340,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ RFP (/031) ══════════════ -->
+        <!-- ══════════════ RFP ══════════════ -->
 
         <record id="view_eds_rfp_list" model="ir.ui.view">
             <field name="name">eds.rfp.list</field>
@@ -419,7 +422,7 @@
                                 <field name="issuance_date" readonly="1"/>
                             </group>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Scope &amp; Specifications" name="scope">
                                 <group>
                                     <field name="objectives"/>
@@ -526,7 +529,10 @@
                             <group string="Award &amp; Value">
                                 <field name="combined_score" readonly="1"/>
                                 <field name="contract_amount"/>
-                                <field name="currency_id" groups="base.group_multi_currency"/>
+                                <field name="provider_category" invisible="1"/>
+                                <field name="currency_id" readonly="provider_category != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                                <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
+                                        invisible="provider_category != 'international'"/>
                                 <field name="start_date"/>
                                 <field name="end_date"/>
                             </group>
@@ -542,7 +548,7 @@
                             <field name="signed_by"/>
                             <field name="signature_date" readonly="1"/>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Version History" name="versions">
                                 <field name="version_ids">
                                     <list editable="bottom">
@@ -568,7 +574,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- EDS-F-13 Provider Performance Appraisal Views -->
+        <!-- Provider Performance Appraisal Views -->
         <record id="view_eds_provider_performance_history_tree" model="ir.ui.view">
             <field name="name">eds.provider.performance.history.tree</field>
             <field name="model">eds.provider.performance.history</field>
@@ -589,9 +595,9 @@
             <field name="name">eds.provider.performance.history.form</field>
             <field name="model">eds.provider.performance.history</field>
             <field name="arch" type="xml">
-                <form string="Provider Performance Appraisal (EDS-F-13)">
+                <form string="Provider Performance Appraisal">
                     <header>
-                        <button name="action_print_appraisal" string="Print Appraisal Form (EDS-F-13)" type="object" icon="fa-print"
+                        <button name="action_print_appraisal" string="Print Appraisal Form" type="object" icon="fa-print"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                     </header>
                     <sheet>
@@ -611,7 +617,7 @@
                                 <field name="evaluated_by_id"/>
                             </group>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Performance Ratings (1 - 5)" name="ratings">
                                 <group>
                                     <group>
@@ -646,7 +652,7 @@
         </record>
 
         <record id="action_eds_provider_performance_appraisal" model="ir.actions.act_window">
-            <field name="name">Provider Appraisals (EDS-F-13)</field>
+            <field name="name">Provider Appraisals</field>
             <field name="res_model">eds.provider.performance.history</field>
             <field name="view_mode">list,form</field>
         </record>
@@ -659,11 +665,12 @@
             <field name="arch" type="xml">
                 <list string="Course Vendor Selections">
                     <field name="name"/>
+                    <field name="source_type" widget="badge"/>
                     <field name="annual_plan_id"/>
-                    <field name="program_name"/>
+                    <field name="unscheduled_request_id" optional="show"/>
                     <field name="delivery_method" widget="badge"/>
                     <field name="currency_id"/>
-                    <field name="course_id" optional="hide"/>
+                    <field name="course_id" optional="show"/>
                     <field name="template_type" widget="badge"/>
                     <field name="vendor_count" string="Bidding Vendors"/>
                     <field name="awarded_vendor_id"/>
@@ -679,62 +686,117 @@
                 <form string="Course Vendor Selection &amp; Evaluation">
                     <header>
                         <button name="action_start_evaluation" string="Start Evaluation" type="object"
-                                class="oe_highlight" invisible="state != 'draft'"/>
+                                class="oe_highlight" invisible="state != 'draft' or delivery_method == 'internal'"/>
+                        <button name="action_mark_awarded" string="Confirm Internal Delivery" type="object"
+                                class="btn-success" invisible="state == 'awarded' or delivery_method != 'internal'"/>
                         <button name="action_mark_awarded" string="Complete Sourcing" type="object"
-                                class="btn-success" invisible="state != 'evaluation'"/>
+                                class="btn-success" invisible="state != 'evaluation' or delivery_method == 'internal'"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,evaluation,awarded"/>
                     </header>
                     <sheet>
                         <div class="alert alert-info mb-3" role="alert">
-                            <h5 class="fw-semibold mb-1"><i class="fa fa-balance-scale me-1" title="Vendor sourcing"/> Post-Plan Course Vendor Sourcing</h5>
-                            <div>Select an approved plan program. Its catalog course fills automatically when applicable. Score each vendor from 0 to 10 against the five HR matrix criteria. The technical criteria carry 70 points and require at least 40 points before the financial score counts. Upload the award letter before award and the signed contract before marking the contract signed. The winning provider fills linked sessions.</div>
+                            <h5 class="fw-semibold mb-1"><i class="fa fa-balance-scale me-1" title="Vendor sourcing"/> Training Provider Sourcing</h5>
+                            <div>Select an approved annual plan program or approved unscheduled request, then add and score the vendor bids. Award one provider that passes the technical gate. The winning provider fills linked sessions.</div>
                         </div>
                         <group>
                             <group string="Program &amp; Plan Context">
                                 <field name="name" readonly="1" invisible="name == 'New'"/>
-                                <field name="annual_plan_id" options="{'no_create': True}"/>
-                                <field name="plan_line_id" options="{'no_create': True}" domain="[('plan_id', '=', annual_plan_id)]"/>
-                                <field name="program_name" readonly="1"/>
+                                <field name="source_type" readonly="state != 'draft'"/>
+                                <field name="annual_plan_id" options="{'no_create': True}" invisible="source_type != 'annual_plan'"
+                                       readonly="state != 'draft'"/>
+                                <field name="plan_line_id" options="{'no_create': True}"
+                                       domain="[('plan_id', '=', annual_plan_id), ('is_addendum', '=', False)]"
+                                       invisible="source_type != 'annual_plan'" readonly="state != 'draft'"/>
+                                <field name="unscheduled_request_id" options="{'no_create': True}"
+                                       invisible="source_type != 'unscheduled'" readonly="state != 'draft'"/>
                                 <field name="course_id" readonly="1"/>
-                                <field name="delivery_method" readonly="1"/>
-                                <field name="awarded_vendor_id" readonly="1"/>
+                                <field name="planned_delivery_method" readonly="1"/>
+                                <field name="delivery_override" readonly="state != 'draft'"/>
+                                <field name="delivery_method" readonly="not delivery_override or state != 'draft'"/>
+                                <field name="delivery_change_reason"
+                                       required="delivery_override and delivery_method != planned_delivery_method"
+                                       invisible="not delivery_override"
+                                       readonly="state != 'draft'" placeholder="Reason for changing delivery"/>
+                                <field name="awarded_vendor_id" readonly="1" invisible="delivery_method == 'internal'"/>
                             </group>
                             <group string="Evaluation Weighting Template">
                                 <field name="template_type"/>
                                 <field name="technical_weight" readonly="template_type != 'custom'"/>
                                 <field name="financial_weight" readonly="template_type != 'custom'"/>
-                                <field name="currency_id" options="{'no_create': True}"/>
+                                <field name="currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                                <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
+                                        invisible="delivery_method != 'international'"/>
                             </group>
                         </group>
 
-                        <notebook>
-                            <page string="Bidding Vendors &amp; Scores" name="vendors">
-                                <field name="line_ids">
-                                    <list editable="bottom">
-                                        <field name="vendor_id" options="{'no_create': True}"/>
-                                        <field name="trainer_id" optional="show" options="{'no_open': False}" domain="[('trainer_type','=','external'),('external_provider_id','=',vendor_id),('state','=','active')]"/>
-                                        <field name="vendor_name" optional="show"/>
-                                        <field name="quality_score" string="Quality /10"/>
-                                        <field name="experience_score" string="Experience /10"/>
-                                        <field name="scalability_score" string="Delivery /10"/>
-                                        <field name="demo_score" string="Demo /10"/>
-                                        <field name="price_score" string="Financial /10"/>
+                        <notebook class="o_eds_notebook">
+                            <page string="Bidding Vendors &amp; Scores" name="vendors" invisible="delivery_method == 'internal'">
+                                <field name="line_ids" context="{'default_selection_id': id, 'default_currency_id': currency_id, 'default_delivery_category': 'international' if delivery_method == 'international' else 'local'}">
+                                    <list string="Vendor Bids">
+                                        <field name="delivery_category" invisible="1"/>
+                                        <field name="vendor_id" options="{'no_create': True}"
+                                               domain="[('category', '=', delivery_category)]"/>
                                         <field name="price_quoted" string="Quoted Price"/>
-                                        <field name="currency_id" options="{'no_create': True}"/>
+                                        <field name="currency_id" string="Currency"/>
                                         <field name="technical_score" string="Tech %" readonly="1"/>
                                         <field name="technical_threshold_met" string="Technical Gate" readonly="1"/>
-                                        <field name="financial_score" string="Financial %" readonly="1" optional="hide"/>
-                                        <field name="total_score" string="Total Weighted Score" class="fw-bold text-primary"/>
-                                        <field name="status" widget="badge" readonly="1" decoration-success="status in ('awarded', 'contract')" decoration-danger="status == 'rejected'"/>
-                                        <field name="award_attachment" filename="award_filename" widget="binary" string="Award Letter"/>
-                                        <field name="award_filename" column_invisible="True"/>
-                                        <field name="contract_attachment" filename="contract_filename" widget="binary" string="Signed Contract"/>
-                                        <field name="contract_filename" column_invisible="True"/>
-                                        <button name="action_award" string="Award" type="object" class="btn btn-sm btn-outline-success" invisible="status in ('awarded', 'contract') or not technical_threshold_met"/>
-                                        <button name="action_contract" string="Sign Contract" type="object" class="btn btn-sm btn-outline-primary" invisible="status != 'awarded'"/>
-                                        <button name="action_reject" string="Reject" type="object" class="btn btn-sm btn-outline-danger" invisible="status == 'rejected'"/>
-                                        <field name="notes" optional="hide"/>
+                                        <field name="total_score" string="Total Score" readonly="1" class="fw-bold text-primary"/>
+                                        <field name="status" widget="badge" readonly="1" decoration-success="status == 'awarded'" decoration-danger="status == 'rejected'"/>
                                     </list>
+                                    <form string="Vendor Bid &amp; Evaluation">
+                                        <header>
+                                            <button name="action_award" string="Award Vendor" type="object"
+                                                    class="oe_highlight"
+                                                    invisible="status != 'draft' or not id"/>
+                                            <button name="action_reject" string="Reject" type="object"
+                                                    invisible="status != 'draft' or not id"/>
+                                            <field name="status" widget="statusbar" readonly="1"
+                                                   statusbar_visible="draft,awarded,rejected"/>
+                                        </header>
+                                        <sheet>
+                                            <field name="delivery_category" invisible="1"/>
+                                            <group>
+                                                <group string="Provider &amp; Quotation">
+                                                    <field name="vendor_id" options="{'no_create': True}"
+                                                           domain="[('category', '=', delivery_category)]"/>
+                                                    <field name="trainer_id" options="{'no_create': True}"
+                                                           domain="[('trainer_type','=','external'),('external_provider_id','=',vendor_id),('state','=','active')]"/>
+                                                    <field name="vendor_name"/>
+                                                    <field name="price_quoted"/>
+                                                    <field name="currency_id" readonly="parent.delivery_method != 'international'"
+                                                           context="{'active_test': False}" options="{'no_create': True}"/>
+                                                </group>
+                                                <group string="Evaluation Result">
+                                                    <field name="technical_score" readonly="1"/>
+                                                    <field name="technical_threshold_met" readonly="1"/>
+                                                    <field name="financial_score" readonly="1"/>
+                                                    <field name="total_score" readonly="1" class="fw-bold text-primary"/>
+                                                </group>
+                                            </group>
+                                            <group string="Score Each Criterion from 0 to 10">
+                                                <group>
+                                                    <field name="quality_score"/>
+                                                    <field name="experience_score"/>
+                                                    <field name="scalability_score"/>
+                                                </group>
+                                                <group>
+                                                    <field name="demo_score"/>
+                                                    <field name="price_score"/>
+                                                </group>
+                                            </group>
+                                            <group string="Optional Award Documents &amp; Remarks">
+                                                <group>
+                                                    <field name="award_attachment" filename="award_filename" widget="binary"/>
+                                                    <field name="award_filename" invisible="1"/>
+                                                    <field name="contract_attachment" filename="contract_filename" widget="binary"/>
+                                                    <field name="contract_filename" invisible="1"/>
+                                                </group>
+                                                <group>
+                                                    <field name="notes"/>
+                                                </group>
+                                            </group>
+                                        </sheet>
+                                    </form>
                                 </field>
                             </page>
                             <page string="Sourcing Objectives &amp; Notes">
@@ -748,15 +810,15 @@
         </record>
 
         <record id="action_eds_course_vendor_selection" model="ir.actions.act_window">
-            <field name="name">Course Vendor Selection</field>
+            <field name="name">Providers</field>
             <field name="res_model">eds.course.vendor.selection</field>
             <field name="view_mode">list,form</field>
         </record>
         <record id="action_eds_local_vendor_selection" model="ir.actions.act_window">
-            <field name="name">Local Training Providers</field>
+            <field name="name">Local Delivery &amp; Providers</field>
             <field name="res_model">eds.course.vendor.selection</field>
             <field name="view_mode">list,form</field>
-            <field name="domain">[('delivery_method','=','local_external')]</field>
+            <field name="domain">[('delivery_method','in',('internal','local_external'))]</field>
         </record>
         <record id="action_eds_international_vendor_selection" model="ir.actions.act_window">
             <field name="name">International Training Providers</field>

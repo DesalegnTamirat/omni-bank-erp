@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="employee_development_system.EdsActionHeads" owl="1">
+        <div t-if="heads.length" class="o_eds_action_heads">
+            <div t-if="state.activeActor" class="o_eds_alert_panel" role="dialog" aria-label="Employee Development notifications">
+                <div class="o_eds_alert_panel_header">
+                    <strong t-esc="activeActorName"/>
+                    <button type="button" class="btn-close" aria-label="Close notifications" t-on-click="close"/>
+                </div>
+                <div t-foreach="activeAlerts" t-as="alert" t-key="alert.uid" class="o_eds_alert_item">
+                    <strong t-esc="alert.title"/>
+                    <p t-esc="alert.message"/>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-primary" t-on-click="() => this.open(alert)">Open record</button>
+                        <button type="button" class="btn btn-sm btn-light" t-on-click="() => this.dismiss(alert)">Dismiss</button>
+                    </div>
+                </div>
+            </div>
+            <div class="o_eds_head_list">
+                <button t-foreach="heads" t-as="head" t-key="head.key" type="button"
+                        class="o_eds_head" t-att-title="head.actor"
+                        t-att-aria-label="head.count + ' notifications from ' + head.actor"
+                        t-on-click="() => this.toggle(head.key)">
+                    <t t-esc="head.initial"/>
+                    <span class="o_eds_head_count" t-esc="head.count"/>
+                </button>
+            </div>
+        </div>
+    </t>
+</templates>

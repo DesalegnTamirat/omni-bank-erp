@@ -22,6 +22,8 @@ class KmsContributorPoint(models.Model):
     points = fields.Integer(string='Points Earned', required=True)
     source = fields.Selection([
         ('document_publish', 'Approved Policy / SOP Published (+20)'),
+        ('library_upload', 'Digital Library Asset Uploaded (+8)'),
+        ('cop_participation', 'Community of Practice Participation (+3)'),
         ('session_delivery', 'Tacit Knowledge Session Delivered (+15)'),
         ('lesson_learned', 'Validated Lesson Learned Contributed (+10)'),
         ('accepted_answer', 'Accepted Forum Solution (+10)'),
@@ -38,7 +40,7 @@ class KmsContributorPoint(models.Model):
             rec.employee_id = rec.user_id.employee_id.id if rec.user_id and rec.user_id.employee_id else False
 
     @api.model
-    def award_points(self, user, points=None, source='manual_award', description=None):
+    def _award_points(self, user, points=None, source='manual_award', description=None):
         """Helper to create point ledger entries safely with configurable points and milestone checks."""
         if not user:
             return False
@@ -52,6 +54,8 @@ class KmsContributorPoint(models.Model):
         if points is None:
             default_map = {
                 'document_publish': 20,
+                'library_upload': 8,
+                'cop_participation': 3,
                 'session_delivery': 15,
                 'lesson_learned': 10,
                 'accepted_answer': 10,
@@ -64,10 +68,15 @@ class KmsContributorPoint(models.Model):
         employee = user.employee_id
         pts_before = 0
         if employee:
-            pts_before = sum(self.search([('employee_id', '=', employee.id)]).mapped('points'))
+            self.flush_model(['employee_id', 'points'])
+            self.env.cr.execute(
+                'SELECT COALESCE(SUM(points), 0) FROM kms_contributor_point WHERE employee_id = %s',
+                (employee.id,),
+            )
+            pts_before = self.env.cr.fetchone()[0]
 
         try:
-            self.env['recognition.point'].sudo().award_points(
+            self.env['recognition.point'].sudo()._award_points(
                 user=user,
                 points=points,
                 source_module='kms',

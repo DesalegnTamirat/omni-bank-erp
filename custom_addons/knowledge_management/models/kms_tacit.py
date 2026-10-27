@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 class KmsKnowledgeSession(models.Model):
@@ -59,40 +59,91 @@ class KmsKnowledgeSession(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+            employee_id = self.env.user.employee_id.id
+            for vals in vals_list:
+                if employee_id not in (vals.get('expert_id'), vals.get('facilitator_id')):
+                    raise AccessError(_('Only a session expert or facilitator may schedule the session.'))
+                if vals.get('state', 'planned') != 'planned':
+                    raise AccessError(_('A knowledge session must begin in the planned state.'))
         records = super(KmsKnowledgeSession, self).create(vals_list)
         for rec in records:
-            try:
-                self.env['kms.audit.log'].log_audit_event(
-                    action='upload',
-                    resource_type='tacit_session',
-                    resource_name=rec.name,
-                    details=f"Created knowledge capture session '{rec.name}' ({rec.session_type})"
-                )
-            except Exception:
-                pass
+            self.env['kms.audit.log']._log_audit_event(
+                action='upload', resource_type='tacit_session', resource_name=rec.name,
+                details=f"Created knowledge capture session '{rec.name}' ({rec.session_type})",
+            )
         return records
+
+    def write(self, vals):
+        if not self.env.su:
+            if 'state' in vals:
+                raise AccessError(_('Use the session completion action to change its state.'))
+            if any(rec.state != 'planned' for rec in self):
+                raise UserError(_('Completed or cancelled sessions cannot be edited.'))
+            if not self.env.user.has_group('knowledge_management.group_kms_manager') and (
+                'expert_id' in vals or 'facilitator_id' in vals
+            ):
+                raise AccessError(_('Only a KMS manager may change session participants.'))
+        result = super().write(vals)
+        if vals:
+            for rec in self:
+                self.env['kms.audit.log']._log_audit_event(
+                    action='modify', resource_type='tacit_session', resource_name=rec.name,
+                    details=f"Updated session fields: {', '.join(sorted(vals))}",
+                )
+        return result
+
+    def unlink(self):
+        names = self.mapped('name')
+        result = super().unlink()
+        for name in names:
+            self.env['kms.audit.log']._log_audit_event(
+                action='delete', resource_type='tacit_session', resource_name=name,
+                details='Deleted knowledge capture session',
+            )
+        return result
 
     def action_complete_session(self):
         for rec in self:
-            rec.write({'state': 'completed'})
-            rec.message_post(body=_('Knowledge capture session completed and tacit insights documented.'))
-            try:
-                self.env['kms.audit.log'].log_audit_event(
-                    action='approve',
-                    resource_type='tacit_session',
-                    resource_name=rec.name,
-                    details=f"Completed knowledge capture session '{rec.name}'"
-                )
-            except Exception:
-                pass
+            if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+                employee_id = self.env.user.employee_id.id
+                if employee_id not in (rec.expert_id.id, rec.facilitator_id.id):
+                    raise AccessError(_('Only the expert, facilitator, or KMS manager may complete this session.'))
+            self.env.cr.execute('SELECT id FROM kms_knowledge_session WHERE id = %s FOR UPDATE', (rec.id,))
+            rec.invalidate_recordset(['state'])
+            if rec.state != 'planned':
+                raise UserError(_('Only a planned session may be completed.'))
+            rec.sudo().write({'state': 'completed'})
+            rec.sudo().message_post(body=_('Knowledge capture session completed and tacit insights documented.'))
+            self.env['kms.audit.log']._log_audit_event(
+                action='approve', resource_type='tacit_session', resource_name=rec.name,
+                details=f"Completed knowledge capture session '{rec.name}'",
+            )
             # Award points to expert and facilitator
-            if rec.expert_id and rec.expert_id.user_id:
-                self.env['kms.contributor.point'].award_points(
-                    rec.expert_id.user_id,
+            if rec.expert_id and rec.expert_id.sudo().user_id:
+                self.env['kms.contributor.point']._award_points(
+                    rec.expert_id.sudo().user_id,
                     points=15,
                     source='session_delivery',
                     description=f'Delivered tacit knowledge session: {rec.name}'
                 )
+
+    def action_cancel_session(self):
+        for rec in self:
+            if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+                employee_id = self.env.user.employee_id.id
+                if employee_id not in (rec.expert_id.id, rec.facilitator_id.id):
+                    raise AccessError(_('Only the expert, facilitator, or KMS manager may cancel this session.'))
+            self.env.cr.execute('SELECT id FROM kms_knowledge_session WHERE id = %s FOR UPDATE', (rec.id,))
+            rec.invalidate_recordset(['state'])
+            if rec.state != 'planned':
+                raise UserError(_('Only a planned session may be cancelled.'))
+            rec.sudo().write({'state': 'cancelled'})
+            rec.sudo().message_post(body=_('Knowledge capture session cancelled.'))
+            self.env['kms.audit.log']._log_audit_event(
+                action='modify', resource_type='tacit_session', resource_name=rec.name,
+                details=f"Cancelled knowledge capture session '{rec.name}'",
+            )
 
 
 class KmsLessonLearned(models.Model):
@@ -154,63 +205,109 @@ class KmsLessonLearned(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+            employee_id = self.env.user.employee_id.id
+            for vals in vals_list:
+                if vals.get('author_id', employee_id) != employee_id:
+                    raise AccessError(_('You may only submit lessons under your own name.'))
+                if vals.get('state', 'draft') != 'draft':
+                    raise AccessError(_('A lesson must begin as a draft.'))
         for vals in vals_list:
             if vals.get('code', _('New')) == _('New'):
                 vals['code'] = self.env['ir.sequence'].next_by_code('kms.lesson.learned') or _('New')
         records = super(KmsLessonLearned, self).create(vals_list)
         for rec in records:
-            try:
-                self.env['kms.audit.log'].log_audit_event(
-                    action='upload',
-                    resource_type='lesson_learned',
-                    resource_name=f"{rec.code} - {rec.name}",
-                    details=f"Documented lesson learned '{rec.name}' for {rec.project_initiative}"
-                )
-            except Exception:
-                pass
+            self.env['kms.audit.log']._log_audit_event(
+                action='upload', resource_type='lesson_learned',
+                resource_name=f"{rec.code} - {rec.name}",
+                details=f"Documented lesson learned '{rec.name}' for {rec.project_initiative}",
+            )
         return records
 
-    def action_approve(self):
-        for rec in self:
-            rec.write({'state': 'reviewed'})
-            rec.message_post(body=_('Lesson learned validated and published to the bank repository.'))
-            try:
-                self.env['kms.audit.log'].log_audit_event(
-                    action='approve',
-                    resource_type='lesson_learned',
-                    resource_name=f"{rec.code} - {rec.name}",
-                    details=f"Validated and approved lesson learned '{rec.name}'"
+    def write(self, vals):
+        if not self.env.su:
+            if 'state' in vals:
+                raise AccessError(_('Use the lesson approval action to change its state.'))
+            if any(rec.state != 'draft' for rec in self):
+                raise UserError(_('Validated or archived lessons cannot be edited.'))
+            if 'author_id' in vals and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+                raise AccessError(_('Only a KMS manager may change the lesson author.'))
+        result = super().write(vals)
+        if vals:
+            for rec in self:
+                self.env['kms.audit.log']._log_audit_event(
+                    action='modify', resource_type='lesson_learned',
+                    resource_name=f'{rec.code} - {rec.name}',
+                    details=f"Updated lesson fields: {', '.join(sorted(vals))}",
                 )
-            except Exception:
-                pass
-            if rec.author_id and rec.author_id.user_id:
-                self.env['kms.contributor.point'].award_points(
-                    rec.author_id.user_id,
+        return result
+
+    def unlink(self):
+        names = [f'{rec.code} - {rec.name}' for rec in self]
+        result = super().unlink()
+        for name in names:
+            self.env['kms.audit.log']._log_audit_event(
+                action='delete', resource_type='lesson_learned', resource_name=name,
+                details='Deleted lesson learned',
+            )
+        return result
+
+    def action_approve(self):
+        if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_reviewer'):
+            raise AccessError(_('Only a KMS reviewer may validate lessons learned.'))
+        for rec in self:
+            if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+                if rec.department_id and rec.department_id != self.env.user.employee_id.department_id:
+                    raise AccessError(_('You may only validate lessons for your department.'))
+            self.env.cr.execute('SELECT id FROM kms_lesson_learned WHERE id = %s FOR UPDATE', (rec.id,))
+            rec.invalidate_recordset(['state'])
+            if rec.state != 'draft':
+                raise UserError(_('Only a draft lesson may be validated.'))
+            rec.sudo().write({'state': 'reviewed'})
+            rec.sudo().message_post(body=_('Lesson learned validated and published to the bank repository.'))
+            self.env['kms.audit.log']._log_audit_event(
+                action='approve', resource_type='lesson_learned',
+                resource_name=f'{rec.code} - {rec.name}',
+                details=f"Validated and approved lesson learned '{rec.name}'",
+            )
+            if rec.author_id and rec.author_id.sudo().user_id:
+                self.env['kms.contributor.point']._award_points(
+                    rec.author_id.sudo().user_id,
                     points=10,
                     source='lesson_learned',
                     description=f'Contributed validated lesson learned: {rec.name} ({rec.code})'
                 )
 
+    def action_archive(self):
+        if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+            raise AccessError(_('Only a KMS manager may archive validated lessons.'))
+        for rec in self:
+            self.env.cr.execute('SELECT id FROM kms_lesson_learned WHERE id = %s FOR UPDATE', (rec.id,))
+            rec.invalidate_recordset(['state'])
+            if rec.state != 'reviewed':
+                raise UserError(_('Only a validated lesson may be archived.'))
+            rec.sudo().write({'state': 'archived'})
+            rec.sudo().message_post(body=_('Lesson archived from the active repository.'))
+            self.env['kms.audit.log']._log_audit_event(
+                action='archive', resource_type='lesson_learned',
+                resource_name=f'{rec.code} - {rec.name}',
+                details=f"Archived lesson learned '{rec.name}'",
+            )
+
     def action_vote_helpful(self):
         Vote = self.env['kms.lesson.learned.vote']
         for rec in self:
+            rec.check_access('read')
+            if rec.state != 'reviewed':
+                raise UserError(_('Only validated lessons can receive helpful votes.'))
             existing = Vote.search([('lesson_id', '=', rec.id), ('user_id', '=', self.env.uid)], limit=1)
             if existing:
-                existing.unlink()
+                existing.sudo().unlink()
             else:
                 Vote.create({
                     'lesson_id': rec.id,
                     'user_id': self.env.uid,
                 })
-                try:
-                    self.env['kms.audit.log'].log_audit_event(
-                        action='modify',
-                        resource_type='lesson_learned',
-                        resource_name=f"{rec.code} - {rec.name}",
-                        details=f"Voted helpful on lesson learned '{rec.name}'"
-                    )
-                except Exception:
-                    pass
 
 
 class KmsLessonLearnedVote(models.Model):
@@ -220,6 +317,35 @@ class KmsLessonLearnedVote(models.Model):
 
     lesson_id = fields.Many2one('kms.lesson.learned', string='Lesson Learned', required=True, ondelete='cascade', index=True)
     user_id = fields.Many2one('res.users', string='User', required=True, ondelete='cascade', default=lambda self: self.env.user, index=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            lesson = self.env['kms.lesson.learned'].browse(vals.get('lesson_id'))
+            lesson.check_access('read')
+            if lesson.state != 'reviewed':
+                raise UserError(_('Only validated lessons can receive helpful votes.'))
+            if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+                if vals.get('user_id', self.env.uid) != self.env.uid:
+                    raise AccessError(_('You may only cast your own lesson vote.'))
+        records = super().create(vals_list)
+        for rec in records:
+            self.env['kms.audit.log']._log_audit_event(
+                action='modify', resource_type='lesson_learned',
+                resource_name=f'{rec.lesson_id.code} - {rec.lesson_id.name}',
+                details='Cast helpful vote',
+            )
+        return records
+
+    def unlink(self):
+        names = [f'{rec.lesson_id.code} - {rec.lesson_id.name}' for rec in self]
+        result = super().unlink()
+        for name in names:
+            self.env['kms.audit.log']._log_audit_event(
+                action='modify', resource_type='lesson_learned', resource_name=name,
+                details='Removed helpful vote',
+            )
+        return result
 
     _unique_lesson_user = models.Constraint(
         'unique(lesson_id, user_id)',
@@ -258,24 +384,102 @@ class KmsMentoringTrack(models.Model):
     milestone_ids = fields.One2many('kms.mentoring.milestone', 'mentoring_id', string='Transfer Milestones')
     overall_evaluation = fields.Text(string='Final Mentor Evaluation & Handover Sign-off')
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+            employee_id = self.env.user.employee_id.id
+            for vals in vals_list:
+                if employee_id not in (vals.get('mentor_id'), vals.get('mentee_id')):
+                    raise AccessError(_('Only a mentor or mentee may create their mentoring track.'))
+                if vals.get('state', 'draft') != 'draft':
+                    raise AccessError(_('A mentoring track must begin as a draft.'))
+        records = super().create(vals_list)
+        for rec in records:
+            self.env['kms.audit.log']._log_audit_event(
+                action='upload', resource_type='mentoring', resource_name=rec.name,
+                details='Created mentoring track',
+            )
+        return records
+
+    def write(self, vals):
+        if not self.env.su:
+            if 'state' in vals or 'actual_end_date' in vals:
+                raise AccessError(_('Use the mentoring workflow actions to change its state.'))
+            if any(rec.state in ('completed', 'terminated') for rec in self):
+                raise UserError(_('Completed or terminated mentoring tracks cannot be edited.'))
+            if not self.env.user.has_group('knowledge_management.group_kms_manager') and (
+                'mentor_id' in vals or 'mentee_id' in vals
+            ):
+                raise AccessError(_('Only a KMS manager may change mentoring participants.'))
+        result = super().write(vals)
+        if vals:
+            for rec in self:
+                self.env['kms.audit.log']._log_audit_event(
+                    action='modify', resource_type='mentoring', resource_name=rec.name,
+                    details=f"Updated mentoring track fields: {', '.join(sorted(vals))}",
+                )
+        return result
+
+    def unlink(self):
+        names = self.mapped('name')
+        result = super().unlink()
+        for name in names:
+            self.env['kms.audit.log']._log_audit_event(
+                action='delete', resource_type='mentoring', resource_name=name,
+                details='Deleted mentoring track',
+            )
+        return result
+
+    def _check_mentor_signoff(self):
+        if self.env.su or self.env.user.has_group('knowledge_management.group_kms_manager'):
+            return
+        if any(track.mentor_id.sudo().user_id != self.env.user for track in self):
+            raise AccessError(_('Only the mentor or KMS manager may sign off a mentoring track.'))
+
     def action_start(self):
-        self.write({'state': 'in_progress'})
+        self._check_mentor_signoff()
+        for rec in self:
+            self.env.cr.execute('SELECT id FROM kms_mentoring_track WHERE id = %s FOR UPDATE', (rec.id,))
+            rec.invalidate_recordset(['state'])
+            if rec.state != 'draft':
+                raise UserError(_('Only a draft mentoring track may be started.'))
+            rec.sudo().write({'state': 'in_progress'})
 
     def action_complete(self):
+        self._check_mentor_signoff()
         for rec in self:
-            rec.write({
+            self.env.cr.execute('SELECT id FROM kms_mentoring_track WHERE id = %s FOR UPDATE', (rec.id,))
+            rec.invalidate_recordset(['state'])
+            if rec.state != 'in_progress':
+                raise UserError(_('Only an active mentoring track may be completed.'))
+            if rec.milestone_ids.filtered(lambda milestone: not milestone.is_achieved):
+                raise UserError(_('Complete all mentoring milestones before sign-off.'))
+            rec.sudo().write({
                 'state': 'completed',
                 'actual_end_date': fields.Date.context_today(self),
             })
-            rec.message_post(body=_('Mentoring and knowledge transfer cycle successfully concluded and signed off.'))
+            rec.sudo().message_post(body=_('Mentoring and knowledge transfer cycle successfully concluded and signed off.'))
             mentor = rec.sudo().mentor_id
             if mentor and mentor.user_id:
-                self.env['kms.contributor.point'].award_points(
+                self.env['kms.contributor.point']._award_points(
                     mentor.user_id,
                     points=25,
                     source='mentoring_signoff',
                     description=f'Completed knowledge transfer mentoring for {rec.mentee_id.name}'
                 )
+
+    def action_terminate(self):
+        self._check_mentor_signoff()
+        for rec in self:
+            self.env.cr.execute('SELECT id FROM kms_mentoring_track WHERE id = %s FOR UPDATE', (rec.id,))
+            rec.invalidate_recordset(['state'])
+            if rec.state not in ('draft', 'in_progress'):
+                raise UserError(_('Only an open mentoring track may be terminated.'))
+            rec.sudo().write({
+                'state': 'terminated',
+                'actual_end_date': fields.Date.context_today(self),
+            })
+            rec.sudo().message_post(body=_('Mentoring track terminated before handover completion.'))
 
 
 class KmsMentoringMilestone(models.Model):
@@ -289,3 +493,52 @@ class KmsMentoringMilestone(models.Model):
     completion_date = fields.Date(string='Date Completed')
     is_achieved = fields.Boolean(string='Achieved & Verified', default=False)
     notes = fields.Text(string='Meeting Notes / Verification Evidence')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+            for vals in vals_list:
+                track = self.env['kms.mentoring.track'].browse(vals.get('mentoring_id'))
+                if not track.exists() or self.env.user.employee_id not in (track.mentor_id, track.mentee_id):
+                    raise AccessError(_('Only mentoring participants may add milestones.'))
+                if vals.get('is_achieved') and track.mentor_id.sudo().user_id != self.env.user:
+                    raise AccessError(_('Only the mentor may verify a milestone.'))
+        records = super().create(vals_list)
+        for rec in records:
+            self.env['kms.audit.log']._log_audit_event(
+                action='upload', resource_type='mentoring',
+                resource_name=f'{rec.mentoring_id.name}: {rec.name}',
+                details='Created mentoring milestone',
+            )
+        return records
+
+    def write(self, vals):
+        if not self.env.su and not self.env.user.has_group('knowledge_management.group_kms_manager'):
+            if 'mentoring_id' in vals:
+                raise AccessError(_('Only a KMS manager may move a milestone to another track.'))
+            if 'is_achieved' in vals or 'completion_date' in vals:
+                if any(milestone.mentoring_id.mentor_id.sudo().user_id != self.env.user for milestone in self):
+                    raise AccessError(_('Only the mentor may verify a milestone.'))
+        if not self.env.su and any(
+            milestone.mentoring_id.state in ('completed', 'terminated') for milestone in self
+        ):
+            raise UserError(_('Milestones cannot be edited after mentoring ends.'))
+        result = super().write(vals)
+        if vals:
+            for rec in self:
+                self.env['kms.audit.log']._log_audit_event(
+                    action='modify', resource_type='mentoring',
+                    resource_name=f'{rec.mentoring_id.name}: {rec.name}',
+                    details=f"Updated mentoring milestone fields: {', '.join(sorted(vals))}",
+                )
+        return result
+
+    def unlink(self):
+        names = [f'{rec.mentoring_id.name}: {rec.name}' for rec in self]
+        result = super().unlink()
+        for name in names:
+            self.env['kms.audit.log']._log_audit_event(
+                action='delete', resource_type='mentoring', resource_name=name,
+                details='Deleted mentoring milestone',
+            )
+        return result

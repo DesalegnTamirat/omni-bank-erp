@@ -5,13 +5,19 @@ import os
 import re
 import logging
 from datetime import datetime
-from odoo import http, _
-from odoo.http import request, Response
+from urllib.parse import urlsplit
+from odoo import http, _, fields
+from odoo.http import request, Response, content_disposition
+from ..models.lms_course import external_media_url_allowed
 
 _logger = logging.getLogger(__name__)
 
 
 class LmsController(http.Controller):
+
+    @staticmethod
+    def _external_media_url_allowed(url, allowed_hosts):
+        return external_media_url_allowed(url, allowed_hosts)
 
     def _check_video_access(self, lesson_id, env=None):
         """
@@ -42,14 +48,15 @@ class LmsController(http.Controller):
         enrollment = env['lms.enrollment'].sudo().search([
             ('employee_id', '=', emp.id),
             ('course_id', '=', lesson.course_id.id),
-        ], limit=1)
+            ('state', 'in', ('enrolled', 'in_progress', 'completed')),
+        ], order='attempt_number desc, id desc', limit=1)
 
         if not enrollment and not is_staff:
             _logger.warning("Video access denied: employee %s not enrolled in course %s", emp.name, lesson.course_id.name)
             return False, Response("Forbidden: Access Denied", status=403), None
 
-        # Ensure course is published, or user has instructor/manager privileges
-        if lesson.course_id.state != 'published' and not is_staff:
+        # An enrolled learner may finish the frozen version after retirement.
+        if not is_staff and (not enrollment or not enrollment._course_available_for_learning()):
             _logger.warning("Video access denied: course %s in state %s", lesson.course_id.name, lesson.course_id.state)
             return False, Response("Forbidden: Access Denied", status=403), None
 
@@ -63,6 +70,15 @@ class LmsController(http.Controller):
             _logger.warning("Video access denied: course is locked by learning path sequencing for employee %s", emp.name)
             return False, Response("Forbidden: Prerequisite courses must be completed first.", status=403), None
 
+        if enrollment and not is_staff:
+            lessons = lesson.course_id.lesson_ids
+            prior = lessons[:lessons.ids.index(lesson.id)].filtered('is_mandatory')
+            completed = enrollment.lesson_progress_ids.filtered(
+                lambda progress: progress.state == 'completed'
+            ).mapped('lesson_id')
+            if prior - completed:
+                return False, Response("Forbidden: Complete earlier mandatory lessons first.", status=403), None
+
         return True, lesson, enrollment
 
     @http.route(['/lms/lesson/<int:lesson_id>/document'], type='http', auth='user')
@@ -73,22 +89,23 @@ class LmsController(http.Controller):
         lesson = result
         if lesson.lesson_type != 'document' or not lesson.document_file:
             return request.not_found()
-        filename = (lesson.document_filename or 'lesson-document').replace('"', '')
+        filename = os.path.basename((lesson.document_filename or 'lesson-document').replace('\\', '/'))
+        filename = filename.replace('\r', '').replace('\n', '') or 'lesson-document'
         content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
         content = base64.b64decode(lesson.document_file)
         return Response(content, headers=[
             ('Content-Type', content_type),
-            ('Content-Disposition', f'attachment; filename="{filename}"'),
+            ('Content-Disposition', content_disposition(filename)),
             ('Content-Length', str(len(content))),
             ('Cache-Control', 'private, no-store'),
+            ('X-Content-Type-Options', 'nosniff'),
         ])
 
     @http.route(['/lms/video/<int:lesson_id>/stream'], type='http', auth='user')
     def stream_lesson_video(self, lesson_id, **kwargs):
         """
-        Internal Video Streaming Controller with HTTP 206 Partial Content Range support
-        (FR-LMS-004, FR-LMS-005).
-        Enables adaptive buffering across branch and mobile environments without YouTube dependencies.
+        Internal Video Streaming Controller with HTTP 206 Partial Content Range support.
+        Enables browser buffering across branches without an external video platform.
         Enforces enrollment and course visibility before serving any bytes.
         """
         authorized, result, enrollment = self._check_video_access(lesson_id)
@@ -98,6 +115,11 @@ class LmsController(http.Controller):
 
         # If hosted via internal streaming URL, redirect
         if lesson.video_source_type == 'url' and lesson.video_url:
+            allowed_hosts = request.env['ir.config_parameter'].sudo().get_param(
+                'learning_management.media_allowed_hosts', ''
+            )
+            if not self._external_media_url_allowed(lesson.video_url, allowed_hosts):
+                return Response('Configure an approved HTTPS media host for this video.', status=503)
             return request.redirect(lesson.video_url)
 
         attachment = request.env['ir.attachment'].sudo().search([
@@ -143,6 +165,8 @@ class LmsController(http.Controller):
             ('Content-Length', str(length)),
             ('Accept-Ranges', 'bytes'),
             ('Cache-Control', 'private, no-store'),
+            ('X-Content-Type-Options', 'nosniff'),
+            ('Referrer-Policy', 'no-referrer'),
         ]
         if status == 206:
             headers.append(('Content-Range', f'bytes {start}-{end}/{file_size}'))
@@ -151,8 +175,7 @@ class LmsController(http.Controller):
     @http.route(['/lms/video/<int:lesson_id>/manifest.m3u8'], type='http', auth='user')
     def get_video_manifest(self, lesson_id, **kwargs):
         """
-        Adaptive HLS Streaming Manifest (FR-LMS-004, FR-LMS-005, NFR Performance/Mobile).
-        Generates standard HLS VOD playlist with byte ranges for seamless streaming.
+        Placeholder for a future HLS packaging service.
         """
         authorized, result, enrollment = self._check_video_access(lesson_id)
         if not authorized:
@@ -160,7 +183,12 @@ class LmsController(http.Controller):
         lesson = result
 
         if lesson.video_source_type == 'url' and lesson.video_url:
-            return request.redirect(lesson.video_url)
+            allowed_hosts = request.env['ir.config_parameter'].sudo().get_param(
+                'learning_management.media_allowed_hosts', ''
+            )
+            if (self._external_media_url_allowed(lesson.video_url, allowed_hosts)
+                    and urlsplit(lesson.video_url).path.lower().endswith('.m3u8')):
+                return request.redirect(lesson.video_url)
 
         # An MP4 file cannot be split into arbitrary HLS byte ranges. The player
         # uses the authenticated HTTP Range endpoint until real HLS segments exist.
@@ -169,7 +197,7 @@ class LmsController(http.Controller):
     @http.route(['/lms/video/<int:lesson_id>/player'], type='http', auth='user', website=True)
     def render_video_player(self, lesson_id, **kwargs):
         """
-        Secure Video Player with Anti-Cheat & Dynamic Watermark Overlay (FR-LMS-004, FR-LMS-007, FR-LMS-008).
+        Responsive player for the authenticated HTTP Range stream and watch heartbeat.
         """
         authorized, result, enrollment = self._check_video_access(lesson_id)
         if not authorized:
@@ -178,7 +206,6 @@ class LmsController(http.Controller):
 
         user = request.env.user
         emp = user.employee_id
-        user_ip = request.httprequest.remote_addr or '127.0.0.1'
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         progress = request.env['lms.lesson.progress'].sudo().search([
@@ -193,11 +220,10 @@ class LmsController(http.Controller):
             'course': lesson.course_id,
             'enrollment': enrollment,
             'user_name': user.name,
-            'user_login': user.login,
             'emp_code': getattr(emp, 'registration_number', '') or getattr(emp, 'identification_id', '') or str(user.id),
-            'user_ip': user_ip,
             'timestamp': timestamp,
             'last_position': last_pos,
+            'lesson_completed': bool(progress and progress.state == 'completed'),
             'stream_url': f"/lms/video/{lesson.id}/stream",
         }
         return request.render('learning_management.lesson_video_player', values)
@@ -248,7 +274,9 @@ class LmsController(http.Controller):
 
         values = {
             'cert': cert,
-            'is_valid': cert.state == 'valid',
+            'is_valid': cert.state == 'valid' and (
+                not cert.expiry_date or cert.expiry_date >= fields.Date.context_today(cert)
+            ),
             'learner_name': cert.employee_id.name,
             'course_name': cert.course_id.name,
             'issue_date': cert.issue_date,

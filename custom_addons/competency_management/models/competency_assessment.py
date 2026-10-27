@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
+import hashlib
+import logging
 import re
 from markupsafe import Markup, escape
+from psycopg2 import IntegrityError
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError, AccessError
+
+
+_logger = logging.getLogger(__name__)
 
 
 class CompetencyAssessmentCycle(models.Model):
@@ -154,7 +160,7 @@ class CompetencyAssessmentCycle(models.Model):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': _('No Pending Assessments'),
+                    'title': _('%s — No Pending Assessments') % self.name,
                     'message': _('All assessments for this cycle have already been submitted!'),
                     'type': 'info',
                     'sticky': False,
@@ -180,16 +186,6 @@ class CompetencyAssessmentCycle(models.Model):
                     if not cycle_rec.exists():
                         return
 
-                    if cycle_rec.assessment_deadline:
-                        deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y')
-                        deadline_phrase = _("The submission deadline is <b>%s</b>. Please complete and submit your assessments before the deadline.") % deadline_str
-                        summary_str = _("URGENT: %d Pending Assessment(s) Due %s") % (pending_count, deadline_str)
-                        note_str = _("You have %d pending assessment(s) for cycle '%s'. Deadline: %s.") % (pending_count, cycle_name, deadline_str)
-                    else:
-                        deadline_phrase = _("Please complete and submit your assessments at your earliest convenience.")
-                        summary_str = _("Action Required: %d Pending Assessment(s)") % pending_count
-                        note_str = _("You have %d pending assessment(s) for cycle '%s'.") % (pending_count, cycle_name)
-
                     new_cr.execute("""
                         SELECT ca.assessor_id,
                                count(ca.id) as pending_count,
@@ -210,6 +206,20 @@ class CompetencyAssessmentCycle(models.Model):
                         if not partner:
                             continue
 
+                        if cycle_rec.assessment_deadline:
+                            deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y')
+                            deadline_phrase = Markup(_(
+                                "The submission deadline is <b>%s</b>. Please complete and submit your assessments before the deadline."
+                            )) % escape(deadline_str)
+                            summary_str = _("URGENT: %d Pending Assessment(s) Due %s") % (pending_count, deadline_str)
+                            note_str = _("You have %d pending assessment(s) for cycle '%s'. Deadline: %s.") % (
+                                pending_count, cycle_name, deadline_str
+                            )
+                        else:
+                            deadline_phrase = _("Please complete and submit your assessments at your earliest convenience.")
+                            summary_str = _("Action Required: %d Pending Assessment(s)") % pending_count
+                            note_str = _("You have %d pending assessment(s) for cycle '%s'.") % (pending_count, cycle_name)
+
                         names_clean = [n for n in (emp_names or []) if n]
                         emp_names_str = ", ".join(names_clean[:5])
                         extra = _(" and %d more") % (len(names_clean) - 5) if len(names_clean) > 5 else ""
@@ -225,10 +235,11 @@ class CompetencyAssessmentCycle(models.Model):
                         )) % (pending_count, escape(cycle_name or ''), escape(emp_names_str or ''), escape(extra or ''), deadline_phrase)
 
                         target_rec = new_env['competency.assessment'].browse(sample_asm_id) if sample_asm_id else cycle_rec
-                        target_rec._notify_user_inbox_and_activity(
-                            assessor, summary_str, note_str, msg_body, target_rec=target_rec
+                        delivered = target_rec._notify_user_inbox_and_activity(
+                            assessor, summary_str, note_str, msg_body, target_rec=target_rec,
+                            event_key='deadline:%s:%s:%s' % (cycle_id, assessor_id, fields.Date.today()),
                         )
-                        sent_count += 1
+                        sent_count += bool(delivered)
 
                         if sent_count % 100 == 0:
                             new_cr.commit()
@@ -246,7 +257,7 @@ class CompetencyAssessmentCycle(models.Model):
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Deadline Warnings Queued'),
+                'title': _('%s — Deadline Warnings Queued') % cycle_name,
                 'message': _('Deadline warning reminders are being dispatched in the background to %d assessor(s) with pending assessments. Progress will be logged in the cycle chatter.') % len(pending_assessor_ids),
                 'type': 'success',
                 'sticky': False,
@@ -272,7 +283,7 @@ class CompetencyAssessmentCycle(models.Model):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': _('No Pending Assessments'),
+                    'title': _('%s — No Pending Assessments') % self.name,
                     'message': _('All assessments for this cycle have already been submitted!'),
                     'type': 'info',
                     'sticky': False,
@@ -355,10 +366,11 @@ class CompetencyAssessmentCycle(models.Model):
                         )
 
                         target_rec = new_env['competency.assessment'].browse(sample_asm_id) if sample_asm_id else cycle_rec
-                        target_rec._notify_user_inbox_and_activity(
-                            assessor, summary_str, note_str, msg_body, target_rec=target_rec
+                        delivered = target_rec._notify_user_inbox_and_activity(
+                            assessor, summary_str, note_str, msg_body, target_rec=target_rec,
+                            event_key='cycle_open:%s:%s' % (cycle_id, assessor_id),
                         )
-                        sent_count += 1
+                        sent_count += bool(delivered)
 
                         if sent_count % 100 == 0:
                             new_cr.commit()
@@ -376,7 +388,7 @@ class CompetencyAssessmentCycle(models.Model):
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Notifications Queued'),
+                'title': _('%s — Notifications Queued') % cycle_name,
                 'message': _('Cycle opening notifications are being dispatched in the background to %d employee(s)/assessor(s). Progress will be logged in the cycle chatter.') % len(pending_assessor_ids),
                 'type': 'success',
                 'sticky': False,
@@ -429,7 +441,7 @@ class CompetencyAssessmentCycle(models.Model):
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Assessment Cycle Started'),
+                'title': _('%s — Assessment Cycle Started') % cycle_name,
                 'message': _("Assessment cycle '%s' has started! 360-degree assessments are generating in the background. You can continue working.") % cycle_name,
                 'type': 'success',
                 'sticky': False,
@@ -1883,6 +1895,18 @@ class CompetencyAssessment(models.Model):
 
             mapping_name_str = _("Competency Matrix Guidelines (%s)") % (j_name or 'Default')
 
+        # Older role mappings can contain the same competency more than once.
+        # A rating form must have one editable line per competency, even when its
+        # source mapping has repeated rows.
+        unique_line_vals = []
+        seen_competencies = set()
+        for line_vals in raw_line_vals:
+            competency_id = line_vals['competency_id']
+            if competency_id not in seen_competencies:
+                seen_competencies.add(competency_id)
+                unique_line_vals.append(line_vals)
+        raw_line_vals = unique_line_vals
+
         # Check if record is saved (real database integer ID) or unsaved (onchange/NewId)
         if isinstance(self.id, int):
             self.line_ids.sudo().unlink()
@@ -2006,6 +2030,11 @@ class CompetencyAssessment(models.Model):
         return True
 
     def write(self, vals):
+        refresh_primary = bool({'employee_id', 'cycle_id', 'assessment_type', 'active'} & vals.keys())
+        old_primary_keys = (
+            self.with_context(active_test=False).mapped('line_ids')._primary_reporting_keys()
+            if refresh_primary else set()
+        )
         # force_write is only honoured when the caller is a trusted internal context
         # (system superuser or a Competency/System Administrator). Regular users
         # cannot exploit this flag via a JSON-RPC context payload.
@@ -2061,6 +2090,11 @@ class CompetencyAssessment(models.Model):
                         "This assessment is locked for editing and submissions are closed unless HR extends the deadline or enables Override."
                     ) % (deadline_str, rec.cycle_id.name))
         res = super(CompetencyAssessment, self).write(vals)
+        if refresh_primary:
+            new_primary_keys = self.with_context(active_test=False).mapped('line_ids')._primary_reporting_keys()
+            self.env['competency.assessment.line']._refresh_primary_reporting_lines(
+                old_primary_keys | new_primary_keys
+            )
         if vals.get('state') == 'draft':
             for rec in self:
                 if rec.cycle_id and rec.employee_id:
@@ -2070,62 +2104,112 @@ class CompetencyAssessment(models.Model):
                     ]).with_context(force_write=True).write({'is_fully_assessed_notified': False})
         return res
 
-    def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None):
-        """Ensure notification appears in standard Odoo notification channels:
-        1. Live on-screen interactive toast notification (via bus.bus)
-        2. Top Header Clock Icon (mail.activity)
-        3. Top Header Notifications Tray / Inbox (mail.notification with inbox type)
-        """
-        if not target_user or not target_user.active:
-            return
-        rec_to_notify = (target_rec or self).sudo()
+    def unlink(self):
+        primary_keys = self.with_context(active_test=False).mapped('line_ids')._primary_reporting_keys()
+        result = super().unlink()
+        surviving_lines = self.env['competency.assessment.line']._refresh_primary_reporting_lines(primary_keys)
+        if surviving_lines and not self.env.context.get('skip_360_recompute'):
+            surviving_lines._trigger_sibling_360_recompute()
+        return result
 
-        # 1. Live Interactive Web Toast Notification (bus.bus)
-        if target_user.partner_id:
-            try:
+    def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text,
+                                        target_rec=None, event_key=None, activity_deadline=None):
+        """Show a popup and Inbox item, and keep a private history after reading.
+
+        Odoo's Inbox only lists unread notifications and eventually removes read
+        notification rows. Competency history is therefore stored separately.
+        """
+        if not target_user or not target_user.active or not target_user.partner_id:
+            return False
+        rec_to_notify = (target_rec or self).sudo()
+        cycle = (
+            rec_to_notify if rec_to_notify and rec_to_notify._name == 'competency.assessment.cycle'
+            else rec_to_notify.cycle_id if rec_to_notify and rec_to_notify._name == 'competency.assessment'
+            else self.env['competency.assessment.cycle']
+        )
+        cycle_name = cycle.name if cycle else False
+        title = _('%s — %s') % (cycle_name, summary) if cycle_name else summary
+        body = (Markup('<p><strong>%s</strong></p>') % escape(cycle_name) if cycle_name else Markup('')) + escape(msg_text)
+        odoobot = self.env.ref('base.partner_root', raise_if_not_found=False)
+        author_id = odoobot.id if odoobot else False
+
+        history = self.env['competency.notification'].sudo()
+        if event_key and history.search([('event_key', '=', event_key)], limit=1):
+            return False
+        try:
+            with self.env.cr.savepoint():
+                history = history.create({
+                    'user_id': target_user.id,
+                    'cycle_id': cycle.id if cycle else False,
+                    'assessment_id': rec_to_notify.id if rec_to_notify and rec_to_notify._name == 'competency.assessment' else False,
+                    'name': title,
+                    'summary': summary,
+                    'body': body,
+                    'event_key': event_key,
+                })
+        except IntegrityError:
+            # Another broadcast already reserved this event for the recipient.
+            return False
+        except Exception:
+            history = self.env['competency.notification']
+            _logger.exception('Could not save competency notification history for user %s', target_user.id)
+
+        # The bus event is registered by Odoo's simple notification service.
+        try:
+            with self.env.cr.savepoint():
                 self.env['bus.bus'].sudo()._sendone(
                     target_user.partner_id,
                     'simple_notification',
                     {
                         'type': 'info',
-                        'title': summary or _('Competency Notification'),
-                        'message': note or summary,
+                        'title': cycle_name or summary or _('Competency Notification'),
+                        'message': '%s\n%s' % (summary or '', note or ''),
                         'sticky': True,
                     }
                 )
-            except Exception:
-                pass
-
-        # 2. Top Header Clock Icon (Planned Activity)
-        try:
-            rec_to_notify.activity_schedule(
-                'mail.mail_activity_data_todo',
-                summary=summary,
-                note=note,
-                user_id=target_user.id,
-            )
         except Exception:
-            pass
+            _logger.exception('Could not show competency popup for user %s', target_user.id)
 
-        # 3. Document Chatter Message & In-App Notification (authored by OdooBot / System)
-        if target_user.partner_id:
+        # A scheduled activity remains available until the task is completed.
+        if rec_to_notify and 'activity_ids' in rec_to_notify._fields:
             try:
-                odoobot = self.env.ref('base.partner_root', raise_if_not_found=False)
-                author_id = odoobot.id if odoobot else False
-                msg = rec_to_notify.with_context(mail_create_nosubscribe=True).message_post(
-                    body=msg_text,
+                with self.env.cr.savepoint():
+                    existing_activity = rec_to_notify.activity_ids.filtered(
+                        lambda activity: activity.user_id.id == target_user.id and activity.summary == title
+                    )
+                    if not existing_activity:
+                        activity_values = {'date_deadline': activity_deadline} if activity_deadline else {}
+                        rec_to_notify.activity_schedule(
+                            'mail.mail_activity_data_todo',
+                            summary=title,
+                            note=note,
+                            user_id=target_user.id,
+                            **activity_values,
+                        )
+            except Exception:
+                _logger.exception('Could not schedule competency activity for user %s', target_user.id)
+
+        # An unlinked notification has the cycle in its Inbox subject without
+        # exposing a recipient's private assessment details in cycle chatter.
+        try:
+            with self.env.cr.savepoint():
+                msg = self.env['mail.thread'].sudo().message_notify(
+                    body=body,
+                    subject=title,
                     partner_ids=[target_user.partner_id.id],
                     author_id=author_id,
-                    message_type='notification',
                     subtype_xmlid='mail.mt_comment',
                 )
-                # Guarantee an unread in-app inbox notification entry
                 notif = self.env['mail.notification'].sudo().search([
                     ('mail_message_id', '=', msg.id),
                     ('res_partner_id', '=', target_user.partner_id.id),
                 ], limit=1)
                 if notif:
-                    notif.write({'notification_type': 'inbox', 'is_read': False})
+                    notif.write({
+                        'notification_type': 'inbox',
+                        'notification_status': 'sent',
+                        'is_read': False,
+                    })
                 else:
                     self.env['mail.notification'].sudo().create({
                         'mail_message_id': msg.id,
@@ -2134,8 +2218,11 @@ class CompetencyAssessment(models.Model):
                         'notification_status': 'sent',
                         'is_read': False,
                     })
-            except Exception:
-                pass
+                if history:
+                    history.mail_message_id = msg.id
+        except Exception:
+            _logger.exception('Could not save competency Inbox notification for user %s', target_user.id)
+        return True
 
 
     def action_submit(self):
@@ -2175,17 +2262,15 @@ class CompetencyAssessment(models.Model):
 
             # Targeted Notifications & Systray Activities on Submission
             if rec.assessment_type == 'self':
-                # Confirmation activity for employee
+                # Confirmation for the employee in all notification channels.
                 if rec.employee_id and rec.sudo().employee_id.user_id:
-                    try:
-                        rec.sudo().activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('Self-Assessment Submitted: %s') % rec.name,
-                            note=_('Your competency self-assessment %s has been submitted successfully.') % rec.name,
-                            user_id=rec.sudo().employee_id.user_id.id,
-                        )
-                    except Exception:
-                        pass
+                    summary = _('Self-Assessment Submitted: %s') % rec.name
+                    note = _('Your competency self-assessment %s has been submitted successfully.') % rec.name
+                    rec._notify_user_inbox_and_activity(
+                        rec.sudo().employee_id.user_id, summary, note,
+                        Markup('<p>%s</p>') % escape(note), target_rec=rec,
+                        event_key='self_submitted:%s:%s' % (rec.id, rec.sudo().employee_id.user_id.id),
+                    )
 
                 coach_emp = rec.sudo().employee_id.coach_id or rec.sudo().employee_id.parent_id
                 coach_user = coach_emp.user_id if (coach_emp and coach_emp.user_id) else False
@@ -2375,16 +2460,14 @@ class CompetencyAssessment(models.Model):
             rec.with_context(force_write=True).sudo().write({'state': 'supervisor_review'})
             supervisor_user = rec.sudo().employee_id.parent_id.user_id if (rec.employee_id and rec.sudo().employee_id.parent_id) else False
             if supervisor_user:
-                try:
-                    rec.sudo().activity_schedule(
-                        'mail.mail_activity_data_todo',
-                        summary=_('Supervisor Review Needed: Assessment %s') % rec.name,
-                        note=_('Please review and complete assessment for %s.') % (rec.sudo().employee_id.name or 'Employee'),
-                        user_id=supervisor_user.id,
-                        date_deadline=rec.cycle_id.assessment_deadline or fields.Date.context_today(self),
-                    )
-                except Exception:
-                    pass
+                summary = _('Supervisor Review Needed: Assessment %s') % rec.name
+                note = _('Please review and complete assessment for %s.') % (rec.sudo().employee_id.name or 'Employee')
+                rec._notify_user_inbox_and_activity(
+                    supervisor_user, summary, note, Markup('<p>%s</p>') % escape(note),
+                    target_rec=rec,
+                    event_key='supervisor_review:%s:%s' % (rec.id, supervisor_user.id),
+                    activity_deadline=rec.cycle_id.assessment_deadline or fields.Date.context_today(self),
+                )
 
     def action_hr_verify(self):
         for rec in self:
@@ -2458,16 +2541,16 @@ class CompetencyAssessment(models.Model):
                     target_user = emp_sudo.parent_id.user_id
                     
                 if target_user:
-                    try:
-                        asm.sudo().activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('UPCOMING DEADLINE (%d days left): Competency Assessment %s') % (days_left, asm.name),
-                            note=_('Reminder: Your competency assessment %s is due in %d days (Deadline: %s).') % (asm.name, days_left, asm.cycle_id.assessment_deadline),
-                            user_id=target_user.id,
-                            date_deadline=asm.cycle_id.assessment_deadline,
-                        )
-                    except Exception:
-                        pass
+                    summary = _('UPCOMING DEADLINE (%d days left): Competency Assessment %s') % (days_left, asm.name)
+                    note = _('Reminder: Your competency assessment %s is due in %d days (Deadline: %s).') % (
+                        asm.name, days_left, asm.cycle_id.assessment_deadline
+                    )
+                    asm._notify_user_inbox_and_activity(
+                        target_user, summary, note, Markup('<p>%s</p>') % escape(note),
+                        target_rec=asm,
+                        event_key='upcoming_deadline:%s:%s:%s' % (asm.id, target_user.id, days_left),
+                        activity_deadline=asm.cycle_id.assessment_deadline,
+                    )
 
         # 2. Overdue Assessments (Deadline reached or passed)
         overdue_assessments = self.search([
@@ -2484,34 +2567,57 @@ class CompetencyAssessment(models.Model):
                 target_user = emp_sudo.parent_id.user_id
                 
             if target_user:
-                try:
-                    asm.sudo().activity_schedule(
-                        'mail.mail_activity_data_todo',
-                        summary=_('OVERDUE: Competency Assessment %s') % asm.name,
-                        note=_('URGENT: Competency Assessment %s passed its deadline (%s) and is overdue for completion.') % (asm.name, asm.cycle_id.assessment_deadline),
-                        user_id=target_user.id,
-                        date_deadline=today,
-                    )
-                except Exception:
-                    pass
+                summary = _('OVERDUE: Competency Assessment %s') % asm.name
+                note = _('URGENT: Competency Assessment %s passed its deadline (%s) and is overdue for completion.') % (
+                    asm.name, asm.cycle_id.assessment_deadline
+                )
+                asm._notify_user_inbox_and_activity(
+                    target_user, summary, note, Markup('<p>%s</p>') % escape(note),
+                    target_rec=asm,
+                    event_key='overdue:%s:%s:%s' % (asm.id, target_user.id, today),
+                    activity_deadline=today,
+                )
 
-    def get_achievement_summary_sentence(self):
+    def get_reporting_lines(self):
+        """One official line per competency for this employee and cycle."""
+        self.ensure_one()
+        lines = self.env['competency.assessment.line'].sudo().search([
+            ('employee_id', '=', self.employee_id.id),
+            ('cycle_id', '=', self.cycle_id.id),
+            ('active', '=', True),
+        ])
+        by_competency = {}
+        for line in sorted(lines, key=lambda l: (
+            not l.is_primary_reporting_line,
+            l.assessment_id.assessment_type != 'self',
+            l.assessment_id.assessment_type not in ('supervisor', 'team'),
+            l.id,
+        )):
+            if line.assessment_id.active:
+                by_competency.setdefault(line.competency_id.id, line.id)
+        return self.env['competency.assessment.line'].sudo().browse(
+            list(by_competency.values())
+        )
+
+    def get_achievement_summary_sentence(self, reporting=False):
         """Returns plain-language alignment sentence for this assessment."""
         self.ensure_one()
-        total = len(self.line_ids)
+        lines = self.get_reporting_lines() if reporting else self.line_ids
+        total = len(lines)
         if not total:
             return _("No competencies rated for position %s.") % (self.job_id.name if self.job_id else 'N/A')
-        meets_or_exceeds = len(self.line_ids.filtered(lambda l: l.achievement_status in ('meets', 'exceeds')))
+        meets_or_exceeds = len(lines.filtered(lambda l: l.achievement_status in ('meets', 'exceeds')))
         pct = round((meets_or_exceeds / total) * 100, 1)
         job_name = self.job_id.name if self.job_id else 'assigned position'
         return _("Employee meets %d of %d required competencies (%s%% alignment) for position %s.") % (
             meets_or_exceeds, total, pct, job_name
         )
 
-    def get_recommended_development_actions(self):
+    def get_recommended_development_actions(self, reporting=False):
         """Returns recommended development action mappings for below-target competencies."""
         self.ensure_one()
-        below_lines = self.line_ids.filtered(lambda l: l.achievement_status == 'below')
+        lines = self.get_reporting_lines() if reporting else self.line_ids
+        below_lines = lines.filtered(lambda l: l.achievement_status == 'below')
         recommendations = []
         for line in below_lines:
             comp_name = line.competency_id.name
@@ -2540,6 +2646,66 @@ class CompetencyAssessmentLine(models.Model):
     """One competency rating line inside an assessment."""
     _name = 'competency.assessment.line'
     _description = 'Competency Assessment Line'
+
+    @api.model
+    def _register_hook(self):
+        result = super()._register_hook()
+        # Existing databases may have saved every rater's line as "primary".
+        # Repair the flags from normal module code when the registry starts;
+        # no migration script or historical rating deletion is required.
+        self._repair_legacy_primary_reporting_flags()
+        return result
+
+    @api.model
+    def _repair_legacy_primary_reporting_flags(self, cycle_ids=None):
+        """Elect one visible line per employee/cycle/competency in existing data."""
+        marker = 'competency_management.primary_reporting_flags_v2'
+        parameters = self.env['ir.config_parameter'].sudo()
+        if cycle_ids is None:
+            # Registry hooks may run in several workers at once.
+            self.env.cr.execute('SELECT pg_advisory_xact_lock(%s)', (77191362246015,))
+            if parameters.get_param(marker):
+                return 0
+        elif not cycle_ids:
+            return 0
+
+        self.env.flush_all()
+        cycle_filter = 'AND line.cycle_id = ANY(%s)' if cycle_ids is not None else ''
+        params = (list(cycle_ids),) if cycle_ids is not None else ()
+        self.env.cr.execute("""
+            WITH ranked AS MATERIALIZED (
+                SELECT line.id,
+                       COALESCE(line.active, FALSE) AND COALESCE(assessment.active, FALSE)
+                       AND ROW_NUMBER() OVER (
+                           PARTITION BY line.employee_id, line.cycle_id, line.competency_id
+                           ORDER BY
+                               CASE WHEN line.active AND assessment.active THEN 0 ELSE 1 END,
+                               CASE
+                                   WHEN assessment.assessment_type = 'self' THEN 0
+                                   WHEN assessment.assessment_type IN ('supervisor', 'team') THEN 1
+                                   ELSE 2
+                               END,
+                               line.id
+                       ) = 1 AS is_primary
+                  FROM competency_assessment_line AS line
+                  JOIN competency_assessment AS assessment ON assessment.id = line.assessment_id
+                 WHERE line.employee_id IS NOT NULL
+                   AND line.cycle_id IS NOT NULL
+                   AND line.competency_id IS NOT NULL
+                   %s
+            )
+            UPDATE competency_assessment_line AS line
+               SET is_primary_reporting_line = ranked.is_primary
+              FROM ranked
+             WHERE line.id = ranked.id
+               AND line.is_primary_reporting_line IS DISTINCT FROM ranked.is_primary
+        """ % cycle_filter, params)
+        updated = self.env.cr.rowcount
+        self.invalidate_model(['is_primary_reporting_line'])
+        if cycle_ids is None:
+            parameters.set_param(marker, 'done')
+        _logger.info('Repaired primary reporting flags on %s competency lines', updated)
+        return updated
 
     @api.model
     def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
@@ -2611,6 +2777,29 @@ class CompetencyAssessmentLine(models.Model):
             'target': 'new',
             'context': self.env.context,
         }
+
+    def _action_open_readonly_detail(self, view_xmlid):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Competency Detail: %s') % (self.competency_id.name or ''),
+            'res_model': 'competency.assessment.line',
+            'res_id': self.id,
+            'view_mode': 'form',
+            'views': [(self.env.ref(view_xmlid).id, 'form')],
+            'target': 'new',
+            'context': dict(self.env.context, create=False, edit=False, delete=False),
+        }
+
+    def action_open_evaluation_detail(self):
+        """Show the same anonymized details used by My Evaluation Results."""
+        return self._action_open_readonly_detail(
+            'competency_management.view_my_competency_evaluation_line_form')
+
+    def action_open_report_detail(self):
+        """Show the reporting summary and behavioral guidance for this line."""
+        return self._action_open_readonly_detail(
+            'competency_management.view_competency_assessment_line_report_form')
 
     tna_measure = fields.Selection([
         ('below', 'Underqualified'),
@@ -2823,6 +3012,27 @@ class CompetencyAssessmentLine(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        requested_keys = [
+            (vals.get('assessment_id'), vals.get('competency_id'))
+            for vals in vals_list
+            if vals.get('assessment_id') and vals.get('competency_id')
+        ]
+        if len(requested_keys) != len(set(requested_keys)):
+            raise ValidationError(_(
+                "This competency already has a rating line in the assessment. "
+                "Edit the existing line instead of adding it again."
+            ))
+        if requested_keys:
+            existing_lines = self.sudo().with_context(active_test=False).search([
+                ('assessment_id', 'in', list({key[0] for key in requested_keys})),
+                ('competency_id', 'in', list({key[1] for key in requested_keys})),
+            ])
+            if any((line.assessment_id.id, line.competency_id.id) in requested_keys
+                   for line in existing_lines):
+                raise ValidationError(_(
+                    "This competency already has a rating line in the assessment. "
+                    "Edit the existing line instead of adding it again."
+                ))
         force_write = self.env.context.get('force_write')
         is_admin = bool(
             self.env.user.has_group('competency_management.group_competency_admin')
@@ -2851,11 +3061,14 @@ class CompetencyAssessmentLine(models.Model):
                             "Only the assigned assessor (%s) or an HR / People Solution Officer with Override can input ratings."
                         ) % (asm.assessor_id.name or 'Assessor'))
         lines = super().create(vals_list)
+        self._refresh_primary_reporting_lines(lines._primary_reporting_keys())
         if not self.env.context.get('skip_360_recompute'):
             lines._trigger_sibling_360_recompute()
         return lines
 
     def write(self, vals):
+        refresh_primary = bool({'assessment_id', 'competency_id', 'active'} & vals.keys())
+        old_primary_keys = self._primary_reporting_keys() if refresh_primary else set()
         # force_write is only honoured when the caller is a trusted internal context
         force_write = self.env.context.get('force_write') and (
             self.env.su
@@ -2905,9 +3118,84 @@ class CompetencyAssessmentLine(models.Model):
                                 "Rating lines cannot be edited after the deadline."
                             ) % (deadline_str, asm.cycle_id.name))
         res = super().write(vals)
+        if refresh_primary:
+            self._refresh_primary_reporting_lines(old_primary_keys | self._primary_reporting_keys())
         if ('current_level' in vals or 'state' in vals) and not self.env.context.get('skip_360_recompute'):
             self._trigger_sibling_360_recompute()
         return res
+
+    def unlink(self):
+        primary_keys = self._primary_reporting_keys()
+        result = super().unlink()
+        surviving_lines = self._refresh_primary_reporting_lines(primary_keys)
+        if surviving_lines and not self.env.context.get('skip_360_recompute'):
+            surviving_lines._trigger_sibling_360_recompute()
+        return result
+
+    def _primary_reporting_keys(self):
+        return {
+            (line.employee_id.id, line.cycle_id.id, line.competency_id.id)
+            for line in self
+            if line.employee_id and line.cycle_id and line.competency_id
+        }
+
+    @api.model
+    def _refresh_primary_reporting_lines(self, keys):
+        """Keep one visible reporting line for each employee/cycle/competency."""
+        if not keys:
+            return self.browse()
+
+        # Serialize writers for each group so concurrent assessors cannot both
+        # commit a primary before either transaction sees the other's line.
+        for key in sorted(keys):
+            lock_name = 'competency.primary.%s.%s.%s' % key
+            lock_id = int.from_bytes(
+                hashlib.blake2b(lock_name.encode(), digest_size=8).digest(),
+                byteorder='big', signed=True,
+            )
+            self.env.cr.execute('SELECT pg_advisory_xact_lock(%s)', (lock_id,))
+
+        employees, cycles, competencies = (set(column) for column in zip(*keys))
+        siblings = self.sudo().with_context(active_test=False).search([
+            ('employee_id', 'in', list(employees)),
+            ('cycle_id', 'in', list(cycles)),
+            ('competency_id', 'in', list(competencies)),
+        ])
+        relevant_lines = siblings.filtered(
+            lambda line: (line.employee_id.id, line.cycle_id.id, line.competency_id.id) in keys
+        )
+        by_key = {}
+        for line in relevant_lines:
+            key = (line.employee_id.id, line.cycle_id.id, line.competency_id.id)
+            by_key.setdefault(key, []).append(line)
+
+        to_clear = siblings.browse()
+        to_select = siblings.browse()
+        for group in by_key.values():
+            active_lines = [line for line in group if line.active and line.assessment_id.active]
+            primary = min(active_lines, key=lambda line: (
+                0 if line.assessment_id.assessment_type == 'self' else
+                1 if line.assessment_id.assessment_type in ('supervisor', 'team') else 2,
+                line.id,
+            )) if active_lines else False
+            for line in group:
+                should_select = bool(primary and line.id == primary.id)
+                if bool(line.is_primary_reporting_line) != should_select:
+                    if should_select:
+                        to_select |= line
+                    else:
+                        to_clear |= line
+
+        # Clear first so no group briefly has two selected lines during a refresh.
+        if to_clear:
+            to_clear.sudo().with_context(skip_360_recompute=True).write({
+                'is_primary_reporting_line': False,
+            })
+        if to_select:
+            to_select.sudo().with_context(skip_360_recompute=True).write({
+                'is_primary_reporting_line': True,
+            })
+        return relevant_lines.filtered('active')
 
     def _trigger_sibling_360_recompute(self):
         config = self.env['competency.matrix.config'].sudo().get_active_config()
@@ -3002,12 +3290,16 @@ class CompetencyAssessmentLine(models.Model):
         string='Is Primary Reporting Line', compute='_compute_is_primary_reporting_line', store=True, index=True,
         help='Designates the single consolidated line per (employee, cycle, competency) used for reporting views.')
 
-    @api.depends('assessment_id.assessment_type', 'assessment_id.employee_id', 'assessment_id.cycle_id', 'competency_id')
+    @api.depends('assessment_id.assessment_type', 'assessment_id.employee_id',
+                 'assessment_id.cycle_id', 'assessment_id.active', 'competency_id', 'active')
     def _compute_is_primary_reporting_line(self):
-        lines_with_data = self.filtered(lambda l: l.employee_id and l.cycle_id and l.competency_id)
+        lines_with_data = self.filtered(
+            lambda l: l.active and l.assessment_id.active
+            and l.employee_id and l.cycle_id and l.competency_id
+        )
         if not lines_with_data:
             for line in self:
-                line.is_primary_reporting_line = True
+                line.is_primary_reporting_line = False
             return
 
         emp_ids = list({l.employee_id.id for l in lines_with_data})
@@ -3018,6 +3310,7 @@ class CompetencyAssessmentLine(models.Model):
             ('employee_id', 'in', emp_ids),
             ('cycle_id', 'in', cycle_ids),
             ('competency_id', 'in', comp_ids),
+            ('assessment_id.active', '=', True),
         ], order='id asc')
 
         grouped_lines = {}
@@ -3038,16 +3331,46 @@ class CompetencyAssessmentLine(models.Model):
                     primary_ids.add(lines_list[0].id)
 
         for line in self:
-            if line.employee_id and line.cycle_id and line.competency_id:
+            if line.active and line.assessment_id.active and line.employee_id and line.cycle_id and line.competency_id:
                 line.is_primary_reporting_line = (line.id in primary_ids)
             else:
-                line.is_primary_reporting_line = True
+                line.is_primary_reporting_line = False
 
     @api.constrains('competency_id')
     def _check_competency_status(self):
         for line in self:
             if line.competency_id and line.competency_id.state == 'retired':
                 raise ValidationError(_("The competency '%s' is retired and cannot be assessed.") % line.competency_id.name)
+
+    @api.constrains('assessment_id', 'competency_id', 'active')
+    def _check_one_line_per_competency(self):
+        """Prevent a mapping or manual edit from repeating a competency in one form."""
+        keys = {
+            (line.assessment_id.id, line.competency_id.id)
+            for line in self
+            if line.active and line.assessment_id and line.competency_id
+        }
+        if not keys:
+            return
+        assessment_ids = sorted({assessment_id for assessment_id, _competency_id in keys})
+        competency_ids = sorted({competency_id for _assessment_id, competency_id in keys})
+        # A lock on each assessment also closes the concurrent-create race.
+        for assessment_id in assessment_ids:
+            self.env.cr.execute('SELECT pg_advisory_xact_lock(%s)', (77191362246016 + assessment_id,))
+        self.env.cr.execute("""
+            SELECT assessment_id, competency_id
+              FROM competency_assessment_line
+             WHERE active
+               AND assessment_id = ANY(%s)
+               AND competency_id = ANY(%s)
+             GROUP BY assessment_id, competency_id
+            HAVING COUNT(*) > 1
+        """, (assessment_ids, competency_ids))
+        if any(key in keys for key in self.env.cr.fetchall()):
+            raise ValidationError(_(
+                "This competency already has a rating line in the assessment. "
+                "Edit the existing line instead of adding it again."
+            ))
 
     @api.depends('current_level', 'required_level', 'weighted_current_level')
     def _compute_level_nums(self):

@@ -413,13 +413,11 @@ class TestKmsPhase5E2E(TransactionCase):
 
     def test_10_immutable_audit_log_security_guard(self):
         """FR-KMS-022, Section 10 NFR: Immutable audit log security guard prevents write and unlink."""
-        log = self.KmsAuditLog.sudo().create({
-            'user_id': self.user_emp.id,
-            'action': 'view',
-            'resource_type': 'document',
-            'resource_name': 'Confidential Audit Test Log',
-            'details': 'Employee viewed document',
-        })
+        log = self.KmsAuditLog.with_user(self.user_emp)._log_audit_event(
+            action='view', resource_type='document',
+            resource_name='Confidential Audit Test Log',
+            details='Employee viewed document',
+        )
 
         # Attempt to modify audit log record -> UserError
         with self.assertRaises(UserError) as cm_write:

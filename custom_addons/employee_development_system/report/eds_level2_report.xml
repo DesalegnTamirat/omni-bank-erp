@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="action_report_eds_level2" model="ir.actions.report">
-        <field name="name">Pre/Post Assessment Sheet (EDS-F-03)</field>
+        <field name="name">Pre/Post Assessment Sheet</field>
         <field name="model">eds.evaluation.level2</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">employee_development_system.report_eds_level2_document</field>
@@ -22,11 +22,6 @@
                                     <td>
                                         <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
                                         <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
-                                    </td>
-                                    <td style="text-align: right; vertical-align: top;">
-                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
-                                            EDS-F-03
-                                        </span>
                                     </td>
                                 </tr>
                             </table>
@@ -63,7 +58,7 @@
 
                         <!-- Formula Banner -->
                         <div style="background-color: #eef2f7; border: 1px solid #d0dbe5; padding: 6px 10px; font-size: 8.5pt; margin-bottom: 15px; border-radius: 4px;">
-                            <strong>Official Bank Formulas:</strong> Pre-test % = Pre ÷ Total × 100 | Post-test % = Post ÷ Total × 100 | Knowledge Gain % = Post % − Pre % | Status = <strong>PASS</strong> if Post % &gt;= Pass Mark, otherwise <strong>FAIL</strong>.
+                            <strong>Assessment Formulas:</strong> Graded question points determine each assessment percentage. Legacy raw marks use marks ÷ total × 100. Knowledge Gain % = Post % − Pre % | Status = <strong>PASS</strong> if Post % &gt;= Pass Mark, otherwise <strong>FAIL</strong>.
                         </div>
 
                         <!-- Assessment Score Summary -->
@@ -84,12 +79,22 @@
                                     <td style="text-align: left;"><strong t-field="o.employee_id.name"/></td>
                                     <td><span t-esc="o.employee_id.barcode or 'N/A'"/></td>
                                     <td>
-                                        <span t-esc="'%.1f / %.1f' % (o.pre_test_score, o.total_marks)"/><br/>
-                                        <small class="text-muted">(<span t-esc="'{:.1f}%'.format(o.pre_test_pct)"/>)</small>
+                                        <t t-if="o.pre_assessment_id">
+                                            <strong t-esc="'{:.1f}%'.format(o.pre_test_pct)"/>
+                                        </t>
+                                        <t t-else="">
+                                            <span t-esc="'%.1f / %.1f' % (o.pre_test_score, o.total_marks)"/><br/>
+                                            <small class="text-muted">(<span t-esc="'{:.1f}%'.format(o.pre_test_pct)"/>)</small>
+                                        </t>
                                     </td>
                                     <td>
-                                        <strong t-esc="'%.1f / %.1f' % (o.post_test_score, o.total_marks)"/><br/>
-                                        <small class="text-muted">(<strong t-esc="'{:.1f}%'.format(o.post_test_pct)"/>)</small>
+                                        <t t-if="o.post_assessment_id">
+                                            <strong t-esc="'{:.1f}%'.format(o.post_test_pct)"/>
+                                        </t>
+                                        <t t-else="">
+                                            <span t-esc="'%.1f / %.1f' % (o.post_test_score, o.total_marks)"/><br/>
+                                            <small class="text-muted">(<strong t-esc="'{:.1f}%'.format(o.post_test_pct)"/>)</small>
+                                        </t>
                                     </td>
                                     <td style="color: #006600; font-weight: bold;">
                                         <span t-esc="'{:+.1f}%'.format(o.learning_gain)"/>

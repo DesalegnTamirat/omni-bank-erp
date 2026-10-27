@@ -46,7 +46,7 @@
                             <field name="candidate_count"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Candidate Assessments &amp; Readiness" name="candidates">
                             <field name="candidate_line_ids">
                                 <list editable="bottom">

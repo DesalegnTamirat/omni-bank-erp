@@ -88,6 +88,8 @@
                         <button name="action_approve" string="Approve &amp; Publish" type="object" class="btn-success" invisible="state != 'review'" groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
                         <button name="action_reject" string="Return to Draft" type="object" class="btn-secondary" invisible="state != 'review'" groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
                         <button name="action_create_new_version" string="Initiate Revision (New Version)" type="object" class="btn-outline-primary" invisible="state != 'approved'" groups="knowledge_management.group_kms_contributor,knowledge_management.group_kms_manager"/>
+                        <button name="action_view_document" string="View Document" type="object" class="btn-primary" invisible="not file_size"/>
+                        <button name="action_preview_document" string="First Page Preview" type="object" class="btn-secondary" invisible="not file_size or not is_pdf"/>
                         <button name="action_download_watermarked" string="Download Protected Copy" type="object" class="btn-info" invisible="not file_size or is_view_only"/>
                         <button name="action_archive" string="Archive / Supersede" type="object" class="btn-outline-danger" invisible="state != 'approved'" groups="knowledge_management.group_kms_manager"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,review,approved,archived"/>
@@ -100,12 +102,12 @@
                             <button name="action_view_versions" type="object" class="oe_stat_button" icon="fa-history">
                                 <field name="version" string="Version" widget="statinfo"/>
                             </button>
-                            <div class="oe_stat_button" role="status">
+                            <button name="action_view_read_history" type="object" class="oe_stat_button" icon="fa-eye">
                                 <field name="view_count" string="Views" widget="statinfo"/>
-                            </div>
-                            <div class="oe_stat_button" role="status">
+                            </button>
+                            <button name="action_view_download_history" type="object" class="oe_stat_button" icon="fa-download">
                                 <field name="download_count" string="Downloads" widget="statinfo"/>
-                            </div>
+                            </button>
                         </div>
 
                         <div class="oe_title">
@@ -152,6 +154,7 @@
                                     <field name="file_data" filename="file_name" widget="binary" groups="knowledge_management.group_kms_contributor"/>
                                     <field name="file_name" invisible="1"/>
                                     <field name="file_size" string="Size (Bytes)" readonly="1"/>
+                                    <field name="is_pdf" invisible="1"/>
                                     <field name="mimetype" readonly="1"/>
                                 </group>
                                 <group string="Executive Summary &amp; Scope">
@@ -217,7 +220,7 @@
                     <filter name="filter_my_docs" string="My Authored Documents" domain="[('owner_id.user_id', '=', uid)]"/>
                     <filter name="filter_view_only" string="View-Only Documents" domain="[('is_view_only', '=', True)]"/>
                     <separator/>
-                    <filter name="filter_archived" string="Archived" domain="[('active', '=', False)]"/>
+                    <filter name="filter_archived" string="Archived" domain="[('state', '=', 'archived')]"/>
 
                     <separator/>
                     <group>

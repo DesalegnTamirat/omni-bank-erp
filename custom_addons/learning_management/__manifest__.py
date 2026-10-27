@@ -2,7 +2,7 @@
 {
     'name': "Bunna Learning Management System (LMS)",
     'summary': "Structured digital training platform, secure video streaming, learning paths, quizzes, automated certification, and compliance analytics.",
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.1.4',
     'category': 'Human Resources/Learning',
     'author': 'Bunna Bank S.C.',
     'website': 'https://www.bunnabanksc.com',
@@ -13,7 +13,8 @@ Bunna Bank Learning Management System (LMS)
 Operationalizes BRD Part 3 Module 2 requirements for employee training and compliance learning:
 - Course creation and lifecycle management (Draft, Review, Published, Superseded/Archived).
 - Structured Learning Paths with linear or optional/branched prerequisite pathways.
-- Internal secure video hosting with chunked/adaptive range streaming (no YouTube dependency).
+- Authenticated progressive video streaming with HTTP Range support (no YouTube dependency).
+- Responsive Odoo web learning interface for desktop and mobile browsers.
 - Anti-cheat learning controls: anti-skip fast-forward prevention, resume capability, and mandatory completion gates.
 - Timed assessment engine: randomized question pools, attempt caps, cooldown intervals, and automated instant grading.
 - Automatic PDF certificate generation with unique security verification hash and public online validation page.
@@ -25,6 +26,7 @@ Operationalizes BRD Part 3 Module 2 requirements for employee training and compl
         'base',
         'auth_ldap',
         'auth_totp',
+        'auditlog',
         'hr',
         'mail',
         'portal',
@@ -39,8 +41,10 @@ Operationalizes BRD Part 3 Module 2 requirements for employee training and compl
         'security/ir.model.access.csv',
         'data/lms_sequence.xml',
         'data/lms_default_data.xml',
+        'data/lms_audit_setup.xml',
         'views/lms_category_views.xml',
         'views/lms_course_views.xml',
+        'views/lms_kms_library_views.xml',
         'views/lms_learning_path_views.xml',
         'views/lms_assignment_views.xml',
         'views/lms_enrollment_views.xml',

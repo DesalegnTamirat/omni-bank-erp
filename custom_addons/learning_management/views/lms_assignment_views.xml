@@ -9,6 +9,7 @@
                 <list string="Course Assignment Campaigns" decoration-info="state == 'draft'" decoration-success="state == 'executed'">
                     <field name="name"/>
                     <field name="course_id"/>
+                    <field name="learning_path_id" optional="show"/>
                     <field name="assignment_type" widget="badge"/>
                     <field name="is_mandatory" widget="boolean_toggle"/>
                     <field name="due_date"/>
@@ -34,7 +35,7 @@
                         </div>
                         <group>
                             <group string="Course &amp; Urgency">
-                                <field name="course_id" options="{'no_create': True}"/>
+                                <field name="course_id" options="{'no_create': True}" invisible="learning_path_id"/>
                                 <field name="learning_path_id" options="{'no_create': True}"/>
                                 <field name="is_mandatory"/>
                                 <field name="due_date"/>

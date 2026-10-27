@@ -89,3 +89,59 @@ class TestEdsTnaPmsPull(TransactionCase):
         wizard2.action_pull_pms_gaps()
         entries_after = self.tna_cycle.entry_ids.filtered(lambda e: e.source == 'pms' and e.employee_id == self.employee)
         self.assertEqual(len(entries_after), 1, "Duplicate TNA entries for same employee and cycle should be skipped.")
+
+    def test_restricted_cycle_filters_pms_mappings_without_losing_gap(self):
+        if 't3.appraisal' not in self.env:
+            return
+        unit = self.env['operating.unit'].create({
+            'name': 'EDS PMS Restriction Unit', 'sol_id': 987653,
+            'work_unit_type': 'head_office',
+        })
+        job = self.env['hr.job'].create({'name': 'EDS PMS Restriction Job'})
+        objective = self.env['performance.objective'].create({
+            'name': 'EDS PMS Restriction Objective', 'employee_id': self.employee.id,
+        })
+        parent_measure = self.env['performance.measure'].create({
+            'name': 'EDS PMS Parent Measure', 'objective_id': objective.id,
+            'weight': 100.0,
+        })
+        kpi = self.env['performance.job.objective'].create({
+            'name': 'EDS PMS Restriction KPI', 'operating_unit_id': unit.id,
+            'job_id': job.id, 'parent_measure_id': parent_measure.id,
+            'measure_ids': [(0, 0, {
+                'name': 'EDS Loan Documentation Accuracy', 'weight': 100.0,
+                'target_type': 'percent',
+            })],
+        })
+        measure = kpi.measure_ids
+        self.appraisal.line_ids.write({'job_measure_id': measure.id})
+        courses = self.env['eds.course'].create([
+            {'name': 'EDS PMS Offered Course', 'code': 'EDS-PMS-01', 'status': 'active'},
+            {'name': 'EDS PMS Excluded Course', 'code': 'EDS-PMS-02', 'status': 'active'},
+            {'name': 'EDS PMS Unrelated Course', 'code': 'EDS-PMS-03', 'status': 'active'},
+        ])
+        for course in courses[:2]:
+            self.env['eds.course.pms.line'].create({
+                'course_id': course.id, 'job_measure_id': measure.id,
+                'min_threshold': 75.0,
+            })
+
+        for selected_course, expected_course in ((courses[0], courses[0]),
+                                                 (courses[2], self.env['eds.course'])):
+            cycle = self.env['eds.tna.cycle'].create({
+                'state': 'collecting', 'restrict_tna_courses': True,
+                'request_course_ids': [(6, 0, selected_course.ids)],
+            })
+            self.env['eds.pms.gap.import'].create({
+                'cycle_id': cycle.id, 'max_score_threshold': 75.0,
+                'state_filter': 'all_evaluated',
+                'department_id': self.dept.id,
+            }).action_pull_pms_gaps()
+            entry = cycle.diagnostic_entry_ids.filtered(
+                lambda need: need.employee_id == self.employee and need.pms_measure_id == measure)
+            self.assertEqual(len(entry), 1)
+            self.assertEqual(entry.suggested_course_ids, expected_course)
+            self.assertEqual(entry.cycle_course_status,
+                             'offered' if expected_course else 'not_offered')
+            cycle._sync_course_demand()
+            self.assertEqual(cycle.course_summary_ids.course_id, expected_course)

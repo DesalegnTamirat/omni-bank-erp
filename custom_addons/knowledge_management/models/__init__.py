@@ -10,3 +10,4 @@ from . import kms_expert
 from . import kms_audit_log
 from . import kms_gamification
 from . import res_users
+from . import kms_rule_cache

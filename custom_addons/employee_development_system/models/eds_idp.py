@@ -2,9 +2,11 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
+from .eds_action_notification import clear_action_activities, notify_action, role_users
+
 
 class EdsIdp(models.Model):
-    """Individual Development Plan (FREDS052)."""
+    """Individual Development Plan."""
     _name = 'eds.idp'
     _description = 'Individual Development Plan (IDP)'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -60,6 +62,10 @@ class EdsIdp(models.Model):
                 raise UserError(_("Only draft IDPs can be submitted."))
             rec.state = 'submitted'
             rec.message_post(body=_("IDP %s submitted for manager review.") % rec.name)
+            reviewer = rec.manager_id.user_id or role_users(rec, 'group_eds_officer')
+            notify_action(rec, reviewer, _('Review development plan'),
+                          _('Development plan %s for %s needs manager review.')
+                          % (rec.name, rec.employee_id.name))
 
     def action_approve(self):
         for rec in self:
@@ -68,6 +74,11 @@ class EdsIdp(models.Model):
                 raise UserError(_("Only submitted IDPs can be approved."))
             rec.state = 'approved'
             rec.message_post(body=_("IDP %s approved by manager.") % rec.name)
+            clear_action_activities(rec)
+            notify_action(rec, rec.employee_id.user_id,
+                          _('Development plan approved'),
+                          _('Your development plan %s was approved. You can begin its activities.')
+                          % rec.name, action_required=False)
 
     def action_start(self):
         for rec in self:
@@ -81,6 +92,10 @@ class EdsIdp(models.Model):
                 raise UserError(_("Only approved or in-progress IDPs can be completed."))
             rec.state = 'completed'
             rec.message_post(body=_("IDP %s marked as completed.") % rec.name)
+            notify_action(rec, rec.employee_id.user_id,
+                          _('Development plan completed'),
+                          _('Your development plan %s is marked complete.') % rec.name,
+                          action_required=False)
 
 
 class EdsIdpLine(models.Model):
@@ -109,7 +124,7 @@ class EdsIdpLine(models.Model):
 
 
 class EdsSelfDevelopment(models.Model):
-    """Self-directed learning activity logged by employee (FREDS053)."""
+    """Self-directed learning activity logged by employee."""
     _name = 'eds.self.development'
     _description = 'Employee Self-Development Activity'
     _inherit = ['mail.thread', 'mail.activity.mixin']

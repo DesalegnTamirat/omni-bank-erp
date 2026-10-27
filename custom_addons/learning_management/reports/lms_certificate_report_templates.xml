@@ -18,26 +18,25 @@
         <template id="report_lms_certificate">
             <t t-call="web.basic_layout">
                 <t t-foreach="docs" t-as="o">
+                    <t t-set="template" t-value="o.template_id.sudo()"/>
                     <div class="page" style="border: 8px double #541718; padding: 40px; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #fffcf9; min-height: 700px; position: relative;">
                         
                         <!-- Header / Crest -->
                         <div style="margin-bottom: 25px;">
+                            <img t-if="template and template.logo" t-att-src="image_data_uri(template.logo)" alt="Institutional crest" style="max-height: 72px; max-width: 180px; margin-bottom: 10px;"/>
                             <h2 style="color: #541718; letter-spacing: 4px; font-weight: bold; margin-bottom: 5px; font-size: 26px;">
                                 BUNNA BANK S.C.
                             </h2>
                             <h4 style="color: #c17540; letter-spacing: 2px; text-transform: uppercase; font-size: 14px; margin-top: 0;">
-                                People Performance &amp; Development Directorate — E-Academy
+                                <t t-out="template.subtitle_text if template and template.subtitle_text else 'People Performance &amp; Development Directorate — E-Academy'"/>
                             </h4>
                             <hr style="border: 1px solid #541718; width: 60%; margin: 15px auto;"/>
                         </div>
 
                         <div style="margin-top: 30px; margin-bottom: 20px;">
                             <h1 style="color: #1d2b32; font-size: 32px; letter-spacing: 3px; font-weight: 800; text-transform: uppercase;">
-                                Certificate of Completion
+                                <t t-out="template.header_text if template and template.header_text else 'Certificate of Completion'"/>
                             </h1>
-                            <p style="font-size: 16px; color: #555; margin-top: 10px;">
-                                This certifies that
-                            </p>
                         </div>
 
                         <!-- Learner Name -->
@@ -52,9 +51,7 @@
 
                         <!-- Course Title -->
                         <div style="margin: 25px 0; padding: 0 40px;">
-                            <p style="font-size: 15px; color: #333; line-height: 1.6;">
-                                has successfully fulfilled all educational requirements and passed the comprehensive examination for
-                            </p>
+                            <div style="font-size: 15px; color: #333; line-height: 1.6;" t-out="o._certificate_body_html()"/>
                             <h3 style="color: #1d2b32; font-size: 22px; font-weight: 700; margin: 15px 0;">
                                 <span t-field="o.course_id.name"/>
                             </h3>
@@ -66,9 +63,10 @@
                         <!-- Signatures & Verification -->
                         <div style="margin-top: 60px; display: table; width: 100%;">
                             <div style="display: table-cell; width: 33%; text-align: center;">
+                                <img t-if="template and template.signatory_1_signature" t-att-src="image_data_uri(template.signatory_1_signature)" alt="First signatory signature" style="max-height: 45px; max-width: 140px;"/>
                                 <div style="border-top: 1px solid #1d2b32; width: 80%; margin: 0 auto; padding-top: 6px;">
-                                    <strong style="color: #1d2b32; font-size: 13px;">Chief Human Resources Officer</strong>
-                                    <div style="font-size: 11px; color: #777;">People Performance &amp; Development</div>
+                                    <strong style="color: #1d2b32; font-size: 13px;"><t t-out="template.signatory_1_name if template and template.signatory_1_name else 'Chief Human Resources Officer'"/></strong>
+                                    <div style="font-size: 11px; color: #777;"><t t-out="template.signatory_1_title if template and template.signatory_1_title else 'People Performance &amp; Development'"/></div>
                                 </div>
                             </div>
 
@@ -81,9 +79,10 @@
                             </div>
 
                             <div style="display: table-cell; width: 33%; text-align: center;">
+                                <img t-if="template and template.signatory_2_signature" t-att-src="image_data_uri(template.signatory_2_signature)" alt="Second signatory signature" style="max-height: 45px; max-width: 140px;"/>
                                 <div style="border-top: 1px solid #1d2b32; width: 80%; margin: 0 auto; padding-top: 6px;">
-                                    <strong style="color: #1d2b32; font-size: 13px;">Chief Executive Officer</strong>
-                                    <div style="font-size: 11px; color: #777;">Bunna Bank S.C.</div>
+                                    <strong style="color: #1d2b32; font-size: 13px;"><t t-out="template.signatory_2_name if template and template.signatory_2_name else 'Chief Executive Officer'"/></strong>
+                                    <div style="font-size: 11px; color: #777;"><t t-out="template.signatory_2_title if template and template.signatory_2_title else 'Bunna Bank S.C.'"/></div>
                                 </div>
                             </div>
                         </div>

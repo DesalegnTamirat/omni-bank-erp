@@ -1,0 +1,13 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.zip
+*.dump
+tmp
+.env
+*.env
+*.env.local
+LMS_DEPLOYMENT_READINESS_PLAN.md
+

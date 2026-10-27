@@ -57,7 +57,7 @@
 
         <!-- Group: L&D Manager -->
         <record id="group_eds_manager" model="res.groups">
-            <field name="name">L&amp;D Manager / Team Leader</field>
+            <field name="name">L&amp;D Manager</field>
             <field name="sequence">50</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
             <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
@@ -73,6 +73,29 @@
             <field name="comment">Full access to EDS configuration, framework approval authority and integration jobs.</field>
         </record>
 
+        <!-- EDS-wide roles are shared by every workflow addressed to these offices. -->
+        <record id="group_eds_team_leader" model="res.groups">
+            <field name="name">Team Leader</field>
+            <field name="sequence">51</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
+            <field name="comment">Checks and acts on EDS work routed to the Team Leader.</field>
+        </record>
+        <record id="group_eds_director" model="res.groups">
+            <field name="name">Director PPDD</field>
+            <field name="sequence">52</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
+            <field name="comment">Reviews and acts on EDS work routed to the Director PPDD.</field>
+        </record>
+        <record id="group_eds_chief" model="res.groups">
+            <field name="name">Chief</field>
+            <field name="sequence">61</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="implied_ids" eval="[(6, 0, [ref('employee_development_system.group_eds_manager')])]"/>
+            <field name="comment">Approves and acts on EDS work routed to the Chief.</field>
+        </record>
+
         <!-- Group: Executive (read-only dashboards/reports) -->
         <record id="group_eds_executive" model="res.groups">
             <field name="name">Executive (Read-Only)</field>
@@ -84,8 +107,8 @@
         <record id="rule_eds_manager_work_unit_employee_read" model="ir.rule">
             <field name="name">EDS Work Unit Leader Employee Directory</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
-            <field name="domain_force">[('default_operating_unit_id', 'in', user.env['eds.hr.compat'].get_managed_operating_units().ids)]</field>
-            <field name="groups" eval="[(4, ref('group_eds_line_manager'))]"/>
+            <field name="domain_force">user.env['eds.hr.compat'].get_managed_employee_read_domain()</field>
+            <field name="groups" eval="[(6, 0, [ref('group_eds_employee')])]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
@@ -173,11 +196,11 @@
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
 
-        <!-- TNA Cycle: employee can read collecting, consolidating, approved and locked cycles -->
+        <!-- TNA Cycle: employees can read cycles open for requests and closed cycles. -->
         <record id="rule_eds_tna_cycle_employee" model="ir.rule">
-            <field name="name">Employee Open and Approved TNA Cycles</field>
+            <field name="name">Employee Open and Closed TNA Cycles</field>
             <field name="model_id" ref="employee_development_system.model_eds_tna_cycle"/>
-            <field name="domain_force">[('state', 'in', ('collecting', 'consolidating', 'under_approval', 'approved', 'locked'))]</field>
+            <field name="domain_force">[('state', 'in', ('collecting', 'closed'))]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -516,14 +539,25 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Assessment scores are managed by L&amp;D staff. -->
+        <!-- Employees can answer only their own distributed assessments;
+             the model write methods additionally restrict writable fields and states. -->
         <record id="rule_eds_assessment_employee_own" model="ir.rule">
-            <field name="name">Employee Own Assessments</field>
+            <field name="name">Employee Own Sent Assessments</field>
             <field name="model_id" ref="employee_development_system.model_eds_assessment"/>
-            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id), ('distributed_at', '!=', False)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_assessment_employee_distributed_write" model="ir.rule">
+            <field name="name">Employee Own Distributed Assessment Write</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id), ('entry_method', '=', 'employee'), ('state', '=', 'distributed')]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
         </record>
@@ -537,6 +571,71 @@
             <field name="name">Assessment Multi Company</field>
             <field name="model_id" ref="employee_development_system.model_eds_assessment"/>
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <!-- Older installations marked the employee read rule as noupdate. A new
+             global read rule keeps unsent staff drafts private after upgrades. -->
+        <record id="rule_eds_assessment_sent_visibility" model="ir.rule">
+            <field name="name">Unsent Assessments Remain With L&amp;D</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment"/>
+            <field name="domain_force">[(1, '=', 1)] if user.has_group('employee_development_system.group_eds_officer') or user.has_group('employee_development_system.group_eds_executive') or user.has_group('base.group_system') else [('distributed_at', '!=', False)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_eds_assessment_question_employee_own" model="ir.rule">
+            <field name="name">Own Distributed Assessment Questions</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_question"/>
+            <field name="domain_force">[('answer_ids', 'in', user.env['eds.assessment.answer'].sudo().search([('assessment_id.employee_id.user_id', '=', user.id), ('assessment_id.distributed_at', '!=', False)]).ids)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_assessment_question_staff" model="ir.rule">
+            <field name="name">Assessment Questions L&amp;D Staff</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_question"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_assessment_question_multi_company" model="ir.rule">
+            <field name="name">Assessment Questions Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_question"/>
+            <field name="domain_force">['|', ('session_id.company_id', '=', False), ('session_id.company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="rule_eds_assessment_answer_employee_own" model="ir.rule">
+            <field name="name">Own Assessment Answers</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_answer"/>
+            <field name="domain_force">[('assessment_id.employee_id.user_id', '=', user.id), ('assessment_id.distributed_at', '!=', False)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_assessment_answer_employee_distributed_write" model="ir.rule">
+            <field name="name">Employee Own Distributed Assessment Answers Write</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_answer"/>
+            <field name="domain_force">[('assessment_id.employee_id.user_id', '=', user.id), ('assessment_id.entry_method', '=', 'employee'), ('assessment_id.state', '=', 'distributed')]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_assessment_answer_staff" model="ir.rule">
+            <field name="name">Assessment Answers L&amp;D Staff</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_answer"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_assessment_answer_multi_company" model="ir.rule">
+            <field name="name">Assessment Answers Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_answer"/>
+            <field name="domain_force">['|', ('assessment_id.company_id', '=', False), ('assessment_id.company_id', 'in', company_ids)]</field>
         </record>
 
         <!-- materials are L&D-internal documents -->

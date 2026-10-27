@@ -3,7 +3,8 @@ import base64
 from unittest.mock import patch
 from cryptography.fernet import InvalidToken
 from odoo.tests.common import TransactionCase
-from odoo.addons.knowledge_management.controllers.main import KmsDocumentController
+from odoo.exceptions import AccessError
+from odoo.addons.knowledge_management.controllers.main import KmsDocumentController, KmsDigitalLibraryController
 from odoo.addons.knowledge_management.utils.encryption import encrypt_document_data, decrypt_document_data
 
 
@@ -136,8 +137,18 @@ class TestKmsPhase4Functional(TransactionCase):
             'file_data': base64.b64encode(b'PDF Content'),
             'file_name': 'basel3.pdf',
         })
+        with self.assertRaises(AccessError):
+            lib_item.with_user(self.user_fin).read(['file_data'])
 
-        lib_item.with_user(self.user_hr).action_read_resource()
+        library_controller = KmsDigitalLibraryController()
+        read_action = lib_item.with_user(self.user_hr).action_read_resource()
+        self.assertEqual(read_action['url'], f'/kms/library/{lib_item.id}/view')
+        self.assertEqual(lib_item.view_count, 0)
+        dummy_req_hr = DummyRequest(self.env, self.user_hr)
+        with patch('odoo.addons.knowledge_management.controllers.main.request', dummy_req_hr):
+            response = library_controller.kms_view_library_resource(lib_item.id)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(lib_item.view_count, 1)
         log_read = self.KmsAuditLog.search([
             ('resource_type', '=', 'digital_library'),
             ('action', '=', 'view'),
@@ -145,7 +156,13 @@ class TestKmsPhase4Functional(TransactionCase):
         ], limit=1)
         self.assertTrue(log_read, 'Reading digital library item must create audit log entry')
 
-        lib_item.with_user(self.user_hr).action_download_resource()
+        download_action = lib_item.with_user(self.user_hr).action_download_resource()
+        self.assertEqual(download_action['url'], f'/kms/library/{lib_item.id}/download')
+        self.assertEqual(lib_item.download_count, 0)
+        with patch('odoo.addons.knowledge_management.controllers.main.request', dummy_req_hr):
+            response = library_controller.kms_download_library_resource(lib_item.id)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(lib_item.download_count, 1)
         log_dl = self.KmsAuditLog.search([
             ('resource_type', '=', 'digital_library'),
             ('action', '=', 'download'),
@@ -222,6 +239,7 @@ class TestKmsPhase4Functional(TransactionCase):
         ], limit=1)
         self.assertTrue(log_lesson, 'Creating lesson learned must create audit log entry')
 
+        self.user_hr.write({'group_ids': [(4, self.env.ref('knowledge_management.group_kms_reviewer').id)]})
         lesson.with_user(self.user_hr).action_approve()
         log_appr = self.KmsAuditLog.search([
             ('resource_type', '=', 'lesson_learned'),

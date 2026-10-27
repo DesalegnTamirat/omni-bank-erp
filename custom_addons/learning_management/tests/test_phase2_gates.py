@@ -221,10 +221,172 @@ class TestLmsPhase2Gates(TransactionCase):
         self.assertTrue(enrollment.pre_assessment_passed, "pre_assessment_passed must be set to True on enrollment")
 
         # 5. Now action_start_course and video streaming succeed
-        enrollment.with_user(self.learner_user).action_start_course()
+        start_action = enrollment.with_user(self.learner_user).action_start_course()
         self.assertEqual(enrollment.state, 'in_progress')
+        self.assertEqual(start_action['type'], 'ir.actions.act_url')
+        self.assertIn('/lms/video/%s/player' % lesson.id, start_action['url'])
         auth_ok, _, _ = controller._check_video_access(lesson.id, env=env_learner)
         self.assertTrue(auth_ok)
+
+    def test_module_quiz_pass_credits_lesson_and_opens_final_exam(self):
+        """A failed quiz stays gated; a passing attempt credits only its enrollment."""
+        course = self.LmsCourse.create({
+            'name': 'Module quiz completion course',
+            'category_id': self.category.id,
+            'instructor_id': self.instructor_employee.id,
+            'state': 'published',
+            'description': '<p>Course description</p>',
+            'issue_certificate': False,
+        })
+        reading = self.LmsLesson.create({
+            'name': 'Read first', 'course_id': course.id,
+            'lesson_type': 'text', 'html_content': '<p>Read.</p>',
+            'is_mandatory': True,
+        })
+        question = self.LmsQuestion.create({
+            'name': 'Quiz question', 'question_text': '<p>Choose yes.</p>',
+            'question_type': 'single_choice', 'points': 1,
+        })
+        correct = self.LmsQuestionAnswer.create({
+            'question_id': question.id, 'answer_text': 'Yes', 'is_correct': True,
+        })
+        wrong = self.LmsQuestionAnswer.create({
+            'question_id': question.id, 'answer_text': 'No', 'is_correct': False,
+        })
+        quiz = self.LmsAssessment.create({
+            'name': 'Module check', 'course_id': course.id,
+            'assessment_type': 'module_quiz', 'cooldown_hours': 0,
+            'use_random_pool': False, 'fixed_question_ids': [(4, question.id)],
+            'instructions': '<p>Answer the quiz.</p>',
+        })
+        quiz_lesson = self.LmsLesson.create({
+            'name': 'Quiz lesson', 'course_id': course.id,
+            'lesson_type': 'quiz', 'assessment_id': quiz.id,
+            'is_mandatory': True,
+        })
+        final = self.LmsAssessment.create({
+            'name': 'Final check', 'course_id': course.id,
+            'assessment_type': 'post_course', 'use_random_pool': False,
+            'fixed_question_ids': [(4, question.id)],
+            'instructions': '<p>Answer the final.</p>',
+        })
+        course.write({'post_assessment_id': final.id})
+        enrollment = self.LmsEnrollment.create({
+            'employee_id': self.learner_employee.id, 'course_id': course.id,
+        })
+        other_enrollment = self.LmsEnrollment.create({
+            'employee_id': self.instructor_employee.id, 'course_id': course.id,
+        })
+
+        reading_progress = enrollment.lesson_progress_ids.filtered(lambda p: p.lesson_id == reading)
+        quiz_progress = enrollment.lesson_progress_ids.filtered(lambda p: p.lesson_id == quiz_lesson)
+        other_quiz_progress = other_enrollment.lesson_progress_ids.filtered(
+            lambda p: p.lesson_id == quiz_lesson)
+        reading_progress.with_user(self.learner_user).action_open_lesson()
+        reading_progress.with_user(self.learner_user).mark_completed()
+        with self.assertRaises(UserError):
+            final.with_user(self.learner_user).action_start_exam(enrollment)
+
+        failed_action = quiz_progress.with_user(self.learner_user).action_open_lesson()
+        failed = self.LmsExamSession.browse(failed_action['res_id'])
+        failed.line_ids.with_user(self.learner_user).write({
+            'selected_answer_ids': [(6, 0, [wrong.id])],
+        })
+        failed.with_user(self.learner_user).action_submit_and_grade()
+        self.assertEqual(failed.state, 'failed')
+        self.assertNotEqual(quiz_progress.state, 'completed')
+        with self.assertRaises(UserError):
+            final.with_user(self.learner_user).action_start_exam(enrollment)
+
+        passed_action = quiz_progress.with_user(self.learner_user).action_open_lesson()
+        passed = self.LmsExamSession.browse(passed_action['res_id'])
+        passed.line_ids.with_user(self.learner_user).write({
+            'selected_answer_ids': [(6, 0, [correct.id])],
+        })
+        passed.with_user(self.learner_user).action_submit_and_grade()
+        self.assertEqual(passed.state, 'passed')
+        self.assertEqual(quiz_progress.state, 'completed')
+        self.assertEqual(quiz_progress.completion_method, 'quiz_pass')
+        self.assertTrue(quiz_progress.date_completed)
+        self.assertNotEqual(other_quiz_progress.state, 'completed')
+        self.assertEqual(enrollment.state, 'in_progress')
+
+        final_action = final.with_user(self.learner_user).action_start_exam(enrollment)
+        final_session = self.LmsExamSession.browse(final_action['res_id'])
+        final_session.line_ids.with_user(self.learner_user).write({
+            'selected_answer_ids': [(6, 0, [correct.id])],
+        })
+        final_session.with_user(self.learner_user).action_submit_and_grade()
+        self.assertEqual(enrollment.state, 'completed')
+        self.assertEqual(other_enrollment.state, 'enrolled')
+
+    def test_shared_quiz_assessment_credits_only_unlocked_lesson(self):
+        """A pass cannot credit a later quiz behind a required reading lesson."""
+        course = self.LmsCourse.create({
+            'name': 'Repeated module check course',
+            'category_id': self.category.id,
+            'instructor_id': self.instructor_employee.id,
+            'state': 'published',
+            'description': '<p>Course description</p>',
+            'has_post_assessment': False,
+            'issue_certificate': False,
+        })
+        question = self.LmsQuestion.create({
+            'name': 'Shared question', 'question_text': '<p>Choose yes.</p>',
+            'question_type': 'single_choice', 'points': 1,
+        })
+        correct = self.LmsQuestionAnswer.create({
+            'question_id': question.id, 'answer_text': 'Yes', 'is_correct': True,
+        })
+        assessment = self.LmsAssessment.create({
+            'name': 'Shared module check', 'course_id': course.id,
+            'assessment_type': 'module_quiz', 'cooldown_hours': 0,
+            'use_random_pool': False, 'fixed_question_ids': [(4, question.id)],
+            'instructions': '<p>Answer the quiz.</p>',
+        })
+        first_quiz = self.LmsLesson.create({
+            'name': 'First quiz', 'course_id': course.id,
+            'lesson_type': 'quiz', 'assessment_id': assessment.id,
+            'is_mandatory': True,
+        })
+        reading = self.LmsLesson.create({
+            'name': 'Required reading', 'course_id': course.id,
+            'lesson_type': 'text', 'html_content': '<p>Read.</p>',
+            'is_mandatory': True,
+        })
+        later_quiz = self.LmsLesson.create({
+            'name': 'Later quiz', 'course_id': course.id,
+            'lesson_type': 'quiz', 'assessment_id': assessment.id,
+            'is_mandatory': True,
+        })
+        enrollment = self.LmsEnrollment.create({
+            'employee_id': self.learner_employee.id, 'course_id': course.id,
+        })
+        first_progress = enrollment.lesson_progress_ids.filtered(lambda p: p.lesson_id == first_quiz)
+        reading_progress = enrollment.lesson_progress_ids.filtered(lambda p: p.lesson_id == reading)
+        later_progress = enrollment.lesson_progress_ids.filtered(lambda p: p.lesson_id == later_quiz)
+
+        first_action = first_progress.with_user(self.learner_user).action_open_lesson()
+        first_session = self.LmsExamSession.browse(first_action['res_id'])
+        first_session.line_ids.with_user(self.learner_user).write({
+            'selected_answer_ids': [(6, 0, [correct.id])],
+        })
+        first_session.with_user(self.learner_user).action_submit_and_grade()
+        self.assertEqual(first_session.state, 'passed')
+        self.assertEqual(first_progress.state, 'completed')
+        self.assertNotEqual(reading_progress.state, 'completed')
+        self.assertNotEqual(later_progress.state, 'completed')
+
+        reading_progress.with_user(self.learner_user).action_open_lesson()
+        reading_progress.with_user(self.learner_user).mark_completed()
+        later_action = later_progress.with_user(self.learner_user).action_open_lesson()
+        later_session = self.LmsExamSession.browse(later_action['res_id'])
+        later_session.line_ids.with_user(self.learner_user).write({
+            'selected_answer_ids': [(6, 0, [correct.id])],
+        })
+        later_session.with_user(self.learner_user).action_submit_and_grade()
+        self.assertEqual(later_progress.state, 'completed')
+        self.assertEqual(enrollment.state, 'completed')
 
     def test_06_learning_path_sequencing(self):
         """Fix 6: Learning path sequence locks subsequent courses until prerequisites are completed."""
@@ -370,6 +532,11 @@ class TestLmsPhase2Gates(TransactionCase):
             'instructor_id': self.instructor_employee.id,
             'description': '<p>Course description</p>',
             'state': 'draft',
+            'has_post_assessment': False,
+        })
+        self.LmsLesson.create({
+            'name': 'State Guard Reading', 'course_id': course.id,
+            'lesson_type': 'text', 'html_content': '<p>Read this lesson.</p>',
         })
         # Learner / non-manager cannot set state to published or archived
         with self.assertRaises(AccessError):
@@ -377,8 +544,9 @@ class TestLmsPhase2Gates(TransactionCase):
         with self.assertRaises(AccessError):
             course.with_user(self.learner_user).write({'state': 'archived'})
 
-        # LMS Manager CAN set state to published and archived
-        course.with_user(self.manager_user).write({'state': 'published'})
+        # LMS Manager can publish after review and archive the course.
+        course.with_user(self.manager_user).action_submit_for_review()
+        course.with_user(self.manager_user).action_publish()
         self.assertEqual(course.state, 'published')
         course.with_user(self.manager_user).write({'state': 'archived'})
         self.assertEqual(course.state, 'archived')
@@ -455,7 +623,7 @@ class TestLmsPhase2Gates(TransactionCase):
         self.LmsLesson.create({
             'name': 'Intro to Risk',
             'course_id': course_v1.id,
-            'lesson_type': 'document',
+            'lesson_type': 'text',
             'html_content': '<p>Content</p>',
         })
         # Publish v1
@@ -548,7 +716,9 @@ class TestLmsPhase2Gates(TransactionCase):
         })
         with self.assertRaises(AccessError):
             video.with_user(self.learner_user).read(['video_file'])
-        enrollment.lesson_progress_ids.filtered(lambda progress: progress.lesson_id == lesson).with_user(
-            self.learner_user
-        ).mark_completed()
+        reading_progress = enrollment.lesson_progress_ids.filtered(
+            lambda progress: progress.lesson_id == lesson
+        ).with_user(self.learner_user)
+        reading_progress.action_open_lesson()
+        reading_progress.mark_completed()
         self.assertEqual(enrollment.state, 'completed')

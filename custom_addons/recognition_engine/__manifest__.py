@@ -2,7 +2,7 @@
 {
     'name': 'Bunna Bank - Unified Recognition & Gamification Engine',
     'summary': 'Unified gamification points ledger, leaderboard, and monthly awards across KMS and LMS.',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'category': 'Human Resources/Gamification',
     'author': 'Bunna Bank S.C.',
     'website': 'https://www.bunnabanksc.com',

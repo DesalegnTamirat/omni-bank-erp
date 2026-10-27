@@ -1,0 +1,44 @@
+# Isolated CI only; credentials and volumes here must not be used in production.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: ci_lms_only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  odoo:
+    build:
+      context: ../..
+      dockerfile: deploy/production/Dockerfile
+      args:
+        ODOO_BASE_IMAGE: ${ODOO_TEST_IMAGE:-odoo:19.0}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: ci_lms_only
+    volumes:
+      - test_filestore:/var/lib/odoo
+    command:
+      - odoo
+      - -d
+      - lms_ci
+      - -i
+      - learning_management,employee_development_system
+      - --test-enable
+      - --test-tags
+      - /learning_management,/employee_development_system:TestEdsLmsRoutingFeedback,/knowledge_management:TestKmsAccessIntegrity.test_contributor_can_notify_reviewer_without_hr_private_access,/performance_management:TestPerformanceUserGroupAssignment
+      - --stop-after-init
+      - --log-level=test
+
+volumes:
+  test_filestore:
+

@@ -1,0 +1,195 @@
+.o_eds_dashboard {
+    --eds-dashboard-accent: #541718;
+    --eds-dashboard-ink: #1d2b32;
+    --eds-dashboard-bronze: #c17540;
+    --eds-dashboard-muted: #69757c;
+    --eds-dashboard-border: #e8e4df;
+    width: 100%;
+    max-width: 1440px !important;
+    margin: 0 auto !important;
+    padding: 30px 34px 38px !important;
+    background: #fcfbfa;
+}
+
+.o_eds_dashboard .eds-dashboard-header,
+.o_eds_dashboard .eds-section-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.o_eds_dashboard .eds-dashboard-header {
+    padding: 24px 27px;
+    margin-bottom: 27px;
+    color: #fff;
+    background: var(--eds-dashboard-accent);
+    border-top: 4px solid var(--eds-dashboard-bronze);
+    border-radius: 12px;
+}
+
+.o_eds_dashboard .eds-dashboard-header .eds-eyebrow {
+    color: #f1c8a2;
+}
+
+.o_eds_dashboard .eds-dashboard-header h1 {
+    color: #fff;
+}
+
+.o_eds_dashboard .eds-dashboard-header .eds-dashboard-meta,
+.o_eds_dashboard .eds-dashboard-header .eds-live-label {
+    color: #f1e5e3;
+}
+
+.o_eds_dashboard .eds-eyebrow {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--eds-dashboard-accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.o_eds_dashboard h1,
+.o_eds_dashboard h2,
+.o_eds_dashboard p {
+    margin-top: 0;
+}
+
+.o_eds_dashboard h1 {
+    margin-bottom: 7px;
+    color: var(--eds-dashboard-ink);
+    font-size: clamp(25px, 2.5vw, 32px);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}
+
+.o_eds_dashboard h2 {
+    margin-bottom: 0;
+    color: var(--eds-dashboard-ink);
+    font-size: 19px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.o_eds_dashboard .eds-dashboard-meta,
+.o_eds_dashboard .eds-section-heading p {
+    margin-bottom: 0;
+    color: var(--eds-dashboard-muted);
+    font-size: 13px;
+}
+
+.o_eds_dashboard .eds-dashboard-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.o_eds_dashboard .eds-live-label {
+    flex: 0 0 auto;
+    color: var(--eds-dashboard-muted);
+    font-size: 12px;
+}
+
+.o_eds_dashboard .eds-live-label .fa {
+    margin-right: 5px;
+    color: #d6a06c;
+    font-size: 8px;
+    vertical-align: middle;
+}
+
+.o_eds_dashboard .eds-section-heading {
+    margin-bottom: 18px;
+}
+
+.o_eds_dashboard .eds-kpi-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 212px;
+    height: 100%;
+    padding: 21px 22px 18px;
+    background: #fff;
+    border: 1px solid var(--eds-dashboard-border);
+    border-top: 3px solid var(--eds-dashboard-accent);
+    border-radius: 13px;
+    box-shadow: 0 5px 18px rgb(45 34 31 / 4%);
+}
+
+.o_eds_dashboard .eds-kpi-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-bottom: 16px;
+    color: var(--eds-dashboard-accent);
+    background: #f7eeee;
+    border-radius: 9px;
+    font-size: 15px;
+}
+
+.o_eds_dashboard .eds-kpi-label {
+    color: var(--eds-dashboard-muted);
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+}
+
+.o_eds_dashboard .eds-kpi-value {
+    margin: 6px 0 5px;
+    color: var(--eds-dashboard-accent);
+    font-size: 38px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+}
+
+.o_eds_dashboard .eds-kpi-value .o_field_widget {
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+}
+
+.o_eds_dashboard .eds-kpi-card p {
+    margin-bottom: 13px;
+    color: var(--eds-dashboard-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.o_eds_dashboard button.eds-card-link {
+    align-self: flex-start;
+    margin-top: auto;
+    padding: 0;
+    color: var(--eds-dashboard-accent);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: left;
+}
+
+.o_eds_dashboard button.eds-card-link:hover,
+.o_eds_dashboard button.eds-card-link:focus-visible {
+    color: #351316;
+    text-decoration: underline;
+}
+
+@media (max-width: 767px) {
+    .o_eds_dashboard {
+        padding: 21px 16px 28px !important;
+    }
+
+    .o_eds_dashboard .eds-dashboard-header,
+    .o_eds_dashboard .eds-section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .o_eds_dashboard .eds-kpi-card {
+        min-height: 175px;
+    }
+}

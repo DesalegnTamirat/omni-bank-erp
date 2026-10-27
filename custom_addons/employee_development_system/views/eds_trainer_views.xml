@@ -58,116 +58,187 @@
                         <button name="action_mark_reviewed" string="Mark Reviewed" type="object"
                                 invisible="state != 'active'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_print_profile" string="Print Trainer Profile (EDS-F-06)" type="object" icon="fa-print"
+                        <button name="action_print_profile" string="Print Trainer Profile" type="object" icon="fa-print"
                                 groups="employee_development_system.group_eds_trainer,employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
+                        <div class="oe_title">
+                            <h1><field name="name" placeholder="Trainer name"
+                                       readonly="trainer_type == 'internal' and employee_id" force_save="1"/></h1>
+                        </div>
                         <group>
-                            <group string="Trainer Profile &amp; Contact">
-                                <field name="trainer_type"/>
-                                <field name="trainer_id_code"/>
-                                <field name="employee_id" invisible="trainer_type != 'internal'" required="trainer_type == 'internal'"/>
-                                <field name="external_partner_id" invisible="trainer_type != 'external'"/>
-                                <field name="external_provider_id" invisible="trainer_type != 'external'"/>
-                                <field name="name" readonly="trainer_type == 'internal' and employee_id"/>
-                                <field name="organization_name" invisible="trainer_type != 'external'"/>
-                                <field name="job_title"/>
-                                <field name="phone"/>
-                                <field name="email"/>
+                            <group string="Profile &amp; Contact">
+                                <field name="trainer_type" widget="badge" readonly="1" force_save="1"/>
+                                <field name="employee_id" invisible="trainer_type != 'internal'"
+                                       required="trainer_type == 'internal'" options="{'no_create': True}"/>
+                                <field name="external_provider_id" string="Training Organization"
+                                       invisible="trainer_type != 'external'" options="{'no_create': True}"/>
+                                <field name="employee_job_position" invisible="trainer_type != 'internal'" readonly="1"/>
+                                <field name="employee_phone" invisible="trainer_type != 'internal'" readonly="1"/>
+                                <field name="employee_email" invisible="trainer_type != 'internal'" readonly="1"/>
+                                <field name="job_title" string="Specialization" invisible="trainer_type != 'external'"/>
+                                <field name="phone" invisible="trainer_type != 'external'"/>
+                                <field name="email" invisible="trainer_type != 'external'"/>
                                 <field name="address" invisible="trainer_type != 'external'"/>
                             </group>
-                            <group string="Qualifications &amp; Review">
-                                <field name="tot_certified"/>
-                                <field name="avg_rating" readonly="1"/>
-                                <field name="rating_count" readonly="1"/>
-                                <field name="banking_experience_years" invisible="trainer_type != 'external'"/>
+                            <group string="Experience &amp; Review">
+                                <field name="tot_certified" invisible="trainer_type != 'internal'"/>
                                 <field name="trainer_experience_years"/>
+                                <field name="banking_experience_years" invisible="trainer_type != 'external'"/>
                                 <field name="institutions_worked_with" invisible="trainer_type != 'external'"/>
                                 <field name="competency_ids" widget="many2many_tags"/>
-                                <field name="review_cycle_months" invisible="trainer_type != 'internal'"/>
-                                <field name="last_review_date" invisible="trainer_type != 'internal'"/>
+                                <field name="avg_rating" readonly="1"/>
+                                <field name="rating_count" readonly="1"/>
+                                <field name="review_cycle_months"/>
+                                <field name="last_review_date" readonly="1"/>
                                 <field name="next_review_date" readonly="1"/>
+                                <field name="review_overdue" readonly="1"/>
                             </group>
                         </group>
-                        <notebook>
-                            <page string="ToT Certifications" name="certs">
-                                <field name="tot_certificate_ids">
-                                    <list editable="bottom">
-                                        <field name="name"/>
-                                        <field name="issued_by"/>
-                                        <field name="issued_date"/>
-                                        <field name="expiry_date"/>
-                                        <field name="status" widget="badge"/>
-                                    </list>
-                                </field>
+                        <notebook class="o_eds_notebook">
+                            <page string="Qualifications" name="qualifications">
+                                <group string="ToT Certifications">
+                                    <field name="tot_certificate_ids" nolabel="1">
+                                        <list>
+                                            <field name="name"/>
+                                            <field name="issued_by"/>
+                                            <field name="issued_date"/>
+                                            <field name="expiry_date"/>
+                                            <field name="status" widget="badge"/>
+                                            <field name="filename" string="File"/>
+                                            <button name="action_preview_document" string="Preview" type="object"
+                                                    icon="fa-eye" invisible="not filename"/>
+                                            <button name="action_download_document" string="Download" type="object"
+                                                    icon="fa-download" invisible="not filename"/>
+                                        </list>
+                                        <form string="ToT Certification">
+                                            <header>
+                                                <button name="action_preview_document" string="Preview" type="object"
+                                                        invisible="not filename"/>
+                                                <button name="action_download_document" string="Download" type="object"
+                                                        invisible="not filename"/>
+                                            </header>
+                                            <sheet>
+                                                <group>
+                                                    <field name="name"/>
+                                                    <field name="issued_by"/>
+                                                    <field name="issued_date"/>
+                                                    <field name="expiry_date"/>
+                                                    <field name="status" readonly="1"/>
+                                                    <field name="document" widget="binary" filename="filename"
+                                                           options="{'accepted_file_extensions': '.pdf,.png,.jpg,.jpeg'}"/>
+                                                    <field name="filename" invisible="1"/>
+                                                </group>
+                                            </sheet>
+                                        </form>
+                                    </field>
+                                </group>
+                                <group string="Education &amp; Other Certifications">
+                                    <field name="education_ids" nolabel="1">
+                                        <list editable="bottom">
+                                            <field name="degree_title"/>
+                                            <field name="field_of_study"/>
+                                            <field name="institution_name"/>
+                                            <field name="year_obtained"/>
+                                        </list>
+                                    </field>
+                                </group>
+                                <group string="Certified Expertise">
+                                    <field name="expertise_ids" nolabel="1">
+                                        <list editable="bottom">
+                                            <field name="subject_domain"/>
+                                            <field name="course_topics"/>
+                                            <field name="target_level"/>
+                                            <field name="years_experience"/>
+                                        </list>
+                                    </field>
+                                </group>
                             </page>
-                            <page string="Availability" name="availability">
-                                <field name="availability_ids">
-                                    <list editable="bottom">
-                                        <field name="date_start"/>
-                                        <field name="date_end"/>
-                                        <field name="state"/>
-                                        <field name="note"/>
-                                    </list>
-                                </field>
+                            <page string="Schedule &amp; Reviews" name="schedule_reviews">
+                                <group string="Availability">
+                                    <field name="availability_ids" nolabel="1">
+                                        <list editable="bottom">
+                                            <field name="date_start"/>
+                                            <field name="date_end"/>
+                                            <field name="state"/>
+                                            <field name="note"/>
+                                        </list>
+                                    </field>
+                                </group>
+                                <group string="Performance Reviews">
+                                    <field name="quarterly_review_ids" nolabel="1">
+                                        <list editable="bottom">
+                                            <field name="period"/>
+                                            <field name="review_date"/>
+                                            <field name="reviewer_id"/>
+                                            <field name="rating"/>
+                                            <field name="strengths"/>
+                                            <field name="improvements"/>
+                                            <field name="action_plan"/>
+                                        </list>
+                                    </field>
+                                </group>
                             </page>
-                            <page string="Quarterly Reviews" name="reviews">
-                                <field name="quarterly_review_ids">
-                                    <list editable="bottom">
-                                        <field name="period"/>
-                                        <field name="review_date"/>
-                                        <field name="reviewer_id"/>
-                                        <field name="rating"/>
-                                        <field name="strengths"/>
-                                        <field name="improvements"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Participant Feedback" name="feedback">
+                            <page string="Participant Feedback" name="feedback"
+                                  groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin">
+                                <div class="alert alert-info" role="note">
+                                    A submitted employee Level-1 questionnaire appears here for trainers assigned to its session.
+                                    Its trainer score describes the session as a whole when several trainers taught together.
+                                </div>
                                 <field name="feedback_ids">
                                     <list editable="bottom">
+                                        <field name="eligible_session_ids" invisible="1"/>
+                                        <field name="eligible_participant_ids" invisible="1"/>
+                                        <field name="session_id" domain="[('id', 'in', eligible_session_ids)]"
+                                               options="{'no_create': True}"/>
+                                        <field name="participant_id" domain="[('id', 'in', eligible_participant_ids)]"
+                                               options="{'no_create': True}"/>
                                         <field name="date"/>
-                                        <field name="level"/>
-                                        <field name="participant_id"/>
-                                        <field name="rating"/>
+                                        <field name="source_kind" readonly="1"/>
+                                        <field name="rating" readonly="source_kind == 'level1'"/>
+                                        <field name="score_pct" readonly="1"/>
                                         <field name="comment"/>
                                     </list>
                                 </field>
+                                <group string="Daily Session Feedback (from Delivery)">
+                                    <field name="daily_feedback_ids" nolabel="1" readonly="1">
+                                        <list create="false" edit="false" delete="false">
+                                            <field name="session_id"/>
+                                            <field name="employee_id"/>
+                                            <field name="feedback_date"/>
+                                            <field name="rating"/>
+                                            <field name="comment"/>
+                                        </list>
+                                    </field>
+                                </group>
                             </page>
-                            <page string="Education &amp; Qualifications (EDS-F-06)" name="education">
-                                <field name="education_ids">
-                                    <list editable="bottom">
-                                        <field name="degree_title"/>
-                                        <field name="field_of_study"/>
-                                        <field name="institution_name"/>
-                                        <field name="year_obtained"/>
-                                    </list>
-                                </field>
+                            <page string="Delivery History" name="delivery_hist">
+                                <group string="EDS Sessions Assigned">
+                                    <field name="session_ids" nolabel="1" readonly="1">
+                                        <list create="false" edit="false" delete="false">
+                                            <field name="name"/>
+                                            <field name="course_id"/>
+                                            <field name="date_start"/>
+                                            <field name="status" widget="badge"/>
+                                            <field name="enrolled_count"/>
+                                        </list>
+                                    </field>
+                                </group>
+                                <group string="Previous Training Outside EDS">
+                                    <field name="delivery_history_ids" nolabel="1">
+                                        <list editable="bottom">
+                                            <field name="program_title"/>
+                                            <field name="client_organization"/>
+                                            <field name="delivery_year"/>
+                                            <field name="participant_count"/>
+                                            <field name="participant_rating"/>
+                                        </list>
+                                    </field>
+                                </group>
                             </page>
-                            <page string="Certified Expertise (EDS-F-06)" name="expertise">
-                                <field name="expertise_ids">
-                                    <list editable="bottom">
-                                        <field name="subject_domain"/>
-                                        <field name="course_topics"/>
-                                        <field name="target_level"/>
-                                        <field name="years_experience"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Delivery History (EDS-F-06)" name="delivery_hist">
-                                <field name="delivery_history_ids">
-                                    <list editable="bottom">
-                                        <field name="program_title"/>
-                                        <field name="client_organization"/>
-                                        <field name="delivery_year"/>
-                                        <field name="participant_count"/>
-                                        <field name="participant_rating"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Commercials &amp; Sign-Off (EDS-F-06)" name="commercials">
-                                <group string="External Consultant Commercials" invisible="trainer_type != 'external'">
+                            <page string="Commercials" name="commercials" invisible="trainer_type != 'external'">
+                                <group string="External Consultant Commercials">
                                     <group>
                                         <field name="daily_fee"/>
                                         <field name="hourly_fee"/>
@@ -218,7 +289,7 @@
             <field name="context">{'default_trainer_type': 'external'}</field>
         </record>
 
-        <!-- ══════════════ External Provider Registry (/036) ══════════════ -->
+        <!-- ══════════════ External Provider Registry ══════════════ -->
 
         <record id="view_eds_external_provider_list" model="ir.ui.view">
             <field name="name">eds.external.provider.list</field>
@@ -229,8 +300,10 @@
                     <field name="name"/>
                     <field name="provider_type" optional="show"/>
                     <field name="rate_per_session" optional="show"/>
+                    <field name="currency_id" optional="show"/>
                     <field name="category" widget="badge"/>
-                    <field name="country_id"/>
+                    <field name="country_id" optional="show"/>
+                    <field name="city" optional="show"/>
                     <field name="accreditation"/>
                     <field name="pre_qualified" widget="boolean_toggle"/>
                     <field name="rating" widget="progressbar"/>
@@ -244,48 +317,48 @@
             <field name="model">eds.external.provider</field>
             <field name="arch" type="xml">
                 <form string="External Training Provider">
-                    <header>
-                        <button name="action_toggle_qualified" string="Toggle Pre-Qualification"
-                                type="object" class="oe_highlight"
-                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    </header>
                     <sheet>
                         <group>
                             <group string="Provider">
                                 <field name="code" readonly="1"/>
-                                <field name="name"/>
-                                <field name="partner_id"/>
-                                <field name="provider_type"/>
-                                <field name="rate_per_session"/>
+                                <field name="name" placeholder="Provider name"/>
                                 <field name="category"/>
-                                <field name="country_id"/>
-                                <field name="tax_id"/>
+                                <field name="provider_type"/>
                             </group>
-                            <group string="Contact &amp; Experience">
-                                <field name="contact_name"/>
-                                <field name="phone"/>
-                                <field name="email"/>
-                                <field name="website"/>
-                                <field name="years_of_experience"/>
-                                <field name="active"/>
+                            <group string="Location &amp; Pricing">
+                                <field name="country_id" invisible="category != 'international'" placeholder="Select country"/>
+                                <field name="city" placeholder="City name"/>
+                                <field name="currency_id" readonly="category != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                                <field name="rate_per_session" placeholder="0.00"/>
+                                <field name="tax_id" placeholder="TIN or license number"/>
                             </group>
                         </group>
                         <group>
+                            <group string="Contact &amp; Experience">
+                                <field name="contact_name" placeholder="Contact person"/>
+                                <field name="phone" placeholder="Phone number"/>
+                                <field name="email" placeholder="Email address"/>
+                                <field name="website" placeholder="Website URL"/>
+                                <field name="years_of_experience"/>
+                                <field name="active"/>
+                            </group>
                             <group string="Qualification &amp; Rating">
-                                <field name="accreditation"/>
+                                <field name="accreditation" placeholder="Accreditation or license"/>
                                 <field name="pre_qualified"/>
                                 <field name="rating"/>
                                 <field name="rating_count"/>
                             </group>
+                        </group>
+                        <group>
                             <group string="Specialization Domains">
-                                <field name="specialization_areas"/>
+                                <field name="specialization_areas" placeholder="Training subjects and areas"/>
                             </group>
                         </group>
                         <group string="Service Offerings &amp; Profile Summary">
-                            <field name="service_offerings"/>
-                            <field name="notes"/>
+                            <field name="service_offerings" placeholder="Services this provider offers"/>
+                            <field name="notes" placeholder="Additional profile notes"/>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Profile Documents &amp; Certifications" name="documents">
                                 <field name="attachment_ids" widget="many2many_binary"/>
                             </page>

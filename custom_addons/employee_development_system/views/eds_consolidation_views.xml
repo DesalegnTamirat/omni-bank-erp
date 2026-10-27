@@ -147,7 +147,7 @@
                                 <field name="approver_id"/>
                             </group>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Training Needs">
                                 <field name="entry_ids" readonly="state == 'locked'">
                                     <list>

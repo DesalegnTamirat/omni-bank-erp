@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Nominations (, ...030) ══════════════ -->
+        <!-- ══════════════ Nominations ══════════════ -->
 
         <record id="view_eds_nomination_list" model="ir.ui.view">
             <field name="name">eds.nomination.list</field>
@@ -115,12 +115,12 @@
                                 <field name="nominated_by" readonly="1"/>
                             </group>
                         </group>
-                        <group string="Capacity &amp; Waitlist (/028)">
+                        <group string="Capacity &amp; Waitlist">
                             <field name="waitlisted"/>
                             <field name="waitlist_position"/>
                             <field name="enrollment_id" readonly="1"/>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Approval Chain " name="approval">
                                 <group>
                                     <group>
@@ -195,6 +195,8 @@
                     <field name="waitlist_position"/>
                     <field name="enrolled_date"/>
                     <field name="state" widget="badge" decoration-success="state == 'completed'" decoration-danger="state == 'absent'"/>
+                    <field name="lms_completion_state" optional="hide"/>
+                    <field name="lms_certificate_state" optional="hide"/>
                 </list>
             </field>
         </record>
@@ -236,20 +238,35 @@
             <field name="arch" type="xml">
                 <form string="Session Enrollment">
                     <header>
-                        <button name="action_open_response" string="Respond / Replace" type="object"
+                        <button name="action_open_response" string="Respond to Invitation" type="object"
                                 class="oe_highlight" invisible="state != 'invited'"/>
+                        <button name="action_open_materials" string="View Training Materials" type="object"
+                                invisible="state not in ('enrolled','completed') or not session_id"/>
                         <button name="action_cancel" string="Cancel Enrollment" type="object"
                                 invisible="state not in ('suggested','invited','enrolled','waitlisted')"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
+                        <group string="Training Details">
+                            <group>
+                                <field name="course_id" readonly="1" options="{'no_open': True}"/>
+                                <field name="training_provider_name" readonly="1"/>
+                                <field name="venue_id" readonly="1" options="{'no_open': True}"/>
+                                <field name="venue_location_details" readonly="1"
+                                       invisible="not venue_location_details"/>
+                            </group>
+                            <group>
+                                <field name="session_start" readonly="1"/>
+                                <field name="session_end" readonly="1"/>
+                            </group>
+                        </group>
                         <group>
                             <group>
                                 <field name="name" readonly="1"/>
-                                <field name="session_id"/>
-                                <field name="employee_id"/>
-                                <field name="selected" invisible="state not in ('suggested','invited')"/>
+                                <field name="session_id" readonly="id"/>
+                                <field name="employee_id" readonly="id"/>
+                                <field name="selected" invisible="state != 'suggested'"/>
                                 <field name="source_summary" readonly="1"/>
                                 <field name="source_count" readonly="1"/>
                                 <field name="work_unit_id" readonly="1"/>
@@ -266,6 +283,12 @@
                                 <field name="enrolled_date"/>
                                 <field name="waitlist_position" invisible="state != 'waitlisted'"/>
                             </group>
+                        </group>
+                        <group string="Linked Online Learning" invisible="not lms_enrollment_ref">
+                            <field name="lms_enrollment_ref" readonly="1"/>
+                            <field name="lms_completion_state" readonly="1"/>
+                            <field name="lms_completion_date" readonly="1"/>
+                            <field name="lms_certificate_state" readonly="1"/>
                         </group>
                     </sheet>
                     <chatter/>

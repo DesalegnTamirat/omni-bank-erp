@@ -149,7 +149,7 @@ class EdsInternshipApplication(models.Model):
             rec.status = 'rejected'
             rec.message_post(body=_("Internship application rejected."))
 
-    # EDS-F-14 Clearance & Final Appraisal Fields
+    # Clearance & Final Appraisal Fields
     clearance_library = fields.Boolean(string='Bank Library / Resource Clearance', default=True)
     clearance_id_badge = fields.Boolean(string='Temporary ID Badge Surrendered', default=True)
     clearance_it_assets = fields.Boolean(string='IT / Workstation Access Cleared', default=True)
@@ -172,7 +172,7 @@ class EdsInternshipApplication(models.Model):
     intern_sign_name = fields.Char(string='Intern Acknowledgment Signature')
 
     def action_print_clearance_form(self):
-        """Prints official Form EDS-F-14 Internship Appraisal & Clearance PDF."""
+        """Prints official Form Internship Appraisal & Clearance PDF."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_internship_appraisal').report_action(self)
 

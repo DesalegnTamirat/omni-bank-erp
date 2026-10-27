@@ -5,6 +5,7 @@ import base64
 import logging
 from datetime import date
 from dateutil.relativedelta import relativedelta
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError
 
@@ -26,11 +27,17 @@ class LmsCertificateTemplate(models.Model):
     )
     signatory_1_name = fields.Char(string='First Signatory Name', default='Chief Human Resources Officer')
     signatory_1_title = fields.Char(string='First Signatory Title', default='People Performance & Development')
-    signatory_1_signature = fields.Binary(string='Signatory 1 Digital Signature', attachment=True)
+    signatory_1_signature = fields.Binary(
+        string='Signatory 1 Digital Signature', attachment=True,
+        groups='learning_management.group_lms_manager',
+    )
 
     signatory_2_name = fields.Char(string='Second Signatory Name', default='Chief Executive Officer')
     signatory_2_title = fields.Char(string='Second Signatory Title', default='Bunna Bank S.C.')
-    signatory_2_signature = fields.Binary(string='Signatory 2 Digital Signature', attachment=True)
+    signatory_2_signature = fields.Binary(
+        string='Signatory 2 Digital Signature', attachment=True,
+        groups='learning_management.group_lms_manager',
+    )
 
     logo = fields.Binary(string='Institutional Crest / Logo', attachment=True)
     active = fields.Boolean(default=True)
@@ -68,6 +75,9 @@ class LmsCertificate(models.Model):
         ('expired', 'Expired (Recertification Due)'),
         ('revoked', 'Revoked / Invalidated'),
     ], string='Certification Status', default='valid', tracking=True, required=True, index=True)
+    revocation_reason = fields.Text(string='Revocation Reason', readonly=True, copy=False)
+    revoked_by_id = fields.Many2one('res.users', string='Revoked By', readonly=True, copy=False)
+    revoked_at = fields.Datetime(string='Revoked At', readonly=True, copy=False)
 
     # Core HR Bridge References (FR-LMS-022)
     hr_training_history_id = fields.Many2one('hr.training.history', string='Linked HR Training History', readonly=True)
@@ -79,6 +89,83 @@ class LmsCertificate(models.Model):
         ('pending', 'Pending'), ('complete', 'Complete'), ('error', 'Needs Retry'),
     ], default='pending', readonly=True, string='PDF / HR Delivery')
     delivery_error = fields.Text(string='Delivery Error', readonly=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su:
+            raise AccessError(_('Certificates are issued by the course completion workflow.'))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if not self.env.su:
+            raise AccessError(_('Certificate records can only be changed by system workflows.'))
+        return super().write(vals)
+
+    def unlink(self):
+        if not self.env.su:
+            raise AccessError(_('Certificate history cannot be deleted.'))
+        return super().unlink()
+
+    def action_open_revoke_wizard(self):
+        self.ensure_one()
+        if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+            raise AccessError(_('Only LMS managers may revoke a certificate.'))
+        if self.state == 'revoked':
+            raise UserError(_('This certificate has already been revoked.'))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Revoke Certificate'),
+            'res_model': 'lms.certificate.revoke.wizard',
+            'view_mode': 'form',
+            'view_id': self.env.ref('learning_management.view_lms_certificate_revoke_wizard_form').id,
+            'target': 'new',
+            'context': {'default_certificate_id': self.id},
+        }
+
+    def action_revoke(self, reason):
+        """Invalidate the certificate while retaining the original evidence."""
+        self.ensure_one()
+        if not self.env.su and not self.env.user.has_group('learning_management.group_lms_manager'):
+            raise AccessError(_('Only LMS managers may revoke a certificate.'))
+        if not isinstance(reason, str) or not reason.strip():
+            raise UserError(_('Provide a reason before revoking the certificate.'))
+        reason = reason.strip()
+        self.env.cr.execute('SELECT id FROM lms_certificate WHERE id = %s FOR UPDATE', (self.id,))
+        self.invalidate_recordset(['state'])
+        if self.state not in ('valid', 'expired'):
+            raise UserError(_('Only valid or expired certificates may be revoked.'))
+        self.sudo().write({
+            'state': 'revoked',
+            'revocation_reason': reason,
+            'revoked_by_id': self.env.user.id,
+            'revoked_at': fields.Datetime.now(),
+        })
+        self.sudo().message_post(
+            body=Markup('<p>%s</p><p>%s</p>') % (
+                escape(_('Certificate revoked by %s.') % self.env.user.name),
+                escape(reason),
+            ),
+            subtype_xmlid='mail.mt_note',
+        )
+
+
+    def _certificate_body_html(self):
+        """Render the sanitized template body with escaped certificate values."""
+        self.ensure_one()
+        body = self.template_id.sudo().body_text or (
+            '<p>This certifies that <strong>${learner_name}</strong> completed '
+            '<strong>${course_name}</strong>.</p>'
+        )
+        values = {
+            'learner_name': self.employee_id.name or '',
+            'course_name': self.course_id.name or '',
+            'score': f'{self.score_percentage:.1f}',
+            'issue_date': str(self.issue_date or ''),
+        }
+        rendered = Markup(body)
+        for key, value in values.items():
+            rendered = rendered.replace('${%s}' % key, escape(value))
+        return rendered
 
     @api.depends('verification_code')
     def _compute_verification_url(self):
@@ -92,6 +179,8 @@ class LmsCertificate(models.Model):
     @api.model
     def issue_certificate(self, enrollment, score_pct):
         """Issues certificate, calculates expiry, generates hash, and bridges to core HR."""
+        if not self.env.su:
+            raise AccessError(_('Certificates are issued by the course completion workflow.'))
         course = enrollment.course_id
         today = date.today()
         months = course.certificate_validity_months
@@ -128,7 +217,7 @@ class LmsCertificate(models.Model):
             if not cert.certificate_pdf:
                 try:
                     with self.env.cr.savepoint():
-                        pdf_bytes, _ = self.env['ir.actions.report']._render_qweb_pdf(
+                        pdf_bytes, _report_format = self.env['ir.actions.report']._render_qweb_pdf(
                             'learning_management.report_lms_certificate', [cert.id]
                         )
                         if not pdf_bytes:
@@ -161,15 +250,16 @@ class LmsCertificate(models.Model):
                     with self.env.cr.savepoint():
                         if not cert.certificate_pdf:
                             raise UserError(_('Render the certificate PDF before creating the HR document.'))
-                        doc_type = self.env['hr.document.type'].sudo().search(
-                            [('name', 'ilike', 'Training')], limit=1
-                        ) or self.env['hr.document.type'].sudo().search([], limit=1)
+                        doc_type = self.env.ref(
+                            'learning_management.lms_hr_training_document_type',
+                            raise_if_not_found=False,
+                        )
                         if not doc_type:
                             raise UserError(_('Configure an HR training document type.'))
                         employee_document = self.env['hr.employee.document'].sudo().create({
                             'name': _('Training Certificate - %s') % cert.course_id.name,
                             'employee_ref': cert.employee_id.id,
-                            'document_type': doc_type.id,
+                            'document_type_id': doc_type.id,
                             'description': _('Issued by LMS on %s. Verification: %s') % (
                                 cert.issue_date, cert.verification_code),
                             'attachment': cert.certificate_pdf or False,
@@ -191,8 +281,8 @@ class LmsCertificate(models.Model):
     @api.model
     def cron_check_certificate_expiry(self):
         """Cron scheduled task to transition expired certifications (FR-LMS-020)."""
-        today = date.today()
-        expired_certs = self.search([
+        today = fields.Date.context_today(self)
+        expired_certs = self.sudo().search([
             ('state', '=', 'valid'),
             ('expiry_date', '!=', False),
             ('expiry_date', '<', today)
@@ -200,3 +290,36 @@ class LmsCertificate(models.Model):
         for cert in expired_certs:
             cert.write({'state': 'expired'})
             cert.message_post(body=_('Certification validity has expired. Recertification required.'))
+            enrollment = cert.enrollment_id
+            course = cert.course_id
+            latest_certificate = self.sudo().search([
+                ('employee_id', '=', cert.employee_id.id),
+                ('course_id', '=', course.id),
+            ], order='issue_date desc, id desc', limit=1)
+            renewal_course = enrollment._current_recertification_course() if enrollment else False
+            current_certificate = self.sudo().search([
+                ('employee_id', '=', cert.employee_id.id),
+                ('course_id', '=', renewal_course.id),
+                ('state', '=', 'valid'),
+                '|', ('expiry_date', '=', False), ('expiry_date', '>=', today),
+            ], limit=1) if renewal_course and renewal_course.id != course.id else False
+            if (enrollment and enrollment.state == 'completed'
+                    and latest_certificate == cert
+                    and (enrollment.is_mandatory or course.is_mandatory)
+                    and renewal_course and not current_certificate):
+                enrollment._create_recertification_enrollment(
+                    due_date=fields.Date.add(today, days=30)
+                )
+
+
+class LmsCertificateRevokeWizard(models.TransientModel):
+    _name = 'lms.certificate.revoke.wizard'
+    _description = 'LMS Certificate Revocation'
+
+    certificate_id = fields.Many2one('lms.certificate', required=True, readonly=True)
+    reason = fields.Text(string='Reason', required=True)
+
+    def action_confirm_revoke(self):
+        self.ensure_one()
+        self.certificate_id.action_revoke(self.reason)
+        return {'type': 'ir.actions.act_window_close'}

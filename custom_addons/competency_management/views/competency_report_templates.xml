@@ -148,12 +148,12 @@
 
                             <!-- Achievement Sentence Summary -->
                             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #541718; padding: 10px 14px; border-radius: 4px; margin-bottom: 18px; font-size: 13px; font-weight: 600; color: #1d2b32;">
-                                <t t-out="doc.get_achievement_summary_sentence()"/>
+                                <t t-out="doc.get_achievement_summary_sentence(reporting=True)"/>
                             </div>
 
                             <!-- Detailed Per-Pillar Breakdown -->
                             <t t-foreach="['core', 'leadership', 'technical']" t-as="pillar_type">
-                                <t t-set="pillar_lines" t-value="doc.line_ids.filtered(lambda l: l.pillar == pillar_type)"/>
+                                <t t-set="pillar_lines" t-value="doc.get_reporting_lines().filtered(lambda l: l.pillar == pillar_type)"/>
                                 <t t-if="pillar_lines">
                                     <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; text-transform: capitalize; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
                                         <t t-out="pillar_type"/> Competencies
@@ -205,7 +205,7 @@
                             </t>
 
                             <!-- Recommended Development Actions -->
-                            <t t-set="recs" t-value="doc.get_recommended_development_actions()"/>
+                            <t t-set="recs" t-value="doc.get_recommended_development_actions(reporting=True)"/>
                             <t t-if="recs">
                                 <div style="margin-top: 14px; margin-bottom: 20px;">
                                     <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">

@@ -4,7 +4,7 @@
     'summary': "Classroom training management: TNA, curriculum, annual L&D plan, sessions, "
                "nomination, delivery, evaluation (L1-L4), certification, budget, sponsorship, "
                "staff education and internship.",
-    'version': '19.0.1.1.1',
+    'version': '19.0.1.1.58',
     'category': 'Human Resources/Employee Development',
     'author': 'Desalegn & Abeza',
     'website': 'https://www.bunnabanksc.com',
@@ -34,6 +34,14 @@ Comprehensive banking Learning & Development management suite for Bunna Bank:
         'performance_management',
         'audit_trail',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'employee_development_system/static/src/scss/eds_notebook.scss',
+            'employee_development_system/static/src/css/eds_dashboard.css',
+            'employee_development_system/static/src/js/action_alerts.js',
+            'employee_development_system/static/src/xml/action_alerts.xml',
+        ],
+    },
     'data': [
         'security/eds_security.xml',
         'security/ir.model.access.csv',
@@ -42,6 +50,7 @@ Comprehensive banking Learning & Development management suite for Bunna Bank:
         'data/eds_cron.xml',
         'data/eds_audit_rules.xml',
         'views/res_config_settings_views.xml',
+        'wizards/eds_currency_quick_create_views.xml',
         'views/eds_dashboard_views.xml',
         'views/eds_consolidation_views.xml',
         'wizards/eds_consolidation_wizard_views.xml',
@@ -61,9 +70,10 @@ Comprehensive banking Learning & Development management suite for Bunna Bank:
         'wizards/eds_gap_import_views.xml',
         'wizards/eds_pms_gap_import_views.xml',
         'wizards/eds_tna_exclude_wizard_views.xml',
-        'wizards/eds_template_import_wizard_views.xml',
+        'wizards/eds_tna_demand_invalidate_views.xml',
         'wizards/eds_plan_return_wizard_views.xml',
         'wizards/eds_enrollment_response_views.xml',
+        'wizards/eds_prerequisite_warning_views.xml',
         'views/eds_delivery_views.xml',
         'views/eds_knowledge_sharing_views.xml',
         'views/eds_tna_views.xml',
@@ -81,7 +91,9 @@ Comprehensive banking Learning & Development management suite for Bunna Bank:
         'views/eds_assessment_center_views.xml',
         'views/eds_partnership_views.xml',
         'views/eds_menus.xml',
+        'views/eds_meeting_minutes_views.xml',
         'report/eds_brand_layout.xml',
+        'report/eds_meeting_minutes_report.xml',
         'report/eds_tna_register.xml',
         'report/eds_annual_plan_preview.xml',
         'report/eds_certificate_template.xml',

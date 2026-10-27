@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eds_currency_quick_create_form" model="ir.ui.view">
+        <field name="name">eds.currency.quick.create.form</field>
+        <field name="model">eds.currency.quick.create</field>
+        <field name="arch" type="xml">
+            <form string="Add Currency for International Training">
+                <group>
+                    <field name="code" placeholder="e.g. EUR, GBP, AED"/>
+                </group>
+                <footer>
+                    <button name="action_create_currency" string="Add Currency" type="object" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    <record id="action_eds_currency_quick_create" model="ir.actions.act_window">
+        <field name="name">Add Currency</field>
+        <field name="res_model">eds.currency.quick.create</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_eds_currency_quick_create_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

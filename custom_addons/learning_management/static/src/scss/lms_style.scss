@@ -27,3 +27,49 @@
         background-color: #541718;
     }
 }
+
+.o_lms_learning_card {
+    border-color: #d8dde2 !important;
+    box-shadow: 0 2px 10px rgba(22, 35, 45, 0.08);
+
+    .o_lms_progress_fill {
+        background-color: #541718;
+    }
+
+    .o_lms_touch_action {
+        min-height: 44px;
+        min-width: 112px;
+        background-color: #541718;
+        border-color: #541718;
+    }
+
+    .o_lms_touch_action:hover,
+    .o_lms_touch_action:focus-visible {
+        background-color: #3d1011;
+        border-color: #3d1011;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .o_lms_learning_card {
+        margin-inline: 0;
+
+        .o_lms_touch_action {
+            width: 100%;
+        }
+    }
+}
+
+.o_lms_exam_form .o_field_many2many_checkboxes {
+    .form-check {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .form-check-input {
+        min-width: 1.15rem;
+        min-height: 1.15rem;
+    }
+}

@@ -13,8 +13,8 @@
                     <field name="session_id" options="{'no_create': True}"/>
                     <field name="employee_id" options="{'no_create': True}"/>
                     <field name="attendance_date"/>
+                    <field name="attendance_slot"/>
                     <field name="attended"/>
-                    <field name="hours_attended" widget="float_time"/>
                     <field name="notes"/>
                     <field name="attendance_percentage" string="Program %"/>
                     <field name="meets_min_attendance" string="Meets 80%"/>
@@ -52,11 +52,11 @@
                                 <field name="name" readonly="1"/>
                                 <field name="session_id" options="{'no_create': True}"/>
                                 <field name="attendance_date"/>
+                                <field name="attendance_slot"/>
                             </group>
                             <group>
                                 <field name="employee_id" options="{'no_create': True}"/>
                                 <field name="attended"/>
-                                <field name="hours_attended" widget="float_time"/>
                             </group>
                         </group>
                         <group string="Program Attendance">
@@ -91,10 +91,13 @@
                     <field name="title"/>
                     <field name="course_id"/>
                     <field name="material_type"/>
-                    <field name="version"/>
-                    <field name="is_approved" string="Approved"/>
-                    <field name="quality_state" widget="badge"/>
-                    <field name="approval_state" widget="badge"/>
+                    <field name="visibility"/>
+                    <field name="source_kind"/>
+                    <field name="filename" string="Attached File" optional="show"/>
+                    <field name="resource_url" column_invisible="True"/>
+                    <button name="action_open_source" string="Open" type="object" icon="fa-external-link"
+                            invisible="(source_kind == 'attachment' and not filename) or (source_kind == 'link' and not resource_url)"/>
+                    <field name="version" optional="hide"/>
                 </list>
             </field>
         </record>
@@ -106,11 +109,10 @@
                 <search>
                     <field name="title"/>
                     <field name="course_id"/>
-                    <filter string="Approved" name="approved" domain="[('is_approved','=',True)]"/>
-                    <filter string="Pending Approval" name="pending" domain="[('is_approved','=',False)]"/>
                     <group name="group_by">
                         <filter string="Course" name="g_course" context="{'group_by':'course_id'}"/>
                         <filter string="Type" name="g_type" context="{'group_by':'material_type'}"/>
+                        <filter string="Audience" name="g_audience" context="{'group_by':'visibility'}"/>
                     </group>
                 </search>
             </field>
@@ -121,23 +123,6 @@
             <field name="model">eds.material</field>
             <field name="arch" type="xml">
                 <form string="Training Material">
-                    <header>
-                        <button name="action_submit_quality_review" string="Submit for Quality Review"
-                                type="object" class="oe_highlight" invisible="quality_state != 'draft'"
-                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_approve_quality" string="Approve Quality"
-                                type="object" invisible="quality_state != 'in_review'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_submit_director_approval" string="Submit to Director PPDD"
-                                type="object" invisible="quality_state != 'quality_approved' or approval_state == 'director_approved'"
-                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_director_approve" string="Director PPDD Approve"
-                                type="object" class="oe_highlight" invisible="approval_state != 'submitted'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_reject" string="Reject" type="object"
-                                invisible="quality_state in ('rejected',) or approval_state in ('rejected','director_approved')"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                    </header>
                     <sheet>
                         <group>
                             <group string="Material">
@@ -147,25 +132,20 @@
                                 <field name="material_type"/>
                                 <field name="version"/>
                             </group>
-                            <group string="Approval">
-                                <field name="quality_state" widget="badge"/>
-                                <field name="approval_state" widget="badge"/>
-                                <field name="is_approved"/>
+                            <group string="Sharing">
+                                <field name="visibility"/>
                             </group>
                         </group>
-                        <group string="Document">
-                            <field name="document" widget="binary" filename="filename"/>
+                        <div class="alert alert-info" role="note">
+                            The material type sets the allowed file formats. Upload a document or slide deck up to 25 MB, or link to a managed LMS/internal resource. Video uses a link. Examination material starts as L&amp;D-only; change Who Can Open if it should be shared.
+                        </div>
+                        <group string="Content">
+                            <field name="source_kind"/>
+                            <field name="document" widget="binary" filename="filename"
+                                   options="{'accepted_file_extensions': '.pdf,.doc,.docx,.odt,.ppt,.pptx,.odp,.xls,.xlsx,.ods,.csv,.txt,.png,.jpg,.jpeg,.webp'}"
+                                   invisible="source_kind != 'attachment' or material_type == 'video'"/>
                             <field name="filename" invisible="1"/>
-                        </group>
-                        <group string="Review trail">
-                            <group>
-                                <field name="reviewed_by"/>
-                                <field name="reviewed_date"/>
-                            </group>
-                            <group>
-                                <field name="approved_by"/>
-                                <field name="approved_date"/>
-                            </group>
+                            <field name="resource_url" widget="url" invisible="source_kind != 'link'"/>
                         </group>
                         <group string="Description">
                             <field name="description"/>
@@ -234,17 +214,20 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Pre/Post Assessments ( EDS-037) ══════════════ -->
+        <!-- ══════════════ Pre/Post Assessments ══════════════ -->
 
         <record id="view_eds_assessment_list" model="ir.ui.view">
             <field name="name">eds.assessment.list</field>
             <field name="model">eds.assessment</field>
+            <field name="group_ids" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
             <field name="arch" type="xml">
-                <list string="Pre/Post Assessments" editable="bottom">
+                <list string="Training Assessments">
                     <field name="session_id" options="{'no_create': True}"/>
                     <field name="employee_id" options="{'no_create': True}"/>
                     <field name="assessment_type"/>
-                    <field name="score"/>
+                    <field name="state" widget="badge"/>
+                    <field name="entry_method"/>
+                    <field name="score" readonly="1"/>
                     <field name="threshold"/>
                     <field name="passed" string="Passed"/>
                     <field name="assessment_date"/>
@@ -262,6 +245,10 @@
                     <field name="session_id"/>
                     <filter string="Pre" name="pre" domain="[('assessment_type','=','pre')]"/>
                     <filter string="Post" name="post" domain="[('assessment_type','=','post')]"/>
+                    <filter string="Practical Skills" name="skills_test" domain="[('assessment_type','=','skills_test')]"/>
+                    <filter string="Awaiting Answers" name="distributed" domain="[('state','=','distributed')]"/>
+                    <filter string="Ready to Grade" name="submitted" domain="[('state','=','submitted')]"/>
+                    <filter string="Graded" name="graded" domain="[('state','=','graded')]"/>
                     <filter string="Passed" name="passed" domain="[('passed','=',True)]"/>
                     <group name="group_by">
                         <filter string="Session" name="g_session" context="{'group_by':'session_id'}"/>
@@ -274,9 +261,35 @@
         <record id="view_eds_assessment_form" model="ir.ui.view">
             <field name="name">eds.assessment.form</field>
             <field name="model">eds.assessment</field>
+            <field name="group_ids" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
             <field name="arch" type="xml">
                 <form string="Pre/Post Assessment">
+                    <header>
+                        <button name="action_take_over_manual_entry" string="Take Over for Manual Entry" type="object"
+                                class="btn-secondary" invisible="state != 'distributed' or entry_method != 'employee'"
+                                confirm="This closes the employee assessment and keeps any answers already entered. Continue?"
+                                groups="employee_development_system.group_eds_officer"/>
+                        <button name="action_load_questions" string="Load Session Questions" type="object"
+                                class="btn-secondary" invisible="assessment_type == 'skills_test' or state not in ('draft', 'submitted')"
+                                groups="employee_development_system.group_eds_officer"/>
+                        <button name="action_finalize" string="Finalize Grade" type="object"
+                                class="oe_highlight" invisible="assessment_type == 'skills_test' or state not in ('draft', 'submitted') or not answer_ids"
+                                groups="employee_development_system.group_eds_officer"/>
+                        <button name="action_finalize_skills_test" string="Record Skills Test Result" type="object"
+                                class="oe_highlight" invisible="assessment_type != 'skills_test' or state == 'graded'"
+                                groups="employee_development_system.group_eds_officer"/>
+                        <button name="action_reopen_skills_test" string="Reopen Skills Test" type="object"
+                                class="btn-secondary" invisible="assessment_type != 'skills_test' or state != 'graded'"
+                                groups="employee_development_system.group_eds_officer"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,distributed,submitted,graded"/>
+                    </header>
                     <sheet>
+                        <div class="alert alert-info" role="status" invisible="assessment_type == 'skills_test'">
+                            Record each question and answer below, then award points and finalize. The score is calculated from the graded answers. For an open employee assessment, use Take Over for Manual Entry to preserve existing answers and complete it in L&amp;D. Existing scored legacy records stay readable; import an explicit replacement if their itemized results need to supersede them.
+                        </div>
+                        <div class="alert alert-info" role="status" invisible="assessment_type != 'skills_test'">
+                            Enter the practical skills test score and select Record Skills Test Result. Reopen it to correct a completed result.
+                        </div>
                         <group>
                             <group>
                                 <field name="session_id" options="{'no_create': True}"/>
@@ -285,11 +298,24 @@
                                 <field name="assessment_date"/>
                             </group>
                             <group>
-                                <field name="score"/>
+                                <field name="entry_method" readonly="1" invisible="assessment_type == 'skills_test'"/>
+                                <field name="score" readonly="assessment_type != 'skills_test' or state == 'graded'"/>
                                 <field name="threshold" readonly="1"/>
                                 <field name="passed" readonly="1"/>
-                                <field name="uploaded_by"/>
+                                <field name="uploaded_by" readonly="1"/>
                             </group>
+                        </group>
+                        <group string="Question Answers" invisible="assessment_type == 'skills_test'">
+                            <field name="answer_ids" readonly="state not in ('draft', 'submitted')">
+                                <list editable="bottom" create="false" delete="false">
+                                    <field name="question_text" readonly="1"/>
+                                    <field name="answer_text"/>
+                                    <field name="max_points" readonly="1"/>
+                                    <field name="awarded_points"/>
+                                    <field name="is_graded" widget="boolean_toggle"/>
+                                    <field name="comments" optional="show"/>
+                                </list>
+                            </field>
                         </group>
                         <group string="Notes">
                             <field name="notes"/>
@@ -301,10 +327,82 @@
         </record>
 
         <record id="action_eds_assessment" model="ir.actions.act_window">
-            <field name="name">Pre/Post Assessments</field>
+            <field name="name">Training Assessments and Answers</field>
             <field name="res_model">eds.assessment</field>
             <field name="view_mode">list,form</field>
+            <field name="context">{'default_entry_method': 'manual'}</field>
             <field name="search_view_id" ref="employee_development_system.view_eds_assessment_search"/>
+        </record>
+
+        <record id="view_eds_assessment_employee_list" model="ir.ui.view">
+            <field name="name">eds.assessment.employee.list</field>
+            <field name="model">eds.assessment</field>
+            <field name="arch" type="xml">
+                <list string="My Pre/Post Assessments" create="false" delete="false">
+                    <field name="session_id"/>
+                    <field name="assessment_type"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_assessment_employee_form" model="ir.ui.view">
+            <field name="name">eds.assessment.employee.form</field>
+            <field name="model">eds.assessment</field>
+            <field name="arch" type="xml">
+                <form string="My Pre/Post Assessment" create="false" delete="false">
+                    <header>
+                        <button name="action_submit_answers" string="Submit Answers" type="object"
+                                class="oe_highlight" invisible="state != 'distributed'"
+                                groups="employee_development_system.group_eds_employee"/>
+                        <field name="state" widget="statusbar" statusbar_visible="distributed,submitted,graded"/>
+                    </header>
+                    <sheet>
+                        <field name="entry_method" invisible="1"/>
+                        <group>
+                            <group>
+                                <field name="session_id" readonly="1"/>
+                                <field name="assessment_type" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="assessment_date" readonly="1"/>
+                                <field name="score" readonly="1" invisible="state != 'graded' and entry_method != 'score_only'"/>
+                                <field name="passed" readonly="1" invisible="state != 'graded' and entry_method != 'score_only'"/>
+                            </group>
+                        </group>
+                        <div class="alert alert-info" role="status" invisible="state != 'distributed'">
+                            Answer every question, save your work, then select Submit Answers. Your answers cannot be changed after submission.
+                        </div>
+                        <field name="answer_ids" readonly="state != 'distributed'">
+                            <list editable="bottom" create="false" delete="false">
+                                <field name="question_text" readonly="1"/>
+                                <field name="answer_text"/>
+                            </list>
+                        </field>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_assessment_own" model="ir.actions.act_window">
+            <field name="name">My Pre/Post Assessments</field>
+            <field name="res_model">eds.assessment</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id.user_id', '=', uid), ('distributed_at', '!=', False)]</field>
+            <field name="context">{'create': False}</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_assessment_search"/>
+        </record>
+        <record id="action_eds_assessment_own_list_view" model="ir.actions.act_window.view">
+            <field name="sequence">1</field>
+            <field name="view_mode">list</field>
+            <field name="view_id" ref="view_eds_assessment_employee_list"/>
+            <field name="act_window_id" ref="action_eds_assessment_own"/>
+        </record>
+        <record id="action_eds_assessment_own_form_view" model="ir.actions.act_window.view">
+            <field name="sequence">2</field>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_eds_assessment_employee_form"/>
+            <field name="act_window_id" ref="action_eds_assessment_own"/>
         </record>
 
         <!-- ══════════════ International Training ══════════════ -->
@@ -316,7 +414,6 @@
                 <list string="International Training">
                     <field name="name"/>
                     <field name="session_id"/>
-                    <field name="program_name"/>
                     <field name="country"/>
                     <field name="institution"/>
                     <field name="cost_estimate" string="Estimated Cost"/>
@@ -352,13 +449,13 @@
                             <group string="Training">
                                 <field name="name" readonly="1"/>
                                 <field name="session_id" options="{'no_create': True}"/>
-                                <field name="program_name" readonly="1"/>
                                 <field name="country"/>
                                 <field name="institution"/>
                             </group>
                             <group string="Cost &amp; Entitlement">
                                 <field name="cost_estimate"/>
-                                <field name="currency_id"/>
+                                <field name="currency_id" context="{'active_test': False}"/>
+                                <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"/>
                                 <field name="entitlement_valid"/>
                                 <field name="travel_total" string="Travel Arrangements Total"/>
                             </group>
@@ -366,7 +463,7 @@
                         <group string="Scope / Objective">
                             <field name="description"/>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Travel Arrangements" name="travel">
                                 <field name="travel_arrangements_ids">
                                     <list editable="bottom">

@@ -21,11 +21,19 @@ class EdsCompetencyGapImport(models.TransientModel):
         help='Only finalized and closed competency assessment cycles can be ingested into TNA.'
     )
     min_gap = fields.Integer(
-        string='Minimum Gap Threshold',
+        string='Minimum Level Gap',
         default=1,
         required=True,
-        help='Only pull gaps where Required Level minus Current Rating is at least this value.'
+        help='Gap = required proficiency level minus current proficiency level. '
+             'For example, current level 2 and required level 4 gives a gap of 2. '
+             'Use 1 to include all positive gaps, or 2 to include gaps of at least two levels.'
     )
+
+    @api.constrains('min_gap')
+    def _check_min_gap(self):
+        for wizard in self:
+            if wizard.min_gap < 1:
+                raise ValidationError(_('Minimum Level Gap must be at least 1. A zero or negative value is not a development gap.'))
     operating_unit_id = fields.Many2one(
         'operating.unit',
         string='Operating Unit (Optional Filter)',
@@ -57,6 +65,7 @@ class EdsCompetencyGapImport(models.TransientModel):
     def action_pull_competency_gaps(self):
         """Query assessment lines from the selected closed cycle and generate TNA entries."""
         self.ensure_one()
+        self._check_min_gap()
         if self.ingestion_done:
             raise ValidationError(_("This ingestion has already been completed. Close this result and open a new pull to run again."))
         if self.cycle_id.state not in ('draft', 'collecting'):
@@ -79,7 +88,8 @@ class EdsCompetencyGapImport(models.TransientModel):
         if self.department_id:
             domain.append(('department_id', '=', self.department_id.id))
 
-        assessment_lines = self.env['competency.assessment.line'].sudo().search(domain)
+        assessment_lines = self.env['competency.assessment.line'].sudo().search(
+            domain + self.cycle_id._target_relation_domain())
         if not assessment_lines:
             self.ingestion_done = True
             self.scanned_count = 0
@@ -121,6 +131,7 @@ class EdsCompetencyGapImport(models.TransientModel):
                 ('required_level', '>=', str(line.required_level or '1')),
                 ('course_id.status', 'in', ('active', 'draft'))
             ]).mapped('course_id')
+            comp_courses = self.cycle_id._filter_cycle_courses(comp_courses)
 
             prog_name = comp_courses[0].name if len(comp_courses) == 1 else (_("%s Mastery Program") % line.competency_id.name)
 

@@ -51,41 +51,60 @@ class CompetencyDashboardSnapshot(models.Model):
         if not cycles:
             return 0
 
-        snapshot_count = 0
         c_ids = tuple(cycles.ids)
 
         query = """
+            WITH selected_lines AS (
+                SELECT DISTINCT ON (a.employee_id, a.cycle_id, l.competency_id)
+                       l.id
+                  FROM competency_assessment_line l
+                  JOIN competency_assessment a ON a.id = l.assessment_id
+                 WHERE a.cycle_id IN %s
+                   AND a.active = TRUE
+                   AND l.active = TRUE
+                 ORDER BY a.employee_id, a.cycle_id, l.competency_id,
+                          CASE WHEN l.is_primary_reporting_line THEN 0 ELSE 1 END,
+                          CASE
+                              WHEN a.assessment_type = 'self' THEN 0
+                              WHEN a.assessment_type IN ('supervisor', 'team') THEN 1
+                              ELSE 2
+                          END,
+                          l.id
+            )
             SELECT 
                 a.cycle_id,
                 e.department_id,
                 COALESCE(c.pillar, 'all') AS pillar_val,
-                COUNT(DISTINCT a.id) AS total_assessed,
+                COUNT(DISTINCT a.employee_id) AS total_assessed,
                 ROUND(AVG(l.gap)::numeric, 2) AS avg_gap,
                 COUNT(CASE WHEN l.tna_measure = 'below' THEN 1 END) AS below_cnt,
                 COUNT(CASE WHEN l.tna_measure = 'meets' THEN 1 END) AS meets_cnt,
                 COUNT(CASE WHEN l.tna_measure = 'exceeds' THEN 1 END) AS exceeds_cnt
-            FROM competency_assessment_line l
+            FROM selected_lines selected
+            JOIN competency_assessment_line l ON l.id = selected.id
             JOIN competency_assessment a ON a.id = l.assessment_id
             JOIN hr_employee e ON e.id = a.employee_id
             LEFT JOIN competency_competency c ON c.id = l.competency_id
-            WHERE a.cycle_id IN %s
             GROUP BY GROUPING SETS (
                 (a.cycle_id, COALESCE(c.pillar, 'all')),
                 (a.cycle_id, e.department_id, COALESCE(c.pillar, 'all'))
-            );
+            )
+            -- An employee without a department belongs in the bank-wide total only.
+            HAVING GROUPING(e.department_id) = 1 OR e.department_id IS NOT NULL;
         """
         self.env.cr.execute(query, (c_ids,))
         rows = self.env.cr.dictfetchall()
 
-        if not rows:
-            return 0
-
-        # Pre-fetch existing snapshots for today in a single query
+        # Today's snapshot is refreshed as assessments arrive or are corrected.
+        # Historical dates remain point-in-time records.
         existing_records = self.search([
             ('cycle_id', 'in', c_ids),
             ('snapshot_date', '=', today),
-        ])
-        existing_keys = {(s.cycle_id.id, s.department_id.id, s.pillar) for s in existing_records}
+        ], order='id')
+        existing_by_key = {}
+        for snapshot in existing_records:
+            key = (snapshot.cycle_id.id, snapshot.department_id.id, snapshot.pillar)
+            existing_by_key.setdefault(key, snapshot)
 
         # Pre-fetch departments to resolve operating units
         dept_ids = list({r['department_id'] for r in rows if r.get('department_id')})
@@ -93,18 +112,17 @@ class CompetencyDashboardSnapshot(models.Model):
         dept_ou_map = {d.id: getattr(d, 'operating_unit_id', False).id for d in depts if hasattr(d, 'operating_unit_id') and d.operating_unit_id}
 
         vals_list = []
+        current_keys = set()
         for row in rows:
             cy_id = row['cycle_id']
-            dept_id = row['department_id']
+            dept_id = row['department_id'] or False
             pillar_val = row['pillar_val'] if row['pillar_val'] in ('core', 'leadership', 'technical') else 'all'
 
-            if (cy_id, dept_id, pillar_val) in existing_keys:
-                continue
-
-            existing_keys.add((cy_id, dept_id, pillar_val))
+            key = (cy_id, dept_id, pillar_val)
+            current_keys.add(key)
             ou_id = dept_ou_map.get(dept_id, False)
 
-            vals_list.append({
+            vals = {
                 'snapshot_date': today,
                 'cycle_id': cy_id,
                 'department_id': dept_id,
@@ -115,11 +133,23 @@ class CompetencyDashboardSnapshot(models.Model):
                 'below_count': row['below_cnt'] or 0,
                 'meets_count': row['meets_cnt'] or 0,
                 'exceeds_count': row['exceeds_cnt'] or 0,
-            })
+            }
+            if key in existing_by_key:
+                existing_by_key[key].write(vals)
+            else:
+                vals_list.append(vals)
 
         if vals_list:
             self.create(vals_list)
-        return len(vals_list)
+        stale_records = existing_records.filtered(
+            lambda s: (
+                (s.cycle_id.id, s.department_id.id, s.pillar) not in current_keys
+                or existing_by_key[(s.cycle_id.id, s.department_id.id, s.pillar)].id != s.id
+            )
+        )
+        if stale_records:
+            stale_records.unlink()
+        return len(rows)
 
     @api.model
     def _cron_send_scheduled_competency_reports(self):
@@ -139,9 +169,23 @@ class CompetencyDashboardSnapshot(models.Model):
         active_cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], limit=1)
         cycle_name = active_cycle.name if active_cycle else 'Current Framework Status'
         total_comps = self.env['competency.competency'].search_count([('status', '=', 'active')])
-        total_asms = self.env['competency.assessment'].search_count([('cycle_id', '=', active_cycle.id)]) if active_cycle else 0
-
-        lines = self.env['competency.assessment.line'].search([('cycle_id', '=', active_cycle.id)]) if active_cycle else self.env['competency.assessment.line']
+        candidate_lines = self.env['competency.assessment.line'].search([
+            ('cycle_id', '=', active_cycle.id),
+            ('active', '=', True),
+        ]) if active_cycle else self.env['competency.assessment.line']
+        selected = {}
+        for line in sorted(candidate_lines, key=lambda l: (
+            not l.is_primary_reporting_line,
+            l.assessment_id.assessment_type != 'self',
+            l.assessment_id.assessment_type not in ('supervisor', 'team'),
+            l.id,
+        )):
+            if line.assessment_id.active:
+                selected.setdefault((line.employee_id.id, line.competency_id.id), line.id)
+        lines = self.env['competency.assessment.line'].browse(
+            list(selected.values())
+        ).filtered(lambda l: l.tna_measure)
+        total_asms = len(lines.mapped('employee_id'))
         below_cnt = len(lines.filtered(lambda l: l.tna_measure == 'below'))
         meets_cnt = len(lines.filtered(lambda l: l.tna_measure == 'meets'))
         exceeds_cnt = len(lines.filtered(lambda l: l.tna_measure == 'exceeds'))

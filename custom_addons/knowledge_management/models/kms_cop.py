@@ -79,7 +79,7 @@ class KmsCommunityOfPractice(models.Model):
     def _log_audit_action(self, action_type, details=None):
         for rec in self:
             try:
-                self.env['kms.audit.log'].sudo().log_audit_event(
+                self.env['kms.audit.log'].sudo()._log_audit_event(
                     action=action_type,
                     resource_type='cop',
                     resource_name=f"{rec.code} - {rec.name}",
@@ -94,10 +94,26 @@ class KmsCommunityOfPractice(models.Model):
         if not emp:
             raise UserError(_('No employee profile is linked to your user account.'))
         for rec in self:
+            if rec.state != 'active':
+                raise UserError(_('Only active communities can accept members.'))
+            self.env.cr.execute('SELECT id FROM kms_cop WHERE id = %s FOR UPDATE', (rec.id,))
+            rec.invalidate_recordset(['member_ids'])
             if emp.id not in rec.member_ids.ids:
                 rec.sudo().write({'member_ids': [(4, emp.id)]})
                 rec.sudo().message_post(body=_('%s has joined the community.') % emp.name)
                 rec._log_audit_action('join', f"{emp.name} joined community of practice {rec.name}")
+                # One contribution event per community and employee. Leaving and
+                # rejoining cannot farm recognition points.
+                description = f'CoP membership: {rec.id}'
+                if not self.env['kms.contributor.point'].sudo().search_count([
+                    ('user_id', '=', self.env.user.id),
+                    ('source', '=', 'cop_participation'),
+                    ('description', '=', description),
+                ]):
+                    self.env['kms.contributor.point']._award_points(
+                        self.env.user, points=3, source='cop_participation',
+                        description=description,
+                    )
         return True
 
     def action_leave(self):

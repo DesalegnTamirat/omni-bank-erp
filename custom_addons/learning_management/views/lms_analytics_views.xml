@@ -2,6 +2,24 @@
 <odoo>
     <data>
 
+        <!-- Compliance Search View -->
+        <record id="view_lms_compliance_search" model="ir.ui.view">
+            <field name="name">lms.branch.compliance.report.search</field>
+            <field name="model">lms.branch.compliance.report</field>
+            <field name="arch" type="xml">
+                <search string="Compliance Search">
+                    <field name="operating_unit_id"/>
+                    <field name="department_id"/>
+                    <field name="course_id"/>
+                    <group>
+                        <filter name="group_ou" string="Branch / Unit" context="{'group_by': 'operating_unit_id'}"/>
+                        <filter name="group_department" string="Department" context="{'group_by': 'department_id'}"/>
+                        <filter name="group_course" string="Course" context="{'group_by': 'course_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
         <!-- Compliance Pivot View -->
         <record id="view_lms_compliance_pivot" model="ir.ui.view">
             <field name="name">lms.branch.compliance.report.pivot</field>
@@ -12,7 +30,6 @@
                     <field name="course_id" type="col"/>
                     <field name="total_assigned" type="measure"/>
                     <field name="total_completed" type="measure"/>
-                    <field name="compliance_percentage" type="measure"/>
                 </pivot>
             </field>
         </record>
@@ -22,9 +39,10 @@
             <field name="name">lms.branch.compliance.report.graph</field>
             <field name="model">lms.branch.compliance.report</field>
             <field name="arch" type="xml">
-                <graph string="Training Compliance by Branch" type="bar" sample="1">
+                <graph string="Training Assignments and Completions by Branch" type="bar" sample="1">
                     <field name="operating_unit_id"/>
-                    <field name="compliance_percentage" type="measure"/>
+                    <field name="total_assigned" type="measure"/>
+                    <field name="total_completed" type="measure"/>
                 </graph>
             </field>
         </record>
@@ -53,6 +71,7 @@
             <field name="name">Branch Compliance Matrix</field>
             <field name="res_model">lms.branch.compliance.report</field>
             <field name="view_mode">pivot,graph,list</field>
+            <field name="search_view_id" ref="view_lms_compliance_search"/>
             <field name="context">{'search_default_group_ou': 1}</field>
         </record>
 
@@ -85,7 +104,10 @@
                     <field name="department_id" type="col"/>
                     <field name="total_enrolled" type="measure"/>
                     <field name="total_completed" type="measure"/>
+                    <field name="total_dropped_out" type="measure"/>
+                    <field name="total_assessed" type="measure"/>
                     <field name="completion_rate" type="measure"/>
+                    <field name="drop_off_rate" type="measure"/>
                     <field name="pass_rate" type="measure"/>
                     <field name="avg_score" type="measure"/>
                     <field name="avg_time_spent_minutes" type="measure"/>
@@ -117,7 +139,10 @@
                     <field name="total_enrolled"/>
                     <field name="total_completed"/>
                     <field name="total_passed"/>
+                    <field name="total_assessed"/>
+                    <field name="total_dropped_out"/>
                     <field name="completion_rate" widget="progressbar"/>
+                    <field name="drop_off_rate" widget="progressbar"/>
                     <field name="pass_rate" widget="progressbar"/>
                     <field name="avg_score"/>
                     <field name="avg_time_spent_minutes"/>

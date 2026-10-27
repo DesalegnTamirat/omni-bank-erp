@@ -4,7 +4,7 @@ from odoo.exceptions import UserError
 
 
 class EdsLearningPartnership(models.Model):
-    """Learning partnership & institutional MoU management (FREDS069 - FREDS072)."""
+    """Learning partnership and institutional MoU management."""
     _name = 'eds.learning.partnership'
     _description = 'Learning Partnership & MoU'
     _inherit = ['mail.thread', 'mail.activity.mixin']

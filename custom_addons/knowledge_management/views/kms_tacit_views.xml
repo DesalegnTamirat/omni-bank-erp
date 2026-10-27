@@ -29,7 +29,8 @@
                 <form string="Knowledge Capture Session">
                     <header>
                         <button name="action_complete_session" string="Mark Completed &amp; Finalize Knowledge" type="object" class="btn-primary" invisible="state != 'planned'"/>
-                        <field name="state" widget="statusbar"/>
+                        <button name="action_cancel_session" string="Cancel Session" type="object" class="btn-secondary" invisible="state != 'planned'"/>
+                        <field name="state" widget="statusbar" readonly="1"/>
                     </header>
                     <sheet>
                         <div class="oe_title">
@@ -102,8 +103,9 @@
                 <form string="Lesson Learned">
                     <header>
                         <button name="action_approve" string="Validate &amp; Publish Lesson" type="object" class="btn-success" invisible="state != 'draft'" groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
+                        <button name="action_archive" string="Archive Lesson" type="object" class="btn-secondary" invisible="state != 'reviewed'" groups="knowledge_management.group_kms_manager"/>
                         <button name="action_vote_helpful" string="Helpful Insight (+1)" type="object" class="btn-outline-primary" icon="fa-thumbs-up" invisible="state != 'reviewed'"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,reviewed"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,reviewed" readonly="1"/>
                     </header>
                     <sheet>
                         <div class="oe_button_box" name="button_box">
@@ -187,7 +189,8 @@
                     <header>
                         <button name="action_start" string="Start Mentoring Cycle" type="object" class="btn-primary" invisible="state != 'draft'"/>
                         <button name="action_complete" string="Sign-off &amp; Complete Transfer" type="object" class="btn-success" invisible="state != 'in_progress'"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,completed"/>
+                        <button name="action_terminate" string="Terminate Track" type="object" class="btn-secondary" invisible="state not in ['draft', 'in_progress']"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,completed" readonly="1"/>
                     </header>
                     <sheet>
                         <div class="oe_title">

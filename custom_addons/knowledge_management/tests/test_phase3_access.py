@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from psycopg2 import IntegrityError
 from odoo.tests.common import TransactionCase
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import mute_logger
 
 
@@ -144,6 +144,119 @@ class TestKmsPhase3Access(TransactionCase):
         doc.with_user(self.user_kms_mgr).write({'state': 'archived'})
         self.assertEqual(doc.state, 'archived')
 
+    def test_approved_document_and_snapshot_are_immutable(self):
+        doc = self.KmsDocument.create({
+            'name': 'Controlled Operations Policy',
+            'category_id': self.category.id,
+            'doc_type_id': self.doc_type.id,
+            'classification_id': self.class_pub.id,
+            'owner_id': self.emp_hr.id,
+            'file_name': 'operations.pdf',
+            'file_data': b'JVBERi0xLjQK',
+        })
+        doc.with_user(self.user_kms_mgr).action_submit_for_review()
+        doc.with_user(self.user_kms_mgr).action_approve()
+        original_file = doc.sudo().file_data
+        self.assertEqual(
+            doc.with_user(self.user_hr).action_view_document()['url'],
+            f'/kms/document/{doc.id}/view',
+        )
+
+        for changes in (
+            {'file_data': b'Y2hhbmdlZA=='},
+            {'name': 'Changed after approval'},
+            {'classification_id': self.class_conf.id},
+            {'state': 'review'},
+        ):
+            with self.assertRaises(UserError):
+                doc.with_user(self.user_kms_mgr).write(changes)
+        self.assertEqual(doc.sudo().file_data, original_file)
+        self.assertEqual(doc.state, 'approved')
+
+        snapshot = doc.version_ids
+        self.assertEqual(len(snapshot), 1)
+        with self.assertRaises(UserError):
+            snapshot.with_user(self.user_kms_mgr).write({'version_number': '9.9'})
+        with self.assertRaises(UserError):
+            snapshot.with_user(self.user_kms_mgr).unlink()
+
+    def test_audit_records_cannot_be_forged(self):
+        Audit = self.env['kms.audit.log']
+        forged = {
+            'user_id': self.user_kms_mgr.id,
+            'action': 'approve',
+            'resource_type': 'document',
+            'resource_name': 'Forged approval',
+        }
+        with self.assertRaises(AccessError):
+            Audit.with_user(self.user_hr).create(forged)
+        with self.assertRaises(AccessError):
+            Audit.with_user(self.user_hr).with_context(_kms_internal_audit=True).create(forged)
+
+        logged = Audit.with_user(self.user_hr)._log_audit_event(
+            action='view', resource_type='document', resource_name='Test document',
+        )
+        self.assertEqual(logged.user_id, self.user_hr)
+        self.assertEqual(logged.employee_id, self.emp_hr)
+
+    def test_draft_deletion_keeps_audit_history(self):
+        doc = self.KmsDocument.create({
+            'name': 'Discarded Draft Procedure',
+            'category_id': self.category.id,
+            'doc_type_id': self.doc_type.id,
+            'classification_id': self.class_pub.id,
+            'owner_id': self.emp_hr.id,
+        })
+        code = doc.code
+        doc.with_user(self.user_kms_mgr).unlink()
+        self.assertFalse(doc.exists())
+        audit = self.env['kms.audit.log'].search([
+            ('action', '=', 'delete'), ('resource_name', 'like', code),
+        ])
+        self.assertEqual(len(audit), 1)
+        self.assertFalse(audit.document_id)
+
+    def test_new_classification_codes_fail_closed(self):
+        custom_class = self.KmsClassification.create({
+            'name': 'Executive Sensitive Test',
+            'code': 'EXEC-SENSITIVE-TEST',
+            'security_level': 79,
+        })
+        doc = self.KmsDocument.create({
+            'name': 'Executive Strategy Test',
+            'category_id': self.category.id,
+            'doc_type_id': self.doc_type.id,
+            'classification_id': custom_class.id,
+            'owner_id': self.emp_hr.id,
+        })
+        self.assertEqual(doc.classification, 'restricted')
+        with self.assertRaises(AccessError):
+            doc.with_user(self.user_hr).write({'classification': 'public'})
+
+    def test_published_classification_scope_cannot_change_via_taxonomy(self):
+        classification = self.KmsClassification.create({
+            'name': 'Restricted Operations Test',
+            'code': 'SCONF-OPERATIONS-TEST',
+            'security_level': 80,
+        })
+        doc = self.KmsDocument.create({
+            'name': 'Restricted Operations Procedure',
+            'category_id': self.category.id,
+            'doc_type_id': self.doc_type.id,
+            'classification_id': classification.id,
+            'owner_id': self.emp_hr.id,
+            'file_name': 'restricted.pdf',
+            'file_data': b'JVBERi0xLjQK',
+        })
+        doc.with_user(self.user_kms_mgr).action_submit_for_review()
+        doc.with_user(self.user_kms_mgr).action_approve()
+
+        with self.assertRaises(UserError):
+            classification.with_user(self.user_kms_mgr).write({'code': 'PUB-OPERATIONS-TEST'})
+        with self.assertRaises(UserError):
+            classification.with_user(self.user_kms_mgr).unlink()
+        self.assertEqual(doc.classification, 'restricted')
+
     def test_10_vote_deduplication(self):
         """Fix 10: Forum and tacit knowledge voting prevents double counting and toggles cleanly."""
         # 1. Forum Post Vote Deduplication
@@ -196,6 +309,7 @@ class TestKmsPhase3Access(TransactionCase):
             'mitigation_recommendation': '<p>Mitigation</p>',
             'author_id': self.emp_hr.id,
         })
+        lesson.action_approve()
 
         self.assertEqual(lesson.helpful_votes, 0)
         # First vote by Fin user -> count becomes 1

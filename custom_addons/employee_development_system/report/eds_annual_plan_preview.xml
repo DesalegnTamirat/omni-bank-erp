@@ -24,18 +24,29 @@
                             </tr></tbody>
                         </table>
                         <h4 style="color: #541718; margin-top: 18px;">Budget by Currency</h4>
-                        <table class="table table-sm table-bordered" style="width:55%;">
-                            <thead><tr><th>Currency</th><th style="text-align:right;">Total</th></tr></thead>
-                            <tbody>
-                                <t t-foreach="summary['currency_totals']" t-as="total">
-                                    <tr><td t-esc="total[0].name"/>
-                                        <td style="text-align:right;" t-esc="'{:,.2f}'.format(total[1])"/></tr>
-                                </t>
-                            </tbody>
-                        </table>
-                        <p><strong>Company-currency equivalent:</strong>
-                            <span t-field="o.budget_total" t-options="{'widget':'monetary','display_currency':o.budget_currency_id}"/>
-                        </p>
+                        <div style="margin:8px 0 16px 0;">
+                            <t t-foreach="summary['currency_totals']" t-as="total">
+                                <div style="display:inline-block;min-width:130px;margin:0 8px 8px 0;padding:10px 14px;border:1px solid #d9dfe4;border-radius:5px;background:#f8fafb;">
+                                    <div style="color:#58677a;font-size:10px;" t-esc="'Total in %s' % total[0].name"/>
+                                    <strong style="color:#541718;font-size:15px;" t-esc="'{:,.2f}'.format(total[1])"/>
+                                </div>
+                            </t>
+                        </div>
+                        <t t-set="delivery_changes" t-value="o.line_ids.filtered(lambda line: line.actual_delivery_method and line.actual_delivery_method != line.delivery_method)"/>
+                        <t t-if="delivery_changes">
+                            <h4 style="color: #541718; margin-top: 18px;">Delivery Changes During Execution</h4>
+                            <table class="table table-sm table-bordered" style="width:100%;">
+                                <thead><tr><th>Program</th><th>Planned</th><th>Chosen / Actual</th><th>Reason</th></tr></thead>
+                                <tbody>
+                                    <tr t-foreach="delivery_changes" t-as="line">
+                                        <td t-esc="line.program_name or line.course_id.name"/>
+                                        <td t-esc="dict(line._fields['delivery_method'].selection).get(line.delivery_method, '')"/>
+                                        <td t-esc="dict(line._fields['actual_delivery_method'].selection).get(line.actual_delivery_method, '')"/>
+                                        <td t-esc="line.delivery_change_reason or ''"/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
                         <t t-foreach="summary['by_method']" t-as="group">
                             <h4 style="color: #541718; margin-top: 18px;" t-esc="group['label']"/>
                             <table class="table table-sm table-bordered" style="width:100%;">

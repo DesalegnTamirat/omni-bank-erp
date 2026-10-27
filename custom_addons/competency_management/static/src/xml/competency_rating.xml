@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="competency_management.CompetencyGuideLink">
+        <button type="button" class="o_competency_guide_link" t-att-disabled="busy.value" t-att-title="name" t-on-click="openGuide">
+            <span t-esc="name"/>
+        </button>
+    </t>
+
+    <t t-name="competency_management.CompetencyMappingGuide">
+        <t t-if="!name || (editing.value &amp;&amp; !props.readonly)">
+            <Many2One t-props="pickerProps"/>
+        </t>
+        <t t-else="">
+            <div class="o_competency_mapping_field">
+                <button type="button" class="o_competency_guide_link" t-att-disabled="busy.value" t-att-title="name" t-on-click="openGuide">
+                    <span t-esc="name"/>
+                </button>
+                <button t-if="!props.readonly" type="button" class="o_competency_mapping_change" t-on-click="startEditing">Change</button>
+            </div>
+        </t>
+    </t>
+
+    <t t-name="competency_management.CompetencyLevelPicker">
+        <button type="button" class="o_competency_level_choice" t-att-data-level="props.level" t-att-class="{'is-selected': isSelected, 'is-readonly': !canRate}" t-att-disabled="!canRate || busy.value" t-on-click="selectLevel">
+            <span class="o_competency_level_choice_title" t-esc="label"/>
+            <span class="o_competency_level_choice_indicator" t-esc="indicator"/>
+            <span class="o_competency_level_choice_hint" t-if="canRate">Select this level</span>
+        </button>
+    </t>
+</templates>

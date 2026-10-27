@@ -12,10 +12,12 @@
                 <list string="Learner Enrollments" decoration-danger="is_overdue" decoration-info="state == 'in_progress'" decoration-success="state == 'completed'">
                     <field name="employee_id" widget="many2one_avatar_employee"/>
                     <field name="course_id"/>
+                    <field name="attempt_number" optional="hide"/>
                     <field name="department_id" optional="show"/>
                     <field name="operating_unit_id" optional="show"/>
                     <field name="is_mandatory" widget="boolean_toggle"/>
                     <field name="due_date"/>
+                    <field name="completion_date" optional="show"/>
                     <field name="is_overdue" widget="badge" decoration-danger="is_overdue" optional="show"/>
                     <field name="progress_percentage" widget="progressbar" string="Progress %"/>
                     <field name="final_score_percentage" string="Final Score (%)" optional="show"/>
@@ -38,32 +40,38 @@
                     <field name="course_id"/>
                     <field name="is_mandatory"/>
                     <field name="due_date"/>
+                    <field name="completion_date"/>
                     <field name="is_overdue"/>
+                    <field name="is_locked"/>
                     <field name="progress_percentage"/>
+                    <field name="completed_lessons_count"/>
+                    <field name="total_lessons_count"/>
                     <field name="state"/>
                     <templates>
                         <t t-name="card">
-                            <div class="oe_kanban_global_click p-3 rounded shadow-sm border mb-3 bg-white">
+                            <div class="oe_kanban_global_click o_lms_learning_card p-3 rounded border mb-3 bg-white">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span t-if="record.is_mandatory.raw_value" class="badge bg-danger">Mandatory</span>
-                                    <span t-else="" class="badge bg-info">Elective</span>
+                                    <span t-else="" class="badge bg-info text-dark">Elective</span>
+                                    <span t-if="record.is_locked.raw_value" class="badge bg-warning text-dark">Prerequisites pending</span>
                                     <span t-if="record.is_overdue.raw_value" class="badge bg-danger text-white"><i class="fa fa-clock-o me-1"/>Overdue</span>
-                                    <span t-else="" class="badge bg-secondary"><t t-esc="record.state.value"/></span>
+                                    <span t-elif="!record.is_locked.raw_value" class="badge bg-secondary"><t t-esc="record.state.value"/></span>
                                 </div>
                                 <div class="fw-bold fs-6 text-dark mb-1"><t t-esc="record.course_id.value"/></div>
-                                <div class="text-muted small mb-2"><i class="fa fa-user me-1"/> <t t-esc="record.employee_id.value"/></div>
+                                <div class="text-muted small mb-2"><t t-esc="record.completed_lessons_count.value"/> of <t t-esc="record.total_lessons_count.value"/> lessons complete</div>
                                 <div class="my-2">
                                     <div class="d-flex justify-content-between small text-muted mb-1">
                                         <span>Course Progress</span>
                                         <span class="fw-bold"><t t-esc="record.progress_percentage.value"/>%</span>
                                     </div>
                                     <div class="progress" style="height: 6px;">
-                                        <div class="progress-bar bg-primary" role="progressbar" t-attf-style="width: #{record.progress_percentage.raw_value}%;"/>
+                                        <div class="progress-bar o_lms_progress_fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" t-att-aria-valuenow="record.progress_percentage.raw_value" t-attf-style="width: #{record.progress_percentage.raw_value}%;"/>
                                     </div>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top text-muted small">
-                                    <span>Due: <t t-esc="(record.due_date and record.due_date.value) or 'Self-Paced'"/></span>
-                                    <span t-if="record.state.raw_value == 'completed'" class="text-success fw-bold"><i class="fa fa-certificate me-1"/>Certified</span>
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 pt-2 border-top text-muted small">
+                                    <span><t t-if="record.due_date.raw_value">Due <t t-esc="record.due_date.value"/></t><t t-else="">Self-paced</t></span>
+                                    <span t-if="record.state.raw_value == 'completed'" class="text-success fw-bold"><i class="fa fa-check-circle me-1"/>Completed</span>
+                                    <button type="open" class="btn btn-primary o_lms_touch_action" aria-label="Open course learning record">Open course</button>
                                 </div>
                             </div>
                         </t>
@@ -81,7 +89,14 @@
             <field name="arch" type="xml">
                 <form string="Course Enrollment Record">
                     <header>
-                        <button name="action_start_course" string="Start / Resume Learning" type="object" class="btn-primary" invisible="state not in ('enrolled', 'in_progress')"/>
+                        <button name="action_start_course" string="Start / Resume Learning" type="object" class="btn-primary" invisible="state not in ('enrolled', 'in_progress') or is_locked or (course_has_pre_assessment and not pre_assessment_passed)"/>
+                        <button name="action_start_pre_assessment" string="Take Pre-Assessment" type="object" class="btn-primary" invisible="state not in ('enrolled', 'in_progress') or is_locked or not course_has_pre_assessment or pre_assessment_passed"/>
+                        <button name="action_start_post_assessment" string="Take Final Assessment" type="object" invisible="state not in ('enrolled', 'in_progress') or is_locked or not course_has_post_assessment or (course_has_pre_assessment and not pre_assessment_passed)"/>
+                        <button name="action_create_recertification" string="Renew Course" type="object" invisible="state != 'completed'"/>
+                        <field name="course_has_pre_assessment" invisible="1"/>
+                        <field name="course_has_post_assessment" invisible="1"/>
+                        <field name="pre_assessment_passed" invisible="1"/>
+                        <field name="is_locked" invisible="1"/>
                         <field name="state" widget="statusbar" statusbar_visible="enrolled,in_progress,completed"/>
                     </header>
                     <sheet>
@@ -104,6 +119,7 @@
                                 <field name="is_overdue" invisible="1"/>
                             </group>
                             <group string="Academic Record &amp; Certificate">
+                                <field name="attempt_number" readonly="1"/>
                                 <field name="progress_percentage" widget="progressbar"/>
                                 <field name="completed_lessons_count" string="Completed / Total Lessons"/>
                                 <field name="final_score_percentage" invisible="not final_score_percentage"/>
@@ -112,16 +128,19 @@
                         </group>
 
                         <notebook>
-                            <page string="Curriculum Progress &amp; Anti-Skip Logs (FR-LMS-007 to 009)">
+                            <page string="My Lessons">
                                 <field name="lesson_progress_ids">
                                     <list decoration-success="state == 'completed'" decoration-info="state == 'in_progress'">
                                         <field name="lesson_id" string="Lesson Module"/>
+                                        <field name="lesson_type" column_invisible="True"/>
                                         <field name="state" widget="badge" decoration-success="state == 'completed'" decoration-info="state == 'in_progress'"/>
-                                        <field name="watch_percentage" widget="progressbar" string="Watched %"/>
-                                        <field name="max_watched_seconds" string="Farthest Legitimate Watched (Sec)"/>
-                                        <field name="last_position_seconds" string="Resume Position (Sec)"/>
-                                        <field name="date_completed" string="Completed Timestamp"/>
-                                        <button name="mark_completed" string="Complete Lesson" type="object" icon="fa-check" invisible="state == 'completed'"/>
+                                        <field name="watch_percentage" widget="progressbar" string="Video Watched %" optional="hide"/>
+                                        <field name="completion_method" string="Completed By" readonly="1" optional="hide"/>
+                                        <field name="opened_at" string="Opened At" readonly="1" optional="hide"/>
+                                        <field name="acknowledged_at" string="Reviewed At" readonly="1" optional="hide"/>
+                                        <field name="date_completed" string="Completed At" optional="hide"/>
+                                        <button name="action_open_lesson" string="Open Lesson" type="object" icon="fa-play"/>
+                                        <button name="mark_completed" string="Confirm reviewed" type="object" icon="fa-check" invisible="state == 'completed' or lesson_type not in ('text', 'document')"/>
                                     </list>
                                 </field>
                             </page>

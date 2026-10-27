@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Attendance and delivery tracking (/041/045).
+"""Attendance and delivery tracking.
 
 Delivery-time records managed by L&D staff:
   - eds.session.attendance   per-participant attendance with computed per-program %
-                             (feeds the 80% certification rule, )
+                             (feeds the 80% certification rule)
   - eds.material             course training material with quality review +
                              Director PPDD approval gate
   - eds.feedback             daily participant feedback lines
@@ -12,25 +12,43 @@ Delivery-time records managed by L&D staff:
                              entitlement validation (service years) and travel
                              arrangements
 """
+import base64
+import binascii
 from datetime import date
+from pathlib import PurePath
+from urllib.parse import urlparse
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
+
+from .eds_action_notification import clear_action_activities, notify_action, notify_role_action
+
+
+_MATERIAL_MAX_BYTES = 25 * 1024 * 1024
+_MATERIAL_FILE_EXTENSIONS = {
+    'manual': {'.pdf', '.doc', '.docx', '.odt'},
+    'presentation': {'.pdf', '.ppt', '.pptx', '.odp'},
+    'handout': {'.pdf', '.doc', '.docx', '.odt', '.ppt', '.pptx', '.odp'},
+    'case_study': {'.pdf', '.doc', '.docx', '.odt'},
+    'examination': {'.pdf', '.doc', '.docx', '.odt', '.xls', '.xlsx', '.ods'},
+    'other': {'.pdf', '.doc', '.docx', '.odt', '.ppt', '.pptx', '.odp',
+              '.xls', '.xlsx', '.ods', '.csv', '.txt', '.png', '.jpg', '.jpeg', '.webp'},
+}
 
 
 class EdsSessionAttendance(models.Model):
     """Per-participant attendance on a session.
 
-    `attendance_percentage` is computed *per program* (all sessions of the same
-    course) so it feeds directly into the certification eligibility rule
-    (default >= 80%, ). Immutable after recording: the model is wired into
+    `attendance_percentage` is computed for this session's scheduled periods
+    so another delivery of the same course cannot affect certification
+    (default >= 80%). Immutable after recording: the model is wired into
     the `audit_trail` module (data/eds_audit_rules.xml) so any later edit is
     logged with user / old value / new value (business rule §6).
     """
     _name = 'eds.session.attendance'
     _description = 'Session Attendance Record'
     _inherit = ['mail.thread', 'mail.activity.mixin']
-    _order = 'session_id, employee_id'
+    _order = 'session_id, attendance_date, attendance_slot, employee_id'
     _rec_name = 'name'
 
     _track_audit = True  # documented intent; enforced via audit.rule in data/
@@ -47,37 +65,74 @@ class EdsSessionAttendance(models.Model):
                                     related='employee_id.department_id', readonly=True)
     attendance_date = fields.Date(string='Attendance Date', default=fields.Date.context_today,
                                   index=True)
-    attended = fields.Boolean(string='Attended', default=True, tracking=True)
-    hours_attended = fields.Float(string='Hours Attended', default=0.0)
+    attendance_slot = fields.Selection([
+        ('day', 'Daily'), ('morning', 'Morning'), ('afternoon', 'Afternoon'),
+    ], string='Period', default='day', required=True, index=True)
+    attended = fields.Boolean(string='Present', default=False, tracking=True)
+    hours_attended = fields.Float(
+        string='Hours Attended', compute='_compute_hours_attended', store=True,
+        readonly=True, help='Calculated from the session timetable when present.')
     notes = fields.Text(string='Notes')
     recorded_by = fields.Many2one('res.users', string='Recorded By',
                                   default=lambda self: self.env.user, readonly=True,
                                   copy=False)
     attendance_percentage = fields.Float(
-        string='Program Attendance %', compute='_compute_program_attendance', store=True,
+        string='Session Attendance %', compute='_compute_program_attendance', store=True,
         digits=(5, 2),
-        help='Attended sessions / total sessions of this program for the participant '
-             '().')
+        help='Present periods / scheduled periods of this session for the participant.')
     meets_min_attendance = fields.Boolean(
         string='Meets Minimum Attendance', compute='_compute_program_attendance', store=True,
-        help='True when the program attendance % is >= the configurable threshold '
-             '(default 80%, ) - feeds certification eligibility .')
+        help='True when this session attendance meets the configured minimum '
+             '(default 80%).')
     company_id = fields.Many2one('res.company', string='Company',
                                  default=lambda self: self.env.company)
 
-    _session_employee_date_uniq = models.Constraint(
-        'UNIQUE(session_id, employee_id, attendance_date)',
-        'Attendance is already recorded for this participant on this session date!',
+    _session_employee_date_slot_uniq = models.Constraint(
+        'UNIQUE(session_id, employee_id, attendance_date, attendance_slot)',
+        'Attendance is already recorded for this participant in this session period!',
     )
+
+    @api.onchange('session_id')
+    def _onchange_session_attendance_period(self):
+        for rec in self:
+            if rec.session_id:
+                slots = rec.session_id._attendance_slots()
+                if slots:
+                    rec.attendance_date, rec.attendance_slot = slots[0][:2]
+
+    @api.constrains('session_id', 'attendance_date', 'attendance_slot')
+    def _check_attendance_slot(self):
+        slots_by_session = {}
+        for rec in self:
+            if not rec.session_id:
+                continue
+            if rec.session_id.id not in slots_by_session:
+                slots_by_session[rec.session_id.id] = {
+                    (day, slot) for day, slot, _hours in rec.session_id._attendance_slots()}
+            if (rec.attendance_date, rec.attendance_slot) not in slots_by_session[rec.session_id.id]:
+                raise ValidationError(_(
+                    'Choose a date and period scheduled for this training session.'))
+
+    @api.depends('attended', 'attendance_date', 'attendance_slot',
+                 'session_id.date_start', 'session_id.date_end', 'session_id.attendance_mode')
+    def _compute_hours_attended(self):
+        slots_by_session = {}
+        for rec in self:
+            if rec.session_id.id not in slots_by_session:
+                slots_by_session[rec.session_id.id] = {
+                    (day, slot): hours for day, slot, hours in rec.session_id._attendance_slots()}
+            rec.hours_attended = (
+                slots_by_session[rec.session_id.id].get(
+                    (rec.attendance_date, rec.attendance_slot), 0.0)
+                if rec.attended else 0.0)
 
     @api.constrains('session_id', 'employee_id')
     def _check_employee_enrolled(self):
         for rec in self:
             if rec.session_id and rec.employee_id:
-                enrolled_emps = rec.session_id.enrollment_ids.filtered(
-                    lambda e: e.state in ('enrolled', 'completed')
-                ).mapped('employee_id')
-                if enrolled_emps and rec.employee_id not in enrolled_emps:
+                enrolled_emps = rec.session_id._accepted_attendance_enrollments().mapped(
+                    'employee_id')
+                if rec.employee_id not in enrolled_emps:
                     raise ValidationError(_(
                         'Participant Error: Employee %s is not an enrolled participant in session %s.'
                     ) % (rec.employee_id.name, rec.session_id.name))
@@ -88,43 +143,81 @@ class EdsSessionAttendance(models.Model):
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code(
                     'eds.session.attendance') or _('New')
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        if not self.env.context.get('eds_defer_attendance_refresh'):
+            records._refresh_program_attendance()
+        return records
 
-    @api.depends('session_id.course_id', 'employee_id', 'attended')
+    def write(self, vals):
+        watched = {'session_id', 'employee_id', 'attended', 'attendance_date', 'attendance_slot'}
+        before = ({(row.employee_id.id, row.session_id.id) for row in self}
+                  if watched & vals.keys() and not self.env.context.get('eds_defer_attendance_refresh')
+                  else set())
+        result = super().write(vals)
+        if before and not self.env.context.get('eds_defer_attendance_refresh'):
+            after = {(row.employee_id.id, row.session_id.id) for row in self}
+            self._refresh_program_attendance(before | after)
+        return result
+
+    def unlink(self):
+        pairs = {(row.employee_id.id, row.session_id.id) for row in self}
+        result = super().unlink()
+        self._refresh_program_attendance(pairs)
+        return result
+
+    def _refresh_program_attendance(self, pairs=None):
+        pairs = pairs or {(row.employee_id.id, row.session_id.id) for row in self}
+        pairs = {(employee_id, session_id) for employee_id, session_id in pairs
+                 if employee_id and session_id}
+        if not pairs:
+            return
+        candidates = self.search([
+            ('employee_id', 'in', list({employee_id for employee_id, _session_id in pairs})),
+            ('session_id', 'in', list({session_id for _employee_id, session_id in pairs})),
+        ])
+        candidates.filtered(
+            lambda row: (row.employee_id.id, row.session_id.id) in pairs
+        )._compute_program_attendance()
+
+    @api.depends('session_id', 'employee_id', 'attended', 'attendance_date', 'attendance_slot',
+                 'session_id.date_start', 'session_id.date_end', 'session_id.attendance_mode')
     def _compute_program_attendance(self):
-        """Program (course) attendance % across all its sessions.
-
-        Batch-computed to avoid N+1 queries.
-        """
+        """Attendance percentage for this session's scheduled periods."""
         threshold = self._get_float_param('eds.min_attendance_pct', 80.0)
-        valid_recs = self.filtered(lambda r: r.session_id.course_id and r.employee_id)
+        valid_recs = self.filtered(lambda r: r.session_id and r.employee_id)
         if not valid_recs:
             for rec in self:
                 rec.attendance_percentage = 0.0
                 rec.meets_min_attendance = False
             return
 
-        pairs = set((r.employee_id.id, r.session_id.course_id.id) for r in valid_recs)
-        domain = ['|'] * (len(pairs) - 1) if len(pairs) > 1 else []
-        for emp_id, course_id in pairs:
-            domain.extend(['&', ('employee_id', '=', emp_id), ('session_id.course_id', '=', course_id)])
-
-        all_records = self.search(domain)
+        pairs = {(r.employee_id.id, r.session_id.id) for r in valid_recs}
+        periods_by_session = {
+            session.id: len(session._attendance_slots())
+            for session in valid_recs.mapped('session_id')
+        }
+        all_records = self.search([
+            ('employee_id', 'in', list({employee_id for employee_id, _session_id in pairs})),
+            ('session_id', 'in', list({session_id for _employee_id, session_id in pairs})),
+        ])
         counts = {}
         for r in all_records:
-            key = (r.employee_id.id, r.session_id.course_id.id)
+            key = (r.employee_id.id, r.session_id.id)
+            if key not in pairs:
+                continue
             tot, att = counts.get(key, (0, 0))
             counts[key] = (tot + 1, att + (1 if r.attended else 0))
 
         for rec in self:
-            course = rec.session_id.course_id
-            if not course or not rec.employee_id:
+            if not rec.session_id or not rec.employee_id:
                 rec.attendance_percentage = 0.0
                 rec.meets_min_attendance = False
                 continue
-            tot, att = counts.get((rec.employee_id.id, course.id), (0, 0))
-            rec.attendance_percentage = round(att * 100.0 / tot, 2) if tot else 0.0
-            rec.meets_min_attendance = bool(tot) and rec.attendance_percentage >= threshold
+            recorded, present = counts.get((rec.employee_id.id, rec.session_id.id), (0, 0))
+            scheduled = periods_by_session[rec.session_id.id]
+            total = max(recorded, scheduled)
+            rec.attendance_percentage = round(present * 100.0 / total, 2) if total else 0.0
+            rec.meets_min_attendance = bool(total) and rec.attendance_percentage >= threshold
 
     @api.model
     def _get_float_param(self, key, default):
@@ -135,11 +228,7 @@ class EdsSessionAttendance(models.Model):
 
 
 class EdsMaterial(models.Model):
-    """Training material with quality review + Director PPDD approval.
-
-    A session whose course has materials cannot be confirmed until at least one
-    material version is approved - enforced on `eds.session.action_confirm`.
-    """
+    """Course material shared through a scheduled session with its audience."""
     _name = 'eds.material'
     _description = 'Training Material'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -161,8 +250,22 @@ class EdsMaterial(models.Model):
         ('other', 'Other'),
     ], string='Material Type', default='manual', tracking=True)
     version = fields.Char(string='Version', default='v1.0', tracking=True)
-    document = fields.Binary(string='Document')
+    visibility = fields.Selection([
+        ('staff', 'L&D Staff Only'),
+        ('trainers', 'Assigned Trainers and L&D'),
+        ('participants', 'Accepted Participants, Assigned Trainers and L&D'),
+    ], string='Who Can Open', default='participants', required=True, tracking=True,
+        help='Accepted participants see shared materials in their training invitation after the session is scheduled. Assigned trainers see trainer and participant materials on their session. L&D can see all materials.')
+    source_kind = fields.Selection([
+        ('attachment', 'Upload to EDS'),
+        ('link', 'Managed Link (LMS / Internal)'),
+    ], string='Content Source', default='attachment', required=True, tracking=True,
+        help='Upload documents and slides to EDS, or link to content already managed in LMS or another bank system. Videos use links.')
+    document = fields.Binary(string='Material File (maximum 25 MB)', attachment=True)
     filename = fields.Char(string='Filename')
+    resource_url = fields.Char(
+        string='Managed Resource URL', tracking=True,
+        help='Use a full http(s) URL or an internal path such as /lms/lesson/123/document or /lms/video/123/player. Access to linked content remains controlled by its source system.')
     description = fields.Text(string='Description')
 
     # Two-stage gate: L&D quality review first, then Director PPDD.
@@ -198,13 +301,183 @@ class EdsMaterial(models.Model):
                 rec.quality_state == 'quality_approved'
                 and rec.approval_state in ('not_required', 'director_approved'))
 
+    @api.onchange('material_type')
+    def _onchange_material_type(self):
+        if self.material_type == 'video':
+            self.source_kind = 'link'
+            self.document = False
+            self.filename = False
+        elif self.material_type == 'examination':
+            self.visibility = 'staff'
+
+    @api.onchange('source_kind')
+    def _onchange_source_kind(self):
+        if self.source_kind == 'link':
+            self.document = False
+            self.filename = False
+        else:
+            self.resource_url = False
+
+    @api.model
+    def _check_upload_size(self, encoded):
+        if not encoded:
+            return
+        try:
+            value = encoded.encode('ascii') if isinstance(encoded, str) else encoded
+            if len(value) > 4 * ((_MATERIAL_MAX_BYTES + 2) // 3) + 4:
+                raise ValidationError(_('Training material files cannot exceed 25 MB. Use an LMS or internal link for larger content.'))
+            size = len(base64.b64decode(value, validate=True))
+        except (UnicodeEncodeError, TypeError, binascii.Error, ValueError) as exc:
+            raise ValidationError(_('The uploaded material is not a valid file.')) from exc
+        if size > _MATERIAL_MAX_BYTES:
+            raise ValidationError(_('Training material files cannot exceed 25 MB. Use an LMS or internal link for larger content.'))
+
+    @api.model
+    def _check_file_extension(self, material_type, filename):
+        extension = PurePath(filename or '').suffix.lower()
+        allowed = _MATERIAL_FILE_EXTENSIONS.get(material_type, set())
+        if extension not in allowed:
+            raise ValidationError(_('%s files must use one of these extensions: %s') % (
+                material_type.replace('_', ' ').title(), ', '.join(sorted(allowed))))
+
+    @api.constrains('document', 'filename', 'resource_url', 'source_kind',
+                    'material_type', 'quality_state', 'approval_state')
+    def _check_content_source(self):
+        for rec in self:
+            if rec.material_type == 'video' and rec.source_kind != 'link':
+                raise ValidationError(_('Video and e-learning materials must link to an LMS lesson or managed streaming resource.'))
+            if rec.source_kind == 'attachment':
+                if rec.resource_url:
+                    raise ValidationError(_('Choose one content source: an EDS attachment or a managed link.'))
+                if rec._has_content():
+                    rec._check_file_extension(rec.material_type, rec.filename)
+            else:
+                if rec.document:
+                    raise ValidationError(_('Choose one content source: an EDS attachment or a managed link.'))
+                if rec.resource_url:
+                    url = rec.resource_url.strip()
+                    parsed = urlparse(url)
+                    internal = url.startswith('/') and not url.startswith('//') and not url.startswith('/\\')
+                    web_url = parsed.scheme in ('http', 'https') and bool(parsed.netloc)
+                    if not (internal or web_url):
+                        raise ValidationError(_('Use a valid http(s) URL or an internal path beginning with /.'))
+            if rec.quality_state in ('in_review', 'quality_approved'):
+                rec._ensure_source_present()
+
+    def _ensure_source_present(self):
+        for rec in self:
+            if rec.source_kind == 'attachment' and not rec.document:
+                raise ValidationError(_('Attach the material file before submitting it for quality review.'))
+            if rec.source_kind == 'link' and not rec.resource_url:
+                raise ValidationError(_('Enter the LMS or internal resource link before submitting it for quality review.'))
+
+    def action_open_source(self):
+        self.ensure_one()
+        self.check_access('read')
+        self._ensure_source_present()
+        return {
+            'type': 'ir.actions.act_url',
+            'url': (f'/web/content/eds.material/{self.id}/document?download=false'
+                    if self.source_kind == 'attachment' else self.resource_url),
+            'target': 'new',
+        }
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get('material_type') == 'video' and 'source_kind' not in vals:
+                vals['source_kind'] = 'link'
+            if vals.get('material_type') == 'examination' and 'visibility' not in vals:
+                vals['visibility'] = 'staff'
+            if vals.get('resource_url'):
+                vals['resource_url'] = vals['resource_url'].strip()
+            self._check_upload_size(vals.get('document'))
+            if vals.get('document') and vals.get('source_kind', 'attachment') == 'attachment':
+                self._check_file_extension(vals.get('material_type', 'manual'), vals.get('filename'))
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code(
                     'eds.material') or _('New')
         return super().create(vals_list)
+
+    def write(self, vals):
+        if vals.get('resource_url'):
+            vals = dict(vals, resource_url=vals['resource_url'].strip())
+        self._check_upload_size(vals.get('document'))
+        if {'document', 'filename', 'material_type', 'source_kind'} & vals.keys():
+            for rec in self:
+                if vals.get('source_kind', rec.source_kind) != 'attachment':
+                    continue
+                has_file = bool(vals['document']) if 'document' in vals else rec._has_content()
+                if has_file:
+                    self._check_file_extension(
+                        vals.get('material_type', rec.material_type),
+                        vals.get('filename', rec.filename),
+                    )
+        if any(name in vals for name in (
+            'title', 'material_type', 'version', 'source_kind', 'document',
+            'filename', 'resource_url', 'description',
+        )):
+            vals = dict(vals, quality_state='draft', approval_state='not_required',
+                        reviewed_by=False, reviewed_date=False,
+                        approved_by=False, approved_date=False)
+        return super().write(vals)
+
+    def _has_content(self):
+        self.ensure_one()
+        return bool(self.with_context(bin_size=True).document if self.source_kind == 'attachment'
+                    else self.resource_url)
+
+    def _can_open_for_session(self, session, user):
+        """Keep model files private; the delivery route checks each viewer."""
+        self.ensure_one()
+        if not self._has_content() or self.course_id != session.course_id:
+            return False
+        if user.has_group('employee_development_system.group_eds_officer'):
+            return True
+        if self.visibility in ('trainers', 'participants') and session.status != 'cancelled':
+            if session.trainer_ids.filtered(
+                lambda trainer: trainer.employee_id.user_id == user
+                or trainer.external_partner_id == user.partner_id
+            ):
+                return True
+        if self.visibility == 'participants' and session.status in (
+            'scheduled', 'ongoing', 'rescheduled', 'completed',
+        ):
+            return bool(self.env['eds.enrollment'].sudo().search_count([
+                ('session_id', '=', session.id),
+                ('employee_id.user_id', '=', user.id),
+                ('state', 'in', ('enrolled', 'completed')),
+            ]))
+        return False
+
+    def _can_open_for_user(self, user):
+        """Check the viewer against matching sessions without scanning all of them."""
+        self.ensure_one()
+        if not self._has_content():
+            return False
+        if user.has_group('employee_development_system.group_eds_officer'):
+            return True
+        if self.visibility in ('trainers', 'participants'):
+            trainers = self.env['eds.trainer'].sudo().search([
+                '|', ('employee_id.user_id', '=', user.id),
+                ('external_partner_id', '=', user.partner_id.id),
+            ])
+            if trainers and self.env['eds.session'].sudo().search_count([
+                ('course_id', '=', self.course_id.id),
+                ('trainer_ids', 'in', trainers.ids),
+                ('status', '!=', 'cancelled'),
+                ('company_id', 'in', user.company_ids.ids),
+            ]):
+                return True
+        if self.visibility == 'participants':
+            return bool(self.env['eds.enrollment'].sudo().search_count([
+                ('session_id.course_id', '=', self.course_id.id),
+                ('session_id.status', 'in', ('scheduled', 'ongoing', 'rescheduled', 'completed')),
+                ('session_id.company_id', 'in', user.company_ids.ids),
+                ('employee_id.user_id', '=', user.id),
+                ('state', 'in', ('enrolled', 'completed')),
+            ]))
+        return False
 
     def _require_group(self, group_xml_id):
         if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)):
@@ -215,12 +488,14 @@ class EdsMaterial(models.Model):
         for rec in self:
             if rec.quality_state != 'draft':
                 raise UserError(_('Only draft materials can be submitted to quality review.'))
-            if not rec.document:
-                raise UserError(_('Attach the material document before submitting it for '
-                                  'quality review.'))
+            rec._ensure_source_present()
             rec.quality_state = 'in_review'
             rec.message_post(body=_('Material %s submitted for quality review.')
                              % rec.title)
+            notify_role_action(
+                rec, 'group_eds_manager', 'group_eds_admin',
+                _('Review training material'),
+                _('Training material %s needs quality review.') % rec.title)
 
     def action_approve_quality(self):
         """In Review -> Quality Approved (L&D Manager / Admin)."""
@@ -233,6 +508,11 @@ class EdsMaterial(models.Model):
                        'reviewed_date': date.today()})
             rec.message_post(body=_('Material %s passed the quality review.')
                              % rec.title)
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid, _('Training material quality approved'),
+                _('Training material %s passed quality review.') % rec.title,
+                action_required=False)
 
     def action_submit_director_approval(self):
         """Quality Approved -> Submitted to Director PPDD."""
@@ -245,11 +525,15 @@ class EdsMaterial(models.Model):
             rec.approval_state = 'submitted'
             rec.message_post(body=_('Material %s submitted for Director PPDD approval '
                                     '().') % rec.title)
+            notify_role_action(
+                rec, 'group_eds_director', None,
+                _('Approve training material'),
+                _('Training material %s needs Director approval.') % rec.title)
 
     def action_director_approve(self):
-        """Submitted -> Director PPDD Approved (L&D Manager / Admin)."""
+        """Submitted -> Director PPDD Approved."""
         for rec in self:
-            rec._require_group('group_eds_manager')
+            rec._require_group('group_eds_director')
             if rec.approval_state != 'submitted':
                 raise UserError(_('Only materials submitted to the Director PPDD can be '
                                   'finally approved.'))
@@ -258,6 +542,12 @@ class EdsMaterial(models.Model):
                        'approved_date': date.today()})
             rec.message_post(body=_('Material %s approved by Director PPDD - session '
                                     'confirmation gate released.') % rec.title)
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid | rec.reviewed_by,
+                _('Training material approved'),
+                _('Training material %s is approved for training delivery.') % rec.title,
+                action_required=False)
 
     def action_reject(self):
         """Reject at any pre-approval stage (mandatory feedback in chatter)."""
@@ -271,6 +561,10 @@ class EdsMaterial(models.Model):
             else:
                 raise UserError(_('Only materials under review can be rejected.'))
             rec.message_post(body=_('Material %s was rejected.') % rec.title)
+            clear_action_activities(rec)
+            notify_action(
+                rec, rec.create_uid, _('Training material returned'),
+                _('Training material %s was rejected and needs revision.') % rec.title)
 
 
 class EdsFeedback(models.Model):
@@ -318,12 +612,12 @@ class EdsFeedback(models.Model):
 
 
 class EdsAssessment(models.Model):
-    """Pre/post training assessment score (, ).
+    """Pre/post assessment, with itemized responses or a legacy score.
 
     Single model shared by delivery  and the Level-2 evaluation engine
     : `eds.evaluation.level2` links pre/post records through this model
     and computes the learning gain. `passed` compares the score against the
-    configurable threshold (default 60%, ).
+    configurable threshold (default 60%).
     """
     _name = 'eds.assessment'
     _description = 'Pre / Post Training Assessment'
@@ -342,15 +636,37 @@ class EdsAssessment(models.Model):
         ('post', 'Post-Training Assessment'),
         ('skills_test', 'Practical Skills Test'),
     ], string='Assessment Type', default='pre', required=True, tracking=True)
+    answer_ids = fields.One2many('eds.assessment.answer', 'assessment_id',
+                                 string='Question Answers')
+    state = fields.Selection([
+        ('draft', 'Draft'),
+        ('distributed', 'Awaiting Employee'),
+        ('submitted', 'Awaiting Grading'),
+        ('graded', 'Graded'),
+    ], default='draft', required=True, tracking=True)
+    entry_method = fields.Selection([
+        ('score_only', 'Legacy Score Only'),
+        ('manual', 'Entered by L&D'),
+        ('import', 'Imported Responses'),
+        ('employee', 'Employee Responses'),
+    ], default='score_only', required=True, tracking=True,
+        help='Existing score-only records remain available; new itemized assessments '
+             'use the same question and grading workflow regardless of source.')
     score = fields.Float(string='Score (0-100)', digits=(5, 2), tracking=True)
     passed = fields.Boolean(string='Passed', compute='_compute_passed', store=True,
                             help='Score >= the configurable Level-2 pass threshold '
-                                 '(default 60%, ).')
+                                 '(default 60%).')
     threshold = fields.Float(string='Pass Threshold %', compute='_compute_passed', store=True)
     assessment_date = fields.Date(string='Assessment Date', default=fields.Date.context_today)
     uploaded_by = fields.Many2one('res.users', string='Uploaded By',
                                   default=lambda self: self.env.user, readonly=True,
                                   help='L&D staff member who entered or imported the score.')
+    distributed_at = fields.Datetime(string='Distributed At', readonly=True, copy=False)
+    submitted_at = fields.Datetime(string='Submitted At', readonly=True, copy=False)
+    graded_at = fields.Datetime(string='Graded At', readonly=True, copy=False)
+    taken_over_at = fields.Datetime(string='Taken Over By L&D At', readonly=True, copy=False)
+    taken_over_by = fields.Many2one('res.users', string='Taken Over By',
+                                    readonly=True, copy=False)
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company',
                                  default=lambda self: self.env.company)
@@ -363,6 +679,234 @@ class EdsAssessment(models.Model):
         'CHECK(score >= 0 AND score <= 100)',
         'The assessment score must be between 0 and 100!',
     )
+
+    def _is_assessment_staff(self):
+        return self.env.su or self.env.user.has_group(
+            'employee_development_system.group_eds_officer')
+
+    def _question_bank(self):
+        self.ensure_one()
+        questions = self.env['eds.assessment.question'].search([
+            ('session_id', '=', self.session_id.id),
+            ('assessment_type', '=', self.assessment_type),
+        ])
+        if not questions and self._is_assessment_staff():
+            questions = self.env['eds.assessment.question'].seed_from_instrument(
+                self.session_id, self.assessment_type)
+        return questions
+
+    def action_load_questions(self):
+        """Add missing question rows for manual entry without replacing responses."""
+        if not self._is_assessment_staff():
+            raise AccessError(_('Only L&D staff may prepare assessment questions.'))
+        answer_model = self.env['eds.assessment.answer']
+        for assessment in self:
+            if assessment.assessment_type not in ('pre', 'post'):
+                raise ValidationError(_('Question responses are available for pre/post assessments.'))
+            questions = assessment._question_bank()
+            if not questions:
+                raise ValidationError(_(
+                    'Add pre/post questions to this session or publish a Level 2 course instrument first.'
+                ))
+            if assessment.entry_method == 'score_only' and assessment.score:
+                raise ValidationError(_(
+                    'This assessment already has a legacy score. Keep that result, or '
+                    'explicitly replace it through the response import workflow.'
+                ))
+            existing_ids = set(assessment.answer_ids.mapped('question_id').ids)
+            missing = questions.filtered(lambda question: question.id not in existing_ids)
+            if missing:
+                answer_model.create([{
+                    'assessment_id': assessment.id,
+                    'question_id': question.id,
+                } for question in missing])
+            if assessment.entry_method == 'score_only':
+                assessment.write({'entry_method': 'manual'})
+        return True
+
+    @api.model
+    def distribute_for_session(self, session, assessment_type):
+        """Open questions for linked participants; return only newly invited rows.
+
+        Calling this again does not change or re-notify a participant who was
+        already invited, submitted, or graded. Staff can record results manually
+        for participants without an active internal user account.
+        """
+        if not self._is_assessment_staff():
+            raise AccessError(_('Only L&D staff may distribute assessments.'))
+        session.ensure_one()
+        if assessment_type not in ('pre', 'post'):
+            raise ValidationError(_('Only pre and post assessments can be distributed.'))
+        # Serialize simultaneous button clicks for this session. The second
+        # transaction searches after the first has committed and therefore
+        # returns no newly distributed rows or duplicate notifications.
+        self.env.cr.execute(
+            'SELECT id FROM eds_session WHERE id = %s FOR UPDATE', [session.id])
+        questions = self.env['eds.assessment.question'].seed_from_instrument(
+            session, assessment_type)
+        if not questions:
+            raise ValidationError(_(
+                'Add %s questions to this session or publish a Level 2 course instrument before distribution.'
+            ) % assessment_type)
+        participants = session._accepted_attendance_enrollments().filtered(
+            lambda enrollment: enrollment.state in ('enrolled', 'completed')
+            and enrollment.employee_id.user_id
+            and enrollment.employee_id.user_id.active
+            and not enrollment.employee_id.user_id.share
+        ).mapped('employee_id')
+        if not participants:
+            raise ValidationError(_(
+                'No enrolled participant has an active internal user account. '
+                'Enter or import their answers through L&D instead.'
+            ))
+        newly_distributed = self.browse()
+        for employee in participants:
+            assessment = self.search([
+                ('session_id', '=', session.id),
+                ('employee_id', '=', employee.id),
+                ('assessment_type', '=', assessment_type),
+            ], limit=1)
+            if assessment:
+                if assessment.state in ('distributed', 'submitted', 'graded'):
+                    continue
+                if (assessment.entry_method == 'score_only'
+                        or assessment.score or assessment.answer_ids.filtered(
+                        lambda line: (line.answer_text or '').strip() or line.is_graded)):
+                    # A pre-existing manual/import/legacy result belongs to staff.
+                    continue
+                assessment.action_load_questions()
+            else:
+                assessment = self.create({
+                    'session_id': session.id,
+                    'employee_id': employee.id,
+                    'assessment_type': assessment_type,
+                    'company_id': session.company_id.id,
+                    'entry_method': 'employee',
+                })
+                assessment.action_load_questions()
+            assessment.write({
+                'entry_method': 'employee',
+                'state': 'distributed',
+                'distributed_at': fields.Datetime.now(),
+            })
+            newly_distributed |= assessment
+        return newly_distributed
+
+    def _validate_itemized_answers(self, *, require_grades=False):
+        for assessment in self:
+            questions = assessment._question_bank()
+            if not questions:
+                raise ValidationError(_(
+                    'Add questions for the %s assessment before submitting results.'
+                ) % assessment.assessment_type)
+            lines = assessment.answer_ids
+            if set(lines.mapped('question_id').ids) != set(questions.ids):
+                raise ValidationError(_(
+                    'Answer every question in the %s assessment for %s.'
+                ) % (assessment.assessment_type, assessment.employee_id.name))
+            for line in lines:
+                if not (line.answer_text or '').strip():
+                    raise ValidationError(_(
+                        'An answer is required for every assessment question (%s).'
+                    ) % line.question_id.question_text)
+                if require_grades and not line.is_graded:
+                    raise ValidationError(_(
+                        'Grade every answer before finalizing the assessment (%s).'
+                    ) % line.question_id.question_text)
+                if require_grades and not (0 <= line.awarded_points <= line.question_id.max_points):
+                    raise ValidationError(_(
+                        'Awarded points are outside the permitted range for %s.'
+                    ) % line.question_id.question_text)
+
+    def action_submit_answers(self):
+        for assessment in self:
+            if (assessment.entry_method != 'employee'
+                    or assessment.state != 'distributed'
+                    or assessment.employee_id.user_id != self.env.user):
+                raise AccessError(_('You can submit only your own distributed assessment.'))
+            assessment._validate_itemized_answers()
+            assessment.sudo().write({
+                'state': 'submitted',
+                'submitted_at': fields.Datetime.now(),
+            })
+        return True
+
+    def action_take_over_manual_entry(self):
+        """Let L&D finish a distributed form while keeping employee answers."""
+        if not self._is_assessment_staff():
+            raise AccessError(_('Only L&D staff may take over an assessment.'))
+        for assessment in self:
+            if assessment.state != 'distributed' or assessment.entry_method != 'employee':
+                raise ValidationError(_(
+                    'Only an assessment awaiting employee answers can be taken over.'
+                ))
+            answered_count = len(assessment.answer_ids.filtered(
+                lambda line: (line.answer_text or '').strip()))
+            employee_user = assessment.employee_id.user_id
+            assessment.write({
+                'entry_method': 'manual',
+                'state': 'submitted',
+                'score': 0.0,
+                'taken_over_at': fields.Datetime.now(),
+                'taken_over_by': self.env.user.id,
+            })
+            # The original notification remains in Inbox as history, but the
+            # action can no longer be completed by the employee.
+            pending = assessment.activity_ids.filtered(
+                lambda activity: activity.user_id == employee_user
+                and (activity.summary or '').startswith('EDS action:'))
+            if pending:
+                pending.sudo().unlink()
+            assessment.with_context(eds_popup_managed=True).message_post(
+                body=_('L&D took over this assessment; %d existing employee '
+                       'answer(s) were preserved for staff completion and grading.')
+                % answered_count,
+                subtype_xmlid='mail.mt_note',
+            )
+        return True
+
+    def action_finalize(self):
+        if not self._is_assessment_staff():
+            raise AccessError(_('Only L&D staff may grade assessments.'))
+        for assessment in self:
+            if assessment.assessment_type not in ('pre', 'post'):
+                raise ValidationError(_('Only pre/post assessments use itemized grading.'))
+            assessment._validate_itemized_answers(require_grades=True)
+            total = sum(assessment.answer_ids.mapped('question_id.max_points'))
+            if total <= 0:
+                raise ValidationError(_('Assessment maximum points must be positive.'))
+            awarded = sum(assessment.answer_ids.mapped('awarded_points'))
+            assessment.with_context(eds_assessment_finalize=True).write({
+                'entry_method': ('manual' if assessment.entry_method == 'score_only'
+                                 else assessment.entry_method),
+                'score': round(100.0 * awarded / total, 2),
+                'state': 'graded',
+                'graded_at': fields.Datetime.now(),
+                'assessment_date': fields.Date.context_today(assessment),
+            })
+        return True
+
+    def action_finalize_skills_test(self):
+        """Keep the existing practical-test score workflow usable."""
+        if not self._is_assessment_staff():
+            raise AccessError(_('Only L&D staff may record practical skills tests.'))
+        for assessment in self:
+            if assessment.assessment_type != 'skills_test':
+                raise ValidationError(_('This action is only for practical skills tests.'))
+            assessment.write({
+                'state': 'graded',
+                'graded_at': fields.Datetime.now(),
+            })
+        return True
+
+    def action_reopen_skills_test(self):
+        if not self._is_assessment_staff():
+            raise AccessError(_('Only L&D staff may reopen practical skills tests.'))
+        for assessment in self:
+            if assessment.assessment_type != 'skills_test' or assessment.state != 'graded':
+                raise ValidationError(_('Only a graded practical skills test can be reopened.'))
+            assessment.write({'state': 'draft', 'graded_at': False})
+        return True
 
     def _sync_level2_evaluation(self):
         """Keep the learning-gain record linked to entered pre/post scores."""
@@ -384,23 +928,200 @@ class EdsAssessment(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        records = super().create(vals_list)
+        normalized_vals = []
+        for source_vals in vals_list:
+            vals = dict(source_vals)
+            if vals.get('assessment_type') == 'skills_test':
+                vals['entry_method'] = 'score_only'
+            if vals.get('session_id'):
+                session = self.env['eds.session'].browse(vals['session_id'])
+                company_id = session.company_id.id or False
+                if vals.get('company_id') not in (None, company_id):
+                    raise ValidationError(_(
+                        'The assessment company must match its training session.'
+                    ))
+                vals['company_id'] = company_id
+            if (vals.get('assessment_type', 'pre') in ('pre', 'post')
+                    and vals.get('entry_method', 'score_only') == 'score_only'
+                    and vals.get('score')
+                    and (not self.env.su or (
+                        vals.get('session_id')
+                        and self.env['eds.assessment.question'].search_count([
+                            ('session_id', '=', vals['session_id']),
+                            ('assessment_type', '=', vals.get('assessment_type', 'pre')),
+                        ])))):
+                raise ValidationError(_(
+                    'Record each question and answer, then finalize the assessment. '
+                    'A new score-only result cannot be entered by L&D.'
+                ))
+            if (vals.get('entry_method', 'score_only') != 'score_only'
+                    and vals.get('state') == 'graded'):
+                raise ValidationError(_('Use Finalize to grade an itemized assessment.'))
+            if (vals.get('entry_method', 'score_only') != 'score_only'
+                    and vals.get('score')):
+                raise ValidationError(_(
+                    'An itemized assessment starts without a score. Grade its '
+                    'question answers and use Finalize to calculate the result.'
+                ))
+            normalized_vals.append(vals)
+        records = super().create(normalized_vals)
         records._sync_level2_evaluation()
         return records
 
     def write(self, vals):
+        vals = dict(vals)
+        if ('score' in vals and any(row.assessment_type == 'skills_test'
+                                    and row.state == 'graded' for row in self)
+                and vals.get('state') != 'draft'):
+            raise ValidationError(_(
+                'Reopen the practical skills test before changing its score.'
+            ))
+        if ('score' in vals and not self.env.su
+                and any(row.entry_method == 'score_only'
+                        and row.assessment_type in ('pre', 'post') for row in self)
+                and not (vals.get('state') == 'graded'
+                         and vals.get('entry_method') not in (None, 'score_only'))
+                and not (self.env.context.get('eds_replace_legacy_score')
+                         and vals.get('entry_method') not in (None, 'score_only')
+                         and not vals['score'])):
+            raise ValidationError(_(
+                'L&D cannot edit a score-only pre/post result. Record each answer '
+                'and finalize, or explicitly replace the legacy result by import.'
+            ))
+        if 'session_id' in vals and not vals['session_id']:
+            raise ValidationError(_('An assessment must belong to a training session.'))
+        if 'session_id' in vals or 'company_id' in vals:
+            session = (self.env['eds.session'].browse(vals['session_id'])
+                       if vals.get('session_id') else False)
+            for assessment in self:
+                target_session = session or assessment.session_id
+                target_company_id = target_session.company_id.id or False
+                if 'company_id' in vals and vals['company_id'] != target_company_id:
+                    raise ValidationError(_(
+                        'The assessment company must match its training session.'
+                    ))
+            if 'session_id' in vals and 'company_id' not in vals:
+                vals['company_id'] = session.company_id.id or False
+        old_identity = {}
+        if {'session_id', 'employee_id', 'assessment_type'} & vals.keys():
+            for assessment in self:
+                if assessment.answer_ids:
+                    raise ValidationError(_(
+                        'An assessment with question answers cannot change its session, '
+                        'participant, or type. Create a new assessment instead.'
+                    ))
+                old_identity[assessment.id] = (
+                    assessment.session_id.id,
+                    assessment.employee_id.id,
+                    assessment.assessment_type,
+                )
+        if not self._is_assessment_staff():
+            for assessment in self:
+                if (assessment.employee_id.user_id != self.env.user
+                        or assessment.state != 'distributed'
+                        or assessment.entry_method != 'employee'):
+                    raise AccessError(_('This assessment is not open for your answers.'))
+                if set(vals) - {'answer_ids', 'state'}:
+                    raise AccessError(_('Employees may edit only their assessment answers.'))
+                if 'state' in vals and vals['state'] != 'submitted':
+                    raise AccessError(_('Employees may only submit their own answers.'))
+                for command in vals.get('answer_ids', []):
+                    if (len(command) < 3 or command[0] != 1
+                            or command[1] not in assessment.answer_ids.ids
+                            or set(command[2]) != {'answer_text'}):
+                        raise AccessError(_(
+                            'Employees may update only their existing answer text.'
+                        ))
+        vals = dict(vals)
+        if not self._is_assessment_staff() and vals.get('state') == 'submitted':
+            # A direct RPC write must produce the same timestamp as the button.
+            vals['submitted_at'] = fields.Datetime.now()
+        if vals.get('entry_method') == 'score_only' and any(
+                row.entry_method != 'score_only' for row in self):
+            raise ValidationError(_('An itemized assessment cannot become a score-only record.'))
+        if (vals.get('entry_method') not in (None, 'score_only')
+                and not self.env.context.get('eds_replace_legacy_score')
+                and any(row.entry_method == 'score_only' and row.score for row in self)):
+            raise ValidationError(_(
+                'This record contains a legacy score. Explicitly replace it through '
+                'the response import workflow before switching to itemized grading.'
+            ))
+        itemized = any(
+            vals.get('entry_method', row.entry_method) != 'score_only'
+            and vals.get('assessment_type', row.assessment_type) != 'skills_test'
+            for row in self
+        )
+        if vals.get('state') == 'graded':
+            if len(self) != 1:
+                raise ValidationError(_('Finalize each assessment separately.'))
+            target_type = vals.get('assessment_type', self.assessment_type)
+            if not itemized and target_type != 'skills_test':
+                raise ValidationError(_('Finalize each itemized assessment separately.'))
+            if target_type != 'skills_test':
+                self._validate_itemized_answers(require_grades=True)
+                total = sum(self.answer_ids.mapped('question_id.max_points'))
+                if total <= 0:
+                    raise ValidationError(_('Assessment maximum points must be positive.'))
+                vals['score'] = round(
+                    100.0 * sum(self.answer_ids.mapped('awarded_points')) / total, 2)
+        elif itemized:
+            if 'score' in vals and vals['score']:
+                raise ValidationError(_('The itemized score is calculated from graded answers.'))
+            if ('score' in vals and any(row.state == 'graded' for row in self)
+                    and vals.get('state') not in ('draft', 'distributed', 'submitted')):
+                raise ValidationError(_(
+                    'Reopen a graded assessment before clearing its calculated score.'
+                ))
+            if ('entry_method' in vals or 'state' in vals or 'score' in vals) and (
+                    vals.get('state') in ('draft', 'distributed', 'submitted')
+                    or any(row.entry_method == 'score_only' for row in self)):
+                vals['score'] = 0.0
+                if (vals.get('entry_method') and 'state' not in vals
+                        and any(row.entry_method == 'score_only' for row in self)):
+                    vals['state'] = 'draft'
         result = super().write(vals)
         if {'session_id', 'employee_id', 'assessment_type'} & vals.keys():
+            evaluation_model = self.env['eds.evaluation.level2'].sudo()
+            for assessment in self:
+                old_session, old_employee, old_type = old_identity[assessment.id]
+                if old_type in ('pre', 'post'):
+                    old_field = ('pre_assessment_id' if old_type == 'pre'
+                                 else 'post_assessment_id')
+                    previous = evaluation_model.search([
+                        ('session_id', '=', old_session),
+                        ('employee_id', '=', old_employee),
+                        (old_field, '=', assessment.id),
+                    ])
+                    if previous:
+                        previous.write({old_field: False, 'state': 'draft'})
             self._sync_level2_evaluation()
+        if {'score', 'state', 'entry_method'} & vals.keys():
+            evaluation_model = self.env['eds.evaluation.level2'].sudo()
+            for assessment in self.filtered(lambda row: row.assessment_type in ('pre', 'post')):
+                evaluated = evaluation_model.search([
+                    ('session_id', '=', assessment.session_id.id),
+                    ('employee_id', '=', assessment.employee_id.id),
+                    ('state', '=', 'evaluated'),
+                ])
+                if evaluated:
+                    evaluated.write({'state': 'draft'})
+        if not self._is_assessment_staff() and vals.get('state') == 'submitted':
+            self._validate_itemized_answers()
         return result
 
-    @api.constrains('session_id', 'employee_id')
+    @api.constrains('session_id', 'employee_id', 'assessment_type', 'entry_method')
     def _check_employee_enrolled(self):
         for rec in self:
             if rec.session_id and rec.employee_id:
-                enrolled_emps = rec.session_id.enrollment_ids.filtered(
-                    lambda e: e.state in ('enrolled', 'completed')
+                enrolled_emps = rec.session_id._accepted_attendance_enrollments().filtered(
+                    lambda enrollment: enrollment.state in ('enrolled', 'completed')
                 ).mapped('employee_id')
+                if (rec.entry_method != 'score_only' and rec.assessment_type in ('pre', 'post')
+                        and rec.employee_id not in enrolled_emps):
+                    raise ValidationError(_(
+                        'Participant Error: %s must have an accepted enrollment '
+                        'in session %s before itemized assessment answers are recorded.'
+                    ) % (rec.employee_id.name, rec.session_id.name))
                 if enrolled_emps and rec.employee_id not in enrolled_emps:
                     raise ValidationError(_(
                         'Participant Error: Employee %s is not an enrolled participant in session %s.'
@@ -446,7 +1167,7 @@ class EdsInternationalTraining(models.Model):
     description = fields.Text(string='Scope / Objective')
     cost_estimate = fields.Monetary(string='Estimated Cost', tracking=True)
     currency_id = fields.Many2one('res.currency', string='Currency',
-                                  default=lambda self: self.env.company.currency_id)
+                                  default=lambda self: self.env['res.currency'].search([('name', '=', 'USD')], limit=1))
     approval_state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
@@ -641,7 +1362,7 @@ class EdsInternationalReport(models.Model):
 
 
 class EdsKnowledgeSharing(models.Model):
-    """Post-Training Knowledge Sharing & Action Debrief Form (EDS-F-12)."""
+    """Post-Training Knowledge Sharing & Action Debrief Form."""
     _name = 'eds.knowledge.sharing'
     _description = 'Post-Training Knowledge Sharing & Action Debrief'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -705,6 +1426,6 @@ class EdsKnowledgeSharing(models.Model):
             rec.message_post(body=_("Knowledge transfer debrief completed and verified by L&D."))
 
     def action_print_form(self):
-        """Prints Form EDS-F-12 Knowledge Sharing & Debrief Form."""
+        """Prints Form Knowledge Sharing & Debrief Form."""
         self.ensure_one()
         return self.env.ref('employee_development_system.action_report_eds_knowledge_sharing').report_action(self)

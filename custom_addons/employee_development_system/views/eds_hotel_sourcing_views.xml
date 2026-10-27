@@ -6,7 +6,9 @@
         <field name="arch" type="xml">
             <list string="Hotel Selections">
                 <field name="name"/>
+                <field name="source_type" widget="badge"/>
                 <field name="annual_plan_id"/>
+                <field name="unscheduled_request_id" optional="show"/>
                 <field name="program_name"/>
                 <field name="delivery_method" widget="badge"/>
                 <field name="currency_id"/>
@@ -22,48 +24,102 @@
             <form string="Hotel / Venue Selection">
                 <header>
                     <button name="action_start_evaluation" string="Start Evaluation" type="object"
-                            class="oe_highlight" invisible="state != 'draft'"/>
+                            class="oe_highlight" invisible="state != 'draft' or delivery_method == 'internal'"/>
+                    <button name="action_confirm_internal_venue" string="Confirm Internal Venue" type="object"
+                            class="btn-success" invisible="state != 'draft' or delivery_method != 'internal'"/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
-                    <div class="alert alert-info" role="alert">Select one approved plan program, compare hotel bids in one currency, and award the winner. Facility/service is 60% and price is 40%; the lowest positive quote receives the full price score. The winner fills linked sessions and their venue booking.</div>
+                    <div class="alert alert-info" role="alert">Choose a venue arrangement for this approved program or request independently of the training provider. Use a bank internal venue directly, or compare local or international hotel bids. The selected venue fills linked sessions.</div>
                     <group>
                         <group>
                             <field name="name" readonly="1"/>
-                            <field name="plan_line_id" options="{'no_create': True}"/>
-                            <field name="annual_plan_id" readonly="1"/>
+                            <field name="source_type" readonly="state != 'draft'"/>
+                            <field name="plan_line_id" options="{'no_create': True}"
+                                   invisible="source_type != 'annual_plan'" readonly="state != 'draft'"/>
+                            <field name="unscheduled_request_id" options="{'no_create': True}"
+                                   invisible="source_type != 'unscheduled'" readonly="state != 'draft'"/>
+                            <field name="annual_plan_id" readonly="1" invisible="not annual_plan_id"/>
                             <field name="program_name" readonly="1"/>
-                            <field name="delivery_method" readonly="1"/>
+                            <field name="planned_delivery_method" readonly="1"/>
+                            <field name="delivery_override" readonly="state != 'draft'"/>
+                            <field name="delivery_method" readonly="state != 'draft' or not delivery_override"/>
+                            <field name="delivery_change_reason" placeholder="Reason for venue change"
+                                   required="delivery_override and delivery_method != planned_delivery_method"
+                                   invisible="not delivery_override" readonly="state != 'draft'"/>
+                            <field name="internal_venue_id" options="{'no_create': True}"
+                                   required="delivery_method == 'internal'"
+                                   invisible="delivery_method != 'internal'" readonly="state != 'draft'"/>
                         </group>
                         <group>
-                            <field name="currency_id" options="{'no_create': True}"/>
+                            <field name="currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                            <button name="%(action_eds_currency_quick_create)d" type="action" string="Add Currency" icon="fa-plus"
+                                    invisible="delivery_method != 'international'"/>
                             <field name="awarded_venue_id" readonly="1"/>
                             <field name="notes"/>
                         </group>
                     </group>
-                    <field name="bid_ids">
-                        <list editable="bottom" default_order="total_score desc">
-                            <field name="venue_id" options="{'no_create': True}"/>
-                            <field name="technical_score" string="Facility /10"/>
+                    <field name="bid_ids" invisible="delivery_method == 'internal'"
+                           context="{'default_selection_id': id, 'default_currency_id': currency_id, 'default_venue_scope': 'international' if delivery_method == 'international' else 'local'}">
+                        <list string="Hotel Bids" default_order="total_score desc">
+                            <field name="venue_scope" invisible="1"/>
+                            <field name="venue_id" options="{'no_create': True}"
+                                   domain="[('active', '=', True), ('location_scope', '=', venue_scope)]"/>
                             <field name="price_quoted"/>
-                            <field name="currency_id" options="{'no_create': True}"/>
-                            <field name="financial_score" readonly="1"/>
+                            <field name="currency_id" readonly="1"/>
+                            <field name="technical_score" string="Facility /10"/>
                             <field name="total_score" readonly="1"/>
-                            <field name="status" widget="badge" readonly="1"/>
-                            <field name="award_attachment" filename="award_filename" widget="binary"/>
-                            <field name="award_filename" column_invisible="True"/>
-                            <field name="contract_attachment" filename="contract_filename" widget="binary" optional="hide"/>
-                            <field name="contract_filename" column_invisible="True"/>
-                            <button name="action_award" string="Award" type="object"
-                                    invisible="status == 'awarded'"/>
-                            <button name="action_reject" string="Reject" type="object"
-                                    invisible="status in ('rejected','awarded')"/>
+                            <field name="status" widget="badge" readonly="1"
+                                   decoration-success="status == 'awarded'" decoration-danger="status == 'rejected'"/>
                         </list>
+                        <form string="Hotel Bid &amp; Evaluation">
+                            <header>
+                                <button name="action_award" string="Award Hotel" type="object"
+                                        class="oe_highlight" invisible="status != 'pending' or not id"/>
+                                <button name="action_reject" string="Reject" type="object"
+                                        invisible="status != 'pending' or not id"/>
+                                <field name="status" widget="statusbar" readonly="1"
+                                       statusbar_visible="pending,awarded,rejected"/>
+                            </header>
+                            <sheet>
+                                <field name="venue_scope" invisible="1"/>
+                                <group>
+                                    <group string="Hotel &amp; Quotation">
+                                        <field name="venue_id" options="{'no_create': True}"
+                                               domain="[('active', '=', True), ('location_scope', '=', venue_scope)]"/>
+                                        <field name="price_quoted"/>
+                                        <field name="currency_id" readonly="venue_scope != 'international'"
+                                               context="{'active_test': False}" options="{'no_create': True}"/>
+                                    </group>
+                                    <group string="Evaluation Result">
+                                        <field name="technical_score"/>
+                                        <field name="financial_score" readonly="1"/>
+                                        <field name="total_score" readonly="1"/>
+                                    </group>
+                                </group>
+                                <group string="Award Documents &amp; Remarks">
+                                    <group>
+                                        <field name="award_attachment" filename="award_filename" widget="binary"/>
+                                        <field name="award_filename" invisible="1"/>
+                                        <field name="contract_attachment" filename="contract_filename" widget="binary"/>
+                                        <field name="contract_filename" invisible="1"/>
+                                    </group>
+                                    <group>
+                                        <field name="notes"/>
+                                    </group>
+                                </group>
+                            </sheet>
+                        </form>
                     </field>
                 </sheet>
                 <chatter/>
             </form>
         </field>
+    </record>
+    <record id="action_eds_hotel_selection" model="ir.actions.act_window">
+        <field name="name">Hotels</field>
+        <field name="res_model">eds.hotel.selection</field>
+        <field name="view_mode">list,form</field>
     </record>
     <record id="action_eds_local_hotel_selection" model="ir.actions.act_window">
         <field name="name">Local Hotel Selection</field>

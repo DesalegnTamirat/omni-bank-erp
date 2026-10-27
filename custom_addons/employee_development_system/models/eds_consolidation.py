@@ -105,7 +105,7 @@ class EdsApprovalHistory(models.Model):
 
 
 class EdsTnaConsolidation(models.Model):
-    """Bank-wide TNA consolidation register (-010).
+    """Bank-wide TNA consolidation register.
 
     Gathers submitted/validated needs (optionally per work unit), auto-flags
     duplicates and non-training items, computes weighted priority
@@ -258,7 +258,7 @@ class EdsTnaConsolidation(models.Model):
                 rec.approval_history_ids.with_context(eds_bypass_history_guard=True).unlink()
         return super().unlink()
 
-    # ── Consolidation & Prioritization (/007) ────────────────────────
+    # ── Consolidation & Prioritization ────────────────────────
     def action_consolidate(self):
         """Gather submitted/validated needs (per work unit when set) into the register,
         auto-flag duplicates and non-training items for review & exclusion."""
@@ -430,14 +430,12 @@ class EdsTnaConsolidation(models.Model):
             rec._log_approval_step('smc_approval', 'approved', _('Final approval by SMC'))
             rec.message_post(body=_('Consolidation %s approved by SMC. Needs are locked for curriculum planning.')
                              % rec.name)
-            self._maybe_approve_cycle(rec)
+            # Consolidation is a historical/optional register. Closing a TNA
+            # cycle is now independent of consolidation approval.
 
     def _maybe_approve_cycle(self, consolidation):
-        """When all consolidations of a cycle are SMC-approved, approve the cycle too."""
-        cycle = consolidation.cycle_id
-        if cycle.state == 'under_approval' and cycle.consolidation_ids:
-            if all(c.state in ('approved', 'locked') for c in cycle.consolidation_ids):
-                cycle.action_approve()
+        """Legacy hook kept for integrations; consolidation does not change cycle state."""
+        return None
 
     def action_lock(self):
         """Approved -> Locked: register is final; edits need a change request."""
@@ -469,14 +467,18 @@ class EdsTnaConsolidation(models.Model):
         created_courses = []
         entries_to_convert = self.entry_ids.filtered(
             lambda e: e.state == 'approved' and not e.is_duplicate and not e.converted_course_ref
+            and (e.is_custom_course or not (
+                e.course_id or e.requested_course_ids
+                or (e.source in ('competency_gap', 'pms') and e.suggested_course_ids)
+            ))
         )
 
         if not entries_to_convert:
-            raise UserError(_('No approved unconverted training needs found in this consolidation.'))
+            raise UserError(_('No approved needs require a new catalog course. Selected catalog courses already remain separate in cycle demand.'))
 
         grouped = {}
         for entry in entries_to_convert:
-            prog_name = entry.proposed_program or (entry.competency_id and f"{entry.competency_id.name} Development Course") or _("New TNA Training Program")
+            prog_name = (entry.custom_course_title if entry.is_custom_course else entry.proposed_program) or (entry.competency_id and f"{entry.competency_id.name} Development Course") or _("New TNA Training Program")
             grouped.setdefault(prog_name, []).append(entry)
 
         for prog_name, entries in grouped.items():

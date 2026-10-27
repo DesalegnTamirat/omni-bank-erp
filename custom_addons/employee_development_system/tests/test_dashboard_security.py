@@ -68,6 +68,8 @@ class TestEdsDashboardSecurity(TransactionCase):
         self.assertEqual((manager.is_admin, manager.is_manager, manager.is_employee), (False, True, False))
         self.assertEqual(manager.team_members_count, 1)
         self.assertEqual(own.my_tna_needs_count, 1)
+        self.assertEqual(own.reporting_year, str(fields.Date.today().year))
+        self.assertEqual(own.reporting_fiscal_year, own.reporting_year)
         self.assertEqual(
             own.action_open_tna_entries()['id'],
             self.env.ref('employee_development_system.action_eds_tna_entry_own').id,
@@ -77,29 +79,100 @@ class TestEdsDashboardSecurity(TransactionCase):
         self.assertEqual(own.action_open_sessions()['res_model'], 'eds.enrollment')
         self.assertEqual(manager.action_open_sessions()['res_model'], 'eds.enrollment')
         self.assertEqual(officer.action_open_sessions()['res_model'], 'eds.session')
+        self.assertEqual(officer.action_open_completed_sessions()['res_model'], 'eds.session')
+        self.assertEqual(officer.total_tna_entries, self.env['eds.tna.entry'].sudo().search_count(
+            officer.action_open_tna_entries()['domain']))
+        self.assertEqual(officer.published_plans_count, self.env['eds.annual.plan'].sudo().search_count(
+            officer.action_open_annual_plans()['domain']))
+        self.assertEqual(officer.upcoming_sessions_count, self.env['eds.session'].sudo().search_count(
+            officer.action_open_sessions()['domain']))
+        self.assertEqual(officer.completed_sessions_count, self.env['eds.session'].sudo().search_count(
+            officer.action_open_completed_sessions()['domain']))
+        self.assertEqual(own.my_certificates_count, self.env['eds.certificate'].sudo().search_count(
+            own.action_open_certificates()['domain']))
         with self.assertRaises(UserError):
             own.action_open_annual_plans()
+        with self.assertRaises(UserError):
+            own.action_open_completed_sessions()
 
         self.own_need.with_user(self.employee_user).action_submit()
         manager.invalidate_recordset()
         self.assertEqual(manager.team_tna_submissions, 1)
+        self.assertEqual(manager.team_tna_submissions, self.env['eds.tna.entry'].sudo().search_count(
+            manager.action_open_tna_entries()['domain']))
 
-    def test_attendance_rate_discloses_its_record_count(self):
-        start = fields.Datetime.now()
-        session = self.env['eds.session'].create({
-            'course_id': self.course.id, 'date_start': start,
-            'date_end': start + timedelta(hours=8),
-        })
-        self.env['eds.session.attendance'].create({
-            'session_id': session.id, 'employee_id': self.employee.id,
-            'attendance_date': fields.Date.today(), 'attended': True,
-            'hours_attended': 0,
-        })
-        dashboard = self.env['eds.dashboard'].with_user(self.employee_user).create({})
-        self.assertEqual(dashboard.my_attendance_records_count, 1)
-        self.assertEqual(dashboard.my_attendance_rate, 100)
-        self.assertEqual(dashboard.my_attended_hours, 0)
-        self.assertEqual(dashboard.my_enrolled_sessions_count, 0)
+    def test_dashboard_counts_only_actionable_sessions_and_invitations(self):
+        now = fields.Datetime.now()
+        start = now + timedelta(days=3)
+
+        def session(status='scheduled', starts=start, ends=None, deadline=None):
+            response_deadline = (deadline if deadline is not None else
+                                 min(now + timedelta(days=1), starts - timedelta(hours=1)))
+            record = self.env['eds.session'].create({
+                'course_id': self.course.id,
+                'date_start': starts,
+                'date_end': ends or starts + timedelta(hours=8),
+                'response_deadline': response_deadline,
+            })
+            record.sudo().write({'status': status})
+            return record
+
+        upcoming = session()
+        another_upcoming = session()
+        expired = session(deadline=now - timedelta(minutes=1))
+        past = session(starts=now - timedelta(days=3),
+                       ends=now - timedelta(days=2))
+        draft = session(status='draft')
+        completed = session(status='completed', starts=now - timedelta(days=3),
+                            ends=now - timedelta(days=2))
+        Enrollment = self.env['eds.enrollment']
+        invited = Enrollment.create({
+            'session_id': upcoming.id, 'employee_id': self.employee.id,
+            'state': 'invited'})
+        Enrollment.create({
+            'session_id': another_upcoming.id, 'employee_id': self.employee.id,
+            'state': 'enrolled'})
+        Enrollment.create({
+            'session_id': another_upcoming.id, 'employee_id': self.other_employee.id,
+            'state': 'enrolled'})
+        expired_invitation = Enrollment.create({
+            'session_id': expired.id, 'employee_id': self.employee.id,
+            'state': 'invited'})
+        past_invitation = Enrollment.create({
+            'session_id': past.id, 'employee_id': self.employee.id,
+            'state': 'invited'})
+        draft_invitation = Enrollment.create({
+            'session_id': draft.id, 'employee_id': self.employee.id,
+            'state': 'invited'})
+        own = self.env['eds.dashboard'].with_user(self.employee_user).create({})
+        manager = self.env['eds.dashboard'].with_user(self.manager_user).create({})
+        officer = self.env['eds.dashboard'].with_user(self.officer_user).create({})
+
+        self.assertEqual(own.my_pending_invitations, 1)
+        self.assertEqual(own.my_upcoming_sessions, 1)
+        self.assertEqual(manager.pending_team_nominations, 1)
+        self.assertEqual(manager.team_confirmed_seats, 1)
+        self.assertIn(upcoming, self.env['eds.session'].search(officer.action_open_sessions()['domain']))
+        self.assertNotIn(past, self.env['eds.session'].search(officer.action_open_sessions()['domain']))
+        self.assertIn(completed, self.env['eds.session'].search(
+            officer.action_open_completed_sessions()['domain']))
+        pending_ids = self.env['eds.enrollment'].search(own.action_open_nominations()['domain']).ids
+        self.assertIn(invited.id, pending_ids)
+        self.assertNotIn(expired_invitation.id, pending_ids)
+        self.assertNotIn(past_invitation.id, pending_ids)
+        self.assertNotIn(draft_invitation.id, pending_ids)
+
+        invited.sudo().write({'state': 'enrolled'})
+        own.invalidate_recordset()
+        manager.invalidate_recordset()
+        self.assertEqual(own.my_pending_invitations, 0)
+        self.assertEqual(own.my_upcoming_sessions, 2)
+        self.assertEqual(manager.pending_team_nominations, 0)
+        self.assertEqual(manager.team_confirmed_seats, 2)
+        self.assertEqual(self.env['eds.enrollment'].search_count(
+            own.action_open_sessions()['domain']), own.my_upcoming_sessions)
+        self.assertEqual(self.env['eds.enrollment'].search_count(
+            manager.action_open_sessions()['domain']), manager.team_confirmed_seats)
 
     def test_direct_workflow_writes_are_rejected(self):
         need = self.own_need.with_user(self.employee_user)
@@ -109,12 +182,12 @@ class TestEdsDashboardSecurity(TransactionCase):
         with self.assertRaises(UserError):
             need.write({'justification': 'Changed after submission'})
 
-        plan = self.env['eds.annual.plan'].with_user(self.officer_user).create({
-            'fiscal_year': '2099',
+        plan = self.env['eds.annual.plan'].sudo().create({
+            'fiscal_year': '2199',
         })
         with self.assertRaises(UserError):
-            plan.write({'state': 'published'})
-        line = self.env['eds.annual.plan.line'].create({
+            plan.with_user(self.officer_user).write({'state': 'published'})
+        line = self.env['eds.annual.plan.line'].sudo().create({
             'plan_id': plan.id, 'course_id': self.course.id,
             'program_name': self.course.name,
         })
@@ -166,7 +239,7 @@ class TestEdsDashboardSecurity(TransactionCase):
             'state': 'enrolled',
         })
         cost = self.env['eds.cost'].create({
-            'session_id': session.id, 'currency_id': plan.company_id.currency_id.id,
+            'session_id': session.id, 'currency_id': line.budget_currency_id.id,
             'amount': 100, 'payment_state': 'paid',
         })
         self.assertEqual(line.actual_participants, 1)

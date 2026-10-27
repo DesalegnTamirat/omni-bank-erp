@@ -4,6 +4,7 @@ from . import competency_cluster
 from . import competency_role_mapping
 from . import competency_skills_test
 from . import competency_assessment
+from . import competency_notification
 from . import competency_coverage_report
 from . import competency_data_validator
 from . import hr_employee

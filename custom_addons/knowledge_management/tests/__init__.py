@@ -5,3 +5,5 @@ from . import test_kms_encryption_security
 from . import test_kms_fulltext_search
 from . import test_kms_ldap_totp_security
 from . import test_recognition_gamification_leaderboard
+from . import test_kms_incremental_gaps
+from . import test_kms_access_integrity

@@ -82,16 +82,16 @@
                 <form string="Digital Library Asset">
                     <header>
                         <button name="action_read_resource" string="Open / Read Asset" type="object" class="btn-primary" icon="fa-book-open"/>
-                        <button name="action_download_resource" string="Download Asset" type="object" class="btn-secondary" icon="fa-download" invisible="is_external_link or not file_data"/>
+                        <button name="action_download_resource" string="Download Asset" type="object" class="btn-secondary" icon="fa-download" invisible="is_external_link or not file_size_display"/>
                     </header>
                     <sheet>
                         <div class="oe_button_box" name="button_box">
-                            <button class="oe_stat_button" icon="fa-eye">
+                            <div class="oe_stat_button" role="status">
                                 <field name="view_count" string="Reads" widget="statinfo"/>
-                            </button>
-                            <button class="oe_stat_button" icon="fa-download" invisible="is_external_link">
+                            </div>
+                            <div class="oe_stat_button" role="status" invisible="is_external_link">
                                 <field name="download_count" string="Downloads" widget="statinfo"/>
-                            </button>
+                            </div>
                         </div>
 
                         <field name="cover_image" widget="image" class="oe_avatar" options="{'preview_image': 'cover_image', 'size': [90, 90]}"/>
@@ -113,6 +113,7 @@
                             </group>
                             <group string="Curated Recommendations &amp; Scoping (FR-KMS-008)">
                                 <field name="is_recommended"/>
+                                <field name="recommended_for_me" readonly="1"/>
                                 <field name="rating_average" widget="priority"/>
                                 <field name="target_job_ids" widget="many2many_tags" placeholder="Roles Recommended For"/>
                                 <field name="target_department_ids" widget="many2many_tags" placeholder="Departments"/>
@@ -123,7 +124,7 @@
                         <group string="Resource Access Mode (File Attachment or External Reference)">
                             <field name="is_external_link"/>
                             <field name="external_url" widget="url" invisible="not is_external_link" placeholder="https://www.nbe.gov.et/directives/..."/>
-                            <field name="file_data" filename="file_name" invisible="is_external_link"/>
+                            <field name="file_data" filename="file_name" invisible="is_external_link" groups="knowledge_management.group_kms_contributor"/>
                             <field name="file_name" invisible="1"/>
                             <field name="file_size_display" string="Attached Size" invisible="is_external_link"/>
                         </group>
@@ -157,6 +158,7 @@
                     <field name="tag_ids"/>
 
                     <filter name="filter_recommended" string="Featured &amp; Recommended" domain="[('is_recommended', '=', True)]"/>
+                    <filter name="filter_recommended_for_me" string="Recommended for Me" domain="[('recommended_for_me', '=', True)]"/>
                     <filter name="filter_ebooks" string="E-Books" domain="[('resource_type', '=', 'ebook')]"/>
                     <filter name="filter_whitepapers" string="Whitepapers" domain="[('resource_type', '=', 'whitepaper')]"/>
                     <filter name="filter_training" string="Training References" domain="[('resource_type', '=', 'training_reference')]"/>

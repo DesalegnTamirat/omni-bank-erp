@@ -5,9 +5,11 @@ from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
+from .eds_action_notification import clear_action_activities, notify_action, notify_role_action
+
 
 class EdsCourse(models.Model):
-    """Training program / course catalog entry (-013, ...013, ).
+    """Training program / course catalog entry.
 
     A course links to the approved competency framework with a required
     proficiency level per competency, and carries its curriculum version(s).
@@ -144,57 +146,16 @@ class EdsCourse(models.Model):
         string='Expected Learning Outcomes & Behavioral Objectives',
         help='Auto-compiled from mapped competencies and their proficiency level behavioral indicators.')
 
-    # ── Training delivery sourcing recommendation ─────────────────
+    # A suggestion only: planning and sessions can choose another delivery source.
     recommended_source = fields.Selection([
         ('internal', 'Internal Delivery'),
         ('local_external', 'External Local Provider'),
         ('international', 'External International Provider'),
     ], string='Recommended Delivery Source', tracking=True,
-        help='Recommended by the L&D officer with justification.')
+        help='Suggested default for a new plan program; planning and sessions may change it.')
     sourcing_justification = fields.Text(
         string='Sourcing Justification',
         help='Why this delivery source is recommended.')
-    sourcing_state = fields.Selection([
-        ('draft', 'Not Recommended'),
-        ('director_review', 'Director PPDD Review'),
-        ('decided', 'Decision Recorded'),
-    ], string='Sourcing Status', default='draft', tracking=True)
-    sourcing_decision = fields.Selection([
-        ('internal', 'Approve - Internal Delivery'),
-        ('local_external', 'Approve - External Local Provider'),
-        ('international', 'Approve - External International Provider'),
-        ('reject', 'Reject Recommendation'),
-    ], string='Director PPDD Decision', tracking=True)
-    sourcing_decision_date = fields.Date(string='Decision Date', readonly=True)
-    sourcing_decided_by_id = fields.Many2one('res.users', string='Decided By', readonly=True)
-
-    def action_submit_sourcing(self):
-        """officer submits the recommended delivery source for Director PPDD review."""
-        for rec in self:
-            if rec.sourcing_state != 'draft':
-                raise UserError(_('The sourcing recommendation was already submitted.'))
-            if not rec.recommended_source:
-                raise UserError(_('Select the recommended delivery source first.'))
-            if not rec.sourcing_justification:
-                raise UserError(_('Enter the sourcing justification before submission.'))
-            rec.sourcing_state = 'director_review'
-            rec.message_post(body=_('Sourcing recommendation %s submitted for Director PPDD review '
-                                    '().') % rec.recommended_source)
-
-    def action_record_sourcing_decision(self):
-        """Director PPDD records the sourcing decision."""
-        for rec in self:
-            rec._require_manager()
-            if rec.sourcing_state != 'director_review':
-                raise UserError(_('Only recommendations under Director review can be decided.'))
-            if not rec.sourcing_decision:
-                raise UserError(_('Record the Director PPDD decision first.'))
-            rec.write({'sourcing_state': 'decided',
-                       'sourcing_decision_date': date.today(),
-                       'sourcing_decided_by_id': self.env.user.id})
-            rec.message_post(body=_('Director PPDD decision for %s: %s.')
-                             % (rec.name, rec.sourcing_decision))
-
     @api.depends('curriculum_ids', 'curriculum_ids.state')
     def _compute_current_curriculum(self):
         for rec in self:
@@ -514,10 +475,10 @@ class EdsCoursePmsLine(models.Model):
 
 
 class EdsCourseDevelopmentRequest(models.Model):
-    """Request to develop a course from approved TNA needs (-014, ).
+    """Request to develop a course from approved TNA needs.
 
     Converted from approved TNA entries; carries an SLA deadline computed from the
-    configurable working-day SLA (default 10 working days, ). On approval the
+    configurable working-day SLA (default 10 working days). On approval the
     request converts to an `eds.course` with competency mapping lines.
     """
     _name = 'eds.course.development.request'
@@ -551,7 +512,7 @@ class EdsCourseDevelopmentRequest(models.Model):
     expected_outcomes = fields.Text(string='Expected Learning Outcomes')
     sla_deadline = fields.Date(
         string='SLA Deadline', compute='_compute_sla_deadline', store=True,
-        help='Computed from the course development SLA in settings (default 10 working days, ).')
+        help='Computed from the course development SLA in settings (default 10 working days).')
     sla_breached = fields.Boolean(
         string='SLA Breached', compute='_compute_sla_breached', store=True, tracking=True)
     last_reminder_date = fields.Date(string='Last SLA Reminder', readonly=True)
@@ -609,7 +570,7 @@ class EdsCourseDevelopmentRequest(models.Model):
                     'eds.course.development.request') or _('New')
         return super().create(vals_list)
 
-    # ── Workflow (/013/014) ──────────────────────────────────────────
+    # ── Workflow ──────────────────────────────────────────
     def action_start_development(self):
         for rec in self:
             if rec.state != 'draft':
@@ -627,6 +588,10 @@ class EdsCourseDevelopmentRequest(models.Model):
             rec.state = 'submitted'
             rec.message_post(body=_('Development request %s submitted for approval.')
                              % rec.name)
+            notify_role_action(
+                rec, 'group_eds_manager', 'group_eds_admin',
+                _('Approve course development request'),
+                _('Course development request %s needs your approval.') % rec.name)
 
     def action_approve(self):
         for rec in self:
@@ -634,11 +599,16 @@ class EdsCourseDevelopmentRequest(models.Model):
             if rec.state != 'submitted':
                 raise UserError(_('Only submitted development requests can be approved.'))
             rec.state = 'approved'
+            clear_action_activities(rec)
             rec.message_post(body=_('Development request %s approved. Ready to convert to a course.')
                              % rec.name)
+            notify_action(
+                rec, rec.assigned_officer_id or rec.create_uid,
+                _('Course development approved'),
+                _('Course development request %s is approved. Convert it to a course.') % rec.name)
 
     def action_convert_to_course(self):
-        """Approved -> Done: create the `eds.course` with competency mapping (/012)."""
+        """Approved -> Done: create the `eds.course` with competency mapping."""
         self.ensure_one()
         if self.state not in ('approved', 'done'):
             raise UserError(_('Only approved development requests can be converted to courses.'))

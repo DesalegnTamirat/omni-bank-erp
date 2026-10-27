@@ -142,7 +142,8 @@ class TestLmsAssignmentsAndAnalytics(TransactionCase):
         self.assertGreaterEqual(rec.total_enrolled, 1)
         self.assertGreaterEqual(rec.total_completed, 1)
         self.assertGreaterEqual(rec.completion_rate, 50.0)
-        self.assertGreaterEqual(rec.avg_score, 90.0)
+        self.assertEqual(rec.total_assessed, 0)
+        self.assertEqual(rec.avg_score, 0.0, 'A course without a graded final exam has no exam average.')
         self.assertGreaterEqual(rec.avg_time_spent_minutes, 1.0)
 
     def test_05_res_config_settings_integration(self):

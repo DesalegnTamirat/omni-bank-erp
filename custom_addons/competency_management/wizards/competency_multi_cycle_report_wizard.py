@@ -162,6 +162,31 @@ class CompetencyMultiCycleReportWizard(models.TransientModel):
 
         return domain
 
+    def _get_canonical_cycle_lines(self, cycle):
+        """Return one line per employee/competency, including legacy duplicates."""
+        self.ensure_one()
+        domain = [
+            term for term in self._build_domain_for_cycle(cycle)
+            if term != ('is_primary_reporting_line', '=', True)
+        ]
+        candidate_lines = self.env['competency.assessment.line'].sudo().search(domain)
+        canonical = {}
+        for line in candidate_lines:
+            if not line.assessment_id.active:
+                continue
+            key = (line.employee_id.id, line.competency_id.id)
+            rank = (
+                not line.is_primary_reporting_line,
+                line.assessment_id.assessment_type != 'self',
+                line.assessment_id.assessment_type not in ('supervisor', 'team'),
+                line.id,
+            )
+            if key not in canonical or rank < canonical[key][0]:
+                canonical[key] = (rank, line.id)
+        return self.env['competency.assessment.line'].sudo().browse([
+            line_id for _, line_id in canonical.values()
+        ])
+
     def _setup_worksheet_header(self, worksheet, workbook, title):
         """Inserts Bunna Bank logo and corporate branding header onto an xlsx worksheet."""
         logo_path = os.path.abspath(
@@ -257,11 +282,9 @@ class CompetencyMultiCycleReportWizard(models.TransientModel):
         meta_info = {}   # (emp_id, comp_id) -> metadata dict
 
         for cyc in sorted_cycles:
-            domain = self._build_domain_for_cycle(cyc)
-            lines = self.env['competency.assessment.line'].sudo().search(domain)
             cycle_map = {}
 
-            for line in lines:
+            for line in self._get_canonical_cycle_lines(cyc):
                 key = (line.employee_id.id, line.competency_id.id)
                 all_keys.add(key)
 

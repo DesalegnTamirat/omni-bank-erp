@@ -45,7 +45,7 @@
                             <field name="year"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Development Goals &amp; Activities" name="goals">
                             <field name="line_ids">
                                 <list editable="bottom">

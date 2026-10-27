@@ -54,11 +54,10 @@
                             <group>
                                 <field name="use_random_pool"/>
                                 <field name="questions_per_session" invisible="not use_random_pool"/>
-                                <field name="pool_ids" widget="many2many_tags" invisible="not use_random_pool"/>
+                                <field name="pool_ids" widget="many2many_tags" invisible="not use_random_pool" groups="learning_management.group_lms_instructor"/>
                             </group>
                             <group>
                                 <field name="shuffle_questions"/>
-                                <field name="shuffle_answers"/>
                             </group>
                         </group>
                         <notebook>
@@ -66,7 +65,7 @@
                                 <field name="instructions" placeholder="Enter instructions shown to candidates prior to starting this exam..."/>
                             </page>
                             <page string="Fixed Questions Bank" invisible="use_random_pool">
-                                <field name="fixed_question_ids">
+                                <field name="fixed_question_ids" groups="learning_management.group_lms_instructor">
                                     <list>
                                         <field name="name"/>
                                         <field name="question_type" widget="badge"/>
@@ -144,7 +143,7 @@
                                 </field>
                             </page>
                             <page string="Explanation &amp; Feedback (Post-Grading)">
-                                <field name="explanation" placeholder="Provide instructional feedback explaining the correct rationale to the learner..."/>
+                                <field name="explanation" placeholder="Provide instructional feedback explaining the correct rationale to the learner..." groups="learning_management.group_lms_instructor"/>
                             </page>
                         </notebook>
                     </sheet>
@@ -176,7 +175,7 @@
             <field name="name">lms.exam.session.form</field>
             <field name="model">lms.exam.session</field>
             <field name="arch" type="xml">
-                <form string="Candidate Exam Attempt">
+                <form string="Candidate Exam Attempt" class="o_lms_exam_form">
                     <header>
                         <button name="action_submit_and_grade" string="Submit Exam &amp; Auto-Grade" type="object" class="btn-primary" invisible="state != 'in_progress'"/>
                         <field name="state" widget="statusbar" statusbar_visible="in_progress,submitted,passed,failed"/>
@@ -194,6 +193,7 @@
                                 <field name="employee_id" widget="many2one_avatar_employee"/>
                                 <field name="assessment_id" readonly="1"/>
                                 <field name="attempt_number" readonly="1"/>
+                                <field name="deadline_time" readonly="1" invisible="not deadline_time"/>
                             </group>
                             <group string="Results &amp; Auto-Grading (FR-LMS-017)">
                                 <field name="score_points" readonly="1"/>
@@ -203,14 +203,27 @@
                             </group>
                         </group>
                         <notebook>
-                            <page string="Candidate Answers">
+                            <page string="Questions &amp; Answers">
+                                <div class="alert alert-info" role="status" invisible="state != 'in_progress'">
+                                    Open each question, choose your answer, and save it before submitting the exam. The time limit is enforced by the server.
+                                </div>
                                 <field name="line_ids">
                                     <list editable="bottom" create="0" delete="0">
                                         <field name="question_id" string="Question" readonly="1"/>
-                                        <field name="selected_answer_ids" widget="many2many_tags" string="Candidate Selection"/>
-                                        <field name="is_correct" string="Correct" readonly="1"/>
-                                        <field name="points_earned" string="Score Earned" readonly="1"/>
+                                        <field name="selected_answer_ids" widget="many2many_tags" string="My Answer" domain="[('question_id', '=', question_id)]" readonly="parent.state != 'in_progress'"/>
+                                        <field name="is_correct" string="Correct" readonly="1" optional="hide" invisible="parent.state == 'in_progress'"/>
+                                        <field name="points_earned" string="Score Earned" readonly="1" optional="hide" invisible="parent.state == 'in_progress'"/>
                                     </list>
+                                    <form string="Answer Question" create="0" delete="0">
+                                        <sheet>
+                                            <field name="question_id" invisible="1"/>
+                                            <field name="question_type_at_start" invisible="1"/>
+                                            <div class="fs-5 fw-semibold mb-3"><field name="question_text" widget="html" readonly="1" nolabel="1"/></div>
+                                            <div class="alert alert-info" role="status" invisible="question_type_at_start == 'multiple_choice'">Choose one answer.</div>
+                                            <div class="alert alert-info" role="status" invisible="question_type_at_start != 'multiple_choice'">Choose all answers that apply.</div>
+                                            <field name="selected_answer_ids" widget="many2many_checkboxes" domain="[('question_id', '=', question_id)]" readonly="parent.state != 'in_progress'" nolabel="1"/>
+                                        </sheet>
+                                    </form>
                                 </field>
                             </page>
                         </notebook>

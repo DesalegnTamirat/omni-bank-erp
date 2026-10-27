@@ -222,8 +222,17 @@ class HrEmployee(models.Model):
     ], string='Marital Status')
     marital_status_date = fields.Date(string="Effective Date of Status Change")
     former_spouse_name = fields.Char(string="Former Spouse Full Name")
+    is_previously_married = fields.Boolean(
+        string="Was Previously Married",
+        compute="_compute_is_previously_married",
+    )
     divorce_certificate = fields.Binary(string="Divorce Certificate/Document", attachment=True)
     divorce_certificate_filename = fields.Char(string="Divorce Certificate Filename")
+
+    @api.depends('marital', 'former_spouse_name')
+    def _compute_is_previously_married(self):
+        for rec in self:
+            rec.is_previously_married = rec.marital in ('divorced', 'widower') or bool(rec.former_spouse_name)
 
     @api.onchange('marital')
     def _onchange_marital_status(self):
@@ -848,3 +857,14 @@ class HrEmployee(models.Model):
             ):
                 return True
         return super()._has_field_access(field, operation)
+
+
+class IrModelFieldsSelection(models.Model):
+    _inherit = 'ir.model.fields.selection'
+
+    def _reflect_selections(self, model_names):
+        # _reflect_fields inserts HR selection field metadata immediately before
+        # this call. A lookup cached earlier in the same init pass misses it.
+        if self.env.context.get('module') == 'hr_employee_custom':
+            self.env.registry.clear_cache('stable')
+        return super()._reflect_selections(model_names)

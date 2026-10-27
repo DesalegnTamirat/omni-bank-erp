@@ -3,6 +3,9 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from datetime import timedelta
 
+from .eds_currency_policy import currency_for_delivery, validate_delivery_currency
+from .eds_action_notification import notify_action
+
 class EdsBudget(models.Model):
     _name = 'eds.budget'
     _description = 'EDS Annual L&D Budget Management'
@@ -23,9 +26,10 @@ class EdsBudget(models.Model):
         ('in_house_elearning', 'Local In-house E-Learning / Virtual'),
         ('bank_level', 'Bank Level Programs'),
     ], string='Budget Category', required=True, tracking=True, default='internal')
-    currency_id = fields.Many2one('res.currency', string='Currency', default=lambda self: self.env.company.currency_id)
+    currency_id = fields.Many2one('res.currency', string='Currency',
+                                  default=lambda self: currency_for_delivery(self.env, 'internal'))
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company, index=True)
-    allocated = fields.Monetary(string='Approved Budget (ETB)', currency_field='currency_id', required=True, tracking=True)
+    allocated = fields.Monetary(string='Approved Budget', currency_field='currency_id', required=True, tracking=True)
 
     # Quarterly Breakdown Structure (aligned with Budget_Year_Plan template)
     q1_allocated = fields.Monetary(string='Q1 (Jul–Sep)', currency_field='currency_id', tracking=True)
@@ -34,7 +38,7 @@ class EdsBudget(models.Model):
     q4_allocated = fields.Monetary(string='Q4 (Apr–Jun)', currency_field='currency_id', tracking=True)
     unallocated = fields.Monetary(string='Q1-Q4 / TBD (Unallocated)', currency_field='currency_id', tracking=True)
     total_estimated = fields.Monetary(
-        string='Total Estimated Budget (ETB)', currency_field='currency_id',
+        string='Total Estimated Budget', currency_field='currency_id',
         compute='_compute_quarterly_totals', store=True)
     budget_variance = fields.Monetary(
         string='Variance (Approved − Estimated)', currency_field='currency_id',
@@ -54,9 +58,36 @@ class EdsBudget(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            category = vals.get('category', 'internal')
+            if category in ('internal', 'local_external', 'international', 'in_house_class', 'in_house_elearning'):
+                method = 'international' if category == 'international' else 'internal'
+                if vals.get('currency_id'):
+                    validate_delivery_currency(self.env, method, vals['currency_id'])
+                else:
+                    vals['currency_id'] = currency_for_delivery(self.env, method).id
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('eds.budget') or _('New')
         return super(EdsBudget, self).create(vals_list)
+
+    @api.onchange('category')
+    def _onchange_category_currency(self):
+        if self.category in ('internal', 'local_external', 'in_house_class', 'in_house_elearning'):
+            self.currency_id = currency_for_delivery(self.env, 'internal')
+        elif self.category == 'international' and (not self.currency_id or self.currency_id.name == 'ETB'):
+            self.currency_id = currency_for_delivery(self.env, 'international')
+
+    def write(self, vals):
+        vals = dict(vals)
+        if 'category' in vals and 'currency_id' not in vals and vals['category'] in (
+                'internal', 'local_external', 'international', 'in_house_class', 'in_house_elearning'):
+            vals['currency_id'] = currency_for_delivery(self.env, vals['category']).id
+        if {'category', 'currency_id'} & vals.keys():
+            for rec in self:
+                category = vals.get('category', rec.category)
+                if category in ('internal', 'local_external', 'international', 'in_house_class', 'in_house_elearning'):
+                    validate_delivery_currency(self.env, category,
+                                               vals.get('currency_id', rec.currency_id.id))
+        return super().write(vals)
 
     @api.depends('q1_allocated', 'q2_allocated', 'q3_allocated', 'q4_allocated', 'unallocated', 'allocated')
     def _compute_quarterly_totals(self):
@@ -92,6 +123,9 @@ class EdsBudget(models.Model):
                 raise UserError(_('Only draft budgets can be approved.'))
             rec.state = 'approved'
             rec.message_post(body=_("Annual L&D budget %s approved.") % rec.name)
+            notify_action(rec, rec.create_uid, _('L&D budget approved'),
+                          _('Budget %s for %s is approved.') % (rec.name, rec.fiscal_year),
+                          action_required=False)
 
     def action_lock(self):
         for rec in self:
@@ -139,7 +173,9 @@ class EdsCost(models.Model):
     session_id = fields.Many2one('eds.session', string='Training Session', required=True,
                                  ondelete='cascade', index=True)
     budget_line_id = fields.Many2one('eds.budget.line', string='Budget Line')
-    currency_id = fields.Many2one('res.currency', default=lambda self: self.env.company.currency_id)
+    delivery_method = fields.Selection(related='session_id.delivery_method', readonly=True)
+    currency_id = fields.Many2one('res.currency', string='Currency',
+                                  default=lambda self: currency_for_delivery(self.env, 'internal'))
     amount = fields.Monetary(string='Actual Cost Amount', currency_field='currency_id', required=True)
     payment_state = fields.Selection([
         ('draft', 'Draft'),
@@ -151,14 +187,32 @@ class EdsCost(models.Model):
     finance_reference = fields.Char(string='Finance Reference / Payment Voucher No.', tracking=True)
     notes = fields.Text(string='Notes / Receipt Details')
 
+    @api.onchange('session_id')
+    def _onchange_session_currency(self):
+        if self.session_id and (
+                self.session_id.delivery_method != 'international'
+                or not self.currency_id or self.currency_id.name == 'ETB'):
+            self.currency_id = currency_for_delivery(self.env, self.session_id.delivery_method)
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get('session_id'):
+                method = self.env['eds.session'].browse(vals['session_id']).delivery_method
+                if vals.get('currency_id'):
+                    validate_delivery_currency(self.env, method, vals['currency_id'])
+                else:
+                    vals['currency_id'] = currency_for_delivery(self.env, method).id
             if vals.get('payment_state') == 'paid' and not vals.get('payment_date'):
                 vals['payment_date'] = fields.Date.context_today(self)
         return super().create(vals_list)
 
     def write(self, vals):
+        if {'session_id', 'currency_id'} & vals.keys():
+            for rec in self:
+                session = self.env['eds.session'].browse(vals['session_id']) if vals.get('session_id') else rec.session_id
+                validate_delivery_currency(self.env, session.delivery_method,
+                                           vals.get('currency_id', rec.currency_id.id))
         if vals.get('payment_state') == 'paid' and not vals.get('payment_date'):
             vals = dict(vals, payment_date=fields.Date.context_today(self))
         return super().write(vals)

@@ -69,7 +69,7 @@
                         <group string="Revision" invisible="state != 'revision'">
                             <field name="revision_comment"/>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Modules">
                                 <field name="module_ids" readonly="state in ('quality_review','director_validation','cpco_approval','approved')">
                                     <list editable="bottom">

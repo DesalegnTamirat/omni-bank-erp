@@ -9,7 +9,7 @@ _logger = logging.getLogger(__name__)
 
 
 class EdsCurriculum(models.Model):
-    """Curriculum / course design document (-019, ...013).
+    """Curriculum / course design document.
 
     Approval chain: L&D Quality Review -> Director PPDD -> CPCO Approval.
     Revision returns the curriculum to the originating officer for update and
@@ -35,7 +35,7 @@ class EdsCurriculum(models.Model):
         'res.users', string='Subject Matter Experts', tracking=True)
     review_sla_deadline = fields.Date(
         string='Review SLA Deadline', compute='_compute_review_sla', store=True,
-        help='Computed from the curriculum SLA in settings (default 10 working days, ).')
+        help='Computed from the curriculum SLA in settings (default 10 working days).')
     sla_breached = fields.Boolean(
         string='SLA Breached', compute='_compute_sla_breached', store=True, tracking=True)
     state = fields.Selection([
@@ -171,10 +171,17 @@ class EdsCurriculum(models.Model):
             routing_model = self.env.registry.get('eds.lms.routing')
             if routing_model:
                 try:
-                    self.env['eds.lms.routing'].create({
-                        'curriculum_id': self.id,
-                        'source': 'curriculum',
-                    })
+                    routing = self.env['eds.lms.routing'].search([
+                        ('curriculum_id', '=', self.id),
+                    ], limit=1)
+                    if not routing:
+                        self.env['eds.lms.routing'].create({
+                            'course_id': self.course_id.id,
+                            'curriculum_id': self.id,
+                            'delivery_mode': ('blended' if any(
+                                entry.delivery_mode == 'blended' for entry in e_learning
+                            ) else 'e_learning'),
+                        })
                 except Exception as exc:
                     _logger.warning('LMS routing creation failed for curriculum %s: %s', self.name, exc)
 

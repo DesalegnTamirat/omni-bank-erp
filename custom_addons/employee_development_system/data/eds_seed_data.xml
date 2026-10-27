@@ -62,7 +62,7 @@
             <field name="notes">Standard 5-point feedback survey for classroom training programs.</field>
         </record>
 
-        <!-- Official EDS-F-02 Level 1 Reaction Survey Questions (18 Items) -->
+        <!-- Official Level 1 Reaction Survey Questions (18 Items) -->
         <!-- A. Training Content -->
         <record id="inst_q1" model="eds.evaluation.instrument.question">
             <field name="instrument_id" ref="inst_level1_standard"/>

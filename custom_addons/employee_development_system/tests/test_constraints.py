@@ -59,47 +59,55 @@ class TestEdsConstraints(TransactionCase):
                 'state': 'submitted',
             })
 
-    def test_b5_reenrollment_after_cancellation(self):
-        """B5: Test that re-enrollment is allowed when prior enrollment was cancelled."""
-        enr1 = self.env['eds.enrollment'].create({
-            'session_id': self.session.id,
-            'employee_id': self.employee.id,
-            'state': 'cancelled',
-        })
-        self.assertEqual(enr1.state, 'cancelled')
-
-        enr2 = self.env['eds.enrollment'].create({
-            'session_id': self.session.id,
-            'employee_id': self.employee.id,
-            'state': 'enrolled',
-        })
-        self.assertTrue(enr2.id)
-
-        with self.assertRaises(ValidationError):
+    def test_session_participant_is_unique_across_all_states(self):
+        """Cancelled and rejected rows still identify an existing participant."""
+        for state in ('cancelled', 'declined', 'replaced'):
+            employee = self.env['hr.employee'].create({'name': 'Participant %s' % state})
             self.env['eds.enrollment'].create({
                 'session_id': self.session.id,
-                'employee_id': self.employee.id,
-                'state': 'enrolled',
+                'employee_id': employee.id,
+                'state': state,
             })
+            with self.assertRaises(ValidationError):
+                self.env['eds.enrollment'].create({
+                    'session_id': self.session.id,
+                    'employee_id': employee.id,
+                })
+
+        new_employee = self.env['hr.employee'].create({'name': 'New participant'})
+        new_enrollment = self.env['eds.enrollment'].create({
+            'session_id': self.session.id, 'employee_id': new_employee.id,
+        })
+        self.assertEqual(new_enrollment.state, 'suggested')
 
     def test_session_completion_preserves_absent_enrollment(self):
         absent_employee = self.env['hr.employee'].create({'name': 'Absent Participant'})
         present = self.env['eds.enrollment'].create({
             'session_id': self.session.id, 'employee_id': self.employee.id,
+            'state': 'enrolled',
         })
         absent = self.env['eds.enrollment'].create({
             'session_id': self.session.id, 'employee_id': absent_employee.id,
-        })
-        self.env['eds.session.attendance'].create({
-            'session_id': self.session.id, 'employee_id': self.employee.id, 'attended': True,
-        })
-        self.env['eds.session.attendance'].create({
-            'session_id': self.session.id, 'employee_id': absent_employee.id, 'attended': False,
+            'state': 'enrolled',
         })
         self.session.write({
             'date_start': date.today() - timedelta(days=1),
             'date_end': date.today(), 'status': 'ongoing',
         })
+        self.env['eds.session.attendance'].create({
+            'session_id': self.session.id, 'employee_id': self.employee.id,
+            'attendance_date': date.today(), 'attended': True,
+        })
+        self.env['eds.session.attendance'].create({
+            'session_id': self.session.id, 'employee_id': absent_employee.id,
+            'attendance_date': date.today(), 'attended': False,
+        })
+        for employee, attended in ((self.employee, True), (absent_employee, False)):
+            self.env['eds.session.attendance'].create({
+                'session_id': self.session.id, 'employee_id': employee.id,
+                'attendance_date': date.today() - timedelta(days=1),
+                'attended': attended,
+            })
         self.session.action_complete()
         self.assertEqual(present.state, 'completed')
         self.assertEqual(absent.state, 'absent')

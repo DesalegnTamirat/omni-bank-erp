@@ -54,6 +54,10 @@ class TestTrainerAccess(TransactionCase):
             self.assigned.with_user(self.trainer_user).write({'notes': 'Unauthorized edit'})
 
     def test_trainer_cannot_read_or_record_attendance_and_scores(self):
+        self.env['eds.enrollment'].create({
+            'session_id': self.assigned.id, 'employee_id': self.employee.id,
+            'state': 'enrolled',
+        })
         self.env['eds.session.attendance'].create({
             'session_id': self.assigned.id, 'employee_id': self.employee.id,
             'attendance_date': '2026-10-20', 'attended': True,

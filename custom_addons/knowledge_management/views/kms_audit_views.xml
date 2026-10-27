@@ -35,12 +35,19 @@
                     <field name="employee_id"/>
                     <field name="resource_name"/>
                     <field name="action"/>
+                    <field name="resource_type"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
                     <filter name="filter_downloads" string="Downloads Only" domain="[('action', '=', 'download')]"/>
                     <filter name="filter_access_denied" string="Denied Access Events" domain="[('action', '=', 'access_denied')]"/>
+                    <filter name="filter_documents" string="Documents" domain="[('resource_type', '=', 'document')]"/>
+                    <filter name="filter_library" string="Digital Library" domain="[('resource_type', '=', 'digital_library')]"/>
                     <separator/>
                     <group>
                         <filter name="group_action" string="Action" context="{'group_by': 'action'}"/>
                         <filter name="group_user" string="User" context="{'group_by': 'user_id'}"/>
+                        <filter name="group_resource" string="Resource Type" context="{'group_by': 'resource_type'}"/>
+                        <filter name="group_department" string="Department" context="{'group_by': 'department_id'}"/>
                         <filter name="group_date" string="Date" context="{'group_by': 'create_date:day'}"/>
                     </group>
                 </search>

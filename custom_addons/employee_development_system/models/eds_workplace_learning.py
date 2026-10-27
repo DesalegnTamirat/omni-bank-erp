@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError, UserError
 
 
 class EdsWorkplaceAssignment(models.Model):
-    """Workplace learning assignment (FREDS046 - FREDS051).
+    """Workplace learning assignment.
 
     Supports straightforward assignment of a Buddy, Mentor, Coach, or OJT guide
     to an employee without heavy task micromanagement.

@@ -159,7 +159,7 @@
                             <field name="verification_url" widget="url" readonly="1"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_eds_notebook">
                         <page string="Certificate Preview" invisible="not certificate_image">
                             <div class="text-center p-3" style="background-color: #f8f9fa; border-radius: 6px;">
                                 <field name="certificate_image" widget="image" readonly="1" style="max-width: 780px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 4px;"/>

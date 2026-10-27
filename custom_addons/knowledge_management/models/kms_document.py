@@ -4,8 +4,21 @@ import logging
 from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, AccessError, ValidationError
+from ..utils.text_extract import extract_document_text
 
 _logger = logging.getLogger(__name__)
+
+# A published revision is an audit record. Content and access policy changes
+# must be made on a new draft, then approved as a new version.
+_REVISION_FIELDS = {
+    'name', 'code', 'category_id', 'doc_type_id', 'classification_id',
+    'classification', 'authorized_employee_ids', 'tag_ids', 'department_id',
+    'operating_unit_id', 'owner_id', 'reviewer_id', 'approver_id',
+    'effective_date', 'review_due_date', 'version', 'previous_version_id',
+    'change_summary', 'file_data', 'file_name', 'summary', 'content_text',
+    'is_view_only', 'require_watermark', 'require_encryption',
+    'allowed_download_group_ids', 'active',
+}
 
 
 class KmsDocument(models.Model):
@@ -54,7 +67,7 @@ class KmsDocument(models.Model):
         ('internal', 'Internal'),
         ('confidential', 'Confidential'),
         ('restricted', 'Restricted'),
-    ], string='Security Classification Scope', compute='_compute_classification', store=True, readonly=False)
+    ], string='Security Classification Scope', compute='_compute_classification', store=True, readonly=True)
     authorized_employee_ids = fields.Many2many(
         'hr.employee',
         'kms_doc_authorized_employee_rel',
@@ -166,24 +179,45 @@ class KmsDocument(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get('file_data') and 'content_text' not in vals:
+                vals['content_text'] = extract_document_text(vals['file_data'], vals.get('file_name'))
+            if 'classification' in vals and not self.env.su:
+                raise AccessError(_('Document classification is derived from the selected security level.'))
             if vals.get('state', 'draft') != 'draft' and not self.env.su:
                 raise AccessError(_('New documents must start as drafts.'))
             if vals.get('code', _('New')) == _('New'):
                 vals['code'] = self.env['ir.sequence'].next_by_code('kms.document') or _('New')
         records = super(KmsDocument, self).create(vals_list)
         for rec in records:
-            rec._log_audit_action('upload', 'Document created in Draft')
+            rec._log_audit_action('upload', 'Document created in Draft', strict=True)
         return records
 
     def write(self, vals):
+        if 'file_data' in vals and 'content_text' not in vals:
+            vals = dict(vals, content_text=extract_document_text(
+                vals['file_data'], vals.get('file_name') or (self.file_name if len(self) == 1 else '')
+            ))
         target = vals.get('state')
+        if 'classification' in vals and not self.env.su:
+            raise AccessError(_('Document classification is derived from the selected security level.'))
+        if self.ids:
+            # Serialize edits and publication so a late draft edit cannot race
+            # with a review or approval transition.
+            self.env.cr.execute(
+                'SELECT id FROM kms_document WHERE id IN %s ORDER BY id FOR UPDATE',
+                (tuple(self.ids),),
+            )
+            self.invalidate_recordset(['state'])
+        if _REVISION_FIELDS.intersection(vals):
+            for rec in self:
+                if rec.state != 'draft':
+                    raise UserError(_(
+                        'Documents under review or already published cannot be edited. '
+                        'Return a reviewed document to draft, or initiate a new revision.'
+                    ))
+        if {'date_approved', 'is_latest_version', 'view_count', 'download_count'} & vals.keys() and not self.env.su:
+            raise AccessError(_('Document lifecycle and usage counters cannot be edited directly.'))
         if target:
-            if target == 'approved' and self.ids:
-                self.env.cr.execute(
-                    'SELECT id FROM kms_document WHERE id IN %s ORDER BY id FOR UPDATE',
-                    (tuple(self.ids),),
-                )
-                self.invalidate_recordset(['state'])
             if target == 'approved' and not (
                 self.env.su or self.env.user.has_group('knowledge_management.group_kms_reviewer')
             ):
@@ -192,27 +226,54 @@ class KmsDocument(models.Model):
                 self.env.su or self.env.user.has_group('knowledge_management.group_kms_manager')
             ):
                 raise AccessError(_('Only KMS managers may archive documents.'))
+            if target == 'draft' and any(rec.state == 'review' for rec in self) and not (
+                self.env.su or self.env.user.has_group('knowledge_management.group_kms_reviewer')
+            ):
+                raise AccessError(_('Only KMS reviewers may return submitted documents to draft.'))
             allowed = {
                 'draft': {'review'}, 'review': {'draft', 'approved'},
-                'approved': {'review', 'archived'}, 'archived': set(),
+                'approved': {'archived'}, 'archived': set(),
             }
             for rec in self:
-                if target != rec.state and target not in allowed.get(rec.state, set()):
+                if target not in allowed.get(rec.state, set()):
                     raise UserError(_('Invalid document transition: %s to %s.') % (rec.state, target))
+                if target == 'review' and not rec.sudo().file_data:
+                    raise UserError(_('A document file is required before review.'))
                 if target == 'approved' and not rec.sudo().file_data:
                     raise UserError(_('A document file is required for approval.'))
+                if target == 'approved' and rec.approver_id and not (
+                    self.env.su
+                    or self.env.user.has_group('knowledge_management.group_kms_manager')
+                    or rec.approver_id.sudo().user_id == self.env.user
+                ):
+                    raise AccessError(_('Only the designated approver may publish this document.'))
+                if target == 'approved' and rec.previous_version_id:
+                    previous = rec.previous_version_id
+                    self.env.cr.execute(
+                        'SELECT id FROM kms_document WHERE id = %s FOR UPDATE',
+                        (previous.id,),
+                    )
+                    previous.invalidate_recordset(['state', 'is_latest_version'])
+                    if previous.state != 'approved' or not previous.is_latest_version:
+                        raise UserError(_('The preceding version is no longer the active approved document.'))
             if target == 'approved':
-                vals = dict(vals, date_approved=vals.get('date_approved') or fields.Datetime.now(),
+                vals = dict(vals, date_approved=fields.Datetime.now(),
                             is_latest_version=True)
             elif target == 'archived':
                 vals = dict(vals, is_latest_version=False)
         result = super(KmsDocument, self).write(vals)
+        if _REVISION_FIELDS.intersection(vals):
+            self._log_audit_action('modify', 'Draft document content or metadata updated', strict=True)
+        if target == 'review':
+            self._log_audit_action('modify', 'Submitted for review', strict=True)
+        elif target == 'draft':
+            self._log_audit_action('modify', 'Returned to draft after review', strict=True)
         if target == 'approved':
             for rec in self:
                 if not self.env['kms.document.version'].sudo().search_count([
                     ('document_id', '=', rec.id), ('version_number', '=', rec.version),
                 ]):
-                    self.env['kms.document.version'].sudo().create({
+                    self.env['kms.document.version'].sudo().with_context(_kms_version_snapshot=True).create({
                         'document_id': rec.id, 'version_number': rec.version,
                         'file_data': rec.sudo().file_data, 'file_name': rec.file_name,
                         'effective_date': rec.effective_date,
@@ -221,9 +282,24 @@ class KmsDocument(models.Model):
                     })
                 if rec.previous_version_id and rec.previous_version_id.state == 'approved':
                     rec.previous_version_id.sudo().write({
-                        'state': 'archived', 'is_latest_version': False,
+                        'state': 'archived',
                     })
+                rec._log_audit_action('approve', f'Approved version {rec.version}', strict=True)
+                owner = rec.sudo().owner_id
+                if owner and owner.user_id:
+                    self.env['kms.contributor.point']._award_points(
+                        owner.user_id, points=20, source='document_publish',
+                        description=f'Published approved document: {rec.name} ({rec.code})',
+                    )
+        elif target == 'archived':
+            self._log_audit_action('archive', 'Document archived or superseded', strict=True)
         return result
+
+    def unlink(self):
+        if any(rec.state != 'draft' for rec in self):
+            raise UserError(_('Submitted, approved, and archived documents must be retained.'))
+        self._log_audit_action('delete', 'Draft document deleted', strict=True)
+        return super().unlink()
 
     @api.depends('file_data', 'file_name')
     def _compute_file_metadata(self):
@@ -259,16 +335,17 @@ class KmsDocument(models.Model):
     @api.depends('classification_id', 'classification_id.code')
     def _compute_classification(self):
         code_map = {
-            'PUB': 'public', 'public': 'public',
-            'INT': 'internal', 'internal': 'internal',
-            'CONF': 'confidential', 'confidential': 'confidential',
-            'SCONF': 'restricted', 'restricted': 'restricted',
+            'PUB': 'public', 'PUBLIC': 'public',
+            'INT': 'internal', 'INTERNAL': 'internal',
+            'CONF': 'confidential', 'CONFIDENTIAL': 'confidential',
+            'SCONF': 'restricted', 'RESTRICTED': 'restricted',
         }
         for rec in self:
             if rec.classification_id and rec.classification_id.code:
-                rec.classification = code_map.get(rec.classification_id.code, 'internal')
-            elif not rec.classification:
-                rec.classification = 'internal'
+                code = rec.classification_id.code.upper().split('-', 1)[0]
+                rec.classification = code_map.get(code, 'restricted')
+            else:
+                rec.classification = 'restricted'
 
     @api.onchange('classification')
     def _onchange_classification(self):
@@ -288,8 +365,13 @@ class KmsDocument(models.Model):
     @api.onchange('classification_id')
     def _onchange_classification_id(self):
         if self.classification_id:
-            code_map = {'PUB': 'public', 'INT': 'internal', 'CONF': 'confidential', 'SCONF': 'restricted'}
-            self.classification = code_map.get(self.classification_id.code, 'internal')
+            code_map = {
+                'PUB': 'public', 'PUBLIC': 'public',
+                'INT': 'internal', 'INTERNAL': 'internal',
+                'CONF': 'confidential', 'CONFIDENTIAL': 'confidential',
+                'SCONF': 'restricted', 'RESTRICTED': 'restricted',
+            }
+            self.classification = code_map.get(self.classification_id.code.upper().split('-', 1)[0], 'restricted')
             if getattr(self.classification_id, 'view_only_default', False):
                 self.is_view_only = True
             if getattr(self.classification_id, 'watermark_mandatory', False):
@@ -310,11 +392,12 @@ class KmsDocument(models.Model):
     <a href="{action_link}" style="background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;">📄 Review Document</a>
 </div>""")
             partner_ids = []
-            reviewer_emp = rec.reviewer_id or rec.approver_id
+            # HR contact and linked user are private employee fields in Odoo 19.
+            # Elevate only the identity lookup, not the document transition.
+            reviewer_emp = (rec.reviewer_id or rec.approver_id).sudo()
             if reviewer_emp and reviewer_emp.work_contact_id:
                 partner_ids.append(reviewer_emp.work_contact_id.id)
             rec.message_post(body=body, partner_ids=partner_ids)
-            rec._log_audit_action('modify', 'Submitted for review')
             reviewer_user = reviewer_emp.user_id if reviewer_emp else False
             if reviewer_user:
                 try:
@@ -333,8 +416,6 @@ class KmsDocument(models.Model):
                 raise UserError(_('Only documents under review can be approved.'))
             rec.write({
                 'state': 'approved',
-                'date_approved': fields.Datetime.now(),
-                'is_latest_version': True
             })
             action_link = f"/web#id={rec.id}&model=kms.document"
             msg_text = _('Document %s (%s) approved and published to the active repository.') % (rec.name, rec.code)
@@ -347,15 +428,6 @@ class KmsDocument(models.Model):
             if owner and owner.work_contact_id:
                 partner_ids.append(owner.work_contact_id.id)
             rec.message_post(body=body, partner_ids=partner_ids)
-            rec._log_audit_action('approve', f'Approved version {rec.version}')
-            # Award points to content owner
-            if owner and owner.user_id:
-                self.env['kms.contributor.point'].award_points(
-                    owner.user_id,
-                    points=20,
-                    source='document_publish',
-                    description=f'Published approved document: {rec.name} ({rec.code})'
-                )
 
     def action_reject(self):
         for rec in self:
@@ -373,21 +445,25 @@ class KmsDocument(models.Model):
             if owner and owner.work_contact_id:
                 partner_ids.append(owner.work_contact_id.id)
             rec.message_post(body=body, partner_ids=partner_ids)
-            rec._log_audit_action('modify', 'Document rejected back to Draft')
 
     def action_archive(self):
         for rec in self:
             if rec.state != 'approved':
                 raise UserError(_('Only approved documents can be archived.'))
-            rec.write({'state': 'archived', 'is_latest_version': False})
+            rec.write({'state': 'archived'})
             rec.message_post(body=_('Document archived and superseded.'))
-            rec._log_audit_action('archive', 'Document archived')
 
     def action_create_new_version(self):
         """Creates a revision draft with incremented version number (FR-KMS-004)."""
         self.ensure_one()
+        self.check_access('read')
         if self.state != 'approved':
             raise UserError(_('Only approved documents can be revised.'))
+        if not (
+            self.env.su or self.owner_id.sudo().user_id == self.env.user
+            or self.env.user.has_group('knowledge_management.group_kms_reviewer')
+        ):
+            raise AccessError(_('Only the document owner or a KMS reviewer may initiate a revision.'))
         current_ver = self.version or '1.0'
         try:
             parts = current_ver.split('.')
@@ -398,16 +474,31 @@ class KmsDocument(models.Model):
         except Exception:
             new_ver = f"{current_ver}-rev"
 
-        new_doc = self.copy({
-            'name': self.name,
-            'version': new_ver,
-            'state': 'draft',
-            'previous_version_id': self.id,
-            'change_summary': _('Revision based on %s (v%s)') % (self.code, self.version),
-            'date_approved': False,
-            'is_latest_version': False,
-        })
-        self.message_post(body=_('New revision draft initiated: %s (v%s)') % (new_doc.code, new_ver))
+        existing = self.search([
+            ('previous_version_id', '=', self.id),
+            ('state', 'in', ['draft', 'review']),
+        ], limit=1)
+        if existing:
+            new_doc = existing
+        else:
+            # copy() also carries employee audience and other HR-backed relations.
+            # The authorized reviewer has passed the access check above, but
+            # Odoo 19 does not grant that role direct write access to HR records.
+            new_doc = self.sudo().copy({
+                'name': self.name,
+                'version': new_ver,
+                'state': 'draft',
+                'previous_version_id': self.id,
+                'change_summary': _('Revision based on %s (v%s)') % (self.code, self.version),
+                'date_approved': False,
+                'is_latest_version': False,
+                'view_count': 0,
+                'download_count': 0,
+            }).with_user(self.env.user)
+            # A reviewer must be able to open and edit the resulting draft.
+            new_doc.check_access('read')
+            new_doc.check_access('write')
+            self.message_post(body=_('New revision draft initiated: %s (v%s)') % (new_doc.code, new_ver))
         return {
             'name': _('Document Revision'),
             'type': 'ir.actions.act_window',
@@ -428,9 +519,51 @@ class KmsDocument(models.Model):
             'context': {'default_document_id': self.id},
         }
 
+    def _action_view_audit(self, action):
+        self.ensure_one()
+        self.check_access('read')
+        return {
+            'name': _('Document %s History - %s') % (action.title(), self.name),
+            'type': 'ir.actions.act_window',
+            'res_model': 'kms.audit.log',
+            'view_mode': 'list',
+            'domain': [('document_id', '=', self.id), ('action', '=', action)],
+        }
+
+    def action_view_read_history(self):
+        return self._action_view_audit('view')
+
+    def action_view_download_history(self):
+        return self._action_view_audit('download')
+
+    def action_view_document(self):
+        """Open an authorized PDF or safe text preview in the browser."""
+        self.ensure_one()
+        self.check_access('read')
+        if not self.sudo().file_data:
+            raise UserError(_('An attached file is required for viewing.'))
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/kms/document/{self.id}/view',
+            'target': 'new',
+        }
+
+    def action_preview_document(self):
+        """Open the first PDF page for a smaller, watermarked preview."""
+        self.ensure_one()
+        self.check_access('read')
+        if not self.is_pdf or not self.sudo().file_data:
+            raise UserError(_('An attached PDF is required for first-page preview.'))
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/kms/document/{self.id}/view?preview=1',
+            'target': 'new',
+        }
+
     def action_download_watermarked(self):
         """Action handler that triggers download through secure watermarked controller."""
         self.ensure_one()
+        self.check_access('read')
         if not self.sudo().file_data:
             raise UserError(_('No file is attached to this document.'))
 
@@ -453,16 +586,12 @@ class KmsDocument(models.Model):
     def _log_audit_action(self, action_type, details=None, strict=False):
         for rec in self:
             try:
-                emp = self.env.user.employee_id
-                self.env['kms.audit.log'].sudo().create({
-                    'user_id': self.env.user.id,
-                    'employee_id': emp.id if emp else False,
-                    'action': action_type,
-                    'document_id': rec.id,
-                    'resource_type': 'document',
-                    'resource_name': f"{rec.code} - {rec.name} (v{rec.version})",
-                    'details': details or f"Action {action_type} performed",
-                })
+                self.env['kms.audit.log']._log_audit_event(
+                    action=action_type, document_id=rec.id,
+                    resource_type='document',
+                    resource_name=f"{rec.code} - {rec.name} (v{rec.version})",
+                    details=details or f"Action {action_type} performed",
+                )
             except Exception as e:
                 _logger.warning("Could not log KMS audit entry: %s", e)
                 if strict:
@@ -481,24 +610,40 @@ class KmsDocument(models.Model):
         query = value.strip()
         if not query:
             return []
-        try:
-            with self.env.cr.savepoint():
-                self.env.cr.execute("""
-                    SELECT id FROM kms_document
-                    WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
-                          @@ websearch_to_tsquery('english', %s)
-                """, (query,))
-                ids = [r[0] for r in self.env.cr.fetchall()]
-        except Exception:
-            self.env.cr.execute("""
+        # A capped ID list cannot correctly implement a negative search:
+        # matches beyond the cap would be returned as false negatives.
+        if operator in ('not in', '!=', 'not like', 'not ilike'):
+            raise UserError(_('Negated full-text search is not supported.'))
+        visible_ids = []
+        offset = 0
+        page_size = 200
+        query_fn = 'websearch_to_tsquery'
+        while len(visible_ids) < 2000 and offset < 5000:
+            sql = """
                 SELECT id FROM kms_document
                 WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
-                      @@ plainto_tsquery('english', %s)
-            """, (query,))
-            ids = [r[0] for r in self.env.cr.fetchall()]
-        if operator in ('not in', '!=', 'not like', 'not ilike'):
-            return [('id', 'not in', ids)]
-        return [('id', 'in', ids)]
+                      @@ {query_fn}('english', %s)
+                ORDER BY id DESC LIMIT %s OFFSET %s
+            """
+            try:
+                with self.env.cr.savepoint():
+                    self.env.cr.execute(sql.format(query_fn=query_fn), (query, page_size, offset))
+                    page = [row[0] for row in self.env.cr.fetchall()]
+            except Exception:
+                if query_fn != 'websearch_to_tsquery':
+                    raise
+                query_fn = 'plainto_tsquery'
+                offset = 0
+                visible_ids = []
+                continue
+            if not page:
+                break
+            readable = set(self.search([('id', 'in', page)]).ids)
+            visible_ids.extend(doc_id for doc_id in page if doc_id in readable)
+            offset += len(page)
+            if len(page) < page_size:
+                break
+        return [('id', 'in', visible_ids[:2000])]
 
     @api.model
     def _search_fulltext(self, query, extra_domain=None, limit=80):
@@ -506,45 +651,41 @@ class KmsDocument(models.Model):
         FR-KMS-006: Ranked full-text search across Title, Summary, and Content using tsvector and GIN index.
         Returns recordset ordered by ts_rank DESC.
         """
+        limit = max(1, min(int(limit or 80), 500))
         if not query or not str(query).strip():
             return self.search(extra_domain or [], limit=limit)
         q = str(query).strip()
-        try:
+        # Apply ORM record rules on each bounded page. Limiting the SQL before
+        # access checks could hide an employee's permitted results behind rows
+        # they cannot read.
+        ranked_ids = []
+        offset = 0
+        page_size = 200
+        while len(ranked_ids) < limit and offset < 5000:
             sql = """
-                SELECT id, ts_rank(
-                    to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, '')),
-                    websearch_to_tsquery('english', %s)
-                ) AS rank
-                FROM kms_document
+                SELECT id FROM kms_document
                 WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
-                      @@ websearch_to_tsquery('english', %s)
-                ORDER BY rank DESC, id DESC
-                LIMIT %s
+                      @@ {tsquery}('english', %s)
+                ORDER BY ts_rank(
+                    to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, '')),
+                    {tsquery}('english', %s)
+                ) DESC, id DESC
+                LIMIT %s OFFSET %s
             """
-            with self.env.cr.savepoint():
-                self.env.cr.execute(sql, (q, q, limit))
+            try:
+                with self.env.cr.savepoint():
+                    self.env.cr.execute(sql.format(tsquery='websearch_to_tsquery'), (q, q, page_size, offset))
+                    rows = self.env.cr.fetchall()
+            except Exception:
+                self.env.cr.execute(sql.format(tsquery='plainto_tsquery'), (q, q, page_size, offset))
                 rows = self.env.cr.fetchall()
-        except Exception:
-            sql_fallback = """
-                SELECT id, ts_rank(
-                    to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, '')),
-                    plainto_tsquery('english', %s)
-                ) AS rank
-                FROM kms_document
-                WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
-                      @@ plainto_tsquery('english', %s)
-                ORDER BY rank DESC, id DESC
-                LIMIT %s
-            """
-            self.env.cr.execute(sql_fallback, (q, q, limit))
-            rows = self.env.cr.fetchall()
-
-        ids = [r[0] for r in rows]
-        if not ids:
-            return self.browse()
-        base_domain = [('id', 'in', ids)]
-        if extra_domain:
-            base_domain = ['&'] + base_domain + extra_domain
-        records = self.search(base_domain)
-        id_map = {rec.id: rec for rec in records}
-        return self.browse([i for i in ids if i in id_map])
+            ids = [row[0] for row in rows]
+            if not ids:
+                break
+            domain = [('id', 'in', ids)] + list(extra_domain or [])
+            readable = set(self.search(domain).ids)
+            ranked_ids.extend(doc_id for doc_id in ids if doc_id in readable)
+            offset += len(ids)
+            if len(ids) < page_size:
+                break
+        return self.browse(ranked_ids[:limit])

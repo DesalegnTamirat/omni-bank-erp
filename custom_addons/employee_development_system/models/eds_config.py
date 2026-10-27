@@ -20,7 +20,7 @@ class ResConfigSettings(models.TransientModel):
     """
     _inherit = 'res.config.settings'
 
-    # TNA timing (/002/009)
+    # TNA timing
     eds_tna_cycle_start_month = fields.Integer(
         string='TNA Cycle Start Month',
         default=4,
@@ -47,7 +47,7 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='eds.max_tna_courses_per_employee',
         help='Maximum number of distinct training courses an individual employee may request in a single TNA cycle.')
 
-    # Delivery (/040)
+    # Delivery
     eds_default_class_capacity = fields.Integer(
         string='Default Session Capacity',
         default=30,
@@ -59,7 +59,7 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='eds.min_attendance_pct',
         help='Minimum attendance percentage required for certificate eligibility.')
 
-    # SLAs (/014/020/054)
+    # SLAs
     eds_course_mapping_sla_days = fields.Integer(
         string='Course-to-Competency Mapping SLA (Working Days)',
         default=5,
@@ -77,12 +77,21 @@ class ResConfigSettings(models.TransientModel):
         default=7,
         config_parameter='eds.level1_report_sla_days')
 
-    # Evaluation & finance (, /069)
+    # Evaluation & finance
     eds_level2_pass_threshold = fields.Float(
         string='Level 2 Pass Threshold (%)',
         default=60.0,
         config_parameter='eds.level2_pass_threshold',
         help='Recommended default 60% - the BRD only requires a configurable threshold .')
+    eds_level3_delay_value = fields.Integer(
+        string='Level 3 Review Delay', default=60,
+        config_parameter='eds.level3_delay_value',
+        help='Time after session completion before the line manager receives the Level 3 review.')
+    eds_level3_delay_unit = fields.Selection([
+        ('minutes', 'Minutes'), ('hours', 'Hours'), ('days', 'Days'),
+        ('weeks', 'Weeks'), ('months', 'Months'),
+    ], string='Level 3 Delay Unit', default='days',
+        config_parameter='eds.level3_delay_unit')
 
     # Nomination approval chain 
     eds_nomination_require_line_manager = fields.Boolean(
@@ -96,14 +105,14 @@ class ResConfigSettings(models.TransientModel):
         default=False,
         config_parameter='eds.nomination_require_budget',
         help='Whether nominations always pass an explicit Budget/HR approval gate '
-             '(overridable per session approval flow, ).')
+             '(overridable per session approval flow).')
 
-    # Procurement & vendors (/032/034)
+    # Procurement & vendors
     eds_rfp_min_providers = fields.Integer(
         string='Minimum Providers per RFP',
         default=3,
         config_parameter='eds.rfp_min_providers',
-        help='Minimum number of qualified providers an RFP must be issued to (, default >= 3).')
+        help='Minimum number of qualified providers an RFP must be issued to (default 3).')
     eds_technical_min_threshold = fields.Float(
         string='Technical Minimum Threshold (%)',
         default=70.0,

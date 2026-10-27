@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 class KmsAuditLog(models.Model):
@@ -26,6 +26,7 @@ class KmsAuditLog(models.Model):
         ('modify', 'Resource Modified / Updated'),
         ('approve', 'Resource Approved / Validated'),
         ('archive', 'Resource Archived'),
+        ('delete', 'Resource Deleted'),
         ('access_denied', 'Access / Download Attempt Denied'),
         ('join', 'Joined Community'),
         ('leave', 'Left Community'),
@@ -38,6 +39,7 @@ class KmsAuditLog(models.Model):
         ('forum', 'Knowledge Forum / Q&A'),
         ('lesson_learned', 'Lesson Learned'),
         ('tacit_session', 'Knowledge Capture Session'),
+        ('mentoring', 'Mentoring Track or Milestone'),
     ], string='Asset Type', default='document', readonly=True, index=True)
 
     document_id = fields.Many2one('kms.document', string='Governed Document Reference', readonly=True, ondelete='set null')
@@ -46,11 +48,11 @@ class KmsAuditLog(models.Model):
     create_date = fields.Datetime(string='Timestamp', readonly=True, index=True)
 
     @api.model
-    def log_audit_event(self, action, resource_type, resource_name, details='', doc_id=False, user=None):
-        """Unified logging method for bank-wide audit compliance (BRD 7.3, NFR-KMS-001)."""
-        user = user or self.env.user
+    def _log_audit_event(self, action, resource_type, resource_name, details='', document_id=False):
+        """Server-side audit helper; private methods cannot be invoked by RPC."""
+        user = self.env.user
         emp = user.employee_id
-        return self.sudo().create({
+        return self.sudo().with_context(_kms_internal_audit=True).create({
             'user_id': user.id,
             'employee_id': emp.id if emp else False,
             'department_id': emp.department_id.id if emp and emp.department_id else False,
@@ -59,20 +61,20 @@ class KmsAuditLog(models.Model):
             'resource_type': resource_type,
             'resource_name': resource_name,
             'details': details or f"Action {action} performed on {resource_name}",
-            'document_id': doc_id,
+            'document_id': document_id,
         })
 
     @api.model_create_multi
     def create(self, vals_list):
+        if not self.env.su or not self.env.context.get('_kms_internal_audit'):
+            raise AccessError(_('Audit entries can only be created by KMS server actions.'))
+        user = self.env.user
+        emp = user.employee_id
         for vals in vals_list:
-            if not vals.get('user_id'):
-                vals['user_id'] = self.env.user.id
-            if not vals.get('employee_id'):
-                emp = self.env.user.employee_id
-                if emp:
-                    vals['employee_id'] = emp.id
-                    vals['department_id'] = emp.department_id.id if emp.department_id else False
-                    vals['operating_unit_id'] = emp.default_operating_unit_id.id if emp.default_operating_unit_id else False
+            vals['user_id'] = user.id
+            vals['employee_id'] = emp.id if emp else False
+            vals['department_id'] = emp.department_id.id if emp and emp.department_id else False
+            vals['operating_unit_id'] = emp.default_operating_unit_id.id if emp and emp.default_operating_unit_id else False
         return super(KmsAuditLog, self).create(vals_list)
 
     def write(self, vals):

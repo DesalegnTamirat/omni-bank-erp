@@ -65,6 +65,10 @@ class TestCertificateAndTemplates(TransactionCase):
             'date_end': '2026-10-12 17:30:00',
             'status': 'ongoing',
         })
+        cls.env['eds.enrollment'].create({
+            'session_id': cls.session.id, 'employee_id': cls.employee.id,
+            'state': 'enrolled',
+        })
 
         # Ensure Certificate Rule exists for technical_compliance
         cls.cert_rule = cls.env['eds.certificate.rule'].search([
@@ -92,13 +96,11 @@ class TestCertificateAndTemplates(TransactionCase):
     def test_01_certificate_issuance_image_and_pdf(self):
         """Test issuing certificate generates PNG image, PDF, token, and delivery notification."""
         # Setup attendance 100%
-        self.env['eds.session.attendance'].create({
-            'session_id': self.session.id,
-            'employee_id': self.employee.id,
-            'attendance_date': '2026-10-10',
-            'attended': True,
-            'attendance_percentage': 100.0,
-        })
+        self.env['eds.session.attendance'].create([
+            {'session_id': self.session.id, 'employee_id': self.employee.id,
+             'attendance_date': day, 'attendance_slot': slot, 'attended': True}
+            for day, slot, _hours in self.session._attendance_slots()
+        ])
 
         # Setup level 2 evaluation passing
         post_ass = self.env['eds.assessment'].create({
@@ -166,13 +168,16 @@ class TestCertificateAndTemplates(TransactionCase):
             'name': 'Ineligible Employee',
             'department_id': self.department.id,
         })
+        self.env['eds.enrollment'].create({
+            'session_id': self.session.id, 'employee_id': emp2.id,
+            'state': 'enrolled',
+        })
         # Low attendance: 50%
         self.env['eds.session.attendance'].create({
             'session_id': self.session.id,
             'employee_id': emp2.id,
             'attendance_date': '2026-10-10',
             'attended': False,
-            'attendance_percentage': 50.0,
         })
 
         cert2 = self.env['eds.certificate'].with_user(self.officer_user).create({
@@ -188,12 +193,11 @@ class TestCertificateAndTemplates(TransactionCase):
     def test_03_portal_certificate_controller_verification(self):
         """Test public certificate verification controller logic."""
         # Create and issue a certificate
-        self.env['eds.session.attendance'].create({
-            'session_id': self.session.id,
-            'employee_id': self.employee.id,
-            'attended': True,
-            'attendance_percentage': 100.0,
-        })
+        self.env['eds.session.attendance'].create([
+            {'session_id': self.session.id, 'employee_id': self.employee.id,
+             'attendance_date': day, 'attendance_slot': slot, 'attended': True}
+            for day, slot, _hours in self.session._attendance_slots()
+        ])
         post_ass3 = self.env['eds.assessment'].create({
             'session_id': self.session.id,
             'employee_id': self.employee.id,
@@ -273,7 +277,8 @@ class TestCertificateAndTemplates(TransactionCase):
         ])
         self.assertTrue(att, "Attendance record should be created/updated by Excel import")
         self.assertTrue(att.attended)
-        self.assertAlmostEqual(att.attendance_percentage, 100.0)
+        self.assertAlmostEqual(att.attendance_percentage,
+                               round(100.0 / len(self.session._attendance_slots()), 2))
 
     def test_05_vendor_evaluation_matrix_threshold(self):
         """Test vendor evaluation matrix 40/70 technical threshold logic."""

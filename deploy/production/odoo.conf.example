@@ -1,0 +1,12 @@
+[options]
+addons_path = /mnt/extra-addons,/usr/lib/python3/dist-packages/odoo/addons
+; Copy to a private path. Set a long random admin_passwd there; do not commit it.
+admin_passwd = REPLACE_WITH_PRIVATE_SECRET
+dbfilter = ^ERP_PRODUCTION$
+list_db = False
+proxy_mode = True
+gevent_port = 8072
+; Tune workers, memory, and time limits using the approved capacity test.
+workers = 4
+log_level = info
+

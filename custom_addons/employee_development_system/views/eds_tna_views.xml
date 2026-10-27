@@ -9,13 +9,13 @@
             <field name="model">eds.tna.cycle</field>
             <field name="arch" type="xml">
                 <list>
+                    <field name="cycle_title"/>
                     <field name="name"/>
                     <field name="year"/>
                     <field name="start_date"/>
                     <field name="submission_end_date"/>
-                    <field name="approval_deadline"/>
                     <field name="entry_count"/>
-                    <field name="days_until_deadline" decoration-danger="days_until_deadline &gt;= 0 and days_until_deadline &lt;= 7"/>
+                    <field name="days_until_deadline" decoration-danger="state == 'collecting' and days_until_deadline &gt;= 0 and days_until_deadline &lt;= 7"/>
                     <field name="state" widget="badge"/>
                 </list>
             </field>
@@ -30,6 +30,10 @@
                         <button name="action_start_collection" string="Start Collection"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_announce_existing_collection" string="Notify Eligible Employees"
+                                type="object" class="btn-secondary"
+                                invisible="state != 'collecting' or announcement_state != 'idle'"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_open_pull_competency_gaps" string="Pull Closed Competency Gaps"
                                 type="object" class="btn-primary" invisible="state not in ('draft', 'collecting')"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
@@ -37,55 +41,59 @@
                                 type="object" class="btn-secondary" invisible="state not in ('draft', 'collecting')"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
                         <button name="action_go_to_planning" string="Go to Planning"
-                                type="object" class="btn-success" invisible="state not in ('collecting', 'consolidating', 'under_approval', 'approved')"
+                                type="object" class="btn-success" invisible="state != 'closed'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_finish_collection" string="Finish Collection"
+                        <button name="action_finish_collection" string="Close Collection"
                                 type="object" class="oe_highlight" invisible="state != 'collecting'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_submit_for_approval" string="Submit for Approval"
-                                type="object" class="oe_highlight" invisible="state != 'consolidating'"
-                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="%(employee_development_system.action_eds_tna_consolidation_wizard)d"
-                                string="Consolidate Needs" type="action" class="oe_highlight"
-                                invisible="state not in ('collecting','consolidating','under_approval')"
-                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_approve" string="Approve TNA"
-                                type="object" class="oe_highlight" invisible="state != 'under_approval'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_lock" string="Lock Approved TNA"
-                                type="object" invisible="state != 'approved'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
-                        <button name="action_unlock" string="Unlock (Change Request)"
-                                type="object" invisible="state != 'locked'"
-                                groups="employee_development_system.group_eds_admin"/>
                         <field name="state" widget="statusbar"
-                                statusbar_visible="draft,collecting,consolidating,under_approval,approved,locked"/>
+                                statusbar_visible="draft,collecting,closed"/>
                     </header>
                     <sheet>
-                        <div class="oe_button_box" colspan="2">
-                            <button name="action_view_consolidations"
-                                    type="object" class="oe_stat_button" icon="fa-archive"
-                                    groups="employee_development_system.group_eds_officer">
-                                <field name="consolidation_count" widget="statinfo" string="Consolidations"/>
-                            </button>
-                        </div>
                         <group>
                             <group string="Cycle">
+                                <field name="cycle_title" placeholder="e.g. Branch Operations Training Needs"/>
                                 <field name="name" readonly="1" invisible="name == 'New'"/>
                                 <field name="year" readonly="1"/>
                                 <field name="start_date" readonly="state != 'draft'"/>
                                 <field name="submission_end_date" readonly="state not in ('draft', 'collecting')"/>
                             </group>
-                            <group string="Deadlines &amp; Status">
-                                <field name="approval_deadline" readonly="state in ('approved', 'locked')"/>
+                            <group string="Collection Status">
                                 <field name="days_until_deadline"/>
                                 <field name="entry_count"/>
-                                <field name="approved_by_id"/>
-                                <field name="approval_date"/>
                                 <field name="responsible_team_id"/>
+                                <field name="announcement_state"/>
+                                <field name="announcement_sent_count"/>
                             </group>
                         </group>
-                        <notebook>
+                        <group string="Courses Available in This Cycle">
+                            <field name="restrict_tna_courses" widget="boolean_toggle" readonly="state != 'draft'"/>
+                            <field name="request_course_ids" widget="many2many_tags"
+                                   invisible="not restrict_tna_courses" readonly="state != 'draft'"
+                                   options="{'no_create': True}" placeholder="Select courses from the active catalog..."/>
+                        </group>
+                        <group string="Employees Available in This Cycle">
+                            <field name="restrict_tna_audience" widget="boolean_toggle" readonly="state != 'draft'"/>
+                            <field name="available_target_unit_ids" invisible="1"/>
+                            <field name="available_target_job_ids" invisible="1"/>
+                            <field name="available_target_employee_ids" invisible="1"/>
+                            <field name="target_department_ids" widget="many2many_tags"
+                                   invisible="not restrict_tna_audience" readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="target_work_unit_ids" widget="many2many_tags"
+                                   invisible="not restrict_tna_audience" readonly="state != 'draft'"
+                                   domain="[('id','in',available_target_unit_ids)] if target_department_ids else []"
+                                   options="{'no_create': True}"/>
+                            <field name="target_job_position_ids" widget="many2many_tags"
+                                   invisible="not restrict_tna_audience" readonly="state != 'draft'"
+                                   domain="[('id','in',available_target_job_ids)] if target_department_ids or target_work_unit_ids else []"
+                                   options="{'no_create': True}"/>
+                            <field name="target_employee_ids" widget="many2many_tags"
+                                   invisible="not restrict_tna_audience" readonly="state != 'draft'"
+                                   domain="[('id','in',available_target_employee_ids)] if target_department_ids or target_work_unit_ids or target_job_position_ids else [('active','=',True)]"
+                                   options="{'no_create': True}"/>
+                        </group>
+                        <notebook class="o_eds_notebook">
                             <page string="Course Demand &amp; Planning" name="page_course_demand" groups="employee_development_system.group_eds_officer">
                                 <div class="alert alert-info py-2 mb-2" role="alert">
                                     <div class="d-flex justify-content-between align-items-center">
@@ -97,6 +105,7 @@
                                     <list editable="bottom" open_form_view="1" create="false" delete="false" default_order="total_employees desc" decoration-info="selected_for_planning">
                                         <field name="selected_for_planning" string="Plan" widget="boolean_toggle"/>
                                         <field name="course_name" string="Course / Program" readonly="1"/>
+                                        <field name="catalog_status" widget="badge" readonly="1"/>
                                         <field name="total_employees" string="Employees Selected" readonly="1" class="fw-bold text-primary"/>
                                         <button name="action_open_employee_demand" string="View Employees" type="object" icon="fa-users"/>
                                         <field name="request_count" string="Requests" readonly="1"/>
@@ -107,7 +116,7 @@
                                         <field name="target_quarter" string="Quarter"/>
                                         <field name="course_id" optional="hide" readonly="1"/>
                                         <field name="duration_days" optional="hide"/>
-                                        <field name="delivery_method" optional="hide"/>
+                                        <field name="delivery_method" optional="hide" readonly="1"/>
                                         <field name="employee_ids" widget="many2many_tags" optional="hide" readonly="1"/>
                                         <field name="remarks" optional="hide"/>
                                     </list>
@@ -120,9 +129,9 @@
                                         <field name="work_unit_id"/>
                                         <field name="department_id"/>
                                         <field name="course_id"/>
-                                        <field name="proposed_program"/>
+                                        <field name="custom_course_title" string="Proposed Course"/>
+                                        <field name="catalog_status" widget="badge"/>
                                         <field name="target_participant_count" string="Number of Employees"/>
-                                        <field name="work_unit_employee_ids" widget="many2many_tags"/>
                                         <field name="urgency" widget="badge"/>
                                         <field name="quarter"/>
                                         <field name="state" widget="badge"/>
@@ -138,7 +147,6 @@
                                         <field name="department_id"/>
                                         <field name="course_id"/>
                                         <field name="requested_course_ids" widget="many2many_tags" optional="show"/>
-                                        <field name="proposed_program"/>
                                         <field name="urgency" widget="badge"/>
                                         <field name="quarter"/>
                                         <field name="state" widget="badge"/>
@@ -153,6 +161,7 @@
                                         <field name="source" widget="badge"/>
                                         <field name="competency_or_measurement" string="Competency / Measurement"/>
                                         <field name="suggested_course_ids" widget="many2many_tags" string="Suggested Courses"/>
+                                        <field name="cycle_course_status" widget="badge" string="Cycle Course Match"/>
                                         <field name="gap_severity" widget="badge"/>
                                         <field name="priority_score"/>
                                         <field name="state" widget="badge"/>
@@ -190,7 +199,9 @@
                                         <field name="employee_id"/>
                                         <field name="work_unit_id"/>
                                         <field name="competency_or_measurement" string="Competency / Measurement"/>
-                                        <field name="proposed_program"/>
+                                        <field name="course_id" optional="show"/>
+                                        <field name="requested_course_ids" widget="many2many_tags" optional="show"/>
+                                        <field name="custom_course_title" string="Proposed Course" optional="show"/>
                                         <field name="delivery_mode"/>
                                         <field name="priority_score"/>
                                         <field name="state" widget="badge"/>
@@ -213,10 +224,11 @@
             <field name="model">eds.tna.cycle</field>
             <field name="arch" type="xml">
                 <search>
+                    <field name="cycle_title"/>
                     <field name="name"/>
                     <field name="year"/>
                     <filter string="Open for Collection" name="open_collection" domain="[('state','=','collecting')]"/>
-                    <filter string="Approved / Locked" name="approved_locked" domain="[('state','in',('approved','locked'))]"/>
+                    <filter string="Closed" name="closed" domain="[('state','=','closed')]"/>
                     <separator/>
                     <group name="group_by">
                         <filter string="State" name="group_state" context="{'group_by':'state'}"/>
@@ -232,7 +244,7 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_tna_cycle_search"/>
         </record>
 
-            <record id="view_eds_tna_entry_list" model="ir.ui.view">
+        <record id="view_eds_tna_entry_list" model="ir.ui.view">
             <field name="name">eds.tna.entry.list</field>
             <field name="model">eds.tna.entry</field>
             <field name="arch" type="xml">
@@ -242,16 +254,49 @@
                     <field name="request_level" widget="badge"/>
                     <field name="employee_id"/>
                     <field name="work_unit_id"/>
-                    <field name="competency_or_measurement" string="Competency / Measurement"/>
-                    <field name="course_id" optional="show"/>
-                    <field name="proposed_program" optional="show"/>
-                    <field name="suggested_course_ids" widget="many2many_tags" string="Suggested Courses" optional="show"/>
-                    <field name="target_participant_count" string="Headcount" optional="show"/>
-                    <field name="quarter" optional="show"/>
+                    <field name="competency_or_measurement" string="Competency / Measurement" optional="hide"/>
+                    <field name="course_request_display" string="Course / Proposed Topic"/>
+                    <field name="target_participant_count" string="Employees"/>
+                    <field name="quarter"/>
                     <field name="urgency" widget="badge"/>
-                    <field name="delivery_mode" widget="badge"/>
+                    <field name="delivery_mode" widget="badge" optional="hide"/>
                     <field name="source" widget="badge"/>
-                    <field name="priority_score"/>
+                    <field name="priority_score" optional="hide"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_entry_own_list" model="ir.ui.view">
+            <field name="name">eds.tna.entry.own.list</field>
+            <field name="model">eds.tna.entry</field>
+            <field name="arch" type="xml">
+                <list string="My Training Needs">
+                    <field name="name" string="Reference"/>
+                    <field name="cycle_id"/>
+                    <field name="request_level" string="Request Level" widget="badge"/>
+                    <field name="course_request_display" string="Courses Requested"/>
+                    <field name="work_unit_id" optional="hide"/>
+                    <field name="target_participant_count" string="Employees" optional="hide"/>
+                    <field name="quarter"/>
+                    <field name="urgency" widget="badge"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_entry_work_unit_list" model="ir.ui.view">
+            <field name="name">eds.tna.entry.work.unit.list</field>
+            <field name="model">eds.tna.entry</field>
+            <field name="arch" type="xml">
+                <list string="Work Unit Training Requests">
+                    <field name="name" string="Reference"/>
+                    <field name="cycle_id"/>
+                    <field name="work_unit_id"/>
+                    <field name="course_request_display" string="Course / Proposed Topic"/>
+                    <field name="target_participant_count" string="Employees"/>
+                    <field name="quarter"/>
+                    <field name="urgency" widget="badge"/>
                     <field name="state" widget="badge"/>
                 </list>
             </field>
@@ -290,18 +335,19 @@
                         </div>
                         <group>
                             <group string="Submission Level &amp; Scope">
-                                <field name="request_level" widget="radio" options="{'horizontal': true}" readonly="state != 'draft'"
-                                       groups="employee_development_system.group_eds_line_manager"/>
-                                <field name="request_level" invisible="1" groups="!employee_development_system.group_eds_line_manager"/>
+                                <field name="can_request_work_unit" invisible="1"/>
+                                <field name="available_cycle_ids" invisible="1"/>
+                                <field name="request_level" widget="radio" options="{'horizontal': true}"
+                                       invisible="not can_request_work_unit and request_level != 'work_unit'"
+                                       readonly="state != 'draft'"/>
                                 <field name="name" readonly="1" invisible="name == 'New'"/>
-                                <field name="cycle_id" readonly="state != 'draft'" domain="[('state','=','collecting')]"/>
-                                <field name="source" readonly="state != 'draft'"/>
+                                <field name="cycle_id" readonly="state != 'draft'" domain="[('state','=','collecting'),('id','in',available_cycle_ids)]"/>
+                                <field name="source" invisible="source == 'manual'" readonly="1"/>
                             </group>
                             <group string="Scheduling &amp; Urgency">
                                 <field name="urgency" readonly="state != 'draft'"/>
                                 <field name="quarter" readonly="state != 'draft'"/>
                                 <field name="delivery_mode" readonly="state != 'draft'"/>
-                                <field name="target_audience" readonly="state != 'draft'"/>
                             </group>
                         </group>
                         <!-- Individual Level Employee Details -->
@@ -318,43 +364,63 @@
                         <!-- Work Unit Level Details -->
                         <group invisible="request_level != 'work_unit'" string="Work Unit Level Group Request">
                             <field name="allowed_work_unit_ids" invisible="1"/>
+                            <field name="allowed_department_ids" invisible="1"/>
+                            <field name="available_work_unit_ids" invisible="1"/>
+                            <field name="can_choose_department" invisible="1"/>
+                            <field name="can_choose_work_unit" invisible="1"/>
                             <field name="eligible_work_unit_employee_ids" invisible="1"/>
                             <group>
-                                <field name="work_unit_id" required="request_level == 'work_unit'" readonly="state != 'draft'"
-                                       domain="[('id','in',allowed_work_unit_ids)]" options="{'no_create': True}"/>
-                                <field name="department_id" readonly="state != 'draft'" options="{'no_create': True}"/>
-                                <field name="job_position_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <field name="department_id" readonly="state != 'draft' or not can_choose_department"
+                                       domain="[('id','in',allowed_department_ids)]" options="{'no_create': True}"/>
+                                <field name="work_unit_id" required="request_level == 'work_unit'"
+                                       readonly="state != 'draft' or not can_choose_work_unit"
+                                       domain="[('id','in',available_work_unit_ids)]" options="{'no_create': True}"/>
                             </group>
                             <group>
+                                <field name="work_unit_employee_ids" string="Select Employees"
+                                       widget="many2many_tags" required="request_level == 'work_unit'"
+                                       readonly="state != 'draft'"
+                                       domain="[('id','in',eligible_work_unit_employee_ids)]"
+                                       options="{'no_create': True}"
+                                       placeholder="Choose employees from this work unit..."/>
                                 <field name="target_participant_count" string="Number of Employees" readonly="1"/>
                                 <field name="template_participant_count" invisible="not template_participant_count" readonly="1"/>
-                                <field name="work_unit_employee_ids" widget="many2many_tags" required="request_level == 'work_unit'" readonly="state != 'draft'"
-                                       domain="[('id','in',eligible_work_unit_employee_ids)]" placeholder="Select employees matching the work unit and job..."/>
                             </group>
                         </group>
                         <group string="Course &amp; Training Program">
                             <group>
-                                <field name="is_custom_course" widget="boolean_toggle" readonly="state != 'draft'" invisible="request_level != 'work_unit'"/>
+                                <field name="restrict_request_courses" invisible="1"/>
+                                <field name="allowed_request_course_ids" invisible="1"/>
+                                <field name="is_custom_course" widget="boolean_toggle" readonly="state != 'draft'"
+                                       invisible="request_level != 'work_unit' or (source == 'manual' and restrict_request_courses)"/>
                                 <field name="course_id" invisible="request_level == 'individual' and source == 'manual' or is_custom_course" readonly="state != 'draft'"
-                                       domain="[('status', '=', 'active')]"
+                                       domain="[('status', '=', 'active'), ('id', 'in', allowed_request_course_ids)] if restrict_request_courses else [('status', '=', 'active')]"
                                        options="{'no_create': True}" placeholder="Select from Course Catalog / Pool..."/>
                                 <field name="requested_course_ids" widget="many2many_tags"
                                        invisible="request_level != 'individual' or source != 'manual'"
-                                       readonly="state != 'draft'" domain="[('status', '=', 'active')]"
+                                       readonly="state != 'draft'"
+                                       domain="[('status', '=', 'active'), ('id', 'in', allowed_request_course_ids)] if restrict_request_courses and source == 'manual' else [('status', '=', 'active')]"
                                        options="{'no_create': True}" placeholder="Select up to the configured number of courses..."/>
                                 <field name="custom_course_title" invisible="not is_custom_course" required="is_custom_course"
                                        placeholder="e.g. Advanced Branch AML Risk Controls" readonly="state != 'draft'"/>
                                 <field name="custom_course_description" invisible="not is_custom_course"
                                        placeholder="Describe what the course is about and expected learning objectives..." readonly="state != 'draft'"/>
-                                <field name="proposed_program" readonly="state != 'draft'" placeholder="Program title..."/>
+                                <field name="proposed_program" string="Imported Training Topic"
+                                       invisible="request_level != 'work_unit' or not proposed_program or course_id or is_custom_course"
+                                       readonly="state != 'draft'"/>
                             </group>
-                            <group>
-                                <field name="suggested_course_ids" widget="many2many_tags" readonly="state != 'draft'"/>
-                                <field name="course_match_status" widget="badge"/>
-                                <field name="recommended_course_id" readonly="1"/>
+                            <group invisible="source not in ('competency_gap', 'pms') and not (request_level == 'work_unit' and is_custom_course)">
+                                <field name="suggested_course_ids" widget="many2many_tags" readonly="state != 'draft'"
+                                       invisible="source not in ('competency_gap', 'pms')"/>
+                                <field name="cycle_course_status" widget="badge" readonly="1"
+                                       invisible="source not in ('competency_gap', 'pms')"/>
+                                <field name="course_match_status" widget="badge"
+                                       invisible="request_level != 'work_unit' or not is_custom_course"/>
+                                <field name="recommended_course_id" string="Possible Catalog Match" readonly="1"
+                                       invisible="request_level != 'work_unit' or not is_custom_course or not recommended_course_id"/>
                                 <button name="action_view_recommended_course" string="Open Mapped Catalog Course"
                                         type="object" class="btn-outline-primary" icon="fa-arrow-right"
-                                        invisible="not recommended_course_id"/>
+                                        invisible="request_level != 'work_unit' or not is_custom_course or not recommended_course_id"/>
                             </group>
                         </group>
                         <group string="Competency &amp; PMS Diagnostic Alignment" invisible="source not in ('competency_gap', 'pms')">
@@ -374,21 +440,11 @@
                                 <field name="pms_actual_value" invisible="source != 'pms'" readonly="1"/>
                             </group>
                         </group>
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Business Justification" name="page_justification">
                                 <group>
                                     <field name="justification" placeholder="Provide detailed justification for this training need (business gap, competency shortfall, operational impact)..." readonly="state != 'draft'"/>
                                 </group>
-                            </page>
-                            <page string="Work Unit Nominated Staff" name="page_work_unit_staff" invisible="request_level != 'work_unit'">
-                                <field name="work_unit_employee_ids" readonly="state != 'draft'">
-                                    <list>
-                                        <field name="name"/>
-                                        <field name="job_title"/>
-                                        <field name="department_id"/>
-                                        <field name="work_email"/>
-                                    </list>
-                                </field>
                             </page>
                             <page string="L&amp;D Consolidation &amp; Priority Analysis" groups="employee_development_system.group_eds_officer">
                                 <group>
@@ -452,9 +508,11 @@
                         </group>
                         <button name="action_open_employee_demand" string="Filter Employee Demand" type="object" class="oe_highlight" icon="fa-users"/>
                         <field name="employee_demand_ids" readonly="1">
-                            <list default_order="overall_priority_score desc,source_count desc,evidence_count desc" create="false" delete="false">
+                            <list default_order="overall_priority_score desc,source_count desc" create="false" delete="false">
                                 <field name="employee_id"/>
+                                <field name="excluded_from_planning" string="Invalidated" widget="boolean_toggle" readonly="1"/>
                                 <field name="overall_priority_score" string="Overall Weighted Priority"/>
+                                <field name="need_severity" string="Highest Need Severity" widget="badge"/>
                                 <field name="source_count" string="Source Types"/>
                                 <field name="source_summary"/>
                                 <field name="work_unit_id"/>
@@ -471,12 +529,14 @@
             <field name="name">eds.tna.cycle.course.employee.list</field>
             <field name="model">eds.tna.cycle.course.employee</field>
             <field name="arch" type="xml">
-                <list string="Course Employee Demand" default_order="overall_priority_score desc,source_count desc,evidence_count desc" create="false" delete="false">
+                <list string="Course Employee Demand" default_order="excluded_from_planning asc,overall_priority_score desc,source_count desc" create="false" delete="false"
+                      decoration-muted="excluded_from_planning">
                     <field name="employee_id"/>
                     <field name="course_line_id" optional="hide"/>
+                    <field name="excluded_from_planning" string="Invalidated" widget="boolean_toggle" readonly="1"/>
                     <field name="overall_priority_score" string="Overall Weighted Priority"/>
+                    <field name="need_severity" string="Highest Need Severity" widget="badge"/>
                     <field name="source_count" string="Source Types"/>
-                    <field name="evidence_count" string="Evidence"/>
                     <field name="source_summary"/>
                     <field name="work_unit_id"/>
                     <field name="department_id"/>
@@ -490,12 +550,22 @@
             <field name="model">eds.tna.cycle.course.employee</field>
             <field name="arch" type="xml">
                 <form string="Employee Course Demand" create="false" edit="false" delete="false">
+                    <header>
+                        <button name="action_open_invalidate_wizard" string="Invalidate Employee"
+                                type="object" class="btn-warning" invisible="excluded_from_planning"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                        <button name="action_restore" string="Restore Employee"
+                                type="object" class="btn-secondary" invisible="not excluded_from_planning"
+                                groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                    </header>
                     <sheet>
                         <group>
                             <group>
                                 <field name="employee_id"/>
                                 <field name="course_line_id"/>
+                                <field name="excluded_from_planning" string="Invalidated" readonly="1"/>
                                 <field name="overall_priority_score"/>
+                                <field name="need_severity" widget="badge"/>
                                 <field name="source_summary"/>
                                 <field name="source_count"/>
                             </group>
@@ -505,9 +575,19 @@
                                 <field name="job_position_id"/>
                             </group>
                         </group>
+                        <group string="Invalidation Record" invisible="not excluded_from_planning">
+                            <field name="exclusion_reason" readonly="1"/>
+                            <field name="excluded_by_id" readonly="1"/>
+                            <field name="excluded_on" readonly="1"/>
+                        </group>
+                        <group string="Last Restoration" invisible="not restored_on">
+                            <field name="restored_by_id" readonly="1"/>
+                            <field name="restored_on" readonly="1"/>
+                        </group>
                         <field name="evidence_ids">
                             <list create="false" delete="false">
                                 <field name="source_kind"/>
+                                <field name="need_severity" widget="badge"/>
                                 <field name="competency_id"/>
                                 <field name="competency_level"/>
                                 <field name="competency_gap_level_diff"/>
@@ -537,6 +617,8 @@
                     <field name="work_unit_id"/>
                     <field name="department_id"/>
                     <field name="job_position_id"/>
+                    <filter string="Eligible" name="eligible" domain="[('excluded_from_planning','=',False)]"/>
+                    <filter string="Invalidated" name="invalidated" domain="[('excluded_from_planning','=',True)]"/>
                     <filter string="Multiple Sources" name="multiple_sources" domain="[('source_count','&gt;',1)]"/>
                     <group name="group_by">
                         <filter string="Work Unit" name="group_by_work_unit" context="{'group_by':'work_unit_id'}"/>
@@ -545,6 +627,24 @@
                     </group>
                 </search>
             </field>
+        </record>
+
+        <record id="action_eds_tna_demand_invalidate_selected" model="ir.actions.server">
+            <field name="name">Invalidate Selected Employees</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_cycle_course_employee"/>
+            <field name="binding_model_id" ref="employee_development_system.model_eds_tna_cycle_course_employee"/>
+            <field name="binding_view_types">list</field>
+            <field name="state">code</field>
+            <field name="code">action = records.action_open_invalidate_wizard()</field>
+        </record>
+
+        <record id="action_eds_tna_demand_restore_selected" model="ir.actions.server">
+            <field name="name">Restore Selected Employees</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_cycle_course_employee"/>
+            <field name="binding_model_id" ref="employee_development_system.model_eds_tna_cycle_course_employee"/>
+            <field name="binding_view_types">list</field>
+            <field name="state">code</field>
+            <field name="code">action = records.action_restore()</field>
         </record>
 
         <record id="view_eds_tna_entry_search" model="ir.ui.view">
@@ -603,17 +703,20 @@
             </field>
         </record>
 
-        <!-- Action: My Training Needs (Employee Self-Service) -->
+        <!-- One self-service action for own individual and work-unit requests. -->
         <record id="action_eds_tna_entry_own" model="ir.actions.act_window">
             <field name="name">My Training Needs</field>
             <field name="res_model">eds.tna.entry</field>
             <field name="view_mode">list,form</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('employee_development_system.view_eds_tna_entry_own_list')}),
+                (0, 0, {'view_mode': 'form', 'view_id': ref('employee_development_system.view_eds_tna_entry_form')})]"/>
             <field name="search_view_id" ref="employee_development_system.view_eds_tna_entry_search"/>
-            <field name="domain">['|', ('submitted_by', '=', uid), ('employee_id.user_id', '=', uid)]</field>
+            <field name="domain">[('source', '=', 'manual'), '|', '&amp;', ('request_level', '=', 'individual'), ('employee_id.user_id', '=', uid), '&amp;', ('request_level', '=', 'work_unit'), ('submitted_by', '=', uid)]</field>
             <field name="context">{'default_submitted_by': uid, 'default_request_level': 'individual', 'default_source': 'manual', 'eds_self_service': True}</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
-                    Submit your training and development needs.
+                    Submit your own training need, or a work-unit request if you lead that unit.
                 </p>
             </field>
         </record>
@@ -622,9 +725,12 @@
             <field name="name">Work Unit Training Requests</field>
             <field name="res_model">eds.tna.entry</field>
             <field name="view_mode">list,form</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('employee_development_system.view_eds_tna_entry_work_unit_list')}),
+                (0, 0, {'view_mode': 'form', 'view_id': ref('employee_development_system.view_eds_tna_entry_form')})]"/>
             <field name="search_view_id" ref="employee_development_system.view_eds_tna_entry_search"/>
-            <field name="domain">[('request_level','=','work_unit')]</field>
-            <field name="context">{'default_request_level': 'work_unit', 'default_source': 'manual'}</field>
+            <field name="domain">[('request_level','=','work_unit'), ('source','=','manual')]</field>
+            <field name="context">{'default_request_level': 'work_unit', 'default_source': 'manual', 'eds_work_unit_request': True}</field>
         </record>
 
     </data>

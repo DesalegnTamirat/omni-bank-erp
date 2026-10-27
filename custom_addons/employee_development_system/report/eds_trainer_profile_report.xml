@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="action_report_eds_trainer_profile" model="ir.actions.report">
-        <field name="name">Trainer Profile &amp; Qualification (EDS-F-06)</field>
+        <field name="name">Trainer Profile &amp; Qualification</field>
         <field name="model">eds.trainer</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">employee_development_system.report_eds_trainer_profile_document</field>
@@ -23,11 +23,6 @@
                                         <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
                                         <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Trainer Qualification Register</p>
                                     </td>
-                                    <td style="text-align: right; vertical-align: top;">
-                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
-                                            EDS-F-06
-                                        </span>
-                                    </td>
                                 </tr>
                             </table>
                         </div>
@@ -44,20 +39,20 @@
                                 <tr>
                                     <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Full Name:</td>
                                     <td style="width: 25%;"><strong t-field="o.name"/></td>
-                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Trainer ID / Ref:</td>
-                                    <td style="width: 25%;"><span t-esc="o.trainer_id_code or 'Pending'"/></td>
+                                    <td style="width: 25%; background-color: #f5f5f5; font-weight: bold;">Job Position / Specialization:</td>
+                                    <td style="width: 25%;"><span t-esc="o.employee_job_position if o.trainer_type == 'internal' else (o.job_title or '')"/></td>
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Trainer Type:</td>
                                     <td><strong t-field="o.trainer_type"/></td>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Organization / Firm:</td>
-                                    <td><span t-field="o.organization_name"/></td>
+                                    <td><span t-esc="o.organization_name or o.external_provider_id.name or ''"/></td>
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Phone:</td>
-                                    <td><span t-field="o.phone"/></td>
+                                    <td><span t-esc="o.employee_phone if o.trainer_type == 'internal' else (o.phone or '')"/></td>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Email:</td>
-                                    <td><span t-field="o.email"/></td>
+                                    <td><span t-esc="o.employee_email if o.trainer_type == 'internal' else (o.email or '')"/></td>
                                 </tr>
                                 <tr>
                                     <td style="background-color: #f5f5f5; font-weight: bold;">Total Banking Experience:</td>
@@ -130,6 +125,25 @@
 
                         <!-- Section 4 -->
                         <h6 style="color: #003366; font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #003366;">4. Delivery History &amp; References</h6>
+                        <t t-if="o.session_ids">
+                            <p style="font-size: 9pt; font-weight: bold; margin: 4px 0;">EDS Session Assignments</p>
+                            <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
+                                <thead style="background-color: #f2f2f2;">
+                                    <tr><th>Session</th><th>Course</th><th>Date</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="o.session_ids" t-as="session">
+                                        <tr>
+                                            <td><span t-field="session.name"/></td>
+                                            <td><span t-esc="session.course_id.name or session.program_name or ''"/></td>
+                                            <td><span t-field="session.date_start"/></td>
+                                            <td><span t-field="session.status"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </t>
+                        <p style="font-size: 9pt; font-weight: bold; margin: 4px 0;">Previous Training Outside EDS</p>
                         <table class="table table-sm table-bordered" style="margin-bottom: 10px; font-size: 8.5pt;">
                             <thead style="background-color: #f2f2f2;">
                                 <tr>
@@ -137,7 +151,7 @@
                                     <th>Client / Bank Organization</th>
                                     <th style="text-align: center;">Year</th>
                                     <th style="text-align: center;">Participants</th>
-                                    <th style="text-align: center;">Avg Rating (/5)</th>
+                                    <th style="text-align: center;">Avg Rating</th>
                                 </tr>
                             </thead>
                             <tbody>

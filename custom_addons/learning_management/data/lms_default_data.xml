@@ -2,6 +2,13 @@
 <odoo>
     <data noupdate="1">
 
+        <!-- Required HR classification for automatic LMS certificate delivery. -->
+        <record id="lms_hr_training_document_type" model="hr.document.type">
+            <field name="name">LMS Training Certificate</field>
+            <field name="code">LMS</field>
+            <field name="description">Certificate issued automatically after LMS course completion.</field>
+        </record>
+
         <!-- ========================================================= -->
         <!-- LMS COURSE CATEGORIES                                     -->
         <!-- ========================================================= -->
@@ -104,6 +111,25 @@
             <field name="code">model.cron_retry_delivery()</field>
             <field name="interval_number">1</field>
             <field name="interval_type">hours</field>
+            <field name="active">True</field>
+        </record>
+        <record id="ir_cron_lms_submit_expired_exams" model="ir.cron">
+            <field name="name">LMS: Submit Expired Timed Exams</field>
+            <field name="model_id" ref="learning_management.model_lms_exam_session"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_submit_expired_exams()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+        </record>
+
+        <record id="ir_cron_lms_reconcile_assignments" model="ir.cron">
+            <field name="name">LMS: Reconcile Assignment Campaigns</field>
+            <field name="model_id" ref="learning_management.model_lms_course_assignment"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_reconcile_assignments()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
             <field name="active">True</field>
         </record>
 

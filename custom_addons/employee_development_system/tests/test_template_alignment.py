@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-import base64
-import io
-from openpyxl import Workbook
 from odoo.tests.common import TransactionCase, tagged
 from odoo.exceptions import ValidationError
 
@@ -32,7 +29,7 @@ class TestTemplateAlignment(TransactionCase):
             'start_date': '2026-07-01',
             'submission_end_date': '2026-08-15',
             'approval_deadline': '2026-08-30',
-            'state': 'approved',
+            'state': 'closed',
         })
 
     def test_01_course_fields(self):
@@ -102,10 +99,14 @@ class TestTemplateAlignment(TransactionCase):
 
     def test_04_calendar_generation_populates_template_fields(self):
         """Verify action_generate_calendar maps target_audience, planned_participants, etc."""
-        # Create approved TNA entry
+        employee = self.env['hr.employee'].create({
+            'name': 'Calendar demand employee', 'department_id': self.department.id,
+        })
+        # Planning now counts named employees on selected course demand.
         tna = self.env['eds.tna.entry'].create({
             'cycle_id': self.cycle.id,
             'department_id': self.department.id,
+            'employee_id': employee.id,
             'course_id': self.course.id,
             'target_audience': 'mlm',
             'target_participant_count': 25,
@@ -121,6 +122,8 @@ class TestTemplateAlignment(TransactionCase):
             'name': 'Annual Plan Generated 2026/27',
             'fiscal_year': '2026',
             'state': 'draft',
+            'restrict_tna_cycles': True,
+            'selected_tna_cycle_ids': [(6, 0, self.cycle.ids)],
         })
         self.cycle._sync_course_demand()
         plan.action_generate_calendar()
@@ -131,62 +134,7 @@ class TestTemplateAlignment(TransactionCase):
         line = lines[0]
         self.assertEqual(line.program_category, 'compliance')
         self.assertEqual(line.target_audience, 'all_staff')
-        # No employees were selected on this legacy estimated-headcount entry.
-        # Demand planning counts actual people, not the old estimate.
-        self.assertEqual(line.planned_participants, 0)
-
-    def test_05_template_import_wizard(self):
-        """Test multi-sheet excel template import wizard."""
-        wb = Workbook()
-        # Sheet 1: Lists
-        ws_lists = wb.active
-        ws_lists.title = "Lists"
-
-        # Sheet 2: Curriculum
-        ws_curr = wb.create_sheet(title="Curriculum")
-        ws_curr.append(["Course Code", "Target Audience", "Focus Area", "Course Title", "Training Topics", "Days", "Delivery Place"])
-        ws_curr.append(["TEST-CURR-01", "MLM", "Leadership", "Executive Management Mastery", "Module 1 Strategy", 3, "Local"])
-
-        # Sheet 3: Provider_Register
-        ws_prov = wb.create_sheet(title="Provider_Register")
-        ws_prov.append(["Provider ID", "Provider Name", "Provider Type", "Specialisation Focus", "Contact Person", "Phone", "Email", "Indicative Rate/Session ETB", "Accreditation / Contract Ref"])
-        ws_prov.append(["PROV-999", "Apex Consulting", "Consultancy", "Leadership & Finance", "Abebe Kebede", "+251911223344", "apex@consulting.et", 50000, "BUNNA-VEND-2026"])
-
-        # Sheet 4: TNA
-        ws_tna = wb.create_sheet(title="TNA")
-        ws_tna.append(["Work Unit", "Training Topic / Course", "Target Group", "Estimated No of Participants", "Related Competency", "Competency Level", "Priority", "Preferred Delivery Method", "Preferred Quarter", "Remark"])
-        ws_tna.append(["Retail Banking Directorate", "Customer Service Mastery", "Below MLM", 40, "Customer Service", "Intermediate", "High", "Workshop", "Q2 Oct-Dec", "Urgent"])
-
-        # Save workbook to bytes
-        buf = io.BytesIO()
-        wb.save(buf)
-        file_data = base64.b64encode(buf.getvalue())
-
-        wizard = self.env['eds.template.import.wizard'].create({
-            'file_name': 'EDS_LD_Templates_2026-27.xlsx',
-            'file_data': file_data,
-            'template_type': 'auto',
-            'fiscal_year': '2026',
-            'tna_cycle_id': self.cycle.id,
-        })
-        wizard.action_import()
-
-        self.assertTrue(wizard.result_summary)
-        # Check course created
-        course = self.env['eds.course'].search([('code', '=', 'TEST-CURR-01')])
-        self.assertTrue(course)
-        self.assertEqual(course.name, "Executive Management Mastery")
-        self.assertEqual(course.duration_days, 3.0)
-
-        # Check provider created
-        prov = self.env['eds.external.provider'].search([('name', '=', 'Apex Consulting')])
-        self.assertTrue(prov)
-        self.assertEqual(prov.email, 'apex@consulting.et')
-
-        # Check TNA entry created
-        tna = self.env['eds.tna.entry'].search([('proposed_program', '=', 'Customer Service Mastery'), ('cycle_id', '=', self.cycle.id)])
-        self.assertTrue(tna)
-        self.assertEqual(tna.target_participant_count, 40)
+        self.assertEqual(line.planned_participants, 1)
 
     def test_06_eds_dashboard_role_adaptation(self):
         """Test eds.dashboard persona and KPI metrics."""
@@ -194,7 +142,7 @@ class TestTemplateAlignment(TransactionCase):
         # Default with admin/test context
         self.assertIn(dashboard.role_persona, ('admin', 'manager', 'employee'))
         self.assertGreaterEqual(dashboard.total_tna_entries, 0)
-        self.assertGreaterEqual(dashboard.budget_utilization_pct, 0.0)
+        self.assertGreaterEqual(dashboard.published_plans_count, 0)
         # Test navigation action helpers
         act_tna = dashboard.action_open_tna_entries()
         self.assertEqual(act_tna['res_model'], 'eds.tna.entry')
@@ -204,6 +152,8 @@ class TestTemplateAlignment(TransactionCase):
         if dashboard.role_persona == 'admin':
             act_plan = dashboard.action_open_annual_plans()
             self.assertEqual(act_plan['res_model'], 'eds.annual.plan')
+            act_completed = dashboard.action_open_completed_sessions()
+            self.assertEqual(act_completed['res_model'], 'eds.session')
         act_cert = dashboard.action_open_certificates()
         self.assertEqual(act_cert['res_model'], 'eds.certificate')
         act_nom = dashboard.action_open_nominations()

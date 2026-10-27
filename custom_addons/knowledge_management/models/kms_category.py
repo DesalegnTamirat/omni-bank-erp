@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class KmsCategory(models.Model):
@@ -111,6 +111,27 @@ class KmsClassification(models.Model):
         'UNIQUE(security_level)',
         'Security level rank must be unique!'
     )
+
+    def write(self, vals):
+        if 'code' in vals:
+            changed = self.filtered(lambda classification: classification.code != vals['code'])
+            if changed and self.env['kms.document'].sudo().with_context(active_test=False).search_count([
+                ('classification_id', 'in', changed.ids),
+                ('state', '!=', 'draft'),
+            ]):
+                raise UserError(_(
+                    'A classification used by submitted or published documents cannot change code. '
+                    'Create a new classification tier for a different access scope.'
+                ))
+        return super().write(vals)
+
+    def unlink(self):
+        if self and self.env['kms.document'].sudo().with_context(active_test=False).search_count([
+            ('classification_id', 'in', self.ids),
+            ('state', '!=', 'draft'),
+        ]):
+            raise UserError(_('A classification used by submitted or published documents cannot be deleted.'))
+        return super().unlink()
 
 
 class KmsTag(models.Model):

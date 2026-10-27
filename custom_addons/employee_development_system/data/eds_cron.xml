@@ -4,13 +4,33 @@
 
         <!-- daily TNA approval-deadline reminder / escalation -->
         <record id="cron_eds_tna_deadline_reminder" model="ir.cron">
-            <field name="name">EDS: TNA Approval Deadline Reminder</field>
+            <field name="name">EDS: TNA Collection Deadline Reminder</field>
             <field name="model_id" ref="employee_development_system.model_eds_tna_cycle"/>
             <field name="state">code</field>
             <field name="code">model._cron_tna_deadline_reminder()</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
             <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=0, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="cron_eds_tna_cycle_announcement" model="ir.cron">
+            <field name="name">EDS: Announce Open TNA Cycles</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_cycle"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_send_cycle_announcements()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="cron_eds_level3_review_notification" model="ir.cron">
+            <field name="name">EDS: Notify Due Level 3 Reviews</field>
+            <field name="model_id" ref="employee_development_system.model_eds_evaluation_level3"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_notify_due_level3()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
             <field name="active" eval="True"/>
         </record>
 
@@ -43,11 +63,11 @@
             <field name="name">EDS: LMS Course &amp; Completion Sync</field>
             <field name="model_id" ref="employee_development_system.model_eds_lms_routing"/>
             <field name="state">code</field>
-            <field name="code">model.search([('sync_state', '=', 'pending')]).action_sync_to_lms()</field>
+            <field name="code">model.cron_sync_lms()</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
             <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=3, minute=0, second=0)"/>
-            <field name="active" eval="False"/>
+            <field name="active" eval="True"/>
         </record>
 
     </data>

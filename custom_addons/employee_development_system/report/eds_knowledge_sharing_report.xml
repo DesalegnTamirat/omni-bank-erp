@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="action_report_eds_knowledge_sharing" model="ir.actions.report">
-        <field name="name">Post-Training Knowledge Sharing &amp; Debrief Form (EDS-F-12)</field>
+        <field name="name">Post-Training Knowledge Sharing &amp; Debrief Form</field>
         <field name="model">eds.knowledge.sharing</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">employee_development_system.report_eds_knowledge_sharing_document</field>
@@ -22,11 +22,6 @@
                                     <td>
                                         <h3 style="margin: 0; color: #003366; font-weight: bold;">BUNNA BANK S.C.</h3>
                                         <p style="margin: 2px 0 0; font-size: 8.5pt; color: #666;">People &amp; Professional Development Directorate | Training Management Module</p>
-                                    </td>
-                                    <td style="text-align: right; vertical-align: top;">
-                                        <span style="display: inline-block; background-color: #003366; color: white; padding: 4px 10px; font-weight: bold; border-radius: 3px; font-size: 9.5pt;">
-                                            EDS-F-12
-                                        </span>
                                     </td>
                                 </tr>
                             </table>

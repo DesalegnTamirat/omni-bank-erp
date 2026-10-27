@@ -15,8 +15,20 @@ class HrEmployee(models.Model):
     """
     _inherit = 'hr.employee'
 
+    @api.model
+    def _delegation_table_available(self):
+        """Registry readiness can precede creation of this module's SQL table."""
+        if not self.env.registry.ready:
+            return False
+        self.env.cr.execute('SELECT to_regclass(%s)', ('hr_employee_delegation',))
+        return bool(self.env.cr.fetchone()[0])
+
     def _get_delegated_subordinate_ids(self):
         if not self:
+            return []
+        # HR record rules can call this helper while the module's tables are
+        # still being created during a fresh installation.
+        if not self._delegation_table_available():
             return []
         today = fields.Date.today()
         active_delegations = self.env['hr.employee.delegation'].sudo().search([
@@ -37,7 +49,6 @@ class HrEmployee(models.Model):
 
     def _get_delegation_visible_employee_ids(self):
         emp = self.env.user.employee_id
-        Delegation = self.env['hr.employee.delegation'].sudo()
         visible_ids = set()
 
         if emp:
@@ -68,7 +79,15 @@ class HrEmployee(models.Model):
                 visited.update(new_subs.ids)
                 current_level = new_subs
 
+            # During registry initialization the delegation table may not
+            # exist yet. Keep the ordinary employee hierarchy visible until
+            # installation completes and the delegation model is ready.
+            if not self._delegation_table_available():
+                visible_ids.discard(False)
+                return list(visible_ids)
+
             # Active delegations where this employee is acting as delegate
+            Delegation = self.env['hr.employee.delegation'].sudo()
             today = fields.Date.today()
             active_as_delegate = Delegation.search([
                 ('delegate_id', '=', emp.id),
@@ -124,14 +143,14 @@ class HrEmployeeDelegation(models.Model):
     manager_job_id = fields.Many2one(
         'hr.job',
         string="Job Position",
-        related="employee_id.job_position",
+        compute="_compute_manager_details",
         compute_sudo=True,
         readonly=True
     )
     manager_department_id = fields.Many2one(
         'hr.department',
         string="Department",
-        related="employee_id.department_id",
+        compute="_compute_manager_details",
         compute_sudo=True,
         readonly=True
     )
@@ -186,14 +205,13 @@ class HrEmployeeDelegation(models.Model):
     delegate_coach_name = fields.Char(
         string="Delegate's Direct Coach",
         compute="_compute_delegate_coach_name",
-        store=True,
         compute_sudo=True,
         help="The direct manager/coach of the selected delegate."
     )
     delegate_job_id = fields.Many2one(
         'hr.job',
         string="Delegate Job Position",
-        related="delegate_id.job_position",
+        compute="_compute_delegate_job_id",
         compute_sudo=True,
         readonly=True
     )
@@ -228,32 +246,27 @@ class HrEmployeeDelegation(models.Model):
     employee_display_name = fields.Char(
         string="Manager / Delegator",
         compute="_compute_display_names",
-        compute_sudo=True,
-        store=True
+        compute_sudo=True
     )
     delegate_display_name = fields.Char(
         string="Delegated Staff / Delegate",
         compute="_compute_display_names",
-        compute_sudo=True,
-        store=True
+        compute_sudo=True
     )
     manager_job_name = fields.Char(
         string="Job Position",
         compute="_compute_display_names",
-        compute_sudo=True,
-        store=True
+        compute_sudo=True
     )
     manager_department_name = fields.Char(
         string="Department",
         compute="_compute_display_names",
-        compute_sudo=True,
-        store=True
+        compute_sudo=True
     )
     delegate_job_name = fields.Char(
         string="Delegate Job Position",
         compute="_compute_display_names",
-        compute_sudo=True,
-        store=True
+        compute_sudo=True
     )
     notification_recipients_display = fields.Html(
         string="Notification Recipients",
@@ -623,6 +636,13 @@ class HrEmployeeDelegation(models.Model):
             rec.manager_department_name = emp.department_id.name if (emp and emp.department_id) else ''
             rec.delegate_job_name = delegate.job_position.name if (delegate and delegate.job_position) else (delegate.job_name if delegate else '')
 
+    @api.depends('employee_id')
+    def _compute_manager_details(self):
+        for rec in self:
+            manager = rec.employee_id.sudo() if rec.employee_id else False
+            rec.manager_job_id = manager.job_position if manager else False
+            rec.manager_department_id = manager.department_id if manager else False
+
     @api.depends('stakeholder_ids', 'stakeholder_ids.name', 'stakeholder_ids.work_email', 'stakeholder_ids.department_name', 'stakeholder_ids.job_name', 'stakeholder_ids.category')
     def _compute_notification_recipients_display(self):
         for rec in self:
@@ -665,7 +685,12 @@ class HrEmployeeDelegation(models.Model):
             ])
             rec.direct_coach_ids = direct_coaches
 
-    @api.depends('delegate_id', 'delegate_id.coach_id', 'delegate_id.parent_id')
+    @api.depends('delegate_id')
+    def _compute_delegate_job_id(self):
+        for rec in self:
+            rec.delegate_job_id = rec.delegate_id.sudo().job_position if rec.delegate_id else False
+
+    @api.depends('delegate_id')
     def _compute_delegate_coach_name(self):
         for rec in self:
             if rec.delegate_id:

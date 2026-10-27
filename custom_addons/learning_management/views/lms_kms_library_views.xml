@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_kms_digital_library_form_lms" model="ir.ui.view">
+        <field name="name">kms.digital.library.form.lms.courses</field>
+        <field name="model">kms.digital.library</field>
+        <field name="inherit_id" ref="knowledge_management.view_kms_digital_library_form"/>
+        <field name="arch" type="xml">
+            <field name="course_reference_note" position="after">
+                <field name="related_course_ids" widget="many2many_tags"
+                       groups="knowledge_management.group_kms_contributor,learning_management.group_lms_manager"/>
+            </field>
+        </field>
+    </record>
+    <record id="view_lms_course_form_library" model="ir.ui.view">
+        <field name="name">lms.course.form.library.items</field>
+        <field name="model">lms.course</field>
+        <field name="inherit_id" ref="learning_management.view_lms_course_form"/>
+        <field name="arch" type="xml">
+            <field name="competency_ids" position="after">
+                <field name="library_item_ids" widget="many2many_tags"/>
+            </field>
+        </field>
+    </record>
+</odoo>

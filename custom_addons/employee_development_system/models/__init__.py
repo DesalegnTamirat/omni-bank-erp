@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
+from . import eds_action_notification
 from . import eds_compat
 from . import eds_config
+from . import eds_settings
 from . import eds_tna
 from . import eds_consolidation
 from . import eds_course
@@ -11,6 +13,7 @@ from . import eds_procurement
 from . import eds_hotel_sourcing
 from . import eds_annual_plan
 from . import eds_session
+from . import eds_assessment_question
 from . import eds_delivery
 from . import eds_nomination
 from . import eds_unscheduled
@@ -28,3 +31,4 @@ from . import eds_idp
 from . import eds_assessment_center
 from . import eds_partnership
 from . import eds_dashboard
+from . import eds_meeting_minutes

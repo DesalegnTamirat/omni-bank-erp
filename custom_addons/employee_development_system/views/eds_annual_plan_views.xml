@@ -4,6 +4,16 @@
 
         <!-- ══════════════ Annual L&amp;D Plan Line Form & List ══════════════ -->
 
+        <record id="view_eds_annual_plan_line_list" model="ir.ui.view">
+            <field name="name">eds.annual.plan.line.list</field>
+            <field name="model">eds.annual.plan.line</field>
+            <field name="arch" type="xml">
+                <list string="Approved Plan Programs">
+                    <field name="course_id" string="Training Program"/>
+                </list>
+            </field>
+        </record>
+
         <record id="view_eds_annual_plan_line_form" model="ir.ui.view">
             <field name="name">eds.annual.plan.line.form</field>
             <field name="model">eds.annual.plan.line</field>
@@ -12,12 +22,16 @@
                     <sheet>
                         <group>
                             <group string="Course &amp; Delivery Details">
-                                <field name="course_id" options="{'no_create': True}"/>
-                                <field name="program_name" required="1"/>
-                                <field name="program_category"/>
-                                <field name="delivery_method"/>
-                                <field name="budget_currency_id" options="{'no_create': True}"/>
-                                <field name="course_demand_id" readonly="1" invisible="not course_demand_id"/>
+                                <field name="available_tna_course_ids" invisible="1"/>
+                                <field name="course_identity_locked" invisible="1"/>
+                                <field name="course_demand_id" invisible="1"/>
+                                <field name="course_demand_ids" invisible="1"/>
+                                <field name="course_id" domain="[('id', 'in', available_tna_course_ids)]"
+                                       readonly="course_identity_locked" force_save="1" options="{'no_create': True}"/>
+                                <field name="program_category" readonly="course_identity_locked" force_save="1"/>
+                                <field name="delivery_method" string="Planned Delivery"/>
+                                <field name="budget_currency_id" readonly="delivery_method != 'international'" context="{'active_test': False}" options="{'no_create': True}"/>
+                                <field name="source_cycle_names" readonly="1" invisible="not source_cycle_names"/>
                                 <field name="target_audience"/>
                                 <field name="status" widget="badge"/>
                             </group>
@@ -31,30 +45,34 @@
                             </group>
                         </group>
 
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Itemized Budget Breakdown" name="budget_breakdown">
                                 <div class="alert alert-info py-2 mb-2" role="alert">
                                     <div>
                                         <span>
                                             <i class="fa fa-calculator me-1" title="Budget calculation"/> <strong>Dynamic Budget Allocation:</strong>
                                             Enter expense rates below (Hotel, Per Diem, Vendor, Transportation, etc.).
-                                            Check <strong>Per Employee</strong> to automatically multiply by planned participants (<field name="planned_participants" readonly="1" class="fw-bold"/> staff), or <strong>General</strong> for fixed expenses.
+                                            Turn on <strong>Per Employee</strong> to multiply by planned participants (<field name="planned_participants" readonly="1" class="fw-bold"/> staff). Leave it off for a fixed expense.
                                         </span>
                                     </div>
                                 </div>
-                                <field name="budget_line_ids">
+                                <field name="budget_line_ids" context="{'budget_planned_participants': planned_participants}">
                                     <list editable="bottom">
                                         <field name="name" string="Expense Item / Name" placeholder="e.g. Hotel, Per Diem, Vendor, Transport"/>
                                         <field name="is_per_employee" string="Per Employee" widget="boolean_toggle"/>
-                                        <field name="is_general" string="General (Fixed)" widget="boolean_toggle"/>
                                         <field name="currency_id" column_invisible="True"/>
                                         <field name="unit_price" string="Rate / Price"/>
-                                        <field name="total_amount" string="Total" sum="Total Program Budget" class="fw-bold text-primary"/>
+                                        <field name="total_amount" string="Total" class="fw-bold text-primary"/>
                                         <field name="notes" placeholder="Notes / specifications" optional="show"/>
                                     </list>
                                 </field>
+                                <details class="text-end mt-2" invisible="delivery_method != 'international'">
+                                    <summary class="text-muted">More</summary>
+                                    <button name="%(action_eds_currency_quick_create)d" type="action"
+                                            string="Add Currency" icon="fa-plus" class="btn-link"/>
+                                </details>
                                 <group class="oe_subtotal_footer oe_right">
-                                    <field name="budget_allocated" string="Total Budget Allocated" class="oe_subtotal_footer_separator fw-bold fs-5 text-primary"/>
+                                    <field name="budget_allocated_display" string="Total Budget Allocated" readonly="1" class="oe_subtotal_footer_separator fw-bold fs-5 text-primary"/>
                                 </group>
                             </page>
                             <page string="Execution &amp; Delivery Tracking" name="execution_tracking">
@@ -64,6 +82,10 @@
                                         <field name="planned_vs_actual" widget="progressbar"/>
                                     </group>
                                     <group string="Actuals &amp; Variance">
+                                        <field name="delivery_method" string="Planned Delivery" readonly="1"/>
+                                        <field name="actual_delivery_method" readonly="1"/>
+                                        <field name="delivery_change_reason" readonly="1"
+                                               invisible="not delivery_change_reason"/>
                                         <field name="actual_participants"/>
                                         <field name="participant_variance"/>
                                         <field name="actual_cost"/>
@@ -91,7 +113,6 @@
                     <field name="line_count" string="Programs"/>
                     <field name="delivered_count" string="Delivered"/>
                     <field name="execution_rate" widget="progressbar"/>
-                    <field name="budget_total" sum="Budget"/>
                     <field name="calendar_generation_date"/>
                     <field name="sla_breached" decoration-danger="sla_breached"/>
                     <field name="state" widget="badge"/>
@@ -130,7 +151,7 @@
                         <button name="action_generate_calendar" string="Generate Calendar"
                                 type="object" class="btn-secondary" invisible="state != 'draft'"
                                 groups="employee_development_system.group_eds_officer,employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"
-                                confirm="Generate the draft calendar from the approved TNA and curricula?"/>
+                                confirm="Add the selected courses from the closed TNA cycles chosen on this plan?"/>
 
                         <!-- Multi-Role Workflow Actions (Requirement 12) -->
                         <button name="action_submit_to_team_leader" string="Submit to Team Leader"
@@ -139,27 +160,27 @@
 
                         <button name="action_team_leader_forward" string="Verify &amp; Forward to Director"
                                 type="object" class="oe_highlight" invisible="state != 'team_leader_review'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_team_leader"/>
 
                         <button name="action_team_leader_return_wizard" string="Return to Creator"
                                 type="object" class="btn-warning" invisible="state != 'team_leader_review'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_team_leader"/>
 
                         <button name="action_director_forward" string="Endorse &amp; Forward to Chief"
                                 type="object" class="oe_highlight" invisible="state != 'director_review'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_director"/>
 
                         <button name="action_director_return_wizard" string="Return Plan"
                                 type="object" class="btn-warning" invisible="state != 'director_review'"
-                                groups="employee_development_system.group_eds_manager,employee_development_system.group_eds_admin"/>
+                                groups="employee_development_system.group_eds_director"/>
 
                         <button name="action_chief_approve" string="Chief Approve &amp; Publish"
                                 type="object" class="btn-success" invisible="state != 'chief_approval'"
-                                groups="employee_development_system.group_eds_admin,employee_development_system.group_eds_manager"/>
+                                groups="employee_development_system.group_eds_chief"/>
 
                         <button name="action_chief_return_wizard" string="Return to Director"
                                 type="object" class="btn-warning" invisible="state != 'chief_approval'"
-                                groups="employee_development_system.group_eds_admin,employee_development_system.group_eds_manager"/>
+                                groups="employee_development_system.group_eds_chief"/>
 
                         <button name="action_amend" string="Amend Plan" type="object"
                                 invisible="state != 'published'"
@@ -189,35 +210,31 @@
                                     <span class="o_stat_text">Sessions of this plan</span>
                                 </div>
                             </button>
-                            <div class="o_stat_info">
-                                <field name="execution_rate" widget="statinfo" string="Execution"/>
-                                <span class="o_stat_text">Delivered <field name="delivered_count"/> of <field name="line_count"/></span>
-                            </div>
-                            <div class="o_stat_info">
-                                <field name="budget_total" widget="statinfo" string="Budget"/>
-                                <span class="o_stat_text">Allocated across lines</span>
-                            </div>
-                            <div class="o_stat_info">
-                                <field name="amendment_count" widget="statinfo" string="Amendments"/>
-                                <span class="o_stat_text">Unscheduled addenda</span>
-                            </div>
                         </div>
                         <group>
                             <group string="Plan Information">
                                 <field name="name" readonly="1" invisible="name == 'New'"/>
-                                <field name="fiscal_year" readonly="state != 'draft'"/>
+                                <field name="fiscal_year" readonly="1"/>
                                 <field name="calendar_generation_date" readonly="1"/>
                                 <field name="calendar_sla_deadline" readonly="1"/>
                                 <field name="sla_breached"/>
                             </group>
-                            <group string="Workflow Governance &amp; Approvals">
+                            <group string="Review History (Recorded Automatically)">
                                 <field name="creator_id" readonly="1"/>
-                                <field name="team_leader_id" readonly="state not in ('draft', 'team_leader_review')"/>
-                                <field name="reviewer_id" string="Director PPDD" readonly="state not in ('draft', 'team_leader_review', 'director_review')"/>
-                                <field name="approver_id" string="Chief / Approver" readonly="state not in ('draft', 'team_leader_review', 'director_review', 'chief_approval')"/>
+                                <field name="team_leader_id" readonly="1"/>
+                                <field name="reviewer_id" string="Director PPDD" readonly="1"/>
+                                <field name="approver_id" string="Chief / Approver" readonly="1"/>
                                 <field name="approved_by_id" readonly="1"/>
                                 <field name="approval_date" readonly="1"/>
                             </group>
+                        </group>
+
+                        <group string="TNA Cycles for Calendar">
+                            <field name="restrict_tna_cycles" widget="boolean_toggle" readonly="state != 'draft'"/>
+                            <field name="selected_tna_cycle_ids" widget="many2many_tags"
+                                   invisible="not restrict_tna_cycles" readonly="state != 'draft'"
+                                   domain="[('year', '=', fiscal_year), ('state', '=', 'closed'), ('company_id', '=', company_id)]"
+                                   options="{'no_create': True}"/>
                         </group>
 
                         <group string="CEO Endorsement &amp; Review Remarks" invisible="state == 'draft'">
@@ -226,35 +243,41 @@
                                 <field name="ceo_memo_filename" invisible="1"/>
                             </group>
                             <group>
-                                <field name="review_remarks" placeholder="Add reviewer remarks or forwarding comments here..."/>
+                                <field name="review_remarks" placeholder="Optional remarks for the next reviewer; return remarks are required in the Return Plan dialog."/>
                             </group>
                         </group>
 
-                        <notebook>
+                        <notebook class="o_eds_notebook">
                             <page string="Plan Lines &amp; Budgets" name="lines">
                                 <field name="line_ids" readonly="state in ('chief_approval','published')">
                                     <list>
                                         <field name="course_id" optional="show"/>
-                                        <field name="program_name"/>
                                         <field name="program_category" optional="show"/>
                                         <field name="planned_participants" string="Planned Pax"/>
                                         <field name="duration_days" string="Days"/>
                                         <field name="quarter" optional="show"/>
                                         <field name="scheduled_date" widget="date" string="Scheduled Month"/>
                                         <field name="delivery_method"/>
-                                        <field name="budget_currency_id"/>
-                                        <field name="budget_allocated" class="fw-bold text-primary"/>
+                                        <field name="budget_currency_id" column_invisible="True"/>
+                                        <field name="budget_allocated_display" string="Budget Allocated" readonly="1" class="fw-bold text-primary"/>
                                         <field name="session_count" string="Sessions"/>
                                         <field name="status" widget="badge"/>
                                         <field name="is_addendum" optional="hide"/>
                                     </list>
                                 </field>
+                                <div class="o_eds_budget_summary">
+                                    <h4>Plan Budget by Currency</h4>
+                                    <field name="budget_by_currency_html" readonly="1" nolabel="1" widget="html"/>
+                                </div>
                             </page>
                             <page string="Plan vs Actual Tracker" name="plan_vs_actual_tracker">
                                 <field name="line_ids" readonly="1">
                                     <list>
-                                        <field name="program_name"/>
+                                        <field name="course_id"/>
                                         <field name="quarter"/>
+                                        <field name="delivery_method" string="Planned Delivery"/>
+                                        <field name="actual_delivery_method"/>
+                                        <field name="delivery_change_reason" optional="hide"/>
                                         <field name="planned_participants"/>
                                         <field name="actual_participants"/>
                                         <field name="participant_variance"/>
@@ -274,7 +297,7 @@
                                 <field name="amendment_ids" readonly="1">
                                     <list>
                                         <field name="name"/>
-                                        <field name="program_name"/>
+                                        <field name="course_id"/>
                                         <field name="reason"/>
                                         <field name="justification"/>
                                         <field name="estimated_cost"/>

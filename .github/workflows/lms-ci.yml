@@ -1,0 +1,57 @@
+name: LMS checks
+
+on:
+  pull_request:
+    paths:
+      - 'custom_addons/learning_management/**'
+      - 'custom_addons/employee_development_system/**'
+      - 'custom_addons/competency_management/**'
+      - 'custom_addons/knowledge_management/**'
+      - 'custom_addons/auditlog/**'
+      - 'custom_addons/audit_trail/**'
+      - 'custom_addons/hr_employee_custom/**'
+      - 'custom_addons/performance_management/**'
+      - 'custom_addons/recognition_engine/**'
+      - 'deploy/**'
+      - 'scripts/check_lms_source.py'
+      - '.github/workflows/lms-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python scripts/check_lms_source.py
+      - run: node --test custom_addons/learning_management/tests/lms_player.test.cjs
+      - run: docker compose -f deploy/test/compose.yml config --quiet
+
+  odoo:
+    needs: source
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build LMS test image
+        run: docker compose -f deploy/test/compose.yml build
+      - name: Install and test LMS with Odoo 19
+        run: docker compose -f deploy/test/compose.yml run --rm -T odoo
+      - name: Test EDS routing after LMS installation
+        run: >-
+          docker compose -f deploy/test/compose.yml run --rm -T odoo
+          odoo -d lms_ci -u employee_development_system --test-enable
+          --test-tags /employee_development_system:TestEdsLmsRoutingFeedback
+          --stop-after-init --log-level=test
+      - name: Collect database logs
+        if: failure()
+        run: docker compose -f deploy/test/compose.yml logs --no-color db
+      - name: Clean up isolated CI stack
+        if: always()
+        run: docker compose -f deploy/test/compose.yml down -v
+
