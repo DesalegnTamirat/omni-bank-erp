@@ -75,16 +75,17 @@ class KmsContributorPoint(models.Model):
             )
             pts_before = self.env.cr.fetchone()[0]
 
-        try:
-            self.env['recognition.point'].sudo()._award_points(
-                user=user,
-                points=points,
-                source_module='kms',
-                source_action=source or 'manual_award',
-                description=description or '',
-            )
-        except Exception as e:
-            _logger.warning("Could not push points to recognition.point: %s", e)
+        if self.env.registry.get('recognition.point'):
+            try:
+                self.env['recognition.point'].sudo()._award_points(
+                    user=user,
+                    points=points,
+                    source_module='kms',
+                    source_action=source or 'manual_award',
+                    description=description or '',
+                )
+            except Exception as e:
+                _logger.warning("Could not push points to recognition.point: %s", e)
 
         record = self.sudo().create({
             'user_id': user.id,
