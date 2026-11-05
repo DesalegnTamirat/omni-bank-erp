@@ -106,27 +106,28 @@ class HrEmployeeCompetency(models.Model):
 
     def _is_competency_scoped_context(self):
         ctx = self.env.context
-        active_model = str(ctx.get('active_model') or '')
-        params_model = str((ctx.get('params') or {}).get('model') or '')
-        params_active_model = str((ctx.get('params') or {}).get('active_model') or '')
+        # Explicit competency selection flags passed by competency views, wizards, or fields
+        if ctx.get('competency_employee_select') or ctx.get('competency_peer_select') or ctx.get('competency_exec_peer_config'):
+            return True
 
-        is_competency_ctx = bool(
-            ctx.get('competency_employee_select')
-            or ctx.get('competency_peer_select')
-            or active_model.startswith('competency.')
-            or params_model.startswith('competency.')
-            or params_active_model.startswith('competency.')
-        )
-        if not is_competency_ctx:
+        active_model = str(ctx.get('active_model') or '')
+        if active_model.startswith('competency.'):
+            return True
+
+        params = ctx.get('params') or {}
+        params_model = str(params.get('model') or '')
+        params_active_model = str(params.get('active_model') or '')
+
+        # CRITICAL SECURITY GUARD:
+        # If the user is currently viewing the Employees app (model = 'hr.employee' or 'hr.employee.public'),
+        # NEVER bypass access rules unless an explicit competency flag is present.
+        if params_model in ('hr.employee', 'hr.employee.public') or params_active_model in ('hr.employee', 'hr.employee.public'):
             return False
-        user = self.env.user
-        return bool(
-            user.has_group('competency_management.group_competency_admin')
-            or user.has_group('competency_management.group_competency_officer')
-            or user.has_group('competency_management.group_competency_supervisor')
-            or self.env.su
-            or self.env.is_admin()
-        )
+
+        if params_model.startswith('competency.') or params_active_model.startswith('competency.'):
+            return True
+
+        return False
 
     def _check_access(self, operation: str):
         if operation == 'read' and self._is_competency_scoped_context():

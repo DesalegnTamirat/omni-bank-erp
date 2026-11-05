@@ -183,7 +183,7 @@
 .badge[data-value="meets"],
 .badge[data-value="fit"],
 .badge[data-value="qualified"] {
-    background-color: #15803d !important;
+    background-color: #425727 !important;
     color: #ffffff !important;
 }
 
@@ -195,5 +195,16 @@
     color: #ffffff !important;
 }
 
-
-
+/* Assessment Line Row Clickable Feedback */
+div[name='core_line_ids'],
+div[name='leadership_line_ids'],
+div[name='technical_line_ids'] {
+    table.o_list_table {
+        tbody tr td:not([name="current_level"]):not([name="comments"]):not([name="evidence_attachment_ids"]) {
+            cursor: pointer;
+        }
+        tbody tr:hover td:not([name="current_level"]):not([name="comments"]):not([name="evidence_attachment_ids"]) {
+            background-color: #f7f3ef !important;
+        }
+    }
+}

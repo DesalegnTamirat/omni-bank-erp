@@ -112,11 +112,9 @@ export class CompetencyDashboard extends Component {
 
             this.state.data = result;
             this.state.persona = result.persona || "executive";
-            if (!this.state.cycleId && result.cycle && result.cycle.id) {
-                this.state.cycleId = result.cycle.id;
-            } else if (!this.state.cycleId && result.all_cycles && result.all_cycles.length > 0) {
-                this.state.cycleId = result.all_cycles[0].id;
-            }
+            // The server resolves eligibility when several cycles are open. Keep
+            // the selector aligned with the cycle used for all returned metrics.
+            this.state.cycleId = result.cycle && result.cycle.id ? result.cycle.id : false;
             if (result.is_dept_readonly || (!this.state.departmentId && result.selected_department_id)) {
                 this.state.departmentId = result.selected_department_id;
             }
@@ -199,7 +197,7 @@ export class CompetencyDashboard extends Component {
                     labels: cdata.labels || ['Underqualified', 'Fit', 'Overqualified'],
                     datasets: [{
                         data: tnaValues,
-                        backgroundColor: cdata.colors || ['#541718', '#16a34a', '#c17540'],
+                        backgroundColor: cdata.colors || ['#541718', '#425727', '#c17540'],
                         borderWidth: 2,
                     }]
                 },
@@ -222,7 +220,7 @@ export class CompetencyDashboard extends Component {
                     labels: pdata.labels || ['Core Pillar', 'Leadership Pillar', 'Technical Pillar'],
                     datasets: pdata.datasets && pdata.datasets.length ? pdata.datasets : [
                         { label: 'Below Target', data: [0, 0, 0], backgroundColor: '#541718' },
-                        { label: 'Meets Target', data: [0, 0, 0], backgroundColor: '#16a34a' },
+                        { label: 'Meets Target', data: [0, 0, 0], backgroundColor: '#425727' },
                         { label: 'Exceeds Target', data: [0, 0, 0], backgroundColor: '#c17540' }
                     ]
                 },
@@ -389,7 +387,7 @@ export class CompetencyDashboard extends Component {
                         labels: { boxWidth: 12, font: { size: 11 } }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        backgroundColor: 'rgba(29, 43, 50, 0.94)',
                         titleFont: { size: 12, weight: 'bold' },
                         bodyFont: { size: 11 },
                         padding: 10,

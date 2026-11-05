@@ -37,6 +37,12 @@ class CompetencyRatingModel(models.Model):
         """Action button to auto-generate or reset proficiency level lines based on max_rating."""
         for rec in self:
             rec._sync_level_lines(force_reset=True)
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
+        return True
 
     def _sync_level_lines(self, force_reset=False):
         for rec in self:

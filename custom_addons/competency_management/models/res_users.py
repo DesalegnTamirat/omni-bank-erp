@@ -92,10 +92,11 @@ class ResUsers(models.Model):
 
         # 3. Operating Unit Leader: All positions in managed Operating Unit(s)
         managed_ous = self.env['operating.unit'].sudo().search([('manager_id', '=', emp.id)])
-        if emp.operating_unit_id and getattr(emp.operating_unit_id, 'manager_id', False) and emp.operating_unit_id.manager_id.id == emp.id:
-            managed_ous |= emp.operating_unit_id
         if emp.default_operating_unit_id and getattr(emp.default_operating_unit_id, 'manager_id', False) and emp.default_operating_unit_id.manager_id.id == emp.id:
             managed_ous |= emp.default_operating_unit_id
+        department_ou = emp.department_id.operating_unit_id if emp.department_id else False
+        if department_ou and department_ou.manager_id.id == emp.id:
+            managed_ous |= department_ou
 
         # Also check if user has an explicit Operating Unit manager group
         user_group_names = [g.name for g in self.group_ids]
@@ -105,7 +106,7 @@ class ResUsers(models.Model):
             if ou_targets:
                 ou_emps = self.env['hr.employee'].sudo().search([
                     '|', ('default_operating_unit_id', 'in', ou_targets.ids),
-                         ('operating_unit_id', 'in', ou_targets.ids)
+                         ('department_id.operating_unit_id', 'in', ou_targets.ids)
                 ])
                 allowed_job_ids.update(ou_emps.mapped('job_id').ids)
                 if 'operating.unit.job.position' in self.env:

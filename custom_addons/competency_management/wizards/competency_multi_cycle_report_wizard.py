@@ -79,7 +79,7 @@ class CompetencyMultiCycleReportWizard(models.TransientModel):
             ou_direct = self.env['operating.unit'].search([('department', 'in', self.department_ids.ids)])
             ou_from_dept = self.department_ids.mapped('operating_unit_id')
             dept_emps = self.env['hr.employee'].with_context(competency_employee_select=True).search([('department_id', 'in', self.department_ids.ids)])
-            ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+            ou_from_emps = dept_emps.mapped('default_operating_unit_id')
             allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
             domain_ou = [('id', 'in', allowed_ous.ids)]
             domain_job = [('department_id', 'in', self.department_ids.ids)]
@@ -302,7 +302,7 @@ class CompetencyMultiCycleReportWizard(models.TransientModel):
                 if key not in meta_info:
                     emp = line.employee_id
                     comp = line.competency_id
-                    ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+                    ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
                     grade = getattr(emp, 'grade_id', False)
                     gender_lbl = 'N/A'
                     if hasattr(emp, 'gender') and emp.gender:

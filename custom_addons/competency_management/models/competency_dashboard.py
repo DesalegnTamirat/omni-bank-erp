@@ -31,10 +31,27 @@ class CompetencyDashboard(models.TransientModel):
     ], string='Persona Role', compute='_compute_user_access')
 
     def _default_cycle_id(self):
-        cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], limit=1)
-        if not cycle:
-            cycle = self.env['competency.assessment.cycle'].sudo().search([], order='id desc', limit=1)
-        return cycle
+        cycles = self.env['competency.assessment.cycle'].sudo().search(
+            [('active', '=', True)], order='id desc'
+        )
+        open_cycles = cycles.filtered(lambda cycle: cycle.state == 'open')
+        user = self.env.user
+        if user.has_group('competency_management.group_competency_admin') or user.has_group('base.group_system'):
+            return open_cycles[:1] or cycles[:1]
+        employee = user.sudo().employee_id
+        if employee:
+            for cycle in open_cycles:
+                if cycle._includes_employee(employee):
+                    return cycle
+            self.env.cr.execute(
+                "SELECT DISTINCT cycle_id FROM competency_assessment WHERE employee_id = %s",
+                (employee.id,),
+            )
+            assessed_cycle_ids = {row[0] for row in self.env.cr.fetchall()}
+            for cycle in cycles:
+                if cycle.id in assessed_cycle_ids:
+                    return cycle
+        return self.env['competency.assessment.cycle'].sudo().browse()
 
     @api.depends_context('uid')
     def _compute_user_access(self):
@@ -70,11 +87,13 @@ class CompetencyDashboard(models.TransientModel):
         if not emp:
             raise UserError(_("No employee record found for user %s.") % user.name)
 
-        cycle = self.cycle_id
-        if not cycle or cycle.state != 'open':
-            cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], limit=1)
+        cycle = self.cycle_id or self._default_cycle_id()
         if not cycle:
-            raise UserError(_('There is currently no open Assessment Cycle. Please contact HR.'))
+            raise UserError(_('There is currently no open Assessment Cycle for you. Please contact HR.'))
+        if cycle.state != 'open' or not cycle.active:
+            raise UserError(_('Select an open Assessment Cycle before starting your self-assessment.'))
+        if not cycle.sudo()._includes_employee(emp):
+            raise UserError(_('You are not included in the selected Assessment Cycle.'))
 
         existing = self.env['competency.assessment'].search([
             ('employee_id', '=', emp.id),
@@ -106,7 +125,7 @@ class CompetencyDashboard(models.TransientModel):
     def action_print_my_report(self):
         self.ensure_one()
         if self.latest_assessment_id:
-            return self.env.ref('competency_management.action_report_competency_assessment').report_action(self.latest_assessment_id)
+            return self.env.ref('competency_management.action_report_competency_assessment_individual').report_action(self.latest_assessment_id)
         else:
             return {
                 'type': 'ir.actions.client',
@@ -226,6 +245,12 @@ class CompetencyDashboard(models.TransientModel):
             raise UserError(_("No employee record found for user %s.") % user.name)
 
         cycle = self.cycle_id or self._default_cycle_id()
+        if not cycle:
+            raise UserError(_('There is currently no open Assessment Cycle for you. Please contact HR.'))
+        if cycle.state != 'open' or not cycle.active:
+            raise UserError(_('Select an open Assessment Cycle before starting your self-assessment.'))
+        if not cycle.sudo()._includes_employee(emp):
+            raise UserError(_('You are not included in the selected Assessment Cycle.'))
         asm = self.env['competency.assessment'].search([
             ('employee_id', '=', emp.id),
             ('cycle_id', '=', cycle.id)
@@ -236,6 +261,7 @@ class CompetencyDashboard(models.TransientModel):
                 'employee_id': emp.id,
                 'cycle_id': cycle.id if cycle else False,
                 'assessment_type': 'self',
+                'assessor_id': user.id,
             })
 
         return {
@@ -345,7 +371,6 @@ class CompetencyDashboard(models.TransientModel):
         if operating_unit_id:
             ou_emp_ids = self.env['hr.employee'].sudo().search([
                 '|', ('default_operating_unit_id', '=', int(operating_unit_id)),
-                '|', ('operating_unit_id', '=', int(operating_unit_id)),
                 ('department_id.operating_unit_id', '=', int(operating_unit_id))
             ]).ids
             domain.append(('employee_id', 'in', ou_emp_ids))
@@ -498,15 +523,15 @@ class CompetencyDashboard(models.TransientModel):
         # Check if user is an Operating Unit Leader
         emp_ou = False
         if emp:
-            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
         if not emp_ou and user.default_operating_unit_id:
             emp_ou = user.default_operating_unit_id
 
         is_ou_leader = False
         if emp and emp_ou and emp_ou.manager_id and emp_ou.manager_id.id == emp.id:
             has_superior_in_ou = bool(
-                (emp.parent_id and (emp.parent_id.default_operating_unit_id == emp_ou or emp.parent_id.operating_unit_id == emp_ou)) or
-                (emp.coach_id and (emp.coach_id.default_operating_unit_id == emp_ou or emp.coach_id.operating_unit_id == emp_ou))
+                (emp.parent_id and (emp.parent_id.default_operating_unit_id == emp_ou or emp.parent_id.department_id.operating_unit_id == emp_ou)) or
+                (emp.coach_id and (emp.coach_id.default_operating_unit_id == emp_ou or emp.coach_id.department_id.operating_unit_id == emp_ou))
             )
             if not has_superior_in_ou:
                 is_ou_leader = True
@@ -531,7 +556,6 @@ class CompetencyDashboard(models.TransientModel):
                 ])
                 ou_emps = self.env['hr.employee'].sudo().search([
                     '|', ('default_operating_unit_id', '=', ou_id_int),
-                    '|', ('operating_unit_id', '=', ou_id_int),
                     ('department_id.operating_unit_id', '=', ou_id_int)
                 ])
                 emp_depts = ou_emps.mapped('department_id')
@@ -545,7 +569,7 @@ class CompetencyDashboard(models.TransientModel):
                 ou_direct = self.env['operating.unit'].sudo().search([('department', '=', dept_id_int)])
                 ou_from_dept = dept_rec.operating_unit_id | dept_rec.operating_unit
                 dept_emps = self.env['hr.employee'].sudo().search([('department_id', '=', dept_id_int)])
-                ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+                ou_from_emps = dept_emps.mapped('default_operating_unit_id')
                 allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
                 all_operating_units = [{'id': u.id, 'name': u.name} for u in allowed_ous.sorted(key=lambda u: u.name or '')]
             else:
@@ -561,7 +585,7 @@ class CompetencyDashboard(models.TransientModel):
             ou_direct = self.env['operating.unit'].sudo().search([('department', 'in', managed_depts.ids)])
             ou_from_dept = managed_depts.mapped('operating_unit_id')
             dept_emps = self.env['hr.employee'].sudo().search([('department_id', 'in', managed_depts.ids)])
-            ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+            ou_from_emps = dept_emps.mapped('default_operating_unit_id')
             allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
             all_operating_units = [{'id': u.id, 'name': u.name} for u in allowed_ous]
         elif is_ou_leader and emp_ou:
@@ -572,7 +596,6 @@ class CompetencyDashboard(models.TransientModel):
             all_operating_units = [{'id': emp_ou.id, 'name': emp_ou.name}]
             ou_emps = self.env['hr.employee'].sudo().search([
                 '|', ('default_operating_unit_id', '=', emp_ou.id),
-                '|', ('operating_unit_id', '=', emp_ou.id),
                 ('department_id.operating_unit_id', '=', emp_ou.id)
             ])
             ou_depts = ou_emps.mapped('department_id').filtered(lambda d: d.id)
@@ -593,16 +616,48 @@ class CompetencyDashboard(models.TransientModel):
             if int(operating_unit_id) not in allowed_ou_ids:
                 operating_unit_id = False
 
-        # Selected Cycle resolution
-        if cycle_id:
-            cycle = self.env['competency.assessment.cycle'].sudo().browse(int(cycle_id))
-        else:
-            cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], limit=1)
-            if not cycle:
-                cycle = self.env['competency.assessment.cycle'].sudo().search([], order='id desc', limit=1)
+        # Each user sees cycles relevant to their own assessments, their raters' work,
+        # or the employees they manage.  Overlapping targeted cycles must not cause
+        # the dashboard to silently select an unrelated bank-wide "latest" cycle.
+        Cycle = self.env['competency.assessment.cycle'].sudo()
+        available_cycles = Cycle.search([('active', '=', True)], order='id desc')
+        if not is_admin:
+            visible_employee_ids = {emp.id} if emp else set()
+            if emp and is_supervisor:
+                visible_employee_ids.update(self.env['hr.employee'].sudo().search([
+                    '|', ('parent_id', '=', emp.id), ('coach_id', '=', emp.id)
+                ]).ids)
+                if is_dept_manager and managed_depts:
+                    visible_employee_ids.update(self.env['hr.employee'].sudo().search([
+                        ('department_id', 'in', managed_depts.ids)
+                    ]).ids)
+                elif is_ou_leader and emp_ou:
+                    visible_employee_ids.update(self.env['hr.employee'].sudo().search([
+                        '|', ('default_operating_unit_id', '=', emp_ou.id),
+                        ('department_id.operating_unit_id', '=', emp_ou.id)
+                    ]).ids)
+            self.env.cr.execute("""
+                SELECT DISTINCT cycle_id
+                FROM competency_assessment
+                WHERE assessor_id = %s OR employee_id = ANY(%s)
+            """, (user.id, list(visible_employee_ids) or [0]))
+            assigned_cycle_ids = {row[0] for row in self.env.cr.fetchall()}
+            available_cycles = available_cycles.filtered(
+                lambda c: c.id in assigned_cycle_ids or (
+                    c.state == 'open' and bool(visible_employee_ids) and (
+                        not c.is_targeted or bool(visible_employee_ids.intersection(c.scoped_employee_ids.ids))
+                    )
+                )
+            )
 
-        # Active Assessment Cycle Info for Dashboard Header Banner
-        open_cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], order='id desc', limit=1)
+        selected_id = int(cycle_id) if cycle_id else False
+        selected = available_cycles.filtered(lambda c: c.id == selected_id)[:1] if selected_id else Cycle.browse()
+        open_cycles = available_cycles.filtered(lambda c: c.state == 'open')
+        cycle = selected or open_cycles[:1] or available_cycles[:1]
+
+        # The campaign banner follows the selected cycle when it is open, otherwise
+        # the latest open cycle relevant to this viewer.
+        open_cycle = cycle if cycle and cycle.state == 'open' else open_cycles[:1]
         active_cycle_info = {}
         if open_cycle:
             p_start = open_cycle.period_start.strftime('%b %d, %Y') if open_cycle.period_start else 'N/A'
@@ -618,8 +673,11 @@ class CompetencyDashboard(models.TransientModel):
 
             active_cycle_info = {
                 'has_active': True,
+                'id': open_cycle.id,
                 'name': open_cycle.name,
                 'state': open_cycle.state,
+                'is_targeted': open_cycle.is_targeted,
+                'participant_count': open_cycle.scope_employee_count,
                 'is_deadline_passed': is_deadline_passed,
                 'state_label': state_label,
                 'period_start': p_start,
@@ -631,12 +689,18 @@ class CompetencyDashboard(models.TransientModel):
                 'has_active': False,
             }
 
-        # Available Cycles list
-        all_cycles = self.env['competency.assessment.cycle'].sudo().search_read([], ['id', 'name', 'state', 'assessment_deadline'], order='id desc')
+        # Available Cycles list, in the same order used for the default selection.
+        all_cycles = [{
+            'id': c.id,
+            'name': c.name,
+            'state': c.state,
+            'assessment_deadline': str(c.assessment_deadline) if c.assessment_deadline else False,
+            'is_targeted': c.is_targeted,
+        } for c in available_cycles]
 
         # Baseline domains
-        line_domain = [('cycle_id', '=', cycle.id)] if cycle else []
-        asm_domain = [('cycle_id', '=', cycle.id)] if cycle else []
+        line_domain = [('cycle_id', '=', cycle.id if cycle else 0)]
+        asm_domain = [('cycle_id', '=', cycle.id if cycle else 0)]
 
         # Persona-based & Role-based employee scoping
         subordinate_emp_ids = []
@@ -655,7 +719,6 @@ class CompetencyDashboard(models.TransientModel):
             elif is_ou_leader and emp_ou:
                 ou_emp_ids = self.env['hr.employee'].sudo().search([
                     '|', ('default_operating_unit_id', '=', emp_ou.id),
-                    '|', ('operating_unit_id', '=', emp_ou.id),
                     ('department_id.operating_unit_id', '=', emp_ou.id)
                 ]).ids
                 scoped_emp_ids = list(set(subordinate_emp_ids + ou_emp_ids + [emp.id]))
@@ -679,7 +742,6 @@ class CompetencyDashboard(models.TransientModel):
         if operating_unit_id and (is_admin or is_dept_manager):
             ou_emp_ids = self.env['hr.employee'].sudo().search([
                 '|', ('default_operating_unit_id', '=', int(operating_unit_id)),
-                '|', ('operating_unit_id', '=', int(operating_unit_id)),
                 ('department_id.operating_unit_id', '=', int(operating_unit_id))
             ]).ids
             line_domain.append(('employee_id', 'in', ou_emp_ids))
@@ -776,7 +838,6 @@ class CompetencyDashboard(models.TransientModel):
         if target_ou_ids:
             ou_emp_domain = [
                 '|', ('default_operating_unit_id', 'in', target_ou_ids),
-                '|', ('operating_unit_id', 'in', target_ou_ids),
                 ('department_id.operating_unit_id', 'in', target_ou_ids)
             ]
             ou_employees = self.env['hr.employee'].sudo().search(ou_emp_domain)
@@ -809,12 +870,12 @@ class CompetencyDashboard(models.TransientModel):
                     ])
                     if asms:
                         my_asm = max(asms, key=lambda a: len(a.line_ids))
-            if not my_asm:
+            if not my_asm and not cycle:
                 my_asm = self.env['competency.assessment'].sudo().search([
                     ('employee_id', '=', emp.id),
                     ('assessment_type', '=', 'self')
                 ], order='id desc', limit=1)
-            if not my_asm:
+            if not my_asm and not cycle:
                 asms = self.env['competency.assessment'].sudo().search([
                     ('employee_id', '=', emp.id)
                 ])
@@ -877,9 +938,7 @@ class CompetencyDashboard(models.TransientModel):
                             assessed_levels_by_comp_id[pl.competency_id.id] = c_val
 
             # 2. Check all assessment lines for this employee in this cycle (self, supervisor, etc.)
-            cycle_domain = [('employee_id', '=', emp.id)]
-            if cycle:
-                cycle_domain.append(('cycle_id', '=', cycle.id))
+            cycle_domain = [('employee_id', '=', emp.id), ('cycle_id', '=', cycle.id if cycle else 0)]
             asm_lines = self.env['competency.assessment.line'].sudo().search(cycle_domain)
             for al in asm_lines:
                 if al.competency_id and al.competency_id.id not in assessed_levels_by_comp_id:
@@ -1055,6 +1114,8 @@ class CompetencyDashboard(models.TransientModel):
                 'id': cycle.id if cycle else False,
                 'name': cycle.name if cycle else 'No Cycle Selected',
                 'deadline': str(cycle.assessment_deadline) if cycle and cycle.assessment_deadline else '',
+                'is_targeted': bool(cycle and cycle.is_targeted),
+                'participant_count': cycle.scope_employee_count if cycle else 0,
             },
             'active_cycle_info': active_cycle_info,
             'all_cycles': all_cycles,
@@ -1079,7 +1140,7 @@ class CompetencyDashboard(models.TransientModel):
                 'tna_donut': {
                     'labels': ['Underqualified (Training Needed)', 'Fit / Qualified', 'Overqualified'],
                     'data': [below_cnt, meets_cnt, exceeds_cnt],
-                    'colors': ['#541718', '#726732', '#c17540']
+                    'colors': ['#541718', '#425727', '#c17540']
                 },
                 'pillar_bar': {
                     'labels': ['Core Pillar', 'Leadership Pillar', 'Technical Pillar'],
@@ -1092,7 +1153,7 @@ class CompetencyDashboard(models.TransientModel):
                         {
                             'label': 'Meets Target',
                             'data': [core_meets, lead_meets, tech_meets],
-                            'backgroundColor': '#726732',
+                            'backgroundColor': '#425727',
                         },
                         {
                             'label': 'Exceeds Target',

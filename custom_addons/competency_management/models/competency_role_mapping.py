@@ -199,6 +199,12 @@ class CompetencyRoleMapping(models.Model):
                 rec.message_post(body=_("Populated %d new unique competency lines from selected clusters.") % added_count)
             else:
                 rec.message_post(body=_("All competencies from selected clusters are already mapped."))
+        if len(self) == 1:
+            return {
+                'type': 'ir.actions.client', 'tag': 'bunna_refresh_form',
+                'params': {'res_model': self._name, 'res_id': self.id},
+            }
+        return True
 
     @api.constrains('line_ids')
     def _check_unique_competency_lines(self):

@@ -67,6 +67,12 @@
             action="action_my_competency_evaluations"
             sequence="15"
             groups="competency_management.group_competency_employee" />
+        <menuitem id="menu_competency_my_peer_config"
+            name="My Team Peer Configuration"
+            parent="menu_competency_assessments_categ"
+            action="action_competency_director_peer_config_scoped_server"
+            sequence="18"
+            groups="competency_management.group_competency_supervisor" />
         <menuitem id="menu_competency_assessments"
             name="All Competency Assessments"
             parent="menu_competency_assessments_categ"
@@ -142,9 +148,9 @@
             sequence="15"
             groups="competency_management.group_competency_officer" />
         <menuitem id="menu_competency_director_peer_config"
-            name="Executive Peer Configuration"
+            name="Executive &amp; BM Peer Configuration"
             parent="menu_competency_config_categ"
-            action="action_competency_director_peer_config"
+            action="action_competency_director_peer_config_server"
             sequence="18"
             groups="competency_management.group_competency_officer" />
         <menuitem id="menu_competency_rating_models"

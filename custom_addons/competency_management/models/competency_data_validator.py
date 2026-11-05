@@ -7,7 +7,6 @@ class CompetencyDataValidator(models.Model):
     """Data Quality Automation & Governance Validator for Competency Data."""
     _name = 'competency.data.validator'
     _description = 'Competency Data Quality & Governance Validator'
-    _auto = False  # No DB table created — keeps it lightweight
 
     @api.model
     def _cron_validate_competency_data_quality(self):

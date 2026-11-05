@@ -35,6 +35,7 @@ Features:
         'views/competency_cluster_views.xml',
         'views/competency_role_mapping_views.xml',
         'views/competency_coverage_report_views.xml',
+        'views/competency_team_dashboard_views.xml',
         'views/competency_assessment_views.xml',
         'views/competency_dashboard_views.xml',
         'views/competency_matrix_config_views.xml',
@@ -47,13 +48,14 @@ Features:
         'wizards/competency_multi_cycle_report_wizard_views.xml',
         'views/competency_dashboard_snapshot_views.xml',
         'views/competency_skills_test_views.xml',
-        'views/competency_team_dashboard_views.xml',
         'views/competency_menus.xml',
     ],
     'assets': {
         'web.assets_backend': [
             'competency_management/static/src/scss/competency_dashboard.scss',
             'competency_management/static/src/js/competency_dashboard.js',
+            'competency_management/static/src/js/competency_assessment_row_click.js',
+            'competency_management/static/src/js/refresh_form.js',
             'competency_management/static/src/xml/competency_dashboard.xml',
         ],
     },

@@ -2,12 +2,12 @@
 <odoo>
     <data>
 
-        <!-- Executive Peer Config Form View -->
+        <!-- Executive & Branch Manager Peer Config Form View -->
         <record id="view_competency_director_peer_config_form" model="ir.ui.view">
             <field name="name">competency.director.peer.config.form</field>
             <field name="model">competency.director.peer.config</field>
             <field name="arch" type="xml">
-                <form string="Executive Peer Configuration">
+                <form string="Peer Evaluation Configuration">
                     <header>
                         <button name="action_sync_cycle_peers"
                                 string="Sync Peers with Open Cycle"
@@ -16,18 +16,23 @@
                                 invisible="not has_open_cycle"
                                 icon="fa-refresh"
                                 confirm="Synchronizing will update peer assignments in the open cycle. Any draft assessments for removed peers will be deleted. Are you sure you want to proceed?"
-                                groups="competency_management.group_competency_admin"/>
+                                groups="competency_management.group_competency_admin,competency_management.group_competency_supervisor"/>
                     </header>
                     <sheet>
                         <field name="has_open_cycle" invisible="1"/>
-                        <widget name="web_ribbon" title="Executive Leadership" bg_color="bg-info"/>
+                        <field name="config_tier" invisible="1"/>
+                        <widget name="web_ribbon" title="Chief" bg_color="bg-primary" invisible="config_tier != 'chief'"/>
+                        <widget name="web_ribbon" title="Director" bg_color="bg-info" invisible="config_tier != 'director'"/>
+                        <widget name="web_ribbon" title="Executive XV" bg_color="bg-secondary" invisible="config_tier != 'executive_15'"/>
+                        <widget name="web_ribbon" title="Branch Manager" bg_color="bg-success" invisible="config_tier != 'branch_manager'"/>
                         <div class="oe_title">
                             <h1>
-                                <field name="director_id" domain="[('is_director_or_chief', '=', True), ('active', '=', True)]" options="{'no_open': True, 'no_create': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select Executive (Grade 15, Director, Chief)..."/>
+                                <field name="director_id" options="{'no_open': True, 'no_create': True}" readonly="context.get('competency_exec_peer_config', False)" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select Employee (Chief, Director, Executive, Branch Manager)..."/>
                             </h1>
                         </div>
                         <group>
-                            <group string="Executive Profile &amp; Position">
+                            <group string="Profile &amp; Position">
+                                <field name="config_tier" widget="badge"/>
                                 <field name="job_id" options="{'no_open': True}"/>
                                 <field name="grade_id" options="{'no_open': True}"/>
                                 <field name="department_id" options="{'no_open': True}"/>
@@ -41,7 +46,7 @@
                         <notebook>
                             <page string="Assigned 360° Peers" name="peers">
                                 <field name="candidate_peer_ids" invisible="1"/>
-                                <field name="peer_ids" widget="many2many_tags" domain="[('id', 'in', candidate_peer_ids)]" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select peers matching executive grade rank..."/>
+                                <field name="peer_ids" widget="many2many_tags" domain="[('id', 'in', candidate_peer_ids)]" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select peers matching tier rules..."/>
                             </page>
                         </notebook>
 
@@ -50,20 +55,20 @@
             </field>
         </record>
 
-        <!-- Executive Peer Config List View -->
+        <!-- Executive & Branch Manager Peer Config List View -->
         <record id="view_competency_director_peer_config_list" model="ir.ui.view">
             <field name="name">competency.director.peer.config.list</field>
             <field name="model">competency.director.peer.config</field>
             <field name="arch" type="xml">
-                <list string="Executive Peer Configurations">
+                <list string="Peer Evaluation Configurations">
                     <header>
                         <button name="action_generate_director_records"
-                                string="Scan Executives"
+                                string="Scan &amp; Discover Positions"
                                 type="object"
                                 class="btn-secondary"
                                 display="always"
                                 icon="fa-users"
-                                confirm="This will scan all active Grade 15, Director (Grade 16), and Chief (Grade 17) employees and create missing configuration records. Are you sure you want to proceed?"
+                                confirm="This will scan active Chiefs, Directors, Grade 15s, and Branch Managers and create missing configuration records. Are you sure?"
                                 groups="competency_management.group_competency_admin"/>
                         <button name="action_sync_all_cycle_peers"
                                 string="Sync All Peers"
@@ -71,11 +76,12 @@
                                 class="btn-primary"
                                 display="always"
                                 icon="fa-refresh"
-                                confirm="This will synchronize all executive peer assignments with the open assessment cycle. Are you sure you want to proceed?"
+                                confirm="This will synchronize all peer assignments with the open assessment cycle. Are you sure you want to proceed?"
                                 groups="competency_management.group_competency_admin"/>
                     </header>
                     <field name="has_open_cycle" column_invisible="True"/>
-                    <field name="director_id" domain="[('is_director_or_chief', '=', True), ('active', '=', True)]" options="{'no_open': True, 'no_create': True}"/>
+                    <field name="config_tier" widget="badge"/>
+                    <field name="director_id" string="Employee" options="{'no_open': True, 'no_create': True}"/>
                     <field name="job_id" options="{'no_open': True}"/>
                     <field name="grade_id" options="{'no_open': True}"/>
                     <field name="department_id" options="{'no_open': True}"/>
@@ -85,23 +91,30 @@
                     <field name="peer_ids" widget="many2many_tags" optional="hide"/>
                     <button name="action_sync_cycle_peers" string="Sync Peers" type="object"
                             class="btn-sm btn-outline-primary" icon="fa-refresh"
-                            invisible="not has_open_cycle" groups="competency_management.group_competency_admin"/>
+                            invisible="not has_open_cycle" groups="competency_management.group_competency_admin,competency_management.group_competency_supervisor"/>
                 </list>
             </field>
         </record>
 
-        <!-- Executive Peer Config Search View -->
+        <!-- Executive & Branch Manager Peer Config Search View -->
         <record id="view_competency_director_peer_config_search" model="ir.ui.view">
             <field name="name">competency.director.peer.config.search</field>
             <field name="model">competency.director.peer.config</field>
             <field name="arch" type="xml">
-                <search string="Search Executive Peer Configurations">
-                    <field name="director_id"/>
+                <search string="Search Peer Configurations">
+                    <field name="director_id" string="Employee"/>
+                    <field name="config_tier"/>
                     <field name="job_id"/>
                     <field name="grade_id"/>
                     <field name="department_id"/>
                     <field name="operating_unit_id"/>
                     <field name="coach_id"/>
+                    <filter string="Chiefs (Grade XVII)" name="tier_chief" domain="[('config_tier', '=', 'chief')]"/>
+                    <filter string="Directors (Grade XVI)" name="tier_director" domain="[('config_tier', '=', 'director')]"/>
+                    <filter string="Executives (Grade XV)" name="tier_exec15" domain="[('config_tier', '=', 'executive_15')]"/>
+                    <filter string="Branch Managers" name="tier_bm" domain="[('config_tier', '=', 'branch_manager')]"/>
+                    <separator/>
+                    <filter string="Tier" name="group_tier" context="{'group_by': 'config_tier'}"/>
                     <filter string="Job Position" name="group_job" context="{'group_by': 'job_id'}"/>
                     <filter string="Job Grade" name="group_grade" context="{'group_by': 'grade_id'}"/>
                     <filter string="Department" name="group_dept" context="{'group_by': 'department_id'}"/>
@@ -111,26 +124,84 @@
             </field>
         </record>
 
-        <!-- Executive Peer Config Window Action -->
+        <!-- Admin / Officer Window Action (Configuration Menu) -->
         <record id="action_competency_director_peer_config" model="ir.actions.act_window">
-            <field name="name">Executive Peer Configuration</field>
+            <field name="name">Executive &amp; Branch Manager Peer Configuration</field>
             <field name="res_model">competency.director.peer.config</field>
             <field name="view_mode">list,form</field>
-            <field name="context">{'competency_peer_select': True, 'competency_employee_select': True}</field>
+            <field name="context">{'competency_peer_select': True, 'competency_employee_select': True, 'search_default_group_tier': 1}</field>
             <field name="search_view_id" ref="view_competency_director_peer_config_search"/>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
-                    Configure custom 360-degree peers for Directors &amp; Chiefs!
+                    Configure custom 360-degree peers for Chiefs, Directors, and Branch Managers!
                 </p>
                 <p>
-                    Click "Scan Executives" to auto-discover all Directors and Chiefs in the bank, then assign peers sharing the executive's coach.
+                    Click "Scan &amp; Discover Positions" to auto-discover positions in the bank, then assign peers.
                 </p>
             </field>
         </record>
 
-        <!-- Server Action for Menu: Auto-populate and open Executive Peer Configuration -->
+        <!-- Scoped List View for CEO, Chiefs, and Directors (create="false", delete="false") -->
+        <record id="view_competency_director_peer_config_scoped_list" model="ir.ui.view">
+            <field name="name">competency.director.peer.config.scoped.list</field>
+            <field name="model">competency.director.peer.config</field>
+            <field name="arch" type="xml">
+                <list string="My Team Peer Configurations" create="false" delete="false">
+                    <header>
+                        <button name="action_populate_my_team"
+                                string="Discover &amp; Populate My Team"
+                                type="object"
+                                class="btn-primary"
+                                display="always"
+                                icon="fa-users"/>
+                        <button name="action_sync_all_cycle_peers"
+                                string="Sync All Peers"
+                                type="object"
+                                class="btn-secondary"
+                                display="always"
+                                icon="fa-refresh"
+                                confirm="This will synchronize peer assignments for all your team members with the open assessment cycle. Are you sure you want to proceed?"/>
+                    </header>
+                    <field name="has_open_cycle" column_invisible="True"/>
+                    <field name="config_tier" widget="badge"/>
+                    <field name="director_id" string="Employee" options="{'no_open': True, 'no_create': True}"/>
+                    <field name="job_id" options="{'no_open': True}"/>
+                    <field name="grade_id" options="{'no_open': True}"/>
+                    <field name="department_id" options="{'no_open': True}"/>
+                    <field name="operating_unit_id" options="{'no_open': True}"/>
+                    <field name="coach_id" options="{'no_open': True}"/>
+                    <field name="peer_count" string="Assigned Peers" widget="badge"/>
+                    <field name="peer_ids" widget="many2many_tags" optional="hide"/>
+                    <button name="action_sync_cycle_peers" string="Sync Peers" type="object"
+                            class="btn-sm btn-outline-primary" icon="fa-refresh"
+                            invisible="not has_open_cycle"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Scoped Window Action for CEO, Chiefs, and Directors (My Team Peer Configuration) -->
+        <record id="action_competency_director_peer_config_scoped" model="ir.actions.act_window">
+            <field name="name">My Team Peer Configuration</field>
+            <field name="res_model">competency.director.peer.config</field>
+            <field name="view_mode">list,form</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_competency_director_peer_config_scoped_list')}),
+                (0, 0, {'view_mode': 'form', 'view_id': ref('view_competency_director_peer_config_form')})]"/>
+            <field name="context">{'competency_peer_select': True, 'competency_employee_select': True, 'competency_exec_peer_config': True, 'search_default_group_tier': 1, 'create': False, 'delete': False}</field>
+            <field name="search_view_id" ref="view_competency_director_peer_config_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Assign 360-degree peers for members of your direct reporting team!
+                </p>
+                <p>
+                    Click "Discover &amp; Populate My Team" to populate your subordinates, then select each employee to assign their peers.
+                </p>
+            </field>
+        </record>
+
+        <!-- Server Action for Menu: Auto-populate and open Executive Peer Configuration (Admin) -->
         <record id="action_competency_director_peer_config_server" model="ir.actions.server">
-            <field name="name">Executive Peer Configuration</field>
+            <field name="name">Executive &amp; BM Peer Configuration</field>
             <field name="model_id" ref="model_competency_director_peer_config"/>
             <field name="state">code</field>
             <field name="code">
@@ -138,9 +209,19 @@
             </field>
         </record>
 
+        <!-- Server Action for Menu: Scoped access for CEO, Chiefs, Directors -->
+        <record id="action_competency_director_peer_config_scoped_server" model="ir.actions.server">
+            <field name="name">My Team Peer Configuration</field>
+            <field name="model_id" ref="model_competency_director_peer_config"/>
+            <field name="state">code</field>
+            <field name="code">
+                action = model.action_open_scoped_peer_config()
+            </field>
+        </record>
+
         <!-- Action / Gear ⚙ Menu Action to Scan Executives directly from list or form view -->
         <record id="action_server_sync_executives" model="ir.actions.server">
-            <field name="name">Scan &amp; Discover Executives (Chiefs &amp; Directors)</field>
+            <field name="name">Scan &amp; Discover Peer Configuration Positions</field>
             <field name="model_id" ref="model_competency_director_peer_config"/>
             <field name="binding_model_id" ref="model_competency_director_peer_config"/>
             <field name="binding_view_types">list,form</field>

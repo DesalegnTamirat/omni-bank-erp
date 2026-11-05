@@ -12,6 +12,8 @@
                     <field name="period_start"/>
                     <field name="period_end"/>
                     <field name="assessment_deadline"/>
+                    <field name="is_targeted" string="Targeted" groups="competency_management.group_competency_admin"/>
+                    <field name="scope_employee_count" string="Included Employees" groups="competency_management.group_competency_admin"/>
                     <field name="assessment_count"/>
                     <field name="state" widget="badge"/>
                 </list>
@@ -27,7 +29,7 @@
                     <header>
                         <button name="action_start" string="Start Cycle"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"
-                                confirm="Are you sure you want to start this assessment cycle? 360-degree assessments will be generated for all active employees."
+                                confirm="Open this cycle and generate assessments for its selected employees? The participant selection cannot be changed afterward."
                                 groups="competency_management.group_competency_admin"/>
                         <button name="action_notify_assessors" string="📢 Notify Employees to Fill Assessments"
                                 type="object" class="btn-primary" invisible="state != 'open' or pending_assessment_count == 0"
@@ -61,12 +63,47 @@
                                 <field name="assessment_deadline" string="Submission Deadline" readonly="state == 'closed'"/>
                             </group>
                             <group string="Cycle Submissions Progress">
+                                <field name="scope_employee_count" string="Included Employees" readonly="1"
+                                       groups="competency_management.group_competency_admin"/>
                                 <field name="pending_assessment_count" string="Pending Drafts"/>
                                 <field name="submitted_assessment_count" string="Submitted / In Review"/>
                                 <field name="assessment_count" string="Total Assessments"/>
                             </group>
                         </group>
+                        <group string="Participants" col="2" groups="competency_management.group_competency_admin">
+                            <field name="is_targeted" string="Target specific employees"
+                                   readonly="state != 'draft'"/>
+                            <field name="target_type" string="Select by" widget="radio"
+                                   options="{'horizontal': True}"
+                                   invisible="not is_targeted" readonly="state != 'draft'"/>
+                            <field name="target_department_ids" widget="many2many_tags"
+                                   placeholder="Search departments..."
+                                   invisible="not is_targeted or target_type != 'department'"
+                                   readonly="state != 'draft'"
+                                   options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
+                            <field name="target_operating_unit_ids" widget="many2many_tags"
+                                   placeholder="Search operating units..."
+                                   invisible="not is_targeted or target_type != 'operating_unit'"
+                                   readonly="state != 'draft'"
+                                   options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
+                            <field name="target_employee_ids" widget="many2many_tags"
+                                   placeholder="Search employees..."
+                                   invisible="not is_targeted or target_type != 'employee'"
+                                   readonly="state != 'draft'"
+                                   context="{'competency_employee_select': True}"
+                                   options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
+                        </group>
                         <notebook>
+                            <page string="Included Employees" groups="competency_management.group_competency_admin"
+                                  invisible="state == 'draft' or not is_targeted">
+                                <field name="scoped_employee_ids" readonly="1"
+                                       context="{'competency_employee_select': True}"
+                                       options="{'no_open': True, 'no_create': True, 'no_create_edit': True}">
+                                    <list create="false" edit="false" delete="false" limit="20">
+                                        <field name="name"/>
+                                    </list>
+                                </field>
+                            </page>
                             <page string="Assessments">
                                 <field name="assessment_ids" readonly="1">
                                     <list limit="20" create="false" edit="false" delete="false">
@@ -141,6 +178,29 @@
                 <form string="Competency Behavioral Guidance &amp; Rating">
                     <sheet>
                         <field name="is_primary_reporting_line" invisible="1"/>
+                        <field name="has_next_line" invisible="1"/>
+                        <field name="has_prev_line" invisible="1"/>
+                        <field name="assessment_progress_text" invisible="1"/>
+
+                        <!-- Assessed Employee & Position Info Banner -->
+                        <div class="p-2 px-3 mb-3 rounded border" style="background-color: #f8fafc; border-left: 5px solid #541718 !important;">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div>
+                                    <span class="text-muted small fw-bold text-uppercase">Assessed Person:</span>
+                                    <strong class="ms-1" style="font-size: 14.5px; color: #1d2b32;"><field name="employee_id" readonly="1"/></strong>
+                                </div>
+                                <div>
+                                    <span class="text-muted small fw-bold text-uppercase">Position / Title:</span>
+                                    <strong class="ms-1" style="font-size: 14.5px; color: #541718;"><field name="job_id" readonly="1"/></strong>
+                                </div>
+                                <div invisible="not assessment_progress_text">
+                                    <span class="badge rounded-pill bg-dark px-3 py-1" style="font-size: 12px; font-weight: 600;">
+                                        <field name="assessment_progress_text" readonly="1"/>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="oe_title" style="margin-bottom: 15px;">
                             <h1 style="color: #541718;"><field name="competency_id" readonly="1"/></h1>
                             <h4 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h4>
@@ -164,22 +224,70 @@
                         </div>
 
                         <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; margin-bottom: 20px;">
-                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fcfbfa; border-left: 5px solid #726732; border-radius: 4px;">
+                            <!-- Level 1 -->
+                            <button name="action_set_level_1" type="object"
+                                    class="btn w-100 text-start p-3 mb-3 border rounded shadow-sm"
+                                    style="background-color: #fcfbfa; border-left: 6px solid #726732 !important; cursor: pointer;"
+                                    invisible="not can_edit_ratings">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <h4 style="color: #726732; margin: 0; font-size: 15px; font-weight: bold;">🟡 Level 1 — Basic</h4>
+                                    <span class="badge rounded-pill bg-warning text-dark" invisible="not has_next_line"><i class="fa fa-arrow-right me-1"/>Select Level 1 &amp; Next</span>
+                                    <span class="badge rounded-pill bg-warning text-dark" invisible="has_next_line"><i class="fa fa-check me-1"/>Select Level 1 &amp; Finish</span>
+                                </div>
+                                <field name="indicator_level_1" readonly="1" nolabel="1"/>
+                            </button>
+                            <div class="mb-3 p-3 border rounded" style="background-color: #fcfbfa; border-left: 6px solid #726732 !important;" invisible="can_edit_ratings">
                                 <h4 style="color: #726732; margin-top: 0; margin-bottom: 6px;">🟡 Level 1 — Basic</h4>
                                 <field name="indicator_level_1" readonly="1" nolabel="1"/>
                             </div>
 
-                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #f8f9fa; border-left: 5px solid #1d2b32; border-radius: 4px;">
+                            <!-- Level 2 -->
+                            <button name="action_set_level_2" type="object"
+                                    class="btn w-100 text-start p-3 mb-3 border rounded shadow-sm"
+                                    style="background-color: #f8f9fa; border-left: 6px solid #1d2b32 !important; cursor: pointer;"
+                                    invisible="not can_edit_ratings">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <h4 style="color: #1d2b32; margin: 0; font-size: 15px; font-weight: bold;">🔵 Level 2 — Intermediate</h4>
+                                    <span class="badge rounded-pill bg-primary" invisible="not has_next_line"><i class="fa fa-arrow-right me-1"/>Select Level 2 &amp; Next</span>
+                                    <span class="badge rounded-pill bg-primary" invisible="has_next_line"><i class="fa fa-check me-1"/>Select Level 2 &amp; Finish</span>
+                                </div>
+                                <field name="indicator_level_2" readonly="1" nolabel="1"/>
+                            </button>
+                            <div class="mb-3 p-3 border rounded" style="background-color: #f8f9fa; border-left: 6px solid #1d2b32 !important;" invisible="can_edit_ratings">
                                 <h4 style="color: #1d2b32; margin-top: 0; margin-bottom: 6px;">🔵 Level 2 — Intermediate</h4>
                                 <field name="indicator_level_2" readonly="1" nolabel="1"/>
                             </div>
 
-                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fdf8f5; border-left: 5px solid #c17540; border-radius: 4px;">
+                            <!-- Level 3 -->
+                            <button name="action_set_level_3" type="object"
+                                    class="btn w-100 text-start p-3 mb-3 border rounded shadow-sm"
+                                    style="background-color: #fdf8f5; border-left: 6px solid #c17540 !important; cursor: pointer;"
+                                    invisible="not can_edit_ratings">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <h4 style="color: #c17540; margin: 0; font-size: 15px; font-weight: bold;">🟠 Level 3 — Advanced</h4>
+                                    <span class="badge rounded-pill bg-warning text-dark" invisible="not has_next_line"><i class="fa fa-arrow-right me-1"/>Select Level 3 &amp; Next</span>
+                                    <span class="badge rounded-pill bg-warning text-dark" invisible="has_next_line"><i class="fa fa-check me-1"/>Select Level 3 &amp; Finish</span>
+                                </div>
+                                <field name="indicator_level_3" readonly="1" nolabel="1"/>
+                            </button>
+                            <div class="mb-3 p-3 border rounded" style="background-color: #fdf8f5; border-left: 6px solid #c17540 !important;" invisible="can_edit_ratings">
                                 <h4 style="color: #c17540; margin-top: 0; margin-bottom: 6px;">🟠 Level 3 — Advanced</h4>
                                 <field name="indicator_level_3" readonly="1" nolabel="1"/>
                             </div>
 
-                            <div style="padding: 12px 15px; background-color: #faf4f5; border-left: 5px solid #541718; border-radius: 4px;">
+                            <!-- Level 4 -->
+                            <button name="action_set_level_4" type="object"
+                                    class="btn w-100 text-start p-3 border rounded shadow-sm"
+                                    style="background-color: #faf4f5; border-left: 6px solid #541718 !important; cursor: pointer;"
+                                    invisible="not can_edit_ratings">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <h4 style="color: #541718; margin: 0; font-size: 15px; font-weight: bold;">🔴 Level 4 — Expert</h4>
+                                    <span class="badge rounded-pill bg-danger" invisible="not has_next_line"><i class="fa fa-arrow-right me-1"/>Select Level 4 &amp; Next</span>
+                                    <span class="badge rounded-pill bg-danger" invisible="has_next_line"><i class="fa fa-check me-1"/>Select Level 4 &amp; Finish</span>
+                                </div>
+                                <field name="indicator_level_4" readonly="1" nolabel="1"/>
+                            </button>
+                            <div class="p-3 border rounded" style="background-color: #faf4f5; border-left: 6px solid #541718 !important;" invisible="can_edit_ratings">
                                 <h4 style="color: #541718; margin-top: 0; margin-bottom: 6px;">🔴 Level 4 — Expert</h4>
                                 <field name="indicator_level_4" readonly="1" nolabel="1"/>
                             </div>
@@ -193,7 +301,7 @@
 
 
                         <!-- Deadline Warning Callout Banner in Modal View -->
-                        <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft' or is_admin_user">
+                        <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft'">
                             <i class="fa fa-exclamation-triangle me-2"/> 
                             <strong>Deadline Passed:</strong> Rating inputs are read-only because the submission deadline for this cycle has passed.
                         </div>
@@ -201,7 +309,7 @@
                         <group string="Proficiency Rating &amp; Supporting Remarks" style="margin-top: 20px;">
                             <group>
                                 <field name="required_level" readonly="1" invisible="state in ('draft', 'submitted', 'supervisor_review')"/>
-                                <field name="current_level" string="Select Current Proficiency Level" required="1" readonly="not can_edit_ratings"/>
+                                <field name="current_level" string="Select Current Proficiency Level" readonly="not can_edit_ratings"/>
                                 <field name="gap" readonly="1" invisible="state in ('draft', 'submitted', 'supervisor_review')"/>
                                 <field name="achievement_status" widget="badge" readonly="1" invisible="state in ('draft', 'submitted', 'supervisor_review')"/>
                             </group>
@@ -211,6 +319,13 @@
                             </group>
                         </group>
                     </sheet>
+                    <footer>
+                        <button name="action_save_and_prev" type="object" string="Save &amp; Prev" class="btn btn-outline-secondary" icon="fa-chevron-left" invisible="not has_prev_line"/>
+                        <button name="action_save_and_next" type="object" string="Save &amp; Next" class="btn btn-primary" icon="fa-chevron-right" invisible="not has_next_line" style="background-color: #541718; border-color: #541718;"/>
+                        <button name="action_save_and_close" type="object" string="Save &amp; Finish" class="btn btn-success" invisible="has_next_line"/>
+                        <button name="action_save_and_close" type="object" string="Save &amp; Close" class="btn btn-secondary" invisible="not has_next_line"/>
+                        <button string="Close" class="btn btn-light" special="cancel"/>
+                    </footer>
                 </form>
             </field>
         </record>
@@ -225,11 +340,7 @@
                         <button name="action_populate_competencies" string="Populate Competencies"
                                 type="object" class="oe_highlight" invisible="state != 'draft' or (is_deadline_passed and not is_admin_or_officer) or not can_edit_ratings" icon="fa-list-ol"/>
                         <button name="action_submit" string="Submit"
-                                type="object" class="oe_highlight" invisible="state != 'draft' or (is_deadline_passed and not is_admin_or_officer) or not can_edit_ratings"/>
-                        <button name="action_submit" string="Admin Submit (Override Deadline)"
-                                type="object" class="btn-warning"
-                                groups="competency_management.group_competency_admin,competency_management.group_competency_officer"
-                                invisible="state != 'draft' or not is_deadline_passed or not is_admin_or_officer or is_override_active"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft' or not cycle_deadline or is_deadline_passed or not can_edit_ratings or not has_lines"/>
                         <button name="action_enable_override" string="Override Ratings"
                                 type="object" class="btn-warning"
                                 groups="competency_management.group_competency_admin,competency_management.group_competency_officer"
@@ -244,6 +355,7 @@
                                 statusbar_visible="draft,submitted"/>
                     </header>
                     <sheet>
+                        <field name="has_lines" invisible="1"/>
                         <field name="is_deadline_passed" invisible="1"/>
                         <field name="cycle_deadline" invisible="1"/>
                         <field name="is_admin_user" invisible="1"/>
@@ -251,6 +363,14 @@
                         <field name="is_override_active" invisible="1"/>
                         <field name="can_edit_ratings" invisible="1"/>
                         <field name="can_override" invisible="1"/>
+
+                        <!-- Competencies Not Populated Warning Banner -->
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" invisible="has_lines or state != 'draft'">
+                            <i class="fa fa-info-circle fa-2x me-3" title="Info"/>
+                            <div>
+                                <strong>Competencies Not Populated:</strong> This assessment currently has no competencies loaded. Please click the <strong>Populate Competencies</strong> button above to load your evaluation competencies.
+                            </div>
+                        </div>
 
                         <!-- Administrative Override Active Warning Alert Banner -->
                         <div class="alert alert-warning text-center" role="alert" invisible="not is_override_active">
@@ -261,19 +381,25 @@
 
 
                         <!-- Deadline Passed Warning Alert Banner -->
-                        <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft' or is_override_active">
+                        <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft'">
                             <i class="fa fa-exclamation-triangle me-2"/> 
-                            <strong>Submission Deadline Passed:</strong> The submission deadline (<field name="cycle_deadline"/>) for this assessment cycle has passed. Standard submissions are closed. (Competency Administrators retain override permissions).
+                            <strong>Submission Deadline Passed:</strong> The submission deadline (<field name="cycle_deadline"/>) for this assessment cycle has passed. A Competency Officer or Administrator must extend the deadline before submission.
+                        </div>
+                        <div class="alert alert-warning text-center" role="alert" invisible="cycle_deadline or state != 'draft'">
+                            <strong>Submission Deadline Not Set:</strong> A Competency Officer or Administrator must set the cycle deadline before assessments can be submitted.
                         </div>
 
                         <group>
-                            <group>
+                            <group string="Evaluation Profile">
                                 <field name="name" readonly="1"/>
                                 <field name="cycle_id" readonly="1" force_save="1" domain="[('state', '=', 'open')]"/>
                                 <field name="assessment_type" readonly="1" force_save="1"/>
                                 <field name="employee_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
+                                <field name="job_id" string="Position / Title" readonly="1" options="{'no_open': True}"/>
+                                <field name="grade_id" string="Job Grade" readonly="1" options="{'no_open': True}"/>
+                                <field name="department_id" string="Department" readonly="1" options="{'no_open': True}"/>
                             </group>
-                            <group>
+                            <group string="Assessor &amp; Status">
                                 <field name="assessor_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
                                 <field name="average_gap" invisible="state in ('draft', 'submitted', 'supervisor_review')"/>
                                 <field name="is_locked"/>
@@ -288,7 +414,7 @@
                                         <field name="competency_id" readonly="1" string="Core Competency"/>
                                         <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="current_level" required="1"/>
+                                        <field name="current_level" readonly="1"/>
                                         <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
@@ -304,7 +430,7 @@
                                         <field name="competency_id" readonly="1" string="Leadership Competency"/>
                                         <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="current_level" required="1"/>
+                                        <field name="current_level" readonly="1"/>
                                         <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
@@ -320,7 +446,7 @@
                                         <field name="competency_id" readonly="1" string="Technical Competency"/>
                                         <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                         <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
-                                        <field name="current_level" required="1"/>
+                                        <field name="current_level" readonly="1"/>
                                         <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
                                         <field name="comments" string="Remarks / Comments"/>
@@ -396,7 +522,7 @@
             <field name="res_model">competency.assessment</field>
             <field name="view_mode">list,form</field>
             <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
-            <field name="context">{'search_default_filter_current_cycle': 1, 'competency_employee_select': True}</field>
+            <field name="context">{'search_default_filter_current_cycle': 1, 'search_default_group_type': 1, 'competency_employee_select': True}</field>
         </record>
 
         <record id="action_my_competency_assessment" model="ir.actions.act_window">
@@ -406,7 +532,7 @@
             <field name="domain">[('assessor_id', '=', uid)]</field>
             <field name="view_id" ref="view_competency_assessment_my_list"/>
             <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
-            <field name="context">{'search_default_filter_current_cycle': 1, 'competency_employee_select': True}</field>
+            <field name="context">{'search_default_filter_current_cycle': 1, 'search_default_group_type': 1, 'competency_employee_select': True}</field>
         </record>
 
         <!-- Dedicated Anonymized Employee Views for My Evaluations -->
@@ -488,7 +614,7 @@
             <field name="name">My Competency Evaluation Results</field>
             <field name="res_model">competency.assessment.line</field>
             <field name="view_mode">list,form</field>
-            <field name="domain">[('employee_id.user_id', '=', uid), ('is_primary_reporting_line', '=', True)]</field>
+            <field name="domain">[('employee_id.user_id', '=', uid), ('is_primary_reporting_line', '=', True), '|', ('assessment_id.is_fully_assessed_notified', '=', True), ('cycle_id.state', '=', 'closed')]</field>
             <field name="search_view_id" ref="view_competency_assessment_line_search"/>
             <field name="context">{'search_default_filter_current_cycle': 1, 'create': False, 'edit': False, 'delete': False}</field>
         </record>

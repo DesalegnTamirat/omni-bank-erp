@@ -45,7 +45,7 @@ class CompetencyReportWizard(models.TransientModel):
             return [user.default_operating_unit_id.id]
         emp = user.employee_id
         if emp:
-            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
             if emp_ou:
                 return [emp_ou.id]
         return []
@@ -257,7 +257,7 @@ class CompetencyReportWizard(models.TransientModel):
                 ou_direct = self.env['operating.unit'].search([('department', 'in', rec.department_ids.ids)])
                 ou_from_dept = rec.department_ids.mapped('operating_unit_id')
                 dept_emps = self.env['hr.employee'].search([('department_id', 'in', rec.department_ids.ids)])
-                ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+                ou_from_emps = dept_emps.mapped('default_operating_unit_id')
                 allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
                 rec.operating_unit_domain = str([('id', 'in', allowed_ous.ids)])
             else:
@@ -270,13 +270,13 @@ class CompetencyReportWizard(models.TransientModel):
                 emp_conditions.extend([
                     '|',
                     ('default_operating_unit_id', 'in', rec.operating_unit_ids.ids),
-                    ('operating_unit_id', 'in', rec.operating_unit_ids.ids)
+                    ('department_id.operating_unit_id', 'in', rec.operating_unit_ids.ids)
                 ])
             elif rec.operating_unit_ids:
                 emp_conditions.extend([
                     '|',
                     ('default_operating_unit_id', 'in', rec.operating_unit_ids.ids),
-                    ('operating_unit_id', 'in', rec.operating_unit_ids.ids)
+                    ('department_id.operating_unit_id', 'in', rec.operating_unit_ids.ids)
                 ])
             elif rec.department_ids:
                 emp_conditions.append(('department_id', 'in', rec.department_ids.ids))
@@ -290,7 +290,7 @@ class CompetencyReportWizard(models.TransientModel):
             ou_direct = self.env['operating.unit'].search([('department', 'in', self.department_ids.ids)])
             ou_from_dept = self.department_ids.mapped('operating_unit_id')
             dept_emps = self.env['hr.employee'].search([('department_id', 'in', self.department_ids.ids)])
-            ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+            ou_from_emps = dept_emps.mapped('default_operating_unit_id')
             allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
             domain_ou = [('id', 'in', allowed_ous.ids)]
             domain_job = [('department_id', 'in', self.department_ids.ids)]
@@ -339,12 +339,12 @@ class CompetencyReportWizard(models.TransientModel):
             domain_emp.append(('department_id', 'in', self.department_ids.ids))
             domain_emp.extend([
                 '|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids),
-                     ('operating_unit_id', 'in', self.operating_unit_ids.ids)
+                     ('department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
             ])
         elif self.operating_unit_ids:
             domain_emp.extend([
                 '|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids),
-                     ('operating_unit_id', 'in', self.operating_unit_ids.ids)
+                     ('department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
             ])
         elif self.department_ids:
             domain_emp.append(('department_id', 'in', self.department_ids.ids))
@@ -524,7 +524,7 @@ class CompetencyReportWizard(models.TransientModel):
             if self.operating_unit_ids:
                 asm_domain.extend([
                     '|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids),
-                    ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
+                    ('employee_id.department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
                 ])
             if self.job_ids:
                 asm_domain.append(('job_id', 'in', self.job_ids.ids))
@@ -552,7 +552,7 @@ class CompetencyReportWizard(models.TransientModel):
             if self.operating_unit_ids:
                 asm_domain.extend([
                     '|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids),
-                    ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
+                    ('employee_id.department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
                 ])
             if self.stage_filter and self.stage_filter != 'all':
                 asm_domain.append(('state', '=', self.stage_filter))
@@ -673,7 +673,7 @@ class CompetencyReportWizard(models.TransientModel):
                 except (ValueError, TypeError):
                     pass
 
-            ou_obj = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+            ou_obj = getattr(emp, 'default_operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
             grade_obj = getattr(emp, 'grade_id', False)
             emp_job = l.job_id or getattr(emp, 'job_position', False) or emp.job_id
             gender_lbl = 'N/A'
@@ -785,7 +785,7 @@ class CompetencyReportWizard(models.TransientModel):
             if self.department_ids:
                 asm_domain.append(('department_id', 'in', self.department_ids.ids))
             if self.operating_unit_ids:
-                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
             if self.job_ids:
                 asm_domain.append(('job_id', 'in', self.job_ids.ids))
             if self.employee_ids:
@@ -799,7 +799,7 @@ class CompetencyReportWizard(models.TransientModel):
                 'Job Position', 'Total Competencies', 'Gap Count', 'Average Gap', 'Overall Score', 'Status'
             ])
             for a in asms:
-                emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.employee_id, 'operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
+                emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
                 ou_name = emp_ou.name if emp_ou else 'N/A'
                 tot_comps = len(a.line_ids)
                 gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
@@ -928,7 +928,7 @@ class CompetencyReportWizard(models.TransientModel):
             sup_gap = round(req_val - sup_avg, 2) if sup_avg is not None else None
             weighted_gap = round(req_val - final_rating, 2)
 
-            ou_obj = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+            ou_obj = getattr(emp, 'default_operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
             grade_obj = getattr(emp, 'grade_id', False)
 
             res[(emp_id, comp_id)] = {
@@ -1250,7 +1250,7 @@ class CompetencyReportWizard(models.TransientModel):
             if self.department_ids:
                 asm_domain.append(('department_id', 'in', self.department_ids.ids))
             if self.operating_unit_ids:
-                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
             if self.job_ids:
                 asm_domain.append(('job_id', 'in', self.job_ids.ids))
             if self.employee_ids:
@@ -1268,7 +1268,7 @@ class CompetencyReportWizard(models.TransientModel):
                 worksheet.set_column(col_num, col_num, 18)
 
             for row_num, a in enumerate(asms, start=start_row + 1):
-                emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.employee_id, 'operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
+                emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
                 ou_name = emp_ou.name if emp_ou else 'N/A'
                 tot_comps = len(a.line_ids)
                 gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
@@ -1351,7 +1351,7 @@ class CompetencyReportWizard(models.TransientModel):
             elif self.department_ids:
                 asm_domain.append(('department_id', 'in', self.department_ids.ids))
             elif self.operating_unit_ids:
-                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
             else:
                 emp = self.env.user.employee_id
                 if emp:

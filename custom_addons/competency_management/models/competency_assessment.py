@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
+import logging
 import re
+from datetime import timedelta
 from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError, AccessError
+
+_logger = logging.getLogger(__name__)
 
 
 class CompetencyAssessmentCycle(models.Model):
     """Scheduled competency assessment cycle."""
     _name = 'competency.assessment.cycle'
     _description = 'Competency Assessment Cycle'
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'id desc'
 
     name = fields.Char(string='Cycle Name', required=True)
@@ -23,6 +27,44 @@ class CompetencyAssessmentCycle(models.Model):
         ('closed', 'Closed'),
     ], string='Status', default='draft', tracking=True)
     active = fields.Boolean(string='Active', default=True, tracking=True)
+    is_targeted = fields.Boolean(
+        string='Target Specific Employees', default=False,
+        groups='competency_management.group_competency_admin',
+    )
+    target_type = fields.Selection(
+        [
+            ('department', 'Department'),
+            ('operating_unit', 'Operating Unit'),
+            ('employee', 'Employees'),
+        ], string='Target By',
+        groups='competency_management.group_competency_admin',
+    )
+    target_department_ids = fields.Many2many(
+        'hr.department', 'competency_cycle_target_department_rel',
+        'cycle_id', 'department_id', string='Target Departments',
+        groups='competency_management.group_competency_admin',
+    )
+    target_operating_unit_ids = fields.Many2many(
+        'operating.unit', 'competency_cycle_target_operating_unit_rel',
+        'cycle_id', 'operating_unit_id', string='Target Operating Units',
+        groups='competency_management.group_competency_admin',
+    )
+    target_employee_ids = fields.Many2many(
+        'hr.employee', 'competency_cycle_target_employee_rel',
+        'cycle_id', 'employee_id', string='Target Employees',
+        groups='competency_management.group_competency_admin',
+    )
+    scoped_employee_ids = fields.Many2many(
+        'hr.employee', 'competency_cycle_scoped_employee_rel',
+        'cycle_id', 'employee_id', string='Employees in Cycle',
+        readonly=True, copy=False,
+        groups='competency_management.group_competency_admin',
+        help='Employee cohort fixed when the cycle opens. Department or work unit transfers do not change it.',
+    )
+    scope_employee_count = fields.Integer(
+        string='Employees in Scope', compute='_compute_scope_employee_count',
+        groups='competency_management.group_competency_admin',
+    )
     assessment_ids = fields.One2many('competency.assessment', 'cycle_id', string='Assessments')
     assessment_count = fields.Integer(string='Total Assessments', compute='_compute_assessment_counts')
     pending_assessment_count = fields.Integer(string='Pending Assessments', compute='_compute_assessment_counts')
@@ -46,6 +88,98 @@ class CompetencyAssessmentCycle(models.Model):
                 ], limit=1)
                 if duplicate:
                     raise ValidationError(_("An Assessment Cycle named '%s' already exists. Cycle names must be unique.") % rec.name.strip())
+
+    def _get_scope_employee_ids(self):
+        """Resolve the cycle cohort; outside bosses may still rate its employees."""
+        self.ensure_one()
+        if self.state != 'draft':
+            if self.sudo().scoped_employee_ids:
+                return set(self.sudo().scoped_employee_ids.ids)
+            if self.sudo().is_targeted:
+                return set()
+
+        employees = self.env['hr.employee'].sudo().search([('active', '=', True)])
+        if not self.sudo().is_targeted:
+            return set(employees.ids)
+
+        target_type = self.sudo().target_type
+        if not target_type:
+            # Preserve the preview for a draft saved before this choice existed.
+            # Opening still requires the administrator to choose a target type.
+            populated_types = [
+                scope_type for scope_type, selected in (
+                    ('department', self.sudo().target_department_ids),
+                    ('operating_unit', self.sudo().target_operating_unit_ids),
+                    ('employee', self.sudo().target_employee_ids),
+                ) if selected
+            ]
+            target_type = populated_types[0] if len(populated_types) == 1 else False
+        if target_type == 'department':
+            department_ids = set(self.sudo().target_department_ids.ids)
+            return {
+                employee.id for employee in employees
+                if employee.department_id.id in department_ids
+            }
+        if target_type == 'operating_unit':
+            operating_unit_ids = set(self.sudo().target_operating_unit_ids.ids)
+            result = set()
+            for employee in employees:
+                operating_unit = (
+                    getattr(employee, 'default_operating_unit_id', False)
+                    or (employee.department_id.operating_unit_id if employee.department_id else False)
+                )
+                if operating_unit and operating_unit.id in operating_unit_ids:
+                    result.add(employee.id)
+            return result
+        if target_type == 'employee':
+            selected_ids = set(self.sudo().target_employee_ids.ids)
+            return selected_ids.intersection(employees.ids)
+        return set()
+
+    def _includes_employee(self, employee):
+        """Check cycle membership without granting access to the employee master."""
+        self.ensure_one()
+        employee_id = employee.id if hasattr(employee, 'id') else employee
+        if not employee_id:
+            return False
+        # Open cycles use the frozen cohort. Legacy bank-wide cycles have no snapshot.
+        if self.state != 'draft':
+            if self.sudo().scoped_employee_ids:
+                return employee_id in set(self.sudo().scoped_employee_ids.ids)
+            if self.sudo().is_targeted:
+                return False
+        if not self.sudo().is_targeted:
+            return bool(self.env['hr.employee'].sudo().browse(employee_id).exists().active)
+        return employee_id in self._get_scope_employee_ids()
+
+    def _allows_assessor(self, employee, assessor_user_id, assessment_type,
+                         scope_employee_ids=None, assessor_employee_ids=None):
+        """In a targeted cycle, only participants or the evaluated employee's boss may rate."""
+        self.ensure_one()
+        if not self.sudo().is_targeted:
+            return True
+        if not assessor_user_id:
+            return False
+        included_ids = scope_employee_ids if scope_employee_ids is not None else self._get_scope_employee_ids()
+        if assessor_employee_ids is None:
+            assessor_employee_ids = set(self.env['hr.employee'].sudo().search([
+                ('user_id', '=', assessor_user_id), ('active', '=', True),
+            ]).ids)
+        if included_ids.intersection(assessor_employee_ids):
+            return True
+        if assessment_type not in ('team', 'supervisor'):
+            return False
+        evaluated = self.env['hr.employee'].sudo().browse(employee.id if hasattr(employee, 'id') else employee)
+        if not evaluated.exists():
+            return False
+        boss = getattr(evaluated, 'coach_id', False) or evaluated.parent_id
+        return bool(boss and boss.user_id.id == assessor_user_id)
+
+    @api.depends('state', 'is_targeted', 'target_type', 'target_department_ids', 'target_operating_unit_ids',
+                 'target_employee_ids', 'scoped_employee_ids')
+    def _compute_scope_employee_count(self):
+        for cycle in self:
+            cycle.scope_employee_count = len(cycle._get_scope_employee_ids())
 
     @api.depends('state', 'active')
     def _compute_is_open_or_latest(self):
@@ -140,9 +274,20 @@ class CompetencyAssessmentCycle(models.Model):
             'context': {'default_cycle_id': self.id, 'search_default_state_draft': 1},
         }
 
+    def _check_cycle_admin(self):
+        if not (
+            self.env.su
+            or self.env.user.has_group('competency_management.group_competency_admin')
+            or self.env.user.has_group('base.group_system')
+        ):
+            raise AccessError(_("Only a Competency Administrator can manage assessment cycles and broadcasts."))
+
     def action_send_deadline_reminders(self):
         """Send warning/reminder notifications to all assessors with pending draft assessments for this cycle."""
         self.ensure_one()
+        self._check_cycle_admin()
+        if self.state != 'open':
+            raise UserError(_("Deadline reminders can only be sent for an open cycle."))
         self.env.cr.execute("""
             SELECT DISTINCT ca.assessor_id
             FROM competency_assessment ca
@@ -164,6 +309,7 @@ class CompetencyAssessmentCycle(models.Model):
         cycle_id = self.id
         cycle_name = self.name
         dbname = self.env.cr.dbname
+        sender_user_id = self.env.user.id
 
         import threading
 
@@ -180,16 +326,6 @@ class CompetencyAssessmentCycle(models.Model):
                     if not cycle_rec.exists():
                         return
 
-                    if cycle_rec.assessment_deadline:
-                        deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y')
-                        deadline_phrase = _("The submission deadline is <b>%s</b>. Please complete and submit your assessments before the deadline.") % deadline_str
-                        summary_str = _("URGENT: %d Pending Assessment(s) Due %s") % (pending_count, deadline_str)
-                        note_str = _("You have %d pending assessment(s) for cycle '%s'. Deadline: %s.") % (pending_count, cycle_name, deadline_str)
-                    else:
-                        deadline_phrase = _("Please complete and submit your assessments at your earliest convenience.")
-                        summary_str = _("Action Required: %d Pending Assessment(s)") % pending_count
-                        note_str = _("You have %d pending assessment(s) for cycle '%s'.") % (pending_count, cycle_name)
-
                     new_cr.execute("""
                         SELECT ca.assessor_id,
                                count(ca.id) as pending_count,
@@ -203,6 +339,7 @@ class CompetencyAssessmentCycle(models.Model):
                     assessor_rows = new_cr.fetchall()
 
                     sent_count = 0
+                    sender_user = new_env['res.users'].browse(sender_user_id)
                     for row in assessor_rows:
                         assessor_id, pending_count, sample_asm_id, emp_names = row
                         assessor = new_env['res.users'].browse(assessor_id)
@@ -213,6 +350,19 @@ class CompetencyAssessmentCycle(models.Model):
                         names_clean = [n for n in (emp_names or []) if n]
                         emp_names_str = ", ".join(names_clean[:5])
                         extra = _(" and %d more") % (len(names_clean) - 5) if len(names_clean) > 5 else ""
+
+                        if cycle_rec.assessment_deadline:
+                            deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y')
+                            if fields.Date.context_today(cycle_rec) > cycle_rec.assessment_deadline:
+                                deadline_phrase = _("The deadline <b>%s</b> has passed. Ask a Competency Officer to extend it before submitting.") % deadline_str
+                            else:
+                                deadline_phrase = _("The submission deadline is <b>%s</b>. Please submit by that date.") % deadline_str
+                            summary_str = _("Deadline: %d Pending Assessment(s) Due %s") % (pending_count, deadline_str)
+                            note_str = _("You have %d pending assessment(s) for cycle '%s'. Deadline: %s.") % (pending_count, cycle_name, deadline_str)
+                        else:
+                            deadline_phrase = _("Please complete and submit your assessments at your earliest convenience.")
+                            summary_str = _("Action Required: %d Pending Assessment(s)") % pending_count
+                            note_str = _("You have %d pending assessment(s) for cycle '%s'.") % (pending_count, cycle_name)
 
                         msg_body = Markup(_(
                             "⚠️ <b>Competency Assessment Deadline Warning:</b><br/>"
@@ -226,7 +376,8 @@ class CompetencyAssessmentCycle(models.Model):
 
                         target_rec = new_env['competency.assessment'].browse(sample_asm_id) if sample_asm_id else cycle_rec
                         target_rec._notify_user_inbox_and_activity(
-                            assessor, summary_str, note_str, msg_body, target_rec=target_rec
+                            assessor, summary_str, note_str, msg_body,
+                            target_rec=target_rec, sender_user=sender_user,
                         )
                         sent_count += 1
 
@@ -260,6 +411,14 @@ class CompetencyAssessmentCycle(models.Model):
 
     def action_notify_assessors(self):
         """Manual button action for Competency Admin to broadcast cycle opening notification to all pending assessors."""
+        self.ensure_one()
+        self._check_cycle_admin()
+        if self.state != 'open':
+            raise UserError(_("Opening notices can only be sent for an open cycle."))
+        return self._queue_cycle_open_notifications(self.env.user.id)
+
+    def _queue_cycle_open_notifications(self, sender_user_id):
+        """Queue cycle invitations from a trusted, already-authorized caller."""
         self.ensure_one()
         self.env.cr.execute("""
             SELECT DISTINCT ca.assessor_id
@@ -321,6 +480,7 @@ class CompetencyAssessmentCycle(models.Model):
                     assessor_rows = new_cr.fetchall()
 
                     sent_count = 0
+                    sender_user = new_env['res.users'].browse(sender_user_id)
                     for row in assessor_rows:
                         assessor_id, total_pending, sample_asm_id, self_cnt, sup_cnt, peer_cnt, sub_cnt = row
                         assessor = new_env['res.users'].browse(assessor_id)
@@ -356,7 +516,8 @@ class CompetencyAssessmentCycle(models.Model):
 
                         target_rec = new_env['competency.assessment'].browse(sample_asm_id) if sample_asm_id else cycle_rec
                         target_rec._notify_user_inbox_and_activity(
-                            assessor, summary_str, note_str, msg_body, target_rec=target_rec
+                            assessor, summary_str, note_str, msg_body,
+                            target_rec=target_rec, sender_user=sender_user,
                         )
                         sent_count += 1
 
@@ -392,15 +553,43 @@ class CompetencyAssessmentCycle(models.Model):
     def action_start(self):
         """Draft -> Open: Sets state to open immediately and generates 360 assessments asynchronously in a background thread."""
         self.ensure_one()
+        self._check_cycle_admin()
         if self.state != 'draft':
             raise UserError(_("Only cycles in Draft state can be started."))
+        if not self.assessment_deadline:
+            raise UserError(_("Set a submission deadline before opening this cycle."))
+        if self.assessment_deadline and self.assessment_deadline < fields.Date.context_today(self):
+            raise UserError(_("Extend the assessment deadline before opening this cycle."))
 
-        self.with_context(force_write=True).write({'state': 'open'})
+        if self.sudo().is_targeted and not self.sudo().target_type:
+            raise UserError(_("Choose Department, Operating Unit, or Employees before opening this targeted cycle."))
+
+        scope_employee_ids = self._get_scope_employee_ids()
+        if not scope_employee_ids:
+            raise UserError(_(
+                "No active employees match this cycle. Select a department, operating unit, or employee before opening a targeted cycle."
+            ))
+        out_of_scope = self.env['competency.assessment'].sudo().search([
+            ('cycle_id', '=', self.id),
+            ('active', '=', True),
+            ('employee_id', 'not in', sorted(scope_employee_ids)),
+        ], limit=1)
+        if out_of_scope:
+            raise UserError(_(
+                "This cycle already has an assessment for an employee outside its selected scope. "
+                "Remove that assessment before opening the cycle."
+            ))
+
+        self.with_context(force_write=True, freeze_cycle_scope=True).sudo().write({
+            'scoped_employee_ids': [(6, 0, sorted(scope_employee_ids))],
+            'state': 'open',
+        })
         self.env.cr.commit()
 
         cycle_id = self.id
         cycle_name = self.name
         dbname = self.env.cr.dbname
+        sender_user_id = self.env.user.id
 
         import threading
 
@@ -418,6 +607,7 @@ class CompetencyAssessmentCycle(models.Model):
                         _logger.info("Starting background assessment generation for cycle %s (id=%d)", cycle_rec.name, cycle_id)
                         cycle_rec._generate_cycle_assessments_batch()
                         new_cr.commit()
+                        cycle_rec._queue_cycle_open_notifications(sender_user_id)
                         _logger.info("Finished background assessment generation for cycle %s", cycle_rec.name)
             except Exception as exc:
                 _logger.exception("Error during background assessment generation for cycle %d: %s", cycle_id, exc)
@@ -456,6 +646,9 @@ class CompetencyAssessmentCycle(models.Model):
 
         active_employees = self.env['hr.employee'].sudo().search([('active', '=', True)])
         if not active_employees:
+            return self.env['competency.assessment']
+        evaluated_employee_ids = self._get_scope_employee_ids()
+        if not evaluated_employee_ids:
             return self.env['competency.assessment']
 
         # Existing assessment pairs to prevent duplicate creation
@@ -542,9 +735,11 @@ class CompetencyAssessmentCycle(models.Model):
         peer_assessor_workload = {}
         sub_assessor_workload = {}
 
-        # 1. Self Assessment (100% mandatory for all active employees with user account)
+        # 1. Self Assessment (all selected employees with a user account)
         for emp in active_employees:
             e_id = emp.id
+            if e_id not in evaluated_employee_ids:
+                continue
             e_data = emp_cache[e_id]
             u_id = e_data['user_id']
             if not u_id:
@@ -562,6 +757,8 @@ class CompetencyAssessmentCycle(models.Model):
         # 2. Team Assessment (Boss / Coach evaluates team member / direct reports, 100% mandatory, no exceptions)
         for emp in active_employees:
             e_id = emp.id
+            if e_id not in evaluated_employee_ids:
+                continue
             e_data = emp_cache[e_id]
             c_id = e_data['coach_id']
             if c_id and emp_cache.get(c_id, {}).get('user_id'):
@@ -585,13 +782,15 @@ class CompetencyAssessmentCycle(models.Model):
         sub_candidates = {}
         for c_id, teammates in coached_by.items():
             for cand_id in teammates:
+                if cand_id not in evaluated_employee_ids:
+                    continue
                 cand_data = emp_cache.get(cand_id)
                 if not cand_data or not cand_data['user_id']:
                     continue
 
                 eligible_evaluators = []
                 for eval_id in teammates:
-                    if eval_id == cand_id:
+                    if eval_id == cand_id or eval_id not in evaluated_employee_ids:
                         continue
                     eval_data = emp_cache.get(eval_id)
                     if not eval_data or not eval_data['user_id']:
@@ -641,12 +840,16 @@ class CompetencyAssessmentCycle(models.Model):
         # B. Direct reports evaluating their coach/superior upward (When someone assesses his coach that is subordinate)
         # Rule: A coach is always evaluated upward by their team, whether in the same work unit or not.
         for m_id, dr_ids in reports_by_manager.items():
+            if m_id not in evaluated_employee_ids:
+                continue
             m_data = emp_cache.get(m_id)
             if not m_data or not m_data['user_id']:
                 continue
 
             eligible_subs = []
             for r in dr_ids:
+                if r not in evaluated_employee_ids:
+                    continue
                 r_data = emp_cache.get(r)
                 if not r_data or not r_data['user_id']:
                     continue
@@ -691,11 +894,13 @@ class CompetencyAssessmentCycle(models.Model):
 
         # A. Directors/Chiefs: manually configured via competency.director.peer.config (unidirectional, no auto-fallback).
         for d_id, p_ids in dir_peer_map.items():
+            if d_id not in evaluated_employee_ids:
+                continue
             d_u_id = emp_cache.get(d_id, {}).get('user_id')
             if not d_u_id or not p_ids:
                 continue
             for p_id in p_ids:
-                if p_id == d_id or p_id not in emp_cache:
+                if p_id == d_id or p_id not in emp_cache or p_id not in evaluated_employee_ids:
                     continue
                 pair_peer = (p_id, d_u_id, 'peer')
                 if pair_peer not in existing_pairs:
@@ -745,12 +950,17 @@ class CompetencyAssessmentCycle(models.Model):
         for b_key, members in peer_buckets.items():
             m_len = len(members)
             if m_len > 1:
-                k_peer = min(m_len - 1, max_peers) if max_peers > 0 else m_len - 1
                 members_sorted = sorted(members)
                 for i, e_id in enumerate(members_sorted):
-                    total_eligible_raters += (m_len - 1)
+                    if e_id not in evaluated_employee_ids:
+                        continue
                     # Candidate peers in circular order starting from the member after e_id
-                    candidate_peers = [members_sorted[(i + j) % m_len] for j in range(1, m_len)]
+                    candidate_peers = [
+                        members_sorted[(i + j) % m_len] for j in range(1, m_len)
+                        if members_sorted[(i + j) % m_len] in evaluated_employee_ids
+                    ]
+                    total_eligible_raters += len(candidate_peers)
+                    k_peer = min(len(candidate_peers), max_peers) if max_peers > 0 else len(candidate_peers)
                     # Sort candidates by current peer workload to balance assessor load
                     sorted_candidates = sorted(candidate_peers, key=lambda pid: (peer_assessor_workload.get(emp_cache[pid]['user_id'], 0), pid))
                     chosen = 0
@@ -808,7 +1018,7 @@ class CompetencyAssessmentCycle(models.Model):
         self.message_post(
             body=Markup(_(
                 "Assessment cycle <b>%s</b> opened. Successfully generated <b>%d</b> 360-degree evaluations for %d employees. Submission Deadline: <b>%s</b>."
-            )) % (escape(self.name or ''), len(assessments_to_create), len(active_employees), escape(deadline_str or ''))
+            )) % (escape(self.name or ''), len(assessments_to_create), len(evaluated_employee_ids), escape(deadline_str or ''))
         )
         self.env.cr.commit()
 
@@ -820,19 +1030,47 @@ class CompetencyAssessmentCycle(models.Model):
         return True
 
     def action_close(self):
+        self._check_cycle_admin()
         for rec in self:
             if rec.state != 'open':
                 raise UserError(_("Only open assessment cycles can be closed."))
-        self.with_context(force_write=True).write({'state': 'closed'})
+        self.with_context(force_write=True).sudo().write({'state': 'closed'})
         for rec in self:
             rec.message_post(body=_('Assessment cycle %s closed.') % rec.name)
             self.env['competency.dashboard.snapshot'].sudo()._cron_take_dashboard_snapshot(cycle_ids=[rec.id])
         return True
 
     def write(self, vals):
-        force_write = self.env.context.get('force_write')
+        if 'state' in vals and not self.env.su:
+            raise AccessError(_("Use Start Cycle or Close Cycle to change the cycle status."))
+        scope_fields = {
+            'is_targeted', 'target_type', 'target_department_ids', 'target_operating_unit_ids',
+            'target_employee_ids',
+        }
+        if 'scoped_employee_ids' in vals and not (
+            self.env.su and self.env.context.get('freeze_cycle_scope')
+        ):
+            raise AccessError(_("The cycle employee list can only be fixed when the cycle opens."))
+        if set(vals) & scope_fields and not (
+            self.env.su
+            or self.env.user.has_group('competency_management.group_competency_admin')
+            or self.env.user.has_group('base.group_system')
+        ):
+            raise AccessError(_("Only a Competency Administrator can set a cycle's employee scope."))
+        if set(vals) & scope_fields:
+            for rec in self:
+                if rec.state != 'draft':
+                    raise ValidationError(_("The employee scope of an opened cycle cannot be changed."))
+        is_officer_or_admin = bool(
+            self.env.su
+            or self.env.user.has_group('competency_management.group_competency_officer')
+            or self.env.user.has_group('competency_management.group_competency_admin')
+            or self.env.user.has_group('base.group_system')
+        )
+        if 'assessment_deadline' in vals and not is_officer_or_admin:
+            raise AccessError(_("Only a Competency Officer or Administrator can change the assessment deadline."))
         for rec in self:
-            if rec.state == 'closed' and not force_write and not self.env.su:
+            if rec.state == 'closed' and not self.env.su:
                 locked_fields = {'name', 'period_start', 'period_end', 'assessment_deadline'}
                 if set(vals.keys()) & locked_fields:
                     raise ValidationError(_("This assessment cycle (%s) is closed and cannot be edited.") % rec.name)
@@ -946,13 +1184,12 @@ class CompetencyAssessment(models.Model):
         for rec in self:
             rec.grade_id = self._resolve_employee_grade(rec.employee_id) if rec.employee_id else False
 
-    @api.depends('employee_id', 'employee_id.default_operating_unit_id', 'employee_id.operating_unit_id', 'department_id.operating_unit_id')
+    @api.depends('employee_id', 'employee_id.default_operating_unit_id', 'department_id.operating_unit_id')
     def _compute_operating_unit_id(self):
         for rec in self:
             emp = rec.employee_id
             rec.operating_unit_id = (
                 getattr(emp, 'default_operating_unit_id', False)
-                or getattr(emp, 'operating_unit_id', False)
                 or (emp.department_id.operating_unit_id if emp and emp.department_id else False)
                 or False
             )
@@ -1227,14 +1464,14 @@ class CompetencyAssessment(models.Model):
         if not emp or not emp.active:
             return self.env['hr.employee']
 
-        # 1. Directors & Chiefs Exception: Strictly manual assignment via competency.director.peer.config
+        # 1. Check Explicit Peer Configuration (Chiefs, Directors, Grade 15, and Branch Managers)
+        peer_config = self.env['competency.director.peer.config'].sudo().search([('director_id', '=', emp.id)], limit=1)
+        if peer_config and peer_config.peer_ids:
+            return peer_config.peer_ids.filtered(lambda p: p.active and p.id != emp.id)
+
+        # Directors & Chiefs strictly require manual configuration
         if self._is_director_or_chief(emp):
-            peers = self.env['hr.employee']
-            config = self.env['competency.director.peer.config'].search([('director_id', '=', emp.id)], limit=1)
-            if config and config.peer_ids:
-                peers |= config.peer_ids.filtered(lambda p: p.active and p.id != emp.id)
-            # Returns manually assigned peers ONLY (strictly unidirectional: no reverse peering, no auto-assignment if unassigned)
-            return peers
+            return self.env['hr.employee']
 
         emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
         emp_grade_id = self._get_employee_grade_id(emp)
@@ -1385,17 +1622,19 @@ class CompetencyAssessment(models.Model):
     technical_line_ids = fields.One2many('competency.assessment.line', 'assessment_id', string='Technical Competencies', domain=[('pillar', '=', 'technical')])
     average_gap = fields.Float(string='Average Gap', compute='_compute_average_gap', store=True)
     is_locked = fields.Boolean(string='Locked', compute='_compute_is_locked')
+    has_lines = fields.Boolean(string='Has Competencies', compute='_compute_has_lines')
     cycle_deadline = fields.Date(related='cycle_id.assessment_deadline', string='Cycle Deadline', readonly=True)
     is_deadline_passed = fields.Boolean(
-        string='Submission Deadline Passed', compute='_compute_is_deadline_passed', store=True,
+        string='Submission Deadline Passed', compute='_compute_is_deadline_passed',
         help='True if current date exceeds the assessment cycle submission deadline.')
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
     @api.depends('cycle_id', 'cycle_id.assessment_deadline')
+    @api.depends_context('tz')
     def _compute_is_deadline_passed(self):
-        today = fields.Date.today()
         for rec in self:
+            today = fields.Date.context_today(rec)
             dl = fields.Date.to_date(rec.cycle_id.assessment_deadline) if (rec.cycle_id and rec.cycle_id.assessment_deadline) else False
             rec.is_deadline_passed = bool(dl and today > dl)
 
@@ -1517,7 +1756,7 @@ class CompetencyAssessment(models.Model):
                 continue
 
             # 3. Designated Assessor editing their own draft assessment within deadline during open cycle
-            cycle_open = not rec.cycle_id or rec.cycle_id.state == 'open'
+            cycle_open = bool(rec.cycle_id and rec.cycle_id.state == 'open' and rec.cycle_id.assessment_deadline)
             if is_assessor and rec.state == 'draft' and not rec.is_deadline_passed and cycle_open:
                 rec.can_edit_ratings = True
                 continue
@@ -1625,6 +1864,11 @@ class CompetencyAssessment(models.Model):
         for rec in self:
             rec.is_locked = rec.state == 'locked'
 
+    @api.depends('line_ids')
+    def _compute_has_lines(self):
+        for rec in self:
+            rec.has_lines = bool(rec.line_ids)
+
     @api.model
     def _get_batch_sequence_names(self, count):
         """Efficiently reserve and generate batch sequence numbers in 1 SQL query."""
@@ -1664,6 +1908,58 @@ class CompetencyAssessment(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        scope_by_cycle = {}
+        assessor_user_ids = {
+            vals.get('assessor_id') or self.env.user.id
+            for vals in vals_list if vals.get('cycle_id') and vals.get('employee_id')
+        }
+        assessor_employee_ids_by_user = {}
+        if assessor_user_ids:
+            assessor_employees = self.env['hr.employee'].sudo().search([
+                ('user_id', 'in', list(assessor_user_ids)), ('active', '=', True),
+            ])
+            for assessor_employee in assessor_employees:
+                assessor_employee_ids_by_user.setdefault(assessor_employee.user_id.id, set()).add(assessor_employee.id)
+        for vals in vals_list:
+            if vals.get('cycle_id') and vals.get('employee_id'):
+                cycle = self.env['competency.assessment.cycle'].sudo().browse(vals['cycle_id'])
+                if cycle.exists():
+                    if cycle.id not in scope_by_cycle:
+                        scope_by_cycle[cycle.id] = cycle._get_scope_employee_ids()
+                    if vals['employee_id'] not in scope_by_cycle[cycle.id]:
+                        raise UserError(_(
+                            "This employee is outside assessment cycle '%s'. Select an employee included when the cycle opened."
+                        ) % cycle.name)
+                    assessor_user_id = vals.get('assessor_id') or self.env.user.id
+                    if not cycle._allows_assessor(
+                        vals['employee_id'], assessor_user_id, vals.get('assessment_type'),
+                        scope_employee_ids=scope_by_cycle[cycle.id],
+                        assessor_employee_ids=assessor_employee_ids_by_user.get(assessor_user_id, set()),
+                    ):
+                        raise UserError(_(
+                            "Only an employee in assessment cycle '%s', or the evaluated employee's boss, "
+                            "may be assigned as assessor."
+                        ) % cycle.name)
+        if not (self.env.su or self._is_elevated_evaluator()):
+            own_employee = self.env.user.employee_id
+            for vals in vals_list:
+                cycle = self.env['competency.assessment.cycle'].sudo().browse(vals.get('cycle_id'))
+                if not (
+                    own_employee and cycle.exists() and cycle.state == 'open'
+                    and vals.get('employee_id') == own_employee.id
+                    and vals.get('assessment_type') == 'self'
+                    and vals.get('assessor_id', self.env.user.id) == self.env.user.id
+                    and vals.get('state', 'draft') == 'draft'
+                ):
+                    raise AccessError(_("Employees may create only their own draft self-assessment in an open cycle."))
+                if cycle.assessment_deadline and fields.Date.context_today(self) > cycle.assessment_deadline:
+                    raise UserError(_("The assessment deadline has passed. Ask a Competency Officer to extend it."))
+                if self.search_count([
+                    ('cycle_id', '=', cycle.id),
+                    ('employee_id', '=', own_employee.id),
+                    ('assessment_type', '=', 'self'),
+                ]):
+                    raise UserError(_("Your self-assessment already exists for this cycle."))
         seq = self.env['ir.sequence'].sudo()
         for vals in vals_list:
             if not vals.get('name'):
@@ -1671,15 +1967,7 @@ class CompetencyAssessment(models.Model):
         return super().create(vals_list)
 
     def web_read(self, specification):
-        """Auto-populate rating lines only when an assessor opens a single draft assessment in form view that has no lines yet."""
-        if len(self) == 1 and specification and 'line_ids' in specification:
-            for rec in self:
-                if rec.state == 'draft' and not rec.line_ids and rec.employee_id and rec.cycle_id:
-                    try:
-                        rec.sudo()._do_populate_lines()
-                    except Exception:
-                        pass
-
+        """Web read override: row-level access control enforced, sudo only for elevated field reads."""
         # Enforce competency.assessment's own row-level rules first (assessor_id = user,
         # supervisor/team rules, officer-sees-all) — unchanged, still blocks anyone not
         # entitled to view this specific assessment.
@@ -1765,9 +2053,9 @@ class CompetencyAssessment(models.Model):
 
     @api.onchange('employee_id', 'assessment_type')
     def _onchange_employee_id_populate_competencies(self):
-        """Automatically populate/refresh competency rating lines when employee_id or assessment_type changes in draft state."""
-        if self.state == 'draft' and self.employee_id:
-            self._do_populate_lines()
+        """When employee_id or assessment_type changes in draft, clear lines so the assessor populates explicitly."""
+        if self.state == 'draft':
+            self.line_ids = [(5, 0, 0)]
 
     def _do_populate_lines(self):
         """Internal helper to populate competency rating lines for self.employee_id according to configured pillar scope."""
@@ -1885,9 +2173,26 @@ class CompetencyAssessment(models.Model):
 
         # Check if record is saved (real database integer ID) or unsaved (onchange/NewId)
         if isinstance(self.id, int):
+            # Preserve existing ratings and comments if re-populating
+            existing_ratings = {
+                line.competency_id.id: {
+                    'current_level': line.current_level,
+                    'comments': line.comments,
+                    'evidence_attachment_ids': [(6, 0, line.evidence_attachment_ids.ids)],
+                }
+                for line in self.line_ids if line.competency_id
+            }
             self.line_ids.sudo().unlink()
             if raw_line_vals:
-                create_vals = [dict(v, assessment_id=self.id) for v in raw_line_vals]
+                create_vals = []
+                for v in raw_line_vals:
+                    cid = v.get('competency_id')
+                    line_dict = dict(v, assessment_id=self.id)
+                    if cid in existing_ratings:
+                        line_dict['current_level'] = existing_ratings[cid]['current_level']
+                        line_dict['comments'] = existing_ratings[cid]['comments']
+                        line_dict['evidence_attachment_ids'] = existing_ratings[cid]['evidence_attachment_ids']
+                    create_vals.append(line_dict)
                 created_lines = self.env['competency.assessment.line'].sudo().create(create_vals)
                 cnt = len(created_lines)
             else:
@@ -1906,40 +2211,41 @@ class CompetencyAssessment(models.Model):
             raise UserError(_("Competencies can only be populated when the assessment is in Draft state."))
         if not self.cycle_id or not self.assessment_type or not self.employee_id:
             raise UserError(_("Assessment Cycle, Assessment Type, and Employee are required before populating competencies."))
+        if not self.can_edit_ratings:
+            raise AccessError(_("Only the assigned assessor or an authorized officer with an active override can populate these ratings before the deadline."))
         
         cnt, mapping_name_str = self.with_context(force_write=True)._do_populate_lines()
         self.message_post(body=_('Competency rating lines populated from %s (%d competencies).') % (mapping_name_str, cnt))
         return {
-            'type': 'ir.actions.act_window',
-            'name': _('Competency Assessment'),
-            'res_model': 'competency.assessment',
-            'res_id': self.id,
-            'view_mode': 'form',
-            'target': 'main',
+            'type': 'ir.actions.client',
+            'tag': 'bunna_refresh_form',
+            'params': {
+                'res_model': self._name,
+                'res_id': self.id,
+                'title': _('Competencies Populated'),
+                'message': _('Successfully populated %d competencies from %s.') % (cnt, mapping_name_str),
+            }
         }
 
     def action_auto_fill_lines(self):
         return self.action_populate_competencies()
 
     def _check_submission_deadline(self):
-        """Enforce cycle submission deadline. Competency Admins can override."""
-        is_admin = bool(
-            self.env.user.has_group('competency_management.group_competency_admin')
-            or self.env.user.has_group('base.group_system')
-            or self.env.su
-            or self.env.is_admin()
-        )
-        if is_admin:
-            return
-        today = fields.Date.today()
+        """Require an open cycle and a submission date within its deadline."""
         for rec in self:
-            dl = fields.Date.to_date(rec.cycle_id.assessment_deadline) if (rec.cycle_id and rec.cycle_id.assessment_deadline) else False
+            cycle = rec.cycle_id.sudo()
+            if not cycle or cycle.state != 'open':
+                raise UserError(_("Assessments can only be submitted while their cycle is open."))
+            dl = fields.Date.to_date(cycle.assessment_deadline) if cycle.assessment_deadline else False
+            if not dl:
+                raise UserError(_("A Competency Officer or Administrator must set the cycle submission deadline before assessments can be submitted."))
+            today = fields.Date.context_today(rec)
             if dl and today > dl:
                 deadline_str = dl.strftime('%b %d, %Y')
                 raise UserError(_(
                     "The submission deadline (%s) for assessment cycle '%s' has passed. "
-                    "Submissions are no longer accepted unless HR extends the deadline."
-                ) % (deadline_str, rec.cycle_id.name))
+                    "A Competency Officer or Administrator must extend the deadline before submission."
+                ) % (deadline_str, cycle.name))
 
     def action_enable_override(self):
         """Enable administrative edit override for an unapproved assessment."""
@@ -2018,6 +2324,43 @@ class CompetencyAssessment(models.Model):
         emp = user.employee_id
         is_elevated = self._is_elevated_evaluator(user)
 
+        # The deadline applies to every submission path, including direct RPC writes,
+        # sudo calls, and administrative rating overrides.
+        if vals.get('state') == 'submitted':
+            self._check_submission_deadline()
+            for rec in self:
+                if rec.state != 'draft':
+                    raise UserError(_("Only draft assessments can be submitted."))
+                if not rec.line_ids:
+                    raise UserError(_("Add and rate the competencies before submitting."))
+                if any(not line.current_level or line.current_level == '0' for line in rec.line_ids):
+                    raise ValidationError(_("Rate every competency before submitting."))
+                if not (self.env.su or is_elevated or rec.assessor_id.id == user.id):
+                    raise AccessError(_("Only the assigned assessor or a Competency Officer/Administrator can submit this assessment."))
+        if 'state' in vals and not self.env.su:
+            raise AccessError(_("Use the assessment workflow action to change its status."))
+
+        if {'employee_id', 'cycle_id', 'assessor_id', 'assessment_type'} & set(vals):
+            for rec in self:
+                target_cycle = (
+                    self.env['competency.assessment.cycle'].sudo().browse(vals['cycle_id'])
+                    if 'cycle_id' in vals else rec.sudo().cycle_id
+                )
+                target_employee_id = vals.get('employee_id', rec.sudo().employee_id.id)
+                if target_cycle.exists() and not target_cycle._includes_employee(target_employee_id):
+                    raise UserError(_(
+                        "This employee is outside assessment cycle '%s'. Select an employee included when the cycle opened."
+                    ) % target_cycle.name)
+                assessor_user_id = vals.get('assessor_id', rec.sudo().assessor_id.id)
+                assessment_type = vals.get('assessment_type', rec.assessment_type)
+                if target_cycle.exists() and not target_cycle._allows_assessor(
+                    target_employee_id, assessor_user_id, assessment_type,
+                ):
+                    raise UserError(_(
+                        "Only an employee in assessment cycle '%s', or the evaluated employee's boss, "
+                        "may be assigned as assessor."
+                    ) % target_cycle.name)
+
         for rec in self:
             # 1. Approved or locked assessment immutability check (cannot be modified by anyone)
             if (rec.state in ('approved', 'locked') or rec.is_locked) and not force_write:
@@ -2048,7 +2391,7 @@ class CompetencyAssessment(models.Model):
                         "An HR / People Solution Officer or Competency Administrator must review or override."
                     ))
 
-            today = fields.Date.today()
+            today = fields.Date.context_today(rec)
             cycle = rec.cycle_id.sudo() if rec.cycle_id else False
             dl = fields.Date.to_date(cycle.assessment_deadline) if (cycle and cycle.assessment_deadline) else False
             is_expired = rec.is_deadline_passed or bool(dl and today > dl)
@@ -2070,31 +2413,38 @@ class CompetencyAssessment(models.Model):
                     ]).with_context(force_write=True).write({'is_fully_assessed_notified': False})
         return res
 
-    def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None):
-        """Ensure notification appears in standard Odoo notification channels:
-        1. Live on-screen interactive toast notification (via bus.bus)
-        2. Top Header Clock Icon (mail.activity)
-        3. Top Header Notifications Tray / Inbox (mail.notification with inbox type)
-        """
+    def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None, sender_user=None):
+        """Deliver a competency notice to its record chatter and Odoo Discuss."""
         if not target_user or not target_user.active:
             return
         rec_to_notify = (target_rec or self).sudo()
 
+        # An automated notice must never become a direct message to oneself.
+        sender = sender_user or self.env.user
+        if not sender or not sender.exists() or not sender.active or sender.id == target_user.id:
+            sender = self.env.ref('base.user_admin', raise_if_not_found=False)
+        if sender and sender.id == target_user.id:
+            sender = self.env.ref('base.user_root', raise_if_not_found=False)
+
+        sender_partner = sender.partner_id if sender and sender.partner_id else False
+        sender_name = sender.name if sender else _('Competency System')
+
         # 1. Live Interactive Web Toast Notification (bus.bus)
         if target_user.partner_id:
             try:
+                toast_title = f"{sender_name}: {summary}" if sender_name else (summary or _('Competency Notification'))
                 self.env['bus.bus'].sudo()._sendone(
                     target_user.partner_id,
                     'simple_notification',
                     {
                         'type': 'info',
-                        'title': summary or _('Competency Notification'),
+                        'title': toast_title,
                         'message': note or summary,
                         'sticky': True,
                     }
                 )
             except Exception:
-                pass
+                _logger.exception("Could not send competency toast to user %s", target_user.id)
 
         # 2. Top Header Clock Icon (Planned Activity)
         try:
@@ -2105,15 +2455,18 @@ class CompetencyAssessment(models.Model):
                 user_id=target_user.id,
             )
         except Exception:
-            pass
+            _logger.exception("Could not schedule competency activity for user %s", target_user.id)
 
-        # 3. Document Chatter Message & In-App Notification (authored by OdooBot / System)
+        # 3. Document Chatter Message & In-App Notification (authored by real sender)
         if target_user.partner_id:
             try:
-                odoobot = self.env.ref('base.partner_root', raise_if_not_found=False)
-                author_id = odoobot.id if odoobot else False
+                author_id = sender_partner.id if sender_partner else False
+                if not author_id:
+                    odoobot = self.env.ref('base.partner_root', raise_if_not_found=False)
+                    author_id = odoobot.id if odoobot else False
                 msg = rec_to_notify.with_context(mail_create_nosubscribe=True).message_post(
                     body=msg_text,
+                    subject=summary,
                     partner_ids=[target_user.partner_id.id],
                     author_id=author_id,
                     message_type='notification',
@@ -2135,7 +2488,22 @@ class CompetencyAssessment(models.Model):
                         'is_read': False,
                     })
             except Exception:
-                pass
+                _logger.exception("Could not post competency chatter notice for user %s", target_user.id)
+
+        # Native Discuss DMs create the bottom-right circular chat head shown in the UI.
+        if sender and sender.partner_id and target_user.partner_id and sender.id != target_user.id:
+            try:
+                channel = self.env['discuss.channel'].with_user(sender)._get_or_create_chat(
+                    partners_to=[target_user.partner_id.id]
+                )
+                channel.with_user(sender).message_post(
+                    body=msg_text,
+                    message_type='comment',
+                    subtype_xmlid='mail.mt_comment',
+                    author_id=sender.partner_id.id,
+                )
+            except Exception:
+                _logger.exception("Could not send competency Discuss message to user %s", target_user.id)
 
 
     def action_submit(self):
@@ -2146,9 +2514,11 @@ class CompetencyAssessment(models.Model):
                     "Only draft assessments can be submitted. "
                     "'%s' is currently in '%s' state and cannot be re-submitted."
                 ) % (rec.name, rec.state))
+            if not (self.env.su or rec._is_elevated_evaluator() or rec.assessor_id.id == self.env.user.id):
+                raise AccessError(_("Only the assigned assessor or a Competency Officer/Administrator can submit this assessment."))
             rec._check_submission_deadline()
             if not rec.line_ids:
-                raise UserError(_('Add at least one competency rating line before submitting.'))
+                raise UserError(_("No competencies found for this assessment. Please click 'Populate Competencies' first, rate all competencies, and then submit."))
             unrated = rec.line_ids.filtered(lambda l: not l.current_level or l.current_level == '0')
             if unrated:
                 unrated_names = ", ".join(unrated.mapped('competency_id.name')[:5])
@@ -2175,17 +2545,20 @@ class CompetencyAssessment(models.Model):
 
             # Targeted Notifications & Systray Activities on Submission
             if rec.assessment_type == 'self':
-                # Confirmation activity for employee
-                if rec.employee_id and rec.sudo().employee_id.user_id:
-                    try:
-                        rec.sudo().activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('Self-Assessment Submitted: %s') % rec.name,
-                            note=_('Your competency self-assessment %s has been submitted successfully.') % rec.name,
-                            user_id=rec.sudo().employee_id.user_id.id,
-                        )
-                    except Exception:
-                        pass
+                employee_user = rec.sudo().employee_id.user_id
+                if employee_user:
+                    confirmation = Markup(_(
+                        "<b>Self-assessment submitted:</b> %s<br/>"
+                        "Your ratings have been received for cycle <b>%s</b>."
+                    )) % (escape(rec.name or ''), escape(rec.cycle_id.name or ''))
+                    rec._notify_user_inbox_and_activity(
+                        employee_user,
+                        _('Self-Assessment Submitted: %s') % rec.name,
+                        _('Your competency self-assessment %s has been submitted successfully.') % rec.name,
+                        confirmation,
+                        target_rec=rec,
+                        sender_user=self.env.ref('base.user_admin', raise_if_not_found=False),
+                    )
 
                 coach_emp = rec.sudo().employee_id.coach_id or rec.sudo().employee_id.parent_id
                 coach_user = coach_emp.user_id if (coach_emp and coach_emp.user_id) else False
@@ -2245,45 +2618,11 @@ class CompetencyAssessment(models.Model):
                 )
 
                 if emp_user:
-                    target_rec = self_asm or rec
+                    target_rec = self_asm or rec.cycle_id
                     rec._notify_user_inbox_and_activity(emp_user, summary_str, note_str, msg_text, target_rec=target_rec)
 
-            elif rec.assessment_type == 'subordinate':
-                # Employee submitted assessment for boss / coach
-                boss_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
-                if boss_user:
-                    view_eval_url = "/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1"
-                    msg_text = Markup(_(
-                        "📥 A subordinate evaluation has been completed and submitted for cycle '<b>%s</b>'.<br/>"
-                        "<div style='margin-top: 10px;'>"
-                        "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
-                        "👁️ View Evaluations</a></div>"
-                    )) % (
-                        escape(rec.cycle_id.name if rec.cycle_id else ''), view_eval_url
-                    )
-                    summary_str = _('Subordinate Evaluation Submitted: %s') % rec.name
-                    note_str = _('A subordinate evaluation has been submitted for cycle %s.') % (
-                        rec.cycle_id.name if rec.cycle_id else ''
-                    )
-                    rec._notify_user_inbox_and_activity(boss_user, summary_str, note_str, msg_text, target_rec=rec)
-
-            elif rec.assessment_type == 'peer':
-                peer_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
-                if peer_user:
-                    view_eval_url = "/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1"
-                    msg_text = Markup(_(
-                        "📥 A peer evaluation has been completed and submitted for cycle '<b>%s</b>'.<br/>"
-                        "<div style='margin-top: 10px;'>"
-                        "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
-                        "👁️ View Evaluations</a></div>"
-                    )) % (
-                        escape(rec.cycle_id.name if rec.cycle_id else ''), view_eval_url
-                    )
-                    summary_str = _('Peer Evaluation Submitted: %s') % rec.name
-                    note_str = _('A peer evaluation has been submitted for cycle %s.') % (
-                        rec.cycle_id.name if rec.cycle_id else ''
-                    )
-                    rec._notify_user_inbox_and_activity(peer_user, summary_str, note_str, msg_text, target_rec=rec)
+            # Peer and upward reviews notify the subject only when all raters finish;
+            # individual chat timestamps or senders would identify an anonymous rater.
 
             # Immediate Notification on Complete 360 Assessment (All Assigned Assessors Submitted)
             if rec.cycle_id and rec.employee_id:
@@ -2309,36 +2648,40 @@ class CompetencyAssessment(models.Model):
                     if all_emp_asms and not draft_asms and not any(all_emp_asms.mapped('is_fully_assessed_notified')):
                         emp_user = rec.sudo().employee_id.user_id
                         cycle_name = rec.cycle_id.name or _('Current Cycle')
-                        assessor_names = ", ".join(filter(None, all_emp_asms.mapped(lambda a: a.assessor_id.name or a.employee_id.name)))
-                        target_rec = all_emp_asms.filtered(lambda a: a.assessment_type == 'self')[:1] or rec
+                        assessor_count = len(all_emp_asms)
+                        target_rec = all_emp_asms.filtered(lambda a: a.assessment_type == 'self')[:1] or rec.cycle_id
+                        system_sender = self.env.ref('base.user_admin', raise_if_not_found=False)
 
                         # 1. Notify the Employee
                         if emp_user:
                             emp_msg_text = Markup(_(
                                 "🎉 <b>360° Competency Evaluation Completed!</b><br/>"
-                                "All assigned assessors (%s) have completed and submitted your evaluations for cycle '<b>%s</b>'.<br/>"
+                                "All %d assigned assessments have been completed for cycle '<b>%s</b>'.<br/>"
                                 "Your full competency evaluation results and capability gap analysis are now available for you to review.<br/><br/>"
                                 "<a href='/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
                                 "👁️ View My Full Evaluation Results</a>"
-                            )) % (escape(assessor_names or ''), escape(cycle_name))
+                            )) % (assessor_count, escape(cycle_name))
                             emp_summary = _('360° Evaluation Completed: %s') % cycle_name
                             emp_note = _('All assigned assessors have completed your evaluations for cycle \'%s\'. You can now view your full evaluation results.') % cycle_name
-                            rec._notify_user_inbox_and_activity(emp_user, emp_summary, emp_note, emp_msg_text, target_rec=target_rec)
+                            rec._notify_user_inbox_and_activity(
+                                emp_user, emp_summary, emp_note, emp_msg_text,
+                                target_rec=target_rec, sender_user=system_sender,
+                            )
 
                         # 2. Notify Coach / Supervisor
                         coach_emp = rec.sudo().employee_id.coach_id or rec.sudo().employee_id.parent_id
                         coach_user = coach_emp.user_id if (coach_emp and coach_emp.user_id) else False
                         if coach_user and coach_user != emp_user:
-                            sup_eval_url = f"/web#id={target_rec.id}&model=competency.assessment"
+                            sup_eval_url = "/web#action=competency_management.action_my_competency_evaluations&search_default_filter_current_cycle=1"
                             coach_msg_text = Markup(_(
                                 "🎉 <b>360° Competency Evaluation Completed for %s!</b><br/>"
-                                "All assigned assessors (%s) have completed evaluations for subordinate employee <b>%s</b> in cycle '<b>%s</b>'.<br/>"
+                                "All %d assigned assessments have been completed for subordinate employee <b>%s</b> in cycle '<b>%s</b>'.<br/>"
                                 "Final capability gaps and multi-source ratings are now ready for review.<br/><br/>"
                                 "<a href='%s' style='background-color: #541718; color: #FFFFFF; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block;'>"
                                 "👁️ Review Final Assessment</a>"
                             )) % (
                                 escape(rec.employee_id.name or ''),
-                                escape(assessor_names or ''),
+                                assessor_count,
                                 escape(rec.employee_id.name or ''),
                                 escape(cycle_name),
                                 sup_eval_url
@@ -2347,7 +2690,10 @@ class CompetencyAssessment(models.Model):
                             coach_note = _('All assigned raters have completed 360° competency evaluations for employee %s (cycle \'%s\').') % (
                                 rec.employee_id.name, cycle_name
                             )
-                            rec._notify_user_inbox_and_activity(coach_user, coach_summary, coach_note, coach_msg_text, target_rec=target_rec)
+                            rec._notify_user_inbox_and_activity(
+                                coach_user, coach_summary, coach_note, coach_msg_text,
+                                target_rec=target_rec, sender_user=system_sender,
+                            )
 
                         all_emp_asms.with_context(force_write=True).write({'is_fully_assessed_notified': True})
 
@@ -2372,6 +2718,12 @@ class CompetencyAssessment(models.Model):
     def action_supervisor_review(self):
         """Transition assessment to Supervisor Review state and notify supervisor."""
         for rec in self:
+            subject = rec.sudo().employee_id
+            supervisor_users = (subject.parent_id.user_id | subject.coach_id.user_id) if subject else self.env['res.users']
+            if not (self.env.su or rec._is_elevated_evaluator() or self.env.user in supervisor_users):
+                raise AccessError(_("Only the assigned supervisor or a Competency Officer/Administrator can request supervisor review."))
+            if rec.state != 'submitted':
+                raise UserError(_("Only submitted assessments can enter supervisor review."))
             rec.with_context(force_write=True).sudo().write({'state': 'supervisor_review'})
             supervisor_user = rec.sudo().employee_id.parent_id.user_id if (rec.employee_id and rec.sudo().employee_id.parent_id) else False
             if supervisor_user:
@@ -2388,14 +2740,22 @@ class CompetencyAssessment(models.Model):
 
     def action_hr_verify(self):
         for rec in self:
+            if not (self.env.su or rec._is_elevated_evaluator()):
+                raise AccessError(_("Only a Competency Officer or Administrator can verify an assessment."))
+            if rec.state not in ('submitted', 'supervisor_review'):
+                raise UserError(_("Only submitted assessments can be verified."))
             rec._check_segregation_of_duties()
-            rec.with_context(force_write=True).write({'state': 'hr_verified'})
+            rec.with_context(force_write=True).sudo().write({'state': 'hr_verified'})
 
     def action_approve(self):
         """Approve assessment with Segregation of Duties guard."""
         for rec in self:
+            if not (self.env.su or rec._is_elevated_evaluator()):
+                raise AccessError(_("Only a Competency Officer or Administrator can approve an assessment."))
+            if rec.state != 'hr_verified':
+                raise UserError(_("Only HR-verified assessments can be approved."))
             rec._check_segregation_of_duties()
-            rec.with_context(force_write=True).write({'state': 'approved'})
+            rec.with_context(force_write=True).sudo().write({'state': 'approved'})
             rec.message_post(body=_('Assessment %s approved.') % rec.name)
             
             gap_lines = rec.line_ids.filtered(lambda l: int(l.current_level or 1) < int(l.required_level or 1))
@@ -2421,7 +2781,11 @@ class CompetencyAssessment(models.Model):
     def action_lock(self):
         """Lock finalized assessment against further modification."""
         for rec in self:
-            rec.with_context(force_write=True).write({'state': 'locked'})
+            if not (self.env.su or rec._is_elevated_evaluator()):
+                raise AccessError(_("Only a Competency Officer or Administrator can lock an assessment."))
+            if rec.state != 'approved':
+                raise UserError(_("Only approved assessments can be locked."))
+            rec.with_context(force_write=True).sudo().write({'state': 'locked'})
             rec.message_post(body=_('Assessment %s locked.') % rec.name)
 
     def action_unlock(self):
@@ -2429,71 +2793,72 @@ class CompetencyAssessment(models.Model):
         self.ensure_one()
         if not (self.env.su or self.env.user.has_group('competency_management.group_competency_admin')):
             raise UserError(_('Only Competency Administrators can unlock finalized assessments.'))
+        if self.state != 'locked':
+            raise UserError(_("Only locked assessments can be unlocked."))
         if not self.notes:
             raise UserError(_('Provide a justification in Notes before unlocking.'))
-        self.with_context(force_write=True).write({'state': 'approved'})
+        self.with_context(force_write=True).sudo().write({'state': 'approved'})
         self.message_post(body=_('Assessment %s unlocked by %s.') % (self.name, self.env.user.name))
 
 
 
     @api.model
     def _cron_pending_assessment_reminders(self):
-        """Daily cron: pending assessment reminders, upcoming deadline alerts & overdue escalations."""
+        """Send one Discuss reminder per pending assessor at each deadline milestone."""
         today = fields.Date.context_today(self)
-        
-        # 1. Upcoming Deadline Alerts (7 days, 3 days, 1 day before deadline)
-        upcoming_assessments = self.search([
-            ('state', 'in', ['draft', 'submitted', 'supervisor_review']),
-            ('cycle_id.assessment_deadline', '!=', False),
-            ('cycle_id.assessment_deadline', '>', today)
-        ])
-        for asm in upcoming_assessments:
-            days_left = (asm.cycle_id.assessment_deadline - today).days
-            if days_left in (7, 3, 1):
-                target_user = False
-                emp_sudo = asm.sudo().employee_id
-                if asm.state in ('draft', 'submitted') and emp_sudo and emp_sudo.user_id:
-                    target_user = emp_sudo.user_id
-                elif asm.state == 'supervisor_review' and emp_sudo and emp_sudo.parent_id and emp_sudo.parent_id.user_id:
-                    target_user = emp_sudo.parent_id.user_id
-                    
-                if target_user:
-                    try:
-                        asm.sudo().activity_schedule(
-                            'mail.mail_activity_data_todo',
-                            summary=_('UPCOMING DEADLINE (%d days left): Competency Assessment %s') % (days_left, asm.name),
-                            note=_('Reminder: Your competency assessment %s is due in %d days (Deadline: %s).') % (asm.name, days_left, asm.cycle_id.assessment_deadline),
-                            user_id=target_user.id,
-                            date_deadline=asm.cycle_id.assessment_deadline,
-                        )
-                    except Exception:
-                        pass
+        self.env.cr.execute("""
+            SELECT ca.cycle_id, ca.assessor_id, count(*), min(ca.id), cycle.assessment_deadline
+              FROM competency_assessment ca
+              JOIN competency_assessment_cycle cycle ON cycle.id = ca.cycle_id
+              JOIN res_users assessor ON assessor.id = ca.assessor_id
+             WHERE ca.state = 'draft' AND ca.active = TRUE
+               AND cycle.state = 'open' AND cycle.active = TRUE
+               AND assessor.active = TRUE
+               AND cycle.assessment_deadline BETWEEN %s AND %s
+             GROUP BY ca.cycle_id, ca.assessor_id, cycle.assessment_deadline
+        """, (today - timedelta(days=1), today + timedelta(days=7)))
+        pending_rows = self.env.cr.fetchall()
+        cycle_model_id = self.env['ir.model']._get('competency.assessment.cycle').id
+        system_sender = self.env.ref('base.user_admin', raise_if_not_found=False) or self.env.user
 
-        # 2. Overdue Assessments (Deadline reached or passed)
-        overdue_assessments = self.search([
-            ('state', 'in', ['draft', 'submitted', 'supervisor_review']),
-            ('cycle_id.assessment_deadline', '!=', False),
-            ('cycle_id.assessment_deadline', '<=', today)
-        ])
-        for asm in overdue_assessments:
-            target_user = False
-            emp_sudo = asm.sudo().employee_id
-            if asm.state in ('draft', 'submitted') and emp_sudo and emp_sudo.user_id:
-                target_user = emp_sudo.user_id
-            elif asm.state == 'supervisor_review' and emp_sudo and emp_sudo.parent_id and emp_sudo.parent_id.user_id:
-                target_user = emp_sudo.parent_id.user_id
-                
-            if target_user:
-                try:
-                    asm.sudo().activity_schedule(
-                        'mail.mail_activity_data_todo',
-                        summary=_('OVERDUE: Competency Assessment %s') % asm.name,
-                        note=_('URGENT: Competency Assessment %s passed its deadline (%s) and is overdue for completion.') % (asm.name, asm.cycle_id.assessment_deadline),
-                        user_id=target_user.id,
-                        date_deadline=today,
-                    )
-                except Exception:
-                    pass
+        for cycle_id, assessor_id, pending_count, assessment_id, deadline in pending_rows:
+            days_left = (deadline - today).days
+            if days_left not in (7, 3, 1, 0, -1):
+                continue
+            cycle = self.env['competency.assessment.cycle'].sudo().browse(cycle_id)
+            assessor = self.env['res.users'].sudo().browse(assessor_id)
+            if days_left > 0:
+                timing = _("%d day(s) remaining") % days_left
+                guidance = _("Please submit your pending assessments by the deadline.")
+            elif days_left == 0:
+                timing = _("Due today")
+                guidance = _("You may submit through today.")
+            else:
+                timing = _("Deadline passed")
+                guidance = _("Submissions are closed. Ask a Competency Officer or Administrator to extend the deadline.")
+            summary = _("Competency deadline %s: %s (%s)") % (timing, cycle.name, deadline)
+            already_sent = self.env['mail.activity'].sudo().search_count([
+                ('res_model_id', '=', cycle_model_id),
+                ('res_id', '=', cycle_id),
+                ('user_id', '=', assessor_id),
+                ('summary', '=', summary),
+            ])
+            if already_sent:
+                continue
+            note = _("You have %d pending assessment(s) in cycle '%s'. Deadline: %s. %s") % (
+                pending_count, cycle.name, deadline, guidance,
+            )
+            body = Markup(_(
+                "<b>Competency Assessment Deadline: %s</b><br/>"
+                "Cycle: <b>%s</b><br/>"
+                "Pending assessments: <b>%d</b><br/>"
+                "Deadline: <b>%s</b><br/>%s<br/>"
+                "<a href='/web#action=competency_management.action_my_competency_assessment'>Open My Competency Assessments</a>"
+            )) % (escape(timing), escape(cycle.name or ''), pending_count, escape(str(deadline)), escape(guidance))
+            assessment = self.sudo().browse(assessment_id)
+            assessment._notify_user_inbox_and_activity(
+                assessor, summary, note, body, target_rec=cycle, sender_user=system_sender,
+            )
 
     def get_achievement_summary_sentence(self):
         """Returns plain-language alignment sentence for this assessment."""
@@ -2611,6 +2976,159 @@ class CompetencyAssessmentLine(models.Model):
             'target': 'new',
             'context': self.env.context,
         }
+
+    has_next_line = fields.Boolean(string='Has Next Competency', compute='_compute_nav_lines')
+    has_prev_line = fields.Boolean(string='Has Previous Competency', compute='_compute_nav_lines')
+    assessment_progress_text = fields.Char(string='Assessment Progress', compute='_compute_nav_lines')
+
+    def _get_ordered_sibling_lines(self):
+        self.ensure_one()
+        if not self.assessment_id:
+            return self
+        pillar_order = {'core': 0, 'leadership': 1, 'technical': 2}
+        return self.assessment_id.line_ids.sorted(
+            key=lambda l: (pillar_order.get(l.pillar, 3), l.id)
+        )
+
+    def _compute_nav_lines(self):
+        for rec in self:
+            if not rec.assessment_id:
+                rec.has_next_line = False
+                rec.has_prev_line = False
+                rec.assessment_progress_text = ''
+                continue
+            lines = list(rec._get_ordered_sibling_lines())
+            total = len(lines)
+            if rec in lines:
+                idx = lines.index(rec)
+                rec.has_prev_line = (idx > 0)
+                rec.has_next_line = (idx + 1 < total)
+                rec.assessment_progress_text = _("Competency %d of %d") % (idx + 1, total)
+            else:
+                rec.has_next_line = False
+                rec.has_prev_line = False
+                rec.assessment_progress_text = ''
+
+    def _action_open_line(self, line):
+        self.ensure_one()
+        view_id = self.env.ref('competency_management.view_competency_assessment_line_form').id
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Behavioral Indicators & Rating: %s') % (line.competency_id.name if line.competency_id else ''),
+            'res_model': 'competency.assessment.line',
+            'res_id': line.id,
+            'view_mode': 'form',
+            'views': [(view_id, 'form')],
+            'target': 'new',
+            'context': dict(self.env.context),
+        }
+
+    def _get_next_line(self):
+        lines = list(self._get_ordered_sibling_lines())
+        if self in lines:
+            idx = lines.index(self)
+            if idx + 1 < len(lines):
+                return lines[idx + 1]
+        return None
+
+    def _get_prev_line(self):
+        lines = list(self._get_ordered_sibling_lines())
+        if self in lines:
+            idx = lines.index(self)
+            if idx > 0:
+                return lines[idx - 1]
+        return None
+
+    def action_set_level_1(self):
+        return self._auto_set_level_and_next('1')
+
+    def action_set_level_2(self):
+        return self._auto_set_level_and_next('2')
+
+    def action_set_level_3(self):
+        return self._auto_set_level_and_next('3')
+
+    def action_set_level_4(self):
+        return self._auto_set_level_and_next('4')
+
+    def _auto_set_level_and_next(self, level):
+        """Sets the selected level, saves immediately, recomputes 360 gaps, and advances to the next inline competency."""
+        self.ensure_one()
+        if not self.can_edit_ratings:
+            raise UserError(_("Ratings editing is closed for this assessment."))
+        self.with_context(force_write=True).sudo().write({'current_level': str(level)})
+        self._trigger_sibling_360_recompute()
+        next_line = self._get_next_line()
+        if next_line:
+            return self._action_open_line(next_line)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Assessment Complete'),
+                'message': _("You have rated the final competency in this assessment."),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }
+
+    def _auto_set_level_and_close(self, level):
+        """Sets level and closes or advances."""
+        return self._auto_set_level_and_next(level)
+
+    def action_save_and_next(self):
+        """Saves current line inputs and opens the next competency line."""
+        self.ensure_one()
+        if self.can_edit_ratings:
+            self._trigger_sibling_360_recompute()
+        next_line = self._get_next_line()
+        if next_line:
+            return self._action_open_line(next_line)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Saved'),
+                'message': _("Rating saved. This is the last competency in the assessment."),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }
+
+    def action_save_and_prev(self):
+        """Saves current line inputs and opens the previous competency line."""
+        self.ensure_one()
+        if self.can_edit_ratings:
+            self._trigger_sibling_360_recompute()
+        prev_line = self._get_prev_line()
+        if prev_line:
+            return self._action_open_line(prev_line)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('First Competency'),
+                'message': _("This is the first competency in the assessment."),
+                'type': 'info',
+                'sticky': False,
+            }
+        }
+
+    def action_save_and_close(self):
+        """Saves current line inputs and closes the modal."""
+        self.ensure_one()
+        if self.can_edit_ratings:
+            self._trigger_sibling_360_recompute()
+        return {'type': 'ir.actions.act_window_close'}
+
+    is_fully_assessed_notified = fields.Boolean(
+        string='Fully Assessed Notified',
+        related='assessment_id.is_fully_assessed_notified',
+        store=False,
+        readonly=True,
+    )
 
     tna_measure = fields.Selection([
         ('below', 'Underqualified'),
@@ -2823,33 +3341,16 @@ class CompetencyAssessmentLine(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        force_write = self.env.context.get('force_write')
-        is_admin = bool(
-            self.env.user.has_group('competency_management.group_competency_admin')
+        force_write = self.env.context.get('force_write') and (
+            self.env.su
+            or self.env.user.has_group('competency_management.group_competency_admin')
             or self.env.user.has_group('base.group_system')
-            or self.env.su
-            or self.env.is_admin()
         )
         for vals in vals_list:
-            if not force_write and not self.env.su and vals.get('assessment_id'):
-                asm = self.env['competency.assessment'].browse(vals['assessment_id'])
-                if asm.state == 'locked' and not is_admin:
-                    raise ValidationError(_("Cannot add rating lines to locked assessment %s.") % asm.name)
-                today = fields.Date.today()
-                dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
-                if (asm.is_deadline_passed or (dl and today > dl)) and asm.state == 'draft' and not is_admin:
-                    deadline_str = dl.strftime('%b %d, %Y') if dl else 'N/A'
-                    raise UserError(_(
-                        "The submission deadline (%s) for assessment cycle '%s' has passed. "
-                        "Rating lines cannot be added or edited after the deadline."
-                    ) % (deadline_str, asm.cycle_id.name))
-                rating_fields = {'current_level', 'comments', 'evidence_attachment_ids'}
-                if any(f in vals for f in rating_fields) and not is_admin:
-                    if asm.assessor_id and asm.assessor_id != self.env.user:
-                        raise UserError(_(
-                            "You are not authorized to rate or edit this assessment. "
-                            "Only the assigned assessor (%s) or an HR / People Solution Officer with Override can input ratings."
-                        ) % (asm.assessor_id.name or 'Assessor'))
+            if not force_write and not self.env.su:
+                asm = self.env['competency.assessment'].browse(vals.get('assessment_id'))
+                if not asm.exists() or not asm.can_edit_ratings:
+                    raise AccessError(_("Rating lines can be added only while this assessment is editable by the assigned assessor or an authorized officer with an active override."))
         lines = super().create(vals_list)
         if not self.env.context.get('skip_360_recompute'):
             lines._trigger_sibling_360_recompute()
@@ -2896,7 +3397,7 @@ class CompetencyAssessmentLine(models.Model):
                         # Assessor editing own assessment
                         if asm.state != 'draft':
                             raise UserError(_("This assessment has already been submitted and cannot be edited by the assessor."))
-                        today = fields.Date.today()
+                        today = fields.Date.context_today(asm)
                         dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
                         if asm.is_deadline_passed or (dl and today > dl):
                             deadline_str = dl.strftime('%b %d, %Y') if dl else 'N/A'
@@ -3120,8 +3621,13 @@ class CompetencyAssessmentLine(models.Model):
 
     @api.ondelete(at_uninstall=False)
     def _prevent_unlink_on_locked(self):
+        force_write = self.env.context.get('force_write') and (
+            self.env.su
+            or self.env.user.has_group('competency_management.group_competency_admin')
+            or self.env.user.has_group('base.group_system')
+        )
         for line in self:
-            if line.assessment_id and not self.env.context.get('force_write') and not self.env.su:
+            if line.assessment_id and not force_write and not self.env.su:
                 if line.assessment_id.state == 'locked':
                     raise ValidationError(_("Cannot delete rating lines from locked assessment %s.") % line.assessment_id.name)
                 if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
