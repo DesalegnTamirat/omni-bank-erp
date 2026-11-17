@@ -902,16 +902,16 @@ class EdsCourseVendorSelection(models.Model):
     vendor_count = fields.Integer(string='Vendors Count', compute='_compute_vendor_count')
     awarded_vendor_id = fields.Many2one(
         'eds.external.provider', string='First Awarded Vendor',
-        compute='_compute_awarded_vendor', store=True,
+        compute='_compute_awarded_vendor_stored', store=True,
         help='Legacy single-vendor reference. Use Awarded Vendors for all sourcing awards.')
     awarded_bid_ids = fields.Many2many(
         'eds.course.vendor.line', string='Awarded Bids',
-        compute='_compute_awarded_vendor')
+        compute='_compute_awarded_vendor_non_stored')
     awarded_vendor_ids = fields.Many2many(
         'eds.external.provider', string='Awarded Vendors',
-        compute='_compute_awarded_vendor')
+        compute='_compute_awarded_vendor_non_stored')
     awarded_vendor_count = fields.Integer(
-        string='Awarded Vendors', compute='_compute_awarded_vendor')
+        string='Awarded Vendors', compute='_compute_awarded_vendor_non_stored')
     currency_id = fields.Many2one(
         'res.currency', string='Bid Currency', required=True,
         default=lambda self: currency_for_delivery(self.env, 'internal'),
@@ -1016,13 +1016,18 @@ class EdsCourseVendorSelection(models.Model):
             rec.vendor_count = len(rec.line_ids)
 
     @api.depends('line_ids.status', 'line_ids.vendor_id')
-    def _compute_awarded_vendor(self):
+    def _compute_awarded_vendor_stored(self):
+        for rec in self:
+            awarded = rec.line_ids.filtered(lambda line: line.status == 'awarded').sorted('id')
+            rec.awarded_vendor_id = awarded[:1].vendor_id if awarded else False
+
+    @api.depends('line_ids.status', 'line_ids.vendor_id')
+    def _compute_awarded_vendor_non_stored(self):
         for rec in self:
             awarded = rec.line_ids.filtered(lambda line: line.status == 'awarded').sorted('id')
             rec.awarded_bid_ids = awarded
             rec.awarded_vendor_ids = awarded.mapped('vendor_id')
             rec.awarded_vendor_count = len(awarded)
-            rec.awarded_vendor_id = awarded[:1].vendor_id if awarded else False
 
     def _sourcing_source_domain(self):
         self.ensure_one()

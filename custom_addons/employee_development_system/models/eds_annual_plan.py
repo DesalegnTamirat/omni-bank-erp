@@ -221,10 +221,14 @@ class EdsAnnualPlan(models.Model):
         self.ensure_one()
         lines = self.line_ids
         methods = [('internal', _('Internal')), ('local_external', _('Local External')),
-                   ('international', _('International'))]
+                   ('international', _('International')), ('elearning', _('E-Learning'))]
         by_method = [{
             'key': key, 'label': label,
-            'lines': lines.filtered(lambda line, method=key: line.delivery_method == method),
+            'lines': lines.filtered(
+                lambda line, method=key: line.delivery_method == method or (
+                    method == 'elearning' and line.delivery_method in ('elearning', 'e_learning')
+                )
+            ),
         } for key, label in methods]
         currency_totals = {}
         for line in lines:
@@ -1005,6 +1009,7 @@ class EdsAnnualPlanLine(models.Model):
         ('internal', 'Internal Delivery'),
         ('local_external', 'Local External Provider'),
         ('international', 'International Provider'),
+        ('elearning', 'E-Learning'),
     ], string='Delivery Method', default='internal')
     vendor_selection_ids = fields.One2many(
         'eds.course.vendor.selection', 'plan_line_id', string='Vendor Sourcing')
@@ -1012,6 +1017,7 @@ class EdsAnnualPlanLine(models.Model):
         ('internal', 'Internal / ToT'),
         ('local_external', 'Local External'),
         ('international', 'International'),
+        ('elearning', 'E-Learning'),
         ('mixed', 'Mixed Delivery'),
     ], string='Actual / Chosen Delivery', compute='_compute_execution_delivery')
     delivery_change_reason = fields.Char(

@@ -23,6 +23,6 @@ def validate_delivery_currency(env, delivery_method, currency_id):
         raise ValidationError('Select a valid currency for this training cost.')
     if delivery_method != 'international' and currency.name != 'ETB':
         raise ValidationError(
-            'Internal and local external training must use ETB. '
+            'Internal, local external, and e-learning training must use ETB. '
             'Select International to use another currency.')
     return currency

@@ -201,6 +201,13 @@
                             <field name="recommended_source"/>
                             <field name="sourcing_justification"/>
                         </group>
+                        <group string="E-Learning &amp; Online Course Setup" invisible="recommended_source != 'elearning' and delivery_method != 'elearning'">
+                            <field name="elearning_url" widget="url" placeholder="https://..."/>
+                            <field name="lms_course_code" placeholder="Optional external course reference code"/>
+                            <div>
+                                <button name="action_quick_create_lms_course" string="Sync / Link E-Learning Course" type="object" class="btn btn-sm btn-outline-primary"/>
+                            </div>
+                        </group>
                         <group string="Course Definition / Summary">
                             <field name="description" placeholder="Provide general definition, target competencies and objectives..." readonly="status != 'draft'"/>
                         </group>

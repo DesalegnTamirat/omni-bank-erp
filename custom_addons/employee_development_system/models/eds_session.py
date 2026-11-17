@@ -336,6 +336,7 @@ class EdsSession(models.Model):
         ('internal', 'Internal / ToT'),
         ('local_external', 'Local External'),
         ('international', 'International'),
+        ('elearning', 'E-Learning'),
     ], string='Execution Delivery Type', default='internal', required=True)
     planned_delivery_method = fields.Selection(
         related='plan_line_id.delivery_method', string='Planned Delivery Type', readonly=True)
@@ -368,8 +369,7 @@ class EdsSession(models.Model):
         ('other', 'Other Video / Call Platform'),
     ], string='Online Meeting Platform', default='google_meet', tracking=True)
     online_meeting_url = fields.Char(
-        string='Online Meeting Link / Details', tracking=True,
-        placeholder='e.g. https://meet.google.com/xxx-xxxx-xxx or Zoom Details')
+        string='Online Meeting Link / Details', tracking=True)
     venue_omission_reason = fields.Text(
         string='Reason for No Hotel / Venue', tracking=True,
         help='Required when saving a session without a hotel or venue.')

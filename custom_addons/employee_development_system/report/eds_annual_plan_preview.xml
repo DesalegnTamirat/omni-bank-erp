@@ -13,7 +13,7 @@
                         <table class="table table-sm table-bordered" style="width:100%; margin-top: 12px;">
                             <thead><tr>
                                 <th>Plan Programs</th><th>Training Need Requests</th>
-                                <th>Internal</th><th>Local External</th><th>International</th>
+                                <th>Internal</th><th>Local External</th><th>International</th><th>E-Learning</th>
                             </tr></thead>
                             <tbody><tr>
                                 <td t-esc="summary['program_count']"/>
@@ -48,32 +48,34 @@
                             </table>
                         </t>
                         <t t-foreach="summary['by_method']" t-as="group">
-                            <h4 style="color: #541718; margin-top: 18px;" t-esc="group['label']"/>
-                            <table class="table table-sm table-bordered" style="width:100%;">
-                                <thead><tr>
-                                    <th>Course / Program</th><th>Quarter</th><th>Participants</th>
-                                    <th>Days</th><th>Currency</th><th style="text-align:right;">Budget</th>
-                                </tr></thead>
-                                <tbody>
-                                    <t t-foreach="group['lines']" t-as="line">
-                                        <tr>
-                                            <td t-esc="line.program_name or line.course_id.name"/>
-                                            <td t-esc="dict(line._fields['quarter'].selection).get(line.quarter, '')"/>
-                                            <td t-esc="line.planned_participants"/>
-                                            <td t-esc="line.duration_days"/>
-                                            <td t-esc="line.budget_currency_id.name"/>
-                                            <td style="text-align:right;" t-esc="'{:,.2f}'.format(line.budget_allocated)"/>
-                                        </tr>
-                                        <tr t-if="line.budget_line_ids.filtered(lambda item: item.remark)">
-                                            <td colspan="6" style="padding: 4px 10px 8px 18px; font-size: 9px;">
-                                                <t t-foreach="line.budget_line_ids.filtered(lambda item: item.remark)" t-as="item">
-                                                    <div><strong t-esc="item.name"/>: <span t-esc="item.remark"/></div>
-                                                </t>
-                                            </td>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
+                            <t t-if="group['lines']">
+                                <h4 style="color: #541718; margin-top: 18px;" t-esc="group['label']"/>
+                                <table class="table table-sm table-bordered" style="width:100%;">
+                                    <thead><tr>
+                                        <th>Course / Program</th><th>Quarter</th><th>Participants</th>
+                                        <th>Days</th><th>Currency</th><th style="text-align:right;">Budget</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <t t-foreach="group['lines']" t-as="line">
+                                            <tr>
+                                                <td t-esc="line.program_name or line.course_id.name"/>
+                                                <td t-esc="dict(line._fields['quarter'].selection).get(line.quarter, '')"/>
+                                                <td t-esc="line.planned_participants"/>
+                                                <td t-esc="line.duration_days"/>
+                                                <td t-esc="line.budget_currency_id.name"/>
+                                                <td style="text-align:right;" t-esc="'{:,.2f}'.format(line.budget_allocated)"/>
+                                            </tr>
+                                            <tr t-if="line.budget_line_ids.filtered(lambda item: item.remark)">
+                                                <td colspan="6" style="padding: 4px 10px 8px 18px; font-size: 9px;">
+                                                    <t t-foreach="line.budget_line_ids.filtered(lambda item: item.remark)" t-as="item">
+                                                        <div><strong t-esc="item.name"/>: <span t-esc="item.remark"/></div>
+                                                    </t>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
                         </t>
                     </div>
                 </t>

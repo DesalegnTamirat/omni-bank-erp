@@ -50,6 +50,7 @@ class EdsCourse(models.Model):
         ('internal', 'Internal Delivery'),
         ('local_external', 'Local External Provider'),
         ('international', 'International Provider'),
+        ('elearning', 'E-Learning'),
     ], string='Delivery Method', default='internal', tracking=True)
     delivery_place = fields.Selection([
         ('local', 'Local'),
@@ -151,11 +152,51 @@ class EdsCourse(models.Model):
         ('internal', 'Internal Delivery'),
         ('local_external', 'External Local Provider'),
         ('international', 'External International Provider'),
+        ('elearning', 'E-Learning'),
     ], string='Recommended Delivery Source', tracking=True,
         help='Suggested default for a new plan program; planning and sessions may change it.')
     sourcing_justification = fields.Text(
         string='Sourcing Justification',
         help='Why this delivery source is recommended.')
+    elearning_url = fields.Char(
+        string='E-Learning Course URL / Link',
+        help='URL to external LMS or digital course module.')
+    lms_course_code = fields.Char(
+        string='External LMS Code',
+        help='Optional identifier for e-learning integration.')
+
+    def action_quick_create_lms_course(self):
+        """Decoupled e-learning / LMS action: works safely in standalone mode without LMS/KMS dependencies."""
+        for rec in self:
+            if 'lms.course' in self.env:
+                LmsCourse = self.env['lms.course'].sudo()
+                existing = LmsCourse.search([('name', '=', rec.name)], limit=1)
+                if not existing:
+                    category = self.env['lms.category'].sudo().search([('code', '=', 'EDS_IMPORT')], limit=1)
+                    if not category:
+                        category = self.env['lms.category'].sudo().create({
+                            'name': _('EDS Routed Courses'), 'code': 'EDS_IMPORT',
+                        })
+                    instructor = rec.create_uid.employee_id or self.env.user.employee_id
+                    LmsCourse.create({
+                        'name': rec.name,
+                        'category_id': category.id,
+                        'description': rec.description or rec.name,
+                        'instructor_id': instructor.id if instructor else False,
+                    })
+                    rec.message_post(body=_("LMS Course linked/created successfully."))
+            else:
+                rec.message_post(body=_("E-Learning reference noted. System running in standalone mode (LMS decoupled)."))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('E-Learning Integration'),
+                'message': _('E-Learning course processed successfully.'),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
     @api.depends('curriculum_ids', 'curriculum_ids.state')
     def _compute_current_curriculum(self):
         for rec in self:
