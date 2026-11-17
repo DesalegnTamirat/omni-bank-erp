@@ -1,16 +1,15 @@
-
-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, AccessError
 from datetime import timedelta
+import logging
+import time
 
-
+_logger = logging.getLogger(__name__)
 
 class HrResignationClearanceLineItem(models.Model):
-
-    _name        = 'hr.resignation.clearance.line.item'
+    _name = 'hr.resignation.clearance.line.item'
     _description = 'Clearance Line Checklist Item'
-    _order       = 'sequence asc'
+    _order = 'sequence asc'
 
     clearance_line_id = fields.Many2one(
         'hr.resignation.clearance',
@@ -26,13 +25,43 @@ class HrResignationClearanceLineItem(models.Model):
         is_officer = self.env.user.has_group('hr_resignation.group_clearance_officer')
         is_admin = self.env.user.has_group('base.group_system') or self.env.user.has_group('hr_resignation.group_resignation_admin')
         for rec in self:
-            is_responsible = (rec.clearance_line_id.responsible_user == self.env.user)
-            # Responsible user can only clear if they also hold the Clearance Officer role
-            rec.can_clear = is_admin or (is_responsible and is_officer)
+            resp_user = rec.clearance_line_id.responsible_user
+            is_responsible = (resp_user == self.env.user)
+            is_delegate = False
+            if not is_responsible and resp_user and resp_user.employee_id:
+                is_delegate = rec.clearance_line_id.resignation_id._is_user_acting_delegate(self.env.user, resp_user.employee_id)
+                if is_delegate:
+                    is_responsible = True
+            # Responsible user or their acting delegate (inheriting officer role) can clear
+            rec.can_clear = is_admin or (is_responsible and (is_officer or is_delegate))
 
     done_by      = fields.Many2one('res.users', readonly=True)
     done_date    = fields.Datetime(readonly=True)
     note         = fields.Text(string='Guidance Note')
+
+    @api.model
+    def _get_delegation_visible_item_ids(self):
+        emp = self.env.user.employee_id
+        if not emp:
+            return []
+        today = fields.Date.today()
+        active_delegations = self.env['hr.employee.delegation'].sudo().search([
+            ('delegate_id', '=', emp.id),
+            ('state', '=', 'submitted'),
+            ('start_date', '<=', today),
+            ('end_date', '>=', today),
+        ])
+        if not active_delegations:
+            return []
+        delegator_emps = active_delegations.mapped('employee_id')
+        delegator_users = delegator_emps.mapped('user_id').filtered(lambda u: u)
+
+        hr_manager_group = self.env.ref('hr_resignation.group_resignation_hr_manager', raise_if_not_found=False)
+        if hr_manager_group and any(u in hr_manager_group.sudo().user_ids for u in delegator_users):
+            return self.sudo().search([]).ids
+
+        domain = ['|', ('clearance_line_id.responsible_user', 'in', delegator_users.ids), ('clearance_line_id.resignation_id.coach_id', 'in', delegator_emps.ids)]
+        return self.sudo().search(domain).ids
 
     def action_dummy_cleared(self):
         from odoo.exceptions import UserError
@@ -50,10 +79,14 @@ class HrResignationClearanceLineItem(models.Model):
             for rec in self:
                 is_officer = self.env.user.has_group('hr_resignation.group_clearance_officer')
                 is_admin = self.env.user.has_group('base.group_system') or self.env.user.has_group('hr_resignation.group_resignation_admin')
-                is_responsible = (rec.clearance_line_id.responsible_user == self.env.user)
+                resp_user = rec.clearance_line_id.responsible_user
+                is_responsible = (resp_user == self.env.user)
+                if not is_responsible and resp_user and resp_user.employee_id:
+                    if rec.clearance_line_id.resignation_id._is_user_acting_delegate(self.env.user, resp_user.employee_id):
+                        is_responsible = True
                 if not (is_officer or is_admin or is_responsible):
                     raise AccessError(_("You are not authorized to check or uncheck clearance items."))
-                
+
                 if vals.get('is_done'):
                     vals['done_by'] = self.env.user.id
                     vals['done_date'] = fields.Datetime.now()
@@ -98,7 +131,7 @@ class HrResignationClearance(models.Model):
     _description = 'Resignation Clearance Line'
     _inherit     = ['mail.thread', 'mail.activity.mixin']
     _rec_name    = 'display_name'
-    _order       = 'sequence asc'
+    _order       = 'state_sort asc, id desc'   # <-- CHANGED: pending first, then newest
 
     # ── Parent ────────────────────────────────────────────────────────────────
     resignation_id = fields.Many2one(
@@ -106,8 +139,8 @@ class HrResignationClearance(models.Model):
     release_date = fields.Date(
         related='resignation_id.release_date', store=True, string='Release Date', readonly=True)
     sla_deadline = fields.Date(
-        string='SLA Deadline', 
-        compute='_compute_sla_deadline', 
+        string='SLA Deadline',
+        compute='_compute_sla_deadline',
         store=True,
         help='Deadline for work unit to clear this task')
 
@@ -157,6 +190,14 @@ class HrResignationClearance(models.Model):
         ('pending',  'Pending'),
         ('cleared',  'Cleared'),
     ], default='pending', required=True)
+    state_sort = fields.Integer(
+        compute='_compute_state_sort', store=True, index=True)
+
+    @api.depends('state')
+    def _compute_state_sort(self):
+        order = {'pending': 0, 'waiting': 1, 'cleared': 2}
+        for rec in self:
+            rec.state_sort = order.get(rec.state, 9)
 
     notification_sent = fields.Boolean(
         default=False, readonly=True,
@@ -167,12 +208,15 @@ class HrResignationClearance(models.Model):
     pending_since = fields.Datetime(string='Pending Since', readonly=True)
     is_overdue = fields.Boolean(compute='_compute_is_overdue', store=True)
 
-    @api.depends('state', 'pending_since', 'sdt_days', 'sla_deadline')
+    @api.depends('state', 'pending_since', 'sdt_days', 'sla_deadline', 'resignation_id.release_date')
     def _compute_is_overdue(self):
         for rec in self:
             if rec.state == 'pending':
                 if rec.sla_deadline:
                     rec.is_overdue = fields.Date.today() > rec.sla_deadline
+                elif rec.resignation_id.release_date and rec.sdt_days:
+                    deadline = rec.resignation_id.release_date + timedelta(days=rec.sdt_days)
+                    rec.is_overdue = fields.Date.today() > deadline
                 elif rec.pending_since and rec.sdt_days:
                     deadline = rec.pending_since + timedelta(days=rec.sdt_days)
                     rec.is_overdue = fields.Datetime.now() > deadline
@@ -183,11 +227,97 @@ class HrResignationClearance(models.Model):
 
     can_approve = fields.Boolean(compute='_compute_can_approve', string='Can Approve')
 
+    is_my_clearance_task = fields.Boolean(
+        string='Is My Clearance Task',
+        compute='_compute_is_my_clearance_task',
+        search='_search_is_my_clearance_task'
+    )
+
+    def _compute_is_my_clearance_task(self):
+        current_user = self.env.user
+        current_emp = current_user.employee_id
+        today = fields.Date.today()
+        delegator_user_ids = set()
+        if current_emp:
+            delegations = self.env['hr.employee.delegation'].sudo().search([
+                ('delegate_id', '=', current_emp.id),
+                ('state', '=', 'submitted'),
+                ('start_date', '<=', today),
+                ('end_date', '>=', today),
+            ])
+            delegator_user_ids = set(delegations.mapped('employee_id.user_id.id'))
+        for rec in self:
+            rec.is_my_clearance_task = (
+                rec.responsible_user.id == current_user.id or
+                rec.responsible_user.id in delegator_user_ids
+            )
+
+    def _search_is_my_clearance_task(self, operator, value):
+        current_user = self.env.user
+        current_emp = current_user.employee_id
+        today = fields.Date.today()
+        delegator_user_ids = []
+        if current_emp:
+            delegations = self.env['hr.employee.delegation'].sudo().search([
+                ('delegate_id', '=', current_emp.id),
+                ('state', '=', 'submitted'),
+                ('start_date', '<=', today),
+                ('end_date', '>=', today),
+            ])
+            delegator_user_ids = delegations.mapped('employee_id.user_id.id')
+
+        is_positive = False
+        if operator in ('=', '=='):
+            is_positive = bool(value)
+        elif operator in ('!=', '<>'):
+            is_positive = not bool(value)
+        elif operator == 'in':
+            is_positive = any(value) if hasattr(value, '__iter__') else bool(value)
+        elif operator == 'not in':
+            is_positive = not any(value) if hasattr(value, '__iter__') else not bool(value)
+
+        if is_positive:
+            if delegator_user_ids:
+                return ['|', ('responsible_user', '=', current_user.id), ('responsible_user', 'in', delegator_user_ids)]
+            return [('responsible_user', '=', current_user.id)]
+        else:
+            if delegator_user_ids:
+                return ['&', ('responsible_user', '!=', current_user.id), ('responsible_user', 'not in', delegator_user_ids)]
+            return [('responsible_user', '!=', current_user.id)]
+
+    @api.model
+    def _get_delegation_visible_clearance_ids(self):
+        emp = self.env.user.employee_id
+        if not emp:
+            return []
+        today = fields.Date.today()
+        active_delegations = self.env['hr.employee.delegation'].sudo().search([
+            ('delegate_id', '=', emp.id),
+            ('state', '=', 'submitted'),
+            ('start_date', '<=', today),
+            ('end_date', '>=', today),
+        ])
+        if not active_delegations:
+            return []
+        delegator_emps = active_delegations.mapped('employee_id')
+        delegator_users = delegator_emps.mapped('user_id').filtered(lambda u: u)
+
+        hr_manager_group = self.env.ref('hr_resignation.group_resignation_hr_manager', raise_if_not_found=False)
+        if hr_manager_group and any(u in hr_manager_group.sudo().user_ids for u in delegator_users):
+            return self.sudo().search([]).ids
+
+        domain = ['|', ('responsible_user', 'in', delegator_users.ids), ('resignation_id.coach_id', 'in', delegator_emps.ids)]
+        return self.sudo().search(domain).ids
+
     @api.depends_context('uid')
     def _compute_can_approve(self):
-        is_hr = self.env.user.has_group('hr.group_hr_user')
+        user = self.env.user
         for rec in self:
-            is_officer = (rec.responsible_user and rec.responsible_user.id == self.env.user.id)
+            is_hr = rec.resignation_id._is_user_acting_hr_manager(user) or user.has_group('hr.group_hr_user')
+            resp_user = rec.responsible_user
+            is_officer = (resp_user and resp_user.id == user.id)
+            if not is_officer and resp_user and resp_user.employee_id:
+                is_officer = rec.resignation_id._is_user_acting_delegate(user, resp_user.employee_id)
             rec.can_approve = is_hr or is_officer
 
     # ── Approval metadata ─────────────────────────────────────────────────────
@@ -209,13 +339,18 @@ class HrResignationClearance(models.Model):
     # ── Related fields for display ────────────────────────────────────────────
     employee_id = fields.Many2one(
         related='resignation_id.employee_id', store=True, string='Employee')
-    
+
     employee_sudo_name = fields.Char(
         string='Employee',
         compute='_compute_employee_sudo_name',
+        search='_search_employee_sudo_name',
         help='Bypasses strict hierarchy rules to display employee name.'
     )
-    
+
+    def _search_employee_sudo_name(self, operator, value):
+        employees = self.env['hr.employee'].sudo().search([('name', operator, value)])
+        return [('employee_id', 'in', employees.ids)]
+
     @api.depends('employee_id')
     def _compute_employee_sudo_name(self):
         for rec in self:
@@ -234,8 +369,6 @@ class HrResignationClearance(models.Model):
     # ═══════════════════════════════════════════════════════════════════════════
     #  COMPUTES
     # ═══════════════════════════════════════════════════════════════════════════
-
-
 
     @api.depends('item_ids.is_done', 'item_ids.is_mandatory')
     def _compute_item_counts(self):
@@ -260,7 +393,10 @@ class HrResignationClearance(models.Model):
     def action_clear(self):
         """Mark clearance as cleared. Lean approach: Executed directly by the Clearance Officer."""
         for rec in self:
+            rec = rec.with_context(mail_notify_force_send=False)
+            _t0 = _t = time.time()
             rec._check_clearance_permission()
+            _logger.warning("CLEAR TIMING permission: %.2fs", time.time() - _t); _t = time.time()
             if not rec.release_date:
                 raise UserError(_('Cannot complete clearance: Release Date has not been set by the Manager.'))
             if rec.state != 'pending':
@@ -271,7 +407,11 @@ class HrResignationClearance(models.Model):
                 raise UserError(_(
                     'The following mandatory checklist items must be '
                     'completed first:\n• %s') % '\n• '.join(pending_items))
-            
+
+            acting_delegation = False
+            if rec.responsible_user != self.env.user and rec.responsible_user and rec.responsible_user.employee_id:
+                acting_delegation = rec.resignation_id._get_acting_delegation(self.env.user, rec.responsible_user.employee_id)
+
             now  = fields.Datetime.now()
             vals = {
                 'state':        'cleared',
@@ -279,39 +419,38 @@ class HrResignationClearance(models.Model):
                 'cleared_date': now,
             }
             rec.write(vals)
-            
+            _logger.warning("CLEAR TIMING write: %.2fs", time.time() - _t); _t = time.time()
+
             # Post a professional log to the chatter
+            if acting_delegation:
+                audit_msg = _(
+                    'Clearance completed by delegate <strong>%s</strong> on behalf of <strong>%s</strong> (Delegation Ref: %s).'
+                ) % (
+                    self.env.user.name,
+                    rec.responsible_user.name,
+                    acting_delegation.name or str(acting_delegation.id)
+                )
+            else:
+                audit_msg = _('Clearance completed successfully by %s.') % self.env.user.name
+
             rec.message_post(
-                body=_('Clearance completed successfully by %s.') % self.env.user.name,
+                body=audit_msg,
                 message_type='notification'
             )
-            # Notify the responsible officer and HR group via Discuss popup
-            # instead of posting to chatter.
-            hr_group = self.env.ref('hr.group_hr_user', raise_if_not_found=False)
-            notify_partners = set()
-            if hr_group:
-                for u in hr_group.sudo().all_user_ids.filtered(lambda u: u.active):
-                    notify_partners.add(u.partner_id.id)
-            emp_user = rec.resignation_id.employee_id.sudo().user_id
-            if emp_user and emp_user.active:
-                notify_partners.add(emp_user.partner_id.id)
-            wu_manager = rec.work_unit_id.sudo().manager_id.user_id
-            if wu_manager and wu_manager.active:
-                notify_partners.add(wu_manager.partner_id.id)
-            if notify_partners:
-                rec.resignation_id.message_notify(
-                    partner_ids=list(notify_partners),
-                    subject=_('Clearance Completed: %s — %s') % (
-                        rec.resignation_id.employee_id.sudo().name,
-                        rec.work_unit_id.name or _('clearance_in_progress'),
-                    ),
-                    body=_('Clearance item <strong>%s</strong> has been cleared by %s for %s (%s).') % (
-                        rec.work_unit_id.name or _('clearance_in_progress'),
-                        self.env.user.name,
-                        rec.resignation_id.employee_id.sudo().name,
-                        rec.resignation_id.name,
-                    ),
-                )
+            # Log an internal audit note to the resignation chatter without slow broadcast notifies
+            if rec.resignation_id:
+                try:
+                    rec.resignation_id.message_post(
+                        body=_('Clearance task <strong>%s</strong> marked Cleared by %s.') % (
+                            rec.work_unit_id.name or _('Clearance Item'),
+                            self.env.user.name,
+                        ),
+                        message_type='comment',
+                        subtype_xmlid='mail.mt_note',
+                    )
+                except Exception:
+                    pass
+
             try:
                 rec._close_clearance_activities(
                     feedback=_('Cleared by %s.') % self.env.user.name)
@@ -320,7 +459,9 @@ class HrResignationClearance(models.Model):
 
             rec.resignation_id._check_and_advance_cleared()
 
-
+    def action_approve(self):
+        """Standard approval entry point used by Delegated Approvals hub."""
+        return self.action_clear()
 
     # ═══════════════════════════════════════════════════════════════════════════
     #  PERMISSION HELPERS
@@ -329,12 +470,14 @@ class HrResignationClearance(models.Model):
     def _check_clearance_permission(self):
         self.ensure_one()
         user           = self.env.user
-        is_hr          = user.has_group('hr.group_hr_user')
+        is_hr          = user.has_group('hr.group_hr_user') or self.resignation_id._is_user_acting_hr_manager(user)
         is_admin       = user.has_group('base.group_system')
         is_responsible = (self.responsible_user == user)
+        if not is_responsible and self.responsible_user and self.responsible_user.employee_id:
+            is_responsible = self.resignation_id._is_user_acting_delegate(user, self.responsible_user.employee_id)
         if not (is_hr or is_responsible or is_admin):
             raise AccessError(_(
-                'Only the responsible officer (%s), an HR user, or an administrator '
+                'Only the responsible officer (%s) or their authorized delegate, an HR user, or an administrator '
                 'can update clearance line "%s".')
                 % (self.responsible_user.name, self.work_unit_id.name))
 
@@ -406,17 +549,25 @@ class HrResignationClearance(models.Model):
                         sep_type,
                         rec.resignation_id.name or '',
                     )
-                    self.env['mail.activity'].sudo().create({
-                        'res_model_id': self.env['ir.model'].sudo()._get_id(
-                            'hr.resignation.clearance'),
-                        'res_id':           rec.id,
-                        'activity_type_id': activity_type.id,
-                        'summary':          _('Clearance task: %s') % (
-                            rec.work_unit_id.name or ''),
-                        'note':             note_body,
-                        'user_id':          rec.responsible_user.id,
-                        'date_deadline':    rec.release_date or fields.Date.today(),
-                    })
+                    users_to_notify = [rec.responsible_user]
+                    if rec.responsible_user.employee_id:
+                        delegates = rec.resignation_id._get_active_delegates_for_employee(rec.responsible_user.employee_id)
+                        for d in delegates:
+                            if d.user_id and d.user_id not in users_to_notify:
+                                users_to_notify.append(d.user_id)
+
+                    for u in users_to_notify:
+                        self.env['mail.activity'].sudo().create({
+                            'res_model_id': self.env['ir.model'].sudo()._get_id(
+                                'hr.resignation.clearance'),
+                            'res_id':           rec.id,
+                            'activity_type_id': activity_type.id,
+                            'summary':          _('Clearance task: %s') % (
+                                rec.work_unit_id.name or ''),
+                            'note':             note_body,
+                            'user_id':          u.id,
+                            'date_deadline':    rec.release_date or fields.Date.today(),
+                        })
 
             except Exception:
                 # Never crash the clearance workflow due to notification failure.
@@ -424,10 +575,13 @@ class HrResignationClearance(models.Model):
 
     @api.model
     def _cron_check_overdue_clearances(self):
-        overdue_lines = self.search([
-            ('state', '=', 'pending'),
-            ('is_overdue', '=', True)
-        ])
+        # Force a dynamic check for all pending items so we don't rely on cached boolean states
+        pending_lines = self.search([('state', '=', 'pending')])
+        if not pending_lines:
+            return
+        pending_lines._compute_is_overdue()
+
+        overdue_lines = pending_lines.filtered(lambda r: r.is_overdue)
         if not overdue_lines:
             return
 
@@ -435,9 +589,9 @@ class HrResignationClearance(models.Model):
         if not activity_type:
             activity_type = self.env['mail.activity.type'].sudo().search([], limit=1)
 
-        # Get all HR users to notify
+        # Get all HR and POMD users to notify
         hr_users = []
-        for group_ref in ['hr_resignation.group_resignation_hr_manager', 'hr_resignation.group_hr_officer']:
+        for group_ref in ['hr_resignation.group_resignation_hr_manager', 'hr_resignation.group_hr_officer', 'hr_resignation.group_pomd_officer']:
             group = self.env.ref(group_ref, raise_if_not_found=False)
             if group:
                 for user in group.user_ids:
@@ -457,7 +611,6 @@ class HrResignationClearance(models.Model):
                     'user_id': wu_manager.id,
                     'date_deadline': fields.Date.today(),
                 })
-            
 
             if activity_type:
                 for hr_user in hr_users:
@@ -470,4 +623,3 @@ class HrResignationClearance(models.Model):
                         'user_id': hr_user.id,
                         'date_deadline': fields.Date.today(),
                     })
-

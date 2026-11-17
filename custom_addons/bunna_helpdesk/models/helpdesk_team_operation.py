@@ -34,19 +34,19 @@ class HelpdeskTeamOperation(models.Model):
     # ── Service Catalogue (3-tier) ────────────────────────────────────────────
     service_family_id = fields.Many2one(
         comodel_name="helpdesk.service.family",
-        string="Service Family",
-        help="Top-level service family grouping (Tier 1 of service catalogue).",
+        string="Service",
+        help="Top-level service grouping (Tier 1 of service catalogue).",
         index=True,
     )
     service_id = fields.Many2one(
         comodel_name="helpdesk.service",
-        string="Service",
+        string="Sub Service",
         domain="[('family_id', '=', service_family_id)] if service_family_id else []",
-        help="Service in the 3-tier banking service catalogue.",
+        help="Sub Service in the 3-tier banking service catalogue.",
     )
     service_sub_category_id = fields.Many2one(
         comodel_name="helpdesk.service.sub.category",
-        string="Sub-Category / Issue",
+        string="Sub Sub Service",
         domain="[('service_id', '=', service_id)] if service_id else []",
     )
     default_priority = fields.Selection(

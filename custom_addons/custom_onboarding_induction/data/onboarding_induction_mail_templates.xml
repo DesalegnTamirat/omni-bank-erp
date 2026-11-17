@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- ── 1. 7-Day Pre-Arrival IT & Workstation Provisioning Alert Template ── -->
+        <record id="mail_template_onboarding_provisioning_alert" model="mail.template">
+            <field name="name">Onboarding: 7-Day Pre-Arrival IT Provisioning Alert</field>
+            <field name="model_id" ref="model_hr_onboarding_plan"/>
+            <field name="subject">🚨 7-Day Pre-Arrival IT &amp; Workstation Provisioning Alert: {{ object.employee_id.name }} ({{ object.name }})</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;">
+                    <div style="background: linear-gradient(135deg, #4A261A 0%, #6E382A 100%); padding: 15px 20px; border-radius: 6px 6px 0 0; color: #FFFFFF;">
+                        <h2 style="margin: 0; color: #F0C27B;">Bunna Bank S.C.</h2>
+                        <h4 style="margin: 5px 0 0 0; color: #FFFFFF; font-weight: normal;">IT &amp; Workstation Provisioning Alert</h4>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #E0E0E0; border-top: none; border-radius: 0 0 6px 6px; background-color: #FAFAFA;">
+                        <p>Dear <strong>IT Operations &amp; Facilities Team</strong>,</p>
+                        <p>Mandatory pre-employment documentation has been verified by POMD. Please prepare IT assets, system credentials, and physical workstation setup for the following new hire prior to arrival:</p>
+                        <table style="width: 100%; border-collapse: collapse; margin: 15px 0; background-color: #FFFFFF;">
+                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                <td style="padding: 10px; font-weight: bold; width: 35%; color: #4A261A;">Employee Name:</td>
+                                <td style="padding: 10px;"><t t-out="object.employee_id.name or 'N/A'"/></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                <td style="padding: 10px; font-weight: bold; color: #4A261A;">Position Title:</td>
+                                <td style="padding: 10px;"><t t-out="object.job_position_id.name or 'N/A'"/></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                <td style="padding: 10px; font-weight: bold; color: #4A261A;">Department / Work Unit:</td>
+                                <td style="padding: 10px;"><t t-out="object.department_id.name or 'N/A'"/></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                <td style="padding: 10px; font-weight: bold; color: #4A261A;">Expected Start Date:</td>
+                                <td style="padding: 10px; font-weight: bold; color: #C0392B;"><t t-out="object.start_date or 'N/A'"/></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                <td style="padding: 10px; font-weight: bold; color: #4A261A;">Immediate Supervisor:</td>
+                                <td style="padding: 10px;"><t t-out="object.supervisor_id.name or 'N/A'"/></td>
+                            </tr>
+                        </table>
+                        <p><strong>Required Provisioning Actions:</strong></p>
+                        <ul>
+                            <li>Configure PC / Laptop hardware &amp; peripheral accessories.</li>
+                            <li>Create Active Directory domain user, Bank email account, and ERP ESS access.</li>
+                            <li>Provision Finacle Core Banking user ID and appropriate teller/maker/checker profile.</li>
+                            <li>Allocate physical desk, chair, telephone extension, and branch/head-office access badge.</li>
+                        </ul>
+                        <p style="margin-top: 20px; font-size: 12px; color: #777777;">
+                            This is an automated system notification from the Bunna Bank Onboarding &amp; Induction Management System.
+                        </p>
+                    </div>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <!-- ── 2a. Welcome Notification to New Hire (With Buddy Details) ── -->
+        <record id="mail_template_onboarding_buddy_assigned" model="mail.template">
+            <field name="name">Onboarding: Buddy Mentorship Assignment Notice (To New Hire)</field>
+            <field name="model_id" ref="model_hr_onboarding_plan"/>
+            <field name="subject">🤝 Welcome to Bunna Bank! Your Onboarding Buddy has been Assigned: {{ object.buddy_id.name }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;">
+                    <div style="background: linear-gradient(135deg, #4A261A 0%, #6E382A 100%); padding: 15px 20px; border-radius: 6px 6px 0 0; color: #FFFFFF;">
+                        <h2 style="margin: 0; color: #F0C27B;">Bunna Bank S.C.</h2>
+                        <h4 style="margin: 5px 0 0 0; color: #FFFFFF; font-weight: normal;">Onboarding Buddy Mentorship Program</h4>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #E0E0E0; border-top: none; border-radius: 0 0 6px 6px; background-color: #FAFAFA;">
+                        <p>Dear <strong><t t-out="object.employee_id.name"/></strong>,</p>
+                        <p>We are thrilled to welcome you to the Bunna Bank family! To guide you through your initial transition, standard operating procedures, and culture, your Immediate Supervisor has assigned your Onboarding Buddy:</p>
+                        <div style="background-color: #FFFFFF; border-left: 4px solid #4A261A; padding: 15px; margin: 15px 0;">
+                            <h3 style="margin: 0 0 5px 0; color: #4A261A;"><t t-out="object.buddy_id.name"/></h3>
+                            <p style="margin: 0; color: #555555;">Email: <t t-out="object.buddy_id.work_email or 'N/A'"/> | Mobile: <t t-out="object.buddy_id.mobile_phone or 'N/A'"/></p>
+                        </div>
+                        <p>Your buddy is your dedicated peer mentor for daily workplace navigation, systems orientation, and weekly check-ins.</p>
+                        <p style="margin-top: 20px; font-size: 12px; color: #777777;">
+                            Bunna Bank S.C. — People Operations &amp; Management Directorate (POMD).
+                        </p>
+                    </div>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <!-- ── 2b. Notification Directly to Assigned Buddy ── -->
+        <record id="mail_template_onboarding_buddy_assigned_to_buddy" model="mail.template">
+            <field name="name">Onboarding: Notice to Assigned Buddy</field>
+            <field name="model_id" ref="model_hr_onboarding_plan"/>
+            <field name="subject">🤝 Mentorship Assignment: You have been assigned as Onboarding Buddy for {{ object.employee_id.name }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;">
+                    <div style="background: linear-gradient(135deg, #4A261A 0%, #6E382A 100%); padding: 15px 20px; border-radius: 6px 6px 0 0; color: #FFFFFF;">
+                        <h2 style="margin: 0; color: #F0C27B;">Bunna Bank S.C.</h2>
+                        <h4 style="margin: 5px 0 0 0; color: #FFFFFF; font-weight: normal;">Onboarding Buddy Mentorship Assignment</h4>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #E0E0E0; border-top: none; border-radius: 0 0 6px 6px; background-color: #FAFAFA;">
+                        <p>Dear <strong><t t-out="object.buddy_id.name"/></strong>,</p>
+                        <p>You have been assigned as the dedicated <strong>Onboarding Buddy</strong> for new hire colleague <strong><t t-out="object.employee_id.name"/></strong> in <t t-out="object.operating_unit_id.name or object.department_id.name"/>.</p>
+                        <div style="background-color: #FFFFFF; border-left: 4px solid #4A261A; padding: 15px; margin: 15px 0;">
+                            <p style="margin: 0 0 5px 0; font-weight: bold; color: #4A261A;">New Hire Details:</p>
+                            <p style="margin: 0;">Name: <strong><t t-out="object.employee_id.name"/></strong></p>
+                            <p style="margin: 0;">Position: <t t-out="object.job_position_id.name or 'N/A'"/></p>
+                            <p style="margin: 0;">Work Unit: <t t-out="object.operating_unit_id.name or object.department_id.name or 'N/A'"/></p>
+                            <p style="margin: 0;">Expected Start Date: <t t-out="object.start_date or 'N/A'"/></p>
+                            <p style="margin: 0;">Email: <t t-out="object.employee_id.work_email or 'N/A'"/> | Mobile: <t t-out="object.employee_id.mobile_phone or 'N/A'"/></p>
+                        </div>
+                        <p><strong>Your Buddy Responsibilities Include:</strong></p>
+                        <ul>
+                            <li>Welcoming the employee on Day 1 and introducing them to colleagues.</li>
+                            <li>Guiding them through team tools, internal shared drives, and standard operating procedures.</li>
+                            <li>Weekly check-in mentoring sessions during their first month of work.</li>
+                        </ul>
+                        <p style="margin-top: 20px; font-size: 12px; color: #777777;">
+                            Bunna Bank S.C. — People Operations &amp; Management Directorate (POMD).
+                        </p>
+                    </div>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <!-- ── 3. 4-Week Mid-Term Evaluation Reminder Template ── -->
+        <record id="mail_template_onboarding_midterm_eval" model="mail.template">
+            <field name="name">Onboarding: 4-Week Mid-Term Evaluation Form Dispatched</field>
+            <field name="model_id" ref="model_hr_onboarding_plan"/>
+            <field name="subject">📋 4-Week Mid-Term Onboarding Evaluation: {{ object.employee_id.name }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;">
+                    <div style="background: linear-gradient(135deg, #4A261A 0%, #6E382A 100%); padding: 15px 20px; border-radius: 6px 6px 0 0; color: #FFFFFF;">
+                        <h2 style="margin: 0; color: #F0C27B;">Bunna Bank S.C.</h2>
+                        <h4 style="margin: 5px 0 0 0; color: #FFFFFF; font-weight: normal;">4-Week Mid-Term Integration Review</h4>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #E0E0E0; border-top: none; border-radius: 0 0 6px 6px; background-color: #FAFAFA;">
+                        <p>Dear <strong><t t-out="object.supervisor_id.name or 'Immediate Supervisor'"/></strong> and <strong><t t-out="object.employee_id.name"/></strong>,</p>
+                        <p>The 4-week milestone for employee <strong><t t-out="object.employee_id.name"/></strong> has been reached. Preliminary Day 1 to Week 3 operational tasks have been completed.</p>
+                        <p>Please log in to the ERP portal to review progress, log feedback, and submit the 4-week supervisory rating (/100) under the <em>Evaluations &amp; Sign-off</em> tab.</p>
+                        <p style="margin-top: 20px; font-size: 12px; color: #777777;">
+                            Bunna Bank S.C. — Workplace Onboarding Management System.
+                        </p>
+                    </div>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <!-- ── 4. Milestone Escalation Alert Template ── -->
+        <record id="mail_template_onboarding_milestone_escalation" model="mail.template">
+            <field name="name">Onboarding: Critical Milestone Escalation Alert</field>
+            <field name="model_id" ref="model_hr_onboarding_plan"/>
+            <field name="subject">⚠️ URGENT: Onboarding Milestone Escalation Alert for {{ object.employee_id.name }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;">
+                    <div style="background-color: #C0392B; padding: 15px 20px; border-radius: 6px 6px 0 0; color: #FFFFFF;">
+                        <h2 style="margin: 0; color: #FFFFFF;">Bunna Bank S.C. — Milestone Escalation</h2>
+                        <h4 style="margin: 5px 0 0 0; color: #FFFFFF; font-weight: normal;">Onboarding &amp; Probation SLA Delay</h4>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #E0E0E0; border-top: none; border-radius: 0 0 6px 6px; background-color: #FAFAFA;">
+                        <p>Attention <strong>POMD Directorate</strong> and <strong><t t-out="object.supervisor_id.name or 'Immediate Supervisor'"/></strong>,</p>
+                        <p>The Onboarding Plan for employee <strong><t t-out="object.employee_id.name"/></strong> (<t t-out="object.name"/>) has breached critical milestone SLAs:</p>
+                        <div style="background-color: #FDEDEC; border-left: 4px solid #C0392B; padding: 15px; margin: 15px 0;">
+                            <strong style="color: #C0392B;">Escalation Reason:</strong>
+                            <p style="margin: 5px 0 0 0; white-space: pre-wrap;"><t t-out="object.escalation_reason or 'Critical milestone overdue.'"/></p>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                            <tr>
+                                <td style="padding: 8px; font-weight: bold; width: 35%;">Category:</td>
+                                <td style="padding: 8px;"><t t-out="object.employee_category"/> (<t t-out="object.probation_duration_days"/> Days Statutory Probation)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; font-weight: bold;">Probation End Date:</td>
+                                <td style="padding: 8px; color: #C0392B; font-weight: bold;"><t t-out="object.probation_deadline or 'N/A'"/></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; font-weight: bold;">Overall Progress:</td>
+                                <td style="padding: 8px;"><t t-out="object.progress_percentage"/>%</td>
+                            </tr>
+                        </table>
+                        <p>Immediate supervisory intervention and remedial action is required before the statutory probation counter expires.</p>
+                        <p style="margin-top: 20px; font-size: 12px; color: #777777;">
+                            Automated Escalation System — Bunna Bank S.C.
+                        </p>
+                    </div>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+    </data>
+</odoo>

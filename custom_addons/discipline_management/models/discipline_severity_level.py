@@ -47,9 +47,15 @@ class DisciplineSeverityLevel(models.Model):
     description = fields.Text(string='Description & Guidelines')
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_uniq', 'unique(code)', 'The Severity Level Code must be unique!')
-    ]
+    _code_uniq = models.Constraint('unique(code)', 'The Severity Level Code must be unique!')
+
+    @api.model
+    def name_search(self, name='', domain=None, operator='ilike', limit=100):
+        if name:
+            domain = list(domain or []) + ['|', ('name', operator, name), ('code', operator, name)]
+            records = self.search(domain, limit=limit)
+            return [(rec.id, rec.name) for rec in records]
+        return super().name_search(name=name, domain=domain, operator=operator, limit=limit)
 
     @api.model_create_multi
     def create(self, vals_list):

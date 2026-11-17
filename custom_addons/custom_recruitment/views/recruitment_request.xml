@@ -112,9 +112,13 @@
                             <field name="request_type" widget="radio" readonly="state != 'draft'"/>
                             <field name="request_date" readonly="state != 'draft'"/>
 
-                            <field name="requested_by" />
-                            <field name="operating_unit_id"/>
-                            <field name="work_unit_type" readonly="1"/>
+                            <field name="requested_by" readonly="1"/>
+                            <field name="operating_unit_id" readonly="state != 'draft' or not is_hr"/>
+
+                            <field name="exceptional_workforce_id"
+                                   invisible="request_type != 'unplanned'"
+                                   readonly="1"
+                                   force_save="1"/>
 
                             <field name="workforce_plan_id"
                                    invisible="request_type != 'planned'"
@@ -122,24 +126,40 @@
                                    readonly="state != 'draft'"/>
 
                             <field name="plan_total_headcount"
-                                   invisible="request_type != 'planned' or not workforce_plan_id"/>
+                                   string="Approved Headcount"
+                                   invisible="(request_type == 'planned' and not workforce_plan_id) or (request_type == 'unplanned' and not exceptional_workforce_id)"
+                                   readonly="1"/>
                             <field name="plan_consumed_headcount"
-                                   invisible="request_type != 'planned' or not workforce_plan_id"/>
+                                   string="Already Requested"
+                                   invisible="(request_type == 'planned' and not workforce_plan_id) or (request_type == 'unplanned' and not exceptional_workforce_id)"
+                                   readonly="1"/>
                             <field name="plan_remaining_headcount"
-                                   invisible="request_type != 'planned' or not workforce_plan_id"/>
+                                   string="Remaining Headcount"
+                                   invisible="(request_type == 'planned' and not workforce_plan_id) or (request_type == 'unplanned' and not exceptional_workforce_id)"
+                                   readonly="1"/>
                         </group>
                         <!-- RIGHT: Job Information  -->
                         <group string="Job Information">
-                            <field name="job_position_id" domain="[('id', 'in', allowed_job_ids)]" readonly="state != 'draft'"/>
-                            <field name="job_grade_id" domain="[('id', 'in', allowed_grade_ids)]" readonly="state != 'draft'"/>
-                            <field name="department_id" />
-                            <field name="employee_category" readonly="state != 'draft'" widget="radio"/>
+                            <field name="job_position_id" domain="[('id', 'in', allowed_job_ids)]"
+                                   readonly="state != 'draft'"/>
+                            <field name="job_grade_id" domain="[('id', 'in', allowed_grade_ids)]"
+                                   readonly="state != 'draft' or request_type == 'unplanned'"
+                                   force_save="1"/>
+                            <field name="department_id" readonly="1" force_save="1"/>
+                            <field name="employee_category" readonly="1" widget="radio" force_save="1"/>
                             <field name="job_level"
                                    invisible="employee_category != 'Non Managerial'"
-                                   readonly="state != 'draft'"/>
-                            <field name="employment_type" readonly="state != 'draft'"/>
-                            <field name="required_headcount" readonly="state != 'draft'"/>
-                            <field name="sourcing_type" readonly="state != 'draft'"/>
+                                   readonly="1"
+                                   force_save="1"/>
+                            <field name="employment_type"
+                                   readonly="state != 'draft' or request_type == 'unplanned'"
+                                   force_save="1"/>
+                            <field name="required_headcount"
+                                   readonly="state != 'draft' or request_type == 'unplanned'"
+                                   force_save="1"/>
+                            <field name="sourcing_type"
+                                   readonly="state != 'draft' or request_type == 'unplanned'"
+                                   force_save="1"/>
 
                         </group>
                     </group>
@@ -149,7 +169,8 @@
                            invisible="request_type != 'unplanned'">
                         <field name="justification" nolabel="1"
                                required="request_type == 'unplanned'"
-                               readonly="state != 'draft'"
+                               readonly="state != 'draft' or request_type == 'unplanned'"
+                               force_save="1"
                                placeholder="Provide business justification for this unplanned recruitment request..."/>
                     </group>
 

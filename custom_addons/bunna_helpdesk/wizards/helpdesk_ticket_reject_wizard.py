@@ -14,7 +14,7 @@ class HelpdeskTicketRejectWizard(models.TransientModel):
         readonly=True,
     )
     ticket_number = fields.Char(related="ticket_id.number", string="Ticket Number", readonly=True)
-    ticket_name = fields.Char(related="ticket_id.name", string="Subject", readonly=True)
+    ticket_name = fields.Char(related="ticket_id.name", string="Sub Service", readonly=True)
     current_stage_id = fields.Many2one(related="ticket_id.stage_id", string="Current Stage", readonly=True)
     rejection_reason = fields.Text(
         string="Rejection Reason",

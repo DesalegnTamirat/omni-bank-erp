@@ -4,6 +4,7 @@ from odoo import _, api, fields, models
 
 class projection_detail_acting_assignment(models.AbstractModel):
     _name = 'report.custom_recruitment.report_minute_template'
+    _description = 'Recruitment Minute Report Template'
 
     @api.model
     def _get_report_values(self,docids,data=None):

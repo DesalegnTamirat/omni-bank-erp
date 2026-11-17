@@ -27,9 +27,16 @@ class TestPbmsWorkflow(TransactionCase):
             "date_end": "2027-06-30",
             "state": "open",
         })
-        cls.deposit_type = cls.env["pbms.deposit.type"].create({
-            "name": "Savings", "code": "SAV-T",
-        })
+        cls.deposit_type = cls.env["pbms.deposit.type"].search([("active", "=", True)], limit=1)
+        if not cls.deposit_type:
+            cls.deposit_type = cls.env["pbms.deposit.type"].create({
+                "name": "Savings", "code": "SAV-T",
+            })
+        Config = cls.env.get("pbms.planning.config")
+        if Config:
+            for cfg in Config.search([]):
+                cfg.write({"deposit_type_ids": [(4, cls.deposit_type.id)]})
+            cls.env.registry.clear_cache()
         cls.expense_account = cls.env["pbms.expense.account"].create({
             "name": "Office Supplies", "code": "6001",
         })
@@ -694,6 +701,15 @@ class TestPbmsWorkflow(TransactionCase):
 
     def test_target_cascade_wizard_ho_to_district_and_branch(self):
         """Test cascading approved corporate targets from HO to Districts and from District to Branches."""
+        Config = self.env.get("pbms.planning.config")
+        if Config:
+            for u in (self.ho, self.district, self.branch):
+                cfg = Config.get_config_for_unit(u)
+                if cfg:
+                    cfg.write({"deposit_type_ids": [(6, 0, [self.deposit_type.id])]})
+                else:
+                    Config.create({"config_type": "operating_unit", "org_unit_id": u.id, "work_unit_type": u.work_unit_type, "deposit_type_ids": [(6, 0, [self.deposit_type.id])]})
+            self.env.registry.clear_cache()
         # 0. Create initial Branch Planning Request
         init_branch_plan = self.env["pbms.planning.category"].create({
             "cycle_id": self.cycle.id,
@@ -802,6 +818,14 @@ class TestPbmsWorkflow(TransactionCase):
         dep_demand = self.env["pbms.deposit.type"].create({"name": "Demand Deposit", "code": "DEM-T"})
         dep_time = self.env["pbms.deposit.type"].create({"name": "Time Deposit", "code": "TIME-T"})
 
+        Config = self.env.get("pbms.planning.config")
+        if Config:
+            for u in (self.ho, self.district, self.branch):
+                cfg = Config.search([("config_type", "=", "operating_unit"), ("org_unit_id", "=", u.id)], limit=1)
+                if not cfg:
+                    cfg = Config.create({"config_type": "operating_unit", "org_unit_id": u.id, "work_unit_type": u.work_unit_type})
+                cfg.write({"deposit_type_ids": [(6, 0, [dep_saving.id, dep_demand.id, dep_time.id])]})
+
         # Head Office Plan with 3 Deposit Products: Total 343,000.00 ETB
         ho_multi_plan = self.env["pbms.planning.category"].create({
             "cycle_id": self.cycle.id,
@@ -809,9 +833,18 @@ class TestPbmsWorkflow(TransactionCase):
             "category": "deposit",
             "state": "ho_reviewed",
             "deposit_line_ids": [
-                (0, 0, {"line_type": "deposit", "deposit_type_id": dep_saving.id, "m01": 69000.0, "m02": 69000.0}),  # 138k
-                (0, 0, {"line_type": "deposit", "deposit_type_id": dep_demand.id, "m01": 52000.0, "m02": 52000.0}),  # 104k
-                (0, 0, {"line_type": "deposit", "deposit_type_id": dep_time.id, "m01": 50500.0, "m02": 50500.0}),    # 101k
+                (0, 0, {
+                    "line_type": "deposit", "deposit_type_id": dep_saving.id,
+                    **{f"m{i:02d}": 11500.0 for i in range(1, 13)},  # 138k
+                }),
+                (0, 0, {
+                    "line_type": "deposit", "deposit_type_id": dep_demand.id,
+                    **{f"m{i:02d}": 8666.66 if i <= 8 else 8666.68 for i in range(1, 13)},  # 104k
+                }),
+                (0, 0, {
+                    "line_type": "deposit", "deposit_type_id": dep_time.id,
+                    **{f"m{i:02d}": 8416.66 if i <= 8 else 8416.68 for i in range(1, 13)},  # 101k
+                }),
             ],
         })
         self.assertEqual(ho_multi_plan.deposit_annual_total, 343000.0)

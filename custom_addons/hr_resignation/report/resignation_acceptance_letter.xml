@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
     <!-- Report Action for Resignation Acceptance Letter (Branches dynamically based on notice_period_accepted) -->
@@ -158,8 +158,13 @@
 
                     <!-- Paragraph 4: RSSA Notice -->
                     <p style="margin-bottom: 10px; text-align: justify; font-size: 11pt; line-height: 1.4; color: #000000;">
-                        Kindly note that any outstanding interest-free Revolving Staff Salary Advance (RSSA) must be settled upon resignation. If not settled, it will be changed to a higher interest rate effective from the final resignation date, in accordance with the Bank’s policy.
+                        Kindly note that any outstanding interest-free Revolving Staff Salary Advance (RSSA) must be settled upon resignation. If not settled, it will be changed to a higher interest rate effective from the final resignation date, in accordance with the Bankâ€™s policy.
                     </p>
+
+                    <!-- Important Notice: Not a Certificate of Release -->
+                    <div style="margin-top: 8px; margin-bottom: 12px; padding: 6px 10px; border: 1px solid #c0392b; background-color: #fdf2f2; font-size: 8.5pt; line-height: 1.35; color: #962d22; text-align: justify;">
+                        <strong>IMPORTANT NOTICE:</strong> This letter serves as administrative notice of resignation acceptance only and is <strong>NOT</strong> a Certificate of Release or Clearance Certificate. Formal release, work experience certificate, and terminal settlement shall only be granted upon 100% completion of digital clearance, asset handover, and total loan settlement.
+                    </div>
 
                     <!-- Paragraph 5: Appreciation -->
                     <p style="margin-bottom: 12px; text-align: justify; font-size: 11pt; line-height: 1.4; color: #000000;">
@@ -370,7 +375,7 @@
                             Accordingly, Credit Relationship Management Directorate is also advised to follow up the adjustment of the interest rate and settlement of unsettled loans and advances (if any). IT Security Directorate is advised to deactivate the user access (if any) accordingly.
                         </p>
                         <p style="margin-bottom: 14px;">
-                            Kindly note that any outstanding interest-free Revolving Staff Salary Advance (RSSA) must be settled upon resignation. If not settled, it will be changed to a higher interest rate effective from the final resignation date, in accordance with the Bank’s policy.
+                            Kindly note that any outstanding interest-free Revolving Staff Salary Advance (RSSA) must be settled upon resignation. If not settled, it will be changed to a higher interest rate effective from the final resignation date, in accordance with the Bankâ€™s policy.
                         </p>
 
                         <div style="margin-top: 18px; margin-bottom: 14px;">
@@ -404,7 +409,7 @@
 
                 </div>
 
-                <!-- Footer (Pinned to bottom): BANK OF THE VISIONARIES! / የባለራዕዮች ባንክ! -->
+                <!-- Footer (Pinned to bottom): BANK OF THE VISIONARIES! / á‹¨á‰£áˆˆáˆ«á‹•á‹®á‰½ á‰£áŠ•áŠ­! -->
                 <div class="footer-fixed-memo">
                     <div style="border-top: 2px solid #000000; margin-bottom: 6px; width: 100%;"></div>
                     <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; border: none !important;">
@@ -413,7 +418,7 @@
                                 <span style="font-family: Arial, sans-serif; font-weight: bold; font-size: 13pt; color: #833c0b; letter-spacing: 0.3px;">BANK OF THE VISIONARIES!</span>
                             </td>
                             <td style="text-align: right; vertical-align: middle; padding: 0; border: none !important;">
-                                <span class="amharic-footer-text">የባለራዕዮች ባንክ!</span>
+                                <span class="amharic-footer-text">á‹¨á‰£áˆˆáˆ«á‹•á‹®á‰½ á‰£áŠ•áŠ­!</span>
                             </td>
                         </tr>
                     </table>

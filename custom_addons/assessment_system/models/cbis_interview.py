@@ -1,8 +1,34 @@
 # -*- coding: utf-8 -*-
 
-from markupsafe import Markup
+import logging
+import threading
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
+
+_logger = logging.getLogger(__name__)
+
+
+def _send_mails_async(env, mail_ids):
+    """Dispatches outgoing emails in a background daemon thread to avoid freezing the HTTP response."""
+    if not mail_ids:
+        return
+    db_name = env.cr.dbname
+
+    def _worker():
+        import odoo
+        from odoo.orm.registry import Registry
+        try:
+            reg = Registry(db_name)
+            with reg.cursor() as cr:
+                threaded_env = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
+                mails = threaded_env['mail.mail'].browse(mail_ids)
+                mails.send(raise_exception=False)
+                cr.commit()
+        except Exception as err:
+            _logger.warning("Background email dispatch error: %s", err)
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 class CBISInterviewSession(models.Model):
@@ -30,7 +56,7 @@ class CBISInterviewSession(models.Model):
         ("non_managerial", "Non-Managerial  Interview"),
         ("junior", "Junior Interview"),
         ("transfer", " Transfer Interview"),
-    ], string="Interview Type", default="non_managerial", required=True, tracking=True)
+    ], string="Interview Type", default="non_managerial", required=False, tracking=True)
 
     interview_date = fields.Date(string="Interview Date", required=True, default=fields.Date.context_today, tracking=True)
     venue = fields.Char(string="Location / Room / Virtual Meeting Link", required=True)
@@ -58,6 +84,11 @@ class CBISInterviewSession(models.Model):
     # Competency Configuration & Weighting (Max 100%)
     competency_line_ids = fields.One2many("cbis.session.competency.line", "session_id", string="Competency Configuration & Weighting", copy=True)
     total_competency_weight = fields.Float(string="Total Weight (%)", compute="_compute_total_competency_weight", store=True)
+    eligible_competency_ids = fields.Many2many(
+        "competency.competency",
+        compute="_compute_eligible_competencies",
+        string="Eligible Competencies"
+    )
 
     state = fields.Selection([
         ("draft", "Draft Schedule"),
@@ -78,6 +109,58 @@ class CBISInterviewSession(models.Model):
                 tot = sum(line.weight_percentage for line in rec.competency_line_ids)
                 if tot > 100.001:
                     raise ValidationError(_("The total percentage weight of all selected competencies must not exceed 100%%. Current total is %.2f%%.") % tot)
+
+    @api.constrains("competency_line_ids")
+    def _check_unique_competency_lines(self):
+        for session in self:
+            comp_ids = [line.competency_id.id for line in session.competency_line_ids if line.competency_id]
+            if len(comp_ids) != len(set(comp_ids)):
+                raise ValidationError(_("Duplicate competencies detected! Each competency can only be added once per interview session."))
+
+    @api.depends("vacancy_id", "vacancy_id.competency_line_ids.competency_id", "job_id")
+    def _compute_eligible_competencies(self):
+        for rec in self:
+            rec.eligible_competency_ids = rec._get_eligible_competencies()
+
+    def _get_eligible_competencies(self):
+        """Aggregate all eligible competencies from the selected vacancy and its job position."""
+        self.ensure_one()
+        comps = self.env["competency.competency"]
+        if not self.vacancy_id:
+            return comps
+
+        # 1. Competencies configured on the Job Vacancy itself
+        if hasattr(self.vacancy_id, "competency_line_ids") and self.vacancy_id.competency_line_ids:
+            comps |= self.vacancy_id.competency_line_ids.mapped("competency_id")
+
+        # 2. Competencies configured for the Target Job Position
+        job = self.job_id or self.vacancy_id.job_position
+        if job:
+            # a. assessment.competency.job.rel
+            if "assessment.competency.job.rel" in self.env:
+                job_rels = self.env["assessment.competency.job.rel"].search([("job_id", "=", job.id)])
+                if job_rels:
+                    comps |= job_rels.mapped("competency_id")
+
+            # b. hr.job competencies_id / competencies_ids
+            for field_name in ("competencies_id", "competencies_ids"):
+                if hasattr(job, field_name) and getattr(job, field_name):
+                    for cline in getattr(job, field_name):
+                        c_obj = getattr(cline, "competencies", False) or getattr(cline, "competency_id", False)
+                        if c_obj:
+                            comps |= c_obj
+
+            # c. competency.role.mapping
+            if "competency.role.mapping" in self.env:
+                mappings = self.env["competency.role.mapping"].search([("job_position_id", "=", job.id)])
+                for m in mappings:
+                    if hasattr(m, "line_ids") and m.line_ids:
+                        comps |= m.line_ids.mapped("competency_id")
+
+            # d. Direct applicable_job_ids on competency.competency
+            comps |= self.env["competency.competency"].search([("applicable_job_ids", "in", [job.id])])
+
+        return comps
 
 
     @api.model_create_multi
@@ -118,40 +201,34 @@ class CBISInterviewSession(models.Model):
             }))
         self.candidate_line_ids = [(5, 0, 0)] + lines
 
-        # 3. Auto-populate Competencies from Job Position Profile
-        target_job = self.vacancy_id.job_position
-        if target_job and not self.competency_line_ids:
-            job_comp_rels = self.env["assessment.competency.job.rel"].search([("job_id", "=", target_job.id)])
-            if job_comp_rels:
-                c_lines = []
-                for idx, rel in enumerate(job_comp_rels, start=1):
-                    comp = rel.competency_id
-                    q_prompt = comp.question_ids[0].name if hasattr(comp, 'question_ids') and comp.question_ids else ""
-                    c_lines.append((0, 0, {
-                        "competency_id": comp.id,
-                        "evaluation_method": getattr(comp, "evaluation_method", False) or rel.evaluation_method or "star",
-                        "weight_percentage": rel.weight_percentage,
-                        "suggested_question": q_prompt,
-                        "sequence": rel.sequence or idx * 10,
-                    }))
-                self.competency_line_ids = [(5, 0, 0)] + c_lines
-            else:
-                default_comps = self.env["competency.competency"].search([("status", "=", "active")], limit=4)
-                if not default_comps:
-                    default_comps = self.env["competency.competency"].search([], limit=4)
-                if default_comps:
-                    weight_each = round(100.0 / len(default_comps), 2)
-                    c_lines = []
-                    for idx, comp in enumerate(default_comps, start=1):
-                        q_prompt = comp.question_ids[0].name if hasattr(comp, 'question_ids') and comp.question_ids else ""
-                        c_lines.append((0, 0, {
-                            "competency_id": comp.id,
-                            "evaluation_method": getattr(comp, "evaluation_method", False) or "star",
-                            "weight_percentage": weight_each,
-                            "suggested_question": q_prompt,
-                            "sequence": idx * 10,
-                        }))
-                    self.competency_line_ids = [(5, 0, 0)] + c_lines
+        # 3. Auto-populate Competencies from Vacancy / Job Position Profile
+        eligible_comps = self._get_eligible_competencies()
+        if eligible_comps:
+            weight_each = round(100.0 / len(eligible_comps), 2)
+            c_lines = []
+            seen_comp_ids = set()
+            for idx, comp in enumerate(eligible_comps, start=1):
+                if comp.id in seen_comp_ids:
+                    continue
+                seen_comp_ids.add(comp.id)
+                q_prompt = comp.question_ids[0].name if hasattr(comp, 'question_ids') and comp.question_ids else ""
+                eval_method = getattr(comp, "evaluation_method", False) or "star"
+                target_job = self.job_id or self.vacancy_id.job_position
+                if target_job and "assessment.competency.job.rel" in self.env:
+                    rel = self.env["assessment.competency.job.rel"].search([
+                        ("job_id", "=", target_job.id),
+                        ("competency_id", "=", comp.id)
+                    ], limit=1)
+                    if rel and rel.evaluation_method:
+                        eval_method = rel.evaluation_method
+                c_lines.append((0, 0, {
+                    "competency_id": comp.id,
+                    "evaluation_method": eval_method,
+                    "weight_percentage": weight_each,
+                    "suggested_question": q_prompt,
+                    "sequence": idx * 10,
+                }))
+            self.competency_line_ids = [(5, 0, 0)] + c_lines
 
 
     @api.onchange("weight_profile_id")
@@ -434,67 +511,97 @@ class CBISInterviewSession(models.Model):
             if not rec.panel_member_ids:
                 raise UserError(_("Please assign at least one panel member to conduct the interview evaluations."))
 
+            # Batch assign group permissions outside iterative writes to avoid cache flushes
             if group_panel:
-                for member in rec.panel_member_ids:
-                    m_groups = getattr(member, 'group_ids', False) or getattr(member, 'groups_id', False)
-                    if m_groups is not False and group_panel not in m_groups:
-                        field_name = 'group_ids' if 'group_ids' in member._fields else 'groups_id'
-                        member.sudo().write({field_name: [(4, group_panel.id)]})
+                users_to_add = rec.panel_member_ids.filtered(
+                    lambda m: group_panel not in (getattr(m, 'group_ids', False) or getattr(m, 'groups_id', False) or self.env['res.groups'])
+                )
+                if users_to_add:
+                    field_name = 'group_ids' if 'group_ids' in users_to_add[0]._fields else 'groups_id'
+                    users_to_add.sudo().write({field_name: [(4, group_panel.id)]})
 
             for candidate in rec.candidate_line_ids:
                 candidate._initialize_evaluations_for_panel()
-                candidate.action_send_interview_invitation()
-                
+
+            # Batch send candidate invitations
+            rec.candidate_line_ids.action_send_interview_invitation()
+
             rec.state = "confirmed"
             rec._notify_panel_members()
 
     def _notify_panel_members(self):
         """Sends notification to panel members via Email, In-App Notification, and Activity (FR-AMS-NOT-07)"""
+        mail_ids_to_send = []
+        activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+        model_id = self.env['ir.model'].sudo()._get('cbis.interview.session').id
+
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        session_url = f"{base_url.rstrip('/')}/web#id={self.id}&model=cbis.interview.session&view_type=form" if base_url else f"/web#id={self.id}&model=cbis.interview.session&view_type=form"
+        btn_session_html = f"<div style='margin-top: 10px; margin-bottom: 12px;'><a href='{session_url}' target='_blank' style='display:inline-block;padding:8px 16px;background-color:#541718;color:#ffffff !important;text-decoration:none;border-radius:4px;font-weight:bold;font-size:13px;'>👉 Open Interview Session &amp; Candidates</a></div>"
+
         for member in self.panel_member_ids:
             subject = _("Interview Panel Assignment: %s - Bunna Bank") % (self.job_id.name or "Position")
             body = _("""
                 <p>Dear %s,</p>
                 <p>You have been assigned to the Interview Panel for <b>%s</b> (Vacancy Ref: <b>%s</b>).</p>
                 <p><b>Date:</b> %s | <b>Venue:</b> %s</p>
+                %s
                 <p>Please log in to your Assessment System Dashboard to view your assigned candidates and evaluate them.</p>
-            """) % (member.name, self.job_id.name, self.vacancy_reference, self.interview_date, self.venue)
+            """) % (member.name, self.job_id.name, self.vacancy_reference, self.interview_date, self.venue, btn_session_html)
 
-            # 1. Send Outbound Email
+            # 1. Queue Outbound Email (background async dispatch)
             if member.email:
-                self.env['mail.mail'].sudo().create({
+                mail = self.env['mail.mail'].sudo().create({
                     'subject': subject,
                     'body_html': body,
                     'email_to': member.email,
-                }).send()
+                    'auto_delete': False,
+                })
+                mail_ids_to_send.append(mail.id)
 
             # 2. Dispatch In-App Notification (Odoo Inbox & Bell Counter)
             if member.partner_id:
-                self.env['mail.message'].sudo().create({
-                    'subject': subject,
-                    'body': body,
-                    'model': 'cbis.interview.session',
-                    'res_id': self.id,
-                    'message_type': 'notification',
-                    'partner_ids': [(4, member.partner_id.id)],
-                    'notification_ids': [(0, 0, {
-                        'res_partner_id': member.partner_id.id,
-                        'notification_type': 'inbox',
-                        'is_read': False,
-                    })],
-                })
+                try:
+                    self.env['mail.message'].sudo().create({
+                        'subject': subject,
+                        'body': body,
+                        'model': 'cbis.interview.session',
+                        'res_id': self.id,
+                        'message_type': 'notification',
+                        'partner_ids': [(4, member.partner_id.id)],
+                        'notification_ids': [(0, 0, {
+                            'res_partner_id': member.partner_id.id,
+                            'notification_type': 'inbox',
+                            'is_read': False,
+                        })],
+                    })
+                except Exception:
+                    pass
 
-            # 3. Schedule Activity on Panelist's Profile
-            activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-            if activity_type:
-                self.env['mail.activity'].sudo().create({
-                    'res_model_id': self.env['ir.model'].sudo()._get('cbis.interview.session').id,
-                    'res_id': self.id,
-                    'activity_type_id': activity_type.id,
-                    'summary': _("Conduct Interview Panel: %s") % (self.job_id.name or "Session"),
-                    'note': body,
-                    'user_id': member.id,
-                    'date_deadline': self.interview_date or fields.Date.today(),
-                })
+            # 3. Schedule Activity on Panelist's Profile (avoiding duplicate activity tasks)
+            if activity_type and model_id:
+                try:
+                    existing_act = self.env['mail.activity'].sudo().search([
+                        ('res_model', '=', 'cbis.interview.session'),
+                        ('res_id', '=', self.id),
+                        ('user_id', '=', member.id),
+                    ], limit=1)
+                    if not existing_act:
+                        self.env['mail.activity'].sudo().create({
+                            'res_model_id': model_id,
+                            'res_id': self.id,
+                            'activity_type_id': activity_type.id,
+                            'summary': _("Conduct Interview Panel: %s") % (self.job_id.name or "Session"),
+                            'note': body,
+                            'user_id': member.id,
+                            'date_deadline': self.interview_date or fields.Date.today(),
+                        })
+                except Exception:
+                    pass
+
+        # Send emails asynchronously in background thread so UI returns immediately!
+        if mail_ids_to_send:
+            _send_mails_async(self.env, mail_ids_to_send)
 
 
 class CBISInterviewCandidate(models.Model):
@@ -508,10 +615,8 @@ class CBISInterviewCandidate(models.Model):
     _description = "Scheduled Candidate Interview Record"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "session_id desc, scheduled_time asc, id asc"
-    _sql_constraints = [
-        ("session_employee_uniq", "unique(session_id, employee_id)", "An internal employee can only be listed once per interview session!"),
-        ("session_applicant_uniq", "unique(session_id, applicant_id)", "An external applicant can only be listed once per interview session!"),
-    ]
+    _session_employee_uniq = models.Constraint("unique(session_id, employee_id)", "An internal employee can only be listed once per interview session!")
+    _session_applicant_uniq = models.Constraint("unique(session_id, applicant_id)", "An external applicant can only be listed once per interview session!")
 
     def _auto_init(self):
         res = super()._auto_init()
@@ -672,22 +777,88 @@ class CBISInterviewCandidate(models.Model):
             rec._sync_interview_score_to_recruitment()
 
     def _sync_interview_score_to_recruitment(self):
-        """Syncs candidate average_interview_score to recruitment selection records (new.internal.recruitment.selected.candidates & external.recruitment.selected.candidates)."""
+        """Syncs candidate average_interview_score to recruitment selection records (new.internal.recruitment.selected.candidates & external.recruitment.selected.candidates).
+        Strictly scopes to the specific vacancy of this interview session."""
         for rec in self:
             score = rec.average_interview_score or 0.0
+            target_vac = rec.session_id.vacancy_id if (rec.session_id and hasattr(rec.session_id, 'vacancy_id')) else False
+            target_vac_ref = rec.session_id.vacancy_reference if (rec.session_id and hasattr(rec.session_id, 'vacancy_reference')) else (target_vac.reference if target_vac else False)
+
             if rec.employee_id:
-                int_cands = self.env["new.internal.recruitment.selected.candidates"].sudo().search([
-                    ("emp_name", "=", rec.employee_id.id)
-                ])
+                int_cand_domain = [("emp_name", "=", rec.employee_id.id)]
+                if target_vac and target_vac_ref:
+                    int_cand_domain = [
+                        ("emp_name", "=", rec.employee_id.id),
+                        "|",
+                        ("new_int_sel_cand.vacancy_id", "=", target_vac.id),
+                        ("new_int_sel_cand.vacancy_reference", "=", target_vac_ref)
+                    ]
+                elif target_vac:
+                    int_cand_domain = [
+                        ("emp_name", "=", rec.employee_id.id),
+                        ("new_int_sel_cand.vacancy_id", "=", target_vac.id)
+                    ]
+                elif target_vac_ref:
+                    int_cand_domain = [
+                        ("emp_name", "=", rec.employee_id.id),
+                        ("new_int_sel_cand.vacancy_reference", "=", target_vac_ref)
+                    ]
+
+                int_cands = self.env["new.internal.recruitment.selected.candidates"].sudo().search(int_cand_domain)
                 if int_cands:
                     int_cands.write({"interview_score": score})
+                    for cand in int_cands:
+                        parent = cand.new_int_sel_cand
+                        if parent:
+                            parent.sudo().write({"interview_scores_fetched": True})
+                            vac = False
+                            if parent.vacancy_id:
+                                vac = self.env["job.vacancy"].sudo().browse(parent.vacancy_id)
+                            elif parent.vacancy_reference:
+                                vac = self.env["job.vacancy"].sudo().search([("reference", "=", parent.vacancy_reference)], limit=1)
+                            if vac and vac.exists():
+                                vac_vals = {"interview_scores_fetched": True}
+                                if vac.recruitment_step in ("fetch_interview", "notify_interview"):
+                                    vac_vals["recruitment_step"] = "compute_rank"
+                                vac.sudo().with_context(skip_lock_check=True).write(vac_vals)
 
             if rec.applicant_id:
-                ext_cands = self.env["external.recruitment.selected.candidates"].sudo().search([
-                    ("applicant_name", "=", rec.applicant_id.id)
-                ])
+                ext_cand_domain = [("applicant_name", "=", rec.applicant_id.id)]
+                if target_vac and target_vac_ref:
+                    ext_cand_domain = [
+                        ("applicant_name", "=", rec.applicant_id.id),
+                        "|",
+                        ("ext_rec_sel_cand.vacancy_id", "=", target_vac.id),
+                        ("ext_rec_sel_cand.vacancy_reference", "=", target_vac_ref)
+                    ]
+                elif target_vac:
+                    ext_cand_domain = [
+                        ("applicant_name", "=", rec.applicant_id.id),
+                        ("ext_rec_sel_cand.vacancy_id", "=", target_vac.id)
+                    ]
+                elif target_vac_ref:
+                    ext_cand_domain = [
+                        ("applicant_name", "=", rec.applicant_id.id),
+                        ("ext_rec_sel_cand.vacancy_reference", "=", target_vac_ref)
+                    ]
+
+                ext_cands = self.env["external.recruitment.selected.candidates"].sudo().search(ext_cand_domain)
                 if ext_cands:
                     ext_cands.write({"interview_score": score})
+                    for cand in ext_cands:
+                        parent = cand.ext_rec_sel_cand
+                        if parent:
+                            parent.sudo().write({"interview_scores_fetched": True})
+                            vac = False
+                            if parent.vacancy_id:
+                                vac = self.env["job.vacancy"].sudo().browse(parent.vacancy_id)
+                            elif parent.vacancy_reference:
+                                vac = self.env["job.vacancy"].sudo().search([("reference", "=", parent.vacancy_reference)], limit=1)
+                            if vac and vac.exists():
+                                vac_vals = {"interview_scores_fetched": True}
+                                if vac.recruitment_step in ("fetch_interview", "notify_interview"):
+                                    vac_vals["recruitment_step"] = "compute_rank"
+                                vac.sudo().with_context(skip_lock_check=True).write(vac_vals)
 
     def _initialize_evaluations_for_panel(self):
         """Creates individual evaluation sheets for each assigned panel member"""
@@ -724,6 +895,7 @@ class CBISInterviewCandidate(models.Model):
 
     def action_send_interview_invitation(self):
         """Sends interview invitation via Email and Discuss Direct Message (FR-AMS-NOT-03)"""
+        mail_ids_to_send = []
         for rec in self:
             subject = _("Interview Invitation: %s - Bunna Bank") % (rec.job_id.name or "Position")
             body = _("""
@@ -738,11 +910,13 @@ class CBISInterviewCandidate(models.Model):
                 'venue': rec.session_id.venue or "Head Office",
             }
             if rec.candidate_email:
-                self.env['mail.mail'].sudo().create({
+                mail = self.env['mail.mail'].sudo().create({
                     'subject': subject,
                     'body_html': body,
                     'email_to': rec.candidate_email,
-                }).send()
+                    'auto_delete': False,
+                })
+                mail_ids_to_send.append(mail.id)
 
             target_partner = False
             if rec.employee_id:
@@ -756,12 +930,13 @@ class CBISInterviewCandidate(models.Model):
                     job_title = rec.job_id.name or "Position"
                     int_date = str(rec.scheduled_time or rec.session_id.interview_date)
                     int_venue = rec.session_id.venue or "Head Office"
+                    venue_html = f"<a href='{escape(int_venue)}' target='_blank' style='color:#0d6efd;font-weight:bold;text-decoration:underline;'>{escape(int_venue)}</a>" if int_venue.strip().startswith(('http://', 'https://')) else escape(int_venue)
 
                     discuss_msg = Markup(
-                        f"<p>Dear <b>{cand_name}</b>,<br/>"
-                        f"You have been shortlisted for the Interview for position <b>{job_title}</b>.<br/>"
-                        f"Date: {int_date}<br/>"
-                        f"Location: {int_venue}<br/><br/>"
+                        f"<p>Dear <b>{escape(cand_name)}</b>,<br/>"
+                        f"You have been shortlisted for the Interview for position: <b>{escape(job_title)}</b>.<br/>"
+                        f"<b>Date:</b> {escape(int_date)}<br/>"
+                        f"<b>Location / Venue:</b> {venue_html}<br/><br/>"
                         f"All The Best!</p>"
                     )
                     chat = self.env['discuss.channel'].sudo()._get_or_create_chat(partners_to=[target_partner.id])
@@ -769,6 +944,10 @@ class CBISInterviewCandidate(models.Model):
                         chat.message_post(body=discuss_msg, message_type='comment', subtype_xmlid='mail.mt_comment')
                 except Exception:
                     pass
+
+        # Send emails asynchronously in background thread so UI returns immediately!
+        if mail_ids_to_send:
+            _send_mails_async(self.env, mail_ids_to_send)
 
 
 class CBISSessionCompetencyLine(models.Model):
@@ -780,10 +959,20 @@ class CBISSessionCompetencyLine(models.Model):
     _description = "Session Competency Weight Configuration Line"
     _order = "sequence asc, id asc"
 
+    _session_competency_uniq = models.Constraint(
+        "unique(session_id, competency_id)",
+        "Each competency can only be added once per interview session!",
+    )
+
     session_id = fields.Many2one("cbis.interview.session", string="Interview Session", required=True, ondelete="cascade", index=True)
     sequence = fields.Integer(string="Sequence", default=10)
     
     competency_id = fields.Many2one("competency.competency", string="Competency", required=True)
+    eligible_competency_ids = fields.Many2many(
+        "competency.competency",
+        compute="_compute_eligible_competency_ids",
+        string="Eligible Competencies"
+    )
     evaluation_method = fields.Selection([
         ("star", "STAR Method (Situation, Task, Action, Result)"),
         ("starr", "STARR Method (Situation, Task, Action, Result, Reflection)"),
@@ -799,13 +988,50 @@ class CBISSessionCompetencyLine(models.Model):
 
     suggested_question = fields.Text(string="Suggested Question Prompt")
 
+    @api.depends("session_id.eligible_competency_ids")
+    def _compute_eligible_competency_ids(self):
+        for line in self:
+            if line.session_id:
+                line.eligible_competency_ids = line.session_id.eligible_competency_ids
+            else:
+                line.eligible_competency_ids = self.env["competency.competency"]
+
     @api.onchange("competency_id")
     def _onchange_competency_id(self):
         if self.competency_id:
+            # Check for duplicate competency in current session lines
+            if self.session_id and self.session_id.competency_line_ids:
+                duplicates = self.session_id.competency_line_ids.filtered(
+                    lambda l: l._origin.id != self._origin.id and l.competency_id == self.competency_id
+                )
+                if duplicates:
+                    comp_name = self.competency_id.name or ""
+                    self.competency_id = False
+                    return {
+                        "warning": {
+                            "title": _("Duplicate Competency"),
+                            "message": _("The competency '%s' is already added to this interview session. Duplicate competencies are not allowed.") % comp_name
+                        }
+                    }
+
             if hasattr(self.competency_id, "evaluation_method") and self.competency_id.evaluation_method:
                 self.evaluation_method = self.competency_id.evaluation_method
             if hasattr(self.competency_id, "question_ids") and self.competency_id.question_ids:
-                self.suggested_question = self.competency_id.question_ids[0].name
+                prompts = [q.name for q in self.competency_id.question_ids if q.name]
+                if prompts:
+                    self.suggested_question = "\n".join(prompts)
+
+    @api.constrains("session_id", "competency_id")
+    def _check_unique_session_competency(self):
+        for line in self:
+            if line.session_id and line.competency_id:
+                duplicates = self.search([
+                    ("session_id", "=", line.session_id.id),
+                    ("competency_id", "=", line.competency_id.id),
+                    ("id", "!=", line.id)
+                ])
+                if duplicates:
+                    raise ValidationError(_("The competency '%s' is already added to this interview session. Each competency can only be added once.") % (line.competency_id.name or ""))
 
     @api.constrains("weight_percentage")
     def _check_weight_percentage(self):

@@ -9,15 +9,14 @@
                 <field name="sequence" widget="handle" />
                 <field name="name" string="Operation / Case" placeholder="e.g. A2A Transaction/Incoming" />
                 <field name="code" string="Code" placeholder="e.g. A2A_IN" />
-                <field name="team_id" string="Assigned Team" options="{'no_create': True}" />
+                <field name="team_id" string="Service Provider" options="{'no_create': True}" />
                 <field name="default_priority" widget="priority" />
-                <field name="case_type_id" string="Default Case Type" options="{'no_create': True}" />
-                <field name="service_family_id" string="Service Family" options="{'no_create': True}" />
+                <field name="case_type_id" string="Default Case Type" />
+                
                 <field
                     name="service_id"
-                    string="Service"
-                    options="{'no_create': True}"
-                    domain="[('family_id', '=', service_family_id)] if service_family_id else []"
+                    string="Sub Service"
+                    
                 />
                 <field name="target_hours" string="SLA Target (Hours)" />
                 <field name="ticket_count" string="Tickets" />
@@ -40,8 +39,8 @@
                         </h1>
                     </div>
                     <group>
-                        <group string="Team Routing &amp; Classification">
-                            <field name="team_id" options="{'no_create': True}" />
+                        <group string="Service Provider Routing &amp; Classification">
+                            <field name="team_id" string="Service Provider" options="{'no_create': True}" />
                             <field name="code" placeholder="e.g. A2A_IN" />
                             <field name="case_type_id" options="{'no_create': True}" />
                             <field name="default_priority" widget="priority" />
@@ -49,14 +48,16 @@
                             <field name="active" widget="boolean_toggle" />
                         </group>
                         <group string="Service Catalogue &amp; SLA">
-                            <field name="service_family_id" options="{'no_create': True}" />
+                            <field name="service_family_id" string="Service" options="{'no_create': True}" />
                             <field
                                 name="service_id"
+                                string="Sub Service"
                                 options="{'no_create': True}"
-                                domain="[('family_id', '=', service_family_id)] if service_family_id else []"
+                                
                             />
                             <field
                                 name="service_sub_category_id"
+                                string="Sub Service"
                                 options="{'no_create': True}"
                                 domain="[('service_id', '=', service_id)] if service_id else []"
                             />
@@ -82,16 +83,17 @@
             <search string="Search Services">
                 <field name="name" string="Operation / Case" />
                 <field name="code" />
-                <field name="team_id" />
-                <field name="service_family_id" string="Service Family" />
+                <field name="team_id" string="Service Provider" options="{'no_create': True}" />
                 <field name="service_id" string="Service" />
+                <field name="service_sub_category_id" string="Sub Service" />
                 <field name="case_type_id" />
                 <separator />
                 <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
                 <group name="group_by">
-                    <filter string="Assigned Team" name="group_by_team" domain="[]" context="{'group_by': 'team_id'}" />
-                    <filter string="Service Family" name="group_by_family" domain="[]" context="{'group_by': 'service_family_id'}" />
+                    <filter string="Service Provider" name="group_by_team" domain="[]" context="{'group_by': 'team_id'}" />
+                    
                     <filter string="Service" name="group_by_service" domain="[]" context="{'group_by': 'service_id'}" />
+                    <filter string="Sub Service" name="group_by_sub_category" domain="[]" context="{'group_by': 'service_sub_category_id'}" />
                     <filter string="Case Type" name="group_by_case_type" domain="[]" context="{'group_by': 'case_type_id'}" />
                     <filter string="Priority" name="group_by_priority" domain="[]" context="{'group_by': 'default_priority'}" />
                 </group>
@@ -126,27 +128,27 @@
                         </div>
                         <field class="fw-bold fs-5 text-truncate" name="name" />
                         <div class="text-muted small mt-1" t-if="record.service_family_id.value">
-                            <i class="fa fa-folder-open me-1" />
+                            <i class="fa fa-folder-open me-1" title="Service" />
                             <field name="service_family_id" />
                         </div>
                         <div class="text-muted small mt-1" t-if="record.service_id.value">
-                            <i class="fa fa-cogs me-1" />
+                            <i class="fa fa-cogs me-1" title="Sub Service" />
                             <field name="service_id" />
                         </div>
                         <div class="d-flex gap-2 mt-2">
                             <span class="badge text-bg-light border" t-if="record.target_hours.value">
-                                <i class="fa fa-clock-o me-1" />
+                                <i class="fa fa-clock-o me-1" title="SLA Target Hours" />
                                 <field name="target_hours" /> hrs SLA
                             </span>
                             <span class="badge text-bg-light border" t-if="record.ticket_count.raw_value">
-                                <i class="fa fa-ticket me-1" />
+                                <i class="fa fa-ticket me-1" title="Total Tickets" />
                                 <field name="ticket_count" /> tickets
                             </span>
                         </div>
                         <footer class="pt-2 d-flex justify-content-between align-items-center">
                             <field name="default_priority" widget="priority" />
                             <span class="text-muted small">
-                                <i class="fa fa-users me-1" />
+                                <i class="fa fa-building me-1" title="Responsible Operating Unit" />
                                 <field name="team_id" />
                             </span>
                         </footer>

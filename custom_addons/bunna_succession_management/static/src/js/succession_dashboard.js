@@ -12,6 +12,8 @@ export class SuccessionDashboard extends Component {
         this.state = useState({
             dashboardData: null,
             loading: true,
+            riskFilter: 'all',
+            searchQuery: '',
         });
 
         onWillStart(async () => {
@@ -29,22 +31,63 @@ export class SuccessionDashboard extends Component {
         });
     }
 
+
+    get filteredCriticalList() {
+        if (!this.state.dashboardData || !this.state.dashboardData.critical_list) return [];
+        let list = this.state.dashboardData.critical_list;
+        if (this.state.riskFilter !== 'all') {
+            list = list.filter(p => p.risk === this.state.riskFilter);
+        }
+        if (this.state.searchQuery && this.state.searchQuery.trim()) {
+            const q = this.state.searchQuery.toLowerCase().trim();
+            list = list.filter(p => (p.name && p.name.toLowerCase().includes(q)) || (p.department && p.department.toLowerCase().includes(q)));
+        }
+        return list;
+    }
+
+    setRiskFilter(filter) {
+        this.state.riskFilter = filter;
+    }
+
+    openPosition(positionId) {
+        if (!positionId) return;
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "succession.critical.position",
+            res_id: positionId,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
     renderCharts() {
         if (!this.state.dashboardData) return;
         const ctx = document.getElementById("readinessChart");
         if (ctx) {
-            new Chart(ctx, {
+            if (this.chartInstance) {
+                this.chartInstance.destroy();
+                this.chartInstance = null;
+            }
+
+            const pipeline = this.state.dashboardData.readiness_pipeline || {
+                labels: ['Ready Now', 'Ready Soon (1-3 yrs)', 'Ready Later (3-5 yrs)'],
+                data: [
+                    this.state.dashboardData.ready_now_count,
+                    this.state.dashboardData.ready_soon_count,
+                    this.state.dashboardData.ready_later_count
+                ],
+                colors: ['#28a745', '#17a2b8', '#ffc107'],
+                levels: []
+            };
+
+            this.chartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Ready Now', 'Ready Soon (1-3 yrs)', 'Ready Later (3-5 yrs)'],
+                    labels: pipeline.labels,
                     datasets: [{
                         label: 'Candidates',
-                        data: [
-                            this.state.dashboardData.ready_now_count,
-                            this.state.dashboardData.ready_soon_count,
-                            this.state.dashboardData.ready_later_count
-                        ],
-                        backgroundColor: ['#28a745', '#17a2b8', '#ffc107'],
+                        data: pipeline.data,
+                        backgroundColor: pipeline.colors,
                         borderWidth: 0
                     }]
                 },
@@ -54,6 +97,23 @@ export class SuccessionDashboard extends Component {
                     legend: { display: false },
                     scales: {
                         yAxes: [{ ticks: { beginAtZero: true, precision: 0 } }]
+                    },
+                    onClick: (evt, elements) => {
+                        if (elements && elements.length > 0 && pipeline.levels && pipeline.levels.length > 0) {
+                            const index = elements[0]._index;
+                            const level = pipeline.levels[index];
+                            if (level) {
+                                this.action.doAction({
+                                    name: `${level.name} Candidates`,
+                                    type: "ir.actions.act_window",
+                                    res_model: "succession.candidate",
+                                    view_mode: "list,form",
+                                    views: [[false, "list"], [false, "form"]],
+                                    domain: [['state', 'in', ['assessed', 'approved']], ['readiness_level_id', '=', level.id]],
+                                    target: "current",
+                                });
+                            }
+                        }
                     }
                 }
             });
@@ -74,7 +134,7 @@ export class SuccessionDashboard extends Component {
 
     openHighRisk() {
         this.action.doAction({
-            name: "High Risk Vacancies",
+            name: "Priority Critical Positions",
             type: "ir.actions.act_window",
             res_model: "succession.critical.position",
             view_mode: "list,form",
@@ -103,7 +163,7 @@ export class SuccessionDashboard extends Component {
             res_model: "succession.candidate",
             view_mode: "list,form",
             views: [[false, "list"], [false, "form"]],
-            domain: [['state', 'in', ['assessed', 'approved']], ['readiness_level', '=', 'ready_now']],
+            domain: [['state', 'in', ['assessed', 'approved']], ['readiness_level_id.is_ready_for_deployment', '=', true]],
             target: "current",
         });
     }
@@ -121,14 +181,7 @@ export class SuccessionDashboard extends Component {
     }
 
     openAspirations() {
-        this.action.doAction({
-            name: "Career Aspirations",
-            type: "ir.actions.act_window",
-            res_model: "hr.career.aspiration",
-            view_mode: "list,form",
-            views: [[false, "list"], [false, "form"]],
-            target: "current",
-        });
+        this.action.doAction("bunna_succession_management.action_view_career_aspiration_readonly");
     }
 
     openIDPs() {
@@ -142,17 +195,6 @@ export class SuccessionDashboard extends Component {
         });
     }
 
-    openTalentPools() {
-        this.action.doAction({
-            name: "Active Talent Pools",
-            type: "ir.actions.act_window",
-            res_model: "succession.talent.pool",
-            view_mode: "list,form",
-            views: [[false, "list"], [false, "form"]],
-            domain: [['state', '=', 'active']],
-            target: "current",
-        });
-    }
 
     openDiscussions() {
         this.action.doAction({

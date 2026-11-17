@@ -101,6 +101,20 @@
             <t t-set="active_tab" t-value="'vacancy'"/>
             <div class="container-fluid p-0">
                 <a href="/jobs" class="btn btn-sm btn-outline-secondary mb-3">&#8592; Back to Open Vacancies</a>
+                <t t-if="error">
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-3" role="alert" style="border-left: 5px solid #dc3545; background-color: #fff5f5;">
+                        <i class="fa fa-exclamation-triangle text-danger me-2" style="font-size: 1.1rem;"/>
+                        <strong class="text-danger">Application Notice:</strong> <t t-esc="error"/>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+                <t t-elif="is_internal_employee and not has_applied">
+                    <div class="alert alert-warning alert-dismissible fade show shadow-sm mb-3" role="alert" style="border-left: 5px solid #d97706; background-color: #fffbeb;">
+                        <i class="fa fa-info-circle text-warning me-2" style="font-size: 1.15rem;"/>
+                        <strong class="text-warning">Application Restriction:</strong> You are an internal employee and cannot apply for external vacancies. You are only eligible for internal vacancies.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
                 
                 <div class="card border-0 shadow-sm p-4 mb-4" style="border-left: 5px solid #541718 !important; border-radius: 8px;">
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
@@ -115,6 +129,9 @@
                             </t>
                             <t t-elif="has_applied">
                                 <span class="btn btn-success disabled fw-bold" style="background-color: #2e7d32 !important; border-color: #2e7d32 !important;"><i class="fa fa-check-circle me-1"/> Applied</span>
+                            </t>
+                            <t t-elif="is_internal_employee">
+                                <span class="btn btn-secondary disabled fw-bold" style="cursor: not-allowed; opacity: 0.85;" title="You are an internal employee and cannot apply for external vacancies. You are only eligible for internal vacancies."><i class="fa fa-ban me-1"/> Internal Employee</span>
                             </t>
                             <t t-else="">
                                 <a t-attf-href="/jobs/#{vacancy.id}/apply" class="btn text-white fw-bold px-4 py-2" style="background-color: #541718;"><i class="fa fa-paper-plane me-1"/> Apply Now</a>
@@ -190,6 +207,17 @@
             <div class="container-fluid p-0">
                 <a t-attf-href="/jobs/#{vacancy.id}" class="btn btn-sm btn-outline-secondary mb-3">&#8592; Back to Job Details</a>
 
+                <t t-if="is_internal_employee">
+                    <div class="card border-0 shadow-sm p-4 max-width-800 mx-auto text-center my-4" style="max-width: 700px; border-left: 5px solid #dc3545 !important;">
+                        <i class="fa fa-ban fa-3x text-danger mb-3"/>
+                        <h4 class="fw-bold text-danger mb-2">Application Restricted</h4>
+                        <p class="text-secondary fs-6 mb-4">You are an internal employee and cannot apply for external vacancies. You are only eligible for internal vacancies.</p>
+                        <div>
+                            <a t-attf-href="/jobs/#{vacancy.id}" class="btn btn-outline-secondary px-4 py-2 fw-bold">&#8592; Back to Vacancy Details</a>
+                        </div>
+                    </div>
+                </t>
+                <t t-else="">
                 <div class="card border-0 shadow-sm p-4 max-width-800 mx-auto" style="max-width: 800px;">
                     <h4 class="fw-bold mb-1" style="color: #541718;">Submit Application</h4>
                     <p class="text-muted small mb-4">Applying for position: <strong><t t-esc="vacancy.job_position.name if vacancy.job_position else (vacancy.vacant_job_position or vacancy.reference)"/> (<t t-esc="vacancy.reference"/>)</strong></p>
@@ -226,6 +254,7 @@
                         </div>
                     </form>
                 </div>
+                </t>
             </div>
         </t>
     </template>
@@ -801,61 +830,8 @@
 
             <div class="container-fluid p-0">
                 <div class="row">
-                    <!-- Left Sidebar Candidate Card -->
-                    <div class="col-lg-3">
-                        <div class="ats-profile-card p-4 text-center">
-                            <div class="position-relative d-inline-block mb-3">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm" style="width: 100px; height: 100px; background-color: #1D2B32; font-size: 2.2rem; margin: 0 auto;">
-                                    <t t-esc="candidate.name[0].upper() if candidate.name else 'C'"/>
-                                </div>
-                            </div>
-                            <h5 class="fw-bold mb-1" style="color: #1D2B32;"><t t-esc="candidate.name"/></h5>
-                            <p class="text-muted small mb-2"><t t-esc="candidate.email"/></p>
-                            <span class="badge bg-light text-dark border px-3 py-1 mb-3"><i class="fa fa-phone me-1"/> <t t-esc="candidate.phone or 'No Phone'"/></span>
-
-                            <hr class="my-3"/>
-                            
-                            <div class="text-start">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted small">National ID:</span>
-                                    <span class="fw-bold small text-dark"><t t-esc="candidate.national_id or 'Not Set'"/></span>
-                                </div>
-                                <t t-if="candidate.secondary_id_type or candidate.secondary_id_number">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span class="text-muted small"><t t-esc="dict([('passport', 'Passport'), ('kebele_id', 'Kebele ID'), ('driver_id', 'Driver ID')]).get(candidate.secondary_id_type, 'Secondary ID')"/>:</span>
-                                        <span class="fw-bold small text-dark"><t t-esc="candidate.secondary_id_number or 'Not Set'"/></span>
-                                    </div>
-                                </t>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted small">Gender:</span>
-                                    <span class="fw-bold small text-dark"><t t-esc="dict([('male', 'Male'), ('female', 'Female')]).get(candidate.gender, 'Not Set')"/></span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted small">Location:</span>
-                                    <span class="fw-bold small text-dark"><t t-esc="candidate.city or 'Not Set'"/></span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted small">Master CV:</span>
-                                    <t t-if="candidate.cv_file">
-                                        <a href="/my/candidate/cv/download" class="badge bg-success text-white text-decoration-none"><i class="fa fa-download me-1"/> Download</a>
-                                    </t>
-                                    <t t-if="not candidate.cv_file">
-                                        <span class="badge bg-danger">Missing</span>
-                                    </t>
-                                </div>
-                                <hr class="my-3"/>
-                                <!-- Data Privacy & Profile Deletion (BRD FR-ATS-009) -->
-                                <form action="/my/candidate/profile/delete" method="POST" onsubmit="return confirm('WARNING: Are you sure you want to request deletion of your account and profile data? This action cannot be undone.');">
-                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger w-100 fw-bold">
-                                        <i class="fa fa-trash me-1"/>Delete Your Profile                                     </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Right Step Builder Container -->
-                    <div class="col-lg-9">
+                    <!-- Step Builder Container (Full Width) -->
+                    <div class="col-12">
                         <div class="ats-profile-card p-4">
                             <!-- Profile Incomplete Helpful Reminder Banner -->
                             <t t-set="is_profile_complete" t-value="bool(candidate and candidate.cv_file and candidate.education_ids)"/>
@@ -911,13 +887,13 @@
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="fw-semibold text-dark small"><i class="fa fa-tasks me-1" style="color: #C17540;"/> Master Profile Completeness</span>
                                 <span class="badge rounded-pill px-3 py-2 fw-bold text-white" style="background-color: #C17540; font-size: 0.85rem;">
-                                    <t t-out="completeness"/>% Completed
+                                    <t t-out="completeness or 0"/>% Completed
                                 </span>
                             </div>
                             <div class="ats-progress-bar-container position-relative mb-4" style="height: 18px; background-color: #e5e7eb; border-radius: 9px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
                                 <div class="ats-progress-bar-fill d-flex align-items-center justify-content-center text-white fw-bold" 
-                                     t-attf-style="width: #{completeness}%; height: 100%; font-size: 0.75rem; background-image: linear-gradient(90deg, #541718 0%, #C17540 100%); transition: width 0.6s ease-in-out;">
-                                    <t t-if="completeness &gt; 10">
+                                     t-attf-style="width: #{completeness or 0}%; height: 100%; font-size: 0.75rem; background-image: linear-gradient(90deg, #541718 0%, #C17540 100%); transition: width 0.6s ease-in-out;">
+                                    <t t-if="(completeness or 0) &gt; 10">
                                         <t t-out="completeness"/>%
                                     </t>
                                 </div>
@@ -1066,7 +1042,7 @@
                                                                             <t t-esc="dict([('regular', 'Regular'), ('extension', 'Extension / Evening'), ('distance', 'Distance / Online'), ('weekend', 'Weekend'), ('summer', 'Summer')]).get(edu.program_type, 'Regular')"/>
                                                                         </span>
                                                                     </td>
-                                                                    <td><t t-esc="edu.graduation_year.strftime('%Y') if edu.graduation_year else 'N/A'"/></td>
+                                                                    <td><t t-esc="str(edu.graduation_year)[:4] if edu.graduation_year else 'N/A'"/></td>
                                                                     <td><strong class="text-primary"><t t-esc="edu.cgpa"/></strong></td>
                                                                     <td>
                                                                         <t t-if="edu.has_cost_sharing">
@@ -1390,17 +1366,24 @@
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label fw-bold small">Date of Birth</label>
-                                            <input type="date" name="dob" id="dobInput" min="1900-01-01" max="2099-12-31" class="form-control" t-att-value="candidate.dob or candidate.birth_date"/>
+                                            <input type="date" name="dob" id="dobInput" min="1900-01-01" class="form-control" t-att-value="candidate.dob or candidate.birth_date"/>
+                                            <div id="dobAgeWarning" class="text-danger small mt-1 d-none fw-bold">
+                                                <i class="fa fa-exclamation-circle me-1"/>Candidates must be at least 18 years old.
+                                            </div>
                                         </div>
                                         <div class="col-md-2">
                                             <label class="form-label fw-bold small">Age</label>
-                                            <input type="number" min="0" max="100" id="ageInput" class="form-control" t-att-value="candidate.age or 0"/>
+                                            <input type="number" min="18" max="100" id="ageInput" class="form-control" t-att-value="candidate.age or 0"/>
                                         </div>
                                         <script>
                                             (function(){
                                                 var dobEl = document.getElementById('dobInput');
                                                 var ageEl = document.getElementById('ageInput');
                                                 if (!dobEl || !ageEl) return;
+
+                                                var eighteenYearsAgo = new Date();
+                                                eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+                                                dobEl.setAttribute('max', eighteenYearsAgo.toISOString().split('T')[0]);
 
                                                 function calcAge(dob) {
                                                     var today = new Date();
@@ -1409,6 +1392,19 @@
                                                     var m = today.getMonth() - birth.getMonth();
                                                     if (m &lt; 0 || (m === 0 &amp;&amp; today.getDate() &lt; birth.getDate())) age--;
                                                     return age;
+                                                }
+
+                                                function validateCandidateAge(age) {
+                                                    var warn = document.getElementById('dobAgeWarning');
+                                                    if (age !== null &amp;&amp; !isNaN(age) &amp;&amp; age &lt; 18) {
+                                                        if (warn) warn.classList.remove('d-none');
+                                                        dobEl.classList.add('is-invalid');
+                                                        ageEl.classList.add('is-invalid');
+                                                    } else {
+                                                        if (warn) warn.classList.add('d-none');
+                                                        dobEl.classList.remove('is-invalid');
+                                                        ageEl.classList.remove('is-invalid');
+                                                    }
                                                 }
 
                                                 function calcDob(age) {
@@ -1421,9 +1417,15 @@
 
                                                 dobEl.addEventListener('change', function(){
                                                     if (this.value) {
-                                                        ageEl.value = calcAge(this.value);
+                                                        var a = calcAge(this.value);
+                                                        ageEl.value = a;
+                                                        validateCandidateAge(a);
                                                     }
                                                 });
+
+                                                if (dobEl.value) {
+                                                    validateCandidateAge(calcAge(dobEl.value));
+                                                }
 
                                                 ageEl.addEventListener('input', function(){
                                                     var v = parseInt(this.value);
@@ -1482,7 +1484,7 @@
                                                             <td><t t-esc="edu.field_of_study"/></td>
                                                             <td><t t-esc="edu.institution"/></td>
                                                             <td><t t-esc="dict([('regular', 'Regular'), ('extension', 'Extension'), ('distance', 'Distance'), ('weekend', 'Weekend'), ('summer', 'Summer')]).get(edu.program_type, 'Regular')"/></td>
-                                                            <td><t t-esc="edu.graduation_year.strftime('%Y') if edu.graduation_year else 'N/A'"/></td>
+                                                            <td><t t-esc="str(edu.graduation_year)[:4] if edu.graduation_year else 'N/A'"/></td>
                                                             <td>
                                                                 <t t-if="edu.cost_sharing_file">
                                                                     <a t-attf-href="/my/candidate/education/cost_sharing/download/#{edu.id}" class="badge bg-secondary text-white text-decoration-none me-1"><i class="fa fa-download"/> Cost Sharing</a>
@@ -1564,7 +1566,7 @@
                                                         </div>
                                                         <div class="col-md-4">
                                                              <label class="form-label fw-bold small">Year of Graduation</label>
-                                                             <input type="date" name="graduation_year" class="form-control" t-att-value="edit_edu.graduation_year.strftime('%Y-%m-%d') if edit_edu and edit_edu.graduation_year else ''" placeholder="Select graduation date"/>
+                                                             <input type="date" name="graduation_year" class="form-control" t-att-value="str(edit_edu.graduation_year)[:10] if edit_edu and edit_edu.graduation_year else ''" placeholder="Select graduation date"/>
                                                          </div>
                                                         <div class="col-md-4">
                                                             <label class="form-label fw-bold small">CGPA / Grade</label>
@@ -1648,6 +1650,116 @@
                                             });
                                         }
                                     </script>
+
+                                    <!-- Ethiopian Universities / Colleges Autocomplete List -->
+                                    <datalist id="instList">
+                                        <option value="Addis Ababa University"/>
+                                        <option value="Adama Science and Technology University"/>
+                                        <option value="Hawassa University"/>
+                                        <option value="Jimma University"/>
+                                        <option value="Bahir Dar University"/>
+                                        <option value="Mekelle University"/>
+                                        <option value="Haramaya University"/>
+                                        <option value="Arba Minch University"/>
+                                        <option value="University of Gondar"/>
+                                        <option value="Dilla University"/>
+                                        <option value="Wolaita Sodo University"/>
+                                        <option value="Wollo University"/>
+                                        <option value="Debre Markos University"/>
+                                        <option value="Debre Berhan University"/>
+                                        <option value="Ambo University"/>
+                                        <option value="Dire Dawa University"/>
+                                        <option value="Jigjiga University"/>
+                                        <option value="Semera University"/>
+                                        <option value="Wachamo University"/>
+                                        <option value="Madda Walabu University"/>
+                                        <option value="Mizan-Tepi University"/>
+                                        <option value="Bule Hora University"/>
+                                        <option value="Woldia University"/>
+                                        <option value="Assosa University"/>
+                                        <option value="Gambella University"/>
+                                        <option value="Injibara University"/>
+                                        <option value="Raya University"/>
+                                        <option value="Kebri Dehar University"/>
+                                        <option value="Salale University"/>
+                                        <option value="Werabe University"/>
+                                        <option value="Oda Bultum University"/>
+                                        <option value="Debark University"/>
+                                        <option value="Jinka University"/>
+                                        <option value="Borena University"/>
+                                        <option value="Ethiopian Civil Service University"/>
+                                        <option value="Kotebe Education University"/>
+                                        <option value="St. Mary's University"/>
+                                        <option value="Unity University"/>
+                                        <option value="Rift Valley University"/>
+                                        <option value="Admas University"/>
+                                        <option value="Alpha University College"/>
+                                        <option value="HiLCoE School of Computer Science &amp; Technology"/>
+                                        <option value="CPU College"/>
+                                        <option value="MicroLink Information Technology College"/>
+                                        <option value="Yardstick International College"/>
+                                        <option value="Gage College"/>
+                                        <option value="Universal Medical College"/>
+                                        <option value="Leadstar University College"/>
+                                        <option value="New Generation University College"/>
+                                        <option value="Royal College"/>
+                                        <option value="Queen's College"/>
+                                        <option value="Other"/>
+                                    </datalist>
+
+                                    <!-- Fields of Study Autocomplete List -->
+                                    <datalist id="fieldsList">
+                                        <option value="Accounting and Finance"/>
+                                        <option value="Banking and Finance"/>
+                                        <option value="Business Administration"/>
+                                        <option value="Business Management"/>
+                                        <option value="Economics"/>
+                                        <option value="Computer Science"/>
+                                        <option value="Information Technology"/>
+                                        <option value="Information Systems"/>
+                                        <option value="Software Engineering"/>
+                                        <option value="Computer Engineering"/>
+                                        <option value="Management"/>
+                                        <option value="Marketing Management"/>
+                                        <option value="Cooperative Accounting and Auditing"/>
+                                        <option value="Logistics and Supply Chain Management"/>
+                                        <option value="Human Resource Management"/>
+                                        <option value="Civil Engineering"/>
+                                        <option value="Electrical and Computer Engineering"/>
+                                        <option value="Mechanical Engineering"/>
+                                        <option value="Industrial Engineering"/>
+                                        <option value="Architecture"/>
+                                        <option value="Agricultural Economics"/>
+                                        <option value="Agronomy"/>
+                                        <option value="Animal Science"/>
+                                        <option value="Plant Science"/>
+                                        <option value="Law (LLB)"/>
+                                        <option value="Public Administration"/>
+                                        <option value="Sociology"/>
+                                        <option value="Social Work"/>
+                                        <option value="Psychology"/>
+                                        <option value="Educational Leadership"/>
+                                        <option value="Statistics"/>
+                                        <option value="Mathematics"/>
+                                        <option value="Physics"/>
+                                        <option value="Chemistry"/>
+                                        <option value="Biology"/>
+                                        <option value="Biotechnology"/>
+                                        <option value="Medicine"/>
+                                        <option value="Public Health"/>
+                                        <option value="Nursing"/>
+                                        <option value="Pharmacy"/>
+                                        <option value="Medical Laboratory Science"/>
+                                        <option value="Environmental Health"/>
+                                        <option value="Journalism and Communications"/>
+                                        <option value="English Language and Literature"/>
+                                        <option value="Amharic Language and Literature"/>
+                                        <option value="International Relations"/>
+                                        <option value="Political Science"/>
+                                        <option value="Hotel and Tourism Management"/>
+                                        <option value="Project Management"/>
+                                        <option value="Other"/>
+                                    </datalist>
                                 </div>
                             </t>
 
@@ -1658,7 +1770,38 @@
                                         <h5 class="fw-bold mb-0" style="color: #1D2B32;">Step 4: Professional Experience <span class="badge bg-light text-muted border font-monospace ms-2 fw-normal" style="font-size: 0.75rem;">Optional</span></h5>
                                     </div>
 
-                                    <!-- Computed Experience Summary Cards -->
+                                    <!-- Work Experience Declaration Toggle -->
+                                    <div class="card p-3 mb-4 bg-white border rounded-3 shadow-sm" style="border-left: 5px solid #541718 !important;">
+                                        <div class="form-check form-switch d-flex align-items-center gap-3 ps-2 my-1">
+                                            <input class="form-check-input ms-0 mt-0" type="checkbox" id="hasWorkExpCheckbox" name="has_work_experience" value="1" style="width: 2.5rem; height: 1.35rem; cursor: pointer;" t-att-checked="'checked' if (candidate.has_work_experience or candidate.experience_ids) else None" onchange="toggleExperienceSection(this.checked)"/>
+                                            <label class="form-check-label fw-bold mb-0 text-dark" for="hasWorkExpCheckbox" style="font-size: 1rem; cursor: pointer;">
+                                                I have professional work experience
+                                                <small class="text-muted d-block fw-normal" style="font-size: 0.82rem;">Check this box if you have work experience. If unchecked (fresh graduate), you can move directly to the next tab without adding experience.</small>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- No Experience Declaration Block (Save & Next visible when unchecked) -->
+                                     <div id="noExperienceBlock" t-att-style="'display: none;' if (candidate.has_work_experience or candidate.experience_ids) else 'display: block;'">
+                                         <div class="alert alert-info border shadow-sm d-flex align-items-center mb-4" style="border-left: 4px solid #0dcaf0 !important;">
+                                             <i class="fa fa-info-circle fa-2x me-3 text-info"/>
+                                             <div>
+                                                 <strong>Fresh Graduate / No Prior Work Experience</strong>
+                                                 <div class="small">You have indicated that you do not have professional work experience. Click <strong>Save &amp; Next</strong> to confirm and proceed directly to Step 5 (Certifications &amp; Training).</div>
+                                             </div>
+                                         </div>
+                                         <form action="/my/candidate/profile?step=4" method="post">
+                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                             <input type="hidden" name="no_experience_declaration" value="1"/>
+                                             <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                                                 <a href="/my/candidate/profile?step=3" class="btn btn-outline-secondary">&#8592; Back to Education</a>
+                                                 <button type="submit" class="btn btn-bunna">Save &amp; Next &#8594;</button>
+                                             </div>
+                                         </form>
+                                     </div>
+
+                                     <div id="experienceDetailsBlock" t-att-style="'display: block;' if (candidate.has_work_experience or candidate.experience_ids) else 'display: none;'">
+                                        <!-- Computed Experience Summary Cards -->
                                     <div class="row g-3 mb-4">
                                         <div class="col-md-3">
                                             <div class="p-3 bg-light rounded-3 border text-center">
@@ -1839,6 +1982,7 @@
 
                                     <!-- Experience Form -->
                                     <form action="/my/candidate/profile?step=4" method="post" enctype="multipart/form-data" id="expMainForm">
+                                        <input type="hidden" name="has_work_experience" value="1"/>
                                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                         <t t-if="edit_exp">
                                             <input type="hidden" name="edit_id" t-att-value="edit_exp.id"/>
@@ -1859,23 +2003,23 @@
                                                         <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-exp" style="display: none;" onclick="removeExpCard(this);"><i class="fa fa-trash me-1"/> Remove</button>
                                                     </div>
                                                     <div class="row g-3">
-                                                        <div class="col-md-6">
-                                                            <label class="form-label fw-bold small">Job Title / Position <span class="text-danger">*</span></label>
+                                                         <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Job Title / Position</label>
                                                             <input type="text" name="position" class="form-control" t-att-value="edit_exp.position if edit_exp else ''" placeholder="e.g. Senior Software Engineer"/>
                                                         </div>
                                                         <div class="col-md-6">
-                                                            <label class="form-label fw-bold small">Company / Organization <span class="text-danger">*</span></label>
+                                                            <label class="form-label fw-bold small">Company / Organization</label>
                                                             <input type="text" name="organization" class="form-control" t-att-value="edit_exp.organization if edit_exp else ''" placeholder="e.g. Bunna Bank"/>
                                                         </div>
                                                         <div class="col-md-6">
-                                                            <label class="form-label fw-bold small">Company Sector Type <span class="text-danger">*</span></label>
+                                                            <label class="form-label fw-bold small">Company Sector Type</label>
                                                             <select name="sector_type" class="form-select">
                                                                 <option value="banking" t-att-selected="edit_exp.sector_type == 'banking' if edit_exp else True">Banking Sector</option>
                                                                 <option value="non_banking" t-att-selected="edit_exp.sector_type == 'non_banking' if edit_exp else False">Non-Banking Sector</option>
                                                             </select>
                                                         </div>
                                                         <div class="col-md-6">
-                                                            <label class="form-label fw-bold small">Employment Type <span class="text-danger">*</span></label>
+                                                            <label class="form-label fw-bold small">Employment Type</label>
                                                             <select name="employment_type" class="form-select">
                                                                 <option value="full_time" t-att-selected="edit_exp.employment_type == 'full_time' if edit_exp else True">Full Time</option>
                                                                 <option value="permanent" t-att-selected="edit_exp.employment_type == 'permanent' if edit_exp else False">Permanent</option>
@@ -1886,7 +2030,7 @@
                                                             </select>
                                                         </div>
                                                         <div class="col-md-3">
-                                                            <label class="form-label fw-bold small">Start Date <span class="text-danger">*</span></label>
+                                                            <label class="form-label fw-bold small">Start Date</label>
                                                             <input type="date" name="start_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_exp.start_date if edit_exp else ''"/>
                                                         </div>
                                                         <div class="col-md-3 end-date-div" t-att-style="'display: none;' if edit_exp and edit_exp.is_current else 'display: block;'">
@@ -1966,7 +2110,19 @@
                                                 }
                                             });
                                         }
+
+                                        function toggleExperienceSection(isChecked) {
+                                            var block = document.getElementById('experienceDetailsBlock');
+                                            var noExpBlock = document.getElementById('noExperienceBlock');
+                                            if (block) {
+                                                block.style.display = isChecked ? 'block' : 'none';
+                                            }
+                                            if (noExpBlock) {
+                                                noExpBlock.style.display = isChecked ? 'none' : 'block';
+                                            }
+                                        }
                                     </script>
+                                    </div>
                                 </div>
                             </t>
 
@@ -2277,8 +2433,8 @@
                                                     <span>Upload Master CV / Resume</span>
                                                     <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.72rem;">Rec: &lt; 2 MB (Max: 5 MB)</span>
                                                 </label>
-                                                <input type="file" name="cv_file" class="form-control file-validate-input" accept=".pdf,.docx,.doc" data-max-size="5" data-rec-size="2" data-type-name="Curriculum Vitae (CV / Resume)"/>
-                                                <small class="text-muted" style="font-size: 0.75rem;">Ideal format: <strong>PDF, DOCX</strong>. Maximum allowed limit: 5 MB.</small>
+                                                <input type="file" name="cv_file" class="form-control file-validate-input" accept=".pdf" data-max-size="5" data-rec-size="2" data-type-name="Curriculum Vitae (CV / Resume)"/>
+                                                <small class="text-muted" style="font-size: 0.75rem;">Supported format: <strong>PDF only</strong>. Maximum allowed limit: 5 MB.</small>
                                                 <t t-if="candidate.cv_file">
                                                     <div class="mt-2">
                                                         <span class="badge bg-success me-2"><i class="fa fa-check"/> Master CV Uploaded</span>
@@ -2492,29 +2648,35 @@
                                                 });
                                             }
 
-                                            // Step 4: Experience Card Validation
+                                            // Step 4: Experience Card Validation based on "I have professional work experience" checkbox
                                             if (form.id === 'expMainForm' || (form.action && form.action.includes('step=4'))) {
-                                                var isEditExp = !!form.querySelector('[name="edit_id"]');
-                                                var hasSavedExp = document.querySelectorAll('.exp-saved-row').length > 0;
-                                                var expCards = form.querySelectorAll('.exp-entry-card');
+                                                var hasExpCb = document.getElementById('hasWorkExpCheckbox');
+                                                var isTicked = hasExpCb ? hasExpCb.checked : false;
 
-                                                expCards.forEach(function(card, idx) {
-                                                    var pos = card.querySelector('[name="position"]');
-                                                    var org = card.querySelector('[name="organization"]');
-                                                    var sDate = card.querySelector('[name="start_date"]');
+                                                // Only validate experience fields if candidate explicitly checked that they have work experience
+                                                if (isTicked) {
+                                                    var isEditExp = !!form.querySelector('[name="edit_id"]');
+                                                    var hasSavedExp = document.querySelectorAll('.exp-saved-row').length > 0;
+                                                    var expCards = form.querySelectorAll('.exp-entry-card');
 
-                                                    var pVal = pos ? pos.value.trim() : '';
-                                                    var oVal = org ? org.value.trim() : '';
-                                                    var sVal = sDate ? sDate.value.trim() : '';
+                                                    expCards.forEach(function(card, idx) {
+                                                        var pos = card.querySelector('[name="position"]');
+                                                        var org = card.querySelector('[name="organization"]');
+                                                        var sDate = card.querySelector('[name="start_date"]');
 
-                                                    var cardStarted = pVal !== '' || oVal !== '' || sVal !== '' || isEditExp || (!hasSavedExp && idx === 0);
+                                                        var pVal = pos ? pos.value.trim() : '';
+                                                        var oVal = org ? org.value.trim() : '';
+                                                        var sVal = sDate ? sDate.value.trim() : '';
 
-                                                    if (cardStarted) {
-                                                        if (!pVal) markFieldInvalid(pos, "Job Title / Position");
-                                                        if (!oVal) markFieldInvalid(org, "Company / Organization");
-                                                        if (!sVal) markFieldInvalid(sDate, "Start Date");
-                                                    }
-                                                });
+                                                        var cardStarted = pVal !== '' || oVal !== '' || sVal !== '' || isEditExp || !hasSavedExp;
+
+                                                        if (cardStarted) {
+                                                            if (!pVal) markFieldInvalid(pos, "Job Title / Position");
+                                                            if (!oVal) markFieldInvalid(org, "Company / Organization");
+                                                            if (!sVal) markFieldInvalid(sDate, "Start Date");
+                                                        }
+                                                    });
+                                                }
                                             }
 
                                             // Universal validation for all standard inputs with required attribute
@@ -2605,19 +2767,134 @@
                                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small">Current Password <span class="text-danger">*</span></label>
-                                        <input type="password" name="old_password" class="form-control" required="required" placeholder="Enter current password"/>
+                                        <div class="input-group">
+                                            <input type="password" id="ats_old_password" name="old_password" class="form-control" required="required" placeholder="Enter current password" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                            <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="ats_old_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                                        </div>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small">New Password <span class="text-danger">*</span></label>
-                                        <input type="password" name="new_password" class="form-control" minlength="6" required="required" placeholder="Enter new password (min 6 chars)"/>
+                                        <div class="input-group">
+                                            <input type="password" id="ats_new_password" name="new_password" class="form-control" minlength="12" required="required" placeholder="Enter new password (min 12 chars)" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                            <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="ats_new_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                                        </div>
                                     </div>
-                                    <div class="mb-4">
+                                    <div class="mb-3">
                                         <label class="form-label fw-bold small">Confirm New Password <span class="text-danger">*</span></label>
-                                        <input type="password" name="confirm_password" class="form-control" minlength="6" required="required" placeholder="Confirm new password"/>
+                                        <div class="input-group">
+                                            <input type="password" id="ats_confirm_password" name="confirm_password" class="form-control" minlength="12" required="required" placeholder="Confirm new password" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                            <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="ats_confirm_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                                        </div>
                                     </div>
+
+                                    <!-- Password Security Policy Checklist -->
+                                    <div class="p-3 mb-3 rounded-3" style="background-color: #fdf8f8; border: 1px solid #ebd4d5; font-size: 0.8rem;">
+                                        <div class="fw-bold mb-2" style="color: #541718;"><i class="fa fa-shield me-1"></i> Bunna Bank Password Security Policy:</div>
+                                        <div class="row g-1">
+                                            <div class="col-sm-6">
+                                                <div id="ats-rule-length" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 12 characters</div>
+                                                <div id="ats-rule-upper" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 uppercase (A-Z)</div>
+                                                <div id="ats-rule-lower" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 lowercase (a-z)</div>
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <div id="ats-rule-number" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 number (0-9)</div>
+                                                <div id="ats-rule-special" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 special symbol (@$!%*?&amp;)</div>
+                                                <div id="ats-rule-match" class="text-muted"><i class="fa fa-circle-o me-1"></i> Passwords match</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div class="d-grid">
                                         <button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Update Password</button>
                                     </div>
+
+                                    <script type="text/javascript"><![CDATA[
+                                        (function() {
+                                            function initAtsPassword() {
+                                                var pwd = document.getElementById('ats_new_password');
+                                                var conf = document.getElementById('ats_confirm_password');
+                                                if (pwd) {
+                                                    var rLen = document.getElementById('ats-rule-length');
+                                                    var rUp = document.getElementById('ats-rule-upper');
+                                                    var rLow = document.getElementById('ats-rule-lower');
+                                                    var rNum = document.getElementById('ats-rule-number');
+                                                    var rSpec = document.getElementById('ats-rule-special');
+                                                    var rMatch = document.getElementById('ats-rule-match');
+
+                                                    function setRuleState(el, label, ok) {
+                                                        if (!el) return;
+                                                        if (ok) {
+                                                            el.className = 'text-success fw-bold';
+                                                            el.innerHTML = '<i class="fa fa-check-circle me-1 text-success"></i> ' + label;
+                                                        } else {
+                                                            el.className = 'text-muted';
+                                                            el.innerHTML = '<i class="fa fa-circle-o me-1"></i> ' + label;
+                                                        }
+                                                    }
+
+                                                    function validate() {
+                                                        var v = pwd.value || '';
+                                                        var cv = conf ? (conf.value || '') : '';
+                                                        setRuleState(rLen, 'At least 12 characters', v.length >= 12);
+                                                        setRuleState(rUp, 'At least 1 uppercase (A-Z)', /[A-Z]/.test(v));
+                                                        setRuleState(rLow, 'At least 1 lowercase (a-z)', /[a-z]/.test(v));
+                                                        setRuleState(rNum, 'At least 1 number (0-9)', /[0-9]/.test(v));
+                                                        setRuleState(rSpec, 'At least 1 special symbol (@$!%*?&)', /[^a-zA-Z0-9\s]/.test(v));
+                                                        if (rMatch && conf) {
+                                                            setRuleState(rMatch, 'Passwords match', v.length >= 12 && v === cv);
+                                                        }
+                                                    }
+
+                                                    pwd.addEventListener('input', validate);
+                                                    if (conf) conf.addEventListener('input', validate);
+                                                    validate();
+                                                }
+
+                                                // Block paste, copy, cut, drop
+                                                function isPasswordInput(el) {
+                                                    if (!el) return false;
+                                                    var name = (el.getAttribute('name') || '').toLowerCase();
+                                                    var id = (el.getAttribute('id') || '').toLowerCase();
+                                                    var type = (el.getAttribute('type') || '').toLowerCase();
+                                                    return type === 'password' || name.indexOf('password') !== -1 || id.indexOf('password') !== -1;
+                                                }
+
+                                                ['paste', 'copy', 'cut', 'drop'].forEach(function(evt) {
+                                                    document.addEventListener(evt, function(e) {
+                                                        if (isPasswordInput(e.target)) {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            return false;
+                                                        }
+                                                    }, true);
+                                                });
+
+                                                document.addEventListener('click', function(e) {
+                                                    var btn = e.target ? e.target.closest('.toggle-pwd-btn') : null;
+                                                    if (!btn) return;
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    var tid = btn.getAttribute('data-target');
+                                                    var inp = document.getElementById(tid);
+                                                    if (!inp) return;
+                                                    var icon = btn.querySelector('i');
+                                                    if (inp.type === 'password') {
+                                                        inp.type = 'text';
+                                                        if (icon) icon.className = 'fa fa-eye-slash';
+                                                    } else {
+                                                        inp.type = 'password';
+                                                        if (icon) icon.className = 'fa fa-eye';
+                                                    }
+                                                });
+                                            }
+
+                                            if (document.readyState === 'loading') {
+                                                document.addEventListener('DOMContentLoaded', initAtsPassword);
+                                            } else {
+                                                initAtsPassword();
+                                            }
+                                        })();
+                                    ]]></script>
                                 </form>
                             </div>
                         </div>
@@ -3606,7 +3883,7 @@
                                             </div>
                                             <div class="col-md-3">
                                                 <span class="text-muted d-block small">Job Grade</span>
-                                                <strong class="text-dark"><i class="fa fa-id-badge me-1" style="color: #c17540;"/> <t t-esc="off.job_grade or (off.vacancy_id.job_grade.grade_name if (off.vacancy_id and hasattr(off.vacancy_id, 'job_grade') and off.vacancy_id.job_grade) else 'Standard Grade')"/></strong>
+                                                <strong class="text-dark"><i class="fa fa-id-badge me-1" style="color: #c17540;"/> <t t-esc="off.job_grade or (off.vacancy_id.job_grade.grade_name if (off.vacancy_id and off.vacancy_id.job_grade) else 'Standard Grade')"/></strong>
                                             </div>
                                             <div class="col-md-3">
                                                 <span class="text-muted d-block small">Monthly Base Salary</span>

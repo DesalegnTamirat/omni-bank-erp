@@ -61,7 +61,7 @@ class HrLeaveRequestWizard(models.TransientModel):
     ], string='Select Half Day', default='start')
 
     holiday_status_id = fields.Many2one('hr.leave.type', string='Leave Reason')
-    attachment = fields.Binary(string='Attachment')
+    attachment = fields.Binary(string='Attachment', attachment=True)
     attachment_name = fields.Char(string='Attachment Name')
     comments = fields.Text(string='Comments')
     leave_start_date = fields.Date(string='Start Date')

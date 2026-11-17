@@ -77,7 +77,6 @@ class RecruitmentCandidateScore(models.Model):
 
 
     job_level = fields.Selection(
-        [("junior", "Junior"), ("senior", "Senior / Regular")],
         string="Job Level", related="vacancy_id.job_level", store=True, readonly=True,
         help="Only applicable for Non-Managerial posts. Pulled directly "
              "from the Vacancy's Job Level — set it there, not here."
@@ -346,9 +345,21 @@ class RecruitmentCandidateScore(models.Model):
             if rec.employee_id:
                 rec.candidate_name = rec.employee_id.name
             elif rec.applicant_id:
-                rec.candidate_name = rec.applicant_id.partner_name or rec.applicant_id.display_name
-            else:
+                rec.candidate_name = rec.applicant_id.partner_name or rec.applicant_id.name
+            elif not rec.candidate_name:
                 rec.candidate_name = _("Unknown")
+
+    @api.depends("candidate_name", "selection_status", "rank")
+    def _compute_display_name(self):
+        for rec in self:
+            name = rec.candidate_name or _("Unknown")
+            status = dict(rec._fields["selection_status"].selection).get(rec.selection_status, "") if rec.selection_status else ""
+            if rec.rank and status:
+                rec.display_name = f"{name} ({status} - Rank {rec.rank})"
+            elif status:
+                rec.display_name = f"{name} ({status})"
+            else:
+                rec.display_name = name
 
     active = fields.Boolean(default=True)
 
@@ -819,26 +830,11 @@ class RecruitmentApplicationWindow(models.Model):
 class BlacklistPool(models.Model):
     _inherit = "blacklist.pool"
 
-    national_id = fields.Char(string="National ID")
-    reason = fields.Text(string="Reason for Blacklisting")
-    blacklisted_on = fields.Date(string="Blacklisted On", default=fields.Date.context_today)
-    active = fields.Boolean(default=True)
-
-    def unlink(self):
-        """ Soft delete: Archive records instead of removing from DB """
-        for rec in self:
-            rec.write({'active': False})
-        return True
     @api.model
-    def is_blacklisted(self, name=None, national_id=None):
-        domain = []
-        if national_id:
-            domain = [("national_id", "=", national_id), ("active", "=", True)]
-        elif name:
-            domain = [("candidate", "ilike", name), ("active", "=", True)]
-        else:
+    def is_blacklisted(self, name=None, **kwargs):
+        if not name:
             return self.browse()
-        return self.search(domain, limit=1)
+        return self.search([("candidate", "ilike", name), ("active", "=", True)], limit=1)
 
 
 class ApplicantAssessmentBlacklistCheck(models.Model):
@@ -863,10 +859,18 @@ class ApplicantAssessmentBlacklistCheck(models.Model):
             result = blacklist.is_blacklisted(name=partner_name)
             if result:
                 rec.write({"blacklist_checked": True, "blacklist_status": "flagged"})
+                info_parts = []
+                if getattr(result, 'name_of_bank', False):
+                    info_parts.append(f"Bank: {result.name_of_bank}")
+                if result.reason:
+                    info_parts.append(f"Reason: {result.reason}")
+                if getattr(result, 'date_of_termination', False):
+                    info_parts.append(f"Date: {result.date_of_termination}")
+                info_str = f" ({', '.join(info_parts)})" if info_parts else ""
                 rec.message_post(body=_(
-                    "⚠️ BLACKLIST ALERT: Applicant <b>%s</b> is on the blacklist. "
-                    "Reason: %s. This application requires HR review before proceeding."
-                ) % (partner_name, result.reason or _("Not specified")))
+                    "⚠️ BLACKLIST ALERT: Applicant <b>%s</b> is on the blacklist%s. "
+                    "This application requires HR review before proceeding."
+                ) % (partner_name, info_str))
                 return {
                     "type": "ir.actions.client",
                     "tag": "display_notification",

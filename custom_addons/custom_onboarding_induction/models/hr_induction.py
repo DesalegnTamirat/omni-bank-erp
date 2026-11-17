@@ -24,6 +24,12 @@ class HrInductionPlan(models.Model):
 
     # ── Basic Employee Info ──────────────────────────────────────────────────
     employee_id = fields.Many2one("hr.employee", string="New Employee", required=True, tracking=True)
+    eligible_employee_ids = fields.Many2many(
+        "hr.employee",
+        compute="_compute_eligible_employee_ids",
+        compute_sudo=True,
+        string="Eligible Employees for Induction",
+    )
     job_position_id = fields.Many2one(
         "hr.job", string="Position Title", compute="_compute_from_employee", store=True, readonly=True
     )
@@ -67,6 +73,122 @@ class HrInductionPlan(models.Model):
     # Computes & Onchanges
     # -------------------------------------------------------------------------
     @api.depends("employee_id")
+    def _compute_eligible_employee_ids(self):
+        """Fetches only employees who have not been registered in Corporate Induction yet."""
+        user = self.env.user
+        is_officer_or_admin = (
+            user.id == 1
+            or user.has_group("custom_onboarding_induction.group_onboarding_induction_officer")
+            or user.has_group("custom_onboarding_induction.group_onboarding_induction_manager")
+            or user.has_group("base.group_system")
+        )
+        if not is_officer_or_admin:
+            for rec in self:
+                rec.eligible_employee_ids = rec.employee_id or self.env["hr.employee"]
+            return
+
+        registered_emp_ids = set(
+            self.env["hr.induction.plan"].sudo().search([("active", "=", True)]).mapped("employee_id.id")
+        )
+        for rec in self.sudo():
+            current_id = rec.employee_id.id if rec.employee_id else False
+            excluded = registered_emp_ids - ({current_id} if current_id else set())
+            domain = [("id", "not in", list(excluded))]
+            rec.eligible_employee_ids = self.env["hr.employee"].sudo().search(domain)
+
+    @api.constrains("employee_id")
+    def _check_unique_induction_employee(self):
+        for rec in self:
+            if rec.employee_id:
+                duplicate = self.search([
+                    ("id", "!=", rec.id),
+                    ("employee_id", "=", rec.employee_id.id),
+                    ("active", "=", True),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_(
+                        "Duplicate Registration Error!\n\n"
+                        "Employee '%s' has already been registered in Corporate Induction Plan '%s'.\n"
+                        "Each employee can only have one Corporate Induction Plan."
+                    ) % (rec.employee_id.name, duplicate.name))
+
+    @api.onchange("employee_id")
+    def _onchange_employee_check_registered(self):
+        if self.employee_id:
+            duplicate = self.search([
+                ("id", "!=", self._origin.id if hasattr(self, "_origin") else False),
+                ("employee_id", "=", self.employee_id.id),
+                ("active", "=", True),
+            ], limit=1)
+            if duplicate:
+                name = self.employee_id.name
+                self.employee_id = False
+                return {
+                    "warning": {
+                        "title": _("Employee Already Registered"),
+                        "message": _(
+                            "Employee '%s' has already been registered in Corporate Induction Plan '%s'.\n\n"
+                            "Please select an employee who has not registered yet."
+                        ) % (name, duplicate.name)
+                    }
+                }
+            # Auto-populate configured LMS task lines interactively on screen
+            valid_tasks = self.lms_task_ids.filtered(lambda t: bool(t.name and t.name.strip()))
+            if not valid_tasks:
+                start = self.start_date or fields.Date.context_today(self)
+                emp_category = "Non Managerial"
+                probation = self.env["hr.employee.probation"].sudo().search([
+                    ("employee_id", "=", self.employee_id.id),
+                    ("active", "=", True),
+                ], order="id desc", limit=1)
+                if probation and probation.employee_category:
+                    emp_category = probation.employee_category
+
+                templates = self.env["hr.induction.task.template"].search([
+                    ("active", "=", True),
+                    ("employee_category", "in", ["all", emp_category]),
+                ])
+                emp_dept_id = self.employee_id.department_id.id if self.employee_id.department_id else False
+                if emp_dept_id:
+                    templates = templates.filtered(lambda t: not t.department_ids or emp_dept_id in t.department_ids.ids)
+                else:
+                    templates = templates.filtered(lambda t: not t.department_ids)
+
+                lines = []
+                if templates:
+                    for tmpl in templates:
+                        due = start + timedelta(days=tmpl.days_offset) if tmpl.days_offset is not False else False
+                        lines.append((0, 0, {
+                            "template_id": tmpl.id,
+                            "name": tmpl.name,
+                            "training_type": tmpl.training_type,
+                            "is_mandatory": tmpl.is_mandatory,
+                            "due_date": due,
+                            "state": "pending",
+                        }))
+                else:
+                    default_tasks = [
+                        ("Bunna Bank Culture, Vision & Core Values Orientation", "classroom", True, 1),
+                        ("PPDD HR Policies, Benefits & Code of Ethics", "document", True, 3),
+                        ("Information Security & Fraud Prevention Awareness", "lms_video", True, 5),
+                        ("Finacle Core Banking System Overview & Basics", "system_demo", True, 7),
+                        ("ERP Employee Self-Service (ESS) Training", "system_demo", True, 10),
+                    ]
+                    for name, ttype, is_mand, offset in default_tasks:
+                        due = start + timedelta(days=offset)
+                        tmpl_rec = self.env["hr.induction.task.template"].search([("name", "=ilike", name.strip())], limit=1)
+                        lines.append((0, 0, {
+                            "template_id": tmpl_rec.id if tmpl_rec else False,
+                            "name": name,
+                            "training_type": ttype,
+                            "is_mandatory": is_mand,
+                            "due_date": due,
+                            "state": "pending",
+                        }))
+                if lines:
+                    self.lms_task_ids = lines
+
+    @api.depends("employee_id")
     def _compute_from_employee(self):
         for rec in self:
             if rec.employee_id:
@@ -86,6 +208,73 @@ class HrInductionPlan(models.Model):
             rec.total_lms_tasks = total
             rec.completed_lms_tasks = completed
             rec.lms_progress_percentage = (completed / total * 100.0) if total > 0 else 0.0
+
+    # ── Scheduled Orientation Date & Anti-Backdating Validations ──────
+    @api.constrains('scheduled_orientation_date', 'start_date', 'state')
+    def _check_scheduled_orientation_date_no_backdate(self):
+        """
+        Enforces strict anti-backdating business rules:
+        1. Scheduled Orientation Date cannot be earlier than today in draft/scheduled status.
+        2. Scheduled Orientation Date cannot be earlier than the employee's Expected Start Date.
+        """
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.scheduled_orientation_date and rec.state in ('draft', 'scheduled'):
+                scheduled_local_dt = fields.Datetime.context_timestamp(self, rec.scheduled_orientation_date)
+                scheduled_date = scheduled_local_dt.date()
+
+                if scheduled_date < today:
+                    raise ValidationError(_(
+                        "Validation Error: Backdating Not Allowed!\n\n"
+                        "The Scheduled Orientation Date (%s) cannot be backdated to a past date.\n"
+                        "Today is %s. Please select today or a future date for the corporate orientation."
+                    ) % (
+                        scheduled_local_dt.strftime('%B %d, %Y %I:%M %p'),
+                        today.strftime('%B %d, %Y')
+                    ))
+
+                if rec.start_date and scheduled_date < rec.start_date:
+                    raise ValidationError(_(
+                        "Validation Error: Inconsistent Orientation Schedule!\n\n"
+                        "The Scheduled Orientation Date (%s) cannot be earlier than the employee's Expected Start Date (%s)."
+                    ) % (
+                        scheduled_local_dt.strftime('%B %d, %Y %I:%M %p'),
+                        rec.start_date.strftime('%B %d, %Y')
+                    ))
+
+    @api.onchange('scheduled_orientation_date')
+    def _onchange_scheduled_orientation_date(self):
+        """Instant interactive UI feedback when user selects a backdated date in the datepicker."""
+        if self.scheduled_orientation_date and self.state in ('draft', 'scheduled'):
+            today = fields.Date.context_today(self)
+            scheduled_local_dt = fields.Datetime.context_timestamp(self, self.scheduled_orientation_date)
+            scheduled_date = scheduled_local_dt.date()
+
+            if scheduled_date < today:
+                invalid_str = scheduled_local_dt.strftime('%B %d, %Y %I:%M %p')
+                self.scheduled_orientation_date = False
+                return {
+                    'warning': {
+                        'title': _("Backdating Not Allowed"),
+                        'message': _(
+                            "The Scheduled Orientation Date (%s) cannot be backdated to a past date.\n\n"
+                            "Today is %s. Please select today or a future date."
+                        ) % (invalid_str, today.strftime('%B %d, %Y'))
+                    }
+                }
+
+            if self.start_date and scheduled_date < self.start_date:
+                invalid_str = scheduled_local_dt.strftime('%B %d, %Y %I:%M %p')
+                self.scheduled_orientation_date = False
+                return {
+                    'warning': {
+                        'title': _("Inconsistent Orientation Schedule"),
+                        'message': _(
+                            "The Scheduled Orientation Date (%s) cannot be earlier than the employee's Expected Start Date (%s)."
+                        ) % (invalid_str, self.start_date.strftime('%B %d, %Y'))
+                    }
+                }
+
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -127,18 +316,51 @@ class HrInductionPlan(models.Model):
             seq = 1
         return f"{prefix}{seq:05d}"
 
-    def _auto_generate_default_lms_tasks(self):
+    def action_load_default_lms_tasks(self):
+        """Allow user to auto-load or reload configured orientation tasks from templates."""
+        for rec in self:
+            rec._auto_generate_default_lms_tasks(force=True)
+
+    def _auto_generate_default_lms_tasks(self, force=False):
         self.ensure_one()
-        if self.lms_task_ids:
-            return
+        if self.lms_task_ids and not force:
+            valid_tasks = self.lms_task_ids.filtered(lambda t: bool(t.name and t.name.strip()))
+            if valid_tasks:
+                return
+            self.lms_task_ids.unlink()
+        elif force and self.lms_task_ids:
+            self.lms_task_ids.unlink()
+
         start = self.start_date or fields.Date.context_today(self)
-        templates = self.env["hr.induction.task.template"].search([])
+
+        # Check linked probation or employee to determine category
+        emp_category = "Non Managerial"
+        if self.employee_id:
+            probation = self.env["hr.employee.probation"].sudo().search([
+                ("employee_id", "=", self.employee_id.id),
+                ("active", "=", True),
+            ], order="id desc", limit=1)
+            if probation and probation.employee_category:
+                emp_category = probation.employee_category
+
+        # Role & Grade specific template search (FR-OB-005)
+        templates = self.env["hr.induction.task.template"].search([
+            ("active", "=", True),
+            ("employee_category", "in", ["all", emp_category]),
+        ])
+        emp_dept_id = self.employee_id.department_id.id if self.employee_id and self.employee_id.department_id else False
+        if emp_dept_id:
+            templates = templates.filtered(lambda t: not t.department_ids or emp_dept_id in t.department_ids.ids)
+        else:
+            templates = templates.filtered(lambda t: not t.department_ids)
+
         task_vals = []
         if templates:
             for tmpl in templates:
                 due = start + timedelta(days=tmpl.days_offset) if tmpl.days_offset is not False else False
                 task_vals.append({
                     "induction_plan_id": self.id,
+                    "template_id": tmpl.id,
                     "name": tmpl.name,
                     "training_type": tmpl.training_type,
                     "is_mandatory": tmpl.is_mandatory,
@@ -155,8 +377,10 @@ class HrInductionPlan(models.Model):
             ]
             for name, ttype, is_mand, offset in default_tasks:
                 due = start + timedelta(days=offset)
+                tmpl_rec = self.env["hr.induction.task.template"].search([("name", "=ilike", name.strip())], limit=1)
                 task_vals.append({
                     "induction_plan_id": self.id,
+                    "template_id": tmpl_rec.id if tmpl_rec else False,
                     "name": name,
                     "training_type": ttype,
                     "is_mandatory": is_mand,
@@ -171,6 +395,7 @@ class HrInductionPlan(models.Model):
     # Actions & Workflow with Segregation of Duties Enforcements
     # -------------------------------------------------------------------------
     def action_schedule_orientation(self):
+        today = fields.Date.context_today(self)
         for rec in self:
             if rec.state != "draft":
                 raise ValidationError(_("Orientation can only be scheduled from 'Draft' status."))
@@ -182,11 +407,36 @@ class HrInductionPlan(models.Model):
                 raise ValidationError(_(
                     "Prerequisite Missing: Please specify the 'Scheduled Orientation Date' before scheduling orientation."
                 ))
+            
+            # Prevent backdating
+            scheduled_local_dt = fields.Datetime.context_timestamp(self, rec.scheduled_orientation_date)
+            scheduled_date = scheduled_local_dt.date()
+            if scheduled_date < today:
+                raise ValidationError(_(
+                    "Validation Error: Backdating Not Allowed!\n\n"
+                    "The Scheduled Orientation Date (%s) cannot be backdated to a past date.\n"
+                    "Today is %s. Please select today or a future date before scheduling orientation."
+                ) % (
+                    scheduled_local_dt.strftime('%B %d, %Y %I:%M %p'),
+                    today.strftime('%B %d, %Y')
+                ))
+
+            if rec.start_date and scheduled_date < rec.start_date:
+                raise ValidationError(_(
+                    "Validation Error: Inconsistent Orientation Schedule!\n\n"
+                    "The Scheduled Orientation Date (%s) cannot be earlier than the employee's Expected Start Date (%s)."
+                ) % (
+                    scheduled_local_dt.strftime('%B %d, %Y %I:%M %p'),
+                    rec.start_date.strftime('%B %d, %Y')
+                ))
+
             rec.write({
                 "state": "scheduled",
                 "scheduled_by_user_id": self.env.user.id,
             })
-            rec.message_post(body=_("Corporate orientation scheduled for %s by %s.") % (rec.scheduled_orientation_date, self.env.user.name))
+            rec.message_post(body=_("Corporate orientation scheduled for %s by %s.") % (
+                scheduled_local_dt.strftime('%B %d, %Y %I:%M %p'), self.env.user.name
+            ))
 
     def action_start_lms(self):
         for rec in self:
@@ -248,6 +498,13 @@ class HrInductionLmsTask(models.Model):
     _order = "due_date asc, id"
 
     induction_plan_id = fields.Many2one("hr.induction.plan", string="Induction Plan", required=True, ondelete="cascade")
+    template_id = fields.Many2one(
+        "hr.induction.task.template",
+        string="Orientation / LMS Training Module",
+        domain=[("active", "=", True)],
+        ondelete="restrict",
+        help="Select strictly from configured Induction Task Templates.",
+    )
     name = fields.Char(string="Task / Training Title", required=True)
     training_type = fields.Selection(
         [
@@ -263,7 +520,89 @@ class HrInductionLmsTask(models.Model):
     completed_date = fields.Datetime(string="Completed On", readonly=True)
     completed_by_user_id = fields.Many2one("res.users", string="Completed By", readonly=True, copy=False)
     state = fields.Selection([("pending", "Pending"), ("completed", "Completed")], string="Status", default="pending")
+    is_officer_or_admin = fields.Boolean(
+        string="Is HR Officer or Administrator",
+        compute="_compute_is_officer_or_admin",
+        store=False,
+    )
     notes = fields.Text(string="Notes / Remarks")
+
+    def _compute_is_officer_or_admin(self):
+        user = self.env.user
+        val = bool(
+            user.id == 1
+            or getattr(user, "_is_admin", lambda: False)()
+            or user.has_group("custom_onboarding_induction.group_onboarding_induction_manager")
+            or user.has_group("custom_onboarding_induction.group_onboarding_induction_officer")
+            or user.has_group("base.group_system")
+        )
+        for rec in self:
+            rec.is_officer_or_admin = val
+
+    @api.onchange("template_id")
+    def _onchange_template_id(self):
+        if self.template_id:
+            tmpl = self.template_id
+            self.name = tmpl.name
+            self.training_type = tmpl.training_type
+            self.is_mandatory = tmpl.is_mandatory
+            plan = self.induction_plan_id
+            start = (plan.start_date or (plan.employee_id and plan.employee_id.first_contract_date)) if plan else False
+            if not start:
+                start = fields.Date.context_today(self)
+            self.due_date = start + timedelta(days=tmpl.days_offset) if tmpl.days_offset is not False else False
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get("template_id"):
+                tmpl = self.env["hr.induction.task.template"].browse(vals["template_id"])
+                if tmpl.exists():
+                    if not vals.get("name"):
+                        vals["name"] = tmpl.name
+                    if "training_type" not in vals:
+                        vals["training_type"] = tmpl.training_type
+                    if "is_mandatory" not in vals:
+                        vals["is_mandatory"] = tmpl.is_mandatory
+            elif vals.get("name") and not vals.get("template_id"):
+                tmpl = self.env["hr.induction.task.template"].search([
+                    ("name", "=ilike", vals["name"].strip())
+                ], limit=1)
+                if tmpl:
+                    vals["template_id"] = tmpl.id
+        return super().create(vals_list)
+
+    @api.constrains("template_id")
+    def _check_template_id(self):
+        for rec in self:
+            if not rec.template_id:
+                if rec.name:
+                    tmpl = self.env["hr.induction.task.template"].search([
+                        ("name", "=ilike", rec.name.strip())
+                    ], limit=1)
+                    if tmpl:
+                        rec.template_id = tmpl.id
+                        continue
+                raise ValidationError(_(
+                    "Invalid Orientation Task Error!\n\n"
+                    "You cannot enter arbitrary text '%s'.\n\n"
+                    "Every orientation training line MUST be selected from the pre-configured Induction Task Templates."
+                ) % (rec.name or ""))
+
+    @api.constrains("induction_plan_id", "template_id")
+    def _check_unique_template_per_plan(self):
+        for rec in self:
+            if rec.template_id and rec.induction_plan_id:
+                dups = self.search([
+                    ("id", "!=", rec.id),
+                    ("induction_plan_id", "=", rec.induction_plan_id.id),
+                    ("template_id", "=", rec.template_id.id),
+                ], limit=1)
+                if dups:
+                    raise ValidationError(_(
+                        "Duplicate Training Module Error!\n\n"
+                        "The module '%s' is already assigned to this Corporate Induction Plan."
+                    ) % rec.template_id.name)
 
     is_overdue = fields.Boolean(
         string="Overdue", compute="_compute_is_overdue", store=False,
@@ -280,29 +619,121 @@ class HrInductionLmsTask(models.Model):
                 and rec.due_date < today
             )
 
+    def write(self, vals):
+        user = self.env.user
+        config_fields = set(vals.keys()) - {"state", "completed_date", "completed_by_user_id", "notes"}
+        if config_fields and not self.env.su:
+            is_officer_or_admin = (
+                user.id == 1
+                or getattr(user, "_is_admin", lambda: False)()
+                or user.has_group("custom_onboarding_induction.group_onboarding_induction_manager")
+                or user.has_group("custom_onboarding_induction.group_onboarding_induction_officer")
+                or user.has_group("base.group_system")
+            )
+            if not is_officer_or_admin:
+                raise ValidationError(_(
+                    "Access Denied: Read-Only Induction Task!\n\n"
+                    "Orientation tasks are strictly read-only for employees.\n"
+                    "Only HR Officers and Administrators can modify induction task details."
+                ))
+
+        if vals.get("state") == "completed":
+            today = fields.Date.context_today(self)
+            for rec in self:
+                target_due = vals.get("due_date") and fields.Date.to_date(vals["due_date"]) or rec.due_date
+                if target_due and today < target_due:
+                    raise ValidationError(_(
+                        "Premature Induction Task Completion Error!\n\n"
+                        "Orientation task '%s' cannot be marked as Completed before its scheduled due date.\n\n"
+                        "• Today's Date: %s\n"
+                        "• Scheduled Due Date: %s\n\n"
+                        "This task can only be completed on or after %s."
+                    ) % (
+                        rec.name,
+                        today.strftime("%b %d, %Y"),
+                        target_due.strftime("%b %d, %Y"),
+                        target_due.strftime("%b %d, %Y"),
+                    ))
+
+                # ── Chronological Pre-Order Validation: Older scheduled modules must be completed first ──
+                if target_due and rec.induction_plan_id:
+                    pending_prior = rec.induction_plan_id.task_ids.filtered(
+                        lambda t: t.id != rec.id and t.state != "completed" and t.due_date and t.due_date < target_due
+                    )
+                    if pending_prior:
+                        earlier_task = pending_prior.sorted(key=lambda t: (t.due_date, t.id))[0]
+                        raise ValidationError(_(
+                            "Chronological Induction Task Completion Error!\n\n"
+                            "Orientation modules must be completed in order of their scheduled dates. "
+                            "A module with a later date cannot be completed while older scheduled modules are still pending.\n\n"
+                            "• Current Module: '%s' (Due Date: %s)\n"
+                            "• Older Pending Module: '%s' (Due Date: %s)\n\n"
+                            "Please complete '%s' first before completing this module."
+                        ) % (
+                            rec.name,
+                            target_due.strftime("%b %d, %Y"),
+                            earlier_task.name,
+                            earlier_task.due_date.strftime("%b %d, %Y"),
+                            earlier_task.name,
+                        ))
+        return super().write(vals)
+
     def action_mark_completed(self):
         current_user = self.env.user
+        today = fields.Date.context_today(self)
         for rec in self:
-            if rec.induction_plan_id.state == "draft":
+            rec_sudo = rec.sudo()
+            plan = rec_sudo.induction_plan_id
+            if plan and plan.state == "draft":
                 raise ValidationError(_(
                     "Prerequisite Missing: Corporate Induction is still in 'Draft'. "
                     "Orientation must be scheduled and started before marking training modules completed."
                 ))
-            rec.write({
+            if rec.due_date and today < rec.due_date:
+                raise ValidationError(_(
+                    "Premature Induction Task Completion Error!\n\n"
+                    "Orientation task '%s' cannot be marked as Completed before its scheduled due date.\n\n"
+                    "• Today's Date: %s\n"
+                    "• Scheduled Due Date: %s\n\n"
+                    "This task can only be completed on or after %s."
+                ) % (rec.name, today.strftime("%b %d, %Y"), rec.due_date.strftime("%b %d, %Y"), rec.due_date.strftime("%b %d, %Y")))
+
+            # ── Chronological Pre-Order Validation: Older scheduled modules must be completed first ──
+            if rec.due_date and plan:
+                pending_prior = plan.task_ids.filtered(
+                    lambda t: t.id != rec.id and t.state != "completed" and t.due_date and t.due_date < rec.due_date
+                )
+                if pending_prior:
+                    earlier_task = pending_prior.sorted(key=lambda t: (t.due_date, t.id))[0]
+                    raise ValidationError(_(
+                        "Chronological Induction Task Completion Error!\n\n"
+                        "Orientation modules must be completed in order of their scheduled dates. "
+                        "A module with a later date cannot be completed while older scheduled modules are still pending.\n\n"
+                        "• Current Module: '%s' (Due Date: %s)\n"
+                        "• Older Pending Module: '%s' (Due Date: %s)\n\n"
+                        "Please complete '%s' first before completing this module."
+                    ) % (
+                        rec.name,
+                        rec.due_date.strftime("%b %d, %Y"),
+                        earlier_task.name,
+                        earlier_task.due_date.strftime("%b %d, %Y"),
+                        earlier_task.name,
+                    ))
+
+            rec_sudo.write({
                 "state": "completed",
                 "completed_date": fields.Datetime.now(),
                 "completed_by_user_id": current_user.id,
             })
             # ── Notify PPDD Coordinator & Buddy on task completion ─────────
-            plan = rec.induction_plan_id
             partner_ids = []
 
             # Notify coordinator
-            if plan.ppdd_coordinator_id and plan.ppdd_coordinator_id.user_id:
+            if plan and plan.ppdd_coordinator_id and plan.ppdd_coordinator_id.user_id:
                 partner_ids.append(plan.ppdd_coordinator_id.user_id.partner_id.id)
 
             # Notify supervisor
-            if plan.supervisor_id and plan.supervisor_id.user_id:
+            if plan and plan.supervisor_id and plan.supervisor_id.user_id:
                 sup_partner = plan.supervisor_id.user_id.partner_id.id
                 if sup_partner not in partner_ids:
                     partner_ids.append(sup_partner)
@@ -320,9 +751,10 @@ class HrInductionLmsTask(models.Model):
                 ("Notes: " + rec.notes) if rec.notes else "",
             )
 
-            plan.message_post(
-                body=body,
-                partner_ids=partner_ids,
-                subtype_xmlid="mail.mt_comment",
-            )
+            if plan:
+                plan.sudo().message_post(
+                    body=body,
+                    partner_ids=partner_ids,
+                    subtype_xmlid="mail.mt_comment",
+                )
 

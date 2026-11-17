@@ -5,6 +5,11 @@ from odoo import api, fields, models
 class OperatingUnit(models.Model):
     _inherit = 'operating.unit'
 
+    work_unit_type = fields.Selection(
+        selection_add=[('area_office', 'Area Office')],
+        ondelete={'area_office': 'cascade'}
+    )
+
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
@@ -49,4 +54,4 @@ class OperatingUnit(models.Model):
                     obj.coach_operating_unit_id.id or None,
                     obj.id
                 ))
-            self.env.invalidate_all()
+            self.env.invalidate_all()

@@ -1,5 +1,7 @@
 from odoo import api, models, fields, _
+from datetime import date
 import logging
+from .clean_utils import clean_job_position_name
 
 # Initialize the logger
 _logger = logging.getLogger(__name__)
@@ -16,13 +18,13 @@ class RecruitmentProcessInternal(models.Model):
 
     def _compute_display_name(self):
         for rec in self:
-            rec.display_name = rec.job_position.name or str(rec.id)
+            rec.display_name = clean_job_position_name(rec.job_position.name) if rec.job_position else str(rec.id)
 
     job_position = fields.Many2one("hr.job", string="Job Position")
     job_location = fields.Char(string="Work Unit")
     job_grade = fields.Char(string="Grade")
     workunit_id = fields.Integer(string="Work Unit Id")
-    job_grade_id = fields.Integer(string="Work Unit Id")
+    job_grade_id = fields.Integer(string="Job Grade Id")
     job_category = fields.Char(string="Category")
     emp_type = fields.Char(string="Employment Type")
     vacancy_reference = fields.Char(string="Vacancy Reference")
@@ -104,7 +106,7 @@ class RecruitmentProcessInternal(models.Model):
                         'internal_employee_id': val.emp_name.id,
                         'bunna_app_status': 'shortlisted',
                         'employee_grade': emp_grade,
-                        'employee_position': val.emp_name.job_position.name if val.emp_name.job_position else '',
+                        'employee_position': clean_job_position_name(val.emp_name.job_position or val.emp_name.job_id),
                         'active': True,
                     })
 
@@ -146,7 +148,7 @@ class RecruitmentProcessInternal(models.Model):
                 avail_vals = {
                     'vacancy_id': vac.id if vac else (self.vacancy_id.id if hasattr(self, 'vacancy_id') and self.vacancy_id else False),
                     'vacancy_reference': self.vacancy_reference,
-                    'job_position': self.job_position.name if self.job_position else False,
+                    'job_position': clean_job_position_name(self.job_position),
                     'job_location': self.job_location,
                     'employee_grade': self.job_grade,
                     'employee_category': self.job_category,
@@ -211,6 +213,30 @@ class EligibleEmployees(models.Model):
     _name = "internal.recruitment.eligible.employees"
     _description = "Eligible Employees"
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('emp_position'):
+                vals['emp_position'] = clean_job_position_name(vals['emp_position'])
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if vals.get('emp_position'):
+            vals['emp_position'] = clean_job_position_name(vals['emp_position'])
+        return super().write(vals)
+
+    def _auto_init(self):
+        super()._auto_init()
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute(r"""
+                    UPDATE internal_recruitment_eligible_employees
+                    SET emp_position = REGEXP_REPLACE(emp_position, '^.*[''"]en_US[''"]\s*:\s*[''"]([^''"]+)[''"].*$', '\1')
+                    WHERE emp_position LIKE '%en_US%';
+                """)
+        except Exception as e:
+            _logger.warning("Auto cleanup of emp_position failed: %s", e)
+
     emp_name = fields.Many2one("hr.employee", string="Name")
     active = fields.Boolean(default=True)
     vacancy_id = fields.Many2one("job.vacancy", string="Job Vacancy", index=True)
@@ -271,8 +297,10 @@ class EligibleEmployees(models.Model):
     employment_experience = fields.Float(string="Employment Experience", readonly=True,
                                          compute="_compute_employee_details", store=True)
 
-    current_location_exp = fields.Float(string="Current Location Experience")
-    current_position_exp = fields.Float(string="Current Position Experience")
+    current_location_exp = fields.Float(string="Current Location Experience", compute="_compute_employee_details", store=True, readonly=False)
+    current_position_exp = fields.Float(string="Current Position Experience", compute="_compute_employee_details", store=True, readonly=False)
+    last_movement_reason = fields.Char(string="Last Movement Reason", compute="_compute_employee_details", store=True)
+    movement_eligible = fields.Boolean(string="Movement Eligible for Promotion/Transfer", compute="_compute_employee_details", store=True, default=True)
     app_date = fields.Date(string="Application Date")
     recommendation = fields.Float(string="Recommendation")
 
@@ -280,7 +308,7 @@ class EligibleEmployees(models.Model):
     position_id = fields.Integer(string="Position Id")
     workunit_id = fields.Integer(string="Workunit Id")
     cgpa = fields.Float(string="CGPA", readonly=True)
-    relevant_experience = fields.Float(string="Relevant Experience", readonly=True)
+    relevant_experience = fields.Float(string="Relevant Experience", compute="_compute_employee_details", store=True, readonly=False)
     job_experience = fields.Float(string="Job Experience", readonly=True)
     preferred_location = fields.Char(string="Preferred Location")
     written_warning = fields.Float(string="Months since Written Warning", readonly=True)
@@ -291,19 +319,22 @@ class EligibleEmployees(models.Model):
 
     @api.depends('emp_name')
     def _compute_employee_details(self):
+        today = date.today()
         for record in self:
             if not record.emp_name:
                 record.update({
                     'emp_grade': False, 'emp_position': False, 'emp_category': False,
                     'emp_type': False, 'emp_gender': False, 'current_work_unit': False,
                     'current_department': False, 'service_in_company': 0.0,
-                    'total_experience': 0.0, 'pms_score': 0.0, 'last_promotion': 0.0
+                    'total_experience': 0.0, 'pms_score': 0.0, 'last_promotion': 0.0,
+                    'current_location_exp': 0.0, 'current_position_exp': 0.0,
+                    'relevant_experience': 0.0,
                 })
                 continue
 
             query = """ SELECT 
                               eg.grade_code AS emp_grade,
-                              hj.name AS emp_position,
+                              COALESCE(hj.name->>'en_US', hj.name::text) AS emp_position,
                               hj.employee_category AS emp_category,
                               hj.type_of_employment AS emp_type,
                               he.gender AS emp_gender,
@@ -326,25 +357,184 @@ class EligibleEmployees(models.Model):
             self.env.cr.execute(query, (record.emp_name.id,))
             res = self.env.cr.dictfetchone()
 
+            emp = record.emp_name
+
+            # 1. Company Experience (Tenure in Bunna Bank)
+            comp_years = 0.0
+            hire_date = (
+                getattr(emp, 'service_start_date', False)
+                or getattr(emp, 'service_hire_date', False)
+                or getattr(emp, 'first_contract_date', False)
+                or getattr(emp, 'joining_date', False)
+            )
+            if hire_date:
+                comp_years = round((today - hire_date).days / 365.25, 2)
+            elif res and res.get('service_in_company'):
+                comp_years = round(float(res.get('service_in_company')), 2)
+
+            # 2. Previous Experience (from employee.previous.occupation)
+            prev_years = 0.0
+            if hasattr(emp, 'previous_occupation_ids') and emp.previous_occupation_ids:
+                for occ in emp.previous_occupation_ids:
+                    if occ.from_date and occ.to_date and occ.to_date > occ.from_date:
+                        prev_years += (occ.to_date - occ.from_date).days / 365.25
+            if not prev_years and res and res.get('employment_experience'):
+                prev_years = float(res.get('employment_experience'))
+            prev_years = round(prev_years, 2)
+
+            # 3. Total Experience = Company Experience + Previous Experience
+            tot_exp = round(comp_years + prev_years, 2)
+
+            # 4. Duration in Current Position ("Service in Current Location means duration of the curent positions")
+            pos_years = 0.0
+            pos_date = False
+            CONSIDERED_MOVEMENTS = ['promotion', 'lateral_transfer', 'transfer', 'assignment', 'placement']
+            job_pos_id = emp.job_position.id if emp.job_position else (emp.job_id.id if getattr(emp, 'job_id', False) else False)
+            if job_pos_id and 'hr.job.history' in self.env:
+                j_hist = self.env['hr.job.history'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    '|', ('to_job_id', '=', job_pos_id), ('job_id', '=', job_pos_id),
+                    '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+                ], order='job_history_start_date desc, id desc', limit=1)
+                if j_hist and j_hist.job_history_start_date:
+                    pos_date = j_hist.job_history_start_date
+            if not pos_date and 'hr.job.history' in self.env:
+                curr_hist = self.env['hr.job.history'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('is_current', '=', True),
+                    '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+                ], order='job_history_start_date desc, id desc', limit=1)
+                if curr_hist and curr_hist.job_history_start_date:
+                    pos_date = curr_hist.job_history_start_date
+            if not pos_date:
+                pos_date = hire_date
+            if pos_date:
+                pos_years = round((today - pos_date).days / 365.25, 2)
+
+            # 5. Service in Current Location (Branch / Operating Unit)
+            loc_date = False
+            ou_id = emp.default_operating_unit_id.id if emp and getattr(emp, 'default_operating_unit_id', False) else False
+            if ou_id and 'hr.job.history' in self.env:
+                job_hist = self.env['hr.job.history'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    '|', ('to_operating_unit_id', '=', ou_id), ('operating_unit_id', '=', ou_id),
+                    '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+                ], order='job_history_start_date desc, id desc', limit=1)
+                if job_hist and job_hist.job_history_start_date:
+                    loc_date = job_hist.job_history_start_date
+            if not loc_date and 'hr.job.history' in self.env:
+                curr_loc_hist = self.env['hr.job.history'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('is_current', '=', True),
+                    '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+                ], order='job_history_start_date desc, id desc', limit=1)
+                if curr_loc_hist and curr_loc_hist.job_history_start_date:
+                    loc_date = curr_loc_hist.job_history_start_date
+            if not loc_date and ou_id and 'hr.employee.transfer.history' in self.env:
+                trans_hist = self.env['hr.employee.transfer.history'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('to_operating_unit_id', '=', ou_id),
+                    ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS),
+                ], order='is_current desc, start_date desc, date desc, id desc', limit=1)
+                if trans_hist and (trans_hist.start_date or trans_hist.date):
+                    loc_date = trans_hist.start_date or trans_hist.date
+            if not loc_date:
+                loc_date = pos_date or hire_date
+            loc_years = round((today - loc_date).days / 365.25, 2) if loc_date else 0.0
+
+            # 6. Demotion Status
+            is_demot = bool(getattr(emp, 'is_demoted', False))
+            if not is_demot and 'employee.demotion' in self.env:
+                demot_cnt = self.env['employee.demotion'].search_count([
+                    ('employee_name', '=', emp.id),
+                    ('state', '=', 'approve'),
+                    '|', ('demoted_until', '=', False), ('demoted_until', '>=', today),
+                ])
+                if demot_cnt > 0:
+                    is_demot = True
+
+            # 7. Last Movement Reason Check
+            # Only 5 reasons are considered: Promotion, Lateral Transfer, Transfer, Assignment, Placement
+            # Remaining 9 reasons are not considered to promote or request transfer:
+            # Acting Assignment, Acting Termination, Job Reclassification, Placement and Adjustment,
+            # Re-Assignment, Alteration of Job Title, Appointment, Job Rotation, Temporarily Assignment
+            CONSIDERED_REASONS = {'promotion', 'lateral_transfer', 'transfer', 'assignment', 'placement'}
+            NON_CONSIDERED_REASONS = {
+                'acting_assignment', 'acting_termination', 'job_reclassification',
+                'placement_and_adjustment', 're_assignment', 'alteration_of_job_title',
+                'appointment', 'job_rotation', 'temporary_assignment'
+            }
+            last_mov = False
+            if 'hr.job.history' in self.env:
+                recent_hist = self.env['hr.job.history'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('reason_for_movement', '!=', False),
+                ], order='job_history_start_date desc, id desc', limit=1)
+                if recent_hist and recent_hist.reason_for_movement:
+                    last_mov = recent_hist.reason_for_movement
+            if not last_mov and 'hr.employee.transfer.history' in self.env:
+                recent_trans = self.env['hr.employee.transfer.history'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('reason_for_movement', '!=', False),
+                ], order='start_date desc, date desc, id desc', limit=1)
+                if recent_trans and recent_trans.reason_for_movement:
+                    last_mov = recent_trans.reason_for_movement
+
+            is_mov_eligible = True
+            if pos_years < 1.0 or loc_years < 1.0:
+                is_mov_eligible = False
+            if last_mov and str(last_mov).lower() in NON_CONSIDERED_REASONS:
+                is_mov_eligible = False
+
+            # Active disciplinary records check
+            if is_mov_eligible and 'discipline.case' in self.env:
+                if self.env['discipline.case'].search_count([('employee_id', '=', emp.id), ('state', '=', 'enforced')]) > 0:
+                    is_mov_eligible = False
+            if is_mov_eligible and 'discipline.action' in self.env:
+                if self.env['discipline.action'].search_count([('employee_name', '=', emp.id)]) > 0:
+                    is_mov_eligible = False
+            if is_mov_eligible and 'disciplinary.action' in self.env:
+                if self.env['disciplinary.action'].search_count([('employee_name', '=', emp.id)]) > 0:
+                    is_mov_eligible = False
+
+            rel_exp = tot_exp
             if res:
                 record.update({
                     'emp_grade': res.get('emp_grade'),
-                    'emp_position': res.get('emp_position'),
+                    'emp_position': clean_job_position_name(res.get('emp_position') or (emp.job_position.name if emp and emp.job_position else False)),
                     'emp_category': res.get('emp_category'),
                     'emp_type': res.get('emp_type'),
                     'emp_gender': res.get('emp_gender'),
                     'current_work_unit': res.get('current_work_unit'),
                     'current_department': res.get('current_department'),
-                    'service_in_company': res.get('service_in_company') or 0.0,
-                    'employment_experience': res.get('employment_experience') or 0.0,
-                    'total_experience': res.get('total_experience') or 0.0,
+                    'service_in_company': comp_years,
+                    'employment_experience': prev_years,
+                    'total_experience': tot_exp,
                     'pms_score': res.get('pms_score') or 0.0,
                     'supervisory_experience': res.get('supervisory_experience') or 0.0,
                     'last_promotion': res.get('last_promotion') or 0.0,
                     'educational_qualification': res.get('educational_qualification'),
+                    'current_location_exp': loc_years,
+                    'current_position_exp': pos_years,
+                    'relevant_experience': rel_exp,
+                    'demoted': is_demot,
+                    'last_movement_reason': last_mov,
+                    'movement_eligible': is_mov_eligible,
                 })
             else:
-                record.update({'emp_grade': False, 'emp_position': False})
+                record.update({
+                    'emp_grade': False,
+                    'emp_position': False,
+                    'service_in_company': comp_years,
+                    'employment_experience': prev_years,
+                    'total_experience': tot_exp,
+                    'current_location_exp': loc_years,
+                    'current_position_exp': pos_years,
+                    'relevant_experience': tot_exp,
+                    'demoted': is_demot,
+                    'last_movement_reason': last_mov,
+                    'movement_eligible': is_mov_eligible,
+                })
 
 
 class InternalSelectedCandidates(models.Model):
@@ -362,13 +552,13 @@ class InternalSelectedCandidates(models.Model):
 
     def _compute_display_name(self):
         for rec in self:
-            rec.display_name = rec.job_position.name or str(rec.id)
+            rec.display_name = clean_job_position_name(rec.job_position.name) if rec.job_position else str(rec.id)
 
     job_position = fields.Many2one("hr.job", string="Job Position")
     job_location = fields.Char(string="Work Unit")
     job_grade = fields.Char(string="Grade")
     workunit_id = fields.Integer(string="Work Unit Id")
-    job_grade_id = fields.Integer(string="Work Unit Id")
+    job_grade_id = fields.Integer(string="Job Grade Id")
     job_category = fields.Char(string="Category")
     emp_type = fields.Char(string="Employment Type")
     recruitment_reference = fields.Char(string="Recruitment Reference")

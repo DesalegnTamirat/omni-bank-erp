@@ -13,7 +13,7 @@ export class AssessmentDashboard extends Component {
         this.actionService = useService("action");
 
         this.state = useState({
-            period: "today",
+            period: "year",
             assessmentType: "all",   // all | exam | interview | transfer
             dateFrom: "",
             dateTo: "",
@@ -64,18 +64,25 @@ export class AssessmentDashboard extends Component {
     // ── Date helpers ──────────────────────────────────────────────────────
     _getDateRange() {
         const today = new Date();
-        const fmt = d => d.toISOString().split("T")[0];
+        const fmt = d => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${y}-${m}-${day}`;
+        };
 
         if (this.state.period === "custom") {
             return [this.state.dateFrom || null, this.state.dateTo || null];
         }
         if (this.state.period === "today") {
-            const f = fmt(today); return [f, f];
+            const f = fmt(today);
+            return [f, f];
         }
         if (this.state.period === "week") {
-            const day = today.getDay();
-            const mon = new Date(today); mon.setDate(today.getDate() - ((day + 6) % 7));
-            const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
+            const dayOfWeek = today.getDay();
+            const diffToMon = (dayOfWeek + 6) % 7;
+            const mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - diffToMon);
+            const sun = new Date(today.getFullYear(), today.getMonth(), today.getDate() - diffToMon + 6);
             return [fmt(mon), fmt(sun)];
         }
         if (this.state.period === "month") {
@@ -87,6 +94,18 @@ export class AssessmentDashboard extends Component {
             return [`${today.getFullYear()}-01-01`, `${today.getFullYear()}-12-31`];
         }
         return [null, null];
+    }
+
+    _buildDateDomain(baseDomain = []) {
+        const [from, to] = this._getDateRange();
+        const domain = [...baseDomain];
+        if (from) {
+            domain.push(["create_date", ">=", from]);
+        }
+        if (to) {
+            domain.push(["create_date", "<=", to + " 23:59:59"]);
+        }
+        return domain;
     }
 
     // ── Filter Event Handlers ─────────────────────────────────────────────
@@ -321,27 +340,27 @@ export class AssessmentDashboard extends Component {
 
     // ── Navigation Action Shortcuts ──
     openSittingsAll() {
-        this.openCandidateSittings([]);
+        this.openCandidateSittings(this._buildDateDomain([]));
     }
 
     openSessionsDraft() {
-        this.openExamSessions([["state", "=", "draft"]]);
+        this.openExamSessions(this._buildDateDomain([["state", "=", "draft"]]));
     }
 
     openSittingsLive() {
-        this.openCandidateSittings([["state", "=", "in_progress"]]);
+        this.openCandidateSittings(this._buildDateDomain([["state", "=", "in_progress"]]));
     }
 
     openSittingsCompleted() {
-        this.openCandidateSittings([["state", "=", "completed"]]);
+        this.openCandidateSittings(this._buildDateDomain([["state", "=", "completed"]]));
     }
 
     openSittingsPassed() {
-        this.openCandidateSittings([["state", "=", "completed"], ["passed", "=", true]]);
+        this.openCandidateSittings(this._buildDateDomain([["state", "=", "completed"], ["is_passed", "=", true]]));
     }
 
     openSittingsDisqualified() {
-        this.openCandidateSittings([["state", "=", "disqualified"]]);
+        this.openCandidateSittings(this._buildDateDomain([["state", "=", "disqualified"]]));
     }
 
     openCandidateSittings(domain = []) {
@@ -370,20 +389,50 @@ export class AssessmentDashboard extends Component {
             name: "Manual Grading Queue",
             res_model: "exam.grading.task",
             views: [[false, "list"], [false, "form"]],
-            domain: [["state", "=", "pending"]],
+            domain: this._buildDateDomain([["state", "=", "pending"]]),
         });
     }
 
     openInterviewsAll() {
-        this.openInterviewSessions();
+        this.openInterviewCandidates(this._buildDateDomain([]));
+    }
+
+    openInterviewCandidates(domain = []) {
+        this.actionService.doAction({
+            type: "ir.actions.act_window",
+            name: "CBIS Interview Candidates",
+            res_model: "cbis.interview.candidate",
+            views: [[false, "list"], [false, "form"]],
+            domain: Array.isArray(domain) ? domain : [],
+            context: { search_default_group_by_vacancy: 1 },
+        });
     }
 
     openMyEvaluationsDone() {
-        this.openMyEvaluations([["state", "=", "submitted"]]);
+        this.openEvaluationsDone();
     }
 
     openMyEvaluationsPending() {
-        this.openMyEvaluations([["state", "=", "draft"]]);
+        this.openEvaluationsPending();
+    }
+
+    openEvaluationsDone() {
+        this.openInterviewEvaluations(this._buildDateDomain([["state", "=", "submitted"]]), "CBIS Interview Evaluations (Done)");
+    }
+
+    openEvaluationsPending() {
+        this.openInterviewEvaluations(this._buildDateDomain([["state", "=", "draft"]]), "CBIS Interview Evaluations (Pending)");
+    }
+
+    openInterviewEvaluations(domain = [], name = "CBIS Interview Evaluations") {
+        this.actionService.doAction({
+            type: "ir.actions.act_window",
+            name: name,
+            res_model: "cbis.interviewer.evaluation",
+            views: [[false, "list"], [false, "form"]],
+            domain: Array.isArray(domain) ? domain : [],
+            context: { search_default_group_by_vacancy: 1 },
+        });
     }
 
     openInterviewSessions() {
@@ -392,6 +441,7 @@ export class AssessmentDashboard extends Component {
             name: "CBIS Interview Sessions",
             res_model: "cbis.interview.session",
             views: [[false, "list"], [false, "form"]],
+            domain: this._buildDateDomain([]),
         });
     }
 
@@ -407,15 +457,15 @@ export class AssessmentDashboard extends Component {
     }
 
     openTransfersAll() {
-        this.openTransferRecords([]);
+        this.openTransferRecords(this._buildDateDomain([]));
     }
 
     openTransfersApproved() {
-        this.openTransferRecords([["state", "=", "approved"]]);
+        this.openTransferRecords(this._buildDateDomain([["state", "=", "approved"]]));
     }
 
     openTransfersPending() {
-        this.openTransferRecords([["state", "in", ["draft", "submitted", "under_review"]]]);
+        this.openTransferRecords(this._buildDateDomain([["state", "in", ["draft", "submitted", "under_review"]]]));
     }
 
     openTransferRecords(domain = []) {

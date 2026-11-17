@@ -83,10 +83,10 @@ class HelpdeskApiController(http.Controller):
         # 1. Check against master API key in system configuration (if configured)
         master_key = request.env["ir.config_parameter"].sudo().get_param("bunna_helpdesk.api_key")
         if master_key and hmac.compare_digest(master_key.strip(), token):
-            admin_user = request.env.ref("base.user_admin", raise_if_not_found=False)
+            admin_user = request.env.ref("base.user_admin", raise_if_not_found=False) or request.env["res.users"].sudo().browse(2)
             if admin_user:
-                request.update_env(user=admin_user.id)
-                return admin_user, None, 200
+                request.update_env(user=admin_user.id, su=True)
+                return admin_user.sudo(), None, 200
 
         # 2. Check against native Odoo res.users.apikeys
         try:
@@ -97,8 +97,8 @@ class HelpdeskApiController(http.Controller):
             if uid:
                 user = request.env["res.users"].sudo().browse(uid)
                 if user.exists() and user.active:
-                    request.update_env(user=user.id)
-                    return user, None, 200
+                    request.update_env(user=user.id, su=True)
+                    return user.sudo(), None, 200
                 return None, "API Key user is inactive or deleted.", 401
         except Exception as e:
             _logger.warning("Error verifying API key: %s", str(e))
@@ -254,6 +254,12 @@ class HelpdeskApiController(http.Controller):
         if payload is None:
             return self._json_error("Malformed JSON payload in request body", status=400)
 
+        # Automatically unwrap if wrapped in vals_list or array
+        if isinstance(payload, list) and payload:
+            payload = payload[0]
+        elif isinstance(payload, dict) and isinstance(payload.get("vals_list"), list) and payload["vals_list"]:
+            payload = payload["vals_list"][0]
+
         # Extract ticket fields
         subject = (
             payload.get("subject")
@@ -261,8 +267,17 @@ class HelpdeskApiController(http.Controller):
             or payload.get("title")
             or ""
         ).strip()
+        inquires = (
+            payload.get("customer_inquires")
+            or payload.get("customer_inquiries")
+            or payload.get("customer_inquiry")
+            or payload.get("inquires")
+            or payload.get("inquiries")
+            or ""
+        ).strip()
         description = (
             payload.get("description")
+            or inquires
             or payload.get("content")
             or payload.get("message")
             or payload.get("inquiry_summary")
@@ -280,9 +295,9 @@ class HelpdeskApiController(http.Controller):
         # Extract customer profile data
         cust = payload.get("customer") or {}
         customer_name = (cust.get("name") or payload.get("customer_name") or payload.get("partner_name") or "").strip()
-        phone = (cust.get("phone") or payload.get("phone") or payload.get("partner_phone") or "").strip()
+        phone = (cust.get("phone") or payload.get("phone_number") or payload.get("phone") or payload.get("partner_phone") or "").strip()
         phone_secondary = (cust.get("secondary_phone") or payload.get("secondary_phone") or payload.get("partner_phone_secondary") or "").strip()
-        email = (cust.get("email") or payload.get("email") or payload.get("partner_email") or "").strip()
+        email = (cust.get("email") or payload.get("customer_email") or payload.get("email") or payload.get("partner_email") or "").strip()
         account_number = (cust.get("account_number") or payload.get("account_number") or "").strip()
         cif_number = (cust.get("cif_number") or payload.get("cif_number") or "").strip()
         fayda_number = (cust.get("fayda_number") or payload.get("fayda_number") or "").strip()
@@ -471,9 +486,14 @@ class HelpdeskApiController(http.Controller):
             "company_id": user.company_id.id or 1,
             "partner_id": partner.id if partner else False,
             "partner_name": partner.name if partner else (customer_name or False),
+            "customer_name": customer_name or (partner.name if partner else "Customer"),
             "partner_phone": phone or (partner.phone if partner else False),
+            "phone_number": phone or (partner.phone if partner else False),
             "partner_phone_secondary": phone_secondary,
             "partner_email": email or (partner.email if partner else False),
+            "customer_email": email or (partner.email if partner else False),
+            "customer_inquires": inquires or (tools.html2plaintext(description).strip() if description else False),
+            "customer_request_details": inquires or (tools.html2plaintext(description).strip() if description else False),
             "account_number": account_number or (partner.account_number if partner else False),
             "cif_number": cif_number or (partner.cif_number if partner else False),
             "fayda_number": fayda_number or (partner.fayda_number if partner else False),

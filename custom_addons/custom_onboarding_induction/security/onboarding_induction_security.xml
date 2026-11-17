@@ -11,7 +11,7 @@
         <!-- Privilege Record for Odoo 19 Security Groups -->
         <record id="onboarding_induction_privilege" model="res.groups.privilege">
             <field name="name">Onboarding and Induction</field>
-            <field name="placeholder"></field>
+            <field name="placeholder" eval="False"/>
             <field name="sequence">25</field>
             <field name="category_id" ref="module_category_onboarding_induction"/>
         </record>
@@ -22,7 +22,6 @@
             <field name="privilege_id" ref="onboarding_induction_privilege"/>
             <field name="sequence">10</field>
             <field name="comment">Employees can view their own onboarding and induction tasks.</field>
-            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         </record>
 
         <!-- Officer Group -->
@@ -52,13 +51,39 @@
             <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_user'))]"/>
         </record>
 
-        <!-- Manager Group -->
+        <!-- Administrator Group (formerly Manager / Directorate Head) -->
         <record id="group_onboarding_induction_manager" model="res.groups">
-            <field name="name">Manager / Directorate Head</field>
+            <field name="name">Administrator</field>
             <field name="privilege_id" ref="onboarding_induction_privilege"/>
             <field name="sequence">30</field>
-            <field name="comment">Full management and sign-off privileges for onboarding and corporate induction.</field>
+            <field name="comment">Full administrator, management, and sign-off privileges for onboarding and corporate induction.</field>
             <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_officer'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
         </record>
+
+        <!-- All internal users (employees) inherit User (Employee) by default -->
+        <record id="base.group_user" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_user'))]"/>
+        </record>
+
+        <record id="base.group_system" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_manager'))]"/>
+        </record>
+
+        <record id="base.group_erp_manager" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_manager'))]"/>
+        </record>
+
+        <!-- Apply to base.group_user even though it has noupdate=1 in base -->
+        <function model="res.groups" name="write">
+            <value eval="[ref('base.group_user')]"/>
+            <value eval="{'implied_ids': [(4, ref('group_onboarding_induction_user'))]}"/>
+        </function>
+
+        <!-- Apply to base.group_system & base.group_erp_manager even though they have noupdate=1 -->
+        <function model="res.groups" name="write">
+            <value eval="[ref('base.group_system'), ref('base.group_erp_manager')]"/>
+            <value eval="{'implied_ids': [(4, ref('group_onboarding_induction_manager'))]}"/>
+        </function>
     </data>
 </odoo>

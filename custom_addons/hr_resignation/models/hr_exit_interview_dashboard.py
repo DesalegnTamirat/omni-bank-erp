@@ -11,37 +11,108 @@ class HrExitInterviewDashboard(models.AbstractModel):
     _name = 'hr.exit.interview.dashboard'
     _description = 'Exit Interview Dashboard Data'
 
+    # ─── DOMAIN BUILDERS ─────────────────────────────────────────────────────
+
+    @api.model
+    def _get_work_unit_domain(self, ou_val, prefix=''):
+        """
+        Build a robust domain to match an interview or line by work unit / operating unit.
+        prefix: '' for hr.exit.interview, 'interview_id.' for hr.exit.interview.line.
+        """
+        if not ou_val or ou_val == 'all':
+            return []
+
+        clauses = [
+            (f"{prefix}employee_id.department_id.name", "=", ou_val),
+            (f"{prefix}employee_id.default_operating_unit_id.name", "=", ou_val),
+            (f"{prefix}employee_id.department_id.operating_unit_id.name", "=", ou_val),
+            (f"{prefix}employee_id.operating_unit_ids.name", "=", ou_val),
+            (f"{prefix}resignation_id.operating_unit_id.name", "=", ou_val),
+            (f"{prefix}resignation_id.department_id.name", "=", ou_val),
+        ]
+        if 'operating_unit_id' in self.env['hr.employee']._fields:
+            clauses.append((f"{prefix}employee_id.operating_unit_id.name", "=", ou_val))
+
+        domain = ['|'] * (len(clauses) - 1)
+        domain.extend(clauses)
+        return domain
+
+    @api.model
+    def _get_position_domain(self, pos_val, prefix=''):
+        """
+        Build a domain matching an employee's job position.
+        prefix: '' for hr.exit.interview, 'interview_id.' for hr.exit.interview.line.
+        """
+        if not pos_val or pos_val == 'all':
+            return []
+
+        clauses = [
+            (f"{prefix}employee_id.job_id.name", "=", pos_val),
+            (f"{prefix}employee_id.job_position.name", "=", pos_val),
+        ]
+        domain = ['|'] * (len(clauses) - 1)
+        domain.extend(clauses)
+        return domain
+
     # ─── FILTER OPTIONS ──────────────────────────────────────────────────────
 
     @api.model
     def get_filter_options(self):
         """Return distinct values for the filter dropdowns."""
-        interviews = self.env['hr.exit.interview'].search([])
+        ou_names = set()
 
-        # Work units (Operating Units)
+        # 1. Operating units (Work Units)
         if 'operating.unit' in self.env:
             ous = self.env['operating.unit'].search([])
-            ou_names = sorted(set(ou.name for ou in ous if ou.name))
-        else:
-            ou_names = []
-        ou_opts = [{'value': d, 'label': d} for d in ou_names]
+            ou_names.update(ou.name for ou in ous if ou.name)
+
+        # 2. Departments (Work Units / Directorates / Divisions)
+        if 'hr.department' in self.env:
+            depts = self.env['hr.department'].search([])
+            ou_names.update(d.name for d in depts if d.name)
+
+        # 3. Work units from interviews and resignations
+        interviews = self.env['hr.exit.interview'].search([])
+        for iv in interviews:
+            emp = iv.employee_id
+            if emp:
+                if emp.department_id and emp.department_id.name:
+                    ou_names.add(emp.department_id.name)
+                if hasattr(emp, 'default_operating_unit_id') and emp.default_operating_unit_id and emp.default_operating_unit_id.name:
+                    ou_names.add(emp.default_operating_unit_id.name)
+                if hasattr(emp, 'operating_unit_ids') and emp.operating_unit_ids:
+                    ou_names.update(ou.name for ou in emp.operating_unit_ids if ou.name)
+            resig = iv.resignation_id
+            if resig:
+                if hasattr(resig, 'operating_unit_id') and resig.operating_unit_id and resig.operating_unit_id.name:
+                    ou_names.add(resig.operating_unit_id.name)
+                if hasattr(resig, 'department_id') and resig.department_id and resig.department_id.name:
+                    ou_names.add(resig.department_id.name)
+
+        ou_opts = [{'value': d, 'label': d} for d in sorted(ou_names)]
 
         # Separation types (All active ones)
+        sep_types = set()
         if 'hr.separation.type' in self.env:
             stypes = self.env['hr.separation.type'].search([])
-            sep_types = sorted(set(s.name for s in stypes if s.name))
-        else:
-            sep_types = sorted(set(
-                i.resignation_id.resignation_type_id.name
-                for i in interviews
-                if i.resignation_id and i.resignation_id.resignation_type_id
-            ))
-        sep_opts = [{'value': s, 'label': s} for s in sep_types]
+            sep_types.update(s.name for s in stypes if s.name)
+        for iv in interviews:
+            if iv.resignation_id and iv.resignation_id.resignation_type_id and iv.resignation_id.resignation_type_id.name:
+                sep_types.add(iv.resignation_id.resignation_type_id.name)
+        sep_opts = [{'value': s, 'label': s} for s in sorted(sep_types)]
 
         # Job positions
+        positions = set()
         all_jobs = self.env['hr.job'].search([])
-        positions = sorted(set(j.name for j in all_jobs if j.name))
-        pos_opts = [{'value': p, 'label': p} for p in positions]
+        positions.update(j.name for j in all_jobs if j.name)
+        for iv in interviews:
+            emp = iv.employee_id
+            if emp:
+                if emp.job_id and emp.job_id.name:
+                    positions.add(emp.job_id.name)
+                elif hasattr(emp, 'job_position') and emp.job_position and emp.job_position.name:
+                    positions.add(emp.job_position.name)
+        pos_opts = [{'value': p, 'label': p} for p in sorted(positions)]
 
         return {
             'operating_units': ou_opts,
@@ -56,8 +127,7 @@ class HrExitInterviewDashboard(models.AbstractModel):
         """
         Compute all analytics for the dashboard.
         filters: dict with optional keys:
-            quarter      - e.g. "Q3 2026"
-            department   - department name string
+            operating_unit - work unit or operating unit name
             position     - job position name
             sep_type     - separation type name
         """
@@ -66,26 +136,33 @@ class HrExitInterviewDashboard(models.AbstractModel):
 
         # ── Build domain ────────────────────────────────────────────────────
         domain = [('state', '=', 'completed')]
+        all_domain = [('resignation_id', '!=', False)]
 
         ou_val = filters.get('operating_unit', '')
         if ou_val and ou_val != 'all':
-            domain.append(('employee_id.department_id.operating_unit_id.name', '=', ou_val))
+            ou_domain = self._get_work_unit_domain(ou_val)
+            domain.extend(ou_domain)
+            all_domain.extend(ou_domain)
 
         pos_val = filters.get('position', '')
         if pos_val and pos_val != 'all':
-            domain.append(('employee_id.job_id.name', '=', pos_val))
+            pos_domain = self._get_position_domain(pos_val)
+            domain.extend(pos_domain)
+            all_domain.extend(pos_domain)
 
         sep_val = filters.get('sep_type', '')
         if sep_val and sep_val != 'all':
-            domain.append(('resignation_id.resignation_type_id.name', '=', sep_val))
+            sep_clause = ('resignation_id.resignation_type_id.name', '=', sep_val)
+            domain.append(sep_clause)
+            all_domain.append(sep_clause)
 
         interviews = self.env['hr.exit.interview'].search(domain)
         total = len(interviews)
 
-        # Total submitted (all, not just filtered) for completion %
-        all_count = self.env['hr.exit.interview'].search_count(
-            [('resignation_id', '!=', False)])
+        all_count = self.env['hr.exit.interview'].search_count(all_domain)
         completion_pct = round(total / all_count * 100) if all_count else 0
+        if completion_pct > 100:
+            completion_pct = 100
 
         if total == 0:
             return {
@@ -94,16 +171,17 @@ class HrExitInterviewDashboard(models.AbstractModel):
                     'completion_pct': 0,
                     'recommend_pct': 0,
                     'regrettable_pct': 0,
+                    'avg_sat': '—',
                     'avg_tenure': '—',
                     'avg_tenure_median': '—',
                 },
                 'bars': [],
                 'keeps': [],
                 'donuts': [],
+                'cg': "#e5e7eb 0% 100%",
                 'likerts': [],
                 'yes_no': [],
-                'themes': [],
-                'quotes': [],
+                'text_qs': [],
                 'interviews': [],
             }
 
@@ -344,47 +422,47 @@ class HrExitInterviewDashboard(models.AbstractModel):
                 'no': 100 - yes_pct
             })
 
-        # ── Top themes (from text answers) ────────────────────────────────
-        stop_words = {
-            'the', 'a', 'to', 'and', 'was', 'is', 'in', 'of', 'for',
-            'it', 'my', 'i', 'with', 'that', 'this', 'on', 'not',
-            'have', 'be', 'as', 'but', 'are', 'at', 'very', 'they',
-            'we', 'our', 'has', 'had', 'been', 'more', 'also', 'me',
-            'from', 'would', 'could', 'bank', 'bunna', 'work',
-        }
-        words = []
-        all_text_vals = []
+        # ── Text questions (Grouped) ──────────────────────────────────────
+        text_qs_dict = {}
         for l in lines:
             if l.question_type == 'text' and l.text_value and len(l.text_value.strip()) > 5:
-                all_text_vals.append(l.text_value.strip())
-                cleaned = re.sub(r'[^a-zA-Z\s]', '', l.text_value).lower()
-                for w in cleaned.split():
-                    if w not in stop_words and len(w) > 3:
-                        words.append(w.capitalize())
+                qn = l.question_name or ''
+                if isinstance(qn, dict): qn = qn.get('en_US', str(qn))
+                qn = str(qn).strip()
+                if qn not in text_qs_dict:
+                    text_qs_dict[qn] = {'count': 0, 'sample': []}
+                text_qs_dict[qn]['count'] += 1
+                if len(text_qs_dict[qn]['sample']) < 5:
+                    text_qs_dict[qn]['sample'].append(l.text_value.strip()[:180])
 
-        word_counts = Counter(words)
-        themes = []
-        for idx, (w, c) in enumerate(word_counts.most_common(10)):
-            if c >= 1:
-                size = 'lg' if idx < 2 else 'md' if idx < 4 else 'sm'
-                themes.append({'t': w, 'n': c, 'size': size})
-
-        # ── Quotes (sample from text answers) ────────────────────────────
-        quotes = []
-        for idx, txt in enumerate(all_text_vals[:5]):
-            if len(txt) > 20:
-                quotes.append({'id': idx, 'text': txt[:180]})
+        text_qs = []
+        for i, (qn, data) in enumerate(text_qs_dict.items()):
+            text_qs.append({
+                'id': i,
+                'l': qn,
+                'count': data['count'],
+                'sample': data['sample']
+            })
 
         # ── Interview list for the table ──────────────────────────────────
         interview_list = []
         for i in interviews:
             emp = i.employee_id
+            pos_name = (emp.job_id.name if emp.job_id else False) or (emp.job_position.name if hasattr(emp, 'job_position') and emp.job_position else False) or '—'
+            dept_name = emp.department_id.name if emp.department_id else ''
+            ou_name = (
+                (emp.default_operating_unit_id.name if hasattr(emp, 'default_operating_unit_id') and emp.default_operating_unit_id else False)
+                or (emp.department_id.operating_unit_id.name if emp.department_id and hasattr(emp.department_id, 'operating_unit_id') and emp.department_id.operating_unit_id else False)
+                or (i.resignation_id.operating_unit_id.name if i.resignation_id and hasattr(i.resignation_id, 'operating_unit_id') and i.resignation_id.operating_unit_id else False)
+                or ''
+            )
             interview_list.append({
                 'id': i.id,
                 'name': emp.name or '—',
                 'emp_id': str(emp.barcode or i.id),
-                'position': emp.job_id.name or '—',
-                'department': emp.department_id.name or '—',
+                'position': pos_name,
+                'department': dept_name or ou_name or '—',
+                'work_unit': ou_name or dept_name or '—',
                 'date': i.interview_date.strftime('%d %b %Y') if i.interview_date else '—',
                 'state': i.state,
                 'resignation_id': i.resignation_id.id if i.resignation_id else False,
@@ -406,8 +484,7 @@ class HrExitInterviewDashboard(models.AbstractModel):
             'cg': cg,
             'likerts': likerts,
             'yes_no': yes_no,
-            'themes': themes,
-            'quotes': quotes,
+            'text_qs': text_qs,
             'interviews': interview_list,
         }
     @api.model
@@ -450,14 +527,23 @@ class HrExitInterviewDashboard(models.AbstractModel):
                     item['options'] = [{'name': line.answer, 'selected': True}]
                 q_reason.append(item)
 
+        pos_name = (emp.job_id.name if emp.job_id else False) or (emp.job_position.name if hasattr(emp, 'job_position') and emp.job_position else False) or 'N/A'
+        dept_name = emp.department_id.name if emp.department_id else 'N/A'
+        branch_name = (
+            (emp.department_id.operating_unit_id.name if emp.department_id and hasattr(emp.department_id, 'operating_unit_id') and emp.department_id.operating_unit_id else False)
+            or (emp.default_operating_unit_id.name if hasattr(emp, 'default_operating_unit_id') and emp.default_operating_unit_id else False)
+            or (resig.operating_unit_id.name if resig and hasattr(resig, 'operating_unit_id') and resig.operating_unit_id else False)
+            or dept_name
+        )
+
         return {
             'id': interview.id, 'emp_name': emp.name,
             'emp_id': emp.barcode or 'N/A',
-            'job': emp.job_id.name or 'N/A',
-            'dept': emp.department_id.name or 'N/A',
-            'branch': emp.department_id.operating_unit_id.name or 'N/A',
+            'job': pos_name,
+            'dept': dept_name,
+            'branch': branch_name,
             'sep_type': resig.resignation_type_id.name if resig and resig.resignation_type_id else 'N/A',
-            'tenure': '0 Years' if not emp.first_contract_date else 'N/A', # Mock
+            'tenure': '0 Years' if not getattr(emp, 'first_contract_date', None) and not emp.date_start else 'N/A',
             'last_day': resig.release_date.strftime('%d %b %Y') if resig and resig.release_date else 'N/A',
             'questions_reason': q_reason,
             'questions_rating': q_rating,

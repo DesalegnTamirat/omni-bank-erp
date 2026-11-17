@@ -12,6 +12,7 @@
                     <button name="action_open_fetch_cash_indemnity_wizard" string="Fetch Cash Indemnity" type="object" class="btn-secondary" icon="fa-money" display="always"/>
                 </header>
                 <field name="name" string="Particulars"/>
+                <field name="payroll_period_id" options="{'no_create': True}" optional="show"/>
                 <field name="salary_rule_id" string="Salary Element" optional="show"/>
                 <field name="code" string="Rule Code" optional="show"/>
                 <field name="default_bank_account" string="Default Account" optional="show"/>
@@ -45,6 +46,7 @@
                     </div>
                     <group>
                         <group string="Configuration">
+                            <field name="payroll_period_id" options="{'no_create': True}" readonly="is_api_synced"/>
                             <field name="salary_rule_id" options="{'no_create': True}" readonly="is_api_synced"/>
                             <field name="code" readonly="is_api_synced"/>
                             <field name="default_bank_account" placeholder="13 digits destination account" readonly="is_api_synced"/>
@@ -100,6 +102,7 @@
         <field name="arch" type="xml">
             <search string="Search Payroll Adjustment">
                 <field name="name" string="Particulars"/>
+                <field name="payroll_period_id"/>
                 <field name="code" string="Rule Code"/>
                 <field name="salary_rule_id" string="Salary Element"/>
                 <separator/>
@@ -109,6 +112,7 @@
                 <filter string="API Synced" name="api_synced" domain="['|', ('is_api_synced', '=', True), ('api_sync_label', '=', 'Synced')]"/>
                 <filter string="Manual" name="manual_records" domain="[('is_api_synced', '=', False), ('api_sync_label', '=', 'Manual')]"/>
                 <group>
+                    <filter string="Payroll Period" name="group_period" context="{'group_by': 'payroll_period_id'}"/>
                     <filter string="Salary Element" name="group_salary_rule" context="{'group_by': 'salary_rule_id'}"/>
                     <filter string="Rule Code" name="group_code" context="{'group_by': 'code'}"/>
                     <filter string="API Synced" name="group_api" context="{'group_by': 'api_sync_label'}"/>

@@ -16,15 +16,36 @@ class ExamGradingTask(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "is_overdue desc, create_date asc, id asc"
 
+    def _auto_init(self):
+        res = super()._auto_init()
+        # Backfill candidate_name_private from attempt_id.candidate_name for historical records
+        self.env.cr.execute("""
+            UPDATE exam_grading_task g
+            SET candidate_name_private = a.candidate_name
+            FROM exam_candidate_attempt a
+            WHERE g.attempt_id = a.id
+              AND (g.candidate_name_private IS NULL OR g.candidate_name_private = '');
+        """)
+        return res
+
     name = fields.Char(string="Task Reference", readonly=True, default=lambda self: _("New"))
     attempt_id = fields.Many2one("exam.candidate.attempt", string="Candidate Attempt", required=True, ondelete="cascade", index=True)
     answer_id = fields.Many2one("exam.candidate.answer", string="Candidate Answer", required=True, ondelete="cascade")
     question_id = fields.Many2one("exam.question", string="Question", required=True, ondelete="cascade")
     job_id = fields.Many2one("hr.job", string="Target Job Position", readonly=True)
+    vacancy_id = fields.Many2one(
+        "job.vacancy",
+        related="attempt_id.vacancy_id",
+        string="Vacancy Reference",
+        store=True,
+        readonly=True,
+        index=True
+    )
+
     department_id = fields.Many2one("hr.department", string="Department", compute="_compute_department_id", store=True, index=True)
     operating_unit_id = fields.Many2one("operating.unit", string="Submitting Work Unit", compute="_compute_department_id", store=True, index=True)
 
-    candidate_name_private = fields.Char(string="Real Candidate Name", readonly=True)
+    candidate_name_private = fields.Char(string="Candidate Name", readonly=True, index=True)
     candidate_name = fields.Char(
         string="Candidate Name",
         compute="_compute_candidate_name_display",
@@ -60,27 +81,18 @@ class ExamGradingTask(models.Model):
         ("verified", "Verified & Score Finalized"),
     ], string="Grading Status", default="pending", tracking=True, required=True)
 
-    @api.depends_context("uid")
+    @api.depends("attempt_id.blind_candidate_code", "job_id.name")
     def _compute_candidate_name_display(self):
-        user = self.env.user
-        # Workunit managers / line managers have candidate names masked as '##' for blind/fair grading.
-        # HR Officers, HR Managers, Assessment Administrators, Recruitment Officers/Managers, and System Admins can view real candidate names.
-        is_hr_or_admin = (
-            user.has_group("assessment_system.group_assessment_officer") or
-            user.has_group("assessment_system.group_assessment_manager") or
-            user.has_group("assessment_system.group_assessment_administrator") or
-            user.has_group("custom_recruitment.group_recruitment_officer") or
-            user.has_group("custom_recruitment.group_recruitment_manager") or
-            user.has_group("custom_recruitment.group_recruitment_administrator") or
-            user._is_admin() or
-            self.env.is_superuser()
-        )
         for rec in self:
-            if is_hr_or_admin:
-                real_name = rec.candidate_name_private or (rec.attempt_id.candidate_name if rec.attempt_id else False)
-                rec.candidate_name = real_name or _("Candidate")
-            else:
-                rec.candidate_name = "##"
+            blind_code = rec.attempt_id.blind_candidate_code if rec.attempt_id else rec._get_default_blind_code()
+            rec.candidate_name = blind_code
+
+    def _get_default_blind_code(self):
+        self.ensure_one()
+        job_name = self.job_id.name or ""
+        clean = "".join(c for c in job_name if c.isalnum()).upper()[:3] if job_name else "CAND"
+        num = (self.id % 1000) or 1
+        return f"{clean or 'CAND'}{num:03d}"
 
     def _search_candidate_name(self, operator, value):
         user = self.env.user
@@ -95,14 +107,32 @@ class ExamGradingTask(models.Model):
             self.env.is_superuser()
         )
         if is_hr_or_admin:
-            return ["|", ("candidate_name_private", operator, value), ("attempt_id.candidate_name", operator, value)]
-        return [("name", operator, value)]
+            return ["|", "|", ("candidate_name_private", operator, value), ("attempt_id.candidate_name", operator, value), ("attempt_id.blind_candidate_code", operator, value)]
+        return [("attempt_id.blind_candidate_code", operator, value)]
+
+    def action_open_candidate_grading(self):
+        self.ensure_one()
+        if not self.attempt_id:
+            raise UserError(_("No candidate attempt linked to this grading task."))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Candidate Grading: %s") % (self.candidate_name or _("Candidate")),
+            "res_model": "exam.candidate.attempt",
+            "res_id": self.attempt_id.id,
+            "view_mode": "form",
+            "views": [(self.env.ref("assessment_system.view_exam_candidate_attempt_grading_form").id, "form")],
+            "target": "current",
+        }
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if vals.get("candidate_name") and not vals.get("candidate_name_private"):
-                vals["candidate_name_private"] = vals["candidate_name"]
+            if not vals.get("candidate_name_private"):
+                if vals.get("candidate_name"):
+                    vals["candidate_name_private"] = vals["candidate_name"]
+                elif vals.get("attempt_id"):
+                    attempt = self.env["exam.candidate.attempt"].browse(vals["attempt_id"])
+                    vals["candidate_name_private"] = attempt.candidate_name
             if vals.get("name", _("New")) == _("New"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("exam.grading.task") or _("GRADE/%06d") % self.search_count([])
         return super().create(vals_list)
@@ -300,25 +330,11 @@ class ExamManualScoreOverride(models.Model):
         ("rejected", "Rejected"),
     ], string="Status", default="draft", tracking=True, required=True)
 
-    @api.depends_context("uid")
+    @api.depends("attempt_id.blind_candidate_code")
     def _compute_candidate_name_display(self):
-        user = self.env.user
-        is_hr_or_admin = (
-            user.has_group("assessment_system.group_assessment_officer") or
-            user.has_group("assessment_system.group_assessment_manager") or
-            user.has_group("assessment_system.group_assessment_administrator") or
-            user.has_group("custom_recruitment.group_recruitment_officer") or
-            user.has_group("custom_recruitment.group_recruitment_manager") or
-            user.has_group("custom_recruitment.group_recruitment_administrator") or
-            user._is_admin() or
-            self.env.is_superuser()
-        )
         for rec in self:
-            if is_hr_or_admin:
-                real_name = rec.attempt_id.candidate_name if rec.attempt_id else False
-                rec.candidate_name = real_name or _("Candidate")
-            else:
-                rec.candidate_name = "##"
+            blind_code = rec.attempt_id.blind_candidate_code if rec.attempt_id else "CAND001"
+            rec.candidate_name = blind_code
 
     @api.model_create_multi
     def create(self, vals_list):

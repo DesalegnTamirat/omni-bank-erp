@@ -76,7 +76,7 @@
                 <templates>
                     <t t-name="card">
                         <div class="d-flex align-items-center gap-2">
-                            <i class="fa fa-comments-o fs-4 text-primary" />
+                            <i class="fa fa-comments-o fs-4 text-primary" title="Channel" />
                             <field class="fw-bold fs-5" name="name" />
                         </div>
                     </t>

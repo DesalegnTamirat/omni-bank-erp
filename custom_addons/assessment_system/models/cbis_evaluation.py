@@ -61,6 +61,49 @@ class CBISInterviewerEvaluation(models.Model):
     has_likert_method = fields.Boolean(string="Has Likert Method", compute="_compute_method_flags")
     has_star_or_starr_method = fields.Boolean(string="Has STAR/STARR Method", compute="_compute_method_flags")
 
+    is_current_interviewer = fields.Boolean(
+        string="Is Current Interviewer",
+        compute="_compute_is_current_interviewer",
+        help="True if current logged-in user is the assigned interviewer or system administrator."
+    )
+
+    can_submit_evaluation = fields.Boolean(
+        string="Can Submit Evaluation",
+        compute="_compute_can_submit_evaluation",
+        help="If single candidate, always visible. If multiple candidates, visible ONLY on the last candidate."
+    )
+
+    def _compute_is_current_interviewer(self):
+        current_uid = self.env.user.id
+        is_admin = self.env.is_admin()
+        for rec in self:
+            rec.is_current_interviewer = bool((rec.interviewer_user_id.id == current_uid) or is_admin)
+
+    @api.depends("session_id", "vacancy_id", "interviewer_user_id", "candidate_interview_id")
+    def _compute_can_submit_evaluation(self):
+        for rec in self:
+            if not rec.interviewer_user_id:
+                rec.can_submit_evaluation = True
+                continue
+
+            domain = [("interviewer_user_id", "=", rec.interviewer_user_id.id)]
+            if rec.session_id:
+                domain.append(("session_id", "=", rec.session_id.id))
+            elif rec.vacancy_id:
+                domain.append(("vacancy_id", "=", rec.vacancy_id.id))
+            else:
+                rec.can_submit_evaluation = True
+                continue
+
+            sibling_evals = self.search(domain, order="candidate_interview_id asc, id asc")
+            if len(sibling_evals) <= 1:
+                # Single candidate in session: visible
+                rec.can_submit_evaluation = True
+            else:
+                # Multiple candidates: only visible on the last candidate
+                last_eval = sibling_evals[-1]
+                rec.can_submit_evaluation = bool(rec.id == last_eval.id)
+
     state = fields.Selection([
         ("draft", "Draft / In Progress"),
         ("submitted", "Submitted / Locked"),
@@ -82,13 +125,18 @@ class CBISInterviewerEvaluation(models.Model):
             rec.has_likert_method = ("likert" in methods)
             rec.has_star_or_starr_method = bool(methods & {"star", "starr"})
 
-    @api.depends("line_ids.weighted_score", "is_absent", "candidate_status")
+    @api.depends("line_ids.weighted_score", "line_ids.weight_percentage", "is_absent", "candidate_status")
     def _compute_total_score(self):
         for rec in self:
             if rec.candidate_status == "absent" or rec.is_absent:
                 rec.total_score = 0.0
             else:
-                rec.total_score = round(sum(line.weighted_score for line in rec.line_ids), 2)
+                tot_weight = sum(line.weight_percentage for line in rec.line_ids)
+                tot_weighted_marks = sum(line.weighted_score for line in rec.line_ids)
+                if tot_weight > 0:
+                    rec.total_score = round((tot_weighted_marks / tot_weight) * 100.0, 2)
+                else:
+                    rec.total_score = 0.0
 
 
     def _initialize_competency_lines(self):
@@ -147,88 +195,221 @@ class CBISInterviewerEvaluation(models.Model):
 
     def action_save_draft(self):
         """Allows saving partial evaluation in progress (FR-CBIS-018)"""
+        current_user = self.env.user
+        is_admin = self.env.is_admin()
         for rec in self:
-            rec.write({"state": "draft"})
+            if rec.interviewer_user_id != current_user and not is_admin:
+                raise UserError(_("You can only edit and save draft evaluations assigned to yourself."))
+            rec.sudo().write({"state": "draft"})
 
     def action_submit_evaluation(self):
         """
-        Submits final evaluation for all candidate evaluations assigned to this interviewer in batch
-        and triggers event-driven auto-lock (FR-CBIS-019, FR-CBIS-021).
+        Submits final evaluation for the CURRENT candidate evaluation only.
+        Each candidate is evaluated and submitted individually (FR-CBIS-019).
+        Strictly enforces that interviewers can only submit their own assigned evaluation.
+        The candidate interview record is auto-locked only when ALL interviewers
+        have submitted their evaluation for that specific candidate (FR-CBIS-021).
         """
-        submitted_count = 0
+        # When evaluating multiple candidates, submitting on the last candidate submits all draft evaluations for this interviewer
+        if len(self) == 1:
+            domain = [
+                ('interviewer_user_id', '=', self.interviewer_user_id.id),
+                ('state', '=', 'draft'),
+            ]
+            if self.session_id:
+                domain.append(('session_id', '=', self.session_id.id))
+            elif self.vacancy_id:
+                domain.append(('vacancy_id', '=', self.vacancy_id.id))
+            sibling_drafts = self.search(domain)
+            if len(sibling_drafts) > 1:
+                return self.action_submit_all_evaluations()
+        current_user = self.env.user
+        is_admin = self.env.is_admin()
+
         for rec in self:
-            # Find all draft evaluations assigned to this interviewer for the same session/vacancy
-            domain = [('interviewer_user_id', '=', rec.interviewer_user_id.id), ('state', '=', 'draft')]
-            if rec.session_id:
-                domain.append(('session_id', '=', rec.session_id.id))
-            elif rec.vacancy_id:
-                domain.append(('vacancy_id', '=', rec.vacancy_id.id))
+            if rec.interviewer_user_id != current_user and not is_admin:
+                raise UserError(_("You are only authorized to evaluate and submit evaluations assigned to yourself."))
 
-            evals_to_submit = self.search(domain)
-            if not evals_to_submit:
-                evals_to_submit = rec
+            if rec.state == "submitted":
+                continue
 
-            for eval_rec in evals_to_submit:
-                if eval_rec.state == "submitted":
-                    continue
+            # Validate ratings for this candidate only
+            if not rec.is_absent:
+                for line in rec.line_ids:
+                    if line.evaluation_method == "star":
+                        if any(s not in ["1", "2", "3", "4", "5"] for s in [line.star_situation, line.star_task, line.star_action, line.star_result]):
+                            raise ValidationError(_(
+                                "Candidate '%s': Please select a rating (1 to 5) for all STAR components in competency '%s'.",
+                                rec.candidate_name,
+                                line.competency_id.name
+                            ))
+                    elif line.evaluation_method == "starr":
+                        if any(s not in ["1", "2", "3", "4", "5"] for s in [line.star_situation, line.star_task, line.star_action, line.star_result, line.starr_reflection]):
+                            raise ValidationError(_(
+                                "Candidate '%s': Please select a rating (1 to 5) for all STARR components in competency '%s'.",
+                                rec.candidate_name,
+                                line.competency_id.name
+                            ))
+                    elif line.evaluation_method == "likert":
+                        if line.likert_score not in ["1", "2", "3", "4", "5"]:
+                            raise ValidationError(_(
+                                "Candidate '%s': Please select a valid Likert rating (1 to 5) for competency '%s'.",
+                                rec.candidate_name,
+                                line.competency_id.name
+                            ))
 
-                for line in eval_rec.line_ids:
-                    if not eval_rec.is_absent:
-                        if line.evaluation_method == "star":
-                            if any(s not in ["1", "2", "3", "4", "5"] for s in [line.star_situation, line.star_task, line.star_action, line.star_result]):
-                                raise ValidationError(_(
-                                    "Candidate '%s': Please select a rating (1 to 5) for all STAR components in competency '%s'.",
-                                    eval_rec.candidate_name,
-                                    line.competency_id.name
-                                ))
-                        elif line.evaluation_method == "starr":
-                            if any(s not in ["1", "2", "3", "4", "5"] for s in [line.star_situation, line.star_task, line.star_action, line.star_result, line.starr_reflection]):
-                                raise ValidationError(_(
-                                    "Candidate '%s': Please select a rating (1 to 5) for all STARR components in competency '%s'.",
-                                    eval_rec.candidate_name,
-                                    line.competency_id.name
-                                ))
-                        elif line.evaluation_method == "likert":
-                            if line.likert_score not in ["1", "2", "3", "4", "5"]:
-                                raise ValidationError(_(
-                                    "Candidate '%s': Please select a valid Likert rating (1 to 5) for competency '%s'.",
-                                    eval_rec.candidate_name,
-                                    line.competency_id.name
-                                ))
+            # Submit only this candidate evaluation
+            rec._compute_total_score()
+            rec.sudo().write({
+                "state": "submitted",
+                "is_locked": True,
+                "submission_datetime": fields.Datetime.now(),
+            })
 
+            # Recompute scores for the candidate interview record with elevated permissions (sudo)
+            candidate_record = rec.candidate_interview_id.sudo()
+            if candidate_record:
+                candidate_record._compute_final_interview_score()
+                candidate_record._compute_evaluation_progress()
+
+                # Auto-lock the candidate record ONLY when ALL assigned interviewers have submitted
+                all_evals = candidate_record.evaluation_ids
+                unsubmitted = all_evals.filtered(lambda e: e.state != "submitted")
+                if all_evals and not unsubmitted:
+                    candidate_record.write({"state": "locked"})
+                    candidate_record.message_post(
+                        body=_("All %d panel evaluations submitted. Candidate evaluation set is now AUTO-LOCKED and immutable (FR-CBIS-021).") % len(all_evals)
+                    )
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Evaluation Submitted'),
+                'message': _("Evaluation for '%s' has been submitted and locked successfully. You may now proceed to the next candidate.") % (self.candidate_name or ''),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    def action_submit_all_evaluations(self):
+        """
+        Submits ALL draft candidate evaluations for THIS interviewer in the same session/vacancy at once.
+        - Strictly isolated to the current interviewer's own assigned evaluations.
+        - Panel members cannot submit evaluations belonging to other panel members.
+        - Absent candidates: auto-submitted without score validation.
+        - Already-submitted records: silently skipped.
+        - Each candidate interview record is auto-locked only when ALL interviewers have submitted (FR-CBIS-021).
+        """
+        current_user = self.env.user
+        is_admin = self.env.is_admin()
+
+        # Strict security validation: Panel members cannot submit other panelists' sheets
+        for rec in self:
+            if rec.interviewer_user_id != current_user and not is_admin:
+                raise UserError(_("You can only submit and lock your own assigned candidate evaluations."))
+
+        # Target interviewer is strictly the logged-in user (or explicitly selected single interviewer for admin)
+        target_interviewer_id = current_user.id if not is_admin else (self[0].interviewer_user_id.id if self else current_user.id)
+
+        # Collect distinct sessions and vacancies in scope
+        session_ids = self.mapped('session_id').ids
+        vacancy_ids = self.mapped('vacancy_id').ids
+
+        domain = [
+            ('interviewer_user_id', '=', target_interviewer_id),
+            ('state', '=', 'draft'),
+        ]
+        if session_ids:
+            domain.append(('session_id', 'in', session_ids))
+        elif vacancy_ids:
+            domain.append(('vacancy_id', 'in', vacancy_ids))
+
+        evals_to_submit = self.search(domain)
+        if not evals_to_submit:
+            evals_to_submit = self.filtered(lambda r: r.interviewer_user_id.id == target_interviewer_id and r.state == 'draft')
+
+        submitted_count = 0
+        skipped_absent = 0
+        errors = []
+
+        for eval_rec in evals_to_submit:
+            if eval_rec.state == "submitted":
+                continue
+
+            # Absent candidates — no rating validation, submit directly
+            if eval_rec.candidate_status == "absent" or eval_rec.is_absent:
                 eval_rec._compute_total_score()
                 eval_rec.write({
                     "state": "submitted",
                     "is_locked": True,
                     "submission_datetime": fields.Datetime.now(),
                 })
+                skipped_absent += 1
+                submitted_count += 1
+            else:
+                # Validate ratings for present candidates
+                candidate_errors = []
+                for line in eval_rec.line_ids:
+                    if line.evaluation_method == "star":
+                        if any(s not in ["1", "2", "3", "4", "5"] for s in [line.star_situation, line.star_task, line.star_action, line.star_result]):
+                            candidate_errors.append(
+                                _("• '%s' — competency '%s': incomplete STAR rating.") % (eval_rec.candidate_name, line.competency_id.name)
+                            )
+                    elif line.evaluation_method == "starr":
+                        if any(s not in ["1", "2", "3", "4", "5"] for s in [line.star_situation, line.star_task, line.star_action, line.star_result, line.starr_reflection]):
+                            candidate_errors.append(
+                                _("• '%s' — competency '%s': incomplete STARR rating.") % (eval_rec.candidate_name, line.competency_id.name)
+                            )
+                    elif line.evaluation_method == "likert":
+                        if line.likert_score not in ["1", "2", "3", "4", "5"]:
+                            candidate_errors.append(
+                                _("• '%s' — competency '%s': incomplete Likert rating.") % (eval_rec.candidate_name, line.competency_id.name)
+                            )
+
+                if candidate_errors:
+                    errors.extend(candidate_errors)
+                    continue  # Skip incomplete candidate, continue with others
+
+                eval_rec._compute_total_score()
+                eval_rec.sudo().write({
+                    "state": "submitted",
+                    "is_locked": True,
+                    "submission_datetime": fields.Datetime.now(),
+                })
                 submitted_count += 1
 
-                # Recompute average interview score, composite total, and evaluation progress for candidate
-                candidate_record = eval_rec.candidate_interview_id
-                if candidate_record:
-                    candidate_record._compute_final_interview_score()
-                    candidate_record._compute_evaluation_progress()
+            # Auto-lock candidate interview record ONLY when ALL assigned panel members have submitted
+            candidate_record = eval_rec.candidate_interview_id.sudo()
+            if candidate_record:
+                candidate_record._compute_final_interview_score()
+                candidate_record._compute_evaluation_progress()
+                all_evals = candidate_record.evaluation_ids
+                if all_evals and not all_evals.filtered(lambda e: e.state != "submitted"):
+                    candidate_record.write({"state": "locked"})
+                    candidate_record.message_post(
+                        body=_("All %d panel evaluations submitted. Candidate evaluation set is now AUTO-LOCKED and immutable (FR-CBIS-021).") % len(all_evals)
+                    )
 
-                    all_evals = candidate_record.evaluation_ids
-                    unsubmitted = all_evals.filtered(lambda e: e.state != "submitted")
+        if errors:
+            err_detail = "\n".join(errors)
+            raise ValidationError(
+                _("The following candidates have incomplete ratings and were NOT submitted:\n\n%s\n\nPlease complete their scores and try again, or submit them individually.") % err_detail
+            )
 
-                    if not unsubmitted:
-                        candidate_record.write({
-                            "state": "locked"
-                        })
-                        candidate_record.message_post(
-                            body=_("All %d panel evaluations submitted. Candidate evaluation set is now AUTO-LOCKED and immutable (FR-CBIS-021).") % len(all_evals)
-                        )
+        msg = _("%d candidate evaluation(s) submitted and locked successfully.") % submitted_count
+        if skipped_absent:
+            msg += _(" (%d absent candidate(s) included.)") % skipped_absent
 
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Evaluations Submitted'),
-                'message': _('All candidate evaluations for this interviewer (%d candidate(s)) have been computed and submitted successfully.') % (submitted_count or len(self)),
+                'title': _('All Evaluations Submitted'),
+                'message': msg,
                 'type': 'success',
-                'sticky': False,
+                'sticky': True,
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
@@ -267,12 +448,12 @@ class CBISInterviewerEvaluationLine(models.Model):
     ]
 
     # STAR / STARR / Likert Component Rating Dropdowns (1 to 5 Selection)
-    star_situation = fields.Selection(RATING_SELECTION, string="S (Situation)", default="3", required=True)
-    star_task = fields.Selection(RATING_SELECTION, string="T (Task)", default="3", required=True)
-    star_action = fields.Selection(RATING_SELECTION, string="A (Action)", default="3", required=True)
-    star_result = fields.Selection(RATING_SELECTION, string="R (Result)", default="3", required=True)
-    starr_reflection = fields.Selection(RATING_SELECTION, string="Refl (Reflection)", default="3", required=True)
-    likert_score = fields.Selection(RATING_SELECTION, string="Likert Rating", default="3", required=True)
+    star_situation = fields.Selection(RATING_SELECTION, string="S (Situation)")
+    star_task = fields.Selection(RATING_SELECTION, string="T (Task)")
+    star_action = fields.Selection(RATING_SELECTION, string="A (Action)")
+    star_result = fields.Selection(RATING_SELECTION, string="R (Result)")
+    starr_reflection = fields.Selection(RATING_SELECTION, string="Refl (Reflection)")
+    likert_score = fields.Selection(RATING_SELECTION, string="Likert Rating")
 
     # STAR / STARR Observation Notes
     situation_notes = fields.Text(string="Situation (S) Notes")
@@ -380,18 +561,32 @@ class CBISInterviewerEvaluationLine(models.Model):
                 line.score_percentage = round((l_rat / 5.0) * 100.0, 2)
                 line.weighted_score = round((l_rat / 5.0) * weight, 2)
 
-    @api.constrains("star_situation", "star_task", "star_action", "star_result", "starr_reflection", "likert_score")
+    @api.constrains("evaluation_method", "star_situation", "star_task", "star_action", "star_result", "starr_reflection", "likert_score")
     def _check_score_range(self):
         for line in self:
-            for val, name in [
-                (line.star_situation, "Situation"),
-                (line.star_task, "Task"),
-                (line.star_action, "Action"),
-                (line.star_result, "Result"),
-                (line.starr_reflection, "Reflection"),
-                (line.likert_score, "Likert Rating"),
-            ]:
-                if val not in ["1", "2", "3", "4", "5"]:
+            method = line.evaluation_method or "star"
+            if method == "star":
+                checks = [
+                    (line.star_situation, "Situation"),
+                    (line.star_task, "Task"),
+                    (line.star_action, "Action"),
+                    (line.star_result, "Result"),
+                ]
+            elif method == "starr":
+                checks = [
+                    (line.star_situation, "Situation"),
+                    (line.star_task, "Task"),
+                    (line.star_action, "Action"),
+                    (line.star_result, "Result"),
+                    (line.starr_reflection, "Reflection"),
+                ]
+            else:  # likert
+                checks = [
+                    (line.likert_score, "Likert Rating"),
+                ]
+
+            for val, name in checks:
+                if val and val not in ["1", "2", "3", "4", "5"]:
                     raise ValidationError(_("Rating for %s in competency '%s' must be selected from 1 to 5.") % (name, line.competency_id.name))
 
 

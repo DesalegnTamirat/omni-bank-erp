@@ -37,12 +37,13 @@ class PmProjectProgressUpdate(models.Model):
         ('off_track', 'Off Track'),
         ('on_hold', 'On Hold'),
         ('done', 'Done')
-    ], string='Health Status', store=True)
-    progress_rate = fields.Float(string='Current Progress (%)', store=True)
+    ], string='Health Status', store=True, readonly=False, tracking=True)
+    progress_rate = fields.Float(string='Current Progress (%)', store=True, readonly=False, tracking=True)
     milestones_summary = fields.Char(string='Milestones (Reached/Total)', store=True)
     deliverables_summary = fields.Char(string='Deliverables (Reached/Total)', store=True)
     project_date_start = fields.Date(string='Project Start', store=True)
     project_date_end = fields.Date(string='Project End', store=True)
+    active = fields.Boolean(string='Active', default=True)
 
     # 7 Sections Under Project Update
     # 1. Project Information (Managed with 1-column lines)
@@ -114,6 +115,35 @@ class PmProjectProgressUpdate(models.Model):
         ('reviewed', 'Reviewed by Stakeholders')
     ], string='Status', default='draft', tracking=True)
 
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        project_id = res.get('project_id') or self.env.context.get('default_project_id')
+        if project_id:
+            p = self.env['pm.project'].browse(project_id)
+            if p.exists():
+                if 'health_state' in fields_list and 'health_state' not in res:
+                    res['health_state'] = p.health_state or 'planning'
+                if 'progress_rate' in fields_list and 'progress_rate' not in res:
+                    res['progress_rate'] = p.progress_rate or 0.0
+                if 'project_status' in fields_list and 'project_status' not in res:
+                    res['project_status'] = p.status
+                if 'manager_id' in fields_list and 'manager_id' not in res:
+                    res['manager_id'] = p.manager_id.id if p.manager_id else False
+                if 'project_date_start' in fields_list and 'project_date_start' not in res:
+                    res['project_date_start'] = p.date_start
+                if 'project_date_end' in fields_list and 'project_date_end' not in res:
+                    res['project_date_end'] = p.date_end
+                if 'milestones_summary' in fields_list and 'milestones_summary' not in res:
+                    m_total = len(p.milestone_ids)
+                    m_reached = len(p.milestone_ids.filtered(lambda m: m.progress_rate >= 100.0 or m.state == 'completed'))
+                    res['milestones_summary'] = f"{m_reached} / {m_total} reached"
+                if 'deliverables_summary' in fields_list and 'deliverables_summary' not in res:
+                    d_total = len(p.deliverable_ids)
+                    d_reached = len(p.deliverable_ids.filtered(lambda d: d.progress_rate >= 100.0 or d.state == 'completed'))
+                    res['deliverables_summary'] = f"{d_reached} / {d_total} reached"
+        return res
+
     @api.depends('project_id')
     def _compute_manager_id(self):
         for rec in self:
@@ -135,10 +165,10 @@ class PmProjectProgressUpdate(models.Model):
                     vals['manager_id'] = p.manager_id.id if p.manager_id else False
                 if 'project_status' not in vals:
                     vals['project_status'] = p.status
-                if 'health_state' not in vals:
-                    vals['health_state'] = p.health_state
-                if 'progress_rate' not in vals:
-                    vals['progress_rate'] = p.progress_rate
+                if 'health_state' not in vals or not vals.get('health_state'):
+                    vals['health_state'] = p.health_state or 'planning'
+                if 'progress_rate' not in vals or vals.get('progress_rate') is None:
+                    vals['progress_rate'] = p.progress_rate or 0.0
                 if 'project_date_start' not in vals:
                     vals['project_date_start'] = p.date_start
                 if 'project_date_end' not in vals:
@@ -237,11 +267,12 @@ class PmProjectProgressUpdate(models.Model):
             if rec.risk_line_ids:
                 parts.append('<h4 style="font-weight: 700; color: #dc3545; margin-top: 15px; margin-bottom: 8px; border-bottom: 2px solid #dc3545; padding-bottom: 4px;">7. Identified Risks</h4>')
                 parts.append('<table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 13px;">')
-                parts.append('<tr style="background-color: #f8d7da;"><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Risk Description</th><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Category</th><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Severity</th><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Mitigation Strategy</th></tr>')
+                parts.append('<tr style="background-color: #f8d7da;"><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Risk Description</th><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Category</th><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Severity</th><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Status</th><th style="border: 1px solid #dee2e6; padding: 6px 10px; text-align: left;">Mitigation Strategy</th></tr>')
                 for r in rec.risk_line_ids:
                     cat_name = dict(r._fields["category"].selection).get(r.category, r.category or "-")
                     sev_name = dict(r._fields["severity"].selection).get(r.severity, r.severity or "")
-                    parts.append(f'<tr><td style="border: 1px solid #dee2e6; padding: 6px 10px; font-weight: bold;">{r.name}</td><td style="border: 1px solid #dee2e6; padding: 6px 10px;">{cat_name}</td><td style="border: 1px solid #dee2e6; padding: 6px 10px;">{sev_name}</td><td style="border: 1px solid #dee2e6; padding: 6px 10px;">{r.mitigation or "-"}</td></tr>')
+                    stat_name = dict(r._fields["status"].selection).get(r.status, r.status or "")
+                    parts.append(f'<tr><td style="border: 1px solid #dee2e6; padding: 6px 10px; font-weight: bold;">{r.name}</td><td style="border: 1px solid #dee2e6; padding: 6px 10px;">{cat_name}</td><td style="border: 1px solid #dee2e6; padding: 6px 10px;">{sev_name}</td><td style="border: 1px solid #dee2e6; padding: 6px 10px;">{stat_name}</td><td style="border: 1px solid #dee2e6; padding: 6px 10px;">{r.mitigation or "-"}</td></tr>')
                 parts.append('</table>')
             else:
                 parts.append('<h4 style="font-weight: 700; color: #dc3545; margin-top: 15px; margin-bottom: 8px; border-bottom: 2px solid #dc3545; padding-bottom: 4px;">7. Identified Risks</h4>')
@@ -299,8 +330,10 @@ class PmProjectProgressUpdate(models.Model):
 
         self.manager_id = p.manager_id
         self.project_status = p.status
-        self.health_state = p.health_state
-        self.progress_rate = p.progress_rate
+        if not self.health_state:
+            self.health_state = p.health_state or 'planning'
+        if not self.progress_rate:
+            self.progress_rate = p.progress_rate or 0.0
         self.project_date_start = p.date_start
         self.project_date_end = p.date_end
 
@@ -478,6 +511,7 @@ class PmProjectProgressUpdate(models.Model):
                     'name': r.name,
                     'category': cat_code,
                     'severity': sev_choice,
+                    'status': r.status or 'open',
                     'mitigation': r.mitigation or 'Ongoing monitoring and control',
                 }))
             if risk_cmds:
@@ -517,16 +551,24 @@ class PmProjectProgressUpdate(models.Model):
         for rec in self:
             rec.state = 'submitted'
             if rec.project_id:
-                # Permanently freeze snapshot KPIs for auditability
-                rec.progress_rate = rec.project_id.progress_rate
-                rec.health_state = rec.project_id.health_state
-                rec.project_status = rec.project_id.status
+                # Freeze snapshot KPIs - preserve user-entered values if provided
+                if rec.progress_rate is False or rec.progress_rate is None:
+                    rec.progress_rate = rec.project_id.progress_rate
+                if not rec.health_state:
+                    rec.health_state = rec.project_id.health_state
+                if not rec.project_status:
+                    rec.project_status = rec.project_id.status
                 m_total = len(rec.project_id.milestone_ids)
                 m_reached = len(rec.project_id.milestone_ids.filtered(lambda m: m.progress_rate >= 100.0 or m.state == 'completed'))
                 rec.milestones_summary = f"{m_reached} / {m_total} reached"
                 d_total = len(rec.project_id.deliverable_ids)
                 d_reached = len(rec.project_id.deliverable_ids.filtered(lambda d: d.progress_rate >= 100.0 or d.state == 'completed'))
                 rec.deliverables_summary = f"{d_reached} / {d_total} reached"
+                if rec.health_state:
+                    rec.project_id.write({
+                        'health_state': rec.health_state,
+                        'is_health_manual': True
+                    })
             rec.message_post(body=_("Progress report submitted to stakeholders."))
 
     def action_review(self):
@@ -537,6 +579,23 @@ class PmProjectProgressUpdate(models.Model):
     def action_set_draft(self):
         for rec in self:
             rec.state = 'draft'
+
+    def action_open_project(self):
+        self.ensure_one()
+        if not self.project_id:
+            return False
+        return {
+            'type': 'ir.actions.act_window',
+            'name': self.project_id.name or _('Project Details'),
+            'res_model': 'pm.project',
+            'res_id': self.project_id.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
+
+    def unlink(self):
+        """Soft delete: archive progress update instead of permanent deletion."""
+        return self.write({'active': False})
 
 
 # -------------------------------------------------------------------------
@@ -596,6 +655,53 @@ class PmProjectUpdateDeliverableLine(models.Model):
             self.date_deadline = d.date_deadline
             self.progress_rate = d.progress_rate
             self.state = d.state if d.state in dict(self._fields['state'].selection) else 'completed'
+
+    def action_view_evidence(self):
+        self.ensure_one()
+        tc_domain = [('deliverable_id', '=', self.deliverable_id.id)] if self.deliverable_id else [('project_id', '=', self.update_id.project_id.id if self.update_id and self.update_id.project_id else False)]
+        if self.env['pm.test.case'].search_count(tc_domain):
+            return {
+                'name': _('Test Cases & QA Evidence: %s') % (self.name or ''),
+                'type': 'ir.actions.act_window',
+                'res_model': 'pm.test.case',
+                'view_mode': 'list,form',
+                'domain': tc_domain,
+                'context': {
+                    'default_project_id': self.update_id.project_id.id if self.update_id and self.update_id.project_id else False,
+                    'default_deliverable_id': self.deliverable_id.id if self.deliverable_id else False,
+                },
+                'target': 'current',
+            }
+        return {
+            'name': _('Evidence & Documents: %s') % (self.name or ''),
+            'type': 'ir.actions.act_window',
+            'res_model': 'pm.project.document',
+            'view_mode': 'list,form',
+            'domain': ['|', ('deliverable_id', '=', self.deliverable_id.id if self.deliverable_id else False),
+                            ('project_id', '=', self.update_id.project_id.id if self.update_id and self.update_id.project_id else False)],
+            'context': {
+                'default_project_id': self.update_id.project_id.id if self.update_id and self.update_id.project_id else False,
+                'default_deliverable_id': self.deliverable_id.id if self.deliverable_id else False,
+            },
+            'target': 'current',
+        }
+
+    def action_view_test_cases(self):
+        self.ensure_one()
+        tc_domain = [('deliverable_id', '=', self.deliverable_id.id)] if self.deliverable_id else [('project_id', '=', self.update_id.project_id.id if self.update_id and self.update_id.project_id else False)]
+        return {
+            'name': _('Test Cases & Results: %s') % (self.name or ''),
+            'type': 'ir.actions.act_window',
+            'res_model': 'pm.test.case',
+            'view_mode': 'list,form',
+            'domain': tc_domain,
+            'context': {
+                'default_project_id': self.update_id.project_id.id if self.update_id and self.update_id.project_id else False,
+                'default_deliverable_id': self.deliverable_id.id if self.deliverable_id else False,
+            },
+            'target': 'current',
+        }
+
 
 
 class PmProjectUpdateTaskLine(models.Model):
@@ -684,6 +790,53 @@ class PmProjectUpdateMilestoneLine(models.Model):
                 else:
                     rec.delay_status = 'pending'
 
+    def action_view_evidence(self):
+        self.ensure_one()
+        tc_domain = [('milestone_id', '=', self.milestone_id.id)] if self.milestone_id else [('project_id', '=', self.update_id.project_id.id if self.update_id and self.update_id.project_id else False)]
+        if self.env['pm.test.case'].search_count(tc_domain):
+            return {
+                'name': _('Test Cases & QA Evidence: %s') % (self.name or ''),
+                'type': 'ir.actions.act_window',
+                'res_model': 'pm.test.case',
+                'view_mode': 'list,form',
+                'domain': tc_domain,
+                'context': {
+                    'default_project_id': self.update_id.project_id.id if self.update_id and self.update_id.project_id else False,
+                    'default_milestone_id': self.milestone_id.id if self.milestone_id else False,
+                },
+                'target': 'current',
+            }
+        return {
+            'name': _('Evidence & Documents: %s') % (self.name or ''),
+            'type': 'ir.actions.act_window',
+            'res_model': 'pm.project.document',
+            'view_mode': 'list,form',
+            'domain': ['|', ('milestone_id', '=', self.milestone_id.id if self.milestone_id else False),
+                            ('project_id', '=', self.update_id.project_id.id if self.update_id and self.update_id.project_id else False)],
+            'context': {
+                'default_project_id': self.update_id.project_id.id if self.update_id and self.update_id.project_id else False,
+                'default_milestone_id': self.milestone_id.id if self.milestone_id else False,
+            },
+            'target': 'current',
+        }
+
+    def action_view_test_cases(self):
+        self.ensure_one()
+        tc_domain = [('milestone_id', '=', self.milestone_id.id)] if self.milestone_id else [('project_id', '=', self.update_id.project_id.id if self.update_id and self.update_id.project_id else False)]
+        return {
+            'name': _('Test Cases & Results: %s') % (self.name or ''),
+            'type': 'ir.actions.act_window',
+            'res_model': 'pm.test.case',
+            'view_mode': 'list,form',
+            'domain': tc_domain,
+            'context': {
+                'default_project_id': self.update_id.project_id.id if self.update_id and self.update_id.project_id else False,
+                'default_milestone_id': self.milestone_id.id if self.milestone_id else False,
+            },
+            'target': 'current',
+        }
+
+
 
 class PmProjectUpdateRiskLine(models.Model):
     _name = 'pm.project.update.risk.line'
@@ -708,6 +861,11 @@ class PmProjectUpdateRiskLine(models.Model):
         ('high', 'High'),
         ('critical', 'Critical')
     ], string='Severity', default='medium')
+    status = fields.Selection([
+        ('open', 'Identified / Open'),
+        ('mitigated', 'Mitigated / Under Control'),
+        ('closed', 'Resolved / Closed')
+    ], string='Status', default='open')
     mitigation = fields.Char(string='Mitigation Strategy')
 
     @api.onchange('risk_id')
@@ -728,6 +886,7 @@ class PmProjectUpdateRiskLine(models.Model):
                 self.severity = 'medium'
             else:
                 self.severity = 'low'
+            self.status = r.status if r.status in dict(self._fields['status'].selection) else 'open'
             self.mitigation = r.mitigation or 'Ongoing monitoring and control'
 
 

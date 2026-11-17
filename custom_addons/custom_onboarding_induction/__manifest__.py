@@ -26,9 +26,11 @@
     ],
     'data': [
         'security/onboarding_induction_security.xml',
+        'security/onboarding_induction_rules.xml',
         'security/ir.model.access.csv',
         'data/onboarding_induction_sequence.xml',
         'data/onboarding_induction_template_data.xml',
+        'data/onboarding_induction_mail_templates.xml',
         'views/hr_onboarding_dashboard_action.xml',
         'views/hr_dashboard.xml',
         'views/hr_config_views.xml',

@@ -13,9 +13,9 @@ class DmsFolder(models.Model):
     _parent_store = True
     _order = 'sequence, name'
 
-    name = fields.Char(required=True, translate=True)
-    sequence = fields.Integer(default=10)
-    active = fields.Boolean(string='Enabled', default=True)
+    name = fields.Char(required=True, translate=True, index=True)
+    sequence = fields.Integer(default=10, index=True)
+    active = fields.Boolean(string='Enabled', default=True, index=True)
     status = fields.Selection(
         [('enabled', 'Enabled'), ('disabled', 'Disabled')], string='Status',
         compute='_compute_status', store=True, index=True)
@@ -27,7 +27,7 @@ class DmsFolder(models.Model):
     color = fields.Integer()
     description = fields.Text()
     company_id = fields.Many2one(
-        'res.company', string='Company',
+        'res.company', string='Company', index=True,
         help="Leave empty to share the folder between all companies.")
     access_ids = fields.One2many('dms.folder.access', 'folder_id', string='Access Rules', copy=True)
     inherit_access = fields.Boolean(

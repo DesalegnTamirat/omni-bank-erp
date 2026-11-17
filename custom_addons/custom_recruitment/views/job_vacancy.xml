@@ -27,25 +27,17 @@
                             type="object"
                             class="btn-primary"
                             icon="fa-paper-plane"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_exam' or not has_written_exam"/>
+                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_exam'"/>
 
-                    <!-- 4. Fetch Written Exam -->
-                    <button name="action_fetch_exam_score"
-                            string="Fetch Written Exam"
-                            type="object"
-                            class="btn-primary"
-                            icon="fa-download"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'fetch_exam' or not has_written_exam"/>
-
-                    <!-- 5. Notify Panel -->
+                    <!-- 4. Notify Panel -->
                     <button name="action_notify_interview_panel"
                             string="Notify Panel"
                             type="object"
                             class="btn-primary"
                             icon="fa-users"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_panel'"/>
+                            invisible="vacancy_status != 'published' or recruitment_step not in ('notify_panel', 'fetch_exam')"/>
 
-                    <!-- 6. Notify Interview -->
+                    <!-- 5. Notify Interview -->
                     <button name="action_notify_interview"
                             string="Notify Interview"
                             type="object"
@@ -53,39 +45,22 @@
                             icon="fa-calendar"
                             invisible="vacancy_status != 'published' or recruitment_step != 'notify_interview'"/>
 
-                    <!-- 7. Fetch Interview -->
-                    <button name="action_fetch_interview_score"
-                            string="Fetch Interview"
-                            type="object"
-                            class="btn-primary"
-                            icon="fa-download"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'fetch_interview'"/>
-
-                    <!-- 7.5 Supervisor Evaluation (Transfer / Lateral) -->
-                    <button name="action_request_supervisor_recommendation"
-                            string="Request Supervisor Recommendation"
-                            type="object"
-                            class="btn-primary"
-                            icon="fa-bell"
-                            invisible="vacancy_status != 'published' or internal_movement_type not in ['lateral', 'transfer'] or recruitment_step != 'compute_rank' or scores_computed == True or supervisor_rec_requested == True"
-                            confirm="This will send notification links to the direct supervisors of all eligible candidates to submit their recommendation marks. Proceed?"/>
-
-                    <!-- 8. Compute and Rank -->
+                    <!-- 6. Compute and Rank -->
                     <button name="action_compute_and_rank"
                             string="Compute and Rank"
                             type="object"
                             class="btn-primary"
                             icon="fa-calculator"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'compute_rank'"
+                            invisible="vacancy_status != 'published' or recruitment_step not in ('compute_rank', 'fetch_interview')"
                             confirm="This will compute weighted scores for all candidates using the vacancy weight matrix, then rank and set final status (Selected / Reserved / Disqualified). Continue?"/>
 
-                    <!-- 8b. Generate Selection Minute (Visible ONLY after Approval Committee Minute is approved/signed) -->
+                    <!-- Generate Minute: visible once scores are computed, and stays permanently visible (never hides after generated) -->
                     <button name="action_generate_minute"
                             string="Generate Minute"
                             type="object"
                             class="btn-secondary"
                             icon="fa-file-text-o"
-                            invisible="vacancy_status != 'published' or not minute_signed"/>
+                            invisible="vacancy_status in ('draft', 'evaluate') or not scores_computed"/>
 
                     <!-- 9. Notify Approval Committee -->
                     <button name="action_notify_approval_committee"
@@ -103,14 +78,14 @@
                             icon="fa-trophy"
                             invisible="vacancy_status != 'published' or recruitment_step != 'notify_selection'"/>
 
-                    <!-- 12. Promote / Transfer Selected Candidate -->
+                    <!-- 12. Promote / Transfer / Hire Selected Candidate -->
                     <button name="action_promote_selected_employees"
-                            string="Complete Transfer"
+                            string="Hire Selected Candidate"
                             type="object"
                             class="btn-success"
                             style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;"
-                            icon="fa-exchange"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'promote' or transfer_eval_mode != 'transfer_matrix_only'"/>
+                            icon="fa-user-plus"
+                            invisible="vacancy_status != 'published' or recruitment_step not in ('promote', 'hire') or sourcing_type != 'external'"/>
 
                     <button name="action_promote_selected_employees"
                             string="Promote Selected Candidate"
@@ -118,21 +93,36 @@
                             class="btn-success"
                             style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;"
                             icon="fa-rocket"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'promote' or transfer_eval_mode == 'transfer_matrix_only'"/>
+                            invisible="vacancy_status != 'published' or recruitment_step not in ('promote', 'hire') or sourcing_type == 'external' or internal_movement_type == 'transfer'"/>
 
-                    <button name="action_print_all_promotion_letters"
-                            string="📄 Transfer Letters"
+                    <button name="action_promote_selected_employees"
+                            string="Transfer Selected Candidate"
+                            type="object"
+                            class="btn-success"
+                            style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;"
+                            icon="fa-exchange"
+                            invisible="vacancy_status != 'published' or recruitment_step not in ('promote', 'hire') or sourcing_type == 'external' or internal_movement_type != 'transfer'"/>
+
+                    <button name="action_open_employment_letters"
+                            string="📄 Employment Letters"
                             type="object"
                             class="btn-secondary"
                             icon="fa-print"
-                            invisible="not employees_promoted or sourcing_type == 'external' or transfer_eval_mode != 'transfer_matrix_only'"/>
+                            invisible="not employees_promoted or sourcing_type != 'external'"/>
 
                     <button name="action_print_all_promotion_letters"
                             string="📄 Promotion Letters"
                             type="object"
                             class="btn-secondary"
                             icon="fa-print"
-                            invisible="not employees_promoted or sourcing_type == 'external' or transfer_eval_mode == 'transfer_matrix_only'"/>
+                            invisible="not employees_promoted or sourcing_type == 'external' or internal_movement_type == 'transfer'"/>
+
+                    <button name="action_print_all_promotion_letters"
+                            string="📄 Transfer Letters"
+                            type="object"
+                            class="btn-secondary"
+                            icon="fa-print"
+                            invisible="not employees_promoted or sourcing_type == 'external' or internal_movement_type != 'transfer'"/>
 
                     <button name="notify"
                             invisible="status in ('notify', 'evaluate') or vacancy_status != 'draft'"
@@ -149,28 +139,27 @@
                             string="Publish Vacancy"
                             type="object"
                             class="btn-primary"/>
+                    <!-- Rollback & Workflow Navigation Buttons -->
                     <button name="action_step_back"
-                            invisible="vacancy_status != 'published' or recruitment_step == 'shortlist'"
-                            string="Previous Step"
+                            string="⏮ Previous Step"
                             type="object"
                             class="btn-secondary"
-                            icon="fa-step-backward"
-                            confirm="Are you sure you want to roll back the recruitment workflow by one step?"/>
-                    <button name="action_reset_workflow"
                             invisible="vacancy_status != 'published' or recruitment_step == 'shortlist'"
-                            string="Reset Workflow"
+                            confirm="Are you sure you want to go back to the previous workflow step?"/>
+                    <button name="action_reset_to_draft"
+                            string="↩ Reset to Draft"
                             type="object"
-                            class="btn-secondary"
-                            icon="fa-undo"
-                            confirm="Are you sure you want to reset the recruitment workflow back to the Shortlist stage? All assessment flags will be reset."/>
+                            class="btn-outline-danger"
+                            invisible="vacancy_status == 'draft'"
+                            confirm="Are you sure you want to reset this Vacancy completely to Draft? This will release all candidates and current states back to draft."/>
                     <button name="close_vacancy"
                             invisible="vacancy_status in ['draft', 'closed']"
                             string="Close Vacancy"
                             type="object"
                             class="btn-secondary"/>
                     <field name="vacancy_status" widget="statusbar"
-                            statusbar_visible="draft,evaluate,published,closed"
-                            readonly="1"/>
+                           statusbar_visible="draft,evaluate,published,closed"
+                           readonly="1"/>
                 </header>
 
                 <sheet>
@@ -187,23 +176,31 @@
                         <button class="oe_stat_button" icon="fa-times-circle" style="color: #dc3545;">
                             <field name="disqualified_candidates_count" string="Disqualified" widget="statinfo"/>
                         </button>
+                        <button name="action_open_digital_minute" type="object" class="oe_stat_button" icon="fa-pencil-square-o" invisible="not committee_notified">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Digital</span>
+                                <span class="o_stat_text">Minute</span>
+                            </div>
+                        </button>
                     </div>
 
                     <!-- Title -->
                     <div class="oe_title">
-                        <h1>
-                            <field name="reference" readonly="1"/>
-                        </h1>
+                        <div class="d-flex align-items-center gap-2">
+                            <h1>
+                                <field name="reference" readonly="1"/>
+                            </h1>
+                            <field name="recruitment_step" widget="badge"
+                                   decoration-info="recruitment_step in ('shortlist', 'notify_cand')"
+                                   decoration-warning="recruitment_step in ('notify_exam', 'fetch_exam', 'notify_panel', 'notify_interview', 'fetch_interview')"
+                                   decoration-success="recruitment_step in ('compute_rank', 'notify_committee', 'notify_selection', 'promote', 'hire', 'done')"
+                                   invisible="vacancy_status != 'published'"/>
+                        </div>
                     </div>
 
                     <field name="status" invisible="1"/>
                     <field name="vacancy_status" invisible="1"/>
                     <field name="recruitment_step" invisible="1"/>
-                    <field name="shortlist_done" invisible="1"/>
-                    <field name="candidate_notified" invisible="1"/>
-                    <field name="scores_computed" invisible="1"/>
-                    <field name="supervisor_rec_requested" invisible="1"/>
-                    <field name="selection_notified" invisible="1"/>
 
                     <!-- Main two-column group — mirrors Odoo 14 layout -->
                     <group>
@@ -213,11 +210,10 @@
                                    readonly="vacancy_status != 'draft'"/>
 
                             <field name="job_position" readonly="vacancy_status != 'draft'"/>
-                            <field name="job_grade" readonly="vacancy_status != 'draft'"/>
-                            <field name="employee_category" string="Job Category" readonly="vacancy_status != 'draft'"/>
-                            <field name="has_written_exam" widget="boolean_toggle" readonly="vacancy_status != 'draft'"/>
+                            <field name="job_grade" readonly="1"/>
+                            <field name="employee_category" string="Job Category" readonly="1"/>
                             <field name="job_level" invisible="employee_category != 'Non Managerial'"
-                                   readonly="vacancy_status != 'draft'"/>
+                                   readonly="1"/>
 
                             <field name="sourcing_type" string="Sourcing Type" readonly="vacancy_status != 'draft'"/>
                             <!-- INTERNAL ONLY: movement type -->
@@ -225,25 +221,28 @@
                                    invisible="sourcing_type not in ['internal', 'both']"
                                    readonly="vacancy_status != 'draft'"/>
                             <field name="transfer_eval_mode" string="Transfer Evaluation Mode"
-                                   invisible="sourcing_type not in ['internal', 'both'] or internal_movement_type not in ['transfer', 'lateral']"
+                                   invisible="internal_movement_type != 'transfer'"
+                                   readonly="vacancy_status != 'draft'"/>
+                            <field name="transfer_min_position_years" string="Min. Years in Position"
+                                   invisible="internal_movement_type != 'transfer'"
+                                   readonly="vacancy_status != 'draft'"/>
+                            <field name="transfer_min_location_years" string="Min. Years in Location"
+                                   invisible="internal_movement_type != 'transfer'"
                                    readonly="vacancy_status != 'draft'"/>
                             <!-- EXTERNAL ONLY: source channel -->
                             <field name="source_channel" string="Source Channel"
-                                   invisible="sourcing_type not in ['external', 'both']"
+                                   invisible="sourcing_type != 'external'"
                                    readonly="vacancy_status != 'draft'"/>
                             <field name="operating_unit_id" readonly="vacancy_status != 'draft'"/>
                             <field name="type_of_employment" readonly="vacancy_status != 'draft'"/>
                         </group>
                         <!-- RIGHT COLUMN -->
                         <group string="Recruitment Details">
-                            <field name="responsible" readonly="vacancy_status != 'draft'"/>
+                            <field name="responsible" readonly="1"/>
                             <field name="opening_date" readonly="vacancy_status != 'draft'"/>
-                            <field name="vacancy_announced_on" readonly="vacancy_status != 'draft'"/>
                             <field name="no_of_vacancies" readonly="vacancy_status != 'draft'"/>
-                            <field name="approved_plan_count" readonly="1" string="Approved Plan"/>
-                            <field name="plan_fulfillment_promotion" readonly="1" string="Approved Promotion Plan" invisible="sourcing_type == 'external'"/>
-                            <field name="plan_fulfillment_lateral" readonly="1" string="Approved Transfer Plan" invisible="sourcing_type == 'external'"/>
                             <field name="last_date_to_apply" readonly="vacancy_status != 'draft'"/>
+                            <field name="full_non_banking_credit" widget="boolean_toggle" readonly="vacancy_status != 'draft'"/>
                             <field name="vacancy_description" readonly="vacancy_status != 'draft'"/>
                         </group>
                     </group>
@@ -251,49 +250,38 @@
                     <!-- Evaluation Weights & Exam/Interview Schedules — visible after draft -->
                     <group invisible="vacancy_status == 'draft'">
                         <group string="Evaluation Weights">
+                            <field name="transfer_eval_mode" invisible="internal_movement_type != 'transfer'" readonly="scores_computed == True"/>
                             <field name="pms_weight" widget="float" readonly="scores_computed == True"/>
-                            <field name="written_weight" widget="float" readonly="scores_computed == True or not has_written_exam" invisible="not has_written_exam or (internal_movement_type in ['transfer', 'lateral'] and transfer_eval_mode in ['interview_only', 'transfer_matrix_only'])"/>
-                            <field name="interview_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type in ['transfer', 'lateral'] and transfer_eval_mode == 'transfer_matrix_only'"/>
-                            
-                            <!-- Transfer Matrix Criteria Weights — visible only when Pure Transfer Matrix is selected -->
-                            <field name="app_date_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type not in ['transfer', 'lateral'] or transfer_eval_mode != 'transfer_matrix_only'"/>
-                            <field name="experience_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type not in ['transfer', 'lateral'] or transfer_eval_mode != 'transfer_matrix_only'"/>
-                            <field name="location_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type not in ['transfer', 'lateral'] or transfer_eval_mode != 'transfer_matrix_only'"/>
-                            <field name="recommendation_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type not in ['transfer', 'lateral'] or transfer_eval_mode != 'transfer_matrix_only'"/>
-
+                            <field name="written_weight" widget="float" readonly="scores_computed == True" invisible="transfer_eval_mode == 'transfer_matrix_only' and internal_movement_type == 'transfer'"/>
+                            <field name="interview_weight" widget="float" readonly="scores_computed == True" invisible="transfer_eval_mode == 'transfer_matrix_only' and internal_movement_type == 'transfer'"/>
+                            <field name="app_date_weight" widget="float" readonly="scores_computed == True" invisible="transfer_eval_mode != 'transfer_matrix_only' or internal_movement_type != 'transfer'"/>
+                            <field name="experience_weight" widget="float" readonly="scores_computed == True" invisible="transfer_eval_mode != 'transfer_matrix_only' or internal_movement_type != 'transfer'"/>
+                            <field name="location_weight" widget="float" readonly="scores_computed == True" invisible="transfer_eval_mode != 'transfer_matrix_only' or internal_movement_type != 'transfer'"/>
+                            <field name="recommendation_weight" widget="float" readonly="scores_computed == True" invisible="transfer_eval_mode != 'transfer_matrix_only' or internal_movement_type != 'transfer'"/>
                             <field name="exam_candidate_summary"
                                    placeholder="Write summary about exams &amp; selected candidates for Approval Committee..."
                                    invisible="recruitment_step != 'notify_committee'"/>
                         </group>
-                        <group string="Exam &amp; Interview Schedules" invisible="transfer_eval_mode == 'transfer_matrix_only' and not has_written_exam">
-                            <field name="written_exam_date" widget="datetime" readonly="scores_computed == True or not has_written_exam" invisible="not has_written_exam"/>
-                            <field name="exam_location" readonly="scores_computed == True or not has_written_exam" invisible="not has_written_exam"/>
-                            <field name="exam_scheduled" widget="badge" decoration-success="exam_scheduled == 'Yes'" decoration-muted="exam_scheduled == 'No'" invisible="not has_written_exam"/>
-                            <field name="interview_date" widget="datetime" readonly="scores_computed == True" invisible="transfer_eval_mode == 'transfer_matrix_only'"/>
-                            <field name="interview_location" readonly="scores_computed == True" invisible="transfer_eval_mode == 'transfer_matrix_only'"/>
-                            <field name="panel_notified" widget="boolean_toggle" readonly="1" invisible="transfer_eval_mode == 'transfer_matrix_only'"/>
-                            <field name="interview_scheduled" widget="badge" decoration-success="interview_scheduled == 'Yes'" decoration-muted="interview_scheduled == 'No'" invisible="transfer_eval_mode == 'transfer_matrix_only'"/>
+                        <group string="Exam &amp; Interview Schedules">
+                            <field name="written_exam_date" widget="datetime" readonly="scores_computed == True"/>
+                            <field name="exam_location" readonly="scores_computed == True"/>
+                            <field name="exam_scheduled" widget="badge" decoration-success="exam_scheduled == 'Yes'" decoration-muted="exam_scheduled == 'No'"/>
+                            <field name="interview_date" widget="datetime" readonly="scores_computed == True"/>
+                            <field name="interview_location" readonly="scores_computed == True"/>
+                            <field name="interview_scheduled" widget="badge" decoration-success="interview_scheduled == 'Yes'" decoration-muted="interview_scheduled == 'No'"/>
                         </group>
                     </group>
 
-                    <!-- EXPERIENCE & ACADEMIC REQUIREMENTS -->
-                    <group string="Experience &amp; Academic Requirements">
-                        <group string="Experience Requirements &amp; Weighting">
-                            <field name="position_experiences" readonly="1" string="Required Experience(s)"/>
-                            <field name="minimum_experience_years" readonly="vacancy_status != 'draft'"/>
-                            <field name="banking_experience_required" readonly="vacancy_status != 'draft'"/>
-                            <field name="full_non_banking_credit" widget="boolean_toggle" readonly="vacancy_status != 'draft'"/>
-                            <field name="non_banking_exp_weight" readonly="vacancy_status != 'draft'"/>
-                            <field name="ex_bunna_preferred" readonly="vacancy_status != 'draft'"/>
-                        </group>
-                        <group string="Academic Requirements" invisible="sourcing_type == 'internal'">
-                            <field name="position_qualifications" readonly="1" string="Required Qualification(s)"/>
+                    <!-- EXTERNAL REQUIREMENTS — only visible for external/both -->
+                    <group string="External Applicant Requirements"
+                           invisible="sourcing_type != 'external'">
+                        <group string="Academic Requirements">
                             <field name="minimum_cgpa" readonly="vacancy_status != 'draft'"/>
                         </group>
                     </group>
 
                     <!-- Website publishing status — only visible for external/both -->
-                    <group invisible="sourcing_type not in ['external', 'both']">
+                    <group invisible="sourcing_type != 'external'">
                         <group string="Website Status">
                             <field name="website_published" readonly="1"/>
                         </group>
@@ -314,17 +302,19 @@
                             </field>
                         </page>
                         <page string="Vacancy Approval Members" name="approval_members">
-                            <field name="vac_del_team_id" readonly="vacancy_status != 'draft'" context="{'parent_responsible_id': responsible}">
+                            <field name="vac_del_team_id" readonly="vacancy_status != 'draft'">
                                 <list editable="bottom">
+                                    <field name="eligible_user_ids" column_invisible="1"/>
                                     <field name="role" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]" options="{'no_create': True, 'no_open': True}" readonly="parent.vacancy_status != 'draft'"/>
                                     <field name="operating_unit"/>
                                     <field name="status" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="alternate_committee_member" domain="[('id', 'in', eligible_user_ids)]"
+                                    <field name="alternate_committee_member"
+                                           domain="[('id', 'in', eligible_user_ids)]"
+                                           options="{'no_create': True, 'no_open': True}"
                                            readonly="parent.vacancy_status != 'draft'"/>
                                     <field name="alter_operating_unit"/>
                                     <field name="approve"/>
-                                    <field name="eligible_user_ids" column_invisible="1"/>
                                 </list>
                             </field>
                         </page>
@@ -338,13 +328,50 @@
                         </page>
 
                         <!-- 2. Tabs visible ONLY after evaluation / approval (vacancy_status != 'draft') -->
-                        <page string="Eligible Employees (Internal)" name="eligible_candidates" invisible="vacancy_status == 'draft' or sourcing_type == 'external' or internal_movement_type in ('lateral', 'transfer')">
-                            <div class="mb-2">
-                                <button name="action_select_all_internal_candidates" string="Select All" type="object" class="btn btn-secondary btn-sm me-2" icon="fa-check-square-o"/>
-                                <button name="action_deselect_all_internal_candidates" string="Deselect All" type="object" class="btn btn-secondary btn-sm" icon="fa-square-o"/>
+                        <page string="Eligible Employees (Internal)" name="eligible_candidates" invisible="vacancy_status == 'draft' or sourcing_type == 'external'">
+                            <div class="d-flex align-items-center justify-content-between mb-2 p-2 bg-light border rounded">
+                                <div class="d-flex align-items-center gap-2">
+                                    <button name="action_select_all_eligible_candidates"
+                                            string="Select All"
+                                            type="object"
+                                            class="btn btn-outline-success btn-sm"
+                                            icon="fa-check-square-o"
+                                            invisible="recruitment_step not in ('shortlist', 'notify_cand')"/>
+                                    <button name="action_deselect_all_eligible_candidates"
+                                            string="Deselect All"
+                                            type="object"
+                                            class="btn btn-outline-danger btn-sm"
+                                            icon="fa-square-o"
+                                            invisible="recruitment_step not in ('shortlist', 'notify_cand')"/>
+                                    <button name="action_open_eligible_candidates_view"
+                                            string="Search &amp; Filter View"
+                                            type="object"
+                                            class="btn btn-outline-primary btn-sm"
+                                            icon="fa-search"
+                                            help="Open full candidate list with search bar to filter by name, department, or grade."/>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted small fw-bold">Filter by Name:</span>
+                                    <field name="filter_candidate_name" placeholder="Type employee name..." class="oe_inline mb-0" style="min-width: 220px;"/>
+                                    <button name="action_select_by_candidate_name"
+                                            string="Select Matching"
+                                            type="object"
+                                            class="btn btn-primary btn-sm"
+                                            icon="fa-filter"
+                                            invisible="not filter_candidate_name"/>
+                                    <button name="action_deselect_by_candidate_name"
+                                            string="Deselect Matching"
+                                            type="object"
+                                            class="btn btn-secondary btn-sm"
+                                            icon="fa-times"
+                                            invisible="not filter_candidate_name"/>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end mb-1">
+                                <field name="eligible_selected_count_summary" class="text-muted small fw-bold" readonly="1"/>
                             </div>
                             <field name="eligible_employee_ids">
-                                <list string="Eligible Employees (Internal)" editable="bottom">
+                                <list string="Eligible Employees" editable="bottom">
                                     <field name="emp_name"/>
                                     <field name="select_flag"/>
                                     <field name="app_date"/>
@@ -377,46 +404,7 @@
                             </field>
                         </page>
 
-                        <page string="Eligible Employees (Lateral)" name="eligible_candidates_lateral" invisible="vacancy_status == 'draft' or sourcing_type == 'external' or internal_movement_type not in ('lateral', 'transfer')">
-                            <div class="mb-2">
-                                <button name="action_select_all_internal_candidates" string="Select All" type="object" class="btn btn-secondary btn-sm me-2" icon="fa-check-square-o"/>
-                                <button name="action_deselect_all_internal_candidates" string="Deselect All" type="object" class="btn btn-secondary btn-sm" icon="fa-square-o"/>
-                            </div>
-                            <field name="eligible_employee_ids">
-                                <list string="Eligible Employees (Lateral)" editable="bottom">
-                                    <field name="emp_name"/>
-                                    <field name="select_flag"/>
-                                    <field name="app_date"/>
-                                    <field name="emp_grade"/>
-                                    <field name="emp_position"/>
-                                    <field name="emp_category"/>
-                                    <field name="emp_type"/>
-                                    <field name="emp_gender"/>
-                                    <field name="current_work_unit"/>
-                                    <field name="current_department"/>
-                                    <field name="educational_qualification"/>
-                                    <field name="service_in_company"/>
-                                    <field name="relevant_experience"/>
-                                    <field name="employment_experience"/>
-                                    <field name="total_experience"/>
-                                    <field name="current_location_exp"/>
-                                    <field name="current_position_exp"/>
-                                    <field name="supervisory_experience"/>
-                                    <field name="last_promotion"/>
-                                    <field name="pms_score"/>
-                                    <field name="recommendation"/>
-                                    <field name="written_warning"/>
-                                    <field name="demoted"/>
-                                    <!-- FR-REC-056: Leave Status from Time Off module -->
-                                    <field name="active_leave_status" string="Leave Status" readonly="1"
-                                           optional="show"
-                                           decoration-danger="active_leave_status not in ('Active', 'N/A')"
-                                           decoration-success="active_leave_status == 'Active'"/>
-                                </list>
-                            </field>
-                        </page>
-
-                        <page string="External Applicants" name="external_applicants" invisible="vacancy_status == 'draft' or sourcing_type == 'internal'">
+                        <page string="External Applicants" name="external_applicants" invisible="vacancy_status == 'draft' or sourcing_type != 'external'">
                             <field name="applicant_ids" readonly="1">
                                 <list string="External Applicants" create="0" delete="0">
                                     <field name="partner_name" string="Applicant Name"/>
@@ -434,12 +422,49 @@
 
                         <!-- Internal Selected Candidates -->
                         <page string="Selected Employees" name="selected_employees" invisible="vacancy_status == 'draft' or sourcing_type == 'external'">
-                            <div class="mb-2">
-                                <button name="action_select_all_internal_candidates" string="Select All" type="object" class="btn btn-secondary btn-sm me-2" icon="fa-check-square-o"/>
-                                <button name="action_deselect_all_internal_candidates" string="Deselect All" type="object" class="btn btn-secondary btn-sm" icon="fa-square-o"/>
+                            <div class="d-flex align-items-center justify-content-between mb-2 p-2 bg-light border rounded">
+                                <div class="d-flex align-items-center gap-2">
+                                    <button name="action_select_all_selected_candidates"
+                                            string="Select All"
+                                            type="object"
+                                            class="btn btn-outline-success btn-sm"
+                                            icon="fa-check-square-o"
+                                            invisible="scores_computed == True"/>
+                                    <button name="action_deselect_all_selected_candidates"
+                                            string="Deselect All"
+                                            type="object"
+                                            class="btn btn-outline-danger btn-sm"
+                                            icon="fa-square-o"
+                                            invisible="scores_computed == True"/>
+                                    <button name="action_open_selected_candidates_view"
+                                            string="Search &amp; Filter View"
+                                            type="object"
+                                            class="btn btn-outline-primary btn-sm"
+                                            icon="fa-search"
+                                            help="Open full selected candidate list with search bar to filter by name, department, or result."/>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted small fw-bold">Filter by Name:</span>
+                                    <field name="filter_selected_emp_name" placeholder="Type employee name..." class="oe_inline mb-0" style="min-width: 220px;" readonly="scores_computed == True"/>
+                                    <button name="action_select_by_selected_emp_name"
+                                            string="Select Matching"
+                                            type="object"
+                                            class="btn btn-primary btn-sm"
+                                            icon="fa-filter"
+                                            invisible="not filter_selected_emp_name or scores_computed == True"/>
+                                    <button name="action_deselect_by_selected_emp_name"
+                                            string="Deselect Matching"
+                                            type="object"
+                                            class="btn btn-secondary btn-sm"
+                                            icon="fa-times"
+                                            invisible="not filter_selected_emp_name or scores_computed == True"/>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end mb-1">
+                                <field name="selected_emp_count_summary" class="text-muted small fw-bold" readonly="1"/>
                             </div>
                             <field name="new_int_rec_sel" readonly="scores_computed == True">
-                                <list string="Selected Employees" default_order="rank asc, weighted_score desc, id asc" editable="bottom" delete="0" decoration-success="selection_type in ['selected', 'Selected']" decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']" decoration-danger="selection_type in ['rejected', 'Disqualified']" decoration-muted="selection_type in ['pending', 'Pending Evaluation']">
+                                <list string="Selected Employees" editable="bottom" delete="0" decoration-success="selection_type in ['selected', 'Selected']" decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']" decoration-danger="selection_type in ['rejected', 'Disqualified']" decoration-muted="selection_type in ['pending', 'Pending Evaluation']">
                                     <field name="emp_name" readonly="parent.scores_computed == True"/>
                                     <field name="select_flag" readonly="parent.scores_computed == True"/>
                                     <field name="emp_position" readonly="parent.scores_computed == True"/>
@@ -447,24 +472,37 @@
                                     <field name="current_department" readonly="parent.scores_computed == True"/>
                                     <field name="preferred_location" readonly="parent.scores_computed == True"/>
                                     <field name="pms_score" readonly="parent.scores_computed == True"/>
-                                    <field name="written_exam_score" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True" column_invisible="parent.transfer_eval_mode in ['interview_only', 'transfer_matrix_only']"/>
-                                    <field name="interview_score" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True" column_invisible="parent.transfer_eval_mode == 'transfer_matrix_only'"/>
-                                    <field name="application_date" string="App Date" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']" readonly="parent.scores_computed == True"/>
-                                    <field name="app_date_score" string="App Date Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']" readonly="1"/>
-                                    <field name="relevant_experience" string="Experience (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']" readonly="parent.scores_computed == True"/>
-                                    <field name="experience_score" string="Experience Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']" readonly="1"/>
-                                    <field name="service_in_company" string="Service (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']" readonly="parent.scores_computed == True"/>
-                                    <field name="location_score" string="Location Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']" readonly="1"/>
-                                    <field name="supervisor_recommendation_score" string="Supervisor Rec Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']"/>
-                                    <field name="supervisor_remarks" string="Supervisor Remarks" optional="hide" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']"/>
-                                    <button name="action_open_supervisor_rec_wizard" string="⭐ Rate" type="object" class="btn-info btn-sm" invisible="parent.transfer_eval_mode != 'transfer_matrix_only' and parent.internal_movement_type not in ['lateral', 'transfer']"/>
+                                    <field name="written_exam_score" readonly="parent.scores_computed == True" column_invisible="parent.transfer_eval_mode in ['interview_only', 'transfer_matrix_only']"/>
+                                    <field name="interview_score" readonly="parent.scores_computed == True" column_invisible="parent.transfer_eval_mode == 'transfer_matrix_only'"/>
+                                    <field name="banking_experience" string="Banking Exp (Yrs)" optional="show" readonly="parent.scores_computed == True"/>
+                                    <field name="non_banking_experience" string="Non-Banking Exp (Yrs)" optional="show" readonly="parent.scores_computed == True"/>
+                                    <field name="service_in_company" string="Company Exp (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="previous_experience" string="Prev Exp (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="relevant_experience" string="Total Credited Exp (Yrs)" optional="show" readonly="parent.scores_computed == True"/>
+                                    <field name="experience_score" string="Exp Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="1"/>
+                                    <field name="service_in_current_position" string="Pos Service (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="service_in_current_location" string="Loc Service (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="location_score" string="Loc Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="1"/>
+                                    <field name="supervisor_recommendation_score" string="Supervisor Rec" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'"/>
                                     <field name="weighted_score" readonly="1" class="fw-bold"/>
                                     <field name="rank" readonly="1"/>
                                     <field name="selection_type" string="Result" readonly="parent.scores_computed == True"/>
-                                     <field name="promotion_type" string="Movement Type" readonly="1" optional="show"/>
-                                     <field name="promotion_status" string="Movement Status" readonly="1" optional="show"/>
+                                    <field name="acceptance_status" widget="badge"
+                                           decoration-success="acceptance_status == 'accepted'"
+                                           decoration-danger="acceptance_status == 'rejected'"
+                                           decoration-warning="acceptance_status == 'pending'"
+                                           optional="show"/>
+                                    <button name="action_accept_promotion" string="Accept" type="object"
+                                            class="btn-success btn-sm" icon="fa-check"
+                                            invisible="selection_type not in ('selected', 'Selected') or acceptance_status == 'accepted'"/>
+                                    <button name="action_decline_promotion" string="Decline" type="object"
+                                            class="btn-danger btn-sm" icon="fa-times"
+                                            invisible="selection_type not in ('selected', 'Selected') or acceptance_status == 'rejected'"/>
+                                     <field name="promotion_type" readonly="1" optional="show"/>
+                                     <field name="promotion_status" readonly="1" optional="show"/>
                                      <field name="promoted_salary" optional="show" string="Salary (ETB)"/>
                                      <field name="promotion_ref_no" readonly="1" optional="show" string="Ref No"/>
+                                     <button name="action_send_promotion_notification" string="Send CC &amp; Letter" type="object" class="btn-primary btn-sm" icon="fa-paper-plane" invisible="selection_type not in ('selected', 'Selected') or promotion_status == 'draft'" help="Dispatch official promotion letter and CC notifications via Discuss and Work Email to all CC Work Unit Managers."/>
                                      <button name="action_print_promotion_letter" string="📄 Letter" type="object" class="btn-secondary btn-sm" invisible="selection_type not in ('selected', 'Selected') or promotion_status == 'draft'"/>
                                      <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="selection_type != 'selected' or promotion_type != 'diff_unit' or not parent.minute_signed or promotion_status in ('promoted', 'released')"/>
                                     <field name="remarks"/>
@@ -473,21 +511,17 @@
                         </page>
 
                         <!-- External Selected Candidates -->
-                        <page string="Selected Candidates" name="selected_candidates_external" invisible="vacancy_status == 'draft' or sourcing_type == 'internal'">
-                            <div class="mb-2">
-                                <button name="action_select_all_external_candidates" string="Select All" type="object" class="btn btn-secondary btn-sm me-2" icon="fa-check-square-o"/>
-                                <button name="action_deselect_all_external_candidates" string="Deselect All" type="object" class="btn btn-secondary btn-sm" icon="fa-square-o"/>
-                            </div>
+                        <page string="Selected Candidates" name="selected_candidates_external" invisible="vacancy_status == 'draft' or sourcing_type != 'external'">
                             <field name="ext_rec_sel" readonly="scores_computed == True">
-                                <list string="Selected Candidates" default_order="rank asc, weighted_score desc, id asc" editable="bottom" delete="0" decoration-success="selection_type in ['selected', 'Selected']" decoration-info="selection_type in ['interview', 'Interview', 'Selected for Interview']" decoration-primary="selection_type in ['exam', 'Exam', 'Selected for Exam']" decoration-muted="selection_type in ['shortlisted', 'Shortlisted', 'pending', 'Pending Evaluation']" decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']" decoration-danger="selection_type in ['rejected', 'Disqualified']">
+                                <list string="Selected Candidates" editable="bottom" delete="0" decoration-success="selection_type in ['selected', 'Selected']" decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']" decoration-danger="selection_type in ['rejected', 'Disqualified']" decoration-muted="selection_type in ['pending', 'Pending Evaluation']">
                                     <field name="applicant_name" readonly="parent.scores_computed == True"/>
                                     <field name="applicant_email" readonly="parent.scores_computed == True"/>
                                     <field name="select_flag" readonly="parent.scores_computed == True"/>
                                     <field name="educational_qualification" readonly="parent.scores_computed == True"/>
                                     <field name="cgpa" readonly="parent.scores_computed == True"/>
                                     <field name="preferred_location" readonly="parent.scores_computed == True"/>
-                                    <field name="written_exam_score" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True"/>
-                                    <field name="interview_score" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="written_exam_score" readonly="parent.scores_computed == True"/>
+                                    <field name="interview_score" readonly="parent.scores_computed == True"/>
                                     <field name="weighted_score" readonly="1" class="fw-bold"/>
                                     <field name="selection_type" string="Result" readonly="parent.scores_computed == True"/>
                                     <field name="remarks"/>
@@ -495,9 +529,9 @@
                             </field>
                         </page>
 
-                        <page string="Panel Members" name="panel_members" invisible="vacancy_status == 'draft' or transfer_eval_mode == 'transfer_matrix_only'">
-                            <field name="new_int_rec_panel" invisible="sourcing_type == 'external'" context="{'parent_operating_unit_id': operating_unit_id, 'parent_responsible_id': responsible, 'default_vacancy_id': id}">
-                                <list string="Panel Members" editable="bottom">
+                        <page string="Panel Members" name="panel_members" invisible="vacancy_status == 'draft'">
+                            <field name="new_int_rec_panel" invisible="sourcing_type == 'external'" context="{'parent_operating_unit_id': operating_unit_id, 'default_vacancy_id': id}">
+                                <list string="Panel Members" editable="bottom" delete="0">
                                     <field name="eligible_employee_ids" column_invisible="1"/>
                                     <field name="emp_name" domain="[('id', 'in', eligible_employee_ids)]"/>
                                     <field name="selection_criteria"/>
@@ -518,8 +552,8 @@
                                     <button name="action_reject_delegation" string="Reject Delegation" type="object" class="btn-sm btn-danger" invisible="delegation_state != 'pending_hr'"/>
                                 </list>
                             </field>
-                            <field name="ext_rec_panel" invisible="sourcing_type == 'internal'" context="{'parent_operating_unit_id': operating_unit_id, 'parent_responsible_id': responsible, 'default_vacancy_id': id}">
-                                <list string="Panel Members" editable="bottom">
+                            <field name="ext_rec_panel" invisible="sourcing_type != 'external'">
+                                <list string="Panel Members" editable="bottom" delete="0">
                                     <field name="eligible_employee_ids" column_invisible="1"/>
                                     <field name="emp_name" domain="[('id', 'in', eligible_employee_ids)]"/>
                                     <field name="selection_criteria"/>
@@ -543,37 +577,41 @@
                         </page>
 
                         <page string="Recruitment Approval Committee" name="recruitment_approval_committee" invisible="vacancy_status == 'draft'">
+                            <field name="allowed_chairperson_user_ids" invisible="1"/>
+                            <field name="allowed_panel_member_user_ids" invisible="1"/>
+                            <field name="allowed_secretary_user_ids" invisible="1"/>
+                            <field name="allowed_observer_user_ids" invisible="1"/>
                             <group string="Approval Hierarchy &amp; Committee Roles">
                                 <group>
                                     <field name="approval_hierarchy_type" widget="radio"/>
                                 </group>
                                 <group>
                                     <!-- Head Office & District Grade II and above -->
-                                    <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
-                                    <field name="panel_member_id" string="Respective Senior Management (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
-                                    <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="panel_member_id" string="Respective Senior Management (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
 
                                     <!-- For all non-managerial head office -->
-                                    <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="panel_member_id" string="Head Office / District Director (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="panel_member_id" string="Head Office / District Director (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
 
                                     <!-- For all non-managerial district -->
-                                    <field name="chairperson_id" string="District Director (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="panel_member_id" string="District Division Member (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="chairperson_id" string="District Director (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="panel_member_id" string="District Division Member (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
 
                                     <!-- Default fallback if unassigned -->
-                                    <field name="chairperson_id" string="Chairperson" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="panel_member_id" string="Panel Member" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="secretary_id" string="Panel Member &amp; Secretary" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="chairperson_id" string="Chairperson" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="panel_member_id" string="Panel Member" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="secretary_id" string="Panel Member &amp; Secretary" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
                                 </group>
                             </group>
                             <field name="recr_selected_team_id" invisible="sourcing_type == 'external'" context="{'parent_operating_unit_id': operating_unit_id, 'parent_responsible_id': responsible, 'default_vac_del_id': id}">
-                                <list editable="bottom" delete="0" decoration-success="approve == True">
+                                <list editable="bottom" decoration-success="approve == True">
                                     <field name="eligible_user_ids" column_invisible="1"/>
                                     <field name="role"/>
                                     <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]"/>
@@ -586,8 +624,8 @@
                                     <field name="approve"/>
                                 </list>
                             </field>
-                            <field name="recr_exter_selected_team_id" invisible="sourcing_type == 'internal'">
-                                <list editable="bottom" delete="0" decoration-success="approve == True">
+                            <field name="recr_exter_selected_team_id" invisible="sourcing_type != 'external'">
+                                <list editable="bottom" decoration-success="approve == True">
                                     <field name="eligible_user_ids" column_invisible="1"/>
                                     <field name="role"/>
                                     <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]"/>
@@ -612,12 +650,11 @@
         <field name="name">Job Vacancy Tree</field>
         <field name="model">job.vacancy</field>
         <field name="arch" type="xml">
-            <list string="Job Vacancy Tree">
+            <list string="Job Vacancy Tree" default_order="id desc">
                 <field name="reference"/>
                 <field name="job_position"/>
                 <field name="recruitment_reference"/>
                 <field name="operating_unit_id"/>
-                <field name="vacancy_announced_on"/>
                 <field name="no_of_vacancies"/>
                 <field name="last_date_to_apply"/>
             </list>

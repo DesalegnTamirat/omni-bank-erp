@@ -5,6 +5,7 @@ import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { _t } from "@web/core/l10n/translation";
 import { Component } from "@odoo/owl";
+import { clearPreAgreed } from "./agreement_new_button";
 
 /**
  * "Discard" for the requester, at any stage before the request is submitted
@@ -44,6 +45,7 @@ export class ReslDiscardButton extends Component {
 
     async discard() {
         const record = this.props.record;
+        clearPreAgreed();   // a discarded request must not leave a remembered agreement behind
         if (record.resId) {
             // Revert unsaved edits so leaving the form never tries to save a
             // record that is about to be deleted.

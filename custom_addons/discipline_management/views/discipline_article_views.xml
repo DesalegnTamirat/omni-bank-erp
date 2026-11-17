@@ -30,13 +30,13 @@
                 <list string="Regulatory Articles &amp; Clauses">
                     <field name="article_number"/>
                     <field name="name"/>
-                    <field name="policy_version_id"/>
                     <field name="staff_category" widget="badge"
                            decoration-info="staff_category == 'non_managerial'"
                            decoration-warning="staff_category == 'managerial'"
                            decoration-success="staff_category == 'all'"/>
                     <field name="severity_level_id"/>
                     <field name="offense_count" string="Sub-Clauses"/>
+                    <field name="policy_version_id" optional="hide"/>
                     <field name="active" widget="boolean_toggle"/>
                 </list>
             </field>
@@ -48,12 +48,13 @@
             <field name="model">discipline.article</field>
             <field name="arch" type="xml">
                 <form string="Regulatory Article">
-                    <header>
-                        <button name="action_create_case" string="Initiate Disciplinary Case from Article"
-                                type="object" class="oe_highlight" icon="fa-gavel"/>
-                    </header>
                     <sheet>
                         <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_offenses" type="object" class="oe_stat_button" icon="fa-list-ol">
+                                <field name="offense_count" string="Sub-Clauses" widget="statinfo"/>
+                            </button>
+                        </div>
                         <div class="oe_title">
                             <span class="o_form_label">Article Number</span>
                             <h1>
@@ -64,35 +65,31 @@
                             </h2>
                         </div>
                         <group>
-                            <group string="Regulation Context">
-                                <field name="policy_version_id"/>
-                                <field name="staff_category" widget="radio" options="{'horizontal': true}"/>
+                            <group string="Classification &amp; Scope">
+                                <field name="staff_category" widget="badge"
+                                       decoration-info="staff_category == 'non_managerial'"
+                                       decoration-warning="staff_category == 'managerial'"
+                                       decoration-success="staff_category == 'all'"/>
                                 <field name="severity_level_id"/>
+                                <field name="policy_version_id" invisible="not policy_version_id"/>
                             </group>
-                            <group string="Configuration &amp; Metrics">
-                                <field name="offense_count" readonly="1"/>
-                                <field name="active"/>
+                            <group string="Status &amp; Availability">
+                                <field name="active" widget="boolean_toggle"/>
                             </group>
                         </group>
                         <notebook>
                             <page string="Sub-Articles &amp; Specific Misconduct Clauses" name="offenses">
                                 <field name="offense_ids">
-                                    <list string="Misconduct Clauses" editable="bottom">
-                                        <field name="sub_article_code" placeholder="e.g. 33.4(ሀ)"/>
-                                        <field name="name"/>
-                                        <field name="category_id"/>
-                                        <field name="penalty_mode"/>
-                                        <field name="custom_punishment_type" string="Override Punishment"/>
-                                        <field name="custom_fine_days" string="Fine Days"/>
-                                        <button name="action_create_case" string="Initiate Case" type="object" icon="fa-plus-circle" class="btn-outline-primary btn-sm"/>
+                                    <list string="Misconduct Clauses" default_order="sequence, id">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="sub_article_code" placeholder="e.g. 33.4.1(ሀ)" decoration-bf="1"/>
+                                        <field name="name" string="Misconduct Title"/>
+                                        <field name="full_clause_text" string="Statutory Clause Definition"/>
+                                        <field name="severity_level_id" optional="show"/>
+                                        <field name="sanction_summary" string="Prescribed Sanction" optional="show"/>
+                                        <field name="active" widget="boolean_toggle" optional="show"/>
                                     </list>
                                 </field>
-                            </page>
-                            <page string="Full Statutory Text / Legal Provision" name="statutory_text">
-                                <field name="statutory_text" placeholder="Enter complete legal / statutory text of the article as written in the Collective Agreement or Policy Document..."/>
-                            </page>
-                            <page string="General Description &amp; Notes" name="description">
-                                <field name="description" placeholder="Additional commentary, guidelines, or interpretation notes..."/>
                             </page>
                         </notebook>
                     </sheet>

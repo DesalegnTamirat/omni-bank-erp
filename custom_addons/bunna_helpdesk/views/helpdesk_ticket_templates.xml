@@ -31,7 +31,7 @@
                 t-att-class="'btn btn-primary ' + (_btn_classes or '')"
                 style="background: linear-gradient(135deg, #541718 0%, #3a0d0e 100%); border: 1px solid #c17540; color: #ffffff;"
             >
-                <i class="fa fa-plus" /> New Ticket</button>
+                <i class="fa fa-plus" title="New Ticket" /> New Ticket</button>
         </form>
     </template>
     <template

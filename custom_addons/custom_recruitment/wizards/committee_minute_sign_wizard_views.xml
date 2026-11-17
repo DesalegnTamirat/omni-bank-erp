@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_committee_minute_sign_wizard_form" model="ir.ui.view">
+        <field name="name">committee.minute.sign.wizard.form</field>
+        <field name="model">committee.minute.sign.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Committee Digital Signature">
+                <sheet>
+                    <!-- Header Info Box -->
+                    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                        <i class="fa fa-pencil-square-o fa-2x me-3 text-primary"/>
+                        <div>
+                            <h5 class="mb-1 font-weight-bold">
+                                Sign Committee Minute: <field name="minute_reference" readonly="1" class="fw-bold"/>
+                            </h5>
+                            <div class="text-muted small">
+                                Signatory: <strong><field name="signatory_user_id" readonly="1" options="{'no_open': True}"/></strong>
+                                <span class="mx-2">•</span>
+                                Role: <strong><field name="signatory_role" readonly="1"/></strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <field name="has_saved_signature" invisible="1"/>
+                    <field name="minute_type" invisible="1"/>
+
+                    <!-- Signature Option Selector (No label, clean horizontal radio buttons) -->
+                    <div class="mb-3">
+                        <field name="signature_mode" widget="radio" options="{'horizontal': true}" nolabel="1"/>
+                    </div>
+
+                    <!-- Option 1: Saved Master Signature Preview -->
+                    <div invisible="signature_mode != 'saved'" class="p-3 mb-3 border rounded bg-light">
+                        <div invisible="not has_saved_signature">
+                            <p class="text-success mb-2 fw-bold">
+                                <i class="fa fa-check-circle me-1"/> Your saved Master Signature from Employee Profile:
+                            </p>
+                            <div class="text-center p-2 bg-white border rounded" style="max-width: 450px; margin: 0 auto;">
+                                <field name="saved_signature_preview" widget="image" class="img-fluid" style="max-height: 120px;"/>
+                            </div>
+                            <p class="text-muted small text-center mt-2 mb-0">
+                                Click <strong>Confirm &amp; Sign</strong> below to apply this signature to the minute.
+                            </p>
+                        </div>
+                        <div invisible="has_saved_signature" class="alert alert-warning mb-0">
+                            <i class="fa fa-exclamation-triangle me-1"/> No master signature is saved in your Employee Profile yet.
+                            Please select <strong>Draw / Upload New Signature</strong> to create your signature.
+                        </div>
+                    </div>
+
+                    <!-- Option 2: Draw New Signature Canvas -->
+                    <div invisible="signature_mode != 'new'" class="p-3 mb-3 border rounded bg-light">
+                        <label for="new_signature" string="Draw or Upload Your Signature Below:" class="fw-bold mb-2"/>
+                        <div class="bg-white border rounded p-2 text-center">
+                            <field name="new_signature" widget="signature" class="w-100"/>
+                        </div>
+                        <div class="mt-2">
+                            <field name="update_master_signature"/>
+                            <label for="update_master_signature" class="small fw-semibold ms-1"/>
+                        </div>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_sign" string="Confirm &amp; Sign" type="object" class="btn-primary" icon="fa-check"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_committee_minute_sign_wizard" model="ir.actions.act_window">
+        <field name="name">Committee Digital Signature</field>
+        <field name="res_model">committee.minute.sign.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

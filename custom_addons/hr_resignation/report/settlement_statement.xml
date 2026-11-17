@@ -26,6 +26,9 @@
                                     <t t-if="doc.employee_id.company_id.logo">
                                         <img t-att-src="image_data_uri(doc.employee_id.company_id.logo)" style="max-height: 70px;" alt="Logo"/>
                                     </t>
+                                    <t t-else="">
+                                        <img src="/hr_resignation/static/src/img/bunna_logo.png" style="max-height: 70px;" alt="Logo"/>
+                                    </t>
                                 </td>
                                 <td style="width: 70%; text-align: right; vertical-align: middle;">
                                     <h2 style="margin: 0; color: #800020; font-size: 20px; font-weight: bold; text-transform: uppercase;">

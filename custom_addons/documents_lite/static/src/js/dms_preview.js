@@ -35,7 +35,7 @@ export class DmsPreview extends Component {
     }
 
     get kind() {
-        return dmsKind(this.data.mimetype);
+        return dmsKind(this.data.mimetype, this.doc.extension);
     }
 
     get src() {

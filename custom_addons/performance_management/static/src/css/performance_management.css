@@ -263,3 +263,310 @@
     border-color: #94a3b8;
     font-weight: 700;
 }
+
+/* ============================================================
+   Position Coverage Section - Compact & Modern Executive UI
+   ============================================================ */
+.pms-coverage-compact-card {
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    padding: 12px 16px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.pms-coverage-compact-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+}
+
+.pms-coverage-t1-border {
+    border-left: 4px solid #1d2b32 !important;
+}
+
+.pms-coverage-t2-border {
+    border-left: 4px solid #425727 !important;
+}
+
+.pms-coverage-t3-border {
+    border-left: 4px solid #541718 !important;
+}
+
+.pms-coverage-mini-ring {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+}
+
+.pms-coverage-mini-svg {
+    transform: rotate(-90deg);
+}
+
+.pms-coverage-mini-ring-bg {
+    fill: none;
+    stroke: #e2e8f0;
+    stroke-width: 6;
+}
+
+.pms-coverage-mini-ring-fill {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.5s ease;
+}
+
+.pms-coverage-mini-pct {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: #1e293b;
+    pointer-events: none;
+}
+
+/* Compact pills */
+.pms-cov-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.pms-cov-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+.pms-cov-pill.covered {
+    background-color: #f0fdf4;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+.pms-cov-pill.covered:hover {
+    background-color: #dcfce7;
+    border-color: #86efac;
+}
+
+.pms-cov-pill.missing {
+    background-color: #fff7ed;
+    color: #c2410c;
+    border-color: #fed7aa;
+}
+
+.pms-cov-pill.missing:hover {
+    background-color: #ffedd5;
+    border-color: #fb923c;
+}
+
+/* Coverage Modal */
+.pms-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 1055;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: pmsFadeIn 0.15s ease-out;
+}
+
+@keyframes pmsFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.pms-modal-window {
+    background: #ffffff;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 780px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+    animation: pmsSlideUp 0.18s ease-out;
+}
+
+@keyframes pmsSlideUp {
+    from { transform: translateY(16px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.pms-modal-header {
+    padding: 14px 20px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pms-modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+}
+
+.pms-modal-footer {
+    padding: 10px 20px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pms-tab-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    transition: all 0.15s ease;
+}
+
+.pms-tab-pill:hover {
+    background: #f1f5f9;
+}
+
+.pms-tab-pill.active {
+    background: #1d2b32;
+    color: #ffffff;
+    border-color: #1d2b32;
+}
+
+.pms-coverage-row-item {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.pms-coverage-row-item:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.pms-coverage-row-item .row-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.pms-coverage-row-item .row-subtitle {
+    font-size: 11.5px;
+    color: #64748b;
+}
+
+/* ========================================================= */
+/* Performance Menu Navigation - Minimal / Default Styling  */
+/* ========================================================= */
+
+/* Smooth dropdown animation only - no color overrides */
+@keyframes pmsDropdownPop {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.o_main_navbar .dropdown-menu,
+.o_main_navbar .o-dropdown--menu {
+    animation: pmsDropdownPop 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* ========================================================= */
+/* Performance Views General UI Polish                      */
+/* ========================================================= */
+
+.o_form_view .o_form_sheet {
+    border-radius: 12px !important;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05) !important;
+}
+
+.o_form_view .o_form_statusbar {
+    border-top-left-radius: 12px !important;
+    border-top-right-radius: 12px !important;
+    padding: 8px 16px !important;
+}
+
+.o_statusbar_buttons .btn {
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    font-size: 12.5px !important;
+    transition: all 0.15s ease !important;
+}
+
+.o_statusbar_buttons .btn-primary {
+    background-color: #425727 !important;
+    border-color: #425727 !important;
+    box-shadow: 0 2px 4px rgba(66, 87, 39, 0.25) !important;
+}
+
+.o_statusbar_buttons .btn-primary:hover {
+    background-color: #33441e !important;
+    border-color: #33441e !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(66, 87, 39, 0.3) !important;
+}
+
+/* Modern Pill Tabs in Performance Forms */
+.o_form_view .nav-tabs {
+    border-bottom: 2px solid #e2e8f0 !important;
+    gap: 8px !important;
+}
+
+.o_form_view .nav-tabs .nav-link {
+    border: none !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    color: #64748b !important;
+    padding: 8px 16px !important;
+    border-radius: 6px 6px 0 0 !important;
+    position: relative;
+    transition: all 0.15s ease !important;
+}
+
+.o_form_view .nav-tabs .nav-link:hover {
+    color: #1e293b !important;
+    background-color: #f8fafc !important;
+}
+
+.o_form_view .nav-tabs .nav-link.active {
+    color: #425727 !important;
+    background: transparent !important;
+    border-bottom: 2.5px solid #425727 !important;
+    margin-bottom: -2px;
+}

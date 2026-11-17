@@ -88,6 +88,22 @@
             <field name="groups" eval="[(4, ref('group_assessment_officer')), (4, ref('group_assessment_manager')), (4, ref('group_assessment_administrator'))]"/>
         </record>
 
+        <!-- Unified Panel Invitations: Officers, Managers & Admins see all -->
+        <record id="rule_recruitment_panel_invitation_officer_all" model="ir.rule">
+            <field name="name">Assessment: Officers &amp; Managers - All Unified Panel Invitations</field>
+            <field name="model_id" ref="model_recruitment_panel_invitation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_officer')), (4, ref('group_assessment_manager')), (4, ref('group_assessment_administrator')), (4, ref('custom_recruitment.group_recruitment_manager')), (4, ref('custom_recruitment.group_recruitment_administrator'))]"/>
+        </record>
+
+        <!-- Unified Panel Invitations: Panel Members see their assigned & delegated invitations -->
+        <record id="rule_recruitment_panel_invitation_panel_member" model="ir.rule">
+            <field name="name">Assessment: Panel Members - My Invitations</field>
+            <field name="model_id" ref="model_recruitment_panel_invitation"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), ('delegate_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_panel_member')), (4, ref('group_assessment_user'))]"/>
+        </record>
+
         <!-- ==================================================== -->
         <!-- CBIS INTERVIEW EVALUATION ISOLATION                 -->
         <!-- ==================================================== -->
@@ -283,4 +299,105 @@
             ]"/>
         </record>
 
+        <!-- ==================================================== -->
+        <!-- TRANSFER ASSESSMENTS RECORD ISOLATION               -->
+        <!-- ==================================================== -->
+
+        <!-- Regular Employee / Default User: Can ONLY see their own transfer assessment records -->
+        <record id="rule_transfer_assessment_record_user_own" model="ir.rule">
+            <field name="name">Transfer Assessment Record: Employee - Own Records Only</field>
+            <field name="model_id" ref="model_transfer_assessment_record"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('create_uid', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Recruitment Officers, Managers & Administrators + Assessment Officers, Managers & Administrators: Full Access to all Transfer Assessment Records -->
+        <record id="rule_transfer_assessment_record_officer_manager_all" model="ir.rule">
+            <field name="name">Transfer Assessment Record: Officers &amp; Managers - All Records</field>
+            <field name="model_id" ref="model_transfer_assessment_record"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
+        </record>
+
+
+        <!-- ==================================================== -->
+        <!-- CANDIDATE DISQUALIFICATION APPEALS RECORD ISOLATION  -->
+        <!-- ==================================================== -->
+
+        <!-- Regular Employee / Base User: Can ONLY see and record their own appeals -->
+        <record id="rule_exam_disqualification_appeal_user_own" model="ir.rule">
+            <field name="name">Candidate Appeal: Employee - Own Records Only</field>
+            <field name="model_id" ref="model_exam_disqualification_appeal"/>
+            <field name="domain_force">['|', '|', ('create_uid', '=', user.id), ('disqualification_log_id.employee_id.user_id', '=', user.id), ('disqualification_log_id.applicant_id.partner_id.user_ids', 'in', [user.id])]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- HR Officers, HR Managers & Administrators: Full Access to all Candidate Appeals -->
+        <record id="rule_exam_disqualification_appeal_officer_manager_all" model="ir.rule">
+            <field name="name">Candidate Appeal: Officers &amp; Managers - All Appeals</field>
+            <field name="model_id" ref="model_exam_disqualification_appeal"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('hr.group_hr_user')),
+                (4, ref('hr.group_hr_manager')),
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Regular Employee / Base User: Can ONLY read their own disqualification logs -->
+        <record id="rule_exam_disqualification_log_user_own" model="ir.rule">
+            <field name="name">Disqualification Log: Employee - Own Records Only</field>
+            <field name="model_id" ref="model_exam_disqualification_log"/>
+            <field name="domain_force">['|', '|', ('employee_id.user_id', '=', user.id), ('create_uid', '=', user.id), ('applicant_id.partner_id.user_ids', 'in', [user.id])]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- HR Officers, HR Managers & Administrators: Full Access to all Disqualification Logs -->
+        <record id="rule_exam_disqualification_log_officer_manager_all" model="ir.rule">
+            <field name="name">Disqualification Log: Officers &amp; Managers - All Logs</field>
+            <field name="model_id" ref="model_exam_disqualification_log"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('hr.group_hr_user')),
+                (4, ref('hr.group_hr_manager')),
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
 </odoo>

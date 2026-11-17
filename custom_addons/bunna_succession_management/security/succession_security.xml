@@ -19,18 +19,31 @@
 
         <!-- =====================================================
              SECURITY GROUPS
-             NOTE: Standard employees have NO access to any group here.
-             This module is strictly confidential.
         ====================================================== -->
+
 
         <!-- Group 1: PPDD Officer -->
         <record id="group_succession_ppdd" model="res.groups">
             <field name="name">PPDD Officer</field>
             <field name="sequence">10</field>
             <field name="privilege_id" ref="bunna_succession_management.res_groups_privilege_succession"/>
+            <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_career_path_officer'))]"/>
             <field name="comment">
                 PPDD Officers can manage critical positions, talent pools,
                 nominate candidates, and run gap analyses. Cannot grant final SPMC approval.
+            </field>
+        </record>
+
+        <!-- Group 1b: Manager (restricted — can only act on their direct reports' dev plans) -->
+        <record id="group_succession_line_manager" model="res.groups">
+            <field name="name">Manager</field>
+            <field name="sequence">12</field>
+            <field name="privilege_id" ref="bunna_succession_management.res_groups_privilege_succession"/>
+            <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_career_path_manager'))]"/>
+            <field name="comment">
+                Managers can view and act on development plans for their direct reports:
+                submit extension requests and mark plans as complete ahead of schedule.
+                They cannot access candidate records, critical position registers, or assessment scores.
             </field>
         </record>
 
@@ -39,10 +52,9 @@
             <field name="name">SPMC / Senior Management</field>
             <field name="sequence">20</field>
             <field name="privilege_id" ref="bunna_succession_management.res_groups_privilege_succession"/>
-            <field name="implied_ids" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
             <field name="comment">
-                SPMC members can approve critical positions and final candidate approvals.
-                Inherits all PPDD permissions.
+                SPMC / Senior Management users review talent pools, conduct candidate assessments,
+                view development plans and career discussions, and approve successors.
             </field>
         </record>
 
@@ -51,7 +63,7 @@
             <field name="name">Succession Administrator</field>
             <field name="sequence">30</field>
             <field name="privilege_id" ref="bunna_succession_management.res_groups_privilege_succession"/>
-            <field name="implied_ids" eval="[(4, ref('bunna_succession_management.group_succession_spmc'))]"/>
+            <field name="implied_ids" eval="[(4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
             <field name="comment">Full admin access including delete and configuration.</field>
             <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
         </record>
@@ -67,24 +79,31 @@
     ====================================================== -->
     <data noupdate="0">
 
-        <!-- Bypass base HR strict hierarchy: PPDD must see all employees to plan successions -->
-        <record id="rule_succession_hr_employee_ppdd" model="ir.rule">
-            <field name="name">PPDD: Read All HR Employees</field>
-            <field name="model_id" ref="hr.model_hr_employee"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
-            <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="False"/>
-            <field name="perm_unlink" eval="False"/>
-        </record>
+        <!-- NOTE: Do NOT define global [(1, '=', 1)] rule on hr.employee here as it overrides
+             bank-wide employee directory privacy for PPDD/SPMC users. Succession models use sudo()
+             internally for candidate operations without compromising employee directory visibility. -->
+
+        <!-- Permanently delete any legacy global employee rule -->
+        <delete model="ir.rule" search="[('name', '=', 'PPDD: Read All HR Employees')]"/>
 
         <!-- Critical Positions: PPDD+ can read all -->
         <record id="rule_succession_critical_position_ppdd" model="ir.rule">
             <field name="name">PPDD: All Critical Positions</field>
             <field name="model_id" ref="bunna_succession_management.model_succession_critical_position"/>
             <field name="domain_force">[]</field>
-            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+        </record>
+
+        <!-- Critical Positions: Employee can read critical positions (e.g. for invitations) -->
+        <record id="rule_succession_critical_position_employee" model="ir.rule">
+            <field name="name">Employee: Read Critical Positions</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_critical_position"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
         </record>
 
         <!-- Candidates: PPDD+ can read all -->
@@ -92,7 +111,7 @@
             <field name="name">PPDD: All Candidates</field>
             <field name="model_id" ref="bunna_succession_management.model_succession_candidate"/>
             <field name="domain_force">[]</field>
-            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
         </record>
 
         <!-- Candidate Gap Lines: PPDD+ -->
@@ -100,32 +119,374 @@
             <field name="name">PPDD: All Candidate Gap Lines</field>
             <field name="model_id" ref="bunna_succession_management.model_succession_candidate_competency_gap"/>
             <field name="domain_force">[]</field>
-            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
-        </record>
-
-        <!-- Talent Pool: PPDD+ -->
-        <record id="rule_succession_talent_pool_ppdd" model="ir.rule">
-            <field name="name">PPDD: All Talent Pools</field>
-            <field name="model_id" ref="bunna_succession_management.model_succession_talent_pool"/>
-            <field name="domain_force">[]</field>
-            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
         </record>
 
         <!-- Development Plans: PPDD+ -->
         <record id="rule_succession_dev_plan_ppdd" model="ir.rule">
-            <field name="name">PPDD: All Development Plans</field>
+            <field name="name">PPDD / SPMC: All Development Plans</field>
             <field name="model_id" ref="bunna_succession_management.model_succession_development_plan"/>
             <field name="domain_force">[]</field>
-            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+        </record>
+
+        <!-- Development Activities: PPDD+ -->
+        <record id="rule_succession_dev_activity_ppdd" model="ir.rule">
+            <field name="name">PPDD / Admin: All Development Activities</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_activity"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Dev Plan Extension Log: PPDD / Admin -->
+        <record id="rule_succession_dev_plan_ext_log_ppdd" model="ir.rule">
+            <field name="name">PPDD / Admin: All Dev Plan Extension Logs</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_plan_extension_log"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_admin')), (4, ref('bunna_succession_management.group_succession_spmc'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <!-- Governance Log: PPDD+ -->
         <record id="rule_succession_gov_log_ppdd" model="ir.rule">
-            <field name="name">PPDD: All Governance Logs</field>
+            <field name="name">PPDD / Admin: All Governance Logs</field>
             <field name="model_id" ref="bunna_succession_management.model_succession_governance_log"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+        </record>
+
+        <!-- Candidate Eval Lines: PPDD can read/write all -->
+        <record id="rule_candidate_eval_line_ppdd" model="ir.rule">
+            <field name="name">PPDD: All Candidate Eval Lines</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_eval_line"/>
             <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+        </record>
+
+        <!-- ─── MANAGER RECORD RULES ─────────────────────────────────────────
+             Managers can ONLY see development plans where the candidate's
+             employee has them as the direct manager (employee.parent_id.user_id = uid).
+        ──────────────────────────────────────────────────────────────────────── -->
+
+        <!-- Dev Plans: Manager sees and creates only their direct reports' plans -->
+        <record id="rule_succession_dev_plan_line_manager" model="ir.rule">
+            <field name="name">Manager: Own Direct Reports' Development Plans</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_plan"/>
+            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Dev Activities: Manager sees and manages activities for their direct reports' plans -->
+        <record id="rule_succession_dev_activity_line_manager" model="ir.rule">
+            <field name="name">Manager: Own Direct Reports' Development Activities</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_activity"/>
+            <field name="domain_force">['|', ('plan_id.employee_id.parent_id.user_id', '=', user.id), ('plan_id.employee_id.coach_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Dev Plan Extension Log: Manager sees and creates extension logs for direct reports' plans -->
+        <record id="rule_succession_dev_plan_ext_log_line_manager" model="ir.rule">
+            <field name="name">Manager: Own Direct Reports' Plan Extension Logs</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_plan_extension_log"/>
+            <field name="domain_force">['|', ('plan_id.employee_id.parent_id.user_id', '=', user.id), ('plan_id.employee_id.coach_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Candidates: Manager sees only their direct reports' candidates -->
+        <record id="rule_succession_candidate_line_manager" model="ir.rule">
+            <field name="name">Manager: Own Direct Reports' Candidates</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate"/>
+            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Candidate Eval Lines: Manager can evaluate their direct reports' lines -->
+        <record id="rule_candidate_eval_line_line_manager" model="ir.rule">
+            <field name="name">Coach / Manager / Assigned SPMC: Competency Eval Lines</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_eval_line"/>
+            <field name="domain_force">['|', '|', '|', ('candidate_id.employee_id.user_id', '=', user.id), ('candidate_id.employee_id.parent_id.user_id', '=', user.id), ('candidate_id.employee_id.coach_id.user_id', '=', user.id), ('candidate_id.spmc_assigned_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Career Discussions: Manager can manage career discussions for their direct reports -->
+        <record id="rule_succession_career_discussion_line_manager" model="ir.rule">
+            <field name="name">Manager: Own Direct Reports' Career Discussions</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_career_discussion"/>
+            <field name="domain_force">['|', '|', ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id), ('manager_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Career Discussions: PPDD / Admin full access -->
+        <record id="rule_succession_career_discussion_ppdd" model="ir.rule">
+            <field name="name">PPDD / Admin / SPMC: All Career Discussions</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_career_discussion"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Career Discussions: Employee can read their own career discussions -->
+        <record id="rule_succession_career_discussion_employee" model="ir.rule">
+            <field name="name">Employee: Own Career Discussions</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_career_discussion"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Assessment Results: PPDD, SPMC, and Admins can read/write all results (mirrors candidate rule) -->
+        <record id="rule_candidate_assessment_result_ppdd" model="ir.rule">
+            <field name="name">PPDD / SPMC / Admin: All Candidate Assessment Results</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_assessment_result"/>
+            <field name="domain_force">[]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+        </record>
+
+        <!-- Assessment Results: Coach / Manager can read results for their direct reports and assigned candidates -->
+        <record id="rule_candidate_assessment_result_line_manager" model="ir.rule">
+            <field name="name">Candidate Assessment Result: Coach / Manager</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_assessment_result"/>
+            <field name="domain_force">['|', '|', '|', ('candidate_id.employee_id.user_id', '=', user.id), ('candidate_id.employee_id.parent_id.user_id', '=', user.id), ('candidate_id.employee_id.coach_id.user_id', '=', user.id), ('candidate_id.spmc_assigned_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Candidate Gap Lines: Coach / Manager can read gaps for their direct reports and assigned candidates -->
+        <record id="rule_candidate_gap_line_manager" model="ir.rule">
+            <field name="name">Candidate Gap Lines: Coach / Manager</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_competency_gap"/>
+            <field name="domain_force">['|', '|', '|', ('candidate_id.employee_id.user_id', '=', user.id), ('candidate_id.employee_id.parent_id.user_id', '=', user.id), ('candidate_id.employee_id.coach_id.user_id', '=', user.id), ('candidate_id.spmc_assigned_user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <!-- Succession Candidate Invitations: Regular Employee Own Invitations -->
+        <record id="rule_succession_candidate_invitation_user" model="ir.rule">
+            <field name="name">Succession Candidate Invitation: Employee Own</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_invitation"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Succession Candidate Invitations: PPDD / Admin Full Access -->
+        <record id="rule_succession_candidate_invitation_ppdd" model="ir.rule">
+            <field name="name">Succession Candidate Invitation: PPDD / Admin Full</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_invitation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+        <!-- Succession Candidate: Regular Employee Own Record -->
+        <record id="rule_succession_candidate_employee" model="ir.rule">
+            <field name="name">Employee: Own Nominated Candidate Record</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Candidate Eval Lines: Regular Employee Own Lines -->
+        <record id="rule_candidate_eval_line_employee" model="ir.rule">
+            <field name="name">Employee: Own Competency Eval Lines</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_eval_line"/>
+            <field name="domain_force">[('candidate_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Candidate Assessment Results: Regular Employee Own Results -->
+        <record id="rule_candidate_assessment_result_employee" model="ir.rule">
+            <field name="name">Candidate Assessment Result: Employee Own</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_assessment_result"/>
+            <field name="domain_force">[('candidate_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Candidate Competency Gap: Regular Employee Own Gaps -->
+        <record id="rule_candidate_gap_employee" model="ir.rule">
+            <field name="name">Candidate Gap Lines: Employee Own</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_candidate_competency_gap"/>
+            <field name="domain_force">[('candidate_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Succession Development Plan: Employee Own Plans (Read-only) -->
+        <record id="rule_succession_dev_plan_employee" model="ir.rule">
+            <field name="name">Employee: Own Succession Development Plans</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_plan"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Succession Development Activities: Employee Own Activities -->
+        <record id="rule_succession_dev_activity_employee" model="ir.rule">
+            <field name="name">Employee: Own Succession Development Activities</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_activity"/>
+            <field name="domain_force">[('plan_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Succession Development Plan Extension Log: Employee Own Plans' Logs (Read-only) -->
+        <record id="rule_succession_dev_plan_ext_log_employee" model="ir.rule">
+            <field name="name">Employee: Own Plan Extension Logs</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_development_plan_extension_log"/>
+            <field name="domain_force">[('plan_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Critical Position Assessment Lines: PPDD+ full access -->
+        <record id="rule_crit_pos_assessment_line_ppdd" model="ir.rule">
+            <field name="name">PPDD: All Critical Position Assessment Lines</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_critical_position_assessment_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
         </record>
 
+        <!-- Critical Position Assessment Lines: Employee/User read access -->
+        <record id="rule_crit_pos_assessment_line_employee" model="ir.rule">
+            <field name="name">Employee: Read Critical Position Assessment Lines</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_critical_position_assessment_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Governance Log: Employee read own candidate log -->
+        <record id="rule_succession_gov_log_employee" model="ir.rule">
+            <field name="name">Employee: Read Own Candidate Governance Logs</field>
+            <field name="model_id" ref="bunna_succession_management.model_succession_governance_log"/>
+            <field name="domain_force">[('candidate_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Career IDP: Succession Line Manager can view and approve direct reports / mentees IDPs -->
+        <record id="rule_succession_line_manager_hr_career_idp" model="ir.rule">
+            <field name="name">Succession Line Manager: Direct Reports and Mentees IDP</field>
+            <field name="model_id" ref="hr_employee_custom.model_hr_career_idp"/>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_line_manager'))]"/>
+            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.coach_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Career IDP: PPDD Officer can view and manage all succession IDPs -->
+        <record id="rule_succession_ppdd_hr_career_idp" model="ir.rule">
+            <field name="name">Succession PPDD: All IDPs</field>
+            <field name="model_id" ref="hr_employee_custom.model_hr_career_idp"/>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Role-Competency Mapping Line: Full read access for PPDD, SPMC, and Succession Admin -->
+        <record id="rule_competency_role_mapping_line_succession" model="ir.rule">
+            <field name="name">Succession Management: Read All Competency Mapping Lines</field>
+            <field name="model_id" ref="competency_management.model_competency_role_mapping_line"/>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin')), (4, ref('competency_management.group_competency_admin'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Role-Competency Mapping: Full read access for PPDD, SPMC, and Succession Admin -->
+        <record id="rule_competency_role_mapping_succession" model="ir.rule">
+            <field name="name">Succession Management: Read All Competency Mappings</field>
+            <field name="model_id" ref="competency_management.model_competency_role_mapping"/>
+            <field name="groups" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_spmc')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
     </data>
 </odoo>

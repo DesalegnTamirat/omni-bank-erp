@@ -111,11 +111,12 @@ class T3Scorecard(models.Model):
         ("draft", "Draft"),
         ("notified", "Notified"),
         ("accepted", "Accepted"),
+        ("auto_accepted", "Auto Accepted"),
         ("rejected", "Rejected"),
-        ("confirmed", "Confirmed"),
         ("appraisal_started", "Appraisal Started"),
     ], default="draft", tracking=True)
     rejection_reason = fields.Text(string="Rejection Reason", copy=False)
+    manager_rejection_reply = fields.Text(string="Manager Rejection Response", copy=False, tracking=True)
 
     @api.constrains('employee_id', 'fiscal_year_id', 'appraisal_period_id')
     def _check_unique_scorecard(self):
@@ -225,6 +226,34 @@ class T3Scorecard(models.Model):
                 self.start_date = line.date_start
                 self.end_date = line.date_end
 
+    @api.constrains('accept_by')
+    def _check_accept_by(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.accept_by and rec.accept_by < today:
+                raise ValidationError("Acceptance deadline ('Accept By') cannot be earlier than the current date.")
+
+    @api.constrains('total_weight', 'state')
+    def _check_total_weight_on_state(self):
+        for rec in self:
+            if rec.state not in ('draft', 'rejected'):
+                if round(rec.total_weight, 2) != 100.0:
+                    state_lbl = dict(rec._fields['state'].selection).get(rec.state, rec.state)
+                    raise ValidationError(
+                        f"Tier 3 Scorecard '{rec.planning_name or rec.name or rec.display_name}' must have a Total Weight of exactly 100% "
+                        f"(currently {round(rec.total_weight, 2)}%) when in '{state_lbl}' status."
+                    )
+
+    @api.onchange('accept_by')
+    def _onchange_accept_by(self):
+        if self.accept_by and self.accept_by < fields.Date.context_today(self):
+            return {
+                'warning': {
+                    'title': 'Invalid Acceptance Deadline',
+                    'message': "Acceptance deadline ('Accept By') cannot be earlier than the current date.",
+                }
+            }
+
     @api.depends("line_ids.weight")
     def _compute_total_weight(self):
         for rec in self:
@@ -314,21 +343,48 @@ class T3Scorecard(models.Model):
                 if target_val <= 0.0:
                     measure_name = line.job_measure_id.name if line.job_measure_id else 'KPI Measure'
                     invalid_measures.append(f"{measure_name} (Current {target_label}: {target_val})")
+                elif line.target_type == 'percent' and target_val > 100.0:
+                    measure_name = line.job_measure_id.name if line.job_measure_id else 'KPI Measure'
+                    invalid_measures.append(f"{measure_name} (Percentage target cannot exceed 100%: {target_val}%)")
 
             if invalid_measures:
                 period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else code
                 raise UserError(
                     f"Scorecard for '{rec.sudo().employee_id.name}' cannot be notified for appraisal period '{period_name}'. "
                     f"All scorecard lines must have a valid non-zero {target_label} set.\n\n"
-                    f"Missing or zero targets found for:\n- " + "\n- ".join(invalid_measures)
+                    f"Missing, zero, or invalid targets found for:\n- " + "\n- ".join(invalid_measures)
                 )
 
     def action_notify(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if round(rec.total_weight, 2) != 100.0:
+                raise UserError(
+                    f"Tier 3 Scorecard '{rec.planning_name or rec.name or rec.display_name}' cannot be notified "
+                    f"because its Total Weight is {round(rec.total_weight, 2)}% (must be exactly 100%)."
+                )
+            if rec.state == 'rejected':
+                if not rec.manager_rejection_reply or not rec.manager_rejection_reply.strip():
+                    return {
+                        'name': 'Reply to Employee Rejection Reason',
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'performance.rejection.reply.wizard',
+                        'view_mode': 'form',
+                        'target': 'new',
+                        'context': {
+                            'default_res_model': rec._name,
+                            'default_res_id': rec.id,
+                            'default_action_type': 'notify',
+                            'default_rejection_reason': rec.rejection_reason,
+                        },
+                    }
         for rec in self:
             if not (rec.is_current_manager or rec.is_hr_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Only the Manager or HR administrator can notify the employee.')
             if not rec.accept_by:
                 raise UserError(f"Please provide an 'Accept By' deadline before notifying the employee for scorecard '{rec.planning_name or rec.name or rec.display_name}'.")
+            if rec.accept_by < today:
+                raise UserError(f"The 'Accept By' deadline cannot be earlier than the current date ({today}) for scorecard '{rec.planning_name or rec.name or rec.display_name}'.")
         self._validate_period_targets_for_notify()
         for rec in self:
             rec.write({'state': 'notified'})
@@ -351,6 +407,7 @@ class T3Scorecard(models.Model):
                 ("Appraisal Period", f"{period_name} ({fy_name})"),
                 ("Accept By Deadline", f'<span style="color: #c53030; font-weight: bold;">{accept_by_str}</span>'),
                 ("Total Weight", f"{rec.total_weight:.2f}%"),
+                ("Manager Response to Rejection", f'<span style="color: #2b6cb0; font-weight: bold;">{rec.manager_rejection_reply}</span>'),
                 ("Current Status", '<span style="background-color: #feebc8; color: #7b341e; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">NOTIFIED</span>'),
             ]
 
@@ -375,6 +432,11 @@ class T3Scorecard(models.Model):
         for rec in self:
             if not (rec.is_current_employee or self.env.is_admin()):
                 raise UserError('Only the assigned employee can accept this Tier 3 Scorecard.')
+            if round(rec.total_weight, 2) != 100.0:
+                raise UserError(
+                    f"Tier 3 Scorecard '{rec.planning_name or rec.name or rec.display_name}' cannot be accepted "
+                    f"because its Total Weight is {round(rec.total_weight, 2)}% (must be exactly 100%)."
+                )
             user_emp_id = self.env.user.sudo().employee_id.id or rec.sudo().employee_id.id
             rec.sudo().write({
                 'state': 'accepted',
@@ -415,12 +477,53 @@ class T3Scorecard(models.Model):
                 border_color="#28a745",
                 intro_text=f"Employee <strong>{emp_name}</strong> has reviewed and <strong>ACCEPTED</strong> their Tier 3 Scorecard for period <strong>{period_name}</strong> ({fy_name}).",
                 details=details,
-                action_btn_text="🎯 Open & Confirm Scorecard",
+                action_btn_text="🎯 View Accepted Scorecard",
                 action_btn_color="#166534",
-                footer_note=f"Manager <b>{manager_name}</b>, please confirm this scorecard to finalize targets.",
+                footer_note=f"Scorecard targets for <b>{emp_name}</b> are accepted and finalized for appraisal evaluation.",
                 recipient_partner_ids=partner_ids,
-                activity_user_id=mgr_user.id if mgr_user else False,
-                activity_summary=f"Scorecard Accepted by {emp_name} - Action: Confirm",
+            )
+
+    def action_auto_accept(self):
+        """Automatically accept scorecards whose deadline has passed without employee response."""
+        for rec in self:
+            if rec.state != 'notified':
+                continue
+            rec.sudo().write({
+                'state': 'auto_accepted',
+                'accepted_by': False,
+            })
+            try:
+                rec.activity_feedback(['mail.mail_activity_data_todo'], feedback="Tier 3 Scorecard automatically accepted by system.")
+            except Exception:
+                pass
+
+            period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else ''
+            fy_name = rec.fiscal_year_id.name if rec.fiscal_year_id else ''
+            emp_name = rec.employee_id.name if rec.employee_id else 'Employee'
+            doc_name = rec.planning_name or rec.name or f"Scorecard - {emp_name}"
+            deadline_str = str(rec.accept_by) if rec.accept_by else 'N/A'
+
+            details = [
+                ("Document Name", f"<strong>{doc_name}</strong>"),
+                ("Employee", f"<strong>{emp_name}</strong>"),
+                ("Operating Unit", rec.operating_unit_id.name if rec.operating_unit_id else "N/A"),
+                ("Appraisal Period", f"{period_name} ({fy_name})"),
+                ("Total Weight", f"{rec.total_weight:.2f}%"),
+                ("Acceptance Deadline", deadline_str),
+                ("Current Status", '<span style="background-color: #ede9fe; color: #5b21b6; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">AUTO-ACCEPTED</span>'),
+            ]
+
+            send_performance_notification(
+                record=rec,
+                title="⚡ Tier 3 Scorecard Automatically Accepted",
+                badge_text="AUTO-ACCEPTED",
+                badge_bg="#6d28d9",
+                border_color="#6d28d9",
+                intro_text=f"The Tier 3 Scorecard for <strong>{emp_name}</strong> ({period_name} {fy_name}) has been <strong>AUTOMATICALLY ACCEPTED</strong> by the system because the deadline (<strong>{deadline_str}</strong>) passed without employee review.",
+                details=details,
+                action_btn_text="🎯 View Auto-Accepted Scorecard",
+                action_btn_color="#5b21b6",
+                footer_note="Scorecard accepted automatically by system policy.",
             )
 
     def action_reject(self):
@@ -440,57 +543,31 @@ class T3Scorecard(models.Model):
         }
 
     def action_confirm(self):
-        for rec in self:
-            if not (rec.is_current_manager or rec.is_hr_role or rec.is_admin_role or self.env.is_admin()):
-                raise UserError('Only the Manager or HR administrator can confirm this Tier 3 Scorecard.')
-            rec.write({'state': 'confirmed'})
-            
-            emp = rec.employee_id
-            emp_user = emp.user_id if emp else False
-            emp_partner = emp_user.partner_id if emp_user else False
-            partner_ids = [emp_partner.id] if emp_partner else []
-
-            period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else ''
-            fy_name = rec.fiscal_year_id.name if rec.fiscal_year_id else ''
-            emp_name = emp.name if emp else 'Employee'
-            manager_name = (rec.manager_id.name if rec.manager_id else (self.env.user.name or 'Manager'))
-            doc_name = rec.planning_name or rec.name or f"Scorecard - {emp_name}"
-
-            try:
-                rec.activity_feedback(['mail.mail_activity_data_todo'], feedback="Scorecard confirmed by manager.")
-            except Exception:
-                pass
-
-            details = [
-                ("Document Name", f"<strong>{doc_name}</strong>"),
-                ("Employee", f"<strong>{emp_name}</strong>"),
-                ("Manager", manager_name),
-                ("Appraisal Period", f"{period_name} ({fy_name})"),
-                ("Total Weight", f"{rec.total_weight:.2f}%"),
-                ("Current Status", '<span style="background-color: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">CONFIRMED</span>'),
-            ]
-
-            send_performance_notification(
-                record=rec,
-                title="🔒 Scorecard Confirmed & Finalized",
-                badge_text="CONFIRMED",
-                badge_bg="#425727",
-                border_color="#425727",
-                intro_text=f"Manager <strong>{manager_name}</strong> has <strong>CONFIRMED &amp; FINALIZED</strong> the Tier 3 Scorecard for <strong>{emp_name}</strong> for period <strong>{period_name}</strong> ({fy_name}).",
-                details=details,
-                action_btn_text="🎯 View Confirmed Scorecard",
-                action_btn_color="#425727",
-                footer_note="Scorecard targets are confirmed and active for appraisal evaluation.",
-                recipient_partner_ids=partner_ids,
-            )
+        raise UserError('Confirm action is no longer required on scorecards. Once accepted by the employee, the scorecard targets are finalized and active for appraisal.')
 
     def action_reset_draft(self):
         for rec in self:
+            if rec.state == 'rejected':
+                if not rec.manager_rejection_reply or not rec.manager_rejection_reply.strip():
+                    return {
+                        'name': 'Reply to Employee Rejection Reason',
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'performance.rejection.reply.wizard',
+                        'view_mode': 'form',
+                        'target': 'new',
+                        'context': {
+                            'default_res_model': rec._name,
+                            'default_res_id': rec.id,
+                            'default_action_type': 'reset_draft',
+                            'default_rejection_reason': rec.rejection_reason,
+                        },
+                    }
+        for rec in self:
             if rec.is_current_employee and not (rec.is_current_manager or rec.is_hr_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Employees are not permitted to reset scorecards to draft.')
-            if rec.state == 'confirmed':
+            if rec.state in ('accepted', 'auto_accepted'):
                 if not (rec.is_hr_role or rec.is_admin_role or self.env.is_admin()):
-                    raise UserError('Once confirmed by the manager, only the HR administrator can reset this Tier 3 Scorecard to draft.')
+                    raise UserError('Once accepted, only the HR administrator can reset this Tier 3 Scorecard to draft.')
             elif not (rec.is_current_manager or rec.is_hr_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Only the Manager or HR administrator can reset this Tier 3 Scorecard to draft.')
             rec.write({'state': 'draft'})
@@ -498,12 +575,16 @@ class T3Scorecard(models.Model):
 
     def write(self, vals):
         for rec in self:
+            if rec.state == 'rejected' and vals.get('state') in ('notified', 'draft'):
+                reply = vals.get('manager_rejection_reply') or rec.manager_rejection_reply
+                if not reply or not str(reply).strip():
+                    raise UserError("You must provide a reply/response to the employee's rejection reason before re-notifying or resetting to draft.")
             if rec.is_current_employee and not (rec.is_current_manager or rec.is_hr_role or rec.is_admin_role or self.env.is_admin()):
-                allowed_fields = {'state', 'accepted_by', 'rejection_reason'}
+                allowed_fields = {'state', 'accepted_by', 'rejection_reason', 'manager_rejection_reply'}
                 if not set(vals.keys()).issubset(allowed_fields):
                     raise UserError('Employees are not permitted to edit scorecards.')
-            if rec.state in ('accepted', 'confirmed', 'appraisal_started'):
-                allowed_fields = {'state', 'accepted_by', 'rejection_reason'}
+            if rec.state in ('accepted', 'auto_accepted', 'appraisal_started'):
+                allowed_fields = {'state', 'accepted_by', 'rejection_reason', 'manager_rejection_reply'}
                 if rec.is_hr_role or rec.is_admin_role or self.env.is_admin():
                     allowed_fields |= {'manager_id', 'employee_id', 'job_id', 'operating_unit_id', 'fiscal_year_id', 'appraisal_period_id'}
                 if not set(vals.keys()).issubset(allowed_fields):
@@ -515,7 +596,7 @@ class T3Scorecard(models.Model):
 
     def unlink(self):
         for rec in self:
-            if rec.state in ('accepted', 'confirmed', 'appraisal_started'):
+            if rec.state in ('accepted', 'auto_accepted', 'appraisal_started'):
                 raise UserError(
                     'This Tier 3 Scorecard is %s and cannot be deleted.'
                     % dict(rec._fields['state'].selection).get(rec.state, rec.state)
@@ -542,14 +623,27 @@ class T3Scorecard(models.Model):
 
         direct_template_map = {}
         branch_template_map = {}
+        district_area_template_map = {}
         for t in active_templates:
             measures = t.line_ids.mapped('job_measure_id').filtered(lambda m: m and m.exists() and m.active)
             if t.operating_unit_id:
                 direct_template_map[(t.operating_unit_id.id, t.job_id.id)] = measures
             if t.is_branch_unit:
                 branch_template_map[t.job_id.id] = measures
+            if getattr(t, 'is_district_area_unit', False):
+                district_area_template_map[t.job_id.id] = measures
 
         branch_types = ('branch', 'sub_branch', 'service_center')
+        district_area_types = ('district_office', 'area_office', 'district', 'area')
+        def _is_dist_area(u):
+            if not u:
+                return False
+            w = getattr(u, 'work_unit_type', '') or ''
+            if w in district_area_types:
+                return True
+            nm = (u.name or '').lower()
+            return 'district' in nm or 'area' in nm
+
         vals_list = []
         for scorecard in self:
             emp_unit = scorecard.operating_unit_id
@@ -568,6 +662,12 @@ class T3Scorecard(models.Model):
                         is_branch = True
                 if is_branch and emp_job.id in branch_template_map:
                     measures = branch_template_map[emp_job.id]
+                else:
+                    is_dist_area = _is_dist_area(emp_unit)
+                    if not is_dist_area and scorecard.employee_id:
+                        is_dist_area = _is_dist_area(scorecard.employee_id.default_operating_unit_id)
+                    if is_dist_area and emp_job.id in district_area_template_map:
+                        measures = district_area_template_map[emp_job.id]
 
             if not measures:
                 # Fallback to direct JobMeasures if configured outside templates
@@ -591,6 +691,13 @@ class T3Scorecard(models.Model):
 
         new_lines = Line.create(vals_list)
         self._compute_total_weight()
+        for scorecard in self:
+            if round(scorecard.total_weight, 2) != 100.0:
+                raise UserError(
+                    f"Populated Tier 3 Scorecard lines for '{scorecard.planning_name or scorecard.employee_id.name}' "
+                    f"total {round(scorecard.total_weight, 2)}% (must be exactly 100%). "
+                    "Please adjust the Position Scorecard Template/Measurements so that total weight is exactly 100%."
+                )
         return new_lines
 
 
@@ -656,7 +763,7 @@ class T3ScorecardLine(models.Model):
         string='Measurement',
         required=True,
         ondelete='cascade',
-        domain="['|', ('operating_unit_id', '=', scorecard_operating_unit_id), ('operating_unit_id.work_unit_type', 'in', ('branch', 'sub_branch', 'service_center')), ('job_id', '=', scorecard_job_id)]",
+        domain="['|', '|', ('operating_unit_id', '=', scorecard_operating_unit_id), ('operating_unit_id.work_unit_type', 'in', ('branch', 'sub_branch', 'service_center', 'district_office', 'area_office')), ('job_id', '=', scorecard_job_id)]",
     )
     job_objective_id = fields.Many2one(
         related='job_measure_id.job_objective_id', store=True, readonly=True,

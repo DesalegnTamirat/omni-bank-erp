@@ -1,27 +1,74 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="view_automatic_scorecard_notify_wizard_form" model="ir.ui.view">
         <field name="name">automatic.scorecard.notify.wizard.form</field>
         <field name="model">automatic.scorecard.notify.wizard</field>
         <field name="arch" type="xml">
             <form string="Automatic Scorecard Notify">
-                <group>
-                    <field name="planning_name" options="{'no_create': True}"/>
-                    <field name="appraisal_period"/>
-                    <field name="fiscal_year" options="{'no_create': True}"/>
-                </group>
+                <field name="state" invisible="1"/>
+                <field name="notified_count" invisible="1"/>
+                <field name="draft_total_count" invisible="1"/>
+                <field name="skipped_count" invisible="1"/>
+
+                <sheet>
+                    <!-- STEP 1: DRAFT FORM -->
+                    <div invisible="state != 'draft'">
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                            <i class="fa fa-info-circle fa-2x me-3 text-info"/>
+                            <div>
+                                Select the <strong>Planning Name</strong> and <strong>Tier</strong> to automatically notify all assigned employees whose scorecards are currently in <strong>Draft</strong> state.
+                            </div>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="planning_name" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="tier" widget="radio" options="{'horizontal': true}"/>
+                                <field name="accept_by"/>
+                            </group>
+                            <group>
+                                <field name="fiscal_year" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="appraisal_period" readonly="1"/>
+                                <field name="draft_scorecard_count" string="Draft Scorecards Found" readonly="1"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <!-- STEP 2: NOTIFICATION RESULT SUMMARY -->
+                    <div invisible="state != 'result'">
+                        <field name="summary_header_html" readonly="1" nolabel="1"/>
+                        <div class="mb-2" invisible="skipped_count == 0">
+                            <h6 class="fw-bold text-dark"><i class="fa fa-wrench text-warning me-2"/>Scorecards Requiring Adjustment:</h6>
+                            <p class="text-muted small mb-2">The following scorecards were skipped because their targets or weights are incomplete. Click <strong>Open Drafts to Adjust</strong> to view and fix them:</p>
+                        </div>
+                        <field name="skipped_details_html" readonly="1" nolabel="1" invisible="skipped_count == 0"/>
+                        <div class="alert alert-success d-flex align-items-center" role="alert" invisible="skipped_count != 0">
+                            <i class="fa fa-check-circle fa-2x me-3 text-success"/>
+                            <div>
+                                All draft scorecards met the criteria and were successfully notified!
+                            </div>
+                        </div>
+                    </div>
+                </sheet>
+
                 <footer>
-                    <button name="action_populate" string="Populate"  type="object" class="btn-primary"/>
-                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                    <div invisible="state != 'draft'" class="d-flex gap-2">
+                        <button name="action_notify" string="Notify" type="object" class="btn-primary" icon="fa-paper-plane"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </div>
+                    <div invisible="state != 'result'" class="d-flex gap-2">
+                        <button name="action_view_drafts_to_adjust" string="Open Drafts to Adjust" type="object" class="btn-primary" icon="fa-wrench" invisible="skipped_count == 0"/>
+                        <button name="action_view_notified" string="View Notified Scorecards" type="object" class="btn-secondary" icon="fa-check" invisible="notified_count == 0"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </div>
                 </footer>
             </form>
         </field>
     </record>
-    <record id ="action_automatic_scorecard_notify_wizard" model="ir.actions.act_window">
+
+    <record id="action_automatic_scorecard_notify_wizard" model="ir.actions.act_window">
         <field name="name">Automatic Scorecard Notify</field>
         <field name="res_model">automatic.scorecard.notify.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
 </odoo>
-

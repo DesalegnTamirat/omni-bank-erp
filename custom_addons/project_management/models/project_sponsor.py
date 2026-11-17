@@ -22,9 +22,9 @@ class PmProjectSponsor(models.Model):
     )
     project_count = fields.Integer(string='Projects Count', compute='_compute_project_count')
 
-    _code_unique = models.Constraint(
-        'unique(code)', 'The Sponsor Code must be unique!'
-    )
+    _sql_constraints = [
+        ('code_unique', 'unique(code)', 'The Sponsor Code must be unique!')
+    ]
 
     @api.depends('head_id')
     def _compute_user_id(self):

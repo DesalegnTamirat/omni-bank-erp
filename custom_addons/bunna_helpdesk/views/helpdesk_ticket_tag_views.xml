@@ -68,7 +68,7 @@
                     <t t-name="card">
                         <div class="d-flex align-items-center justify-content-between">
                             <div class="d-flex align-items-center gap-2">
-                                <i class="fa fa-tag fs-5 text-primary" />
+                                <i class="fa fa-tag fs-5 text-primary" title="Tag" />
                                 <field class="fw-bold fs-5" name="name" />
                             </div>
                             <field name="color" widget="kanban_color_picker" />

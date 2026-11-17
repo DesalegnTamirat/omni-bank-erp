@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree View -->
+    <record id="view_committee_role_config_tree" model="ir.ui.view">
+        <field name="name">committee.role.config.list</field>
+        <field name="model">committee.role.config</field>
+        <field name="arch" type="xml">
+            <list string="Committee Approval Role Configurations" decoration-muted="not active">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="approval_hierarchy_type"/>
+                <field name="scope"/>
+                <field name="chairperson_title"/>
+                <field name="panel_member_title"/>
+                <field name="secretary_title"/>
+                <field name="observer_title"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_committee_role_config_form" model="ir.ui.view">
+        <field name="name">committee.role.config.form</field>
+        <field name="model">committee.role.config</field>
+        <field name="arch" type="xml">
+            <form string="Committee Approval Role Configuration">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Configuration Title"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Head Office &amp; District Grade II and above"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Hierarchy Category &amp; Scope">
+                            <field name="approval_hierarchy_type" readonly="1"/>
+                            <field name="scope"/>
+                        </group>
+                        <group string="Settings">
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-info" role="alert">
+                        <strong>ℹ️ Unified Configuration:</strong>
+                        This configuration dynamically drives committee member eligibility and dropdown restrictions across <strong>Transfer Vacancies</strong>, <strong>Promotion Vacancies (Internal)</strong>, and <strong>External Vacancies</strong>. When Job Positions are selected, matching employees are automatically fetched.
+                    </div>
+
+                    <notebook>
+                        <!-- Role 1: Chairperson -->
+                        <page string="1. Chairperson" name="chairperson">
+                            <field name="chairperson_job_domain" invisible="1"/>
+                            <field name="chairperson_employee_domain" invisible="1"/>
+                            <group>
+                                <group string="Role Designation">
+                                    <field name="chairperson_title"/>
+                                </group>
+                                <group string="Allowed People">
+                                    <field name="chairperson_job_ids" widget="many2many_tags"
+                                           domain="chairperson_job_domain"
+                                           options="{'no_create': True}"/>
+                                    <field name="chairperson_employee_ids" widget="many2many_tags"
+                                           domain="chairperson_employee_domain"
+                                           options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Role 2: Panel Member -->
+                        <page string="2. Panel Member" name="panel_member">
+                            <field name="panel_member_job_domain" invisible="1"/>
+                            <field name="panel_member_employee_domain" invisible="1"/>
+                            <group>
+                                <group string="Role Designation">
+                                    <field name="panel_member_title"/>
+                                    <field name="panel_member_is_unit_head"/>
+                                </group>
+                                <group string="Allowed People">
+                                    <field name="panel_member_job_ids" widget="many2many_tags"
+                                           domain="panel_member_job_domain"
+                                           options="{'no_create': True}"/>
+                                    <field name="panel_member_employee_ids" widget="many2many_tags"
+                                           domain="panel_member_employee_domain"
+                                           options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Role 3: Panel Member & Secretary -->
+                        <page string="3. Panel Member &amp; Secretary" name="secretary">
+                            <field name="secretary_job_domain" invisible="1"/>
+                            <field name="secretary_employee_domain" invisible="1"/>
+                            <group>
+                                <group string="Role Designation">
+                                    <field name="secretary_title"/>
+                                </group>
+                                <group string="Allowed People">
+                                    <field name="secretary_job_ids" widget="many2many_tags"
+                                           domain="secretary_job_domain"
+                                           options="{'no_create': True}"/>
+                                    <field name="secretary_employee_ids" widget="many2many_tags"
+                                           domain="secretary_employee_domain"
+                                           options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Role 4: Labor Representative (Observer) -->
+                        <page string="4. Labor Representative (Observer)" name="observer">
+                            <field name="observer_job_domain" invisible="1"/>
+                            <field name="observer_employee_domain" invisible="1"/>
+                            <group>
+                                <group string="Role Designation">
+                                    <field name="observer_title"/>
+                                </group>
+                                <group string="Allowed People">
+                                    <field name="observer_job_ids" widget="many2many_tags"
+                                           domain="observer_job_domain"
+                                           options="{'no_create': True}"/>
+                                    <field name="observer_employee_ids" widget="many2many_tags"
+                                           domain="observer_employee_domain"
+                                           options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_committee_role_config_search" model="ir.ui.view">
+        <field name="name">committee.role.config.search</field>
+        <field name="model">committee.role.config</field>
+        <field name="arch" type="xml">
+            <search string="Search Committee Configurations">
+                <field name="name"/>
+                <field name="approval_hierarchy_type"/>
+                <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="filter_archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_by_hierarchy" string="Hierarchy Category" context="{'group_by': 'approval_hierarchy_type'}"/>
+                    <filter name="group_by_scope" string="Scope" context="{'group_by': 'scope'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Window -->
+    <record id="action_committee_role_config" model="ir.actions.act_window">
+        <field name="name">Committee Approval Roles</field>
+        <field name="res_model">committee.role.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_committee_role_config_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure Committee Approval Roles for Minutes!
+            </p>
+            <p>
+                Define authorized job positions and allowed employees for Chairperson, Panel Members, Secretary, and Observers for each approval hierarchy tier.
+            </p>
+        </field>
+    </record>
+
+</odoo>

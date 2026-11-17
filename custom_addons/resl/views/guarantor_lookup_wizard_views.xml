@@ -23,6 +23,7 @@
                         <group>
                             <field name="loan_id" invisible="1"/>
                             <field name="loan_created_here" invisible="1"/>
+                            <field name="pre_agreed" invisible="1"/>
                             <field name="borrower_id" invisible="1"/>
                             <!-- Picking an employee here adds him/her to the list
                                  below straight away (onchange). Nothing is saved:

@@ -22,6 +22,12 @@ export class PerformanceDashboard extends Component {
             },
             data: null,
             watchlist_tab: 'pending',
+            coverageModal: {
+                isOpen: false,
+                tier: 't2',
+                filter: 'all',
+                search: '',
+            },
         });
 
         this.bellCurveCanvas = useRef("bellCurveChart");
@@ -444,6 +450,116 @@ export class PerformanceDashboard extends Component {
             domain.push(['department_id', '=', this.state.filters.department_id]);
         }
         this.openFilteredList(model, domain, title);
+    }
+
+    /**
+     * Opens interactive modal drilldown for Coverage Tracker.
+     * @param {string} tier  - 't1' | 't2' | 't3'
+     * @param {string} filter - 'all' | 'covered' | 'missing'
+     */
+    openCoverageModal(tier, filter = 'all') {
+        this.state.coverageModal.isOpen = true;
+        this.state.coverageModal.tier = tier;
+        this.state.coverageModal.filter = filter;
+        this.state.coverageModal.search = '';
+    }
+
+    openCoverageList(tier, filter) {
+        this.openCoverageModal(tier, filter);
+    }
+
+    closeCoverageModal() {
+        this.state.coverageModal.isOpen = false;
+        this.state.coverageModal.search = '';
+    }
+
+    setCoverageModalFilter(filter) {
+        this.state.coverageModal.filter = filter;
+    }
+
+    onCoverageModalSearch(ev) {
+        this.state.coverageModal.search = (ev.target.value || '').toLowerCase().trim();
+    }
+
+    getFilteredCoverageItems() {
+        const pc = this.state.data && this.state.data.position_coverage;
+        if (!pc) return [];
+        const tierKey = this.state.coverageModal.tier === 't1' ? 'tier1' : (this.state.coverageModal.tier === 't2' ? 'tier2' : 'tier3');
+        const tierData = pc[tierKey];
+        if (!tierData) return [];
+
+        let items = [];
+        if (this.state.coverageModal.filter === 'covered') {
+            items = tierData.covered || [];
+        } else if (this.state.coverageModal.filter === 'missing') {
+            items = tierData.uncovered || [];
+        } else {
+            items = tierData.all || [];
+        }
+
+        const q = (this.state.coverageModal.search || '').toLowerCase();
+        if (!q) return items;
+
+        return items.filter(item => {
+            const title = (item.title || '').toLowerCase();
+            const dept = (item.department || '').toLowerCase();
+            const mgr = (item.manager_name || '').toLowerCase();
+            const wut = (item.work_unit_type || '').toLowerCase();
+            return title.includes(q) || dept.includes(q) || mgr.includes(q) || wut.includes(q);
+        });
+    }
+
+    openScorecardsForJob(jobId, jobTitle) {
+        this.closeCoverageModal();
+        const domain = [['job_id', '=', jobId]];
+        if (this.state.filters.fiscal_year_id) {
+            domain.push(['fiscal_year_id', '=', this.state.filters.fiscal_year_id]);
+        }
+        if (this.state.filters.appraisal_period_id) {
+            domain.push(['appraisal_period_id', '=', this.state.filters.appraisal_period_id]);
+        }
+        this.openFilteredList('t3.scorecard', domain, `Tier 3 – Scorecards for ${jobTitle}`);
+    }
+
+    openScorecardDirect(model, scId) {
+        this.closeCoverageModal();
+        if (!scId) return;
+        this.openRecord(model, scId);
+    }
+
+    createNewScorecardFor(tier, item) {
+        this.closeCoverageModal();
+        let model = 't3.scorecard';
+        const context = {};
+        if (this.state.filters.fiscal_year_id) {
+            context.default_fiscal_year_id = this.state.filters.fiscal_year_id;
+        }
+        if (this.state.filters.appraisal_period_id) {
+            context.default_appraisal_period_id = this.state.filters.appraisal_period_id;
+        }
+
+        if (tier === 't1') {
+            model = 'corporate.scorecard';
+        } else if (tier === 't2') {
+            model = 't2.scorecard';
+            if (item && item.id) {
+                context.default_operating_unit_id = item.id;
+            }
+        } else if (tier === 't3') {
+            model = 't3.scorecard';
+            if (item && item.id) {
+                context.default_job_id = item.id;
+            }
+        }
+
+        this.action.doAction({
+            name: 'Create Scorecard',
+            type: 'ir.actions.act_window',
+            res_model: model,
+            views: [[false, 'form']],
+            context: context,
+            target: 'current',
+        });
     }
 }
 

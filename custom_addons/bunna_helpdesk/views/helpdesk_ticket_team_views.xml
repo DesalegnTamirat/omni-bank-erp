@@ -4,7 +4,7 @@
         <field name="name">helpdesk.ticket.team.search</field>
         <field name="model">helpdesk.ticket.team</field>
         <field name="arch" type="xml">
-            <search string="Helpdesk Team Search">
+            <search string="Responsible Operating Unit Search">
                 <filter
                     string="Archived"
                     name="inactive"
@@ -12,6 +12,7 @@
                 />
                 <separator />
                 <field name="name" filter_domain="[('name', 'ilike', self)]" />
+                <field name="operating_unit_id" />
                 <field
                     name="user_ids"
                     string="User"
@@ -19,6 +20,11 @@
                 />
                 <field name="company_id" groups="base.group_multi_company" />
                 <group>
+                    <filter
+                        string="Responsible Operating Unit"
+                        name="group_operating_unit"
+                        context="{'group_by': 'operating_unit_id'}"
+                    />
                     <filter
                         string="Company"
                         name="company"
@@ -34,7 +40,7 @@
         <field name="name">view.helpdesk_team.form</field>
         <field name="model">helpdesk.ticket.team</field>
         <field name="arch" type="xml">
-            <form string="Helpdesk Team">
+            <form string="Responsible Operating Unit" create="false">
                 <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button
@@ -54,25 +60,27 @@
                         invisible="active"
                     />
                     <div class="oe_title">
-                        <label for="name" class="oe_edit_only" string="Helpdesk Team" />
+                        <label for="name" class="oe_edit_only" string="Responsible Operating Unit" />
                         <h1>
-                            <field name="name" placeholder="Helpdesk Team name..." />
+                            <field name="name" placeholder="Responsible Operating Unit name..." />
                         </h1>
                         <div name="options_active" />
                         <label
                             for="parent_id"
                             class="oe_edit_only"
-                            string="Parent Team"
+                            string="Parent Operating Unit"
                         />
                         <h4>
-                            <field name="parent_id" placeholder="Parent Team name..." />
+                            <field name="parent_id" placeholder="Parent Operating Unit name..." />
                         </h4>
                         <div name="options_active" />
                     </div>
                     <group>
                         <group name="left" string="General">
                             <field name="active" invisible="1" />
-                            <field name="user_id" domain="[('share', '=', False)]" />
+                            <field name="operating_unit_id" options="{'no_create': True}" placeholder="Select Directorate / Operating Unit..." />
+                            <field name="parent_operating_unit_id" invisible="not parent_operating_unit_id" readonly="1" string="Parent Operating Unit" />
+                            <field name="user_id" domain="[('share', '=', False)]" options="{'no_create': True}" placeholder="Select Team Leader / Manager..." />
                             <label for="alias_name" string="Email Alias" />
                             <div class="oe_inline" name="alias_def">
                                 <field
@@ -147,18 +155,46 @@
                     <!-- SLA Policies tab -->
                     <notebook>
                         <page name="members" string="Team Members">
+                            <div class="alert alert-light border d-flex flex-wrap align-items-center justify-content-between p-3 mb-3" role="status">
+                                <div class="d-flex align-items-center mb-2 mb-md-0">
+                                    <i class="fa fa-users fa-2x me-3 text-primary" title="Team Members" />
+                                    <div>
+                                        <div class="fw-bold fs-6">Operating Unit Team Members &amp; Specialization</div>
+                                        <div class="small text-muted">
+                                            Divide and assign Operating Unit employees into <strong>Frontend (L1)</strong>, <strong>Backend (L2)</strong>, and <strong>Managers (L3+)</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <span class="badge text-bg-info fs-6 py-2 px-3">
+                                        <i class="fa fa-desktop me-1" title="Frontend" /> Frontend: <field name="frontend_member_count" />
+                                    </span>
+                                    <span class="badge text-bg-primary fs-6 py-2 px-3">
+                                        <i class="fa fa-cogs me-1" title="Backend" /> Backend: <field name="backend_member_count" />
+                                    </span>
+                                    <span class="badge text-bg-success fs-6 py-2 px-3">
+                                        <i class="fa fa-user-tie me-1" title="Managers" /> Managers: <field name="manager_member_count" />
+                                    </span>
+                                </div>
+                            </div>
                             <field
                                 name="user_ids"
                                 widget="many2many"
-                                options="{'not_delete': True}"
                             >
+                                <list editable="bottom" string="Operating Unit Members &amp; Roles" create="false" delete="false">
+                                    <field name="name" string="Employee / Member Name" readonly="1" />
+                                    <field name="helpdesk_role" string="Role / Specialization (Frontend / Backend / Manager)" widget="selection" decoration-info="helpdesk_role in ('frontend', 'support')" decoration-primary="helpdesk_role in ('backend', 'fullstack', 'database')" decoration-warning="helpdesk_role in ('qa', 'supervisor')" decoration-success="helpdesk_role in ('manager', 'director', 'deputy_cto', 'cido', 'ceo')" />
+                                    <field name="agent_duty_status" widget="badge" decoration-success="agent_duty_status == 'available'" decoration-warning="agent_duty_status in ('busy', 'on_break')" decoration-danger="agent_duty_status == 'offline'" readonly="1" />
+                                    <field name="login" string="Login / Email" readonly="1" />
+                                </list>
                                 <kanban
                                     quick_create="false"
-                                    create="true"
-                                    delete="true"
+                                    create="false"
+                                    delete="false"
                                 >
                                     <field name="id" />
                                     <field name="name" />
+                                    <field name="helpdesk_role" />
                                     <field name="agent_duty_status" />
                                     <field name="agent_duty_status_reason" />
                                     <templates>
@@ -175,7 +211,13 @@
 
                                             <main class="ps-2 ps-md-0 d-flex flex-column justify-content-center">
                                                 <field name="name" class="fw-bold" />
-                                                <div class="mt-1">
+                                                <div class="d-flex flex-wrap gap-1 mt-1">
+                                                    <field name="helpdesk_role" widget="badge"
+                                                        decoration-info="helpdesk_role in ('frontend', 'support')"
+                                                        decoration-primary="helpdesk_role in ('backend', 'fullstack', 'database')"
+                                                        decoration-warning="helpdesk_role in ('qa', 'supervisor')"
+                                                        decoration-success="helpdesk_role in ('manager', 'director', 'deputy_cto', 'cido', 'ceo')"
+                                                    />
                                                     <field name="agent_duty_status" widget="badge"
                                                         decoration-success="agent_duty_status == 'available'"
                                                         decoration-warning="agent_duty_status in ('busy', 'on_break')"
@@ -211,12 +253,12 @@
                                     <field name="code" string="Code" placeholder="e.g. A2A_IN" />
                                     <field name="default_priority" widget="priority" />
                                     <field name="case_type_id" string="Case Type" options="{'no_create': True}" />
-                                    <field name="service_family_id" string="Service Family" options="{'no_create': True}" />
+                                    <field name="service_family_id" string="Service" options="{'no_create': True}" />
                                     <field
                                         name="service_id"
-                                        string="Service"
+                                        string="Sub Service"
                                         options="{'no_create': True}"
-                                        domain="[('family_id', '=', service_family_id)] if service_family_id else []"
+                                        
                                     />
                                     <field name="target_hours" string="SLA (Hours)" />
                                     <field name="active" widget="boolean_toggle" />
@@ -234,9 +276,12 @@
         <field name="name">view.helpdesk_team.list</field>
         <field name="model">helpdesk.ticket.team</field>
         <field name="arch" type="xml">
-            <list>
+            <list create="false">
                 <field name="sequence" widget="handle" />
-                <field name="name" />
+                <field name="complete_name" string="Responsible Operating Unit (Hierarchy)" decoration-bf="1" />
+                <field name="operating_unit_id" optional="show" string="Operating Unit" />
+                <field name="parent_id" optional="show" string="Parent Operating Unit" />
+                <field name="user_id" string="Team Leader" optional="show" />
                 <field name="visibility" />
                 <field name="assignment_method" />
                 <field name="category_ids" widget="many2many_tags" />
@@ -267,8 +312,9 @@
         <field name="model">helpdesk.ticket.team</field>
         <field name="priority">16</field>
         <field name="arch" type="xml">
-            <kanban class="o_kanban_mobile">
+            <kanban class="o_kanban_mobile" create="false">
                 <field name="name" />
+                <field name="operating_unit_id" />
                 <field name="user_id" />
                 <field name="user_ids" />
                 <field name="category_ids" />
@@ -278,7 +324,7 @@
                     <t t-name="card">
                         <div class="d-flex align-items-center justify-content-between mb-1">
                             <span class="badge text-bg-primary">
-                                <i class="fa fa-ticket me-1" />
+                                <i class="fa fa-ticket me-1" title="Active Tickets" />
                                 <field name="todo_ticket_count" /> Active
                             </span>
                             <span class="badge text-bg-danger" t-if="record.todo_ticket_count_high_priority.raw_value">
@@ -286,8 +332,12 @@
                             </span>
                         </div>
                         <field class="fw-bold fs-5 text-truncate" name="name" />
+                        <div class="text-muted small mt-1" t-if="record.operating_unit_id.value">
+                            <i class="fa fa-building-o me-1 text-primary" title="Operating Unit" />
+                            <field name="operating_unit_id" />
+                        </div>
                         <div class="text-muted small mt-1" t-if="record.user_id.value">
-                            <i class="fa fa-user me-1" />
+                            <i class="fa fa-user me-1" title="Team Leader" />
                             Lead: <field name="user_id" />
                         </div>
                         <div class="mt-2" t-if="record.category_ids.raw_value and record.category_ids.raw_value.length">

@@ -79,7 +79,7 @@ class TestSmsEmailNotifications(TransactionCase):
         self.assertFalse(ticket.acceptance_sms_sent)
 
         # Explicit header action sends SMS
-        ticket.header_action = "accept"
+        ticket.header_action = "escalated"
         ticket.header_channel = "sms"
         with patch(POST, return_value=_ok_response()) as post:
             ticket.action_execute_header_notification()

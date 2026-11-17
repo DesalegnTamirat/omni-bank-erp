@@ -9,9 +9,18 @@
             <field name="model">resl.loan</field>
             <field name="arch" type="xml">
                 <search string="Search Staff Loans">
-                    <field name="name"/>
-                    <field name="employee_id"/>
+                    <field name="name" string="Reference / Borrower / ID / Guarantor / Account"
+                        filter_domain="['|','|','|','|','|',
+                            ('name','ilike',self),
+                            ('employee_id.name','ilike',self),
+                            ('employee_id.barcode','ilike',self),
+                            ('employee_id.identification_id','ilike',self),
+                            ('guarantor_line_ids.guarantor_id.name','ilike',self),
+                            ('bank_account_number','ilike',self)]"/>
+                    <field name="employee_id" string="Borrower"/>
                     <field name="designated_approver_id"/>
+                    <field name="operating_unit_id" string="Branch / Work Unit"/>
+                    <field name="bank_account_number" string="Bank Account Number"/>
                     <field name="disbursement_requested_by_id" string="Disbursement Requested By"/>
                     <field name="disbursed_by_id" string="Disbursed By"/>
                     <separator/>
@@ -60,6 +69,20 @@
             <field name="context">{'resl_check_on_new': True}</field>
             <field name="help" type="html">
                 <p class="oe_view_nocontent_create">Create staff loan requests.</p>
+            </field>
+        </record>
+
+        <!-- Print Agreements: open approved / manager-review loans to print the signed agreement.
+             Visible only to managers, HR, auditors, accountants (groups enforced in the menu too).
+             Filter is by status so it works without storing agr_can_print. -->
+        <record id="action_resl_print_agreements" model="ir.actions.act_window">
+            <field name="name">Print Agreements</field>
+            <field name="res_model">resl.loan</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('custom_saved','=',True),('name','!=','New'),('status','in',['manager_review','approved'])]</field>
+            <field name="search_view_id" ref="view_resl_loan_search"/>
+            <field name="help" type="html">
+                <p>Approved and in-review loans whose agreement can be printed.</p>
             </field>
         </record>
 
@@ -397,7 +420,7 @@
                                 icon="fa-exchange"
                                 class="btn-secondary"
                                 context="{'default_is_hr_action': True}"
-                                invisible="not has_replaceable_guarantor or not can_ho_replace or (is_employee_user and employee_active and is_eligible and status in ('draft','guarantor_pending','manager_review'))"/>
+                                invisible="not has_replaceable_guarantor or not can_ho_replace or (is_employee_user and employee_active and is_eligible and status in ('draft','guarantor_pending','manager_review')) or (is_employee_user and status not in ('draft','guarantor_pending','manager_review'))"/>
 
                             <!-- Approve -->
                             <field name="can_approve" invisible="1"/>
@@ -604,10 +627,11 @@
                                 <group>
                                     <group string="Core Banking (FR-RESL-019)">
                                         <field name="core_banking_status" readonly="1"/>
-                                        <field name="disbursement_officer_id" readonly="1"
-                                               invisible="not disbursement_officer_id"/>
+                                        <field name="disbursement_officer_ids" readonly="1"
+                                               widget="many2many_tags"
+                                               invisible="not disbursement_officer_ids"/>
                                         <field name="disbursement_officer_role" readonly="1"
-                                               invisible="not disbursement_officer_id"/>
+                                               invisible="not disbursement_officer_ids"/>
                                         <field name="core_banking_ref" readonly="core_banking_status == 'disbursed'"/>
                                         <field name="bank_account_number" readonly="1"
                                                string="Disbursed-to Account No."/>

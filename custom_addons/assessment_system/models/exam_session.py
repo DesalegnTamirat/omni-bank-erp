@@ -3,7 +3,7 @@
 import secrets
 import random
 from datetime import datetime, timedelta
-from markupsafe import Markup
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 
@@ -30,12 +30,76 @@ class ExamSession(models.Model):
     )
     job_id = fields.Many2one("hr.job", string="Job Position", store=True)
     vacancy_id = fields.Many2one("job.vacancy", string="Job Vacancy", store=True)
+    vacancy_reference = fields.Char(string="Vacancy Reference", compute="_compute_vacancy_reference", store=True)
+    is_external = fields.Boolean(string="Is External Vacancy", compute="_compute_is_external", store=True)
+    invitation_dispatched = fields.Boolean(
+        string="Invitations Dispatched",
+        compute="_compute_invitation_dispatched",
+        store=True,
+        readonly=False,
+        copy=False,
+    )
+    evaluations_finalized = fields.Boolean(
+        string="Evaluations Finalized",
+        compute="_compute_evaluations_finalized",
+        store=True,
+        readonly=False,
+        copy=False,
+    )
+
+    @api.depends("attempt_ids.state", "attempt_ids.invitation_sent_date")
+    def _compute_invitation_dispatched(self):
+        for rec in self:
+            has_dispatched = False
+            if rec.attempt_ids:
+                has_dispatched = any(a.invitation_sent_date for a in rec.attempt_ids) or all(a.state != 'assigned' for a in rec.attempt_ids)
+            if has_dispatched:
+                rec.invitation_dispatched = True
+            elif not rec.invitation_dispatched:
+                rec.invitation_dispatched = False
+
+    @api.depends("attempt_ids.state", "attempt_ids.score_percentage", "state", "vacancy_id.exam_scores_fetched")
+    def _compute_evaluations_finalized(self):
+        for rec in self:
+            if rec.state == "completed":
+                rec.evaluations_finalized = True
+            elif rec.attempt_ids and all(a.state in ("completed", "disqualified") for a in rec.attempt_ids):
+                target_vac = rec.vacancy_id or (rec.exam_id.vacancy_id if rec.exam_id else False)
+                if target_vac and getattr(target_vac, "exam_scores_fetched", False):
+                    rec.evaluations_finalized = True
+                elif not rec.evaluations_finalized:
+                    rec.evaluations_finalized = False
+            elif not rec.evaluations_finalized:
+                rec.evaluations_finalized = False
+
+    @api.depends("vacancy_id", "vacancy_id.reference", "exam_id.vacancy_id", "exam_id.vacancy_id.reference")
+    def _compute_vacancy_reference(self):
+        for rec in self:
+            ref = False
+            if rec.vacancy_id and rec.vacancy_id.reference:
+                ref = rec.vacancy_id.reference
+            elif rec.exam_id and rec.exam_id.vacancy_id and rec.exam_id.vacancy_id.reference:
+                ref = rec.exam_id.vacancy_id.reference
+            rec.vacancy_reference = ref
+
+    @api.depends("vacancy_reference", "vacancy_id.recruitment_type", "vacancy_id.sourcing_type")
+    def _compute_is_external(self):
+        for rec in self:
+            ref = (rec.vacancy_reference or "").upper()
+            rec_type = getattr(rec.vacancy_id, 'recruitment_type', '') or ''
+            sourcing = getattr(rec.vacancy_id, 'sourcing_type', '') or ''
+            rec.is_external = ("EXT" in ref) or (rec_type == 'External') or (sourcing == 'external')
 
     @api.onchange("vacancy_id")
     def _onchange_vacancy_id(self):
         if self.vacancy_id:
             if hasattr(self.vacancy_id, "job_position") and self.vacancy_id.job_position:
                 self.job_id = self.vacancy_id.job_position.id
+            if hasattr(self.vacancy_id, "written_exam_date") and self.vacancy_id.written_exam_date:
+                self.start_datetime = self.vacancy_id.written_exam_date
+                duration = self.duration_minutes or (self.exam_id.duration_minutes if self.exam_id else 60)
+                if duration > 0:
+                    self.end_datetime = self.start_datetime + timedelta(minutes=duration)
             # Auto-find matching Exam Definition for this vacancy/job
             exam = self.env["exam.definition"].search([
                 "|", ("vacancy_id", "=", self.vacancy_id.id), ("job_id", "=", self.job_id.id if self.job_id else False),
@@ -74,15 +138,75 @@ class ExamSession(models.Model):
             if duration > 0:
                 self.end_datetime = self.start_datetime + timedelta(minutes=duration)
 
+            now = fields.Datetime.now()
+            target_vac = self.vacancy_id or (self.exam_id.vacancy_id if self.exam_id else False)
+            if self.start_datetime < (now - timedelta(minutes=1)):
+                return {
+                    "warning": {
+                        "title": _("Back Date Not Allowed"),
+                        "message": _("Scheduled Start Time cannot be in the past (back date). Please select a date and time greater than or equal to current time.")
+                    }
+                }
+            if target_vac and getattr(target_vac, "written_exam_date", False) and target_vac.written_exam_date:
+                if self.start_datetime < target_vac.written_exam_date:
+                    vac_exam_str = fields.Datetime.context_timestamp(self, target_vac.written_exam_date).strftime("%Y-%m-%d %H:%M:%S")
+                    return {
+                        "warning": {
+                            "title": _("Earlier than Vacancy Examination Date"),
+                            "message": _(
+                                "Scheduled Start Time cannot be earlier than the Vacancy Examination Date (%(vac_date)s).\n"
+                                "It must be greater than or equal to the examination date for written exam."
+                            ) % {"vac_date": vac_exam_str}
+                        }
+                    }
+
+    @api.onchange("end_datetime")
+    def _onchange_end_datetime(self):
+        if self.end_datetime and self.start_datetime and self.end_datetime <= self.start_datetime:
+            return {
+                "warning": {
+                    "title": _("Invalid End Time"),
+                    "message": _("Scheduled End Time must be strictly after Scheduled Start Time.")
+                }
+            }
+
     start_datetime = fields.Datetime(string="Scheduled Start Time", required=True, tracking=True)
     end_datetime = fields.Datetime(string="Scheduled End Time", required=True, tracking=True)
     duration_minutes = fields.Integer(related="exam_id.duration_minutes", string="Duration (Mins)", readonly=True)
 
-    @api.constrains("start_datetime", "end_datetime")
+    @api.constrains("start_datetime", "end_datetime", "vacancy_id", "exam_id")
     def _check_start_end_datetime(self):
+        now = fields.Datetime.now()
+        grace_buffer = timedelta(minutes=1)
         for rec in self:
             if rec.start_datetime and rec.end_datetime and rec.end_datetime <= rec.start_datetime:
                 raise ValidationError(_("Scheduled End Time must be strictly after Scheduled Start Time."))
+
+            if rec.state in ("draft", "scheduled") and rec.start_datetime:
+                if rec.start_datetime < (now - grace_buffer):
+                    st_str = fields.Datetime.context_timestamp(rec, rec.start_datetime).strftime("%Y-%m-%d %H:%M:%S")
+                    now_str = fields.Datetime.context_timestamp(rec, now).strftime("%Y-%m-%d %H:%M:%S")
+                    raise ValidationError(_(
+                        "Scheduled Start Time cannot be in the past (back date)!\n\n"
+                        "Selected Start Time: %s\n"
+                        "Current Time: %s\n\n"
+                        "Please select a date and time greater than or equal to current time."
+                    ) % (st_str, now_str))
+
+                target_vac = rec.vacancy_id or (rec.exam_id.vacancy_id if rec.exam_id else False)
+                if target_vac and getattr(target_vac, "written_exam_date", False) and target_vac.written_exam_date:
+                    if rec.start_datetime < target_vac.written_exam_date:
+                        vac_exam_str = fields.Datetime.context_timestamp(rec, target_vac.written_exam_date).strftime("%Y-%m-%d %H:%M:%S")
+                        session_start_str = fields.Datetime.context_timestamp(rec, rec.start_datetime).strftime("%Y-%m-%d %H:%M:%S")
+                        raise ValidationError(_(
+                            "Scheduled Start Time cannot be earlier than the Vacancy Examination Date!\n\n"
+                            "Vacancy Written Exam Date: %(vac_date)s\n"
+                            "Scheduled Start Time: %(session_date)s\n\n"
+                            "Scheduled Start Time must be greater than or equal to the examination date configured for this vacancy."
+                        ) % {
+                            "vac_date": vac_exam_str,
+                            "session_date": session_start_str,
+                        })
 
     venue_type = fields.Selection([
         ("online", "Online / Remote Proctoring"),
@@ -124,6 +248,19 @@ class ExamSession(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
+        if not self.env.context.get("bypass_session_lock"):
+            locked_fields = {
+                "exam_id", "job_id", "vacancy_id", "venue_type", "start_datetime",
+                "end_datetime", "location_notes", "invigilator_user_ids"
+            }
+            if set(vals.keys()) & locked_fields:
+                for rec in self:
+                    if rec.state in ("scheduled", "active", "evaluating", "completed", "cancelled"):
+                        raise UserError(_("Exam Session '%(name)s' is locked in '%(state)s' status. Parameters cannot be altered once scheduled or dispatched.") % {
+                            "name": rec.name,
+                            "state": dict(self._fields["state"].selection).get(rec.state, rec.state)
+                        })
+
         if "start_datetime" in vals and "end_datetime" not in vals:
             for rec in self:
                 exam = rec.exam_id
@@ -145,7 +282,27 @@ class ExamSession(models.Model):
             rec.passed_count = len(attempts.filtered(lambda a: a.state == "completed" and a.is_passed))
 
     def action_schedule(self):
+        now = fields.Datetime.now()
+        grace_buffer = timedelta(minutes=1)
         for rec in self:
+            if not rec.start_datetime:
+                raise UserError(_("Please specify Scheduled Start Time before scheduling."))
+            if not rec.end_datetime:
+                raise UserError(_("Please specify Scheduled End Time before scheduling."))
+            if rec.end_datetime <= rec.start_datetime:
+                raise UserError(_("Scheduled End Time must be strictly after Scheduled Start Time."))
+            if rec.start_datetime < (now - grace_buffer):
+                raise UserError(_(
+                    "Cannot schedule session: Scheduled Start Time cannot be in the past (back date). "
+                    "It must be greater than or equal to current time."
+                ))
+            target_vac = rec.vacancy_id or (rec.exam_id.vacancy_id if rec.exam_id else False)
+            if target_vac and getattr(target_vac, "written_exam_date", False) and target_vac.written_exam_date:
+                if rec.start_datetime < target_vac.written_exam_date:
+                    vac_exam_str = fields.Datetime.context_timestamp(rec, target_vac.written_exam_date).strftime("%Y-%m-%d %H:%M:%S")
+                    raise UserError(_(
+                        "Cannot schedule session: Scheduled Start Time must be greater than or equal to the Vacancy Written Exam Date (%(vac_date)s)."
+                    ) % {"vac_date": vac_exam_str})
             if not rec.attempt_ids:
                 raise UserError(_("Please assign at least one candidate before scheduling the session."))
             rec.state = "scheduled"
@@ -183,7 +340,19 @@ class ExamSession(models.Model):
         for rec in self:
             for att in rec.attempt_ids:
                 att.action_submit_essay_evaluation()
-            rec.message_post(body=_("All candidate essay evaluations have been submitted and final exam scores computed."))
+            rec.evaluations_finalized = True
+            rec.message_post(body=_("All candidate essay evaluations have been submitted and final exam scores computed and synchronized."))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Evaluations Finalized'),
+                'message': _('All candidate evaluations and scores have been finalized and synchronized to recruitment.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def action_fetch_recruitment_candidates(self):
         """
@@ -433,7 +602,19 @@ class ExamSession(models.Model):
         for rec in self:
             for attempt in rec.attempt_ids.filtered(lambda a: a.state == "assigned"):
                 attempt.action_send_invitation_email()
+            rec.invitation_dispatched = True
             rec.message_post(body=_("Exam invitations dispatched to %d candidate(s).") % len(rec.attempt_ids))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Invitations Dispatched'),
+                'message': _('Exam invitations dispatched successfully.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
 
 class ExamCandidateAttempt(models.Model):
@@ -448,13 +629,149 @@ class ExamCandidateAttempt(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "session_id desc, candidate_name asc"
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.context.get("bypass_session_lock"):
+            for vals in vals_list:
+                if vals.get("session_id"):
+                    session = self.env["exam.session"].browse(vals["session_id"])
+                    if session.exists() and session.state in ("scheduled", "active", "evaluating", "completed", "cancelled"):
+                        raise UserError(_("Cannot add candidates to Exam Session '%(name)s' because it is already %(state)s.") % {
+                            "name": session.name,
+                            "state": dict(session._fields["state"].selection).get(session.state, session.state)
+                        })
+        return super().create(vals_list)
+
+    def unlink(self):
+        if not self.env.context.get("bypass_session_lock"):
+            for rec in self:
+                if rec.session_id and rec.session_id.state in ("scheduled", "active", "evaluating", "completed", "cancelled"):
+                    raise UserError(_("Cannot delete candidate '%(cand)s' from Exam Session '%(name)s' because it is already %(state)s.") % {
+                        "cand": rec.candidate_name,
+                        "name": rec.session_id.name,
+                        "state": dict(rec.session_id._fields["state"].selection).get(rec.session_id.state, rec.session_id.state)
+                    })
+        return super().unlink()
+
     name = fields.Char(string="Attempt Reference", readonly=True, default=lambda self: _("New"))
     session_id = fields.Many2one("exam.session", string="Exam Session", required=True, ondelete="cascade", index=True)
     exam_id = fields.Many2one(related="session_id.exam_id", string="Exam Definition", store=True, readonly=True)
     version_exam_id = fields.Many2one("exam.definition", string="Assigned Version Paper", domain="[('parent_exam_id', '=', exam_id)]", tracking=True)
     version_code = fields.Char(related="version_exam_id.version_code", string="Version", readonly=True)
     job_id = fields.Many2one(related="session_id.job_id", string="Job Position", store=True, readonly=True)
-    
+    vacancy_reference = fields.Char(related="session_id.vacancy_reference", string="Vacancy Reference", store=True, readonly=True)
+    is_external = fields.Boolean(string="Is External Vacancy", compute="_compute_is_external", store=True)
+
+    @api.depends("candidate_type", "session_id.is_external", "session_id.vacancy_reference", "session_id.vacancy_id.reference")
+    def _compute_is_external(self):
+        for rec in self:
+            ref = (rec.session_id.vacancy_reference or (rec.session_id.vacancy_id.reference if rec.session_id.vacancy_id else "") or "").upper()
+            rec_type = getattr(rec.session_id.vacancy_id, 'recruitment_type', '') if rec.session_id.vacancy_id else ''
+            sourcing = getattr(rec.session_id.vacancy_id, 'sourcing_type', '') if rec.session_id.vacancy_id else ''
+            rec.is_external = ("EXT" in ref) or rec.session_id.is_external or (rec.candidate_type == "external") or (rec_type == 'External') or (sourcing == 'external')
+    vacancy_id = fields.Many2one(
+        "job.vacancy",
+        related="session_id.vacancy_id",
+        string="Vacancy Reference",
+        store=True,
+        readonly=True,
+        index=True
+    )
+    blind_candidate_code = fields.Char(
+        string="Candidate Code",
+        compute="_compute_blind_candidate_code",
+        store=True,
+        index=True
+    )
+    grading_task_ids = fields.One2many(
+        "exam.grading.task",
+        "attempt_id",
+        string="Manual Grading Tasks"
+    )
+    pending_grading_task_count = fields.Integer(
+        string="Pending Questions",
+        compute="_compute_grading_task_stats",
+        store=True
+    )
+    total_grading_task_count = fields.Integer(
+        string="Total Manual Questions",
+        compute="_compute_grading_task_stats",
+        store=True
+    )
+    grading_state = fields.Selection([
+        ("not_required", "No Manual Grading"),
+        ("pending", "Pending Grading"),
+        ("graded", "Graded / Awaiting Verification"),
+        ("verified", "Verified & Finalized"),
+    ], string="Grading Status", compute="_compute_grading_task_stats", store=True, index=True)
+
+    @api.depends("job_id.name", "session_id.job_id.name", "session_id")
+    def _compute_blind_candidate_code(self):
+        for rec in self:
+            job_name = rec.job_id.name or (rec.session_id.job_id.name if rec.session_id else "")
+            prefix = "CAND"
+            if job_name:
+                clean_name = job_name.strip()
+                words = clean_name.split()
+                if len(words) == 1:
+                    clean_w = "".join(c for c in words[0] if c.isalnum()).upper()
+                    prefix = clean_w[:3] if len(clean_w) >= 3 else clean_w
+                else:
+                    modifiers = {"SENIOR", "JUNIOR", "LEAD", "CHIEF", "ASSISTANT", "ASSOCIATE", "TRAINEE", "GRADUATE", "INTERN", "I", "II", "III", "IV", "-"}
+                    key_words = [w for w in words if w.upper() not in modifiers and w.isalnum()]
+                    if not key_words:
+                        key_words = [w for w in words if w.isalnum()]
+                    if len(key_words) == 1:
+                        clean_w = "".join(c for c in key_words[0] if c.isalnum()).upper()
+                        prefix = clean_w[:3] if len(clean_w) >= 3 else clean_w
+                    else:
+                        acronym = "".join(w[0].upper() for w in key_words if w and w[0].isalnum())
+                        if 2 <= len(acronym) <= 4:
+                            prefix = acronym
+                        else:
+                            clean_w = "".join(c for c in key_words[0] if c.isalnum()).upper()
+                            prefix = clean_w[:3] if len(clean_w) >= 3 else clean_w
+            prefix = prefix or "CAND"
+            rec_id = rec.id or 1
+            num = (rec_id % 1000) or 1
+            rec.blind_candidate_code = f"{prefix}{num:03d}"
+
+    @api.depends("grading_task_ids.state", "state")
+    def _compute_grading_task_stats(self):
+        for rec in self:
+            if rec.state == "disqualified":
+                rec.total_grading_task_count = 0
+                rec.pending_grading_task_count = 0
+                rec.grading_state = "not_required"
+                continue
+            if not rec.grading_task_ids and rec.answer_ids:
+                has_manual = any(
+                    a.question_id.question_type in ["short_answer", "essay", "fill_blank"]
+                    for a in rec.answer_ids
+                )
+                if has_manual:
+                    try:
+                        rec._spawn_manual_grading_tasks()
+                    except Exception:
+                        pass
+            tasks = rec.grading_task_ids
+            rec.total_grading_task_count = len(tasks)
+            pending = tasks.filtered(lambda t: t.state == "pending")
+            rec.pending_grading_task_count = len(pending)
+            if not tasks:
+                rec.grading_state = "not_required"
+            elif any(t.state == "pending" for t in tasks):
+                rec.grading_state = "pending"
+            elif any(t.state == "graded" for t in tasks):
+                rec.grading_state = "graded"
+            else:
+                rec.grading_state = "verified"
+
+    @api.depends("name", "blind_candidate_code")
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.blind_candidate_code or rec.name or "CAND001"
+
     # Candidate Identification
     candidate_type = fields.Selection([
         ("external", "External Applicant"),
@@ -533,8 +850,8 @@ class ExamCandidateAttempt(models.Model):
     )
     objective_score = fields.Float(string="Auto-Scored Marks (MCQ/TF)", default=0.0, readonly=True, tracking=True)
     manual_score = fields.Float(string="Manually Graded Marks", default=0.0, readonly=True, tracking=True)
-    total_score = fields.Float(string="Total Exam Score", compute="_compute_total_score", store=True, tracking=True)
-    score_percentage = fields.Float(string="Score (%)", compute="_compute_total_score", store=True, tracking=True)
+    total_score = fields.Float(string="Total Exam Score", compute="_compute_total_score", inverse="_inverse_total_score", store=True, readonly=False, tracking=True)
+    score_percentage = fields.Float(string="Score (%)", compute="_compute_total_score", inverse="_inverse_score_percentage", store=True, readonly=False, tracking=True)
     
     is_passed = fields.Boolean(
         string="Passed (>=50%)",
@@ -542,6 +859,13 @@ class ExamCandidateAttempt(models.Model):
         store=True,
         tracking=True,
         help="50% minimum passing score required."
+    )
+    passed = fields.Boolean(
+        string="Passed",
+        related="is_passed",
+        store=True,
+        readonly=True,
+        help="Alias for is_passed for backward compatibility."
     )
 
     disqualification_reason = fields.Text(string="Disqualification Reason", readonly=True, tracking=True)
@@ -593,22 +917,80 @@ class ExamCandidateAttempt(models.Model):
             else:
                 rec.token_expiry = False
 
-    @api.depends("objective_score", "manual_score", "answer_ids.marks_available", "exam_id.total_marks")
+    @api.depends("objective_score", "manual_score", "answer_ids.marks_available", "exam_id.total_marks", "is_external")
     def _compute_total_score(self):
         for rec in self:
-            rec.total_score = round(rec.objective_score + rec.manual_score, 2)
             assigned_max = sum(ans.marks_available for ans in rec.answer_ids)
             if assigned_max > 0:
                 rec.total_marks_available = round(assigned_max, 2)
             elif rec.exam_id and rec.exam_id.total_marks > 0:
                 rec.total_marks_available = round(rec.exam_id.total_marks, 2)
+            elif rec.is_external:
+                rec.total_marks_available = 100.0
             else:
                 rec.total_marks_available = 0.0
+
+            if rec.is_external and (rec.manual_score > 0 or rec.total_score > 0):
+                if rec.manual_score and not rec.total_score:
+                    rec.total_score = rec.manual_score
+                elif rec.total_score and not rec.manual_score:
+                    rec.manual_score = rec.total_score
+                else:
+                    rec.total_score = round(rec.objective_score + rec.manual_score, 2)
+            else:
+                rec.total_score = round(rec.objective_score + rec.manual_score, 2)
 
             if rec.total_marks_available > 0:
                 rec.score_percentage = round((rec.total_score / rec.total_marks_available) * 100.0, 2)
             else:
                 rec.score_percentage = 0.0
+            rec._sync_written_score_to_recruitment()
+
+    def _inverse_total_score(self):
+        for rec in self:
+            if not rec.is_external:
+                continue
+            rec.manual_score = rec.total_score
+            max_marks = rec.total_marks_available
+            if not max_marks or max_marks <= 0:
+                if rec.exam_id and rec.exam_id.total_marks > 0:
+                    max_marks = rec.exam_id.total_marks
+                else:
+                    max_marks = 100.0
+                rec.total_marks_available = max_marks
+
+            if max_marks > 0:
+                rec.score_percentage = round((rec.total_score / max_marks) * 100.0, 2)
+            else:
+                rec.score_percentage = 0.0
+
+            if rec.state != "completed":
+                rec.state = "completed"
+
+            passing_pct = rec.exam_id.passing_score_percentage or 50.0
+            rec.is_passed = (rec.score_percentage >= passing_pct)
+            rec._sync_written_score_to_recruitment()
+
+    def _inverse_score_percentage(self):
+        for rec in self:
+            if not rec.is_external:
+                continue
+            max_marks = rec.total_marks_available
+            if not max_marks or max_marks <= 0:
+                if rec.exam_id and rec.exam_id.total_marks > 0:
+                    max_marks = rec.exam_id.total_marks
+                else:
+                    max_marks = 100.0
+                rec.total_marks_available = max_marks
+
+            rec.total_score = round((rec.score_percentage / 100.0) * max_marks, 2)
+            rec.manual_score = rec.total_score
+
+            if rec.state != "completed":
+                rec.state = "completed"
+
+            passing_pct = rec.exam_id.passing_score_percentage or 50.0
+            rec.is_passed = (rec.score_percentage >= passing_pct)
             rec._sync_written_score_to_recruitment()
 
     def _sync_written_score_to_recruitment(self):
@@ -617,35 +999,128 @@ class ExamCandidateAttempt(models.Model):
         1. New Internal Recruitment Selected Candidates (new.internal.recruitment.selected.candidates) if Internal Candidate
         2. External Recruitment Selected Candidates (external.recruitment.selected.candidates) if External Candidate
         3. Central Candidate Score (recruitment.candidate.score) if present
+        Strictly scopes to the specific vacancy of this exam session.
         """
         for rec in self:
+            # Only sync if the exam is finalized/completed, disqualified, or explicitly scored
+            if rec.state not in ('completed', 'disqualified') and not (rec.is_external and rec.score_percentage > 0):
+                continue
+
             pct = rec.score_percentage or 0.0
+            target_vac = rec.vacancy_id or (rec.session_id.vacancy_id if rec.session_id else False) or (rec.exam_id.vacancy_id if rec.exam_id else False)
+            target_vac_ref = rec.vacancy_reference or (rec.session_id.vacancy_reference if rec.session_id else False) or (target_vac.reference if target_vac else False)
 
             # 1. Internal Employee Sync
             if rec.employee_id:
-                int_cand_lines = self.env['new.internal.recruitment.selected.candidates'].sudo().search([
-                    ('emp_name', '=', rec.employee_id.id)
-                ])
-                if int_cand_lines:
-                    int_cand_lines.write({'written_exam_score': pct})
+                int_cand_domain = [('emp_name', '=', rec.employee_id.id)]
+                if target_vac and target_vac_ref:
+                    int_cand_domain = [
+                        ('emp_name', '=', rec.employee_id.id),
+                        '|',
+                        ('new_int_sel_cand.vacancy_id', '=', target_vac.id),
+                        ('new_int_sel_cand.vacancy_reference', '=', target_vac_ref)
+                    ]
+                elif target_vac:
+                    int_cand_domain = [
+                        ('emp_name', '=', rec.employee_id.id),
+                        ('new_int_sel_cand.vacancy_id', '=', target_vac.id)
+                    ]
+                elif target_vac_ref:
+                    int_cand_domain = [
+                        ('emp_name', '=', rec.employee_id.id),
+                        ('new_int_sel_cand.vacancy_reference', '=', target_vac_ref)
+                    ]
 
-                scores = self.env['recruitment.candidate.score'].sudo().search([
-                    ('employee_id', '=', rec.employee_id.id)
-                ])
+                int_cand_lines = self.env['new.internal.recruitment.selected.candidates'].sudo().search(int_cand_domain)
+                if int_cand_lines:
+                    int_vals = {'written_exam_score': pct}
+                    if pct < 50.0 and rec.state == 'completed':
+                        int_vals['select_flag'] = False
+                        int_vals['selection_type'] = 'rejected'
+                        int_vals['remarks'] = _("Disqualified: Written Exam score (%.2f%%) is below 50%% threshold.") % pct
+                    elif pct >= 50.0:
+                        int_vals['select_flag'] = True
+                        if int_vals.get('selection_type') == 'rejected':
+                            int_vals['selection_type'] = 'pending'
+                    int_cand_lines.write(int_vals)
+
+                    for cand in int_cand_lines:
+                        parent = cand.new_int_sel_cand
+                        if parent:
+                            parent.sudo().write({'exam_scores_fetched': True})
+                            vac = False
+                            if parent.vacancy_id:
+                                vac = self.env['job.vacancy'].sudo().browse(parent.vacancy_id)
+                            elif parent.vacancy_reference:
+                                vac = self.env['job.vacancy'].sudo().search([('reference', '=', parent.vacancy_reference)], limit=1)
+                            if vac and vac.exists():
+                                vac_vals = {'exam_scores_fetched': True}
+                                if vac.recruitment_step in ('fetch_exam', 'notify_exam'):
+                                    vac_vals['recruitment_step'] = 'notify_panel'
+                                vac.sudo().with_context(skip_lock_check=True).write(vac_vals)
+
+                score_domain = [('employee_id', '=', rec.employee_id.id)]
+                if target_vac:
+                    score_domain.append(('vacancy_id', '=', target_vac.id))
+                scores = self.env['recruitment.candidate.score'].sudo().search(score_domain)
                 if scores:
                     scores.write({'written_score': pct})
 
             # 2. External Applicant Sync
             if rec.applicant_id:
-                ext_cand_lines = self.env['external.recruitment.selected.candidates'].sudo().search([
-                    ('applicant_name', '=', rec.applicant_id.id)
-                ])
-                if ext_cand_lines:
-                    ext_cand_lines.write({'written_exam_score': pct})
+                ext_cand_domain = [('applicant_name', '=', rec.applicant_id.id)]
+                if target_vac and target_vac_ref:
+                    ext_cand_domain = [
+                        ('applicant_name', '=', rec.applicant_id.id),
+                        '|',
+                        ('ext_rec_sel_cand.vacancy_id', '=', target_vac.id),
+                        ('ext_rec_sel_cand.vacancy_reference', '=', target_vac_ref)
+                    ]
+                elif target_vac:
+                    ext_cand_domain = [
+                        ('applicant_name', '=', rec.applicant_id.id),
+                        ('ext_rec_sel_cand.vacancy_id', '=', target_vac.id)
+                    ]
+                elif target_vac_ref:
+                    ext_cand_domain = [
+                        ('applicant_name', '=', rec.applicant_id.id),
+                        ('ext_rec_sel_cand.vacancy_reference', '=', target_vac_ref)
+                    ]
 
-                scores = self.env['recruitment.candidate.score'].sudo().search([
-                    ('applicant_id', '=', rec.applicant_id.id)
-                ])
+                ext_cand_lines = self.env['external.recruitment.selected.candidates'].sudo().search(ext_cand_domain)
+                if ext_cand_lines:
+                    ext_vals = {'written_exam_score': pct}
+                    if pct < 50.0 and rec.state == 'completed':
+                        ext_vals['select_flag'] = False
+                        ext_vals['selection_type'] = 'rejected'
+                        ext_vals['remarks'] = _("Disqualified: Written Exam score (%.2f%%) is below 50%% threshold.") % pct
+                        if rec.applicant_id:
+                            rec.applicant_id.sudo().write({'bunna_app_status': 'rejected'})
+                    elif pct >= 50.0:
+                        ext_vals['select_flag'] = True
+                        ext_vals['selection_type'] = 'interview'
+                        ext_vals['remarks'] = _("Selected for Interview (Written Exam: %.2f%%)") % pct
+                    ext_cand_lines.write(ext_vals)
+
+                    for cand in ext_cand_lines:
+                        parent = cand.ext_rec_sel_cand
+                        if parent:
+                            parent.sudo().write({'exam_scores_fetched': True})
+                            vac = False
+                            if parent.vacancy_id:
+                                vac = self.env['job.vacancy'].sudo().browse(parent.vacancy_id)
+                            elif parent.vacancy_reference:
+                                vac = self.env['job.vacancy'].sudo().search([('reference', '=', parent.vacancy_reference)], limit=1)
+                            if vac and vac.exists():
+                                vac_vals = {'exam_scores_fetched': True}
+                                if vac.recruitment_step in ('fetch_exam', 'notify_exam'):
+                                    vac_vals['recruitment_step'] = 'notify_panel'
+                                vac.sudo().with_context(skip_lock_check=True).write(vac_vals)
+
+                score_domain = [('applicant_id', '=', rec.applicant_id.id)]
+                if target_vac:
+                    score_domain.append(('vacancy_id', '=', target_vac.id))
+                scores = self.env['recruitment.candidate.score'].sudo().search(score_domain)
                 if scores:
                     scores.write({'written_score': pct})
 
@@ -732,6 +1207,22 @@ class ExamCandidateAttempt(models.Model):
         and computes the final exam score and pass/fail status (FR-EXM-033, FR-EXM-036).
         """
         for rec in self:
+            # Sync marks and feedback from grading_task_ids if edited in the candidate grading form
+            for task in rec.grading_task_ids:
+                if task.marks_awarded < 0 or task.marks_awarded > task.marks_available:
+                    raise ValidationError(
+                        _("Marks awarded for '%s' must be between 0 and %s.") % (
+                            (task.question_text or "Question")[:40], task.marks_available
+                        )
+                    )
+                if task.answer_id:
+                    task.answer_id.marks_awarded = task.marks_awarded
+                    task.answer_id.is_correct = (task.marks_awarded > 0)
+                if task.state == "pending":
+                    task.state = "graded"
+                    task.graded_by_user_id = self.env.user.id
+                    task.graded_date = fields.Datetime.now()
+
             manual_answers = rec.answer_ids.filtered(
                 lambda a: a.question_id.question_type in ["short_answer", "essay", "fill_blank"]
             )
@@ -764,11 +1255,8 @@ class ExamCandidateAttempt(models.Model):
                 if task:
                     task.write({
                         "marks_awarded": ans.marks_awarded,
-                        "state": "verified",
                         "graded_by_user_id": self.env.user.id,
                         "graded_date": fields.Datetime.now(),
-                        "verified_by_user_id": self.env.user.id,
-                        "verified_date": fields.Datetime.now(),
                     })
 
             # Compute manual score and total final score
@@ -790,6 +1278,17 @@ class ExamCandidateAttempt(models.Model):
                     pct=rec.score_percentage, status="PASSED" if rec.is_passed else "FAILED"
                 )
             )
+
+    def action_verify_grading(self):
+        """Supervisor verifies and finalizes grading for all tasks of this attempt"""
+        for rec in self:
+            for task in rec.grading_task_ids:
+                task.write({
+                    "state": "verified",
+                    "verified_by_user_id": self.env.user.id,
+                    "verified_date": fields.Datetime.now(),
+                })
+            rec.action_submit_essay_evaluation()
 
     def _auto_grade_objective_answers(self):
         """Calculates score automatically for objective questions (MCQ Single, MCQ Multi, True/False, and Fill-in-Blank)"""
@@ -898,6 +1397,8 @@ class ExamCandidateAttempt(models.Model):
     def _spawn_manual_grading_tasks(self):
         """Creates manual grading tasks for Essay and Fill-in-the-Blank questions"""
         self.ensure_one()
+        if self.state == "disqualified":
+            return
         manual_answers = self.answer_ids.filtered(
             lambda a: a.question_id.question_type in ["short_answer", "essay", "fill_blank"]
         )
@@ -956,6 +1457,12 @@ class ExamCandidateAttempt(models.Model):
             self.copy_paste_attempt_count += 1
         elif event_type == "screenshot":
             self.screenshot_attempt_count += 1
+            if self.exam_id.block_screenshot:
+                self._disqualify_candidate(
+                    reason=_("Prohibited screen capture / screenshot attempt detected."),
+                    violation_type="screenshot"
+                )
+                return {"action": "disqualified", "message": _("Prohibited screen capture / screenshot attempt detected.")}
             
         return {"action": "logged", "count": self.tab_switch_count}
 
@@ -980,7 +1487,12 @@ class ExamCandidateAttempt(models.Model):
             "disqualification_log_id": disq_log.id,
             "objective_score": 0.0,
             "manual_score": 0.0,
+            "grading_state": "not_required",
+            "total_grading_task_count": 0,
+            "pending_grading_task_count": 0,
         })
+        if self.grading_task_ids:
+            self.grading_task_ids.unlink()
         self.message_post(body=_("Candidate automatically DISQUALIFIED. Reason: %s") % reason)
 
     def action_send_invitation_email(self):
@@ -1047,13 +1559,20 @@ class ExamCandidateAttempt(models.Model):
                 cand_name = self.candidate_name or target_partner.name
 
                 discuss_msg = Markup(
-                    f"<p>Dear <b>{cand_name}</b>,<br/>"
-                    f"You have been shortlisted for the Written Exam for position <b>{job_title}</b>.<br/>"
-                    f"Date: {start_dt}<br/>"
-                    f"Duration: {duration_min} Minutes<br/>"
-                    f"Location: Online<br/>"
-                    f"Here is Exam Link: <a href='{exam_url}' target='_blank' style='color:#1a73e8;text-decoration:underline;font-weight:bold;'>{exam_url}</a><br/><br/>"
-                    f"All The Best!</p>"
+                    f"<p>Dear <b>{escape(cand_name)}</b>,</p>"
+                    f"<p>You have been shortlisted for the Written Exam for position: <b>{escape(job_title)}</b></p>"
+                    f"<ul style='list-style-type:disc; padding-left:20px; margin-bottom:10px;'>"
+                    f"<li><b>Date:</b> {escape(start_dt)}</li>"
+                    f"<li><b>Duration:</b> {duration_min} Minutes</li>"
+                    f"<li><b>Location:</b> Online</li>"
+                    f"<li><b>Exam Link:</b> <a href='{escape(exam_url)}' target='_blank' style='color:#1a73e8; text-decoration:underline; font-weight:bold; word-break:break-all;'>{escape(exam_url)}</a></li>"
+                    f"</ul>"
+                    f"<div style='margin-top:10px; margin-bottom:12px;'>"
+                    f"<a href='{escape(exam_url)}' target='_blank' style='background-color:#541718; color:#ffffff; padding:7px 15px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block; font-size:12px;'>"
+                    f"👉 Start Written Exam"
+                    f"</a>"
+                    f"</div>"
+                    f"<p>All The Best!</p>"
                 )
                 chat_channel = self.env['discuss.channel'].sudo()._get_or_create_chat(partners_to=[target_partner.id])
                 if chat_channel:
@@ -1123,6 +1642,137 @@ class ExamCandidateAnswer(models.Model):
     is_marked_for_review = fields.Boolean(string="Marked for Review", default=False)
     last_saved_datetime = fields.Datetime(string="Last Auto-Save Time")
 
+    # Display & Comparison Fields for Candidate & Correct Answers
+    candidate_response_display = fields.Text(
+        string="Candidate Response",
+        compute="_compute_candidate_response_display",
+        store=True,
+    )
+    correct_answer_display = fields.Text(
+        string="Correct Answer",
+        compute="_compute_correct_answer_display",
+        store=True,
+    )
+    correct_option_id = fields.Many2one(
+        "exam.question.option",
+        string="Correct Option (Single)",
+        compute="_compute_correct_answer_display",
+        store=True,
+    )
+    correct_option_ids = fields.Many2many(
+        "exam.question.option",
+        "exam_cand_ans_corr_opt_rel",
+        "answer_id",
+        "option_id",
+        string="Correct Options (Multi)",
+        compute="_compute_correct_answer_display",
+        store=True,
+    )
+    correct_text_answer = fields.Char(
+        string="Expected Text / Rubric",
+        related="question_id.correct_text_answer",
+        readonly=True,
+    )
+
+    @api.depends("selected_option_id", "selected_option_ids", "text_answer", "question_type")
+    def _compute_candidate_response_display(self):
+        for rec in self:
+            q_type = rec.question_type or (rec.question_id and rec.question_id.question_type)
+            if q_type in ["mcq_single", "true_false"]:
+                if rec.selected_option_id:
+                    rec.candidate_response_display = rec.selected_option_id.option_text or rec.selected_option_id.display_name
+                elif rec.text_answer:
+                    txt = rec.text_answer.strip()
+                    if txt.isdigit():
+                        opt = self.env["exam.question.option"].browse(int(txt))
+                        if opt.exists():
+                            rec.candidate_response_display = opt.option_text or opt.display_name
+                        else:
+                            rec.candidate_response_display = txt
+                    else:
+                        rec.candidate_response_display = txt
+                else:
+                    rec.candidate_response_display = _("No Answer")
+            elif q_type == "mcq_multiple":
+                if rec.selected_option_ids:
+                    rec.candidate_response_display = ", ".join(rec.selected_option_ids.mapped("option_text"))
+                else:
+                    rec.candidate_response_display = _("No Answer")
+            elif q_type in ["fill_blank", "short_answer", "essay"]:
+                rec.candidate_response_display = rec.text_answer or _("No Answer")
+            else:
+                rec.candidate_response_display = rec.text_answer or _("No Answer")
+
+    @api.depends("question_id", "question_id.option_ids", "question_id.option_ids.is_correct", "question_id.correct_text_answer", "question_type")
+    def _compute_correct_answer_display(self):
+        for rec in self:
+            q = rec.question_id
+            if not q:
+                rec.correct_answer_display = ""
+                rec.correct_option_id = False
+                rec.correct_option_ids = [(5, 0, 0)]
+                continue
+
+            q_type = rec.question_type or q.question_type
+            correct_opts = q.option_ids.filtered(lambda o: o.is_correct)
+
+            if q_type in ["mcq_single", "true_false"]:
+                if correct_opts:
+                    rec.correct_option_id = correct_opts[0].id
+                    rec.correct_answer_display = correct_opts[0].option_text or correct_opts[0].display_name
+                elif q.correct_text_answer:
+                    rec.correct_option_id = False
+                    rec.correct_answer_display = q.correct_text_answer
+                else:
+                    rec.correct_option_id = False
+                    rec.correct_answer_display = _("N/A")
+                rec.correct_option_ids = [(5, 0, 0)]
+
+            elif q_type == "mcq_multiple":
+                rec.correct_option_id = False
+                rec.correct_option_ids = [(6, 0, correct_opts.ids)]
+                rec.correct_answer_display = ", ".join(correct_opts.mapped("option_text")) if correct_opts else _("N/A")
+
+            elif q_type == "fill_blank":
+                rec.correct_option_id = False
+                rec.correct_option_ids = [(5, 0, 0)]
+                rec.correct_answer_display = q.correct_text_answer or _("N/A")
+
+            elif q_type in ["short_answer", "essay"]:
+                rec.correct_option_id = False
+                rec.correct_option_ids = [(5, 0, 0)]
+                rec.correct_answer_display = q.correct_text_answer or q.rubric_guidelines or q.explanation or _("Manual Evaluation Rubric")
+            else:
+                rec.correct_option_id = False
+                rec.correct_option_ids = [(5, 0, 0)]
+                rec.correct_answer_display = q.correct_text_answer or _("N/A")
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get("selected_option_id") and (not vals.get("text_answer") or str(vals.get("text_answer")).strip().isdigit()):
+                opt = self.env["exam.question.option"].browse(vals["selected_option_id"])
+                if opt.exists():
+                    vals["text_answer"] = opt.option_text
+            elif vals.get("text_answer") and str(vals.get("text_answer")).strip().isdigit() and not vals.get("selected_option_id"):
+                opt = self.env["exam.question.option"].browse(int(str(vals["text_answer"]).strip()))
+                if opt.exists():
+                    vals["selected_option_id"] = opt.id
+                    vals["text_answer"] = opt.option_text
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if vals.get("selected_option_id") and (not vals.get("text_answer") or str(vals.get("text_answer")).strip().isdigit()):
+            opt = self.env["exam.question.option"].browse(vals["selected_option_id"])
+            if opt.exists():
+                vals["text_answer"] = opt.option_text
+        elif vals.get("text_answer") and str(vals.get("text_answer")).strip().isdigit() and not vals.get("selected_option_id"):
+            opt = self.env["exam.question.option"].browse(int(str(vals["text_answer"]).strip()))
+            if opt.exists():
+                vals["selected_option_id"] = opt.id
+                vals["text_answer"] = opt.option_text
+        return super().write(vals)
+
     @api.constrains("marks_awarded", "marks_available")
     def _check_marks_awarded(self):
         for rec in self:
@@ -1136,6 +1786,17 @@ class ExamCandidateAnswer(models.Model):
                         rec.question_text or rec.id
                     )
                 )
+
+
+    def get_shuffled_options(self):
+        """Returns answer options for this question, randomized per candidate if exam.randomize_options is enabled."""
+        self.ensure_one()
+        opts = list(self.question_id.option_ids)
+        target_exam = self.attempt_id.version_exam_id or self.attempt_id.exam_id
+        if target_exam and target_exam.randomize_options and opts:
+            seed = f"{self.attempt_id.id}_{self.id}_{self.question_id.id}"
+            random.Random(seed).shuffle(opts)
+        return opts
 
 
 class ExamProctorEvent(models.Model):

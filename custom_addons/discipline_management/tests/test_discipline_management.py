@@ -30,7 +30,7 @@ class TestDisciplineManagement(TransactionCase):
 
         # Reference Security Groups
         cls.group_internal = cls.env.ref('base.group_user')
-        cls.group_officer = cls.env.ref('discipline_management.group_discipline_officer')
+        cls.group_officer = cls.env.ref('discipline_management.group_discipline_pomd')
         cls.group_manager = cls.env.ref('discipline_management.group_discipline_manager')
         cls.group_director = cls.env.ref('discipline_management.group_discipline_director')
         cls.group_chief = cls.env.ref('discipline_management.group_discipline_chief')

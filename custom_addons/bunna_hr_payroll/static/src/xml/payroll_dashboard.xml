@@ -61,10 +61,13 @@
                         <!-- Period Selector Integrated Straight Pill -->
                         <div class="bpd-period-selector-pill">
                             <span class="bpd-period-label"><i class="fa fa-calendar me-1"></i> Period:</span>
-                            <select class="bpd-period-select" t-on-change="onPeriodChange">
+                            <select class="bpd-period-select" t-att-value="state.selectedPeriodId" t-on-change="onPeriodChange">
+                                <t t-if="!state.allPeriods.length">
+                                    <option value="" disabled="disabled" selected="selected">No Periods Available</option>
+                                </t>
                                 <t t-foreach="state.allPeriods" t-as="p" t-key="p.id">
-                                    <option t-att-value="p.id" t-att-selected="p.is_selected">
-                                        <t t-esc="p.name"/> (<t t-esc="p.fiscal_year"/>)
+                                    <option t-att-value="p.id">
+                                        <t t-esc="p.name"/> (<t t-esc="p.state_display || (p.state || 'draft').toUpperCase()"/> - <t t-esc="p.fiscal_year"/>)
                                     </option>
                                 </t>
                             </select>

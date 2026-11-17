@@ -5,7 +5,7 @@
         <field name="name">helpdesk.ticket.convert.wizard.form</field>
         <field name="model">helpdesk.ticket.convert.wizard</field>
         <field name="arch" type="xml">
-            <form string="Convert Ticket">
+            <form string="Convert Ticket" class="o_helpdesk_wizard">
                 <sheet>
                     <group>
                         <field name="ticket_id" readonly="1" />

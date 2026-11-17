@@ -22,6 +22,26 @@ class BunnaPayrollJournalEntry(models.Model):
         string='Operating Unit / Branch',
         index=True
     )
+    is_ifb = fields.Boolean(
+        string='Is IFB',
+        related='operating_unit_id.is_ifb',
+        store=True,
+        index=True,
+        help="Indicates whether the operating unit operates under Interest-Free Banking (IFB)."
+    )
+    banking_type_label = fields.Char(
+        string='Banking',
+        compute='_compute_banking_type_label',
+        store=True,
+        index=True,
+        help="Conventional or IFB"
+    )
+
+    @api.depends('is_ifb')
+    def _compute_banking_type_label(self):
+        for rec in self:
+            rec.banking_type_label = 'IFB' if rec.is_ifb else 'Conventional'
+
     work_unit_id = fields.Integer(string='Work Unit ID')
     ou_name = fields.Char(string='Branch / Work Unit')
     sol_id = fields.Char(string='SOL ID', index=True)
@@ -69,6 +89,65 @@ class BunnaPayrollJournalEntry(models.Model):
         default=lambda self: self.env.company
     )
 
+    salary_rule_id = fields.Many2one(
+        'hr.salary.rule',
+        string='Salary Rule',
+        ondelete='set null',
+        index=True,
+        help='Salary rule that generated this CBS entry. Used for per-rule debit/credit balance '
+             'verification to pinpoint which rule is causing an imbalance within a group.'
+    )
+
+    is_group_unbalanced = fields.Boolean(
+        string='Group Unbalanced',
+        compute='_compute_group_balance',
+        store=True,
+        index=True,
+        help='True if total Debits do not equal total Credits for this Group Code in this Period.'
+    )
+    group_balance_diff = fields.Float(
+        string='Group Diff (D - C)',
+        compute='_compute_group_balance',
+        store=True,
+        digits=(16, 2),
+        help='Total Debit minus Total Credit for this Group Code in this Period. Zero means balanced.'
+    )
+
+
+
+    @api.depends('period_id', 'group_code', 'amount', 'flag')
+    def _compute_group_balance(self):
+        period_ids = self.mapped('period_id').ids
+        if not period_ids:
+            for rec in self:
+                rec.is_group_unbalanced = False
+                rec.group_balance_diff = 0.0
+            return
+
+        self.env.cr.execute("""
+            SELECT
+                period_id,
+                group_code,
+                ROUND(COALESCE(SUM(CASE WHEN flag = 'D' THEN amount ELSE 0 END), 0)::numeric, 2) AS debit,
+                ROUND(COALESCE(SUM(CASE WHEN flag = 'C' THEN amount ELSE 0 END), 0)::numeric, 2) AS credit
+            FROM bunna_payroll_journal_entry
+            WHERE period_id IN %s
+            GROUP BY period_id, group_code
+        """, (tuple(period_ids),))
+
+        balance_map = {}
+        for pid, grp, deb, cred in self.env.cr.fetchall():
+            diff = round(float(deb - cred), 2)
+            is_unbalanced = abs(diff) >= 0.01
+            balance_map[(pid, grp)] = (is_unbalanced, diff)
+
+        for rec in self:
+            key = (rec.period_id.id, rec.group_code)
+            is_unbal, diff = balance_map.get(key, (False, 0.0))
+            rec.is_group_unbalanced = is_unbal
+            rec.group_balance_diff = diff
+
+
 
 class HrPayrollPeriod(models.Model):
     _inherit = 'hr.payroll.period'
@@ -93,19 +172,46 @@ class HrPayrollPeriod(models.Model):
         compute='_compute_journal_totals',
         digits=(16, 2)
     )
+    journal_is_balanced = fields.Boolean(
+        string='CBS Balanced',
+        compute='_compute_journal_totals',
+        help='True if all CBS journal entry group codes are balanced.'
+    )
+    unbalanced_group_summary = fields.Text(
+        string='Unbalanced Groups Summary',
+        compute='_compute_journal_totals',
+        help='Detailed summary of debit vs credit for unbalanced groups.'
+    )
 
     @api.depends('journal_entry_ids')
     def _compute_journal_entry_count(self):
         for rec in self:
             rec.journal_entry_count = len(rec.journal_entry_ids)
 
-    @api.depends('journal_entry_ids.amount', 'journal_entry_ids.flag')
+    @api.depends('journal_entry_ids.amount', 'journal_entry_ids.flag', 'journal_entry_ids.group_code')
     def _compute_journal_totals(self):
         for rec in self:
-            debits = sum(rec.journal_entry_ids.filtered(lambda e: e.flag == 'D').mapped('amount'))
-            credits = sum(rec.journal_entry_ids.filtered(lambda e: e.flag == 'C').mapped('amount'))
+            entries = rec.journal_entry_ids
+            debits = sum(entries.filtered(lambda e: e.flag == 'D').mapped('amount'))
+            credits = sum(entries.filtered(lambda e: e.flag == 'C').mapped('amount'))
             rec.total_journal_debit = debits
             rec.total_journal_credit = credits
+
+            unbalanced_list = []
+            group_codes = set(entries.mapped('group_code'))
+            for grp in sorted(group_codes):
+                g_entries = entries.filtered(lambda e: e.group_code == grp)
+                g_deb = round(sum(g_entries.filtered(lambda e: e.flag == 'D').mapped('amount')), 2)
+                g_cred = round(sum(g_entries.filtered(lambda e: e.flag == 'C').mapped('amount')), 2)
+                g_diff = round(g_deb - g_cred, 2)
+                if abs(g_diff) >= 0.01:
+                    grp_name = dict(g_entries._fields['group_code'].selection).get(grp, grp)
+                    unbalanced_list.append(
+                        f"• Group {grp_name}: Debit = {g_deb:,.2f}, Credit = {g_cred:,.2f} (Diff = {g_diff:+,.2f})"
+                    )
+
+            rec.journal_is_balanced = len(unbalanced_list) == 0 and len(entries) > 0
+            rec.unbalanced_group_summary = "\n".join(unbalanced_list) if unbalanced_list else False
 
     def action_view_journal_entries(self):
         self.ensure_one()

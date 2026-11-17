@@ -123,9 +123,9 @@ class CorporateAppraisal(models.Model):
         ('notified', 'Notified'),
         ('accepted', 'Accepted'),
         ('rejected', 'Rejected'),
-        ('confirmed', 'Confirmed'),
     ], string='Status', default='draft', required=True, tracking=True, copy=False)
     rejection_reason = fields.Text(string='Rejection Reason', copy=False)
+    manager_rejection_reply = fields.Text(string='Manager Rejection Response', copy=False, tracking=True)
 
     is_current_employee = fields.Boolean(
         compute='_compute_current_user_roles',
@@ -217,6 +217,23 @@ class CorporateAppraisal(models.Model):
                     rec.performance_rating = False
             else:
                 rec.performance_rating = False
+
+    @api.constrains('accept_by')
+    def _check_accept_by(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.accept_by and rec.accept_by < today:
+                raise ValidationError("Acceptance deadline ('Accept By') cannot be earlier than the current date.")
+
+    @api.onchange('accept_by')
+    def _onchange_accept_by(self):
+        if self.accept_by and self.accept_by < fields.Date.context_today(self):
+            return {
+                'warning': {
+                    'title': 'Invalid Acceptance Deadline',
+                    'message': "Acceptance deadline ('Accept By') cannot be earlier than the current date.",
+                }
+            }
 
     def action_populate_score(self):
         for rec in self:
@@ -341,11 +358,30 @@ class CorporateAppraisal(models.Model):
         }
 
     def action_notify(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.state == 'rejected':
+                if not rec.manager_rejection_reply or not rec.manager_rejection_reply.strip():
+                    return {
+                        'name': 'Reply to Employee Rejection Reason',
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'performance.rejection.reply.wizard',
+                        'view_mode': 'form',
+                        'target': 'new',
+                        'context': {
+                            'default_res_model': rec._name,
+                            'default_res_id': rec.id,
+                            'default_action_type': 'notify',
+                            'default_rejection_reason': rec.rejection_reason,
+                        },
+                    }
         for rec in self:
             if not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Only the Planning administrator can notify the employee.')
             if not rec.accept_by:
                 raise UserError(f"Please provide an 'Accept By' deadline before notifying the employee for corporate appraisal '{rec.name or rec.display_name}'.")
+            if rec.accept_by < today:
+                raise UserError(f"The 'Accept By' deadline cannot be earlier than the current date ({today}) for corporate appraisal '{rec.name or rec.display_name}'.")
             
             invalid_lines = rec.line_ids.filtered(lambda l: l.appraised == 'yes' and (l.uploaded_value or 0.0) <= 0.0)
             if invalid_lines:
@@ -387,6 +423,7 @@ class CorporateAppraisal(models.Model):
                 ("Overall Evaluated Score", f'<span style="font-size: 14px; font-weight: bold; color: #541718;">{score:.2f}%</span>'),
                 ("Performance Rating", f'<span style="font-weight: bold; color: #2b6cb0;">{rating}</span>'),
                 ("Accept By Deadline", f'<span style="color: #c53030; font-weight: bold;">{accept_by_str}</span>'),
+                ("Manager Response to Rejection", f'<span style="color: #2b6cb0; font-weight: bold;">{rec.manager_rejection_reply}</span>'),
                 ("Current Status", '<span style="background-color: #feebc8; color: #7b341e; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">NOTIFIED</span>'),
             ]
 
@@ -535,6 +572,22 @@ class CorporateAppraisal(models.Model):
 
     def action_reset_draft(self):
         for rec in self:
+            if rec.state == 'rejected':
+                if not rec.manager_rejection_reply or not rec.manager_rejection_reply.strip():
+                    return {
+                        'name': 'Reply to Employee Rejection Reason',
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'performance.rejection.reply.wizard',
+                        'view_mode': 'form',
+                        'target': 'new',
+                        'context': {
+                            'default_res_model': rec._name,
+                            'default_res_id': rec.id,
+                            'default_action_type': 'reset_draft',
+                            'default_rejection_reason': rec.rejection_reason,
+                        },
+                    }
+        for rec in self:
             if rec.is_current_employee and not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Employees are not permitted to reset appraisals to draft.')
             if not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
@@ -544,12 +597,16 @@ class CorporateAppraisal(models.Model):
 
     def write(self, vals):
         for rec in self:
+            if rec.state == 'rejected' and vals.get('state') in ('notified', 'draft'):
+                reply = vals.get('manager_rejection_reply') or rec.manager_rejection_reply
+                if not reply or not str(reply).strip():
+                    raise UserError("You must provide a reply/response to the employee's rejection reason before re-notifying or resetting to draft.")
             if rec.is_current_employee and not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
-                allowed_fields = {'state', 'rejection_reason'}
+                allowed_fields = {'state', 'rejection_reason', 'manager_rejection_reply'}
                 if not set(vals.keys()).issubset(allowed_fields):
                     raise UserError('Employees are not permitted to edit appraisals.')
-            if rec.state in ('accepted', 'confirmed'):
-                allowed_fields = {'state', 'rejection_reason'}
+            if rec.state == 'accepted':
+                allowed_fields = {'state', 'rejection_reason', 'manager_rejection_reply'}
                 if rec.is_planning_role or rec.is_admin_role or self.env.is_admin():
                     allowed_fields |= {'manager_id', 'employee_id', 'job_id', 'operating_unit_id', 'department_id', 'fiscal_year_id', 'appraisal_period_id'}
                 if not set(vals.keys()).issubset(allowed_fields):

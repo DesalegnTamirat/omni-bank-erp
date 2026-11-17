@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from markupsafe import Markup
-from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo import models, fields, api, _, SUPERUSER_ID
+from odoo.exceptions import UserError, ValidationError
+from .discipline_case_report_helpers import gregorian_to_ethiopian
 
 
 class DisciplineAttendanceCase(models.Model):
     _name = 'discipline.attendance.case'
     _description = 'Attendance & Absence Disciplinary Case'
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'incident_date desc, id desc'
 
     PUNISHMENT_SELECTION = [
@@ -105,6 +106,18 @@ class DisciplineAttendanceCase(models.Model):
         ('force_checkout', 'Force Check-Out Violation'),
     ], string='Attendance Breach Type', required=True, default='absence_minor', tracking=True)
 
+    # Backward compatibility alias
+    attendance_violation_type = fields.Selection(
+        related='violation_type',
+        string='Attendance Breach Type (Alias)',
+        readonly=True,
+    )
+    is_attendance_case = fields.Boolean(
+        string='Is Attendance Case',
+        default=True,
+        readonly=True,
+    )
+
     incident_date = fields.Date(
         string='Evaluation / Incident Date',
         required=True,
@@ -133,10 +146,36 @@ class DisciplineAttendanceCase(models.Model):
     description = fields.Text(string='Violation Summary & Audit Details')
 
     # Regulatory & Sanction Details
-    offense_id = fields.Many2one('discipline.offense', string='Misconduct Clause / Offense', tracking=True)
+    offense_id = fields.Many2one(
+        'discipline.offense',
+        string='Misconduct Clause / Offense',
+        tracking=True,
+    )
     severity_level_id = fields.Many2one('discipline.severity.level', string='Severity Classification', tracking=True)
     severity_level = fields.Char(related='severity_level_id.code', string='Severity Code', store=True)
-    occurrence_count = fields.Integer(string='Breach Occurrence (Tier)', default=1, tracking=True)
+    occurrence_count = fields.Integer(
+        string='Breach Occurrence (Tier)',
+        compute='_compute_occurrence_count',
+        store=True,
+        readonly=False,
+        default=1,
+        tracking=True,
+        help='Progressive disciplinary tier for this breach based on active prior enforced history within the reset period.'
+    )
+    def _get_notice_language_selection(self):
+        return [
+            ('amharic', 'Amharic (አማርኛ)'),
+            ('english', 'English'),
+        ]
+
+    notice_language = fields.Selection(
+        selection='_get_notice_language_selection',
+        string='Notice Letter Language',
+        default='amharic',
+        required=True,
+        tracking=True,
+        help='Language format for the formal disciplinary notice letter. Amharic is the official standard for Bunna Bank.'
+    )
 
     punishment_type = fields.Selection(
         PUNISHMENT_SELECTION,
@@ -182,6 +221,17 @@ class DisciplineAttendanceCase(models.Model):
         string='Coach / Leave Justification Notes',
         tracking=True,
     )
+    has_pending_leave_approval = fields.Boolean(
+        string='Has Pending Leave Approval',
+        compute='_compute_pending_leave_approval',
+        store=True,
+        tracking=True,
+        help='True when an attached leave request is awaiting approval by the Coach/Manager.',
+    )
+    can_coach_approve_leave = fields.Boolean(
+        string='Can Coach Approve Leave Adjustment',
+        compute='_compute_access_flags',
+    )
 
     # HR Refusal & Enforcement Audit Fields
     hr_refusal_reason = fields.Text(string='HR / POMD Refusal Reason', tracking=True)
@@ -190,6 +240,22 @@ class DisciplineAttendanceCase(models.Model):
 
     enforced_by_id = fields.Many2one('res.users', string='Enforced By', readonly=True, tracking=True)
     enforced_date = fields.Date(string='Enforced Date', readonly=True, tracking=True)
+    active_duration_days = fields.Integer(string='Warning Active Validity (Days)', default=180, tracking=True)
+    active_penalty_end_date = fields.Date(string='Warning Active End Date', compute='_compute_active_penalty_dates', store=True, tracking=True)
+
+    signatory_id = fields.Many2one(
+        'res.users',
+        string='Authorized Signatory',
+        compute='_compute_signatory_id',
+        store=True,
+        tracking=True,
+        help='Authorized executive / line manager who signed and enforced this attendance decision.'
+    )
+    signatory_signature = fields.Binary(
+        string='Signatory Signature',
+        compute='_compute_signatory_signature',
+        help='Authorized digital signature image rendered on the notice letter.'
+    )
 
     exonerated_by_id = fields.Many2one('res.users', string='Exonerated / Adjusted By', readonly=True, tracking=True)
     exonerated_date = fields.Date(string='Exonerated / Adjusted Date', readonly=True, tracking=True)
@@ -248,6 +314,32 @@ class DisciplineAttendanceCase(models.Model):
                     'Invalid Incident Date: The Attendance Incident Date (%s) cannot be in the future. '
                     'Please select today (%s) or a prior date.'
                 ) % (rec.incident_date, today))
+
+    @api.constrains('employee_id', 'violation_type', 'date_from', 'date_to', 'state')
+    def _check_no_duplicate_active_case(self):
+        """Prevent double active attendance disciplinary cases for the same employee
+        covering overlapping dates."""
+        for rec in self:
+            if rec.state in ('leave_adjusted', 'exonerated', 'hr_refused'):
+                continue
+            if not rec.employee_id or not rec.date_from or not rec.date_to:
+                continue
+            duplicates = self.search([
+                ('id', '!=', rec.id),
+                ('employee_id', '=', rec.employee_id.id),
+                ('state', 'not in', ['leave_adjusted', 'exonerated', 'hr_refused']),
+                ('date_from', '<=', rec.date_to),
+                ('date_to', '>=', rec.date_from),
+            ], limit=1)
+            if duplicates:
+                raise ValidationError(_(
+                    "Duplicate Attendance Case Detected!\n"
+                    "An active attendance disciplinary case (%s, Status: %s) already exists for employee '%s' "
+                    "covering the period %s to %s.\n"
+                    "Duplicate active disciplinary records for the same employee and period are not permitted."
+                ) % (duplicates.name, duplicates.state, rec.employee_id.name, rec.date_from, rec.date_to))
+
+
 
     @api.onchange('incident_date')
     def _onchange_incident_date(self):
@@ -316,6 +408,61 @@ class DisciplineAttendanceCase(models.Model):
         for rec in self:
             rec.payroll_penalty_count = len(rec.payroll_penalty_ids)
 
+    @api.depends('employee_id', 'violation_type', 'incident_date', 'date_from')
+    def _compute_occurrence_count(self):
+        for rec in self:
+            emp = rec.employee_id
+            if not emp:
+                rec.occurrence_count = 1
+                continue
+            inc_date = rec.incident_date or rec.date_from or fields.Date.context_today(rec)
+            prior_cases = self.search([
+                ('id', '!=', rec._origin.id if rec._origin else (rec.id or 0)),
+                ('employee_id', '=', emp.id),
+                ('state', '=', 'enforced'),
+                ('enforced_date', '!=', False),
+            ])
+            active_priors = prior_cases.filtered(
+                lambda c: (c.active_penalty_end_date and c.active_penalty_end_date >= inc_date) or
+                          (c.enforced_date and (c.enforced_date + timedelta(days=c.active_duration_days or 180)) >= inc_date)
+            )
+            if rec.violation_type in ('absence_minor', 'absence_prolonged'):
+                same_type = active_priors.filtered(lambda c: c.violation_type in ('absence_minor', 'absence_prolonged'))
+            else:
+                same_type = active_priors.filtered(lambda c: c.violation_type == rec.violation_type)
+            rec.occurrence_count = len(same_type) + 1
+
+    @api.depends('enforced_date', 'active_duration_days', 'punishment_type', 'state')
+    def _compute_active_penalty_dates(self):
+        for rec in self:
+            if rec.state == 'enforced' and rec.enforced_date and rec.punishment_type != 'dismissal':
+                duration = rec.active_duration_days or 180
+                rec.active_penalty_end_date = rec.enforced_date + timedelta(days=duration)
+            else:
+                rec.active_penalty_end_date = False
+
+    @api.depends('enforced_by_id', 'coach_id', 'director_id', 'state')
+    def _compute_signatory_id(self):
+        for rec in self:
+            if rec.enforced_by_id:
+                rec.signatory_id = rec.enforced_by_id
+            elif rec.state == 'pomd_review':
+                sec_user = self.env['hr.employee'].sudo().get_secretary_user()
+                rec.signatory_id = sec_user or self.env.user
+            elif rec.state == 'director_review':
+                rec.signatory_id = rec.director_id or self.env.user
+            else:
+                rec.signatory_id = rec.coach_id or self.env.user
+
+    @api.depends('signatory_id')
+    def _compute_signatory_signature(self):
+        for rec in self:
+            sig = False
+            if rec.signatory_id and rec.signatory_id.employee_ids:
+                emp = rec.signatory_id.employee_ids[0]
+                sig = getattr(emp, 'digital_signature', False) or getattr(emp, 'signature', False)
+            rec.signatory_signature = sig
+
     @api.depends('violation_type', 'severity_level_id', 'is_managerial', 'occurrence_count')
     def _compute_sanction_details(self):
         for rec in self:
@@ -328,9 +475,15 @@ class DisciplineAttendanceCase(models.Model):
                 rec.penalty_percentage = 0.0
                 rec.fine_days = 0.0
             elif v_type == 'absence_prolonged':
-                rec.punishment_type = 'final_warning_penalty'
-                rec.penalty_percentage = 0.0 if is_mgr else 20.0
-                rec.fine_days = 3.0 if is_mgr else 0.0
+                if occ >= 2:
+                    # Repeated prolonged unexcused absence within active window escalates to dismissal
+                    rec.punishment_type = 'dismissal'
+                    rec.penalty_percentage = 0.0
+                    rec.fine_days = 0.0
+                else:
+                    rec.punishment_type = 'final_warning_penalty'
+                    rec.penalty_percentage = 0.0 if is_mgr else 20.0
+                    rec.fine_days = 3.0 if is_mgr else 0.0
             elif v_type == 'absence_minor':
                 if occ == 1:
                     rec.punishment_type = 'first_warning_penalty'
@@ -362,6 +515,17 @@ class DisciplineAttendanceCase(models.Model):
                     rec.punishment_type = 'final_warning_penalty'
                     rec.penalty_percentage = 0.0 if is_mgr else 20.0
                     rec.fine_days = 3.0 if is_mgr else 0.0
+
+    @api.depends('leave_id', 'leave_id.state', 'state')
+    def _compute_pending_leave_approval(self):
+        for rec in self:
+            if not rec.leave_id or rec.state in ('leave_adjusted', 'exonerated', 'enforced', 'hr_refused'):
+                rec.has_pending_leave_approval = False
+            else:
+                lv = rec.leave_id
+                lv_status = getattr(lv, 'leave_request_status', False)
+                is_pending = lv.state in ('draft', 'confirm') or lv_status in ('draft', 'fetch', 'notify')
+                rec.has_pending_leave_approval = is_pending
 
     def _compute_access_flags(self):
         user = self.env.user
@@ -413,6 +577,11 @@ class DisciplineAttendanceCase(models.Model):
                 rec.state in ('coach_review', 'director_review', 'pomd_review', 'enforced') and
                 is_pomd_admin and
                 rec.deduction_status not in ('deducted',)
+            )
+            rec.can_coach_approve_leave = bool(
+                rec.has_pending_leave_approval and
+                (is_coach or is_dir or is_pomd_admin) and
+                not is_emp
             )
 
     @api.model_create_multi
@@ -638,15 +807,31 @@ class DisciplineAttendanceCase(models.Model):
         }
 
     def action_recheck_leave_coverage(self, silent=False):
-        """Check hr.leave records for the employee in [date_from, date_to] and automatically close or downgrade the case if covered."""
+        """Cross-check Attendance Management for manager acknowledgments and Time Off for approved leaves.
+        Automatically exonerates or converts the case if the absent dates are verified as cleared.
+        """
         Leave = self.env['hr.leave'].sudo()
         AttModel = self.env['hr.attendance'].sudo()
+        notification = None
+
         for rec in self:
             if rec.state in ('enforced', 'leave_adjusted', 'exonerated', 'hr_refused'):
                 continue
             emp = rec.employee_id.sudo()
             if not emp:
                 continue
+
+            # Check if linked leave is still pending approval
+            if rec.leave_id:
+                lv = rec.leave_id
+                lv_status = getattr(lv, 'leave_request_status', False)
+                if lv.state not in ('validate', 'validate1') and lv_status != 'approved':
+                    if not silent:
+                        raise UserError(_(
+                            'Linked Leave Request "%s" is pending Coach/Manager approval. '
+                            'The attendance case will close automatically once the Coach approves it.'
+                        ) % lv.display_name)
+                    continue
 
             # Find validated or linked leaves overlapping the period
             domain = [
@@ -655,16 +840,11 @@ class DisciplineAttendanceCase(models.Model):
                 ('date_to', '>=', rec.date_from),
             ]
             if rec.leave_id:
-                domain = ['|', ('id', '=', rec.leave_id.id)] + domain
+                domain = [('id', '=', rec.leave_id.id)]
             else:
-                domain.append(('state', 'in', ['validate', 'validate1', 'confirm']))
+                domain.append(('state', 'in', ['validate', 'validate1']))
 
             leaves = Leave.search(domain)
-            if not leaves:
-                if not silent:
-                    raise UserError(_('No Leave / Time Off records found for %s between %s and %s.') % (emp.name, rec.date_from, rec.date_to))
-                continue
-
             leave_dates = set()
             for lv in leaves:
                 l_start = max(rec.date_from, lv.date_from.date() if hasattr(lv.date_from, 'date') else lv.date_from)
@@ -676,35 +856,143 @@ class DisciplineAttendanceCase(models.Model):
 
             # Recompute unexcused dates using shift-aware schedule
             work_days, _is_shift, _sched_label = AttModel._get_employee_scheduled_work_days(emp, rec.date_from, rec.date_to)
+            
+            # Query attendance records in the window
+            dt_from_min = datetime.combine(rec.date_from, time.min)
+            dt_to_max = datetime.combine(rec.date_to, time.max)
             atts = AttModel.search([
                 ('employee_id', '=', emp.id),
-                ('check_in', '>=', rec.date_from),
-                ('check_in', '<=', rec.date_to + timedelta(days=1)),
+                '|',
+                '&', ('check_in', '>=', dt_from_min), ('check_in', '<=', dt_to_max),
+                '&', ('work_date', '>=', rec.date_from), ('work_date', '<=', rec.date_to),
             ])
-            checkin_dates = {a.check_in.date() for a in atts if a.check_in}
-            remaining_absent = [d for d in work_days if d not in checkin_dates and d not in leave_dates]
+
+            checkin_dates = set()
+            ack_dates = set()
+            for a in atts:
+                d = a.check_in.date() if a.check_in else getattr(a, 'work_date', False)
+                if d:
+                    is_ack = bool(
+                        getattr(a, 'is_acknowledged', False) or
+                        getattr(a, 'in_mode', '') == 'acknowledged' or
+                        getattr(a, 'out_mode', '') == 'acknowledged' or
+                        getattr(a, 'acknowledged_by', False) or
+                        getattr(a, 'check_in_status', '') == 'Acknowledged Lateness'
+                    )
+                    has_real_checkin = bool(a.check_in and getattr(a, 'in_mode', '') != 'absent')
+                    if is_ack:
+                        ack_dates.add(d)
+                    if has_real_checkin:
+                        checkin_dates.add(d)
+
+            # Cleared dates include valid punches, manager-acknowledged dates, and approved leaves
+            cleared_dates = checkin_dates | ack_dates | leave_dates
+            remaining_absent = [d for d in work_days if d not in cleared_dates]
             max_consec = AttModel._compute_max_consecutive_work_days(remaining_absent, work_days)
 
             covered_count = max(0, (rec.absent_days_count or len(work_days)) - len(remaining_absent))
-            rec.write({
-                'leave_id': leaves[0].id,
-                'covered_leave_days': covered_count,
-            })
-
-            if not remaining_absent or (rec.violation_type == 'late' and rec.leave_id):
+            if leaves:
                 rec.write({
-                    'state': 'leave_adjusted',
-                    'punishment_type': 'leave_adjusted',
-                    'penalty_percentage': 0.0,
-                    'fine_days': 0.0,
-                    'deduction_status': 'cancelled',
-                    'exonerated_by_id': self.env.user.id,
-                    'exonerated_date': fields.Date.context_today(self),
+                    'leave_id': leaves[0].id,
+                    'covered_leave_days': covered_count,
                 })
-                rec.message_post(body=Markup(_(
-                    '<strong>✅ Case Adjusted by Leave &amp; Closed:</strong><br/>'
-                    'Absent dates are covered by Leave record <strong>%s</strong>. Zero disciplinary penalty applied.'
-                ) % (leaves[0].display_name,)))
+
+            today = fields.Date.context_today(rec)
+
+            if not remaining_absent or (rec.violation_type == 'late' and (rec.leave_id or ack_dates)):
+                # Distinguish between Manager Attendance Acknowledgment vs Leave Adjustment
+                if ack_dates and not leave_dates and not rec.leave_id:
+                    # 100% Cleared via Manager Attendance Acknowledgment
+                    rec.write({
+                        'state': 'exonerated',
+                        'punishment_type': 'exonerate',
+                        'penalty_percentage': 0.0,
+                        'fine_days': 0.0,
+                        'covered_leave_days': 0,
+                        'deduction_status': 'cancelled',
+                        'exonerated_by_id': self.env.user.id,
+                        'exonerated_date': today,
+                        'justification_reason': _(
+                            'Automated Exoneration: All absent dates (%s to %s) verified as officially acknowledged by Manager in Attendance Management.'
+                        ) % (rec.date_from.strftime('%b %d, %Y') if rec.date_from else '', rec.date_to.strftime('%b %d, %Y') if rec.date_to else ''),
+                    })
+                    rec.message_post(body=Markup(_(
+                        '<strong>🛡️ Case Automatically Exonerated by Manager Attendance Acknowledgment:</strong><br/>'
+                        '• <strong>Verified Acknowledged Dates:</strong> %s<br/>'
+                        '• <strong>Acknowledged By:</strong> %s<br/>'
+                        '• <strong>Outcome:</strong> Closed with zero disciplinary penalty.'
+                    ) % (
+                        ', '.join(d.strftime('%b %d, %Y') for d in sorted(ack_dates or work_days)),
+                        self.env.user.name,
+                    )))
+                    notification = {
+                        'type': 'ir.actions.client',
+                        'tag': 'display_notification',
+                        'params': {
+                            'title': _('Case Automatically Exonerated'),
+                            'message': _('Manager attendance acknowledgment verified for all dates. Case exonerated with 0 penalty.'),
+                            'type': 'success',
+                            'sticky': False,
+                        }
+                    }
+                elif leaves or leave_dates:
+                    # Cleared via Approved Leave
+                    rec.write({
+                        'state': 'leave_adjusted',
+                        'punishment_type': 'leave_adjusted',
+                        'penalty_percentage': 0.0,
+                        'fine_days': 0.0,
+                        'covered_leave_days': covered_count or rec.absent_days_count,
+                        'deduction_status': 'cancelled',
+                        'exonerated_by_id': self.env.user.id,
+                        'exonerated_date': today,
+                    })
+                    rec.message_post(body=Markup(_(
+                        '<strong>✅ Case Adjusted by Leave &amp; Closed:</strong><br/>'
+                        'Absent dates are fully covered by Leave record <strong>%s</strong>. Zero disciplinary penalty applied.'
+                    ) % (leaves[0].display_name if leaves else 'Approved Time Off',)))
+                    notification = {
+                        'type': 'ir.actions.client',
+                        'tag': 'display_notification',
+                        'params': {
+                            'title': _('Converted to Leave'),
+                            'message': _('Approved leave verified for all dates. Case converted to leave with 0 penalty.'),
+                            'type': 'success',
+                            'sticky': False,
+                        }
+                    }
+                else:
+                    # Cleared via existing punches / attendance
+                    rec.write({
+                        'state': 'exonerated',
+                        'punishment_type': 'exonerate',
+                        'penalty_percentage': 0.0,
+                        'fine_days': 0.0,
+                        'covered_leave_days': 0,
+                        'deduction_status': 'cancelled',
+                        'exonerated_by_id': self.env.user.id,
+                        'exonerated_date': today,
+                        'justification_reason': _('Absence dates regularized by verified Attendance records.'),
+                    })
+                    rec.message_post(body=Markup(_(
+                        '<strong>🛡️ Case Regularized by Attendance Records &amp; Closed:</strong><br/>'
+                        'Attendance verified for all previously flagged dates. Zero disciplinary penalty applied.'
+                    )))
+                    notification = {
+                        'type': 'ir.actions.client',
+                        'tag': 'display_notification',
+                        'params': {
+                            'title': _('Case Regularized & Closed'),
+                            'message': _('Attendance verified for all dates. Case regularized with 0 penalty.'),
+                            'type': 'success',
+                            'sticky': False,
+                        }
+                    }
+                # Cancel pending payroll penalty lines
+                pending_pens = rec.payroll_penalty_ids.sudo().filtered(lambda p: p.state == 'pending')
+                if pending_pens:
+                    pending_pens.write({'state': 'cancelled'})
+
             elif rec.violation_type == 'absence_dismissal' and max_consec < 5:
                 new_vtype = 'absence_prolonged' if max_consec >= 3 else 'absence_minor'
                 rec.write({
@@ -715,11 +1003,172 @@ class DisciplineAttendanceCase(models.Model):
                     'state': 'coach_review',
                 })
                 rec._compute_sanction_details()
-                rec.message_post(body=Markup(_(
-                    '<strong>🔄 Partial Leave Coverage Applied — Downgraded to Coach Review:</strong><br/>'
-                    'Leave record <strong>%s</strong> reduced consecutive unexcused days to <strong>%d day(s)</strong> (below the 5-day dismissal threshold). '
+                clear_src = _('Leave record %s') % leaves[0].display_name if leaves else _('Manager Attendance Acknowledgment')
+                msg = _(
+                    '<strong>🔄 Partial Coverage Applied — Downgraded to Coach Review:</strong><br/>'
+                    '%s reduced consecutive unexcused days to <strong>%d day(s)</strong> (below the 5-day dismissal threshold). '
                     'Routed to Direct Coach (%s) for review.'
-                ) % (leaves[0].display_name, max_consec, rec.coach_id.name if rec.coach_id else _('Coach'))))
+                ) % (clear_src, max_consec, rec.coach_id.name if rec.coach_id else _('Coach'))
+                rec.message_post(body=Markup(msg))
+                notification = {
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': _('Partial Coverage — Downgraded'),
+                        'message': _('Consecutive unexcused days reduced to %d. Downgraded to Coach Review.') % max_consec,
+                        'type': 'info',
+                        'sticky': False,
+                    }
+                }
+
+            elif rec.violation_type == 'absence_dismissal' and max_consec >= 5:
+                rec.write({
+                    'max_consecutive_days': max_consec,
+                    'absent_days_count': len(remaining_absent),
+                    'absent_dates_summary': ', '.join(d.strftime('%Y-%m-%d') for d in remaining_absent),
+                })
+                target_stage = 'Directorate Director' if rec.state == 'director_review' else 'POMD'
+                clear_src = _('Leave record %s') % leaves[0].display_name if leaves else _('Attendance Regularization')
+                msg = _(
+                    '<strong>⚠️ Partial Coverage Applied — Dismissal Threshold Still Exceeded:</strong><br/>'
+                    '%s was applied, but <strong>%d consecutive unexcused working day(s)</strong> remain '
+                    '(still meeting or exceeding the 5-day dismissal threshold). Case remains in %s review.'
+                ) % (clear_src, max_consec, target_stage)
+                rec.message_post(body=Markup(msg))
+                notification = {
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': _('Dismissal Threshold Still Exceeded'),
+                        'message': _('%d consecutive unexcused days remain. Case remains in %s review.') % (max_consec, target_stage),
+                        'type': 'warning',
+                        'sticky': True,
+                    }
+                }
+
+            else:
+                initial_count = rec.absent_days_count or len(work_days)
+                rec.write({
+                    'max_consecutive_days': max_consec,
+                    'absent_days_count': len(remaining_absent),
+                    'absent_dates_summary': ', '.join(d.strftime('%Y-%m-%d') for d in remaining_absent),
+                })
+                rec._compute_sanction_details()
+                if len(remaining_absent) < initial_count:
+                    clear_src = _('Leave record %s') % leaves[0].display_name if leaves else _('Manager Attendance Acknowledgment')
+                    msg = _(
+                        '<strong>ℹ️ Partial Coverage Applied:</strong><br/>'
+                        '%s was applied. Remaining unexcused days: <strong>%d day(s)</strong>.'
+                    ) % (clear_src, len(remaining_absent))
+                    rec.message_post(body=Markup(msg))
+                    notification = {
+                        'type': 'ir.actions.client',
+                        'tag': 'display_notification',
+                        'params': {
+                            'title': _('Partial Coverage Applied'),
+                            'message': _('Remaining unexcused days reduced to %d.') % len(remaining_absent),
+                            'type': 'info',
+                            'sticky': False,
+                        }
+                    }
+                else:
+                    # 0 dates acknowledged and 0 leaves
+                    notification = {
+                        'type': 'ir.actions.client',
+                        'tag': 'display_notification',
+                        'params': {
+                            'title': _('No Acknowledgment or Leave Found'),
+                            'message': _(
+                                'No manager attendance acknowledgment or approved leave was found for the absent dates (%s to %s). '
+                                'To exonerate this case, the manager must first acknowledge the attendance record in Attendance Management or approve a leave request.'
+                            ) % (
+                                rec.date_from.strftime('%b %d, %Y') if rec.date_from else '',
+                                rec.date_to.strftime('%b %d, %Y') if rec.date_to else ''
+                            ),
+                            'type': 'warning',
+                            'sticky': True,
+                        }
+                    }
+
+        if not silent and len(self) == 1 and notification:
+            return notification
+
+    def action_coach_approve_leave_adjustment(self):
+        """Allow Direct Coach / Line Manager / Director / POMD to approve the employee's submitted leave request directly from the attendance case."""
+        self.ensure_one()
+        user = self.env.user
+        emp = self.employee_id
+        is_emp = bool(emp and (emp.user_id == user or emp.id in user.employee_ids.ids))
+        if is_emp and not (user.has_group('discipline_management.group_discipline_admin') or user._is_admin()):
+            raise UserError(_("You cannot approve your own leave adjustment. Your Direct Coach or Line Manager must approve it."))
+
+        if not self.leave_id:
+            raise UserError(_("No linked leave request found to approve."))
+
+        leave = self.leave_id.sudo().with_user(SUPERUSER_ID).with_context(
+            leave_fast_create=True,
+            leave_skip_state_check=True,
+            leave_skip_date_check=True,
+            mail_create_nolog=True,
+            tracking_disable=True,
+        )
+        try:
+            if hasattr(leave, 'action_approve') and leave.state not in ('validate', 'validate1'):
+                leave.action_approve()
+            if leave.state not in ('validate', 'validate1') or getattr(leave, 'leave_request_status', False) != 'approved':
+                leave.write({
+                    'leave_request_status': 'approved',
+                    'state': 'validate',
+                })
+        except Exception:
+            leave.write({
+                'leave_request_status': 'approved',
+                'state': 'validate',
+            })
+
+        # Mark any pending approval activities on this case as done
+        activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+        case_activities = getattr(self, 'activity_ids', self.env['mail.activity'])
+        if case_activities:
+            pending = case_activities.filtered(lambda a: (activity_type and a.activity_type_id == activity_type) or (a.summary and 'Leave Adjustment' in a.summary))
+            if pending:
+                try:
+                    pending.action_feedback(feedback=_("Leave adjustment approved by %s.") % user.name)
+                except Exception:
+                    pass
+
+        # Close the case with zero penalty
+        self.write({
+            'state': 'leave_adjusted',
+            'punishment_type': 'leave_adjusted',
+            'penalty_percentage': 0.0,
+            'fine_days': 0.0,
+            'covered_leave_days': self.absent_days_count,
+            'deduction_status': 'cancelled',
+            'exonerated_by_id': user.id,
+            'exonerated_date': fields.Date.context_today(self),
+        })
+        pending_pens = self.payroll_penalty_ids.sudo().filtered(lambda p: p.state == 'pending')
+        if pending_pens:
+            pending_pens.write({'state': 'cancelled'})
+
+        self.message_post(body=Markup(_(
+            '<strong>✅ Leave Adjustment Approved by Coach (%s):</strong><br/>'
+            '• Leave Request <strong>%s</strong> approved.<br/>'
+            '• %.1f absent days covered and deducted from leave balance.<br/>'
+            '• Attendance case closed with zero penalty.'
+        ) % (user.name, leave.display_name or f"LR-{leave.id}", self.absent_days_count)))
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Leave Adjustment Approved'),
+                'message': _('Leave Request %s approved successfully. Case closed with zero penalty.') % (leave.display_name or f"LR-{leave.id}"),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
 
     # =========================================================================
     # DIRECT COACH ACTIONS (Minor / Prolonged Attendance Cases)
@@ -783,11 +1232,19 @@ class DisciplineAttendanceCase(models.Model):
                 raise UserError(_('Only pending attendance cases can be enforced.'))
 
             has_financial = (not rec.is_managerial and rec.penalty_percentage > 0.0) or (rec.is_managerial and rec.fine_days > 0.0)
+            validity_map = {
+                'verbal_warning': 30,
+                'first_warning_penalty': 90,
+                'second_warning_penalty': 180,
+                'final_warning_penalty': 365,
+            }
+            v_duration = validity_map.get(rec.punishment_type, 180)
             rec.write({
                 'state': 'enforced',
                 'enforced_by_id': self.env.user.id,
                 'enforced_date': today,
                 'payroll_month': target_month,
+                'active_duration_days': v_duration,
                 'deduction_status': 'scheduled' if has_financial else 'not_applicable',
             })
 
@@ -931,3 +1388,129 @@ class DisciplineAttendanceCase(models.Model):
             'domain': [('attendance_case_id', '=', self.id)],
             'context': {'default_attendance_case_id': self.id, 'default_employee_id': self.employee_id.id},
         }
+
+    @api.model
+    def action_run_attendance_scan(self):
+        """Action invoked from UI button to trigger violation scan."""
+        cases = self.env['hr.attendance'].sudo().scan_and_initiate_attendance_cases()
+        new_count = len(cases) if cases else 0
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Attendance Scan Executed'),
+                'message': _('Attendance scan finished successfully. %d new disciplinary case(s) evaluated/generated.') % new_count,
+                'sticky': False,
+                'type': 'success',
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    # =========================================================================
+    # OFFICIAL NOTICE LETTER & REPORT HELPERS
+    # =========================================================================
+
+    def action_print_notice_letter(self):
+        """Download and print the official Bunna Bank Disciplinary Notice / Warning Letter PDF."""
+        self.ensure_one()
+        if self.state in ('draft', 'leave_adjusted', 'exonerated', 'hr_refused'):
+            raise UserError(_("Notice letters cannot be printed for draft, exonerated, or refused cases."))
+        return self.env.ref('discipline_management.action_report_attendance_warning_letter').report_action(self)
+
+    def get_ethiopic_sadiss_font_css(self):
+        """Loads and base64-embeds Ethiopic Sadiss font family for wkhtmltopdf."""
+        return self.env['discipline.case'].get_ethiopic_sadiss_font_css()
+
+    def get_official_bunna_logo_base64(self):
+        """Returns base64 string of official Bunna Bank logo for PDF rendering."""
+        return self.env['discipline.case'].get_official_bunna_logo_base64()
+
+    def get_ethiopian_date_short(self, g_date=None):
+        """Returns short Ethiopian calendar date string e.g. '28/02/2019 ዓ.ም.'."""
+        self.ensure_one()
+        d = g_date or self.enforced_date or self.incident_date or fields.Date.today()
+        short_d, _, _ = gregorian_to_ethiopian(d)
+        return short_d
+
+    def get_ethiopian_date_long(self, g_date=None):
+        """Returns full long Ethiopian calendar date string e.g. 'ጥቅምት 28 ቀን 2019 ዓ.ም.'."""
+        self.ensure_one()
+        d = g_date or self.enforced_date or self.incident_date or fields.Date.today()
+        _, long_d, _ = gregorian_to_ethiopian(d)
+        return long_d
+
+    def get_salutation_label(self):
+        """Returns formal Ethiopian salutation based on gender (Ato / W/ro / W/t)."""
+        self.ensure_one()
+        emp = self.sudo().employee_id
+        gender = getattr(emp, 'gender', False)
+        if gender == 'male':
+            return 'አቶ' if self.notice_language != 'english' else 'Ato'
+        elif gender == 'female':
+            marital = getattr(emp, 'marital', False)
+            if self.notice_language != 'english':
+                return 'ወ/ሪት' if marital == 'single' else 'ወ/ሮ'
+            return 'W/t' if marital == 'single' else 'W/ro'
+        return 'አቶ/ወ/ሮ' if self.notice_language != 'english' else 'Ato/W/ro'
+
+    def get_formatted_employee_name(self):
+        """Returns formatted full recipient employee name with formal salutation."""
+        self.ensure_one()
+        sal = self.get_salutation_label()
+        emp_name = self.employee_id.name if self.employee_id else _('Staff')
+        return f"{sal} {emp_name}"
+
+    def get_punishment_display_text_amharic(self):
+        """Returns clean Amharic description of the enforced sanction and financial penalty."""
+        self.ensure_one()
+        labels = {
+            'verbal_warning': 'የቃል ማስጠንቀቂያ',
+            'first_warning_penalty': 'የመጀመሪያ የጽሁፍ ማስጠንቀቂያ',
+            'second_warning_penalty': 'የሁለተኛ የጽሁፍ ማስጠንቀቂያ',
+            'final_warning_penalty': 'የመጨረሻ የጽሁፍ ማስጠንቀቂያ',
+            'dismissal': 'ከስራ ማሰናበት (የስራ ውል መቋረጥ)',
+        }
+        base = labels.get(self.punishment_type, dict(self._fields['punishment_type'].selection).get(self.punishment_type, ''))
+        pen_parts = []
+        if self.penalty_percentage > 0.0:
+            pen_parts.append(f"የ{self.penalty_percentage}% የአንድ ወር ደመወዝ ቅጣት")
+        if self.fine_days > 0.0:
+            pen_parts.append(f"የ{int(self.fine_days)} ቀናት የደመወዝ ቅጣት")
+        if pen_parts:
+            return f"{base} ከ{' እና '.join(pen_parts)} ጋር"
+        return base
+
+    def get_notice_subject_amharic(self):
+        """Returns subject line in Amharic."""
+        self.ensure_one()
+        if self.violation_type == 'absence_dismissal' or self.punishment_type == 'dismissal':
+            return "ጉዳዩ፡- ያለፈቃድ የስራ ገበታን በመተው የስራ ውል መቋረጥ (ስንብት) ውሳኔ ማሳወቂያ"
+        elif self.violation_type == 'absence_prolonged':
+            return "ጉዳዩ፡- በተከታታይ የስራ ቀናት ያለፈቃድ በመቅረት የተሰጠ የዲሲፕሊን ማስጠንቀቂያ እና የደመወዝ ቅጣት ውሳኔ ማሳወቂያ"
+        elif self.violation_type == 'absence_minor':
+            return "ጉዳዩ፡- ያለፈቃድ ከስራ ገበታ መቅረት የተሰጠ የዲሲፕሊን ማስጠንቀቂያ ማሳወቂያ"
+        elif self.violation_type == 'late':
+            return "ጉዳዩ፡- በተደጋጋሚ የስራ ሰዓት አለማክበር (ማርፈድ) የተሰጠ የዲሲፕሊን ማስጠንቀቂያ ማሳወቂያ"
+        return "ጉዳዩ፡- የስራ ሰዓትና መገኘት የዲሲፕሊን ውሳኔ ማሳወቂያ"
+
+    def get_notice_subject_english(self):
+        """Returns subject line in English."""
+        self.ensure_one()
+        if self.violation_type == 'absence_dismissal' or self.punishment_type == 'dismissal':
+            return "Subject: Disciplinary Decision Notice — Contract Termination / Dismissal for Job Abandonment"
+        elif self.violation_type == 'absence_prolonged':
+            return "Subject: Disciplinary Decision Notice — Final Written Warning & Salary Deduction for Prolonged Absence"
+        elif self.violation_type == 'absence_minor':
+            return "Subject: Disciplinary Decision Notice — Written Warning for Unexcused Absence"
+        elif self.violation_type == 'late':
+            return "Subject: Disciplinary Decision Notice — Warning for Repeated Lateness Violation"
+        return "Subject: Attendance Disciplinary Decision Notice"
+
+    def get_signatory_title(self):
+        """Returns formal reviewer/signatory title."""
+        self.ensure_one()
+        if self.state in ('pomd_review', 'enforced') and (self.violation_type == 'absence_dismissal' or self.punishment_type == 'dismissal'):
+            return "የሰው ኃይል እና ድርጅታዊ አስተዳደር ዳይሬክቶሬት (POMD) / People & Organization Management"
+        elif self.state == 'director_review' or (self.signatory_id and self.signatory_id == self.director_id):
+            return "የተመለከተው ዳይሬክቶሬት ዳይሬክተር / Directorate Director"
+        return "የቅርብ ኃላፊ (Direct Coach / Line Manager)"

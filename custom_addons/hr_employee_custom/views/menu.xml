@@ -90,7 +90,7 @@
         <menuitem id="menu_supplementary_role_list" name="Supplementary Role" parent="hr.menu_hr_employee_payroll"
                   action="employee_supplementary_role_tree" sequence="14" groups="hr_employee_custom.group_hr_coach,hr.group_hr_user,hr.group_hr_manager,base.group_user"/>
         <menuitem id="menu_employee_service_probation" name="Probation Management" parent="hr.menu_hr_employee_payroll"
-                  action="custom_recruitment.action_hr_employee_probation" sequence="15"
+                  action="custom_recruitment.action_server_hr_employee_probation" sequence="15"
                   groups="base.group_user"/>
         <!-- <menuitem id="menu_hr_employee_custom_re_instating" name="Re-Instating" parent="hr.menu_hr_employee_payroll"
                   action="employee_re_instating_tree" sequence="15"/> -->

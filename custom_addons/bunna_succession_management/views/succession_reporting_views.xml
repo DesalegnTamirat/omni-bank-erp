@@ -19,7 +19,7 @@
             <field name="name">succession.critical.position.report.job.pivot</field>
             <field name="model">succession.critical.position</field>
             <field name="arch" type="xml">
-                <pivot string="Succession Coverage by Job Position" sample="1">
+                <pivot string="Successor Pipeline by Job Position" sample="1">
                     <field name="department_id" type="row"/>
                     <field name="job_id" type="row"/>
                     <field name="candidate_count" type="measure" string="Total Candidates"/>

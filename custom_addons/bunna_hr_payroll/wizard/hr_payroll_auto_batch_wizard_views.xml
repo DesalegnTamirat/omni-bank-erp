@@ -36,6 +36,7 @@
                                 <field name="payment_date"/>
                                 <field name="batch_size"/>
                                 <field name="batch_prefix"/>
+                                <field name="compute_sheets" widget="boolean_toggle"/>
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
                             <group string="Automatic Exclusion Rules (Pre-Checks)">

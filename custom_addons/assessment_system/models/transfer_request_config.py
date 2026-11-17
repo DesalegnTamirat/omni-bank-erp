@@ -28,9 +28,19 @@ class TransferRequestConfig(models.TransientModel):
         help="Minimum PMS score required to be eligible for transfer."
     )
     transfer_min_service_years = fields.Float(
-        string="Minimum Service Years",
+        string="Minimum Service Years (Legacy)",
         default=1.0,
-        help="Minimum tenure (years) required in current position/location."
+        help="Fallback minimum tenure (years) required in current position/location."
+    )
+    transfer_min_position_service_years = fields.Float(
+        string="Minimum Position Service (Years)",
+        default=1.0,
+        help="Minimum tenure (years) required in current job position."
+    )
+    transfer_min_location_service_years = fields.Float(
+        string="Minimum Location Service (Years)",
+        default=1.0,
+        help="Minimum tenure (years) required in current operating unit / branch."
     )
     transfer_refusal_penalty_months = fields.Integer(
         string="Refusal Penalty (Months)",
@@ -77,6 +87,8 @@ class TransferRequestConfig(models.TransientModel):
             'transfer_discipline_blocks_second_warning': ICPSudo.get_param('custom_recruitment.transfer_discipline_blocks_second_warning', 'False') == 'True',
             'transfer_min_pms_score': float(ICPSudo.get_param('custom_recruitment.transfer_min_pms_score', '75.0')),
             'transfer_min_service_years': float(ICPSudo.get_param('custom_recruitment.transfer_min_service_years', '1.0')),
+            'transfer_min_position_service_years': float(ICPSudo.get_param('custom_recruitment.transfer_min_position_service_years') or ICPSudo.get_param('custom_recruitment.transfer_min_service_years', '1.0')),
+            'transfer_min_location_service_years': float(ICPSudo.get_param('custom_recruitment.transfer_min_location_service_years') or ICPSudo.get_param('custom_recruitment.transfer_min_service_years', '1.0')),
             'transfer_refusal_penalty_months': int(ICPSudo.get_param('custom_recruitment.transfer_refusal_penalty_months', '12')),
             'transfer_pending_expiry_days': int(ICPSudo.get_param('custom_recruitment.transfer_pending_expiry_days', '365')),
             'transfer_pending_auto_withdraw_days': int(ICPSudo.get_param('custom_recruitment.transfer_pending_auto_withdraw_days', '7')),
@@ -108,6 +120,8 @@ class TransferRequestConfig(models.TransientModel):
         ICPSudo.set_param('custom_recruitment.transfer_discipline_blocks_second_warning', str(self.transfer_discipline_blocks_second_warning))
         ICPSudo.set_param('custom_recruitment.transfer_min_pms_score', str(self.transfer_min_pms_score))
         ICPSudo.set_param('custom_recruitment.transfer_min_service_years', str(self.transfer_min_service_years))
+        ICPSudo.set_param('custom_recruitment.transfer_min_position_service_years', str(self.transfer_min_position_service_years))
+        ICPSudo.set_param('custom_recruitment.transfer_min_location_service_years', str(self.transfer_min_location_service_years))
         ICPSudo.set_param('custom_recruitment.transfer_refusal_penalty_months', str(self.transfer_refusal_penalty_months))
         ICPSudo.set_param('custom_recruitment.transfer_pending_expiry_days', str(self.transfer_pending_expiry_days))
         ICPSudo.set_param('custom_recruitment.transfer_pending_auto_withdraw_days', str(self.transfer_pending_auto_withdraw_days))

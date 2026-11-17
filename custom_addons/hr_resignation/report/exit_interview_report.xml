@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Report Action -->
+    <!-- Report Action with zero-margin paperformat matching Acceptance Letter -->
     <record id="action_report_exit_interview" model="ir.actions.report">
         <field name="name">Exit Interview</field>
         <field name="model">hr.exit.interview</field>
@@ -11,107 +11,137 @@
         <field name="print_report_name">'Exit_Interview_%s' % (object.employee_id.name.replace(' ','_'))</field>
         <field name="binding_model_id" ref="model_hr_exit_interview"/>
         <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="hr_resignation.paperformat_certificate_of_release"/>
     </record>
 
     <!-- Report Template -->
     <template id="report_exit_interview">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <t t-call="web.external_layout">
-                    <div class="page" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                        <div class="oe_structure"/>
-                        
-                        <div class="text-center" style="margin-bottom: 30px; padding-bottom: 10px; border-bottom: 2px solid #0f766e;">
-                            <h2 style="color: #0f766e; font-weight: bold;">Exit Interview Report</h2>
-                            <p class="text-muted" style="font-size: 14px;">Strictly Confidential</p>
-                        </div>
-                        
-                        <table class="table table-sm table-borderless" style="margin-bottom: 30px; font-size: 14px;">
-                            <tbody>
-                                <tr>
-                                    <td style="width: 25%; color: #555;"><strong>Employee Name:</strong></td>
-                                    <td style="width: 25%;"><strong><span t-field="o.employee_id.name"/></strong></td>
-                                    <td style="width: 25%; color: #555;"><strong>Interview Date:</strong></td>
-                                    <td style="width: 25%;"><span t-field="o.interview_date" t-options='{"widget": "date"}'/></td>
-                                </tr>
-                                <tr>
-                                    <td style="color: #555;"><strong>Job Title:</strong></td>
-                                    <td><span t-field="o.employee_id.job_title"/></td>
-                                    <td style="color: #555;"><strong>Conducted By:</strong></td>
-                                    <td><span t-field="o.interviewer_id.name"/></td>
-                                </tr>
-                                <tr>
-                                    <td style="color: #555;"><strong>Department:</strong></td>
-                                    <td><span t-field="o.employee_id.department_id.name"/></td>
-                                    <td style="color: #555;"><strong>Status:</strong></td>
-                                    <td>
-                                        <span t-if="o.state == 'draft'" class="badge" style="background-color: #94a3b8; color: white; padding: 3px 8px; border-radius: 4px;">Draft</span>
-                                        <span t-if="o.state == 'done'" class="badge" style="background-color: #15803d; color: white; padding: 3px 8px; border-radius: 4px;">Completed</span>
+                <t t-call="web.basic_layout">
+                    <style type="text/css">
+                        @page {
+                            size: A4 portrait;
+                            margin: 0;
+                        }
+                        html, body, body.container, body.o_body_pdf, .container, .container-fluid, .article {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            min-width: 100% !important;
+                        }
+                        .page {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            width: 100% !important;
+                        }
+                        .header-table, .header-table tr, .header-table td {
+                            border: none !important;
+                            border-top: none !important;
+                            border-bottom: none !important;
+                            border-left: none !important;
+                            border-right: none !important;
+                            outline: none !important;
+                        }
+                    </style>
+
+                    <div class="page" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; width: 100%; color: #1e293b;">
+                        <!-- Official Bunna Bank Letterhead Header Banner (Identical to Acceptance Letter) -->
+                        <div style="padding-top: 26pt; margin-bottom: 20pt; width: 100%; border: 0 !important;">
+                            <table class="header-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0; padding: 0;">
+                                <tr style="border: 0 !important;">
+                                    <td style="width: 155px; vertical-align: middle; text-align: left; padding: 0 0 0 24px; margin: 0; border: 0 !important;">
+                                        <img src="/hr_resignation/static/src/img/bunna_logo.png" style="width: 130px; height: auto; display: block; object-fit: contain;" alt="Bunna Bank Logo"/>
                                     </td>
-                                </tr>
-                                <tr>
-                                    <td style="color: #555;"><strong>Manager:</strong></td>
-                                    <td><span t-field="o.employee_id.parent_id.name"/></td>
-                                    <td></td>
-                                    <td></td>
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        <h4 style="color: #0f766e; font-size: 18px; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 20px;">
-                            Interview Responses
-                        </h4>
-                        
-                        <table class="table table-sm table-bordered" style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background-color: #f4f6f8; color: #333;">
-                                    <th style="width: 5%; text-align: center; border: 1px solid #ddd; padding: 10px;">#</th>
-                                    <th style="width: 45%; border: 1px solid #ddd; padding: 10px;">Question</th>
-                                    <th style="width: 50%; border: 1px solid #ddd; padding: 10px;">Response</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-foreach="o.line_ids" t-as="line">
-                                    <tr>
-                                        <td style="text-align: center; vertical-align: top; border: 1px solid #ddd; padding: 10px;">
-                                            <span t-esc="line_index + 1"/>
-                                        </td>
-                                        <td style="vertical-align: top; border: 1px solid #ddd; padding: 10px; font-weight: 500; color: #1f2937;">
-                                            <span t-field="line.question_name"/>
-                                        </td>
-                                        <td style="vertical-align: top; border: 1px solid #ddd; padding: 10px; color: #4b5563;">
-                                            <span t-if="line.answer" t-field="line.answer"/>
-                                            <span t-else="" style="color: #9ca3af; font-style: italic;">No answer provided</span>
-                                        </td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
-
-                        <div t-if="not o.line_ids" class="alert alert-info" style="margin-top: 20px;">
-                            No response lines found for this interview.
-                        </div>
-
-                        <div style="margin-top: 50px; page-break-inside: avoid;">
-                            <table style="width: 100%;">
-                                <tr>
-                                    <td style="width: 50%; padding: 20px 0;">
-                                        <div style="border-top: 1px solid #333; width: 80%; padding-top: 5px;">
-                                            <strong>Interviewer Signature</strong><br/>
-                                            <span class="text-muted" style="font-size: 11px;">Date: _________________</span>
-                                        </div>
-                                    </td>
-                                    <td style="width: 50%; padding: 20px 0;">
-                                        <div style="border-top: 1px solid #333; width: 80%; padding-top: 5px;">
-                                            <strong>Employee Signature</strong><br/>
-                                            <span class="text-muted" style="font-size: 11px;">Date: _________________</span>
-                                        </div>
+                                    <td style="vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                                        <!-- Official Bunna Bank Coffee Brown Header Bar (#6d382d) -->
+                                        <div style="background-color: #6d382d; height: 28px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
                                     </td>
                                 </tr>
                             </table>
                         </div>
 
-                        <div class="oe_structure"/>
+                        <!-- Body Content Container with Standard Letter Margins (25.4mm) -->
+                        <div style="padding-left: 25.4mm; padding-right: 25.4mm;">
+                            <div class="oe_structure"/>
+                            
+                            <div class="text-center" style="margin-bottom: 24px; padding-bottom: 10px; border-bottom: 2px solid #6d382d;">
+                                <h2 style="color: #6d382d; font-weight: bold; font-size: 22px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Exit Interview Report</h2>
+                                <p class="text-muted" style="font-size: 13px; margin: 0;">Separation &amp; Off-boarding &#183; Strictly Confidential</p>
+                            </div>
+                            
+                            <!-- Employee & Interview Details Card -->
+                            <div style="background-color: #fafbfc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 18px; margin-bottom: 24px;">
+                                <table class="table table-sm table-borderless" style="margin-bottom: 0; font-size: 13px; width: 100%;">
+                                    <tbody>
+                                        <tr>
+                                            <td style="width: 22%; color: #64748b;"><strong>Employee Name:</strong></td>
+                                            <td style="width: 28%;"><strong><span t-field="o.employee_id.name"/></strong></td>
+                                            <td style="width: 22%; color: #64748b;"><strong>Interview Date:</strong></td>
+                                            <td style="width: 28%;"><span t-field="o.interview_date" t-options='{"widget": "date"}'/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #64748b;"><strong>Job Title:</strong></td>
+                                            <td><span t-field="o.employee_id.job_title"/></td>
+                                            <td style="color: #64748b;"><strong>Conducted By:</strong></td>
+                                            <td><span t-field="o.interviewer_id.name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #64748b;"><strong>Department:</strong></td>
+                                            <td><span t-field="o.employee_id.department_id.name"/></td>
+                                            <td style="color: #64748b;"><strong>Status:</strong></td>
+                                            <td>
+                                                <span t-if="o.state == 'draft'" class="badge" style="background-color: #94a3b8; color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px;">Draft</span>
+                                                <span t-if="o.state == 'done'" class="badge" style="background-color: #6d382d; color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px;">Completed</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="color: #64748b;"><strong>Manager:</strong></td>
+                                            <td><span t-field="o.employee_id.parent_id.name"/></td>
+                                            <td></td>
+                                            <td></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <h4 style="color: #6d382d; font-size: 15px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #6d382d; padding-bottom: 6px; margin-bottom: 16px;">
+                                Interview Responses
+                            </h4>
+                            
+                            <table class="table table-sm table-bordered" style="width: 100%; font-size: 12.5px; border-collapse: collapse; margin-bottom: 30px;">
+                                <thead>
+                                    <tr style="background-color: #fdf5f3; color: #6d382d; border-bottom: 2px solid #6d382d;">
+                                        <th style="width: 6%; text-align: center; border: 1px solid #e2e8f0; padding: 8px;">#</th>
+                                        <th style="width: 44%; border: 1px solid #e2e8f0; padding: 8px;">Question</th>
+                                        <th style="width: 50%; border: 1px solid #e2e8f0; padding: 8px;">Response</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="o.line_ids" t-as="line">
+                                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                                            <td style="text-align: center; vertical-align: top; border: 1px solid #e2e8f0; padding: 8px; color: #64748b;">
+                                                <span t-esc="line_index + 1"/>
+                                            </td>
+                                            <td style="vertical-align: top; border: 1px solid #e2e8f0; padding: 8px; font-weight: 500; color: #1e293b;">
+                                                <span t-field="line.question_name"/>
+                                            </td>
+                                            <td style="vertical-align: top; border: 1px solid #e2e8f0; padding: 8px; color: #334155;">
+                                                <span t-if="line.answer" t-field="line.answer"/>
+                                                <span t-else="" style="color: #94a3b8; font-style: italic;">No answer provided</span>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <div t-if="not o.line_ids" class="alert alert-info" style="margin-top: 20px; font-size: 13px;">
+                                No response lines found for this interview.
+                            </div>
+
+                            <div class="oe_structure"/>
+                        </div>
                     </div>
                 </t>
             </t>

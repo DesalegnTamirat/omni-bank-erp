@@ -135,7 +135,7 @@
         <field name="name">dms.document.form</field>
         <field name="model">dms.document</field>
         <field name="arch" type="xml">
-            <form class="o_dms_form" delete="0">
+            <form class="o_dms_form" js_class="dms_form" delete="0">
                 <header>
                     <button name="action_download" type="object" string="Download" invisible="not id or not file_size or not allow_download"/>
                     <button name="action_disable" type="object" string="Disable" invisible="not id or not active" groups="documents_lite.group_dms_manager"
@@ -194,7 +194,18 @@
                         <page string="Preview" name="preview" invisible="not id or not file_size">
                             <widget name="dms_preview_pane"/>
                         </page>
-                        
+                        <page string="Access &amp; Permissions" name="permissions">
+                            <group>
+                                <field name="custom_permission"/>
+                                <field name="is_restricted" invisible="not custom_permission"/>
+                            </group>
+                            <group invisible="not custom_permission or not is_restricted">
+                                <field name="read_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                <field name="read_group_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                <field name="read_department_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                <field name="read_operating_unit_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            </group>
+                        </page>
                         <page string="Description" name="description">
                             <field name="description" placeholder="Free text, searched with the name and tags."/>
                         </page>

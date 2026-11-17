@@ -12,18 +12,22 @@
 
                     <button string="Calculate Standard Lines" type="object" name="action_recalculate"
                             class="oe_highlight" invisible="state != 'draft' or is_processed"
-                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
+                            confirm="Are you sure you want to calculate standard settlement lines?"
+                            groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
                     <button string="Recalculate Standard Lines" type="object" name="action_recalculate"
                             class="btn-secondary" invisible="state != 'draft' or not is_processed"
-                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
+                            confirm="Are you sure you want to recalculate standard settlement lines?"
+                            groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
                     <button string="Submit for Audit" type="object" name="action_confirm_settlement"
                             class="oe_highlight" invisible="state != 'draft' or not is_processed"
-                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
+                            confirm="Are you sure you want to submit this settlement for audit?"
+                            groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
                     <button string="Confirm &amp; Send for Payment" type="object" name="action_audit_confirm"
                             class="oe_highlight" invisible="state != 'waiting_audit'"
+                            confirm="Are you sure you want to confirm audit and send this settlement for payment?"
                             groups="hr_resignation.group_resignation_auditor,base.group_system"/>
                     <button string="Return for Revision" type="object" name="action_open_return_wizard"
                             class="btn-secondary" invisible="state != 'waiting_audit'"
@@ -31,15 +35,18 @@
 
                     <button string="Pay" type="object" name="action_mark_paid"
                             class="oe_highlight" invisible="state != 'waiting_payment'"
+                            confirm="Are you sure you want to execute this payment?"
                             groups="hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
                     <button string="Reset to Draft" type="object" name="action_set_draft"
                             class="btn-secondary"
                             invisible="state == 'draft' or state == 'paid'"
+                            confirm="Are you sure you want to reset this settlement to draft?"
                             groups="hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
                     <button string="Reset Lines" type="object" name="action_reset_lines"
                             class="btn-secondary" invisible="state != 'draft' or not is_processed"
+                            confirm="Are you sure you want to reset all settlement lines?"
                             groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
                     <field name="state" widget="statusbar" statusbar_visible="draft,waiting_audit,waiting_payment,paid"/>
@@ -59,7 +66,15 @@
                             <field name="separation_reason" readonly="1"/>
                             <field name="job_category" readonly="1"/>
                             <field name="joined_date" readonly="1"/>
+                            <field name="application_date" string="Resignation Application Date" readonly="1"/>
+                            <field name="release_date" string="Release Date" readonly="1"/>
                             <field name="service_years" readonly="1"/>
+                        </group>
+                        <group string="Policy &amp; Notice Period Eligibility">
+                            <field name="severance_eligible" string="Severance Eligible" readonly="1"/>
+                            <field name="pf_eligible" string="PF Eligible" readonly="1"/>
+                            <field name="notice_period_accepted" string="Notice Period?" readonly="1"/>
+                            <field name="liability" string="Notice Period Liability" readonly="1" invisible="notice_period_accepted != 'no'"/>
                         </group>
                     </group>
 
@@ -67,52 +82,95 @@
                         <page string="Standard Parameters">
                             <group>
                                 <group>
-                                    <field name="basic_salary" readonly="state != 'draft'"/>
-                                    <field name="related_release_date" invisible="1"/>
-                                    <field name="settlement_date" string="Release Date (End Date)" readonly="state != 'draft'"/>
-                                    <field name="date_change_justification" invisible="settlement_date == related_release_date" required="settlement_date != related_release_date"/>
-                                    <field name="worked_days_final_month" string="Final Month Working Days" readonly="state != 'draft'"/>
+<field name="basic_salary" readonly="1"/>
+<field name="related_release_date" invisible="1"/>
+<field name="settlement_date" string="Release Date (End Date)" readonly="1"/>
+<field name="date_change_justification" invisible="settlement_date == related_release_date" required="settlement_date != related_release_date"/>
+<field name="worked_days_final_month" string="Final Month Working Days" readonly="1"/>
                                 </group>
                             </group>
                         </page>
-                        
-                        <page string="Cash Indemnity, PF &amp; Eligibility">
-                            <group>
-                                <!-- Row 1: Eligibility and Notice Period -->
-                                <group string="Policy Eligibility">
-                                    <field name="severance_eligible" readonly="1"/>
-                                    <field name="pf_eligible" readonly="1"/>
-                                </group>
-                                <group string="Notice Period Status">
-                                    <field name="notice_period_accepted" readonly="1"/>
-                                    <field name="liability" readonly="1" invisible="notice_period_accepted != 'no'"/>
-                                </group>
 
-                                <!-- Row 2: Cash Indemnity Calculation and Fetched Balances -->
-                                <group string="Cash Indemnity Calculation">
-                                    <field name="cbs_start_date" string="Indemnity Start Date" readonly="state != 'draft'"/>
-                                    <field name="cbs_end_date" string="Indemnity End Date" readonly="state != 'draft'"/>
-                                    <field name="cash_indemnity_working_days" string="Indemnity Total Days" readonly="state != 'draft'"/>
-                                    <button string="Calculate Cash Indemnity" type="object" name="action_fetch_cbs_indemnity"
-                                            class="oe_highlight mt-3" invisible="state != 'draft'"
+                        <page string="Cash Indemnity, PF, RSSA Deduction">
+                            <!-- Section 1: Cash Indemnity & CBS Accounts -->
+                            <div class="o_horizontal_separator mt-2 mb-2">Cash Indemnity &amp; CBS Accounts</div>
+                            <group>
+                                <group string="Indemnity Calculation">
+                                    <field name="cbs_start_date" string="Start Date" readonly="state != 'draft'"/>
+                                    <field name="cbs_end_date" string="End Date" readonly="state != 'draft'"/>
+                                    <field name="cash_indemnity_working_days" string="Working Days" readonly="state != 'draft'"/>
+                                    <field name="cbs_indemnity_amount" string="Calculated Indemnity (ETB)" readonly="1" force_save="1"
+                                           style="font-weight: bold; color: #017e84; font-size: 1.1em;"/>
+                                    <field name="cbs_sync_status" string="Response" readonly="1" force_save="1"
+                                           invisible="not cbs_sync_status"
+                                           style="font-size: 0.9em; font-weight: 500;"/>
+                                    <button string="&#8635; Calculate Cash Indemnity" type="object" name="action_fetch_cbs_indemnity"
+                                            class="oe_highlight mt-2" invisible="state != 'draft'"
                                             groups="hr_resignation.group_pomd_officer,base.group_system" colspan="2"/>
                                 </group>
-                                <group string="System Balances (Read-Only)">
-                                    <field name="cbs_user_id" string="Employee ID" readonly="1"/>
+                                <group string="Cash Indemnity, PF Accounts and Balances">
+                                    <field name="cbs_user_id" string="Employee CBS ID" readonly="1"/>
                                     <field name="cbs_working_days" invisible="1"/>
-                                    
-                                    <hr colspan="2" class="mt-3 mb-3"/>
-                                    
-                                    <field name="cbs_indemnity_account" string="Cash Indemnity Account" readonly="1"/>
-                                    <field name="cbs_indemnity_amount" string="Cash Indemnity Balance" readonly="1" force_save="1" style="font-weight: bold; color: #017e84;"/>
-                                    
-                                    <hr colspan="2" class="mt-3 mb-3"/>
-                                    
-                                    <field name="cbs_pf_account" string="Provident Fund Account" readonly="1"/>
-                                    <field name="pf_amount" string="Provident Fund Balance" readonly="1" force_save="1" style="font-weight: bold; color: #017e84;"/>
+                                    <field name="cbs_indemnity_account" string="Cash Indemnity A/C No." readonly="1"/>
+                                    <field name="cbs_indemnity_balance" string="Indemnity Balance (ETB)" readonly="1" force_save="1"
+                                           style="font-weight: bold; color: #017e84;"/>
+                                    <field name="cbs_pf_account" string="Provident Fund A/C No." readonly="1"/>
+                                    <field name="pf_amount" string="PF Balance (ETB)" readonly="1" force_save="1"
+                                           style="font-weight: bold; color: #017e84;"/>
+                                    <field name="cbs_pf_sync_status" string="PF Response" readonly="1" force_save="1"
+                                           invisible="not cbs_pf_sync_status"
+                                           style="font-size: 0.85em; font-style: italic; color: #6c757d;"/>
                                 </group>
                             </group>
+
+                            <!-- Section 2: LOAN DEDUCTIONS — clearly separated, full-width -->
+                            <div class="o_horizontal_separator mt-4 mb-2" style="color: #c0392b; font-weight: bold;">
+                                &#9888; Loan &amp; Debt Deductions
+                            </div>
+
+                            <group>
+                                <group string="Personal RSSA Overdraft (CBS Live)">
+                                    <field name="debt_rssa_loan" string="OD/RSSA Loan Balance (ETB)" readonly="1"
+                                           style="font-weight: bold; font-size: 1.15em; color: #c0392b;"/>
+                                    <field name="rssa_od_guarantor" string="OD/RSSA Loan Guarantor(s)" readonly="1"/>
+                                </group>
+
+                                <group string="Guaranteed Loan &amp; Guarantee Status">
+                                    <field name="debt_guaranteed_loan" string="Transferred Guarantee Debt (ETB)" readonly="1"
+                                           decoration-danger="debt_guaranteed_loan &gt; 0"
+                                           style="font-weight: bold; font-size: 1.15em;"/>
+                                    <field name="guaranteed_other_status" string="Loans Guaranteed for Others" readonly="1"/>
+                                </group>
+                            </group>
+
+                            <!-- Total Debt Summary -->
+                            <group>
+                                <group colspan="2">
+                                    <field name="outstanding_debt_deduction" string="TOTAL LOAN DEDUCTION (ETB)" readonly="1"
+                                           style="font-weight: bold; font-size: 1.25em; color: #c0392b; border-top: 2px solid #c0392b; padding-top: 6px;"/>
+                                </group>
+                            </group>
+
+                            <!-- Warning banner when guarantee is active -->
+                            <div class="alert alert-danger mt-3 mb-0" role="alert" invisible="not debt_guaranteed_loan">
+                                <strong>&#9888; Enforced Guarantee Liability Active</strong><br/>
+                                This employee signed as a guarantor for a staff loan whose borrower has separated from
+                                the bank without full repayment. The outstanding CBS balance has been verified and the
+                                amount will be <strong>deducted from this settlement</strong> per Bunna Bank loan policy.<br/>
+                                <span style="font-style: italic; margin-top: 4px; display:block;">
+                                    <field name="debt_guaranteed_notes" readonly="1" nolabel="1"/>
+                                </span>
+                            </div>
                         </page>
+
+                        <page string="Severance Calculation Details" invisible="severance_eligible == 'no' and severance_amount == 0">
+                            <field name="severance_breakdown_html" nolabel="1"/>
+                        </page>
+
+                        <page string="Accrued Leave Calculation Details" invisible="accrued_leave_pay == 0 and income_tax_leave == 0">
+                            <field name="accrued_leave_breakdown_html" nolabel="1"/>
+                        </page>
+
                         <page string="Settlement Breakdown">
                             <div class="alert alert-warning text-center mt-4" role="alert" invisible="is_processed">
                                 <h4>Settlement Not Yet Processed</h4>
@@ -134,12 +192,13 @@
                                 </group>
                                 <group colspan="4" class="text-end">
                                     <field name="taxable_gross" string="Taxable Gross:" readonly="1" class="text-info"/>
-                                    <field name="total_earnings" string="Total Earnings:" readonly="1"/>
+                                    <field name="total_earnings" string="Total Entitlements:" readonly="1"/>
                                     <field name="total_deductions_taxes" string="Total Deductions &amp; Taxes:" readonly="1" class="text-danger"/>
                                     <field name="net_payment" string="Net Payment:" class="fs-3 fw-bold" readonly="1"/>
                                 </group>
                             </group>
                         </page>
+
                         <page string="Audit Information">
                             <group>
                                 <group>

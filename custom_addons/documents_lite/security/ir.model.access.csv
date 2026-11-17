@@ -11,3 +11,7 @@ access_dms_tag_group_dms_user,dms.tag group_dms_user,model_dms_tag,documents_lit
 access_dms_tag_group_dms_manager,dms.tag group_dms_manager,model_dms_tag,documents_lite.group_dms_manager,1,1,1,0
 access_dms_rule_group_dms_manager,dms.rule group_dms_manager,model_dms_rule,documents_lite.group_dms_manager,1,1,1,0
 access_dms_rule_group_dms_user,dms.rule group_dms_user,model_dms_rule,documents_lite.group_dms_user,1,0,0,0
+access_dms_upload_wizard_mgr,dms.upload.wizard group_dms_manager,model_dms_upload_wizard,documents_lite.group_dms_manager,1,1,1,1
+access_dms_upload_wizard_usr,dms.upload.wizard group_dms_user,model_dms_upload_wizard,documents_lite.group_dms_user,1,1,1,1
+access_dms_config_settings_user,dms.config.settings group_dms_user,model_dms_config_settings,documents_lite.group_dms_user,1,0,0,0
+access_dms_config_settings_manager,dms.config.settings group_dms_manager,model_dms_config_settings,documents_lite.group_dms_manager,1,1,1,1

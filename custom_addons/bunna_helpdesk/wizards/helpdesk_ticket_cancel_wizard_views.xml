@@ -4,7 +4,7 @@
         <field name="name">helpdesk.ticket.cancel.wizard.form</field>
         <field name="model">helpdesk.ticket.cancel.wizard</field>
         <field name="arch" type="xml">
-            <form string="Cancel Helpdesk Ticket">
+            <form string="Cancel Helpdesk Ticket" class="o_helpdesk_wizard">
                 <sheet>
                     <div class="alert alert-danger py-2 mb-3" role="alert">
                         <i class="fa fa-ban me-1" title="Cancellation Notice" aria-label="Cancellation Notice" />

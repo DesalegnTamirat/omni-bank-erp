@@ -218,38 +218,52 @@ class TestBunnaHelpdeskEnhancements(TransactionCase):
     # ── Test 7: CBS API Real Response Parser and Error Handling ───────────────
     def test_cbs_response_parser(self):
         """Test parsing real Finacle CBS production response payload."""
-        real_cbs_payload = {
-            "ACCOUNT_NUMBER": "1019501012030",
-            "CIF_NUMBER": "100271122",
-            "FAYDA_NUMBER": "6/440/3/1",
-            "PHONE": "0912211913",
-            "NAME": "YONAS GOSA DIBARGACHEW",
+        cbs_payload = {
+            "ACCOUNT_NUMBER": "3359501001922",
+            "CIF_NUMBER": "102022612",
+            "FAYDA_NUMBER": "294447016062900884077001197089924994",
+            "PHONE": "0918979030",
+            "NAME": "NATNAEL NEGUSSIE TIRUYE",
             "EMAIL": None,
             "ACCOUNT_TYPE": "Saving Account",
-            "ACCOUNT_STATUS": "I",
+            "ACCOUNT_STATUS": "A",
             "CUSTOMER_SEGMENT": "Retail",
             "PREFERRED_LANGUAGE": "AMH",
-            "SOL_ID": "101",
-            "BRANCH_NAME": "BIB MAIN BRANCH",
-            "DISTRICT_NAME": "South Addis Ababa",
-            "ACCT_OPN_DATE": "2017-07-20T00:00:00",
+            "SOL_ID": "335",
+            "BRANCH_NAME": "BIB ARAT KILO BRANCH",
+            "DISTRICT_NAME": "East Addis Ababa",
+            "ACCT_OPN_DATE": "2022-06-21T00:00:00",
             "MODE_OF_OPER_CODE": "SINGL",
-            "AGE": 56,
+            "AGE": 39,
+            "ACCOUNT_OWNERSHIP": "Employee",
         }
-        parsed = parse_cbs_response_customer(real_cbs_payload, "1019501012030", "account")
-        self.assertEqual(parsed["name"], "YONAS GOSA DIBARGACHEW")
-        self.assertEqual(parsed["account_number"], "1019501012030")
-        self.assertEqual(parsed["cif_number"], "100271122")
-        self.assertEqual(parsed["fayda_number"], "6/440/3/1")
-        self.assertEqual(parsed["phone"], "0912211913")
+        parsed = parse_cbs_response_customer(cbs_payload, "3359501001922", "account")
+        self.assertEqual(parsed["name"], "NATNAEL NEGUSSIE TIRUYE")
+        self.assertEqual(parsed["account_number"], "3359501001922")
+        self.assertEqual(parsed["cif_number"], "102022612")
+        self.assertEqual(parsed["fayda_number"], "294447016062900884077001197089924994")
+        self.assertEqual(parsed["phone"], "0918979030")
         self.assertFalse(parsed["email"])
         self.assertEqual(parsed["account_type"], "Saving Account")
-        self.assertEqual(parsed["account_status"], "frozen")
+        self.assertEqual(parsed["account_status"], "active")
         self.assertEqual(parsed["customer_segment"], "retail")
         self.assertEqual(parsed["preferred_language"], "amharic")
-        self.assertEqual(parsed["branch_name"], "BIB MAIN BRANCH")
-        self.assertEqual(parsed["district_name"], "South Addis Ababa")
-        self.assertEqual(parsed["age"], 56)
+        self.assertEqual(parsed["sol_id"], "335")
+        self.assertEqual(parsed["branch_name"], "BIB ARAT KILO BRANCH")
+        self.assertEqual(parsed["district_name"], "East Addis Ababa")
+        self.assertEqual(str(parsed["acct_opn_date"]), "2022-06-21")
+        self.assertEqual(parsed["mode_of_oper_code"], "SINGL")
+        self.assertEqual(parsed["age"], 39)
+        self.assertEqual(parsed["account_ownership"], "Employee")
+
+        # Test sync with partner & ticket
+        partner, msg = self.env["helpdesk.ticket"]._fetch_or_create_finacle_cbs_partner("3359501001922", "account")
+        self.assertEqual(partner.account_number, "3359501001922")
+        self.assertEqual(partner.fayda_number, "294447016062900884077001197089924994")
+        self.assertEqual(partner.sol_id, "335")
+        self.assertEqual(partner.account_ownership, "Employee")
+        self.assertEqual(str(partner.acct_opn_date), "2022-06-21")
+        self.assertEqual(partner.mode_of_oper_code, "SINGL")
 
     def test_cbs_timeout_handling(self):
         """Test handling CBS timeout without uncaught exceptions and reporting timeout cleanly."""
@@ -446,9 +460,13 @@ class TestBunnaHelpdeskEnhancements(TransactionCase):
             "state": "published",
         })
 
+        # Create a tag on ticket
+        tag = self.env["helpdesk.ticket.tag"].create({"name": "ATM Dispute"})
         ticket = self.env["helpdesk.ticket"].create({
             "team_id": self.team.id,
             "service_id": self.service.id,
+            "operating_unit_id": self.team.operating_unit_id.id if self.team.operating_unit_id else False,
+            "tag_ids": [(4, tag.id)],
             "inquiry_summary": "ATM Cash Retraction Issue",
             "customer_request_details": "Customer attempted 5000 ETB withdrawal at Bole ATM. Debited without cash.",
             "kb_article_id": article.id,
@@ -466,3 +484,153 @@ class TestBunnaHelpdeskEnhancements(TransactionCase):
         new_article = self.env["helpdesk.knowledge.article"].browse(new_article_id)
         self.assertEqual(new_article.name, "ATM Cash Retraction Issue")
         self.assertIn("Customer attempted 5000 ETB", new_article.content)
+        self.assertIn(tag, new_article.tag_ids)
+        if ticket.operating_unit_id:
+            self.assertEqual(new_article.operating_unit_id, ticket.operating_unit_id)
+
+    # ── Test 17: Acceptance & Done Channel Selection and Mutual Exclusivity ───
+    def test_17_acceptance_done_channel_selection_and_mutual_exclusivity(self):
+        """Verify separate dropdown channel selection (SMS vs Email) for Acceptance and Done."""
+        partner = self.env["res.partner"].create({
+            "name": "Abebe Bikila",
+            "phone": "0911223344",
+            "email": "abebe@example.com",
+        })
+
+        # Test A: Acceptance via SMS (Email becomes inactive)
+        ticket_a = self.env["helpdesk.ticket"].create({
+            "name": "Acceptance SMS Test",
+            "team_id": self.team.id,
+            "partner_id": partner.id,
+            "partner_phone": "0911223344",
+            "partner_email": "abebe@example.com",
+            "acceptance_channel": "sms",
+            "stage_id": self.stage_new.id,
+            "description": "<p>Acceptance test</p>",
+        })
+        self.assertFalse(ticket_a.is_acceptance_sent)
+        self.assertIn("Pending", ticket_a.acceptance_notification_status)
+
+        with patch("odoo.addons.bunna_helpdesk.models.cbs_sms_service.requests.post") as mock_post:
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json.return_value = {"status": "success"}
+            resp.text = "ok"
+            mock_post.return_value = resp
+
+            ticket_a.action_accept_ticket_channel()
+
+        self.assertTrue(ticket_a.acceptance_sms_sent)
+        self.assertTrue(ticket_a.acceptance_email_sent)
+        self.assertEqual(ticket_a.acceptance_sent_channel, "sms")
+        self.assertTrue(ticket_a.is_acceptance_sent)
+        self.assertIn("SMS", ticket_a.acceptance_notification_status)
+        self.assertIn("inactive", ticket_a.acceptance_notification_status)
+
+        # Test B: Acceptance via Email (SMS becomes inactive)
+        ticket_b = self.env["helpdesk.ticket"].create({
+            "name": "Acceptance Email Test",
+            "team_id": self.team.id,
+            "partner_id": partner.id,
+            "partner_phone": "0911223344",
+            "partner_email": "abebe@example.com",
+            "acceptance_channel": "email",
+            "stage_id": self.stage_new.id,
+            "description": "<p>Acceptance email test</p>",
+        })
+        ticket_b.action_accept_ticket_channel()
+        self.assertTrue(ticket_b.acceptance_sms_sent)
+        self.assertTrue(ticket_b.acceptance_email_sent)
+        self.assertEqual(ticket_b.acceptance_sent_channel, "email")
+        self.assertIn("Email", ticket_b.acceptance_notification_status)
+        self.assertIn("inactive", ticket_b.acceptance_notification_status)
+
+        # Test C: Done via SMS (Email becomes inactive)
+        ticket_a.done_channel = "sms"
+        with patch("odoo.addons.bunna_helpdesk.models.cbs_sms_service.requests.post") as mock_post:
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json.return_value = {"status": "success"}
+            resp.text = "ok"
+            mock_post.return_value = resp
+
+            ticket_a.action_done_ticket_channel()
+
+        self.assertTrue(ticket_a.completion_sms_sent)
+        self.assertTrue(ticket_a.completion_email_sent)
+        self.assertEqual(ticket_a.done_sent_channel, "sms")
+        self.assertTrue(ticket_a.is_done_sent)
+        self.assertIn("SMS", ticket_a.done_notification_status)
+        self.assertIn("inactive", ticket_a.done_notification_status)
+
+        # Test D: Done via Email (SMS becomes inactive)
+        ticket_b.done_channel = "email"
+        ticket_b.action_done_ticket_channel()
+        self.assertTrue(ticket_b.completion_sms_sent)
+        self.assertTrue(ticket_b.completion_email_sent)
+        self.assertEqual(ticket_b.done_sent_channel, "email")
+        self.assertTrue(ticket_b.is_done_sent)
+        self.assertIn("Email", ticket_b.done_notification_status)
+        self.assertIn("inactive", ticket_b.done_notification_status)
+
+        # Verify Captured Delivery Summary Field
+        self.assertIn("SMS", ticket_a.notification_channel_sent)
+        self.assertIn("EMAIL", ticket_b.notification_channel_sent)
+
+        # Test E: 2 Header Dropdowns Execution (1st Accept/Done, 2nd SMS/Email)
+        ticket_c = self.env["helpdesk.ticket"].create({
+            "name": "Header Dropdowns Test",
+            "team_id": self.team.id,
+            "partner_id": partner.id,
+            "partner_phone": "0911223344",
+            "partner_email": "abebe@example.com",
+            "header_action": "escalated",
+            "header_channel": "sms",
+            "stage_id": self.stage_new.id,
+            "description": "<p>Header dropdowns test</p>",
+        })
+        with patch("odoo.addons.bunna_helpdesk.models.cbs_sms_service.requests.post") as mock_post:
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json.return_value = {"status": "success"}
+            resp.text = "ok"
+            mock_post.return_value = resp
+
+            ticket_c.action_execute_header_notification()
+
+        self.assertEqual(ticket_c.stage_id, self.env.ref("bunna_helpdesk.helpdesk_ticket_stage_in_progress"))
+        self.assertEqual(ticket_c.acceptance_sent_channel, "sms")
+        self.assertTrue(ticket_c.acceptance_sms_sent)
+
+        # Now execute Done via Email from header dropdowns
+        ticket_c.header_action = "done"
+        ticket_c.header_channel = "email"
+        ticket_c.action_execute_header_notification()
+        self.assertEqual(ticket_c.stage_id, self.env.ref("bunna_helpdesk.helpdesk_ticket_stage_done"))
+        self.assertEqual(ticket_c.done_sent_channel, "email")
+        self.assertTrue(ticket_c.completion_email_sent)
+        self.assertFalse(ticket_c.display_header_notification)
+
+        # Test F: In Done stage without notification dispatched, header controls remain visible
+        ticket_d = self.env["helpdesk.ticket"].create({
+            "name": "Done Stage Persistence Test",
+            "team_id": self.team.id,
+            "partner_id": partner.id,
+            "partner_phone": "0911223344",
+            "stage_id": self.env.ref("bunna_helpdesk.helpdesk_ticket_stage_done").id,
+            "description": "<p>Done persistence test</p>",
+        })
+        self.assertTrue(ticket_d.display_header_notification, "Header controls must stay visible in Done stage until notification is dispatched")
+        with patch("odoo.addons.bunna_helpdesk.models.cbs_sms_service.requests.post") as mock_post:
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json.return_value = {"status": "success"}
+            resp.text = "ok"
+            mock_post.return_value = resp
+
+            ticket_d.header_channel = "sms"
+            ticket_d.action_execute_header_notification()
+
+        self.assertTrue(ticket_d.completion_sms_sent)
+        self.assertEqual(ticket_d.done_sent_channel, "sms")
+        self.assertFalse(ticket_d.display_header_notification, "Header controls must hide once Done notification has been sent")

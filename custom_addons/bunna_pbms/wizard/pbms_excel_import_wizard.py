@@ -38,6 +38,10 @@ class PbmsExcelImportWizard(models.TransientModel):
             ("general_expense", "General Expense"),
             ("manpower", "Manpower Planning"),
             ("fixed_asset", "Fixed Asset Requirement"),
+            ("credit_portfolio", "Income Plan / Credit Portfolio"),
+            ("initiative_budget", "Initiative Budget"),
+            ("loan_disbursement_collection", "Loan Disbursement & Collection"),
+            ("loan_outstanding", "Loan & Advances Outstanding"),
         ],
         string="Category",
         required=True,
@@ -58,18 +62,26 @@ class PbmsExcelImportWizard(models.TransientModel):
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
-        active_model = self.env.context.get("active_model")
-        active_id = self.env.context.get("active_id")
+        ctx = self.env.context
+        ctx_cat = (
+            ctx.get("default_format_type")
+            or ctx.get("target_category")
+            or ctx.get("active_category")
+            or ctx.get("active_tab_category")
+            or ctx.get("default_category")
+            or ctx.get("default_line_type")
+        )
+        active_model = ctx.get("active_model")
+        active_id = ctx.get("active_id") or ctx.get("default_plan_id")
         if active_model == "pbms.planning.category" and active_id:
             plan = self.env["pbms.planning.category"].browse(active_id)
             if plan.exists():
                 res["plan_id"] = plan.id
                 res["cycle_id"] = plan.cycle_id.id
                 res["org_unit_id"] = plan.org_unit_id.id
-                if plan.category:
-                    res["format_type"] = plan.category
-        elif self.env.context.get("default_category"):
-            res["format_type"] = self.env.context.get("default_category")
+                res["format_type"] = ctx_cat or plan.category or "deposit"
+        elif ctx_cat:
+            res["format_type"] = ctx_cat
         elif not res.get("cycle_id"):
             cycle = self.env["pbms.planning.cycle"].search([("state", "=", "open")], limit=1)
             if cycle:
@@ -79,18 +91,34 @@ class PbmsExcelImportWizard(models.TransientModel):
     def _get_target_plan(self):
         self.ensure_one()
         if self.plan_id:
+            if getattr(self.plan_id, "is_planning_request", False) or self.plan_id.category == self.format_type:
+                return self.plan_id
+            sibling = self.env["pbms.planning.category"].search([
+                ("cycle_id", "=", self.plan_id.cycle_id.id),
+                ("org_unit_id", "=", self.plan_id.org_unit_id.id),
+                ("category", "=", self.format_type),
+                ("is_consolidated_district_plan", "=", bool(self.plan_id.is_consolidated_district_plan)),
+                ("is_consolidated_ho_plan", "=", bool(self.plan_id.is_consolidated_ho_plan)),
+            ], limit=1)
+            if sibling:
+                return sibling
             return self.plan_id
+
         Plan = self.env["pbms.planning.category"]
         plan = Plan.search([
             ("cycle_id", "=", self.cycle_id.id),
             ("org_unit_id", "=", self.org_unit_id.id),
             ("category", "=", self.format_type),
+            ("is_consolidated_district_plan", "=", False),
+            ("is_consolidated_ho_plan", "=", False),
         ], limit=1)
         if not plan:
             plan = Plan.create({
                 "cycle_id": self.cycle_id.id,
                 "org_unit_id": self.org_unit_id.id,
                 "category": self.format_type,
+                "is_consolidated_district_plan": False,
+                "is_consolidated_ho_plan": False,
             })
         return plan
 
@@ -110,34 +138,43 @@ class PbmsExcelImportWizard(models.TransientModel):
         align_center = Alignment(horizontal="center", vertical="center")
 
         cat = self.format_type
-        if cat in ("deposit", "customer_base"):
-            headers = ["Product Code", "Product Name", "Estimate",
+        if cat == "deposit":
+            headers = ["Product Name", "Estimate",
                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
             ws.append(headers)
             dep_types = self.env["pbms.deposit.type"].search([("active", "=", True)], order="sequence, id")
             for dt in dep_types:
-                ws.append([dt.code or "", dt.name or "", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                ws.append([dt.name or "", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        elif cat == "customer_base":
+            headers = ["Customer Type", "Customer Category", "Estimate",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+            ws.append(headers)
+            cust_types = self.env["pbms.customer.type"].search([("active", "=", True)], order="sequence, id")
+            for ct in cust_types:
+                ws.append([ct.name or "", "New Customer Acquisition", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+            for ct in cust_types:
+                ws.append([ct.name or "", "Quality Customer", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         elif cat == "fx":
-            headers = ["Source Code", "FX Source Name", "Estimate",
+            headers = ["FX Source Name", "Estimate",
                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
             ws.append(headers)
-            fx_types = self.env["pbms.fx.source.type"].search([("active", "=", True)])
+            fx_types = self.env["pbms.fx.source.type"].search([("active", "=", True)], order="sequence, id")
             for fx in fx_types:
-                ws.append([fx.code or "", fx.name or "", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                ws.append([fx.name or "", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         elif cat == "digital_banking":
-            headers = ["Channel Code", "Channel Name", "Estimate",
+            headers = ["Channel Name", "Estimate",
                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
             ws.append(headers)
-            channels = self.env["pbms.digital.channel"].search([("active", "=", True)])
+            channels = self.env["pbms.digital.channel"].search([("active", "=", True)], order="sequence, id")
             for ch in channels:
-                ws.append([ch.code or "", ch.name or "", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                ws.append([ch.name or "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         elif cat == "general_expense":
-            headers = ["Account Code", "Expense Account Name", "Estimate",
+            headers = ["Expense Account Name", "Estimate",
                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
             ws.append(headers)
-            accounts = self.env["pbms.expense.account"].search([("active", "=", True)], limit=20)
+            accounts = self.env["pbms.expense.account"].search([("active", "=", True)], limit=20, order="sequence, id")
             for acc in accounts:
-                ws.append([acc.code or "", acc.name or "", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                ws.append([acc.name or "", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         elif cat == "manpower":
             headers = ["Position Type", "Job Title", "Authorized Baseline",
                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -159,6 +196,33 @@ class PbmsExcelImportWizard(models.TransientModel):
                     ws.append([fc.name or fc.code, f"Sample {fc.name}", 1, 5000.0, 1, 0, 0, 0, "Annual requirement"])
             else:
                 ws.append(["Office Equipment", "Desktop Computer with UPS", 2, 85000.0, 2, 0, 0, 0, "New staff workstation"])
+        elif cat == "credit_portfolio":
+            headers = ["Portfolio Item Name", "Totals Basis", "Estimate",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+            ws.append(headers)
+            cp_items = self.env["pbms.credit.portfolio.item"].search([("active", "=", True)], limit=20, order="sequence, id") if "pbms.credit.portfolio.item" in self.env else []
+            for cp in cp_items:
+                ws.append([cp.name or "", "sum_months", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        elif cat == "initiative_budget":
+            headers = ["Initiative Name", "Description", "Estimate",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Justification"]
+            ws.append(headers)
+            ws.append(["Digital Banking Expansion", "Branch POS & Agent Expansion", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, "Strategic objective"])
+        elif cat == "loan_disbursement_collection":
+            headers = ["Flow Type", "Product / Description", "Estimate",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+            ws.append(headers)
+            ws.append(["Disbursement", "Term Loans", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            ws.append(["Collection", "Term Loans", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        elif cat == "loan_outstanding":
+            headers = ["Product Code", "Product Name", "Estimate",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+            ws.append(headers)
+            products = self.env["pbms.loan.product"].search([("active", "=", True)], limit=10) if "pbms.loan.product" in self.env else []
+            for lp in products:
+                ws.append([lp.code or "", lp.name or "", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            if not products:
+                ws.append(["LP01", "Short Term Loan", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
         # Format header cells
         for col_idx, cell in enumerate(ws[1], start=1):
@@ -294,16 +358,36 @@ class PbmsExcelImportWizard(models.TransientModel):
         return s
 
     def _import_deposit_row(self, row, plan):
-        code = str(row[0] or "").strip()
-        name = str(row[1] or "").strip() if len(row) > 1 else ""
-        deposit_type = self.env["pbms.deposit.type"].search([
-            "|", ("code", "=ilike", code), ("name", "=ilike", name or code)
-        ], limit=1)
-        if not deposit_type:
-            raise UserError(_("Unknown deposit product code or name: '%s'") % (code or name))
+        item_str_0 = str(row[0] or "").strip()
+        item_str_1 = str(row[1] or "").strip() if len(row) > 1 else ""
 
-        ob = self._get_float(row[2], _("Opening Balance")) if len(row) > 2 else 0.0
-        months = [self._get_float(row[i], f"Month {i-2}") if len(row) > i else 0.0 for i in range(3, 15)]
+        deposit_type = self.env["pbms.deposit.type"].search([
+            "|", ("name", "=ilike", item_str_0), ("code", "=ilike", item_str_0)
+        ], limit=1)
+
+        is_legacy = False
+        if not deposit_type and item_str_1:
+            deposit_type = self.env["pbms.deposit.type"].search([
+                "|", ("name", "=ilike", item_str_1), ("code", "=ilike", item_str_1)
+            ], limit=1)
+            if deposit_type:
+                is_legacy = True
+        elif deposit_type and item_str_1:
+            try:
+                float(item_str_1.replace(",", ""))
+                is_legacy = False
+            except (ValueError, TypeError):
+                is_legacy = True
+
+        if not deposit_type:
+            raise UserError(_("Unknown deposit product: '%s'") % (item_str_0 or item_str_1))
+
+        if is_legacy:
+            ob = self._get_float(row[2], _("Opening Balance")) if len(row) > 2 else 0.0
+            months = [self._get_float(row[i], f"Month {i-2}") if len(row) > i else 0.0 for i in range(3, 15)]
+        else:
+            ob = self._get_float(row[1], _("Opening Balance")) if len(row) > 1 else 0.0
+            months = [self._get_float(row[i], f"Month {i-1}") if len(row) > i else 0.0 for i in range(2, 14)]
 
         vals = {
             "plan_id": plan.id,
@@ -317,22 +401,66 @@ class PbmsExcelImportWizard(models.TransientModel):
         return 1
 
     def _import_customer_base_row(self, row, plan):
-        code = str(row[0] or "").strip()
-        name = str(row[1] or "").strip() if len(row) > 1 else ""
-        deposit_type = self.env["pbms.deposit.type"].search([
-            "|", ("code", "=ilike", code), ("name", "=ilike", name or code)
-        ], limit=1)
-        if not deposit_type:
-            raise UserError(_("Unknown customer segment code or name: '%s'") % (code or name))
+        item_str_0 = str(row[0] or "").strip()
+        item_str_1 = str(row[1] or "").strip() if len(row) > 1 else ""
 
-        ob = self._get_float(row[2], _("Opening Balance")) if len(row) > 2 else 0.0
-        months = [self._get_float(row[i], f"Month {i-2}") if len(row) > i else 0.0 for i in range(3, 15)]
+        cust_type = self.env["pbms.customer.type"].search([
+            "|", ("name", "=ilike", item_str_0), ("code", "=ilike", item_str_0)
+        ], limit=1)
+        dep_type = self.env["pbms.deposit.type"].search([
+            "|", ("name", "=ilike", item_str_0), ("code", "=ilike", item_str_0)
+        ], limit=1)
+
+        is_legacy = False
+        if not cust_type and not dep_type and item_str_1:
+            cust_type = self.env["pbms.customer.type"].search([
+                "|", ("name", "=ilike", item_str_1), ("code", "=ilike", item_str_1)
+            ], limit=1)
+            dep_type = self.env["pbms.deposit.type"].search([
+                "|", ("name", "=ilike", item_str_1), ("code", "=ilike", item_str_1)
+            ], limit=1)
+            if cust_type or dep_type:
+                is_legacy = True
+        elif (cust_type or dep_type) and item_str_1:
+            col1_lower = item_str_1.lower()
+            if any(w in col1_lower for w in ("acquisition", "quality", "customer", "dormant", "category")):
+                is_legacy = False
+            else:
+                match_col1 = self.env["pbms.customer.type"].search([("name", "=ilike", item_str_1)], limit=1)
+                if match_col1:
+                    is_legacy = True
+
+        if not cust_type and not dep_type:
+            raise UserError(_("Unknown customer type or deposit product: '%s'") % (item_str_0 or item_str_1))
+
+        if is_legacy:
+            cat_str = str(row[2] or "").strip() if len(row) > 2 else ""
+            start_idx = 3
+        else:
+            cat_str = str(row[1] or "").strip() if len(row) > 1 else ""
+            start_idx = 2
+
+        base_type = "new_acquisition"
+        if any(w in cat_str.lower() for w in ("quality", "dormant", "reactivation")):
+            base_type = "dormant_reduction"
+
+        ob = self._get_float(row[start_idx], _("Opening Balance")) if len(row) > start_idx else 0.0
+        months = [self._get_float(row[i], f"Month {i - start_idx}") if len(row) > i else 0.0 for i in range(start_idx + 1, start_idx + 13)]
+
+        c_rec = cust_type or (self.env["pbms.customer.type"].search([
+            "|", ("name", "=ilike", dep_type.name), ("code", "=ilike", dep_type.code)
+        ], limit=1) if dep_type else False)
+        d_rec = dep_type or (self.env["pbms.deposit.type"].search([
+            "|", ("name", "=ilike", cust_type.name), ("code", "=ilike", cust_type.code)
+        ], limit=1) if cust_type else False)
 
         vals = {
             "plan_id": plan.id,
             "line_type": "customer_base",
             "source_unit_id": plan.org_unit_id.id,
-            "deposit_type_id": deposit_type.id,
+            "customer_type_id": c_rec.id if c_rec else False,
+            "deposit_type_id": d_rec.id if d_rec else False,
+            "base_type": base_type,
             "opening_balance": ob,
         }
         vals.update({f"m{str(i + 1).zfill(2)}": months[i] for i in range(12)})
@@ -340,19 +468,35 @@ class PbmsExcelImportWizard(models.TransientModel):
         return 1
 
     def _import_fx_row(self, row, plan):
-        code = str(row[0] or "").strip()
-        name = str(row[1] or "").strip() if len(row) > 1 else ""
-        fx_type = self.env["pbms.fx.source.type"].search([
-            "|", ("code", "=ilike", code), ("name", "=ilike", name or code)
-        ], limit=1)
-        if not fx_type:
-            raise UserError(_("Unknown FX source code or name: '%s'") % (code or name))
+        item_str_0 = str(row[0] or "").strip()
+        item_str_1 = str(row[1] or "").strip() if len(row) > 1 else ""
 
-        if len(row) >= 15:
-            ob = self._get_float(row[2], _("Estimate"))
+        fx_type = self.env["pbms.fx.source.type"].search([
+            "|", ("name", "=ilike", item_str_0), ("code", "=ilike", item_str_0)
+        ], limit=1)
+
+        is_legacy = False
+        if not fx_type and item_str_1:
+            fx_type = self.env["pbms.fx.source.type"].search([
+                "|", ("name", "=ilike", item_str_1), ("code", "=ilike", item_str_1)
+            ], limit=1)
+            if fx_type:
+                is_legacy = True
+        elif fx_type and item_str_1:
+            try:
+                float(item_str_1.replace(",", ""))
+                is_legacy = False
+            except (ValueError, TypeError):
+                is_legacy = True
+
+        if not fx_type:
+            raise UserError(_("Unknown FX source: '%s'") % (item_str_0 or item_str_1))
+
+        if is_legacy:
+            ob = self._get_float(row[2], _("Estimate")) if len(row) > 2 else 0.0
             months = [self._get_float(row[i], f"Month {i-2}") if len(row) > i else 0.0 for i in range(3, 15)]
         else:
-            ob = 0.0
+            ob = self._get_float(row[1], _("Estimate")) if len(row) > 1 else 0.0
             months = [self._get_float(row[i], f"Month {i-1}") if len(row) > i else 0.0 for i in range(2, 14)]
 
         vals = {
@@ -367,19 +511,35 @@ class PbmsExcelImportWizard(models.TransientModel):
         return 1
 
     def _import_digital_banking_row(self, row, plan):
-        code = str(row[0] or "").strip()
-        name = str(row[1] or "").strip() if len(row) > 1 else ""
-        ch = self.env["pbms.digital.channel"].search([
-            "|", ("code", "=ilike", code), ("name", "=ilike", name or code)
-        ], limit=1)
-        if not ch:
-            raise UserError(_("Unknown digital channel code or name: '%s'") % (code or name))
+        item_str_0 = str(row[0] or "").strip()
+        item_str_1 = str(row[1] or "").strip() if len(row) > 1 else ""
 
-        if len(row) >= 15:
-            ob = self._get_float(row[2], _("Estimate"))
+        ch = self.env["pbms.digital.channel"].search([
+            "|", ("name", "=ilike", item_str_0), ("code", "=ilike", item_str_0)
+        ], limit=1)
+
+        is_legacy = False
+        if not ch and item_str_1:
+            ch = self.env["pbms.digital.channel"].search([
+                "|", ("name", "=ilike", item_str_1), ("code", "=ilike", item_str_1)
+            ], limit=1)
+            if ch:
+                is_legacy = True
+        elif ch and item_str_1:
+            try:
+                float(item_str_1.replace(",", ""))
+                is_legacy = False
+            except (ValueError, TypeError):
+                is_legacy = True
+
+        if not ch:
+            raise UserError(_("Unknown digital channel: '%s'") % (item_str_0 or item_str_1))
+
+        if is_legacy:
+            ob = self._get_float(row[2], _("Estimate")) if len(row) > 2 else 0.0
             months = [self._get_float(row[i], f"Month {i-2}") if len(row) > i else 0.0 for i in range(3, 15)]
         else:
-            ob = 0.0
+            ob = self._get_float(row[1], _("Estimate")) if len(row) > 1 else 0.0
             months = [self._get_float(row[i], f"Month {i-1}") if len(row) > i else 0.0 for i in range(2, 14)]
 
         vals = {
@@ -394,19 +554,35 @@ class PbmsExcelImportWizard(models.TransientModel):
         return 1
 
     def _import_expense_row(self, row, plan):
-        code = str(row[0] or "").strip()
-        name = str(row[1] or "").strip() if len(row) > 1 else ""
-        acc = self.env["pbms.expense.account"].search([
-            "|", ("code", "=ilike", code), ("name", "=ilike", name or code)
-        ], limit=1)
-        if not acc:
-            raise UserError(_("Unknown expense account code or name: '%s'") % (code or name))
+        item_str_0 = str(row[0] or "").strip()
+        item_str_1 = str(row[1] or "").strip() if len(row) > 1 else ""
 
-        if len(row) >= 15:
-            ob = self._get_float(row[2], _("Estimate"))
+        acc = self.env["pbms.expense.account"].search([
+            "|", ("name", "=ilike", item_str_0), ("code", "=ilike", item_str_0)
+        ], limit=1)
+
+        is_legacy = False
+        if not acc and item_str_1:
+            acc = self.env["pbms.expense.account"].search([
+                "|", ("name", "=ilike", item_str_1), ("code", "=ilike", item_str_1)
+            ], limit=1)
+            if acc:
+                is_legacy = True
+        elif acc and item_str_1:
+            try:
+                float(item_str_1.replace(",", ""))
+                is_legacy = False
+            except (ValueError, TypeError):
+                is_legacy = True
+
+        if not acc:
+            raise UserError(_("Unknown expense account: '%s'") % (item_str_0 or item_str_1))
+
+        if is_legacy:
+            ob = self._get_float(row[2], _("Estimate")) if len(row) > 2 else 0.0
             months = [self._get_float(row[i], f"Month {i-2}") if len(row) > i else 0.0 for i in range(3, 15)]
         else:
-            ob = 0.0
+            ob = self._get_float(row[1], _("Estimate")) if len(row) > 1 else 0.0
             months = [self._get_float(row[i], f"Month {i-1}") if len(row) > i else 0.0 for i in range(2, 14)]
 
         vals = {

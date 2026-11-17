@@ -13,7 +13,7 @@ class TestDisciplineCase(TransactionCase):
         # Security groups
         self.group_base_user = self.env.ref('base.group_user')
         self.group_user = self.env.ref('discipline_management.group_discipline_user')
-        self.group_officer = self.env.ref('discipline_management.group_discipline_officer')
+        self.group_officer = self.env.ref('discipline_management.group_discipline_pomd')
         self.group_admin = self.env.ref('discipline_management.group_discipline_admin')
         self.group_ceo = self.env.ref('discipline_management.group_discipline_ceo')
 

@@ -7,6 +7,7 @@ import urllib.parse
 import urllib.error
 
 from odoo import api, fields, models, _
+from odoo.tools import html_escape, plaintext2html
 
 _logger = logging.getLogger(__name__)
 
@@ -506,6 +507,169 @@ class HelpdeskSocialChannel(models.AbstractModel):
         except Exception as e:
             _logger.warning("Failed to send Facebook message to %s: %s", recipient_psid, str(e))
             return False
+
+    # ── Website Chatbot ───────────────────────────────────────────────────────
+
+    @api.model
+    def process_chatbot_request(self, data):
+        """Create a helpdesk ticket (channel_type = 'chatbot') from a website chatbot.
+
+        Used by the Odoo Live Chat chatbot step (bunna_helpdesk_livechat) and by
+        the public /helpdesk/chatbot/ticket endpoint for external chatbots.
+
+        :param dict data: keys (all optional except description or subject)
+            subject, description, transcript (plain text), full_name, email,
+            phone, account_number, session_id (dedupe key), message_id,
+            partner_id (already identified customer)
+        :return: helpdesk.ticket record (sudo) or empty recordset
+        """
+        data = data or {}
+        # Support Tidio native webhook structure:
+        visitor = data.get("visitor") if isinstance(data.get("visitor"), dict) else {}
+        msg_obj = data.get("message") if isinstance(data.get("message"), dict) else {}
+
+        full_name = (data.get("full_name") or data.get("name") or visitor.get("name") or "").strip()
+        email = (data.get("email") or visitor.get("email") or "").strip()
+        phone = (data.get("phone") or data.get("mobile") or visitor.get("phone") or "").strip()
+
+        msg_val = data.get("message")
+        if isinstance(msg_val, dict):
+            raw_msg = msg_val.get("text") or ""
+        elif isinstance(msg_val, str):
+            raw_msg = msg_val
+        else:
+            raw_msg = ""
+
+        raw_desc = data.get("description") if isinstance(data.get("description"), str) else ""
+        msg_text = msg_obj.get("text") or ""
+        description = (raw_desc or raw_msg or msg_text or "").strip()
+        subject = (data.get("subject") or "").strip() if isinstance(data.get("subject"), str) else ""
+        transcript = (data.get("transcript") or "").strip() if isinstance(data.get("transcript"), str) else ""
+
+        combined_text = f"{subject} {description} {transcript}"
+        if not phone and combined_text:
+            phone_match = re.search(r"(\+?251\s?[79]\d{8}|0[79]\d{8})", combined_text)
+            if phone_match:
+                raw_phone = phone_match.group(1).replace(" ", "")
+                if raw_phone.startswith("0"):
+                    phone = f"+251{raw_phone[1:]}"
+                elif not raw_phone.startswith("+"):
+                    phone = f"+{raw_phone}"
+                else:
+                    phone = raw_phone
+
+        account_number = (data.get("account_number") or "").strip()
+        if not account_number and combined_text:
+            for num_candidate in re.findall(r"\b\d{11,16}\b", combined_text):
+                if not phone or num_candidate not in phone:
+                    account_number = num_candidate
+                    break
+
+        if not (subject or description or transcript):
+            _logger.warning("Chatbot ticket request ignored: no subject/description/transcript.")
+            return self.env["helpdesk.ticket"]
+
+        env_sudo = self.sudo()
+        Ticket = env_sudo.env["helpdesk.ticket"]
+        session_id = (str(data.get("session_id") or data.get("thread_id") or visitor.get("id") or "")).strip()[:120] or False
+
+        # Idempotency: the same chatbot session cannot create a flood of tickets
+        # (double click, retry of a failed HTTP call, bot re-processing a step).
+        if session_id:
+            since = fields.Datetime.subtract(fields.Datetime.now(), minutes=10)
+            existing = Ticket.search(
+                [
+                    ("channel_type", "=", "chatbot"),
+                    ("social_chat_id", "=", session_id),
+                    ("create_date", ">=", since),
+                ],
+                limit=1,
+            )
+            if existing:
+                return existing
+
+        partner = self._resolve_chatbot_partner(
+            partner_id=data.get("partner_id"), full_name=full_name, email=email, phone=phone
+        )
+
+        title_src = subject or description or transcript
+        title_src = " ".join(title_src.split())
+        body = ["<p><strong>Channel:</strong> Website Chatbot / Tidio Live Chat</p>"]
+        if full_name or partner:
+            body.append(f"<p><strong>Customer:</strong> {html_escape(full_name or partner.name)}</p>")
+        if email:
+            body.append(f"<p><strong>Email:</strong> {html_escape(email)}</p>")
+        if phone:
+            body.append(f"<p><strong>Phone:</strong> {html_escape(phone)}</p>")
+        if session_id:
+            body.append(f"<p><strong>Chat session / Thread ID:</strong> {html_escape(session_id)}</p>")
+        body.append("<p><strong>Request:</strong></p>")
+        body.append(str(plaintext2html(description or subject or transcript)))
+        if transcript and transcript != description:
+            body.append("<p><strong>Chatbot conversation:</strong></p>")
+            body.append(str(plaintext2html(transcript)))
+
+        ticket_vals = {
+            "name": f"Chatbot: {title_src[:60]}",
+            "description": "".join(body),
+            "channel_type": "chatbot",
+            "social_chat_id": session_id,
+            "social_message_id": str(data.get("message_id") or "") or False,
+            "partner_id": partner.id if partner else False,
+            "partner_name": (partner.name if partner else full_name) or False,
+            "partner_email": email or (partner.email if partner else False) or False,
+            "partner_phone": phone or (partner.phone if partner else False) or False,
+        }
+        if account_number:
+            ticket_vals["account_number"] = account_number
+        team_id = self._get_config_param("bunna_helpdesk.chatbot_team_id")
+        case_type_id = self._get_config_param("bunna_helpdesk.chatbot_default_case_type_id")
+        if team_id:
+            ticket_vals["team_id"] = team_id
+        if case_type_id:
+            ticket_vals["case_type_id"] = case_type_id
+
+        ticket = Ticket.create(ticket_vals)
+
+        if partner:
+            try:
+                with self.env.cr.savepoint():
+                    ticket._apply_customer_profile(partner)
+            except Exception:  # CBS profile is a nice-to-have, never block the ticket
+                _logger.exception("Could not apply customer profile on chatbot ticket %s", ticket.number)
+
+        _logger.info("Created Helpdesk Ticket %s from website chatbot session %s", ticket.number, session_id)
+        return ticket
+
+    @api.model
+    def _resolve_chatbot_partner(self, partner_id=None, full_name=None, email=None, phone=None):
+        """Known partner (logged-in user) > match by email > match by phone > create."""
+        Partner = self.env["res.partner"].sudo()
+        if partner_id:
+            partner = Partner.browse(int(partner_id)).exists()
+            if partner:
+                return partner
+        if email:
+            partner = Partner.search([("email", "=ilike", email)], limit=1)
+            if partner:
+                return partner
+        if phone:
+            digits_suffix = phone[-9:] if len(phone) >= 9 else phone
+            partner = Partner.search(
+                ["|", ("phone", "=ilike", phone), ("phone", "=ilike", f"%{digits_suffix}")], limit=1
+            )
+            if partner:
+                return partner
+        if full_name or email or phone:
+            return Partner.create(
+                {
+                    "name": full_name or email or phone,
+                    "email": email or False,
+                    "phone": phone or False,
+                    "comment": "Auto-created from Website Chatbot",
+                }
+            )
+        return Partner.browse()
 
     # ── Helper Methods ────────────────────────────────────────────────────────
 

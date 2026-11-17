@@ -40,7 +40,7 @@
                                        class="fw-bold fs-6"
                                        options="{'horizontal': true}"/>
                                 <field name="calibration_notes"
-                                       string="Decision Rationale / Committee Notes"
+                                       string="Justification / Note"
                                        placeholder="Document the key considerations, committee rationale, and development focus for this candidate..."/>
                             </group>
                         </div>

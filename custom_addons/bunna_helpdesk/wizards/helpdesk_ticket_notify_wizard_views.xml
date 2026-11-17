@@ -4,7 +4,7 @@
         <field name="name">helpdesk.ticket.notify.wizard.form</field>
         <field name="model">helpdesk.ticket.notify.wizard</field>
         <field name="arch" type="xml">
-            <form string="Customer Notification">
+            <form string="Customer Notification" class="o_helpdesk_wizard">
                 <sheet>
                     <div class="alert alert-info py-2 mb-3" role="alert" style="font-size: 0.88rem; line-height: 1.4;">
                         <i class="fa fa-info-circle me-1" title="Notice" />

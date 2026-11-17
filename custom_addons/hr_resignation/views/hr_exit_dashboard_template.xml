@@ -8,11 +8,11 @@
             <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
             <title>Exit Interview Analytics &amp; Report</title>
             <style>
-            :root{--bg:#f4f6f8;--card:#fff;--ink:#14212b;--mut:#5d6b78;--line:#e2e7ec;--acc:#0f766e;--acc2:#b45309;--soft:#e6f3f1;
-            --c1:#b91c1c;--c2:#ea580c;--c3:#ca8a04;--c4:#65a30d;--c5:#15803d;--pos:#15803d;--neu:#94a3b8;--neg:#b91c1c;
+            :root{--bg:#f4f6f8;--card:#fff;--ink:#14212b;--mut:#5d6b78;--line:#e2e7ec;--acc:#425727;--acc2:#c17540;--soft:#e6f3f1;
+            --c1:#541718;--c2:#1d2b32;--c3:#726732;--c4:#1e2917;--c5:#425727;--pos:#425727;--neu:#94a3b8;--neg:#541718;
             box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-            @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e161d;--card:#16212b;--ink:#e8eef3;--mut:#93a3b1;--line:#263442;--acc:#2dd4bf;--acc2:#fbbf24;--soft:#12302e}}
-            :root[data-theme="dark"]{--bg:#0e161d;--card:#16212b;--ink:#e8eef3;--mut:#93a3b1;--line:#263442;--acc:#2dd4bf;--acc2:#fbbf24;--soft:#12302e}
+            @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e161d;--card:#16212b;--ink:#e8eef3;--mut:#93a3b1;--line:#263442;--acc:#425727;--acc2:#c17540;--soft:#12302e}}
+            :root[data-theme="dark"]{--bg:#0e161d;--card:#16212b;--ink:#e8eef3;--mut:#93a3b1;--line:#263442;--acc:#425727;--acc2:#c17540;--soft:#12302e}
             html{scroll-padding-top:env(safe-area-inset-top,0px)}
             *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
             .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 20px}
@@ -21,9 +21,11 @@
             .tabs button.on{background:var(--card);color:var(--acc);box-shadow:0 1px 3px #0002}
             .btn{background:var(--acc);color:#fff}
             main{max-width:1180px;margin:0 auto;padding:18px 20px 40px}
-            .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
-            .filters select{font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
-            .lock{margin-left:auto;font-size:12px;color:var(--mut);background:var(--soft);padding:5px 10px;border-radius:99px}
+            .filters{display:flex;flex-wrap:wrap;gap:20px;margin-bottom:24px;align-items:flex-end}
+            .filter-group{display:flex;flex-direction:column;gap:6px;flex:1;min-width:200px}
+            .filter-group label{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em}
+            .filters select{font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 12px;width:100%}
+            .lock{font-size:12px;color:var(--mut);background:var(--soft);padding:6px 12px;border-radius:99px;margin-left:auto;white-space:nowrap}
             .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
             .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:14px}
             .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
@@ -69,10 +71,21 @@
             <main>
             <!-- ============ DASHBOARD ============ -->
             <section id="dash">
-            <div class="filters"><select><option>Last 12 months</option><option>Q3 2026</option><option>Custom…</option></select>
-            <select><option>All business units</option><option>Retail Banking</option><option>Credit</option><option>IT</option><option>Finance</option></select>
-            <select><option>All districts</option></select><select><option>All branches</option></select><select><option>All positions</option></select><select><option>All separation types</option><option>Resignation</option><option>Retirement</option></select>
-            <span class="lock">🔒 Anonymized · min. 5 responses per segment</span></div>
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Work Units</label>
+                    <select><option>All units</option><option>Retail Banking</option><option>Credit</option><option>IT</option><option>Finance</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Position</label>
+                    <select><option>All positions</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Separation Type</label>
+                    <select><option>All types</option><option>Resignation</option><option>Retirement</option></select>
+                </div>
+                <span class="lock">🔒 Anonymized · min. 5 responses</span>
+            </div>
             <div class="kpis" id="kpis"></div>
             <div class="grid" id="cards"></div>
             </section>

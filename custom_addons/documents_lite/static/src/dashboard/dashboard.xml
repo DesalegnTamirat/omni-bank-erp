@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="documents_lite.Dashboard">
+        <div class="o_dms_dash h-100 overflow-auto">
+            <div class="o_dms_dash_inner">
+
+                <t t-if="state.loading">
+                    <div class="text-center text-muted py-5">
+                        <i class="fa fa-spinner fa-spin fa-2x mb-2"/>
+                        <div>Loading Documents Lite dashboard…</div>
+                    </div>
+                </t>
+                <t t-elif="state.error or !state.data">
+                    <div class="alert alert-warning m-3">
+                        The dashboard could not be loaded.
+                        <button class="btn btn-link p-0 ms-2" t-on-click="load">Try again</button>
+                    </div>
+                </t>
+                <t t-else="">
+                    <t t-set="d" t-value="state.data"/>
+
+                    <!-- Elegant Top Banner -->
+                    <div class="o_dms_dash_banner">
+                        <div class="o_dms_dash_banner_text">
+                            <div class="o_dms_dash_banner_title">
+                                <i class="fa fa-folder-open-o me-2"/>Bunna Documents Lite
+                            </div>
+                            <div class="o_dms_dash_banner_sub">
+                                <span class="o_dms_dash_role"><t t-esc="d.is_manager ? 'Document Manager' : 'Document Viewer'"/></span>
+                                <span t-esc="d.today"/>
+                                <span class="fst-italic">Welcome, <t t-esc="d.user_name"/></span>
+                            </div>
+                        </div>
+                        <div class="o_dms_dash_banner_actions">
+                            <button class="btn btn-light" t-on-click="load" title="Refresh">
+                                <i class="fa fa-refresh me-1"/>Refresh
+                            </button>
+                            <button t-if="d.is_manager" class="btn btn-warning fw-semibold shadow-sm" t-on-click="openUploadWizard">
+                                <i class="fa fa-cloud-upload me-1"/>Upload Document
+                            </button>
+                            <button class="btn btn-outline-light" t-on-click="viewAllDocuments">
+                                <i class="fa fa-th-large me-1"/>Browse All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Cards Grid -->
+                    <div class="o_dms_dash_kpis">
+                        <t t-foreach="d.kpis" t-as="k" t-key="k.key">
+                            <div t-attf-class="o_dms_dash_kpi tone-#{k.tone}" role="button" t-on-click="() => this.openKpi(k)">
+                                <div class="o_dms_dash_kpi_icon"><i t-att-class="'fa ' + k.icon"/></div>
+                                <div class="o_dms_dash_kpi_body">
+                                    <div class="o_dms_dash_kpi_value" t-esc="k.value"/>
+                                    <div class="o_dms_dash_kpi_label" t-esc="k.label"/>
+                                    <div class="o_dms_dash_kpi_hint" t-esc="k.hint"/>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- Split Section: Folders breakdown & File Types breakdown -->
+                    <div class="o_dms_dash_split">
+                        <!-- Top Active Folders -->
+                        <div class="o_dms_dash_card">
+                            <div class="o_dms_dash_card_head">
+                                <h5><i class="fa fa-folder me-2 text-warning"/>Active Folders</h5>
+                                <span class="o_dms_dash_count"><t t-esc="d.folder_list.length"/> Folders</span>
+                            </div>
+                            <div class="o_dms_dash_card_sub">Overview of main storage folders and their document volume</div>
+                            <div t-if="!d.folder_list.length" class="o_dms_dash_empty">
+                                <i class="fa fa-folder-open-o"/>
+                                <span>No folders available.</span>
+                            </div>
+                            <div t-else="" class="o_dms_folder_grid">
+                                <t t-foreach="d.folder_list" t-as="f" t-key="f.id">
+                                    <div class="o_dms_folder_pill" role="button" t-on-click="() => this.openFolder(f)">
+                                        <div class="o_dms_folder_icon"><i class="fa fa-folder"/></div>
+                                        <div class="o_dms_folder_info">
+                                            <div class="o_dms_folder_name" t-esc="f.name"/>
+                                            <div class="o_dms_folder_cnt"><t t-esc="f.count"/> files</div>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+
+                        <!-- File Formats Distribution -->
+                        <div class="o_dms_dash_card">
+                            <div class="o_dms_dash_card_head">
+                                <h5><i class="fa fa-pie-chart me-2 text-info"/>File Types</h5>
+                            </div>
+                            <div class="o_dms_dash_card_sub">Distribution of document types across the repository</div>
+                            <div t-if="!d.type_data.length" class="o_dms_dash_empty">
+                                <i class="fa fa-file-o"/>
+                                <span>No documents found.</span>
+                            </div>
+                            <div t-else="" class="o_dms_type_list">
+                                <t t-foreach="d.type_data" t-as="t" t-key="t.label">
+                                    <div class="o_dms_type_row">
+                                        <div class="o_dms_type_badge" t-esc="t.label"/>
+                                        <div class="o_dms_type_bar_wrapper">
+                                            <div class="o_dms_type_bar" t-att-style="'width: ' + ((t.count / (d.kpis[0].value || 1)) * 100) + '%'"/>
+                                        </div>
+                                        <span class="o_dms_type_cnt"><t t-esc="t.count"/></span>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Uploads Table -->
+                    <div class="o_dms_dash_card">
+                        <div class="o_dms_dash_card_head">
+                            <h5><i class="fa fa-history me-2 text-primary"/>Recent Uploads</h5>
+                            <button class="btn btn-sm btn-link" t-on-click="viewAllDocuments">View All &gt;</button>
+                        </div>
+                        <div class="o_dms_dash_card_sub">Recently added or updated files in the system</div>
+                        <div t-if="!d.recent_docs.length" class="o_dms_dash_empty">
+                            <i class="fa fa-files-o"/>
+                            <span>No recent documents uploaded.</span>
+                        </div>
+                        <div t-else="" class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Folder</th>
+                                        <th>Type</th>
+                                        <th>Size</th>
+                                        <th>Uploaded By</th>
+                                        <th>Date</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="d.recent_docs" t-as="doc" t-key="doc.id">
+                                        <tr role="button" t-on-click="() => this.openDocument(doc.id)">
+                                            <td>
+                                                <i class="fa fa-file-text-o me-2 text-muted"/>
+                                                <span class="fw-semibold text-primary" t-esc="doc.name"/>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-light text-dark"><i class="fa fa-folder-o me-1"/><t t-esc="doc.folder || 'Root'"/></span>
+                                            </td>
+                                            <td>
+                                                <span class="badge rounded-pill bg-secondary" t-esc="doc.extension"/>
+                                            </td>
+                                            <td t-esc="doc.size"/>
+                                            <td t-esc="doc.create_uid"/>
+                                            <td class="text-muted" t-esc="doc.create_date"/>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" title="Open details">
+                                                    <i class="fa fa-external-link"/>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

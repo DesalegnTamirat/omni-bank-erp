@@ -357,10 +357,18 @@
             <field name="search_view_id" ref="view_hr_payslip_filter"/>
         </record>
 
-        <menuitem id="menu_department_tree"
-                  action="action_view_hr_payslip_form"
+        <!-- Parent Payslips Dropdown Menu -->
+        <menuitem id="menu_hr_payslip_menu"
+                  name="Payslips"
                   parent="menu_hr_payroll_root"
                   sequence="10"
+                  groups="bunna_hr_payroll.group_hr_payroll_user"/>
+
+        <menuitem id="menu_department_tree"
+                  name="Employee Payslips"
+                  action="action_view_hr_payslip_form"
+                  parent="menu_hr_payslip_menu"
+                  sequence="1"
                   groups="bunna_hr_payroll.group_hr_payroll_user"/>
 
         <record id="act_hr_employee_payslip_list" model="ir.actions.act_window">
@@ -466,10 +474,12 @@
             <field name="arch" type="xml">
                 <form string="Payslips Batches">
                     <header>
+                        <button name="action_compute_sheet" type="object" string="Compute Sheets"
+                                invisible="state != 'draft'" class="oe_highlight"/>
                         <button name="%(action_hr_payslip_by_employees)d" type="action" invisible="state != 'draft'"
-                                string="Generate Payslips" class="oe_highlight"/>
+                                string="Generate Payslips" class="btn-secondary"/>
                         <button string="Set to Draft" name="draft_payslip_run" type="object"
-                                invisible="state != 'close'"/>
+                                invisible="state == 'draft'"/>
                         <button string="Mark As Done" name="done_payslip_run" type="object" invisible="state != 'draft'"
                                 class="oe_highlight"/>
                         <button name="close_payslip_run" type="object" string="Close" invisible="state != 'draft'"/>
@@ -513,16 +523,17 @@
         </record>
 
         <menuitem id="menu_hr_payslip_run"
+                  name="Payslips Batches"
                   action="action_hr_payslip_run_tree"
-                  parent="menu_hr_payroll_root"
-                  sequence="20"
+                  parent="menu_hr_payslip_menu"
+                  sequence="2"
                   groups="bunna_hr_payroll.group_hr_payroll_user"/>
 
         <menuitem id="menu_bunna_payroll_journal_entry"
                   name="CBS Journal Entries"
                   action="bunna_hr_payroll.action_bunna_payroll_journal_entry"
                   parent="menu_hr_payroll_root"
-                  sequence="21"
+                  sequence="20"
                   groups="bunna_hr_payroll.group_hr_payroll_user"/>
 
         <!--  Shortcuts -->

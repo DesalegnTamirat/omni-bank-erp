@@ -96,7 +96,7 @@ class RecruitmentOfferLetter(models.Model):
         default=lambda self: _('New')
     )
     reference = fields.Char(
-        string='Offer Reference',
+        string='Reference Number',
         related='name',
         store=True,
         readonly=True
@@ -118,6 +118,52 @@ class RecruitmentOfferLetter(models.Model):
     vacancy_reference = fields.Char(
         related='vacancy_id.reference', string='Vacancy Reference String', store=True
     )
+
+    eligible_vacancy_ids = fields.Many2many(
+        'job.vacancy',
+        compute='_compute_eligible_vacancy_ids',
+        default=lambda self: self._get_eligible_vacancy_ids(),
+        string='Eligible Vacancies',
+        help="External vacancies that have selected candidates not yet registered in Employee Master (hr.employee)."
+    )
+
+    @api.model
+    def _get_eligible_vacancy_ids(self):
+        """Returns recordset of external job.vacancy that have at least one selected candidate
+        who is NOT yet registered in Employee Master (hr.employee).
+        If all selected candidates for a vacancy are created in Employee Master,
+        that vacancy is completed and excluded.
+        """
+        SelectedCand = self.env['external.recruitment.selected.candidates'].sudo()
+        selected_cands = SelectedCand.search([
+            ('selection_type', 'in', ['selected', 'Selected']),
+            ('active', '=', True)
+        ])
+        unprocessed_cands = selected_cands.filtered(
+            lambda c: not (c.applicant_name and c.applicant_name.employee_id)
+        )
+        parents = unprocessed_cands.mapped('ext_rec_sel_cand')
+        vac_ids = set()
+        for p in parents:
+            if p.vacancy_id:
+                vac_ids.add(p.vacancy_id)
+            if p.vacancy_reference:
+                v = self.env['job.vacancy'].sudo().search([('reference', '=', p.vacancy_reference)], limit=1)
+                if v:
+                    vac_ids.add(v.id)
+
+        return self.env['job.vacancy'].browse(list(vac_ids)).filtered(
+            lambda v: 'EXT' in (v.reference or '')
+        )
+
+    @api.depends('vacancy_id')
+    def _compute_eligible_vacancy_ids(self):
+        eligible = self._get_eligible_vacancy_ids()
+        for rec in self:
+            if rec.vacancy_id:
+                rec.eligible_vacancy_ids = eligible | rec.vacancy_id
+            else:
+                rec.eligible_vacancy_ids = eligible
     
     ext_candidate_id = fields.Many2one(
         'external.recruitment.selected.candidates',
@@ -164,7 +210,7 @@ class RecruitmentOfferLetter(models.Model):
     job_position_name = fields.Char(
         string='Job Position Name',
         related='job_position_id.name',
-        store=True,
+        store=False,
         readonly=True,
     )
 
@@ -255,6 +301,12 @@ class RecruitmentOfferLetter(models.Model):
         related='deadline_date', store=True, readonly=False
     )
     ref_no = fields.Char(string='Letter Reference Number', tracking=True)
+    signatory_config_id = fields.Many2one(
+        'recruitment.signatory.config',
+        string='Signatory & Stamp Configuration',
+        default=lambda self: self.env['recruitment.signatory.config'].get_active_signatory('all') if 'recruitment.signatory.config' in self.env else False,
+        help='Configuration providing authorized signature, rubber stamp, and executive title for offer letters'
+    )
     signatory_name = fields.Char(string='Signatory Title/Name', default='Human Resources Management Department')
     cc_chief_office = fields.Char(string='CC: Chief Office', default='Respective Chief Offices')
     cc_work_unit = fields.Char(string='CC: Work Unit', default='Respective Work Units')
@@ -292,6 +344,24 @@ class RecruitmentOfferLetter(models.Model):
             else:
                 rec.deadline_date = fields.Date.today() + timedelta(days=3)
 
+    def _resolve_base_salary(self):
+        """Resolves the base salary from the Selection Minute and Job Grade."""
+        sal = 0.0
+        vac = self.vacancy_id
+        if not vac and self.ext_candidate_id and self.ext_candidate_id.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.ext_candidate_id.vacancy_id)
+        if vac:
+            grade_rec = vac.job_grade or (vac.job_position.grade if vac.job_position else False)
+            if grade_rec:
+                sal = getattr(grade_rec, 'base_salary', 0.0) or getattr(grade_rec, 'basic_salary', 0.0) or 0.0
+            if not sal:
+                min_rec = self.env['recruitment.selection.minute'].search([('vacancy_id', '=', vac.id)], order='id desc', limit=1)
+                if min_rec:
+                    sal = getattr(min_rec, 'starting_salary', 0.0) or getattr(min_rec, 'base_salary', 0.0) or 0.0
+            if not sal:
+                sal = getattr(vac, 'starting_salary', 0.0) or getattr(vac, 'base_salary', 0.0) or getattr(vac, 'basic_salary', 0.0) or 0.0
+        return sal
+
     @api.onchange('vacancy_id')
     def _onchange_vacancy_id_filter_candidates(self):
         """
@@ -324,13 +394,15 @@ class RecruitmentOfferLetter(models.Model):
         ])
         offered_candidate_ids = existing_offers.mapped('ext_candidate_id').ids
 
-        remaining_candidates = selected_candidates.filtered(lambda c: c.id not in offered_candidate_ids)
+        remaining_candidates = selected_candidates.filtered(lambda c: c.id not in offered_candidate_ids and not (c.applicant_name and c.applicant_name.employee_id))
 
         self.ext_candidate_id = False
 
         # Auto-set is_managerial from vacancy's employee_category (Job Category)
         if self.vacancy_id:
             self.is_managerial = (self.vacancy_id.employee_category == 'Managerial')
+            if not self.salary_figure or self.salary_figure <= 0:
+                self.salary_figure = self._resolve_base_salary()
 
         return {
             'domain': {
@@ -358,12 +430,52 @@ class RecruitmentOfferLetter(models.Model):
             # Ensure is_managerial matches vacancy_id.employee_category
             if self.vacancy_id:
                 self.is_managerial = (self.vacancy_id.employee_category == 'Managerial')
+            if not self.salary_figure or self.salary_figure <= 0:
+                self.salary_figure = self._resolve_base_salary()
+
+    def get_letter_signature_data(self):
+        """Returns structured dictionary with separate signature & stamp base64 data URIs."""
+        self.ensure_one()
+        sig = self.get_offer_signatory()
+        if sig and hasattr(sig, 'get_letter_signature_data'):
+            return sig.get_letter_signature_data()
+        return {
+            'has_split': False,
+            'signature_b64': '',
+            'stamp_b64': '',
+            'stamp_position': 'right',
+            'legacy_b64': sig.get_signature_stamp_base64() if (sig and hasattr(sig, 'get_signature_stamp_base64')) else '',
+            'signatory_name': sig.signatory_name if sig else 'Abayneh Markos',
+            'signatory_title': sig.signatory_title if sig else 'People Operation Management Directorate',
+            'signatory_company': sig.signatory_company if sig else 'Bunna Bank S.C.',
+        }
+
+    def get_offer_signatory(self):
+        """Returns the configured or active authorized signatory record for the offer letter."""
+        self.ensure_one()
+        if hasattr(self, 'signatory_config_id') and self.signatory_config_id:
+            return self.signatory_config_id
+        if 'recruitment.signatory.config' in self.env:
+            return self.env['recruitment.signatory.config'].get_active_signatory('all')
+        return False
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get('name') or vals.get('name') == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('recruitment.offer.letter') or _('New')
+            if not vals.get('signatory_config_id') and 'recruitment.signatory.config' in self.env:
+                active_sig = self.env['recruitment.signatory.config'].get_active_signatory('all')
+                if active_sig:
+                    vals['signatory_config_id'] = active_sig.id
+            if not vals.get('salary_figure') or vals.get('salary_figure') <= 0:
+                vac_id = vals.get('vacancy_id')
+                if vac_id:
+                    vac = self.env['job.vacancy'].browse(vac_id)
+                    grade_rec = vac.job_grade or (vac.job_position.grade if vac.job_position else False)
+                    if grade_rec:
+                        vals['salary_figure'] = getattr(grade_rec, 'base_salary', 0.0) or getattr(grade_rec, 'basic_salary', 0.0) or 0.0
+
             if vals.get('ext_candidate_id') and not vals.get('applicant_id'):
                 ext_cand = self.env['external.recruitment.selected.candidates'].browse(vals['ext_candidate_id'])
                 if ext_cand.applicant_name:
@@ -379,6 +491,75 @@ class RecruitmentOfferLetter(models.Model):
                 vals['applicant_id'] = ext_cand.applicant_name.id
         return super().write(vals)
 
+    def _get_district_for_unit(self, unit_name_or_rec):
+        """Resolves the parent or associated District for a given operating unit or unit name."""
+        if not unit_name_or_rec:
+            return ""
+        ou = False
+        if isinstance(unit_name_or_rec, str):
+            ou = self.env['operating.unit'].search([('name', '=ilike', unit_name_or_rec.strip())], limit=1)
+            if not ou and 'branch' in unit_name_or_rec.lower():
+                clean_name = unit_name_or_rec.lower().replace('branch', '').strip()
+                ou = self.env['operating.unit'].search([('name', '=ilike', clean_name)], limit=1)
+        elif hasattr(unit_name_or_rec, 'name'):
+            ou = unit_name_or_rec
+
+        if ou:
+            if getattr(ou, 'work_unit_type', '') in ('head_office', 'head_office_unit'):
+                return ""
+            ou_name_lower = (ou.name or '').lower()
+            if 'directorate' in ou_name_lower or 'department' in ou_name_lower or 'head office' in ou_name_lower:
+                return ""
+            if getattr(ou, 'work_unit_type', '') == 'district_office' or 'district' in ou_name_lower:
+                return ou.name
+            curr = getattr(ou, 'parent_unit', False)
+            while curr and curr.exists():
+                if getattr(curr, 'work_unit_type', '') in ('head_office', 'head_office_unit'):
+                    return ""
+                if getattr(curr, 'work_unit_type', '') == 'district_office' or 'district' in (curr.name or '').lower():
+                    return curr.name
+                curr = getattr(curr, 'parent_unit', False)
+            d_field = getattr(ou, 'district', False)
+            if d_field:
+                d_str = str(d_field).strip()
+                if d_str and 'district' in d_str.lower():
+                    return d_str
+        return ""
+
+    def get_offer_letter_cc_lines(self):
+        """
+        Returns list of CC lines for offer letter:
+        - If hiring work unit is Head Office: ONLY hiring work unit.
+        - If hiring work unit is out of Head Office: hiring work unit AND their respective district.
+        """
+        self.ensure_one()
+        lines = []
+        ou = self.operating_unit_id
+        if not ou and self.vacancy_id and hasattr(self.vacancy_id, 'operating_unit_id') and self.vacancy_id.operating_unit_id:
+            ou = self.vacancy_id.operating_unit_id
+
+        assigned_unit = (ou.name if ou else (self.work_unit or '')).strip()
+
+        # Check if hiring work unit is Head Office
+        is_ho = False
+        if ou:
+            if getattr(ou, 'work_unit_type', '') in ('head_office', 'head_office_unit') or 'directorate' in (ou.name or '').lower() or 'department' in (ou.name or '').lower():
+                is_ho = True
+            elif ou.parent_unit and getattr(ou.parent_unit, 'work_unit_type', '') in ('head_office', 'head_office_unit'):
+                is_ho = True
+        elif 'directorate' in assigned_unit.lower() or 'department' in assigned_unit.lower() or 'head office' in assigned_unit.lower():
+            is_ho = True
+
+        if not is_ho and assigned_unit:
+            district = self._get_district_for_unit(ou or assigned_unit)
+            if district and district.strip().lower() != assigned_unit.lower():
+                lines.append(district.strip())
+
+        if assigned_unit:
+            lines.append(assigned_unit)
+
+        return lines
+
     def action_send(self):
         """Send offer letter to candidate, generate PDF attachment, and set deadline."""
         for rec in self:
@@ -390,48 +571,84 @@ class RecruitmentOfferLetter(models.Model):
             rec.expiry_date = rec.deadline_date
             
             # Send notification email if email exists
-            email_target = rec.candidate_email or (rec.applicant_id.email_from if rec.applicant_id else False)
-            if email_target:
-                pos_str = rec.job_position_name or (rec.vacancy_id.job_position.name if rec.vacancy_id and rec.vacancy_id.job_position else 'Position')
-                cand_title_str = dict(rec._fields['candidate_title'].selection).get(rec.candidate_title, 'Ato/W/ro/W/t')
-                cand_display_name = f"{cand_title_str} {rec.candidate_name or 'Candidate'}"
-                deadline_str = rec.deadline_date.strftime('%B %d, %Y') if rec.deadline_date else 'within 3 calendar days'
+            email_target = (rec.candidate_email or (rec.applicant_id.email_from if rec.applicant_id else False) or (rec.ext_candidate_id.applicant_email if hasattr(rec, 'ext_candidate_id') and rec.ext_candidate_id else False) or '').strip()
+            
+            # Resolve authorized sender for outgoing SMTP server
+            mail_server = self.env['ir.mail_server'].sudo().search([('active', '=', True)], order='sequence, id', limit=1)
+            cfg_from = self.env['ir.config_parameter'].sudo().get_param('mail.default.from')
+            sender_email = (cfg_from or (mail_server.smtp_user if mail_server else False) or 'natnael.negussie@bunnabanksc.com').strip()
+            sender_formatted = f'"Bunna Bank Recruitment" <{sender_email}>'
 
+            pos_str = rec.job_position_name or (rec.vacancy_id.job_position.name if rec.vacancy_id and rec.vacancy_id.job_position else 'Position')
+            cand_title_str = dict(rec._fields['candidate_title'].selection).get(rec.candidate_title, 'Ato/W/ro/W/t')
+            cand_display_name = f"{cand_title_str} {rec.candidate_name or 'Candidate'}"
+            deadline_str = rec.deadline_date.strftime('%B %d, %Y') if rec.deadline_date else 'within 3 calendar days'
+
+            attachments = []
+            try:
+                # Generate PDF report attachment
+                report = self.env.ref('custom_recruitment.action_report_recruitment_offer_letter', raise_if_not_found=False)
+                if report:
+                    pdf_content, _dummy = self.env['ir.actions.report']._render_qweb_pdf('custom_recruitment.action_report_recruitment_offer_letter', [rec.id])
+                    attachment = self.env['ir.attachment'].sudo().create({
+                        'name': f"Employment_Offer_Letter_{rec.candidate_name or 'Candidate'}.pdf",
+                        'type': 'binary',
+                        'raw': pdf_content,
+                        'res_model': 'recruitment.offer.letter',
+                        'res_id': rec.id,
+                        'mimetype': 'application/pdf',
+                    })
+                    attachments.append(attachment.id)
+            except Exception as pdf_err:
+                _logger.warning("Failed to render offer letter PDF: %s", pdf_err)
+
+            base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+            portal_offer_url = f"{base_url.rstrip('/')}/my/candidate/offers" if base_url else "/my/candidate/offers"
+            if email_target:
                 message_body = _(
                     "Dear %s,<br><br>"
                     "We are pleased to extend a formal Offer Letter of Employment for the position of <b>%s</b> at Bunna Bank S.C.<br>"
                     "Please review the attached official Offer Letter and submit your response via the Bunna ATS Candidate Portal on or before <b>%s</b>.<br><br>"
                     "<div style='margin: 20px 0;'>"
-                    "<a href='/my/candidate/offers' style='background-color: #541718; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;'>Review &amp; Respond in ATS Portal</a>"
+                    "<a href='%s' target='_blank' style='background-color: #541718; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;'>Review &amp; Respond in ATS Portal</a>"
                     "</div>"
                     "Best Regards,<br><b>Human Resources Management Department</b><br>Bunna Bank S.C."
-                ) % (cand_display_name, pos_str, deadline_str)
+                ) % (cand_display_name, pos_str, deadline_str, portal_offer_url)
                 
                 try:
-                    # Generate PDF report attachment
-                    report = self.env.ref('custom_recruitment.action_report_recruitment_offer_letter', raise_if_not_found=False)
-                    attachments = []
-                    if report:
-                        pdf_content, _dummy = self.env['ir.actions.report']._render_qweb_pdf('custom_recruitment.action_report_recruitment_offer_letter', [rec.id])
-                        attachment = self.env['ir.attachment'].sudo().create({
-                            'name': f"Employment_Offer_Letter_{rec.candidate_name or 'Candidate'}.pdf",
-                            'type': 'binary',
-                            'raw': pdf_content,
-                            'res_model': 'recruitment.offer.letter',
-                            'res_id': rec.id,
-                            'mimetype': 'application/pdf',
-                        })
-                        attachments.append(attachment.id)
-
                     mail_values = {
                         'subject': _("Official Employment Offer Letter - %s - Bunna Bank S.C.") % pos_str,
                         'body_html': message_body,
                         'email_to': email_target,
+                        'email_from': sender_formatted,
                         'attachment_ids': [(6, 0, attachments)] if attachments else [],
                     }
-                    self.env['mail.mail'].sudo().create(mail_values).send()
+                    mail = self.env['mail.mail'].sudo().create(mail_values)
+                    mail.send(raise_exception=False)
                 except Exception as ex:
                     _logger.warning("Failed to dispatch offer letter email: %s", ex)
+
+            # Dispatch CC Discuss notifications and emails to work unit managers
+            cc_lines = rec.get_offer_letter_cc_lines()
+            if cc_lines:
+                try:
+                    from .cc_dispatch_service import dispatch_letter_cc_notifications
+                    details_html = (
+                        f"• Candidate: <b>{rec.candidate_name or 'Candidate'}</b><br/>"
+                        f"• Offeree Position: <b>{pos_str}</b><br/>"
+                        f"• Response Deadline: <b>{deadline_str}</b>"
+                    )
+                    dispatch_letter_cc_notifications(
+                        rec,
+                        cc_lines,
+                        letter_title=_("Employment Offer Letter"),
+                        letter_subject=_("Offer Letter for %s - %s") % (rec.candidate_name or 'Candidate', pos_str),
+                        details_html=details_html,
+                        attachment_ids=attachments,
+                        target_ou=rec.operating_unit_id,
+                    )
+                except Exception as cc_err:
+                    _logger.warning("Error dispatching CC notifications for offer letter: %s", cc_err)
 
             rec.message_post(body=_("Offer Letter sent to candidate %s. Response Deadline: %s.") % (
                 rec.candidate_name or (rec.ext_candidate_id.emp_name if rec.ext_candidate_id else 'Candidate'),

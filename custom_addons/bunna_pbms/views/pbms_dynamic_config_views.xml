@@ -434,7 +434,8 @@
         <field name="model">pbms.privilege.assignment</field>
         <field name="arch" type="xml">
             <list string="Privilege Assignments" editable="bottom">
-                <field name="privilege_id"/>
+                <field name="privilege_id" placeholder="Specific Privilege..."/>
+                <field name="privilege_ids" widget="many2many_tags" optional="hide" string="Additional Privileges"/>
                 <field name="grant_type"/>
                 <field name="role_id"/>
                 <field name="user_id"/>
@@ -442,6 +443,7 @@
                 <field name="job_id"/>
                 <field name="org_unit_id"/>
                 <field name="org_level"/>
+                <field name="category_ids" widget="many2many_tags" string="Planning Categories" optional="show"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
         </field>
@@ -456,7 +458,8 @@
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <group>
                         <group string="Privilege &amp; Grant Type">
-                            <field name="privilege_id"/>
+                            <field name="privilege_id" placeholder="Select Specific Privilege..."/>
+                            <field name="privilege_ids" widget="many2many_tags" placeholder="Or select multiple specific privileges..."/>
                             <field name="grant_type"/>
                             <field name="active" widget="boolean_toggle"/>
                         </group>

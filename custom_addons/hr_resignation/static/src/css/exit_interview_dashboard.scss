@@ -69,27 +69,28 @@
 
 /* ========== FILTERS ROW ========== */
 .eid_filters {
-    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-    margin-bottom: 22px;
+    display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;
+    margin-bottom: 24px;
 }
 .eid_sel {
-    font: inherit; font-size: 13px;
+    font: inherit; font-size: 14px;
     background: var(--card); color: var(--ink);
-    border: 1px solid var(--line); border-radius: 8px;
-    padding: 6px 28px 6px 10px; cursor: pointer;
-    appearance: auto;
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 8px 32px 8px 12px; cursor: pointer;
+    appearance: auto; min-width: 200px; width: 100%;
 }
 .eid_sel:focus { outline: 2px solid var(--teal); }
 .eid_lock {
     margin-left: auto; font-size: 12px; color: var(--mut);
     background: var(--soft_a); border: 1px solid #e8d5c2;
-    border-radius: 20px; padding: 5px 12px;
+    border-radius: 20px; padding: 6px 14px;
     display: flex; align-items: center; gap: 5px;
+    white-space: nowrap;
 }
 
 /* ── filter group with label ── */
-.eid_filter_group { display: flex; flex-direction: column; gap: 2px; }
-.eid_filter_lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--mut); }
+.eid_filter_group { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.eid_filter_lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink); }
 
 /* ── loading / empty ── */
 .eid_loading { display: flex; align-items: center; gap: 10px; color: var(--mut); padding: 40px 0; justify-content: center; font-size: 14px; }
@@ -104,6 +105,13 @@
 .eid_kpi {
     background: var(--card); border: 1px solid var(--line);
     border-radius: 12px; padding: 18px 16px; position: relative;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.eid_kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #cbd5e1;
 }
 .eid_kpi_blue  { border-top: 3px solid var(--blue); }
 .eid_kpi_teal  { border-top: 3px solid var(--teal); }
@@ -366,4 +374,200 @@
     .eid_header, .eid_filters, .noprint { display: none !important; }
     .eid_body { padding: 0; max-width: none; }
     .eid_paper { border: 0; box-shadow: none; padding: 0; max-width: none; }
+}
+
+/* Collapse toggle pill */
+.eid_collapse_toggle {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+    text-align: center;
+    cursor: pointer;
+}
+.eid_collapse_btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6d382d;
+    background: #fdf5f3;
+    padding: 5px 14px;
+    border-radius: 16px;
+    border: 1px solid #f2ded9;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.eid_collapse_btn:hover {
+    background: #faece8;
+    border-color: #e5c4bc;
+    color: #541718;
+}
+
+/* ================================================================
+   EXIT INTERVIEW QUESTIONNAIRE (Form View / Modal line_ids)
+   - Layout: Questions column takes ~70% width (long space),
+             Response column takes ~30% width (right side).
+   - Text alignment: Left-aligned (justified) headers and questions text.
+   - Text display: Fully displays the entire question sentence with no
+     truncation or collapse into ellipsis (...). Word wrap is enabled.
+   ================================================================ */
+.o_exit_interview_lines,
+.o_exit_interview_form div[name="line_ids"],
+div[name="line_ids"].o_exit_interview_lines {
+    width: 100% !important;
+
+    .o_list_renderer {
+        width: 100% !important;
+        overflow-x: auto !important;
+    }
+
+    table.o_list_table {
+        table-layout: fixed !important;
+        width: 100% !important;
+
+        /* Force 70% / 30% width ratio on headers */
+        thead > tr > th[data-name="question_name"],
+        thead > tr > th.o_exit_interview_question_col {
+            width: 70% !important;
+            min-width: 350px !important;
+            max-width: 70% !important;
+            text-align: left !important;
+
+            .d-flex {
+                justify-content: flex-start !important;
+                text-align: left !important;
+            }
+
+            span {
+                text-align: left !important;
+                white-space: normal !important;
+            }
+        }
+
+        thead > tr > th[data-name="answer"],
+        thead > tr > th.o_exit_interview_answer_col {
+            width: 30% !important;
+            min-width: 150px !important;
+            max-width: 30% !important;
+            text-align: left !important;
+
+            .d-flex {
+                justify-content: flex-start !important;
+                text-align: left !important;
+            }
+
+            span {
+                text-align: left !important;
+                white-space: normal !important;
+            }
+        }
+
+        /* Prevent text collapsing/ellipsis in question and answer data cells */
+        tbody > tr > td {
+            vertical-align: middle !important;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+
+            &[name="question_name"],
+            &.o_exit_interview_question_col {
+                width: 70% !important;
+                max-width: 70% !important;
+                text-align: left !important;
+                white-space: normal !important;
+                text-overflow: unset !important;
+                overflow: visible !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                word-break: break-word !important;
+                font-weight: 600 !important;
+                line-height: 1.45 !important;
+
+                span,
+                div,
+                .o_field_widget,
+                .o_field_char {
+                    text-align: left !important;
+                    white-space: normal !important;
+                    text-overflow: unset !important;
+                    overflow: visible !important;
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    word-break: break-word !important;
+                    display: inline !important;
+                    max-width: 100% !important;
+                    font-weight: 600 !important;
+                }
+            }
+
+            &[name="answer"],
+            &.o_exit_interview_answer_col {
+                width: 30% !important;
+                max-width: 30% !important;
+                text-align: left !important;
+                white-space: normal !important;
+                text-overflow: unset !important;
+                overflow: visible !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                word-break: break-word !important;
+                line-height: 1.4 !important;
+
+                span,
+                div,
+                .o_field_widget,
+                .o_field_char {
+                    text-align: left !important;
+                    white-space: normal !important;
+                    text-overflow: unset !important;
+                    overflow: visible !important;
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    word-break: break-word !important;
+                    display: inline !important;
+                    max-width: 100% !important;
+                }
+            }
+        }
+
+        /* Specific high-priority overrides for non-selected rows in Odoo list view */
+        .o_data_row:not(.o_selected_row) {
+            td[name="question_name"],
+            td.o_exit_interview_question_col {
+                white-space: normal !important;
+                text-align: left !important;
+
+                span,
+                .o_field_widget span {
+                    white-space: normal !important;
+                    text-overflow: unset !important;
+                    overflow: visible !important;
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    word-break: break-word !important;
+                    display: inline !important;
+                    text-align: left !important;
+                }
+            }
+
+            td[name="answer"],
+            td.o_exit_interview_answer_col {
+                white-space: normal !important;
+                text-align: left !important;
+
+                span,
+                .o_field_widget span {
+                    white-space: normal !important;
+                    text-overflow: unset !important;
+                    overflow: visible !important;
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    word-break: break-word !important;
+                    display: inline !important;
+                    text-align: left !important;
+                }
+            }
+        }
+    }
 }

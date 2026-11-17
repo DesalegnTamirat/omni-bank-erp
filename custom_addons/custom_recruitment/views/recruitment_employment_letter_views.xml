@@ -67,7 +67,7 @@
                     </div>
                     <group>
                         <group string="Candidate &amp; Application">
-                            <field name="applicant_id" readonly="state in ['sent', 'issued']"/>
+                            <field name="applicant_id" invisible="1"/>
                             <field name="vacancy_id" readonly="state in ['sent', 'issued']"/>
                             <field name="candidate_id" readonly="state in ['sent', 'issued']"/>
                             <field name="candidate_title" readonly="state in ['sent', 'issued']"/>
@@ -79,10 +79,10 @@
                             <field name="letter_date" readonly="state in ['sent', 'issued']"/>
                             <field name="effective_date" readonly="state in ['sent', 'issued']"/>
                             <field name="job_id" readonly="state in ['sent', 'issued']"/>
-                            <field name="job_position_name" readonly="state in ['sent', 'issued']"/>
+                            <field name="job_position_name" invisible="1"/>
                             <field name="job_grade_name" readonly="state in ['sent', 'issued']"/>
                             <field name="work_unit_id" readonly="state in ['sent', 'issued']"/>
-                            <field name="work_unit_name" readonly="state in ['sent', 'issued']"/>
+                            <field name="work_unit_name" invisible="1"/>
                         </group>
                     </group>
                     <notebook>
@@ -96,17 +96,6 @@
                                     <field name="is_managerial" widget="boolean_toggle" readonly="state in ['sent', 'issued']"/>
                                     <field name="probation_days" readonly="state in ['sent', 'issued']"/>
                                     <field name="probation_eval_days" readonly="state in ['sent', 'issued']"/>
-                                </group>
-                            </group>
-                        </page>
-                        <page string="Signatory &amp; Distribution" name="signatory_page">
-                            <group>
-                                <group string="Signatory">
-                                    <field name="signatory_title" readonly="state in ['sent', 'issued']"/>
-                                    <field name="signatory_company" readonly="state in ['sent', 'issued']"/>
-                                </group>
-                                <group string="Distribution (CC)">
-                                    <field name="cc_district_or_work_unit" readonly="state in ['sent', 'issued']"/>
                                 </group>
                             </group>
                         </page>

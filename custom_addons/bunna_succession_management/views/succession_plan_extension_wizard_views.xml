@@ -25,25 +25,19 @@
                             <group string="Candidate Details">
                                 <field name="employee_id"/>
                                 <field name="critical_position_id"/>
-                                <field name="extension_count" string="Previous Extensions"/>
                             </group>
                             <group string="Timeline Adjustment">
                                 <field name="original_end_date" string="Baseline End Date"/>
                                 <field name="current_end_date" string="Current End Date"/>
                                 <field name="proposed_end_date"/>
-                                <field name="days_extended" class="fw-bold text-danger"/>
                             </group>
                         </group>
 
-                        <!-- Root Cause dropdown removed — justification text area only -->
                         <group string="Root Cause &amp; Justification">
                             <field name="justification"
                                    nolabel="1"
                                    placeholder="Mandatory: Provide detailed justification explaining why an extension is necessary (e.g. project workload, training schedule postponed, rotational depth)..."
                                    style="min-height: 100px;"/>
-                            <field name="remedial_plan"
-                                   placeholder="Milestones and actions planned during the extension period to ensure on-time completion..."
-                                   style="min-height: 80px;"/>
                         </group>
                     </sheet>
                     <footer>

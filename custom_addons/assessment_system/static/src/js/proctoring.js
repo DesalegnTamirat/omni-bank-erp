@@ -1,13 +1,13 @@
 /**
- * Advanced Anti-Cheating & Screenshot Prevention Engine (FR-EXM-021 - FR-EXM-023)
+ * Advanced Anti-Cheating & Proctoring Engine (FR-EXM-021 - FR-EXM-023)
  * ==============================================================================
  * Comprehensive Client-Side Security Controls:
- * 1. Screenshot & Snipping Tool Interception (PrtScn, Win+Shift+S, Cmd+Shift+3/4/5)
+ * 1. Screenshot & Snipping Tool Interception (PrtScn, Win+Shift+S, Alt+PrtScn) -> Auto-Disqualify
  * 2. Instant Clipboard Neutralization
  * 3. Screen Obfuscation Privacy Shield (triggers on window blur / snipping activation)
  * 4. DevTools / Print Protection (F12, Ctrl+Shift+I, Ctrl+P, Ctrl+U)
  * 5. Copy / Cut / Paste Lockout
- * 6. Tab-Switch & Visibility Tracking with Auto-Disqualification
+ * 6. Tab-Switch & Window Blur Tracking with Auto-Disqualification
  */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -16,7 +16,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const token = examContainer.dataset.token;
     const maxTabSwitches = parseInt(examContainer.dataset.maxTabSwitches || "3", 10);
-    let tabSwitchCount = 0;
+    let tabSwitchCount = parseInt(examContainer.dataset.tabSwitchCount || "0", 10);
+    const blockScreenshot = examContainer.dataset.blockScreenshot === "1";
+    let isDisqualified = false;
+    let lastSwitchTime = 0;
 
     // Create Full-Screen Security Obfuscation Shield (Blocks Snipping Tool & Background Captures)
     const privacyShield = document.createElement("div");
@@ -40,36 +43,69 @@ document.addEventListener("DOMContentLoaded", () => {
             <div style="font-size: 4rem; color: #ef4444; margin-bottom: 20px;"><i class="fa-solid fa-shield-halved"></i></div>
             <h2 style="font-size: 1.6rem; font-weight: 700; color: #f8fafc; margin-bottom: 12px;">EXAM SCREEN PROTECTED</h2>
             <p style="color: #cbd5e1; font-size: 1.05rem; line-height: 1.6; margin-bottom: 24px;">
-                Screen capture and application switching are strictly prohibited during the assessment.<br/>
+                Screen capture and switching windows/tabs are strictly prohibited during the assessment.<br/>
                 Please click back on this window to resume your examination.
             </p>
             <div style="display: inline-block; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 18px; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">
-                All screenshot attempts are logged
+                All screenshot and window switch attempts are logged
             </div>
         </div>
     `;
     document.body.appendChild(privacyShield);
 
+    function triggerDisqualification(reason) {
+        if (isDisqualified) return;
+        isDisqualified = true;
+
+        document.body.innerHTML = `
+            <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#450a0a;color:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;text-align:center;padding:20px;">
+                <div style="background:#1e1e1e;border:3px solid #dc2626;border-radius:16px;max-width:650px;padding:40px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);">
+                    <div style="font-size:4.5rem;color:#ef4444;margin-bottom:15px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <h1 style="color:#f87171;font-size:2rem;font-weight:800;margin-bottom:12px;letter-spacing:1px;">
+                        EXAMINATION TERMINATED
+                    </h1>
+                    <h2 style="color:#ffffff;font-size:1.3rem;font-weight:600;margin-bottom:20px;">
+                        You have been DISQUALIFIED
+                    </h2>
+                    <p style="color:#e2e8f0;font-size:1.05rem;line-height:1.6;margin-bottom:25px;background:rgba(239,68,68,0.15);padding:15px;border-radius:8px;border-left:4px solid #ef4444;">
+                        ${reason}
+                    </p>
+                    <p style="color:#94a3b8;font-size:0.9rem;">
+                        This incident has been permanently logged in your assessment record. You cannot resume this exam.
+                    </p>
+                </div>
+            </div>
+        `;
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    }
+
     function reportViolation(eventType, details) {
-        fetch(`/exam/session/${token}/event`, {
+        return fetch(`/exam/session/${token}/event`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "call",
                 params: {
                     event_type: eventType,
                     details: details || "",
-                }
+                },
+                id: Date.now()
             })
         })
         .then(res => res.json())
         .then(data => {
-            const result = data.result || {};
+            const result = (data && data.result) ? data.result : {};
             if (result.action === "disqualified") {
-                alert("CRITICAL NOTICE: You have exceeded the allowable security violation limit and have been automatically DISQUALIFIED from this examination.");
-                window.location.reload();
+                triggerDisqualification(result.message || "Security violation limit exceeded.");
             }
+            return result;
         })
         .catch(err => console.error("Proctor event error:", err));
     }
@@ -104,25 +140,34 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // 3. Screenshot & DevTools Keyboard Defense (FR-EXM-022)
-    document.addEventListener("keydown", (e) => {
-        // PrintScreen key
-        if (e.key === "PrintScreen" || e.keyCode === 44) {
-            e.preventDefault();
-            wipeClipboard();
+    function handleScreenshotAttempt(detail) {
+        wipeClipboard();
+        reportViolation("screenshot", detail);
+        if (blockScreenshot) {
+            triggerDisqualification("Screen capture and screenshots are strictly prohibited. You have been disqualified.");
+        } else {
             showPrivacyShieldTemporarily();
-            reportViolation("screenshot", "PrintScreen key press intercepted");
             showSecurityWarning("Screenshots and screen captures are strictly prohibited.");
-            return false;
         }
+    }
 
-        // Windows Snipping Tool: Win + Shift + S or Shift + Windows key
-        if (e.shiftKey && (e.key === "S" || e.key === "s") && (e.metaKey || e.ctrlKey)) {
+    function isScreenshotKey(e) {
+        return (
+            e.key === "PrintScreen" ||
+            e.code === "PrintScreen" ||
+            e.key === "Snapshot" ||
+            e.keyCode === 44 ||
+            (e.shiftKey && (e.key === "S" || e.key === "s" || e.code === "KeyS") && (e.metaKey || e.ctrlKey || e.altKey)) ||
+            (e.altKey && (e.key === "PrintScreen" || e.code === "PrintScreen" || e.keyCode === 44))
+        );
+    }
+
+    // 3. Screenshot & DevTools Keyboard Defense (FR-EXM-022)
+    window.addEventListener("keydown", (e) => {
+        if (isScreenshotKey(e)) {
             e.preventDefault();
             wipeClipboard();
-            showPrivacyShieldTemporarily();
-            reportViolation("screenshot", "Snipping tool shortcut (Win+Shift+S) detected");
-            showSecurityWarning("Snipping tool is disabled during the exam.");
+            handleScreenshotAttempt("PrintScreen / Snipping key intercepted");
             return false;
         }
 
@@ -154,39 +199,58 @@ document.addEventListener("DOMContentLoaded", () => {
             showSecurityWarning("Developer Tools are strictly prohibited.");
             return false;
         }
-    });
+    }, true);
 
-    document.addEventListener("keyup", (e) => {
-        if (e.key === "PrintScreen" || e.keyCode === 44) {
+    window.addEventListener("keyup", (e) => {
+        if (isScreenshotKey(e)) {
             wipeClipboard();
+            handleScreenshotAttempt("PrintScreen / Snipping key released");
         }
-    });
+    }, true);
 
-    // 4. Screen Privacy Shield on Focus Loss (Protects against external snipping tools)
+    // 4. Screen Privacy Shield on Focus Loss
     function showPrivacyShieldTemporarily() {
         privacyShield.style.display = "block";
         setTimeout(() => {
-            privacyShield.style.display = "none";
+            if (!document.hidden) privacyShield.style.display = "none";
         }, 3000);
     }
 
-    window.addEventListener("blur", () => {
-        // Obfuscate screen when window loses focus (e.g. snipping tool overlay activated)
+    function handleSwitchAway(reason) {
+        const now = Date.now();
+        if (now - lastSwitchTime < 1000) {
+            return; // Debounce rapid blur + visibilitychange events within 1s
+        }
+        lastSwitchTime = now;
+        tabSwitchCount++;
         privacyShield.style.display = "block";
+        reportViolation("tab_switch", `${reason} #${tabSwitchCount} detected`);
+        if (tabSwitchCount >= maxTabSwitches) {
+            triggerDisqualification(`Exceeded maximum allowed window/tab switches (${tabSwitchCount}/${maxTabSwitches}).`);
+        } else {
+            showSecurityWarning(`SECURITY ALERT: ${reason} detected (${tabSwitchCount}/${maxTabSwitches}). Exceeding ${maxTabSwitches} switches will result in immediate disqualification.`);
+        }
+    }
+
+    window.addEventListener("blur", () => {
+        handleSwitchAway("Window switch");
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            handleSwitchAway("Tab switch");
+        } else {
+            if (tabSwitchCount >= maxTabSwitches) {
+                triggerDisqualification(`Exceeded maximum allowed tab switches (${tabSwitchCount}/${maxTabSwitches}).`);
+            } else {
+                privacyShield.style.display = "none";
+            }
+        }
     });
 
     window.addEventListener("focus", () => {
-        // Restore screen when candidate refocuses window
-        privacyShield.style.display = "none";
-    });
-
-    // 5. Tab-Switch & Visibility Lockout (FR-EXM-023)
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-            privacyShield.style.display = "block";
-            tabSwitchCount++;
-            reportViolation("tab_switch", `Tab switch #${tabSwitchCount} detected`);
-            showSecurityWarning(`SECURITY ALERT: Tab switch detected (${tabSwitchCount}/${maxTabSwitches}). Exceeding ${maxTabSwitches} tab switches will result in immediate disqualification.`);
+        if (tabSwitchCount >= maxTabSwitches) {
+            triggerDisqualification(`Exceeded maximum allowed window switches (${tabSwitchCount}/${maxTabSwitches}).`);
         } else {
             privacyShield.style.display = "none";
         }

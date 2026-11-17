@@ -20,7 +20,7 @@
               name="Dashboard"
               parent="menu_assessment_root"
               action="action_assessment_dashboard"
-              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
               sequence="1"/>
 
     <!-- ============================================ -->
@@ -43,7 +43,7 @@
               name="Candidate Exam Sittings"
               parent="menu_exm_root"
               action="action_exam_candidate_attempts"
-              groups="group_assessment_user"
+              groups="group_assessment_administrator"
               sequence="7"/>
 
     <menuitem id="menu_exam_grading_tasks"
@@ -52,6 +52,13 @@
               action="action_exam_grading_tasks"
               groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
               sequence="8"/>
+
+    <menuitem id="menu_exam_grading_tasks_by_question"
+              name="Question Grading Tasks"
+              parent="menu_exm_root"
+              action="action_exam_grading_tasks_by_question"
+              groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="9"/>
 
     <menuitem id="menu_exam_definitions"
               name="Exam Definitions / Templates"
@@ -64,21 +71,21 @@
               name="Question Bank"
               parent="menu_exm_root"
               action="action_exam_question_bank"
-              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="group_assessment_administrator"
               sequence="3"/>
 
     <menuitem id="menu_exam_question_approval_queue"
               name="Question Review Queue"
               parent="menu_exm_root"
               action="action_exam_question_approval_queue"
-              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="group_assessment_administrator"
               sequence="2"/>
 
     <menuitem id="menu_exam_pdf_import"
               name="Import Questions (Word / PDF)"
               parent="menu_exm_root"
               action="action_exam_pdf_import_wizard"
-              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="group_assessment_administrator"
               sequence="1"/>
 
     <menuitem id="menu_exam_disqualifications"
@@ -90,10 +97,12 @@
 
     <menuitem id="menu_exam_appeals"
               name="Candidate Appeals"
-              parent="menu_exm_root"
+              parent="menu_assessment_root"
               action="action_exam_disqualification_appeals"
-              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
-              sequence="10"/>
+              groups="base.group_user"
+              sequence="45"/>
+
+
 
     <!-- ============================================ -->
     <!-- 2. CBIS INTERVIEW SYSTEM SUB-MODULE          -->

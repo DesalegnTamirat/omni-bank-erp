@@ -39,6 +39,11 @@ class PmProjectRisk(models.Model):
         ('mitigated', 'Mitigated / Under Control'),
         ('closed', 'Resolved / Closed')
     ], string='Status', default='open')
+    active = fields.Boolean(string='Active', default=True)
+
+    def unlink(self):
+        """Soft delete: archive risk instead of permanent deletion."""
+        return self.write({'active': False})
 
     @api.depends('probability', 'impact')
     def _compute_severity(self):
@@ -73,6 +78,11 @@ class PmProjectDependency(models.Model):
         ('in_progress', 'Being Addressed'),
         ('satisfied', 'Satisfied / Delivered')
     ], string='Status', default='pending')
+    active = fields.Boolean(string='Active', default=True)
+
+    def unlink(self):
+        """Soft delete: archive dependency instead of permanent deletion."""
+        return self.write({'active': False})
 
 
 class PmProjectCustomTab(models.Model):

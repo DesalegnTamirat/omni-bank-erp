@@ -1,0 +1,247 @@
+.o_dms_dash {
+    background: var(--bs-secondary-bg, #f4f5f7);
+    background: color-mix(in srgb, var(--bs-secondary-bg, #f4f5f7) 92%, #5d4037);
+}
+.o_dms_dash_inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.25rem 1.5rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+/* Banner */
+.o_dms_dash_banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.4rem 1.8rem;
+    border-radius: 0.9rem;
+    color: #fff;
+    background: linear-gradient(120deg, #1f2937 0%, #374151 50%, #4b5563 100%);
+    box-shadow: 0 6px 20px rgba(31, 41, 55, 0.28);
+}
+.o_dms_dash_banner_title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.o_dms_dash_banner_sub {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1rem;
+    align-items: center;
+    margin-top: 0.4rem;
+    opacity: 0.95;
+    font-size: 0.9rem;
+}
+.o_dms_dash_role {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    padding: 0.15rem 0.8rem;
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+.o_dms_dash_banner_actions {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+/* KPIs */
+.o_dms_dash_kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+.o_dms_dash_kpi {
+    --tone: #6c757d;
+    --tone-bg: rgba(108, 117, 125, 0.12);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.1rem 1.25rem;
+    background: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #e3e6ea);
+    border-radius: 0.9rem;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.o_dms_dash_kpi::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: var(--tone);
+}
+.o_dms_dash_kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+.o_dms_dash_kpi.tone-primary { --tone: #0d6efd; --tone-bg: rgba(13, 110, 253, 0.12); }
+.o_dms_dash_kpi.tone-success { --tone: #198754; --tone-bg: rgba(25, 135, 84, 0.12); }
+.o_dms_dash_kpi.tone-info    { --tone: #0dcaf0; --tone-bg: rgba(13, 202, 240, 0.15); }
+.o_dms_dash_kpi.tone-warning { --tone: #ffc107; --tone-bg: rgba(255, 193, 7, 0.18); }
+.o_dms_dash_kpi.tone-danger  { --tone: #dc3545; --tone-bg: rgba(220, 53, 69, 0.12); }
+.o_dms_dash_kpi.tone-muted   { --tone: #6c757d; --tone-bg: rgba(108, 117, 125, 0.12); }
+
+.o_dms_dash_kpi_icon {
+    flex: 0 0 auto;
+    width: 3.2rem;
+    height: 3.2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--tone-bg);
+    color: var(--tone);
+    font-size: 1.4rem;
+}
+.o_dms_dash_kpi_body { min-width: 0; }
+.o_dms_dash_kpi_value {
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--tone);
+}
+.o_dms_dash_kpi_label { font-weight: 600; font-size: 0.95rem; }
+.o_dms_dash_kpi_hint { font-size: 0.78rem; color: var(--bs-secondary-color, #6c757d); }
+
+/* Split Cards */
+.o_dms_dash_split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 1rem;
+}
+@media (max-width: 992px) {
+    .o_dms_dash_split { grid-template-columns: minmax(0, 1fr); }
+}
+
+.o_dms_dash_card {
+    background: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #e3e6ea);
+    border-radius: 0.9rem;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.o_dms_dash_card_head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+}
+.o_dms_dash_card_head h5 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+.o_dms_dash_card_sub {
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+.o_dms_dash_count {
+    background: var(--bs-secondary-bg, #eef0f2);
+    border-radius: 999px;
+    padding: 0.1rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* Folder Grid */
+.o_dms_folder_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.8rem;
+}
+.o_dms_folder_pill {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    background: var(--bs-secondary-bg, #f8f9fa);
+    border: 1px solid var(--bs-border-color, #e9ecef);
+    border-radius: 0.65rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.o_dms_folder_pill:hover {
+    background: #e9ecef;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+}
+.o_dms_folder_icon {
+    font-size: 1.5rem;
+    color: #f59e0b;
+}
+.o_dms_folder_name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+.o_dms_folder_cnt {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+/* Type Breakdown */
+.o_dms_type_list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.o_dms_type_row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+.o_dms_type_badge {
+    width: 60px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #4b5563;
+}
+.o_dms_type_bar_wrapper {
+    flex: 1;
+    height: 10px;
+    background: var(--bs-secondary-bg, #e9ecef);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.o_dms_type_bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #06b6d4);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+.o_dms_type_cnt {
+    font-size: 0.85rem;
+    font-weight: 600;
+    min-width: 30px;
+    text-align: right;
+}
+
+/* Empty state */
+.o_dms_dash_empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 2rem 1rem;
+    color: var(--bs-secondary-color, #6c757d);
+}
+.o_dms_dash_empty .fa {
+    font-size: 2rem;
+    opacity: 0.5;
+}

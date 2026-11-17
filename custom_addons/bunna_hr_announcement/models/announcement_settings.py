@@ -1,16 +1,35 @@
 # -*- coding: utf-8 -*-
+import re
+
+import pytz
+
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
 
 DEFAULT_PAGE_SIZE = 5
 DEFAULT_SIGNED_BY = 'Bunna Bank S.C'
+DEFAULT_TZ = 'Africa/Addis_Ababa'
 # defaults for settings that are not plain numbers
-OTHER_DEFAULTS = {'new_unit': 'minutes', 'block_duplicate_titles': True}
+OTHER_DEFAULTS = {'new_unit': 'minutes', 'block_duplicate_titles': True, 'track_views': True,
+                  'show_archive': True, 'comments_site_enabled': True, 'comments_default_allow': False,
+                  'comment_block_links': True, 'comment_notify_emails': ''}
 
 # setting name: (default, minimum allowed, maximum allowed)
 LIMITS = {
     'page_size': (5, 1, 50),
     'new_duration': (120, 0, 10080),
+    'visit_retention_days': (90, 7, 730),
+    'gallery_max_photos': (12, 1, 30),
+    'gallery_max_photo_mb': (8, 1, 20),
+    'gallery_max_px': (1600, 800, 4000),
+    'gallery_thumb_px': (480, 160, 800),
+    'gallery_quality': (85, 50, 95),
+    'gallery_caption_max': (150, 20, 500),
+    'gallery_cache_hours': (24, 0, 168),
+    'comment_max_length': (1000, 50, 5000),
+    'comment_rate_per_hour': (3, 1, 30),
+    'comment_max_pending': (100, 10, 1000),
+    'comment_report_hide_at': (3, 0, 20),
     'title_max_length': (120, 20, 255),
     'summary_max_length': (250, 20, 500),
     'content_min_length': (10, 0, 500),
@@ -46,6 +65,12 @@ class BunnaAnnouncementSettings(models.Model):
     new_unit = fields.Selection(
         [('minutes', 'Minutes'), ('hours', 'Hours'), ('days', 'Days')],
         string='Green Highlight: Unit', default='minutes', required=True)
+
+    show_archive = fields.Boolean(
+        string='Archive: Allow Opening Expired Announcements', default=True,
+        help="On: visitors can tick 'Include expired' on the website to find old announcements, "
+             "which stay readable and are marked Expired. Off: an expired announcement disappears "
+             "completely. Revoked announcements are never shown.")
 
     # ---- New announcements ----
     default_signed_by = fields.Char(
@@ -86,6 +111,67 @@ class BunnaAnnouncementSettings(models.Model):
     max_total_mb = fields.Integer(
         string='Attachments: Maximum Total MB per Announcement', default=LIMITS['max_total_mb'][0], required=True)
 
+    # ---- Readership tracking ----
+    track_views = fields.Boolean(
+        string='Count Views', default=True,
+        help="Count how many times each announcement is opened (anonymous: no names, no IP addresses).")
+    visit_retention_days = fields.Integer(
+        string='Keep Visitor Records (Days)', default=LIMITS['visit_retention_days'][0], required=True,
+        help="Anonymous visitor identifiers older than this are deleted. The daily totals are kept.")
+
+    # ---- Photo gallery ----
+    gallery_max_photos = fields.Integer(
+        string='Gallery: Maximum Photos per Announcement', default=LIMITS['gallery_max_photos'][0], required=True)
+    gallery_max_photo_mb = fields.Integer(
+        string='Gallery: Maximum MB per Uploaded Photo', default=LIMITS['gallery_max_photo_mb'][0], required=True,
+        help="Larger pictures are refused. Accepted pictures are shrunk automatically for the website.")
+
+    gallery_max_px = fields.Integer(
+        string='Gallery: Largest Photo Side (px)', default=LIMITS['gallery_max_px'][0], required=True,
+        help="Uploaded photos are shrunk so neither side is longer than this. "
+             "Applies to photos uploaded from now on.")
+    gallery_thumb_px = fields.Integer(
+        string='Gallery: Thumbnail Side (px)', default=LIMITS['gallery_thumb_px'][0], required=True,
+        help="Size of the small pictures in the grid. Applies to photos uploaded from now on.")
+    gallery_quality = fields.Integer(
+        string='Gallery: Picture Quality (%)', default=LIMITS['gallery_quality'][0], required=True,
+        help="Higher looks better but makes files bigger (thumbnails use 5 points less). "
+             "Applies to photos uploaded from now on.")
+    gallery_caption_max = fields.Integer(
+        string='Gallery: Caption Maximum Characters', default=LIMITS['gallery_caption_max'][0], required=True)
+    gallery_cache_hours = fields.Integer(
+        string='Gallery: Browser Keeps Photos (Hours)', default=LIMITS['gallery_cache_hours'][0], required=True,
+        help="How long a visitor's browser keeps a photo before asking again. Longer means less load on the "
+             "server; a revoked post's photos can stay in a browser this long. 0 = always check.")
+
+    # ---- Anonymous comments ----
+    comments_site_enabled = fields.Boolean(
+        string='Comments: Allowed on the Website', default=True,
+        help="Master switch. Off: no announcement shows a comment form, whatever its own setting says.")
+    comments_default_allow = fields.Boolean(
+        string='Comments: Open on New Announcements', default=False,
+        help="The starting value of 'Allow Comments' on every new announcement. "
+             "It can be changed per announcement, before or after publishing.")
+    comment_max_length = fields.Integer(
+        string='Comments: Maximum Characters', default=LIMITS['comment_max_length'][0], required=True)
+    comment_rate_per_hour = fields.Integer(
+        string='Comments: Per Visitor per Hour', default=LIMITS['comment_rate_per_hour'][0], required=True,
+        help="How many comments one connection may send per hour. Counted with a daily-changing one-way "
+             "code that is deleted after two hours and never stored with a comment.")
+    comment_max_pending = fields.Integer(
+        string='Comments: Maximum Waiting for Review', default=LIMITS['comment_max_pending'][0], required=True,
+        help="When this many comments are waiting on one announcement, new ones are paused until a moderator reviews them.")
+    comment_report_hide_at = fields.Integer(
+        string='Comments: Hide After This Many Reports', default=LIMITS['comment_report_hide_at'][0], required=True,
+        help="A comment reported by this many readers is hidden automatically until a moderator looks at it. 0 = never.")
+    comment_block_links = fields.Boolean(
+        string='Comments: Refuse Links', default=True,
+        help="Comments containing web addresses are refused (the most common kind of spam).")
+    comment_notify_emails = fields.Char(
+        string='Comments: Alert These Emails',
+        help="Optional. Comma-separated addresses told that a comment is waiting for review "
+             "(at most one email per announcement every 15 minutes; the comment itself is not emailed).")
+
     # ---- Checks ----
     block_duplicate_titles = fields.Boolean(
         string='Block Duplicate Titles', default=True,
@@ -99,6 +185,8 @@ class BunnaAnnouncementSettings(models.Model):
                     raise ValidationError(_(
                         "%(field)s: enter a number between %(low)s and %(high)s.",
                         field=self._fields[name].string, low=low, high=high))
+            if rec.gallery_thumb_px > rec.gallery_max_px:
+                raise ValidationError(_("Gallery: the thumbnail cannot be larger than the photo itself."))
             if rec.max_total_mb < rec.max_file_mb:
                 raise ValidationError(_(
                     "Attachments: the total size allowed per announcement must be at least "
@@ -111,6 +199,14 @@ class BunnaAnnouncementSettings(models.Model):
             if rec.new_duration > maximum[rec.new_unit]:
                 raise ValidationError(_(
                     "Green Highlight: at most %(max)s %(unit)s.", max=maximum[rec.new_unit], unit=rec.new_unit))
+
+    @api.constrains('comment_notify_emails')
+    def _check_comment_emails(self):
+        for rec in self:
+            for address in (rec.comment_notify_emails or '').split(','):
+                address = address.strip()
+                if address and not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', address):
+                    raise ValidationError(_("Comments: '%s' is not a valid email address.", address))
 
     @api.model
     def _get_settings(self):
@@ -125,6 +221,14 @@ class BunnaAnnouncementSettings(models.Model):
         if name in LIMITS:
             return LIMITS[name][0]
         return OTHER_DEFAULTS.get(name)
+
+    @api.model
+    def get_tz(self):
+        """Company time zone (Addis Ababa when the company has none): used for dates on the website."""
+        try:
+            return pytz.timezone(self.env.company.partner_id.tz or DEFAULT_TZ)
+        except Exception:
+            return pytz.timezone(DEFAULT_TZ)
 
     @api.model
     def get_page_size(self):

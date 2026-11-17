@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from odoo import api, fields, models, _
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from .pbms_access import _safe_table_exists
 
 _logger = logging.getLogger(__name__)
@@ -60,6 +60,13 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
         """Retrieve the configured dynamic workflow for this planning record."""
         self.ensure_one()
         cat_code = getattr(self, "category", False)
+        memo_wf = getattr(self.env, "_pbms_active_wf_memo", None)
+        if memo_wf is None:
+            memo_wf = {}
+            self.env._pbms_active_wf_memo = memo_wf
+        cache_key = (cat_code, self.is_head_office_unit, bool(self.district_id))
+        if cache_key in memo_wf:
+            return memo_wf[cache_key]
 
         if not _safe_table_exists(self.env, "pbms.workflow.definition"):
             return False
@@ -95,8 +102,10 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
                 if wf:
                     return wf
         except Exception:
+            memo_wf[cache_key] = False
             return False
-        return False
+        memo_wf[cache_key] = wf if 'wf' in locals() and wf else False
+        return memo_wf[cache_key]
 
     def _get_current_workflow_step(self):
         """Find the matching pbms.workflow.step for current state and unit level."""
@@ -126,7 +135,7 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
 
     def _check_dynamic_privilege(self, action_type):
         """Dynamic check of user permissions against pbms.privilege, pbms.privilege.assignment,
-        and pbms.role.definition.
+        and pbms.role.definition with request-level memoization.
         Returns:
             True: if explicitly granted by dynamic config
             False: if explicitly denied by dynamic config
@@ -140,6 +149,23 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
         if not _safe_table_exists(self.env, "pbms.privilege.assignment") or not _safe_table_exists(self.env, "pbms.role.definition"):
             return None
 
+        # Request-level memoization to eliminate hundreds of duplicate queries per action
+        memo = getattr(self.env, "_pbms_dyn_priv_memo", None)
+        if memo is None:
+            memo = {}
+            self.env._pbms_dyn_priv_memo = memo
+
+        cat_code = getattr(self, "category", False)
+        unit_id = self.org_unit_id.id if self.org_unit_id else False
+        cache_key = (user.id, action_type, cat_code, unit_id, self.is_head_office_unit, self.is_district_unit)
+        if cache_key in memo:
+            return memo[cache_key]
+
+        res = self._check_dynamic_privilege_impl(action_type, user, cat_code, unit_id)
+        memo[cache_key] = res
+        return res
+
+    def _check_dynamic_privilege_impl(self, action_type, user, cat_code, unit_id):
         try:
             Assignment = self.env["pbms.privilege.assignment"].sudo()
             Role = self.env["pbms.role.definition"].sudo()
@@ -155,54 +181,60 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
         user_group_ids = user.all_group_ids.ids if hasattr(user, "all_group_ids") else getattr(user, "group_ids", getattr(user, "groups_id", self.env["res.groups"])).ids
         user_emp = user.employee_id.sudo() if user.employee_id else False
         user_job_id = user_emp.job_id.id if user_emp and user_emp.job_id else False
-        unit_id = self.org_unit_id.id if self.org_unit_id else False
-        cat_code = getattr(self, "category", False)
 
         u_level = "head_office" if self.is_head_office_unit else ("district" if self.is_district_unit else "branch")
+
+        def _matches_privilege(assign):
+            if assign.privilege_id and (assign.privilege_id.action_type == action_type or assign.privilege_id.code == action_type):
+                return True
+            if hasattr(assign, "privilege_ids") and any(p.action_type == action_type or p.code == action_type for p in assign.privilege_ids):
+                return True
+            if assign.role_id and any(p.action_type == action_type or p.code == action_type for p in assign.role_id.privilege_ids):
+                return True
+            return False
+
+        def _matches_actor(assign):
+            if assign.user_id and assign.user_id.id == user.id:
+                return True
+            if assign.group_id and assign.group_id.id in user_group_ids:
+                return True
+            if assign.job_id and user_job_id and assign.job_id.id == user_job_id:
+                return True
+            if assign.role_id and any(g.id in user_group_ids for g in assign.role_id.group_ids):
+                return True
+            return False
+
+        def _matches_scope(assign):
+            if assign.category_ids and cat_code and not any(c.code == cat_code for c in assign.category_ids):
+                return False
+            if assign.org_level != "all":
+                if assign.org_level in ("head_office", "ho") and u_level != "head_office":
+                    return False
+                if assign.org_level == "district" and u_level != "district":
+                    return False
+                if assign.org_level == "branch" and u_level != "branch":
+                    return False
+            if assign.org_unit_id and assign.org_unit_id.id != unit_id:
+                return False
+            return True
 
         # 1. Check explicit DENY assignments first
         if has_assignments:
             deny_assigns = Assignment.search([
                 ("active", "=", True),
                 ("grant_type", "=", "deny"),
-                ("privilege_id.action_type", "=", action_type),
             ])
             for da in deny_assigns:
-                if da.category_ids and cat_code and not any(c.code == cat_code for c in da.category_ids):
-                    continue
-                if da.org_level != "all" and da.org_level != u_level:
-                    continue
-                if da.org_unit_id and da.org_unit_id.id != unit_id:
-                    continue
-                if da.user_id and da.user_id.id == user.id:
-                    return False
-                if da.group_id and da.group_id.id in user_group_ids:
-                    return False
-                if da.job_id and user_job_id and da.job_id.id == user_job_id:
-                    return False
-                if da.role_id and any(g.id in user_group_ids for g in da.role_id.group_ids):
+                if _matches_privilege(da) and _matches_actor(da) and _matches_scope(da):
                     return False
 
             # 2. Check explicit ALLOW assignments
             allow_assigns = Assignment.search([
                 ("active", "=", True),
                 ("grant_type", "=", "allow"),
-                ("privilege_id.action_type", "=", action_type),
             ])
             for aa in allow_assigns:
-                if aa.category_ids and cat_code and not any(c.code == cat_code for c in aa.category_ids):
-                    continue
-                if aa.org_level != "all" and aa.org_level != u_level:
-                    continue
-                if aa.org_unit_id and aa.org_unit_id.id != unit_id:
-                    continue
-                if aa.user_id and aa.user_id.id == user.id:
-                    return True
-                if aa.group_id and aa.group_id.id in user_group_ids:
-                    return True
-                if aa.job_id and user_job_id and aa.job_id.id == user_job_id:
-                    return True
-                if aa.role_id and any(g.id in user_group_ids for g in aa.role_id.group_ids):
+                if _matches_privilege(aa) and _matches_actor(aa) and _matches_scope(aa):
                     return True
 
         # 3. Check active Roles
@@ -211,14 +243,14 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
             for role in matching_roles:
                 if not any(g.id in user_group_ids for g in role.group_ids):
                     continue
-                if not any(p.action_type == action_type for p in role.privilege_ids):
+                if not any(p.action_type == action_type or p.code == action_type for p in role.privilege_ids):
                     continue
                 if role.org_level != "all":
                     if role.org_level == "branch" and u_level != "branch":
                         continue
                     if role.org_level == "district" and u_level != "district":
                         continue
-                    if role.org_level == "ho" and u_level != "head_office":
+                    if role.org_level in ("head_office", "ho") and u_level != "head_office":
                         continue
                 if role.category_ids and cat_code and not any(c.code == cat_code for c in role.category_ids):
                     continue
@@ -264,10 +296,24 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
         if step and not step.can_edit_content and not (user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
             return False
 
-        if dyn_edit is True and step and step.can_edit_content:
+        if dyn_edit is True:
+            if self.state in ("approved", "rejected"):
+                return False
             return True
 
         return super()._pbms_can_edit_plan_content()
+
+    def _pbms_can_delete_plan(self):
+        """Dynamic check for delete privilege combined with static rules."""
+        self.ensure_one()
+        dyn_del = self._check_dynamic_privilege("delete")
+        if dyn_del is False:
+            return False
+        if dyn_del is True:
+            if self.state in ("approved", "rejected"):
+                return False
+            return True
+        return super()._pbms_can_delete_plan()
 
     def _get_submission_destination_and_state(self):
         """Determine destination state and flags for this plan upon submission,
@@ -356,9 +402,14 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
         """Determine destination state and notification label when a district reviewer approves a branch plan."""
         self.ensure_one()
         cat_def = self._get_category_def()
+        target_cat = getattr(self, "category", False)
         if cat_def and cat_def.district_approve_destination and cat_def.district_approve_destination != "default":
             dest = cat_def.district_approve_destination
-            if dest == "ho_reviewer":
+            if dest in ("district_approved", "district_reviewer"):
+                return "district_approved", _("District Approved (Retained at District)")
+            elif dest == "ho_reviewer":
+                if target_cat in ("deposit", "customer_base", "fx", "digital_banking"):
+                    return "district_approved", _("District Approved (Retained at District)")
                 return "district_approved", _("Head Office Functional Review")
             elif dest == "respective_chief":
                 return "chief_review", _("Respective Chief Review")
@@ -371,8 +422,9 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
         if dyn_trans and dyn_trans.target_state:
             return dyn_trans.target_state, dyn_trans.name or _("Dynamic Transition")
 
-        target_cat = getattr(self, "category", False)
-        if target_cat == "manpower":
+        if target_cat in ("deposit", "customer_base", "fx", "digital_banking"):
+            return "district_approved", _("District Approved (Retained at District)")
+        elif target_cat == "manpower":
             return "chief_review", _("Respective Chief Review (Workforce)")
         return "district_approved", _("Head Office Functional Review")
 
@@ -498,6 +550,27 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
         return super()._pbms_can_ho_review_plan()
 
     def action_submit(self):
+        # 1. Validation: Prevent submission of empty planning requests
+        plans_to_validate = self.filtered(lambda p: p.state in ("draft", "returned", "info_requested"))
+        candidate_all = self.env[self._name]
+        for rec in plans_to_validate:
+            candidate_all |= rec
+            if hasattr(rec, "org_unit_id") and hasattr(rec, "cycle_id") and rec.org_unit_id and rec.cycle_id:
+                siblings = self.env[rec._name].search([
+                    ("org_unit_id", "=", rec.org_unit_id.id),
+                    ("cycle_id", "=", rec.cycle_id.id),
+                    ("active", "=", True),
+                    ("state", "in", ("draft", "returned", "info_requested")),
+                ])
+                candidate_all |= siblings
+
+        has_any_data = any(
+            p._pbms_has_valid_planning_data() if hasattr(p, "_pbms_has_valid_planning_data") else False
+            for p in candidate_all
+        )
+        if not has_any_data:
+            raise ValidationError(_("You cannot submit an empty planning request. Please plan at least one planning category before submitting."))
+
         for rec in self:
             cat_def = rec.category_definition_id
             if not cat_def and getattr(rec, "category", False):
@@ -539,9 +612,9 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
         elif hasattr(plans_to_submit, "_sync_category_records"):
             plans_to_submit.with_context(bypass_plan_lock=True)._sync_category_records()
 
-        all_plans = self.env[self._name]
+        candidate_plans = self.env[self._name]
         for rec in plans_to_submit:
-            all_plans |= rec
+            candidate_plans |= rec
             if hasattr(rec, "org_unit_id") and hasattr(rec, "cycle_id") and rec.org_unit_id and rec.cycle_id:
                 siblings = self.env[rec._name].search([
                     ("org_unit_id", "=", rec.org_unit_id.id),
@@ -549,7 +622,18 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
                     ("active", "=", True),
                     ("state", "in", ("draft", "returned", "info_requested")),
                 ])
-                all_plans |= siblings
+                candidate_plans |= siblings
+
+        all_plans = self.env[self._name]
+        for p in candidate_plans:
+            if hasattr(p, "_pbms_has_valid_planning_data"):
+                if p._pbms_has_valid_planning_data():
+                    all_plans |= p
+            else:
+                all_plans |= p
+
+        if not all_plans:
+            raise ValidationError(_("You cannot submit an empty planning request. Please plan at least one planning category before submitting."))
 
         plans_by_action = {}
         old_states = {p.id: p.state for p in all_plans}
@@ -692,17 +776,19 @@ class PbmsWorkflowDynamicEngine(models.AbstractModel):
                 if target_cat in ("deposit", "customer_base", "fx", "digital_banking"):
                     district = line.district_id or line._find_district_ancestor(line.org_unit_id)
                     if district and hasattr(line, "_consolidate_district_plan_data"):
-                        dist_plan = line.sudo()._consolidate_district_plan_data(line.cycle_id, district)
+                        dist_plan = line.sudo().with_context(
+                            target_category=target_cat,
+                            skip_sync_category_records=True,
+                        )._consolidate_district_plan_data(line.cycle_id, district)
                         if dist_plan:
                             if dist_plan.state in ("draft", "returned", "info_requested"):
-                                dist_plan.with_context(bypass_plan_lock=True).write({
-                                    "state": "submitted",
+                                dist_plan.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({
+                                    "state": "district_endorsed",
                                     "active": True,
                                 })
+                                dist_plan._notify_pending_approval("district_endorsed", _("Head Office Functional Review"))
                             elif not dist_plan.active:
-                                dist_plan.with_context(bypass_plan_lock=True).write({"active": True})
-                            if hasattr(dist_plan, "_sync_category_records"):
-                                dist_plan.with_context(bypass_plan_lock=True)._sync_category_records()
+                                dist_plan.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({"active": True})
             else:
                 # District plan endorsed to Head Office:
                 # Bank-Wide Head Office Overview is NOT generated here.

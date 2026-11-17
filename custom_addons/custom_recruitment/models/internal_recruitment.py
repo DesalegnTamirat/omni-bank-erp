@@ -49,6 +49,6 @@ class EligibleEmployees(models.Model):
     emp_category = fields.Char("Employee Category")
     employment_type = fields.Char("Type of Employment")
     job_position_id = fields.Integer("Job Position Id")
-    hr_employee_id = fields.Integer("Job Position Id")
+    hr_employee_id = fields.Integer("HR Employee Id")
     informed_employee_status = fields.Char("Informed Employee Status", default='New')
     select_flag = fields.Boolean("Select", default='Y')

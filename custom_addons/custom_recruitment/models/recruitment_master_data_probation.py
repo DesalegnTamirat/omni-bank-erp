@@ -10,6 +10,7 @@ from odoo.exceptions import ValidationError
 
 class EmployeeProbationCriteria(models.Model):
     _name = "emp.probation.criteria"
+    _description = "Employee Probation Criteria"
     _rec_name = "emp_evaluation_criteria"
 
     emp_evaluation_criteria = fields.Char(string="Evaluation Criteria", required=True)
@@ -21,6 +22,7 @@ class EmployeeProbationCriteria(models.Model):
 
 class ProbationAssessmentForm(models.Model):
     _name = "probation.assessment.form"
+    _description = "Probation Assessment Form"
     _rec_name = "name_of_probationer"
 
     prob_sequence = fields.Char(
@@ -100,8 +102,8 @@ class ProbationAssessmentForm(models.Model):
     def mail_channel_msgs(self, rec_id, ref, arg1):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         message = (
-            "Dear Committee<br>Please approve the Probation Assessment of following details<br>"
-            "Reference number is <b>%s</b><br>Position: <b>%s</b><br><br>Kindly approve."
+            "Dear Committee,\n\nPlease approve the Probation Assessment of following details:\n"
+            "Reference number: %s\nPosition: %s\n\nKindly approve."
         ) % (ref, arg1)
         channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
 
@@ -169,8 +171,8 @@ class ProbationAssessmentForm(models.Model):
         for rec in self:
             usr = self.env["res.partner"].search([("name", "=", rec.in_charge.name)])
             msg = (
-                "Dear Sir<br>Here are the details of Probation Assessment of<br>"
-                "Employee: <b>%s</b><br>Position: <b>%s</b><br>Work Unit: <b>%s</b><br>"
+                "Dear Sir,\n\nHere are the details of Probation Assessment:\n"
+                "Employee: %s\nPosition: %s\nWork Unit: %s\n\n"
                 "Please look into it."
             ) % (
                 rec.name_of_probationer.employee_id.name if rec.name_of_probationer else '',
@@ -256,6 +258,7 @@ class ProbationAssessmentForm(models.Model):
 
 class ProbationAssessmentCriteriaForm(models.Model):
     _name = "probation.assessment.form.criteria"
+    _description = "Probation Assessment Form Criteria"
 
     evaluation_criteria = fields.Many2one("emp.probation.criteria", string="Evaluation Criteria")
     rating = fields.Selection([
@@ -277,6 +280,7 @@ class ProbationAssessmentCriteriaForm(models.Model):
 
 class EmpProbationDelegation(models.Model):
     _name = "emp.probation.delegation.team"
+    _description = "Employee Probation Delegation Team"
 
     role = fields.Selection([
         ("chair_person", "Chair Person"),

@@ -5,6 +5,7 @@ import { FormController } from "@web/views/form/form_controller";
 import { ListController } from "@web/views/list/list_controller";
 import { KanbanController } from "@web/views/kanban/kanban_controller";
 import { Many2OneField } from "@web/views/fields/many2one/many2one_field";
+import { DateTimeField } from "@web/views/fields/datetime/datetime_field";
 import { NavBar } from "@web/webclient/navbar/navbar";
 import { registry } from "@web/core/registry";
 import { patch } from "@web/core/utils/patch";
@@ -603,3 +604,30 @@ document.addEventListener(
     },
     true
 );
+
+/**
+ * -----------------------------------------------------------------------------
+ * 3. Support dynamic field names in DateTimeField min_date / max_date options
+ * (e.g. options="{'min_date': 'date_start', 'max_date': 'date_end'}")
+ * When clicked, ensures calendar popup opens clamped within the record's date range.
+ * -----------------------------------------------------------------------------
+ */
+patch(DateTimeField.prototype, {
+    parseLimitDate(value) {
+        if (value && typeof value === "string" && this.props.record?.data && value in this.props.record.data) {
+            const fieldVal = this.props.record.data[value];
+            if (fieldVal) {
+                // If this is max_date and min_date field is also present, ensure max >= min
+                if (value === this.props.maxDate && this.props.minDate && this.props.minDate in this.props.record.data) {
+                    const minVal = this.props.record.data[this.props.minDate];
+                    if (minVal && fieldVal < minVal) {
+                        return null;
+                    }
+                }
+                return fieldVal;
+            }
+            return null;
+        }
+        return super.parseLimitDate(value);
+    },
+});

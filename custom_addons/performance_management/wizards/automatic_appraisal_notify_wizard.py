@@ -28,7 +28,7 @@ class AutomaticAppraisalNotifyWizard(models.TransientModel):
     )
     fiscal_year = fields.Many2one(
         'performance.fiscal.year',
-        string='Fiscal Year Ref',
+        string='Fiscal Year',
         compute='_compute_planning_details',
         store=True,
         readonly=True,
@@ -41,7 +41,7 @@ class AutomaticAppraisalNotifyWizard(models.TransientModel):
         readonly=True,
     )
     appraisal_period = fields.Char(
-        string='Appraisal Period Name',
+        string='Appraisal Period',
         compute='_compute_planning_details',
         store=True,
         readonly=True,

@@ -7,27 +7,35 @@
             <field name="name">succession.critical.position.list</field>
             <field name="model">succession.critical.position</field>
             <field name="arch" type="xml">
-                <list decoration-danger="succession_risk == 'critical'"
-                      decoration-warning="succession_risk == 'high'"
-                      decoration-success="succession_risk == 'low'">
-                    <field name="display_name"/>
-                    <field name="department_id"/>
-                    <field name="risk_level" widget="badge"
-                           decoration-danger="risk_level == 'critical'"
-                           decoration-warning="risk_level == 'high'"
-                           decoration-info="risk_level == 'medium'"/>
-                    <field name="candidate_count"/>
-                    <field name="ready_now_count"/>
-                    <field name="bench_strength"/>
-                    <field name="succession_risk" widget="badge"
-                           decoration-danger="succession_risk == 'critical'"
-                           decoration-warning="succession_risk in ('high', 'medium')"
-                           decoration-success="succession_risk == 'low'"
-                           decoration-muted="succession_risk == 'draft'"/>
-                    <field name="state" widget="badge"
+                <list sample="1" default_order="create_date desc, id desc"
+                      decoration-danger="bench_health in ('critical', 'at_risk')"
+                      decoration-warning="bench_health == 'deficit'"
+                      decoration-success="bench_health in ('strong', 'adequate')">
+                    <field name="succession_risk" column_invisible="1"/>
+                    <field name="job_id" class="fw-bold text-primary" string="Job Position"/>
+                    <field name="work_unit_id" string="Work Unit"/>
+                    <field name="department_id" string="Department"/>
+                    <field name="risk_level_id" widget="badge" options="{'color_field': 'color'}" string="Risk Level"/>
+                    <field name="min_successor_count" string="Required Successors"/>
+                    <field name="candidate_count" string="Nominated Successors"/>
+                    <field name="bench_strength" string="Nominated / Required" class="fw-bold"/>
+                    <field name="ready_now_count" string="Ready Now (0-6 Mo)"
+                           decoration-success="ready_now_count &gt; 0"
+                           decoration-danger="ready_now_count == 0"/>
+                    <field name="ready_soon_count" string="Ready in 1-2 Years" optional="show"/>
+                    <field name="ready_future_count" string="Ready in 3-5 Years" optional="show"/>
+                    <field name="bench_deficit" string="Successors Needed"
+                           decoration-danger="bench_deficit &gt; 0"
+                           decoration-success="bench_deficit == 0"/>
+                    <field name="bench_health" widget="badge" string="Successor Pipeline Status"
+                           decoration-success="bench_health in ('strong', 'adequate')"
+                           decoration-warning="bench_health == 'deficit'"
+                           decoration-danger="bench_health in ('critical', 'at_risk')"/>
+                    <field name="bench_readiness_summary" string="Readiness Breakdown" optional="hide"/>
+                    <field name="state" widget="badge" string="Governance State"
                            decoration-success="state == 'approved'"
-                           decoration-warning="state in ('ppdd_review','spmc_approval')"
-                           decoration-muted="state == 'deactivated'"/>
+                           decoration-info="state == 'spmc_approval'"
+                           decoration-muted="state == 'draft'"/>
                 </list>
             </field>
         </record>
@@ -44,52 +52,43 @@
                                 type="object" class="oe_highlight"
                                 invisible="state != 'draft'"
                                 groups="bunna_succession_management.group_succession_ppdd"/>
+                        <span class="badge bg-info-subtle text-info border border-info px-3 py-2 fw-bold"
+                              invisible="state != 'spmc_approval'">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Submitted for SPMC Approval
+                        </span>
                         <button name="action_spmc_approve"
                                 string="✓ SPMC Final Approval"
                                 type="object" class="btn-success"
                                 invisible="state != 'spmc_approval'"
-                                groups="bunna_succession_management.group_succession_spmc"/>
+                                groups="bunna_succession_management.group_succession_spmc" />
+                        <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fw-bold"
+                              invisible="state != 'approved'">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Approved by SPMC
+                        </span>
                         <button name="action_auto_match_candidates"
                                 string="Auto-Match Candidates"
                                 type="object" class="oe_highlight"
-                                invisible="state == 'draft'"/>
-                        <button name="action_deactivate"
-                                string="Deactivate"
-                                type="object"
-                                invisible="state in ('draft','deactivated')"
-                                groups="bunna_succession_management.group_succession_admin"/>
+                                invisible="state != 'approved'"/>
+                        <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-2 fw-bold"
+                              invisible="state != 'placed'">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Placed
+                        </span>
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary px-3 py-2 fw-bold"
+                              invisible="state != 'deactivated'">
+                            <i class="fa fa-ban me-1"/>Deactivated
+                        </span>
+
                         <field name="state" widget="statusbar"
-                               statusbar_visible="draft,spmc_approval,approved"/>
+                               statusbar_visible="draft,spmc_approval,approved,placed"/>
                     </header>
                     <sheet>
-                        <!-- Succession Risk Banner -->
-                        <div class="alert alert-danger" role="alert"
-                             invisible="succession_risk != 'critical' or state != 'approved'">
-                            <strong>&#128680; CRITICAL SUCCESSION RISK:</strong>
-                            No identified successors for this position. Immediate action required.
-                        </div>
-                        <div class="alert alert-warning" role="alert"
-                             invisible="succession_risk != 'high' or state != 'approved'">
-                            <strong>&#9888; HIGH SUCCESSION RISK:</strong>
-                            Candidates identified but none are Ready Now. Development plans required.
-                        </div>
-                        <div class="alert alert-success" role="alert"
-                             invisible="succession_risk != 'low' or state != 'approved'">
-                            <strong>&#10004; LOW SUCCESSION RISK:</strong>
-                            At least one Ready Now successor available.
-                        </div>
+                        <field name="active" invisible="1"/>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <widget name="web_ribbon" title="Approved" bg_color="text-bg-success" invisible="state != 'approved' or not active"/>
+                        <widget name="web_ribbon" title="Placed" bg_color="text-bg-primary" invisible="state != 'placed' or not active"/>
 
                         <!-- Stats Buttons -->
                         <div class="oe_button_box" name="button_box">
-                            <button name="action_view_talent_pools"
-                                    type="object"
-                                    class="oe_stat_button"
-                                    icon="fa-folder-open">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="talent_pool_count"/></span>
-                                    <span class="o_stat_text">Talent Pools</span>
-                                </div>
-                            </button>
                             <button name="action_view_candidates"
                                     type="object"
                                     class="oe_stat_button"
@@ -105,19 +104,25 @@
                                     <span class="o_stat_text">Ready Now</span>
                                 </div>
                             </button>
+                            <button class="oe_stat_button" icon="fa-clock-o" type="object" name="action_view_ready_soon">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="ready_soon_count"/></span>
+                                    <span class="o_stat_text">Ready 1-2 Yrs</span>
+                                </div>
+                            </button>
                         </div>
 
                         <group>
                             <group string="Position Details">
                                 <field name="job_id" readonly="state == 'approved'"/>
+                                <field name="work_unit_id" readonly="state == 'approved'"/>
                                 <field name="department_id" readonly="state == 'approved'"/>
-                                <field name="risk_level"/>
-                                <field name="vacancy_probability"/>
+                                <field name="risk_level_id" widget="selection"/>
+                                <field name="criticality_category_id" widget="selection" required="1"/>
+                                <field name="vacancy_timeframe_id" widget="selection" required="1"/>
                             </group>
-                            <group string="Succession Status">
+                            <group string="Succession Metrics">
                                 <field name="min_successor_count"/>
-                                <field name="bench_strength"/>
-                                <field name="succession_risk" widget="badge"/>
                             </group>
                         </group>
 
@@ -125,38 +130,104 @@
                             <page string="Strategic Inputs &amp; Justification" icon="fa-lightbulb-o">
                                 <div class="alert alert-info mt-2 mb-4" role="alert" style="background-color: rgba(1, 126, 132, 0.05); border-left: 4px solid #017e84; color: #017e84; border-radius: 4px; padding: 1rem;">
                                     <i class="fa fa-info-circle me-2"></i>
-                                    <strong>FR-SWP-001:</strong> To classify this position as Critical, PPDD must capture the strategic workforce planning inputs justifying this decision. These inputs guide the selection and training of future successors.
+                                    To classify this position as Critical, PPDD must capture the strategic workforce planning inputs justifying this decision. These inputs guide the selection and training of future successors.
                                 </div>
-                                <div class="row" style="margin-top: 15px;">
-                                    <div class="col-md-6 mb-4">
-                                        <label for="strategic_plan_review_outcome" class="fw-bold" style="color: #017e84;"><i class="fa fa-bullseye me-2"></i>Strategic Plan Outcomes</label>
-                                        <div class="text-muted small mb-1">How does this position tie into the Bank's strategic goals?</div>
-                                        <field name="strategic_plan_review_outcome" placeholder="e.g. The bank's 3-year strategic plan requires a 50% shift to digital revenue..." nolabel="1"/>
+                                <div class="row g-3" style="margin-top: 10px;">
+                                    <!-- Strategic Alignment -->
+                                    <div class="col-lg-6 col-md-12">
+                                        <div class="card h-100 border shadow-none" style="background-color: #f8fafc; border: 1px solid #d0d7de !important; border-radius: 8px;">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center mb-1">
+                                                    <span class="badge bg-primary-subtle text-primary p-2 rounded-circle me-2">
+                                                        <i class="fa fa-bullseye fa-fw" title="Target"></i>
+                                                    </span>
+                                                    <label for="strategic_plan_review_outcome" class="fw-bold mb-0" style="color: #005662; font-size: 0.95rem;">Strategic Alignment</label>
+                                                </div>
+                                                <div class="text-muted small mb-2 ps-1">How does this position tie into the Bank's strategic goals?</div>
+                                                <field name="strategic_plan_review_outcome" widget="text" class="form-control bg-white" style="min-height: 90px; resize: vertical;" placeholder="e.g. The bank's 3-year strategic plan requires a 50% shift to digital revenue..." nolabel="1"/>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="col-md-6 mb-4">
-                                        <label for="workforce_risk_notes" class="fw-bold" style="color: #017e84;"><i class="fa fa-exclamation-triangle me-2"></i>Workforce Risks Identified</label>
-                                        <div class="text-muted small mb-1">What are the risks if this position is vacant?</div>
-                                        <field name="workforce_risk_notes" placeholder="e.g. Flight risks, retirement risks, market scarcity for this role..." nolabel="1"/>
+
+                                    <!-- Workforce Risk Notes -->
+                                    <div class="col-lg-6 col-md-12">
+                                        <div class="card h-100 border shadow-none" style="background-color: #f8fafc; border: 1px solid #d0d7de !important; border-radius: 8px;">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center mb-1">
+                                                    <span class="badge bg-warning-subtle text-warning-emphasis p-2 rounded-circle me-2">
+                                                        <i class="fa fa-exclamation-triangle fa-fw" title="Risk"></i>
+                                                    </span>
+                                                    <label for="workforce_risk_notes" class="fw-bold mb-0" style="color: #005662; font-size: 0.95rem;">Workforce Risk Notes</label>
+                                                </div>
+                                                <div class="text-muted small mb-2 ps-1">What are the specific risks if this position is vacant?</div>
+                                                <field name="workforce_risk_notes" widget="text" class="form-control bg-white" style="min-height: 90px; resize: vertical;" placeholder="e.g. Flight risks, retirement risks, market scarcity for this role..." nolabel="1"/>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="col-md-6 mb-4">
-                                        <label for="emerging_business_needs" class="fw-bold" style="color: #017e84;"><i class="fa fa-rocket me-2"></i>Emerging Business Needs</label>
-                                        <div class="text-muted small mb-1">What new business demands make this role critical?</div>
-                                        <field name="emerging_business_needs" placeholder="e.g. Immediate need to integrate with external Fintech APIs..." nolabel="1"/>
+
+                                    <!-- Emerging Business Needs -->
+                                    <div class="col-lg-6 col-md-12">
+                                        <div class="card h-100 border shadow-none" style="background-color: #f8fafc; border: 1px solid #d0d7de !important; border-radius: 8px;">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center mb-1">
+                                                    <span class="badge bg-info-subtle text-info-emphasis p-2 rounded-circle me-2">
+                                                        <i class="fa fa-rocket fa-fw" title="Action"></i>
+                                                    </span>
+                                                    <label for="emerging_business_needs" class="fw-bold mb-0" style="color: #005662; font-size: 0.95rem;">Emerging Business Needs</label>
+                                                </div>
+                                                <div class="text-muted small mb-2 ps-1">What new business demands or technologies make this role critical?</div>
+                                                <field name="emerging_business_needs" widget="text" class="form-control bg-white" style="min-height: 90px; resize: vertical;" placeholder="e.g. Immediate need to integrate with external Fintech APIs..." nolabel="1"/>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="col-md-6 mb-4">
-                                        <label for="future_capability_reqs" class="fw-bold" style="color: #017e84;"><i class="fa fa-graduation-cap me-2"></i>Future Capability Requirements</label>
-                                        <div class="text-muted small mb-1">What specific future skills must successors possess?</div>
-                                        <field name="future_capability_reqs" placeholder="e.g. Successors must possess advanced knowledge of Cloud Infrastructure (AWS)..." nolabel="1"/>
+
+                                    <!-- Future Capability Requirements -->
+                                    <div class="col-lg-6 col-md-12">
+                                        <div class="card h-100 border shadow-none" style="background-color: #f8fafc; border: 1px solid #d0d7de !important; border-radius: 8px;">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center mb-1">
+                                                    <span class="badge bg-success-subtle text-success p-2 rounded-circle me-2">
+                                                        <i class="fa fa-graduation-cap fa-fw" title="Education"></i>
+                                                    </span>
+                                                    <label for="future_capability_reqs" class="fw-bold mb-0" style="color: #005662; font-size: 0.95rem;">Future Capability Requirements</label>
+                                                </div>
+                                                <div class="text-muted small mb-2 ps-1">What specific future skills must successors possess?</div>
+                                                <field name="future_capability_reqs" widget="text" class="form-control bg-white" style="min-height: 90px; resize: vertical;" placeholder="e.g. Successors must possess advanced knowledge of Cloud Infrastructure (AWS)..." nolabel="1"/>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="col-md-12">
-                                        <label for="business_impact" class="fw-bold" style="color: #017e84;"><i class="fa fa-briefcase me-2"></i>Overall Business Impact</label>
-                                        <field name="business_impact" placeholder="Describe the operational and strategic impact of this position being vacant..." nolabel="1"/>
+
+                                    <!-- Business Impact Statement (Full Width) -->
+                                    <div class="col-12">
+                                        <div class="card border shadow-none" style="background-color: #f8fafc; border: 1px solid #d0d7de !important; border-radius: 8px;">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center mb-1">
+                                                    <span class="badge bg-danger-subtle text-danger p-2 rounded-circle me-2">
+                                                        <i class="fa fa-briefcase fa-fw" title="Job"></i>
+                                                    </span>
+                                                    <label for="business_impact" class="fw-bold mb-0" style="color: #005662; font-size: 0.95rem;">Business Impact Statement</label>
+                                                </div>
+                                                <div class="text-muted small mb-2 ps-1">Describe the operational, financial, and strategic impact if this position becomes vacant.</div>
+                                                <field name="business_impact" widget="text" class="form-control bg-white" style="min-height: 105px; resize: vertical;" placeholder="Describe the operational and strategic impact of this position being vacant..." nolabel="1"/>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </page>
                             <page string="Required Competencies">
-                                <field name="required_role_mapping_line_ids">
-                                    <list string="Competencies">
+                                <group string="Role Baseline Profile (Inherited from Job Position)">
+                                    <group>
+                                        <field name="required_grade_id" string="Required Grade"/>
+                                        <field name="required_experience_years" string="Required Experience (Yrs)"/>
+                                    </group>
+                                    <group>
+                                        <field name="required_certificate" string="Required Education"/>
+                                        <field name="required_study_field" string="Required Field of Study"/>
+                                    </group>
+                                </group>
+                                <separator string="Target Competency Profile"/>
+                                <field name="required_role_mapping_line_ids" readonly="1">
+                                    <list string="Competencies" create="0" delete="0" edit="0">
                                         <field name="competency_id"/>
                                         <field name="pillar"/>
                                         <field name="required_proficiency"/>
@@ -164,38 +235,8 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Talent Pools">
-                                <div class="alert alert-info text-center mt-3" role="alert" invisible="state == 'approved'">
-                                    <i class="fa fa-info-circle me-1"/> 
-                                    <b>Governance Lock:</b> Talent Pools can only be linked after the SPMC has approved this Critical Position.
-                                </div>
-                                <field name="talent_pool_ids" readonly="1">
-                                    <list>
-                                        <field name="name"/>
-                                        <field name="candidate_count"/>
-                                        <field name="ready_now_count"/>
-                                        <field name="state" widget="badge"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Succession Pipeline">
-                                <div class="alert alert-info text-center mt-3" role="alert" invisible="state == 'approved'">
-                                    <i class="fa fa-info-circle me-1"/> 
-                                    <b>Governance Lock:</b> Successors cannot be nominated until the SPMC has officially approved this Critical Position.
-                                </div>
-                                <field name="candidate_ids" readonly="1">
-                                    <list decoration-success="readiness_level == 'ready_now'"
-                                          decoration-warning="readiness_level == 'ready_1_2_yrs'"
-                                          decoration-muted="state in ('rejected','waitlisted')">
-                                        <field name="employee_id"/>
-                                        <field name="readiness_level" widget="badge"/>
-                                        <field name="competency_match_percent"/>
-                                        <field name="latest_pms_score"/>
-                                        <field name="state" widget="badge"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Approval &amp; Review Info">
+
+                            <page string="Approval Information">
                                 <group>
                                     <group string="PPDD Review">
                                         <field name="ppdd_reviewed_by_id" readonly="1"/>
@@ -204,12 +245,6 @@
                                     <group string="SPMC Approval">
                                         <field name="spmc_approved_by_id" readonly="1"/>
                                         <field name="spmc_approval_date" readonly="1"/>
-                                    </group>
-                                </group>
-                                <group string="Review Cycle">
-                                    <group>
-                                        <field name="review_interval_months"/>
-                                        <field name="next_review_date"/>
                                     </group>
                                 </group>
                                 <field name="notes" placeholder="Notes and justification..."/>
@@ -222,29 +257,167 @@
             </field>
         </record>
 
+        <!-- READINESS LEVEL OVERVIEW LIST VIEW -->
+        <record id="view_succession_critical_position_readiness_tree" model="ir.ui.view">
+            <field name="name">succession.critical.position.readiness.tree</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <list string="Critical Positions Readiness Level Overview" default_order="create_date desc, id desc" create="false" delete="false"
+                      decoration-danger="bench_health in ('critical', 'at_risk')"
+                      decoration-warning="bench_health == 'deficit'"
+                      decoration-success="bench_health in ('strong', 'adequate')">
+                    <field name="job_id" string="Job Position" class="fw-bold fs-6"/>
+                    <field name="work_unit_id" string="Work Unit"/>
+                    <field name="department_id" string="Department"/>
+                    <field name="min_successor_count" string="Required Successors"/>
+                    <field name="candidate_count" string="Nominated Successors" class="fw-bold"/>
+                    <field name="bench_strength" string="Nominated / Required" class="fw-bold text-primary"/>
+                    <field name="bench_deficit" string="Successors Needed"
+                           decoration-danger="bench_deficit &gt; 0"
+                           decoration-success="bench_deficit == 0"/>
+                    <field name="ready_now_count" string="Ready Now (0 - 6 Mos)" widget="badge"
+                           decoration-success="ready_now_count &gt; 0"
+                           decoration-danger="ready_now_count == 0"
+                           class="fw-bold"/>
+                    <field name="ready_soon_count" string="Ready in 1-2 Years" widget="badge"
+                           decoration-info="ready_soon_count &gt; 0"
+                           decoration-muted="ready_soon_count == 0"/>
+                    <field name="ready_future_count" string="Ready in 3-5 Years" optional="show"/>
+                    <field name="bench_health" widget="badge" string="Successor Pipeline Status"
+                           decoration-success="bench_health in ('strong', 'adequate')"
+                           decoration-warning="bench_health == 'deficit'"
+                           decoration-danger="bench_health in ('critical', 'at_risk')"/>
+                    <field name="bench_readiness_summary" string="Readiness Breakdown" optional="show"/>
+                    <field name="state" string="Status" widget="badge"
+                           decoration-success="state == 'approved'"
+                           decoration-primary="state == 'placed'"/>
+                </list>
+            </field>
+        </record>
+
+
+
         <!-- SEARCH VIEW -->
         <record id="view_succession_critical_position_search" model="ir.ui.view">
             <field name="name">succession.critical.position.search</field>
             <field name="model">succession.critical.position</field>
             <field name="arch" type="xml">
                 <search>
-                    <field name="job_id"/>
+                    <field name="job_id" string="Job Position"/>
+                    <field name="display_name" string="Critical Position"/>
+                    <field name="work_unit_id"/>
                     <field name="department_id"/>
-                    <filter string="Critical Risk" name="critical_risk"
-                            domain="[('risk_level','=','critical')]"/>
-                    <filter string="No Successors" name="no_successors"
-                            domain="[('succession_risk','=','critical')]"/>
-                    <filter string="Approved" name="approved"
+                    <filter string="Approved Positions" name="approved"
                             domain="[('state','=','approved')]"/>
+                    <filter string="Successor Placed" name="placed"
+                            domain="[('state','=','placed')]"/>
+                    <filter string="⚠️ Positions Needing More Successors" name="filter_bench_deficit"
+                            domain="[('bench_deficit','&gt;',0)]"/>
+                    <filter string="🚨 Positions with No Immediate Successor" name="vulnerable_positions"
+                            domain="[('ready_now_count','=',0), ('state','=','approved')]"/>
+                    <filter string="✅ Positions with Required Target Met" name="filter_bench_covered"
+                            domain="[('bench_health','in',['strong','adequate'])]"/>
                     <filter string="Pending Approval" name="pending"
                             domain="[('state','in',['ppdd_review','spmc_approval'])]"/>
                     <separator/>
+
+                    <separator/>
+                    <filter string="Critical Risk" name="critical_risk"
+                            domain="[('risk_level_id.code','=','critical')]"/>
+                    <filter string="High Risk" name="high_risk"
+                            domain="[('risk_level_id.code','=','high')]"/>
+                    <separator/>
+                    <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                     <group name="group_by">
-                        <filter string="Risk Level" name="group_risk" context="{'group_by':'risk_level'}"/>
+                        <filter string="Risk Level" name="group_risk" context="{'group_by':'risk_level_id'}"/>
+                        <filter string="Successor Pipeline Status" name="group_bench_health" context="{'group_by':'bench_health'}"/>
+                        <filter string="Work Unit" name="group_work_unit" context="{'group_by':'work_unit_id'}"/>
                         <filter string="Department" name="group_dept" context="{'group_by':'department_id'}"/>
                         <filter string="Succession Risk" name="group_succ_risk" context="{'group_by':'succession_risk'}"/>
+                        <filter string="Governance State" name="group_state" context="{'group_by':'state'}"/>
                     </group>
+                    <searchpanel>
+                        <field name="risk_level_id" icon="fa-exclamation-triangle" enable_counters="1"/>
+                        <field name="state" icon="fa-tasks" enable_counters="1"/>
+                        <field name="department_id" icon="fa-building" enable_counters="1" select="multi"/>
+                    </searchpanel>
                 </search>
+            </field>
+        </record>
+
+        <!-- KANBAN VIEW -->
+        <record id="view_succession_critical_position_kanban" model="ir.ui.view">
+            <field name="name">succession.critical.position.kanban</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="succession_risk" class="o_kanban_small_column" records_draggable="false" sample="1">
+                    <field name="display_name"/>
+                    <field name="work_unit_id"/>
+                    <field name="department_id"/>
+                    <field name="risk_level_id"/>
+                    <field name="succession_risk"/>
+                    <field name="candidate_count"/>
+                    <field name="ready_now_count"/>
+                    <field name="ready_soon_count"/>
+                    <field name="bench_strength"/>
+                    <field name="bench_deficit"/>
+                    <field name="bench_health"/>
+                    <field name="state"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_details">
+                                <div class="o_kanban_record_top">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title">
+                                            <field name="display_name"/>
+                                        </strong>
+                                        <span class="o_kanban_record_subtitle text-muted">
+                                            <field name="work_unit_id"/> &#8226; <field name="department_id"/>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_body mt-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="text-muted small">Nominated / Required:</span>
+                                        <span class="fw-bold"><field name="bench_strength"/></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="text-muted small">Successor Status:</span>
+                                        <field name="bench_health" widget="badge"
+                                               decoration-success="bench_health in ('strong', 'adequate')"
+                                               decoration-warning="bench_health == 'deficit'"
+                                               decoration-danger="bench_health in ('critical', 'at_risk')"/>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1" t-if="record.bench_deficit.raw_value &gt; 0">
+                                        <span class="text-danger small fw-bold"><i class="fa fa-exclamation-triangle me-1"/>Shortage:</span>
+                                        <span class="badge text-bg-danger fw-bold"><t t-esc="record.bench_deficit.raw_value"/> More Needed</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted small">Pipeline Risk:</span>
+                                        <span t-attf-class="badge rounded-pill #{record.succession_risk.raw_value == 'critical' ? 'text-bg-danger' : (record.succession_risk.raw_value in ['high','medium'] ? 'text-bg-warning' : (record.succession_risk.raw_value == 'low' ? 'text-bg-success' : 'text-bg-secondary'))}">
+                                            <field name="succession_risk"/>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_bottom mt-2 pt-2 border-top">
+                                    <div class="oe_kanban_bottom_left d-flex gap-2">
+                                        <div title="Total Nominated Successors">
+                                            <i class="fa fa-users me-1 text-primary" title="Total Nominated Successors"></i> <field name="candidate_count"/>
+                                        </div>
+                                        <div title="Ready in 1-2 Years" class="text-warning fw-bold">
+                                            <i class="fa fa-clock-o me-1" title="Pending"></i> <field name="ready_soon_count"/>
+                                        </div>
+                                    </div>
+                                    <div class="oe_kanban_bottom_right">
+                                        <div title="Ready Now Candidates" t-attf-class="#{record.ready_now_count.raw_value == 0 ? 'text-danger fw-bold' : 'text-success fw-bold'}">
+                                            <i class="fa fa-check-circle me-1" title="Ready Now Candidates"></i> <field name="ready_now_count"/> Now
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
             </field>
         </record>
 
@@ -252,10 +425,335 @@
         <record id="action_succession_critical_position" model="ir.actions.act_window">
             <field name="name">Critical Positions</field>
             <field name="res_model">succession.critical.position</field>
-            <field name="view_mode">list,form</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="search_view_id" ref="view_succession_critical_position_search"/>
             <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Define and Safeguard Your Bank's Critical Leadership Roles
+                </p>
+                <p>
+                    Critical Positions are high-impact roles essential to Bunna Bank's operational continuity and executive strategy.
+                </p>
+                <div class="row mt-3 text-start">
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <strong><i class="fa fa-shield text-primary me-2"/>1. Assess Vulnerability</strong>
+                            <div class="small text-muted mt-1">Determine position risk, vacancy impact, and target successor count.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <strong><i class="fa fa-sliders text-success me-2"/>2. Standardize Assessment Plans</strong>
+                            <div class="small text-muted mt-1">Configure balanced 100% exam, appraisal, and competency weights.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <strong><i class="fa fa-magic text-warning me-2"/>3. Auto-Match Talent</strong>
+                            <div class="small text-muted mt-1">Automatically evaluate eligible bank employees against recruitment criteria.</div>
+                        </div>
+                    </div>
+                </div>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             DEDICATED DIALOG / POPUP: Position Assessment & Exam Plan
+        ================================================================ -->
+                <record id="view_succession_critical_position_assessment_plan_dialog" model="ir.ui.view">
+            <field name="name">succession.critical.position.assessment.plan.dialog</field>
+            <field name="model">succession.critical.position</field>
+            <field name="priority">40</field>
+            <field name="arch" type="xml">
+                <form string="Assessment &amp; Exam Plan">
+                    <header>
+                        <button name="action_lock_assessment_plan" type="object"
+                                string="Lock &amp; Sync to Employees" class="oe_highlight btn-success"
+                                invisible="plan_status == 'active'"
+                                confirm="Locking will freeze this assessment plan and automatically synchronize it to all nominated employees. Proceed?"/>
+                        <button name="action_apply_plan_to_candidates" type="object"
+                                string="Re-Sync to Employees" class="btn-primary"
+                                invisible="plan_status != 'active' or unsynced_candidate_count == 0"
+                                confirm="This will push the latest assessment components to all nominated employees. Proceed?"/>
+                        <button name="action_apply_plan_to_candidates" type="object"
+                                string="Re-Sync to Employees" class="btn-secondary"
+                                invisible="plan_status != 'active' or unsynced_candidate_count &gt; 0"
+                                confirm="This will refresh assessment components and weights for all nominated employees. Existing scores will NOT be erased. Proceed?"/>
+                        <button name="action_unlock_assessment_plan" type="object"
+                                string="Reopen Plan" class="btn-warning"
+                                invisible="plan_status != 'active'"
+                                confirm="Reopening will unlock this assessment plan for revisions. Proceed?"
+                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+                        <button name="action_auto_balance_weights" type="object"
+                                string="Auto-Balance 100%" class="btn-info"
+                                invisible="plan_locked"/>
+                        <button name="action_reset_assessment_lines" type="object"
+                                string="Reset Standard" class="btn-secondary"
+                                invisible="plan_locked"
+                                confirm="This will reload default components from Global Assessment Configuration. Proceed?"/>
+                        <button name="action_enable_assessment_plan" type="object"
+                                string="Re-Enable Plan" class="btn-secondary"
+                                invisible="plan_status != 'disabled'"/>
+                        <field name="plan_status" widget="statusbar" statusbar_visible="draft,active,reopened"/>
+                    </header>
+                    <sheet>
+                        <!-- Invisible control fields -->
+                        <field name="plan_locked" invisible="1"/>
+                        <field name="unsynced_candidate_count" invisible="1"/>
+                        <field name="nominated_candidate_count" invisible="1"/>
+
+                        <!-- Smart Button Box -->
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_synced_candidates" type="object"
+                                    class="oe_stat_button" icon="fa-users"
+                                    invisible="nominated_candidate_count == 0">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="nominated_candidate_count"/></span>
+                                    <span class="o_stat_text">Nominees</span>
+                                </div>
+                            </button>
+                        </div>
+
+                        <!-- Title and Status Info -->
+                        <div class="oe_title">
+                            <label for="display_name" string="Critical Position"/>
+                            <h1>
+                                <field name="display_name" readonly="1"/>
+                            </h1>
+                            <div class="d-flex align-items-center gap-2 mt-2">
+                                <field name="plan_sync_status" widget="badge"
+                                       decoration-success="plan_sync_status == 'synced'"
+                                       decoration-warning="plan_sync_status in ('pending', 'reopened')"
+                                       decoration-info="plan_sync_status == 'no_candidates'"
+                                       decoration-muted="plan_sync_status in ('draft', 'disabled')"/>
+                                <span class="text-muted small" invisible="not plan_last_synced_date">
+                                    <i class="fa fa-calendar-check-o text-primary me-1"/>Last Synced: <field name="plan_last_synced_date" readonly="1" class="fw-semibold"/>
+                                    <span invisible="not plan_last_synced_by_id"> by <field name="plan_last_synced_by_id" readonly="1"/></span>
+                                </span>
+                                <span class="badge bg-warning text-dark" invisible="unsynced_candidate_count == 0">
+                                    <i class="fa fa-clock-o me-1" title="Pending"/><field name="unsynced_candidate_count" readonly="1"/> Pending Sync
+                                </span>
+                            </div>
+                        </div>
+
+                        <group>
+                            <group string="Position Details">
+                                <field name="department_id" readonly="1"/>
+                                <field name="work_unit_id" readonly="1"/>
+                            </group>
+                            <group string="Risk &amp; Criticality">
+                                <field name="risk_level_id" readonly="1"/>
+                                <field name="criticality_category_id" readonly="1"/>
+                            </group>
+                        </group>
+
+                        <!-- PART 1: Evaluator Scope -->
+                        <div class="p-3 bg-light rounded border mb-3">
+                            <div class="border-bottom pb-2 mb-2">
+                                <h6 class="fw-bold text-primary mb-0">
+                                    <i class="fa fa-users me-2"/>1. Succession Competency Assessment — Evaluator Scope
+                                </h6>
+                            </div>
+                            <p class="small text-muted mb-2">
+                                Turn ON the evaluators who will rate candidates' competencies for this position. An equal average across active evaluators is automatically calculated.
+                            </p>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-4">
+                                    <div class="p-2 bg-white rounded border d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong><i class="fa fa-user-tie me-1 text-primary"/>Manager Evaluation</strong>
+                                            <div class="text-muted small">Direct supervisor rating</div>
+                                        </div>
+                                        <field name="plan_include_manager" widget="boolean_toggle" readonly="plan_locked or state == 'deactivated'"/>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="p-2 bg-white rounded border d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong><i class="fa fa-university me-1 text-warning"/>SPMC Committee</strong>
+                                            <div class="text-muted small">Executive committee rating</div>
+                                        </div>
+                                        <field name="plan_include_spmc" widget="boolean_toggle" readonly="plan_locked or state == 'deactivated'"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2 p-2 bg-white rounded border" invisible="not plan_include_spmc">
+                                <label for="spmc_assessor_ids" string="Designated SPMC Committee Assessors" class="fw-bold text-dark"/>
+                                <field name="spmc_assessor_ids" widget="many2many_tags"
+                                       options="{'no_create': True, 'color_field': 'color'}"
+                                       domain="[('all_group_ids', 'in', [%(bunna_succession_management.group_succession_spmc)d])]"
+                                       placeholder="Select designated SPMC committee members..."
+                                       required="plan_include_spmc"
+                                       readonly="plan_locked or state == 'deactivated'"/>
+                                <div class="text-muted small mt-1">
+                                    <i class="fa fa-shield me-1 text-primary"/>Only employees with the <strong>SPMC Committee</strong> role are available for selection. When candidates are nominated, these assessors will evaluate their competencies.
+                                </div>
+                            </div>
+                            <div class="alert alert-info py-2 px-3 small mb-0" role="alert">
+                                <i class="fa fa-calculator me-1" title="Calculation"/>
+                                <field name="competency_formula_notice" readonly="1" class="fw-bold d-inline"/>
+                            </div>
+                        </div>
+
+                        <!-- PART 2: Components & Weights -->
+                        <div class="p-3 bg-light rounded border">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2 flex-wrap gap-2">
+                                <h6 class="fw-bold text-success mb-0">
+                                    <i class="fa fa-list-ol me-2"/>2. Assessment Components &amp; Plan Weights
+                                </h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="small fw-bold text-muted">Total Configured Weight:</span>
+                                    <field name="plan_total_weight" readonly="1"
+                                           decoration-success="plan_total_weight == 100.0"
+                                           decoration-danger="plan_total_weight != 100.0" class="fs-6 fw-bold"/>
+                                    <span class="fs-6 fw-bold">%</span>
+                                    <button name="action_auto_balance_weights" type="object" string="Auto-Balance to 100%"
+                                            class="btn btn-sm btn-outline-primary" icon="fa-balance-scale"
+                                            invisible="plan_locked"/>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-warning py-2 px-3 small mb-2 d-flex align-items-center" invisible="plan_total_weight == 100.0" role="alert">
+                                <i class="fa fa-exclamation-triangle fa-lg me-2 text-warning" title="Warning"/>
+                                <div>Configured weights sum to <strong class="text-danger"><field name="plan_total_weight" readonly="1" class="d-inline"/>%</strong>. Active components must sum to exactly 100.00%.</div>
+                            </div>
+
+                            <div class="alert alert-success py-2 px-3 small mb-2 d-flex align-items-center" invisible="plan_total_weight != 100.0" role="status">
+                                <i class="fa fa-check-circle fa-lg me-2 text-success" title="Success"/>
+                                <div><strong>Plan is balanced!</strong> Total weight equals exactly 100.00%.</div>
+                            </div>
+
+                            <field name="assessment_line_ids" nolabel="1" readonly="plan_locked or state == 'deactivated'">
+                                <list editable="bottom" create="0" delete="0">
+                                    <field name="component_id" readonly="1" force_save="1" string="Component"/>
+                                    <field name="evaluation_type" readonly="1" string="Evaluation Type"/>
+                                    <field name="component_source" readonly="1" string="Source"/>
+                                    <field name="not_applicable" widget="boolean_toggle" string="Not Applicable (N/A)"
+                                           readonly="parent.plan_locked"/>
+                                    <field name="weight" string="Weight (%)" class="fw-bold text-primary"
+                                           readonly="parent.plan_locked or not_applicable" sum="Total Weight (%)"/>
+                                    <field name="max_score" string="Max Score" readonly="parent.plan_locked or not_applicable"/>
+                                    <field name="justification" string="Justification / Exemption Reason"
+                                           placeholder="Required if Not Applicable (N/A)..."
+                                           readonly="parent.plan_locked"/>
+                                </list>
+                            </field>
+                        </div>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             STANDALONE LIST: Position Assessment Plans
+        ================================================================ -->
+        <record id="view_succession_critical_position_assessment_plan_list" model="ir.ui.view">
+            <field name="name">succession.critical.position.assessment.plan.list</field>
+            <field name="model">succession.critical.position</field>
+            <field name="priority">40</field>
+            <field name="arch" type="xml">
+                <list string="Assessment &amp; Exam Plans" sample="1"
+                      default_order="create_date desc, id desc"
+                      decoration-success="plan_status == 'active'"
+                      decoration-warning="plan_status in ('draft', 'reopened')"
+                      decoration-muted="plan_status == 'disabled'">
+                    <field name="job_id" string="Job Position" class="fw-bold text-primary"/>
+                    <field name="work_unit_id" string="Work Unit"/>
+                    <field name="department_id" string="Department"/>
+                    <field name="risk_level_id" widget="badge" options="{'color_field': 'color'}" string="Risk Level"/>
+                    <field name="plan_status" widget="badge" string="Plan Status"
+                           decoration-success="plan_status == 'active'"
+                           decoration-warning="plan_status in ('draft', 'reopened')"
+                           decoration-muted="plan_status == 'disabled'"/>
+                    <field name="state" widget="badge" string="Position Status"
+                           decoration-success="state == 'approved'"
+                           decoration-info="state == 'placed'"
+                           decoration-warning="state in ('ppdd_review','spmc_approval')"
+                           decoration-muted="state == 'deactivated'"/>
+                    <field name="nominated_candidate_count" string="Nominees"/>
+                    <button name="action_open_assessment_plan" type="object"
+                            string="Configure" class="btn btn-sm btn-primary" icon="fa-sliders"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             SEARCH: Position Assessment Plans
+        ================================================================ -->
+        <record id="view_succession_critical_position_assessment_plan_search" model="ir.ui.view">
+            <field name="name">succession.critical.position.assessment.plan.search</field>
+            <field name="model">succession.critical.position</field>
+            <field name="arch" type="xml">
+                <search string="Search Assessment Plans">
+                    <field name="display_name" string="Critical Position"/>
+                    <field name="department_id" string="Department"/>
+                    <filter string="Synced &amp; Active" name="filter_active" domain="[('plan_status', '=', 'active')]"/>
+                    <filter string="Reopened" name="filter_reopened" domain="[('plan_status', '=', 'reopened')]"/>
+                    <filter string="Draft" name="filter_draft" domain="[('plan_status', '=', 'draft')]"/>
+                    <separator/>
+                    <filter string="Synced" name="filter_synced" domain="[('plan_sync_status', '=', 'synced')]"/>
+                    <filter string="Sync Pending" name="filter_pending_sync" domain="[('plan_sync_status', '=', 'pending')]"/>
+                    <filter string="Reopened" name="filter_reopened_sync" domain="[('plan_sync_status', '=', 'reopened')]"/>
+                    <filter string="No Nominees" name="filter_no_nominees" domain="[('plan_sync_status', '=', 'no_candidates')]"/>
+                    <group name="group_by">
+                        <filter string="Plan Status" name="group_by_plan_status" context="{'group_by': 'plan_status'}"/>
+                        <filter string="Sync Status" name="group_by_sync_status" context="{'group_by': 'plan_sync_status'}"/>
+                        <filter string="Department" name="group_by_department" context="{'group_by': 'department_id'}"/>
+                    </group>
+                    <searchpanel>
+                        <field name="plan_status" icon="fa-lock" enable_counters="1"/>
+                        <field name="plan_sync_status" icon="fa-refresh" enable_counters="1"/>
+                        <field name="department_id" icon="fa-building" enable_counters="1"/>
+                    </searchpanel>
+                </search>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             ACTION: Assessment & Exam Plans
+        ================================================================ -->
+        <record id="action_succession_critical_position_assessment_plans" model="ir.actions.act_window">
+            <field name="name">Assessment &amp; Exam Plans</field>
+            <field name="res_model">succession.critical.position</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_succession_critical_position_assessment_plan_search"/>
+            <field name="context">{}</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_succession_critical_position_assessment_plan_list')}),
+                (0, 0, {'view_mode': 'form', 'view_id': ref('view_succession_critical_position_assessment_plan_dialog')})]"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Standardized Assessment &amp; Exam Plans for Critical Positions
+                </p>
+                <p>
+                    Assessment plans govern how candidates for each critical position are evaluated and scored across exams, appraisals, and multi-rater competencies.
+                </p>
+                <div class="row mt-3 text-start">
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <strong><i class="fa fa-users text-primary me-2"/>1. Select Evaluator Scope</strong>
+                            <div class="small text-muted mt-1">Enable Manager rating and SPMC executive committee ratings.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <strong><i class="fa fa-balance-scale text-success me-2"/>2. Auto-Balance to 100%</strong>
+                            <div class="small text-muted mt-1">Distribute weights across Written Exams, PMS Appraisals, Interviews, and Competencies summing to exactly 100%.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-light">
+                            <strong><i class="fa fa-refresh text-warning me-2"/>3. Lock &amp; Sync to Nominees</strong>
+                            <div class="small text-muted mt-1">Lock the official assessment plan to automatically populate evaluation scorecards for all nominated candidates.</div>
+                        </div>
+                    </div>
+                </div>
+            </field>
         </record>
 
     </data>
 </odoo>
+
+

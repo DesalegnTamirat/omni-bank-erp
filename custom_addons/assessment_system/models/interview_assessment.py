@@ -438,6 +438,9 @@ class InterviewSession(models.Model):
             for int_sel in int_sels:
                 cand_lines = int_sel.new_int_rec_sel.filtered(lambda c: c.emp_name and c.emp_name.id == emp_id.id)
                 cand_lines.write({'interview_score': score_val})
+                int_sel.sudo().write({'interview_scores_fetched': True})
+                if self.vacancy_id and self.vacancy_id.recruitment_step in ('fetch_interview', 'notify_interview'):
+                    self.vacancy_id.sudo().write({'interview_scores_fetched': True, 'recruitment_step': 'compute_rank'})
 
         # Push to External Recruitment Selection candidate lines
         if app_id:
@@ -463,6 +466,9 @@ class InterviewSession(models.Model):
                     
                     if (app_rec and app_rec.id == app_id.id) or any(n in line_names for n in app_names):
                         cand_line.write({'interview_score': score_val})
+                        ext_sel.sudo().write({'interview_scores_fetched': True})
+                        if self.vacancy_id and self.vacancy_id.recruitment_step in ('fetch_interview', 'notify_interview'):
+                            self.vacancy_id.sudo().write({'interview_scores_fetched': True, 'recruitment_step': 'compute_rank'})
 
     def _check_and_auto_complete(self):
         for session in self:

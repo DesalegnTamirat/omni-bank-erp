@@ -1,4 +1,5 @@
 from odoo import api, models, fields, _
+from .clean_utils import clean_job_position_name
 
 
 class CandidateShortlist(models.Model):
@@ -8,9 +9,26 @@ class CandidateShortlist(models.Model):
 
     recruitment_reference = fields.Char(string="Recruitment Reference")
     job_position = fields.Char(string="Job Applied For")
-    employee_id = fields.Many2one("hr.employee", "Employee Name")
+    employee_id = fields.Many2one("hr.employee", "Employee")
     employee_name = fields.Char(string="Employee Name")
     active = fields.Boolean(default=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if 'job_position' in vals and vals['job_position']:
+                vals['job_position'] = clean_job_position_name(vals['job_position'])
+            if 'current_position' in vals and vals['current_position']:
+                vals['current_position'] = clean_job_position_name(vals['current_position'])
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if 'job_position' in vals and vals['job_position']:
+            vals['job_position'] = clean_job_position_name(vals['job_position'])
+        if 'current_position' in vals and vals['current_position']:
+            vals['current_position'] = clean_job_position_name(vals['current_position'])
+        return super().write(vals)
+
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
         for rec in self:

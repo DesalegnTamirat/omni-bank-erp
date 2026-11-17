@@ -147,6 +147,102 @@
         <field name="description">Allows Chief Executive Officer final approval for workforce plans.</field>
     </record>
 
+    <record id="priv_delete" model="pbms.privilege">
+        <field name="name">Delete Plan</field>
+        <field name="code">priv_delete</field>
+        <field name="sequence">35</field>
+        <field name="action_type">delete</field>
+        <field name="description">Allows deleting unfinalized planning records.</field>
+    </record>
+
+    <record id="priv_district_review" model="pbms.privilege">
+        <field name="name">District Review Plan</field>
+        <field name="code">priv_district_review</field>
+        <field name="sequence">55</field>
+        <field name="action_type">district_review</field>
+        <field name="description">Allows district reviewer to review and edit child unit plans.</field>
+    </record>
+
+    <record id="priv_ho_review" model="pbms.privilege">
+        <field name="name">Head Office Functional Review</field>
+        <field name="code">priv_ho_review</field>
+        <field name="sequence">95</field>
+        <field name="action_type">ho_review</field>
+        <field name="description">Allows Head Office functional reviewers to review submitted plans.</field>
+    </record>
+
+    <record id="priv_chief_review" model="pbms.privilege">
+        <field name="name">Respective Chief Review</field>
+        <field name="code">priv_chief_review</field>
+        <field name="sequence">135</field>
+        <field name="action_type">chief_review</field>
+        <field name="description">Allows Respective Chief review and commentary on plans.</field>
+    </record>
+
+    <record id="priv_committee_review" model="pbms.privilege">
+        <field name="name">Budget Hiring Committee Review</field>
+        <field name="code">priv_committee_review</field>
+        <field name="sequence">165</field>
+        <field name="action_type">committee_review</field>
+        <field name="description">Allows Budget &amp; Hiring Committee review.</field>
+    </record>
+
+    <record id="priv_ceo_approval" model="pbms.privilege">
+        <field name="name">CEO / Executive Approval</field>
+        <field name="code">priv_ceo_approval</field>
+        <field name="sequence">175</field>
+        <field name="action_type">ceo_approval</field>
+        <field name="description">Allows CEO / Executive review and approval.</field>
+    </record>
+
+    <record id="priv_final_approve" model="pbms.privilege">
+        <field name="name">SPPMD Final Approval</field>
+        <field name="code">priv_final_approve</field>
+        <field name="sequence">190</field>
+        <field name="action_type">final_approve</field>
+        <field name="description">Allows SPPMD final plan approval.</field>
+    </record>
+
+    <record id="priv_return_plan" model="pbms.privilege">
+        <field name="name">Return for Revision</field>
+        <field name="code">priv_return_plan</field>
+        <field name="sequence">200</field>
+        <field name="action_type">return_plan</field>
+        <field name="description">Allows returning plan for revision.</field>
+    </record>
+
+    <record id="priv_request_info" model="pbms.privilege">
+        <field name="name">Request Information</field>
+        <field name="code">priv_request_info</field>
+        <field name="sequence">210</field>
+        <field name="action_type">request_info</field>
+        <field name="description">Allows requesting information on submitted plans.</field>
+    </record>
+
+    <record id="priv_reject_plan" model="pbms.privilege">
+        <field name="name">Reject Plan</field>
+        <field name="code">priv_reject_plan</field>
+        <field name="sequence">220</field>
+        <field name="action_type">reject_plan</field>
+        <field name="description">Allows rejecting proposed plans.</field>
+    </record>
+
+    <record id="priv_export_excel" model="pbms.privilege">
+        <field name="name">Export to Excel</field>
+        <field name="code">priv_export_excel</field>
+        <field name="sequence">230</field>
+        <field name="action_type">export_excel</field>
+        <field name="description">Allows exporting planning data to Excel.</field>
+    </record>
+
+    <record id="priv_import_excel" model="pbms.privilege">
+        <field name="name">Import from Excel</field>
+        <field name="code">priv_import_excel</field>
+        <field name="sequence">240</field>
+        <field name="action_type">import_excel</field>
+        <field name="description">Allows importing planning data from Excel.</field>
+    </record>
+
     <!-- ======================================================== -->
     <!-- 2. STANDARD ROLES DEFINITION                             -->
     <!-- ======================================================== -->
@@ -571,6 +667,17 @@
         <field name="sequence">10</field>
     </record>
 
+    <record id="step_wf_district" model="pbms.workflow.step">
+        <field name="workflow_id" ref="wf_workforce"/>
+        <field name="name">District Review</field>
+        <field name="state">submitted</field>
+        <field name="org_level">district</field>
+        <field name="role_id" ref="role_district_reviewer"/>
+        <field name="required_privilege_id" ref="priv_district_approve"/>
+        <field name="can_edit_content">True</field>
+        <field name="sequence">15</field>
+    </record>
+
     <record id="step_wf_chief" model="pbms.workflow.step">
         <field name="workflow_id" ref="wf_workforce"/>
         <field name="name">Respective Chief Review</field>
@@ -641,14 +748,38 @@
     <!-- Transitions for wf_workforce -->
     <record id="trans_wf_submit" model="pbms.workflow.transition">
         <field name="step_id" ref="step_wf_draft"/>
-        <field name="name">Submit to Chief</field>
+        <field name="name">Submit to District</field>
         <field name="action_type">submit</field>
         <field name="action_method">action_submit</field>
-        <field name="target_step_id" ref="step_wf_chief"/>
-        <field name="target_state">chief_review</field>
+        <field name="target_step_id" ref="step_wf_district"/>
+        <field name="target_state">submitted</field>
         <field name="required_privilege_id" ref="priv_submit"/>
         <field name="button_style">btn-primary</field>
         <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_wf_district_approve" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_wf_district"/>
+        <field name="name">Approve — Forward to Respective Chief</field>
+        <field name="action_type">district_approve</field>
+        <field name="action_method">action_district_approve_workforce</field>
+        <field name="target_step_id" ref="step_wf_chief"/>
+        <field name="target_state">chief_review</field>
+        <field name="required_privilege_id" ref="priv_district_approve"/>
+        <field name="button_style">btn-primary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_wf_district_return" model="pbms.workflow.transition">
+        <field name="step_id" ref="step_wf_district"/>
+        <field name="name">Return to Branch</field>
+        <field name="action_type">return</field>
+        <field name="action_method">action_reject</field>
+        <field name="target_step_id" ref="step_wf_draft"/>
+        <field name="target_state">draft</field>
+        <field name="required_privilege_id" ref="priv_district_return"/>
+        <field name="button_style">btn-secondary</field>
+        <field name="sequence">20</field>
     </record>
 
     <record id="trans_wf_chief_approve" model="pbms.workflow.transition">
@@ -862,7 +993,7 @@
         <field name="is_consolidable">True</field>
         <field name="requires_dropdown_planning">True</field>
         <field name="workflow_id" ref="wf_resources"/>
-        <field name="branch_submission_destination">respective_chief</field>
+        <field name="branch_submission_destination">district_reviewer</field>
         <field name="district_submission_destination">ho_reviewer</field>
         <field name="ho_submission_destination">respective_chief</field>
         <field name="district_endorse_destination">ho_reviewer</field>
@@ -880,7 +1011,7 @@
         <field name="is_consolidable">True</field>
         <field name="requires_dropdown_planning">True</field>
         <field name="workflow_id" ref="wf_workforce"/>
-        <field name="branch_submission_destination">respective_chief</field>
+        <field name="branch_submission_destination">district_reviewer</field>
         <field name="district_submission_destination">respective_chief</field>
         <field name="ho_submission_destination">respective_chief</field>
         <field name="district_endorse_destination">respective_chief</field>
@@ -898,7 +1029,7 @@
         <field name="is_consolidable">True</field>
         <field name="requires_dropdown_planning">True</field>
         <field name="workflow_id" ref="wf_resources"/>
-        <field name="branch_submission_destination">respective_chief</field>
+        <field name="branch_submission_destination">district_reviewer</field>
         <field name="district_submission_destination">ho_reviewer</field>
         <field name="ho_submission_destination">respective_chief</field>
         <field name="district_endorse_destination">ho_reviewer</field>
@@ -970,7 +1101,7 @@
         <field name="is_consolidable">True</field>
         <field name="requires_dropdown_planning">True</field>
         <field name="workflow_id" ref="wf_resources"/>
-        <field name="branch_submission_destination">respective_chief</field>
+        <field name="branch_submission_destination">district_reviewer</field>
         <field name="district_submission_destination">ho_reviewer</field>
         <field name="ho_submission_destination">respective_chief</field>
         <field name="district_endorse_destination">ho_reviewer</field>

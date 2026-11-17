@@ -4,6 +4,7 @@ hr_applicant.py
 Extends the core hr.applicant model with custom recruitment fields required
 by Bunna Bank's recruitment process (Internal / External recruitment journeys).
 """
+from datetime import date, datetime
 from email.policy import default
 
 from odoo import api, fields, models, _
@@ -62,7 +63,7 @@ _logger = logging.getLogger(__name__)
 #         required=True, ondelete='cascade', index=True,
 #     )
 #     competencies = fields.Many2one(
-#         'recruitment.competency', string='Competency',
+#         'competency.competency', string='Competency',
 #     )
 #     requirement = fields.Char(string='Requirement')
 #     response = fields.Char(string='Response / Achieved')
@@ -89,7 +90,16 @@ class HrApplicantCustom(models.Model):
 
     app_reference = fields.Many2one(
         'job.vacancy', string='Vacancy Reference',
-        help='Links this applicant to a specific job vacancy.',
+        domain=[
+            ('reference', '!=', 'New'),
+            ('reference', '!=', False),
+            ('reference', 'not like', 'BB/INT/%'),
+            ('reference', 'not like', 'BB/LAT/%'),
+            '|',
+            ('reference', '=like', 'BB/EXT/%'),
+            ('sourcing_type', '=', 'external'),
+        ],
+        help='Links this applicant to an external job vacancy.',
     )
     vacancy_reference = fields.Char(
         string='Vacancy No.',
@@ -100,8 +110,22 @@ class HrApplicantCustom(models.Model):
         help='Applicant preferred work location.',
     )
     candidate_score_id = fields.Many2one(
-        'recruitment.candidate.score', string='Candidate Score',
+        'recruitment.candidate.score', string='Candidate Name',
+        domain="[('vacancy_id', '=', app_reference)]",
         help='Link to the candidate score record for this applicant.',
+    )
+    # ── Bunna Bank Account Snapshot ─────────────────────────────────────────
+    bunna_account_number = fields.Char(string='Bunna Account Number')
+    bunna_account_name = fields.Char(string='Bunna Account Holder Name')
+    bunna_account_type = fields.Char(string='Bunna Account Type')
+    bunna_account_status = fields.Char(string='Bunna Account Status')
+    bunna_branch_name = fields.Char(string='Bunna Branch Name')
+    bunna_account_phone = fields.Char(string='Bunna Account Phone')
+
+    employment_letter_id = fields.Many2one(
+        'recruitment.employment.letter', string='Employment Letter',
+        copy=False, readonly=True,
+        help='Official Employment Letter generated for external hire.'
     )
 
     # ── External ATS Candidate Profile Link ─────────────────────────────────
@@ -222,13 +246,13 @@ class HrApplicantCustom(models.Model):
             if ou:
                 ou_name = (ou.name or '').lower()
                 ou_code = (getattr(ou, 'code', '') or '').lower()
-                if getattr(ou, 'full_non_banking_credit', False) or any(kw in ou_name or kw in ou_code for kw in ['hr', 'human resource', 'it', 'information technology', 'ict', 'software', 'digital']):
+                if getattr(ou, 'full_non_banking_credit', False) or any(kw in ou_name or kw in ou_code for kw in ['hr', 'human resource', 'people', 'talent', 'culture', 'it', 'information technology', 'ict', 'software', 'digital', 'system']):
                     is_hr_it = True
 
             if not is_hr_it and dept:
                 dept_name = (dept.name or '').lower()
                 dept_code = (getattr(dept, 'code', '') or '').lower()
-                if getattr(dept, 'full_non_banking_credit', False) or any(kw in dept_name or kw in dept_code for kw in ['hr', 'human resource', 'it', 'information technology', 'ict', 'software', 'digital']):
+                if getattr(dept, 'full_non_banking_credit', False) or any(kw in dept_name or kw in dept_code for kw in ['hr', 'human resource', 'people', 'talent', 'culture', 'it', 'information technology', 'ict', 'software', 'digital', 'system']):
                     is_hr_it = True
 
             app.is_hr_or_it_workunit = is_hr_it
@@ -246,7 +270,6 @@ class HrApplicantCustom(models.Model):
 
     def _compute_assessment_schedules(self):
         ExtSelCand = self.env['external.recruitment.selected.candidates'].sudo()
-        ExtSel = self.env['external.recruitment.selected'].sudo()
 
         for app in self:
             exam_dt = False
@@ -256,77 +279,47 @@ class HrApplicantCustom(models.Model):
             inter_loc = 'Head Office'
             inter_notif = False
 
-            vac = app.app_reference
-            vac_id = vac.id if vac else False
-            vac_ref = vac.reference if vac else False
-
-            # 1. Check external.recruitment.selected.candidates
-            ext_cand = ExtSelCand.search([
-                '|', ('applicant_name', '=', app.id),
-                ('applicant_email', '=ilike', app.email_from or 'no_match_email')
-            ], limit=1, order='id desc')
+            # Find matching candidate record ONLY for this applicant
+            ext_cand = ExtSelCand.search([('applicant_name', '=', app.id)], limit=1, order='id desc')
+            if not ext_cand and app.email_from:
+                cand_domain = [('applicant_email', '=ilike', app.email_from)]
+                if app.app_reference:
+                    cand_domain.append(('ext_rec_sel_cand.vacancy_id', '=', app.app_reference.id))
+                elif app.job_id:
+                    cand_domain.append(('ext_rec_sel_cand.job_position', '=', app.job_id.id))
+                ext_cand = ExtSelCand.search(cand_domain, limit=1, order='id desc')
 
             if ext_cand and ext_cand.ext_rec_sel_cand:
                 parent_sel = ext_cand.ext_rec_sel_cand
-                if parent_sel.written_exam_date:
+
+                # Only include exam schedule if candidate is selected for exam / notified
+                is_selected_for_exam = (
+                    ext_cand.selection_type in ('exam', 'interview', 'selected')
+                    or ext_cand.exam_notified == 'Yes'
+                    or app.bunna_app_status in ('exam', 'interview')
+                )
+                if parent_sel.written_exam_date and (parent_sel.exam_scheduled == 'Yes' or ext_cand.exam_notified == 'Yes') and is_selected_for_exam:
                     exam_dt = parent_sel.written_exam_date
                     exam_loc = parent_sel.exam_location or 'Main Branch'
-                    exam_notif = (parent_sel.exam_scheduled == 'Yes') or (parent_sel.status == 'notify') or bool(parent_sel.written_exam_date)
-                if parent_sel.interview_date:
+                    exam_notif = True
+
+                # Only include interview schedule if candidate is selected for interview / notified
+                is_selected_for_interview = (
+                    ext_cand.selection_type in ('interview', 'selected')
+                    or ext_cand.interview_notified == 'Yes'
+                    or app.bunna_app_status in ('interview', 'approved', 'offer')
+                )
+                if parent_sel.interview_date and (parent_sel.interview_scheduled == 'Yes' or ext_cand.interview_notified == 'Yes') and is_selected_for_interview:
                     inter_dt = parent_sel.interview_date
                     inter_loc = parent_sel.interview_location or 'Head Office'
-                    inter_notif = (parent_sel.interview_scheduled == 'Yes') or bool(parent_sel.interview_date)
-
-            # 2. Check external.recruitment.selected by vacancy
-            if not exam_dt and (vac_id or vac_ref):
-                ext_sel = ExtSel.search([
-                    '|', ('vacancy_id', '=', vac_id or 0),
-                    ('vacancy_reference', '=', vac_ref or '')
-                ], limit=1, order='id desc')
-                if ext_sel:
-                    if ext_sel.written_exam_date:
-                        exam_dt = ext_sel.written_exam_date
-                        exam_loc = ext_sel.exam_location or 'Main Branch'
-                        exam_notif = (ext_sel.exam_scheduled == 'Yes') or (ext_sel.status == 'notify') or bool(ext_sel.written_exam_date)
-                    if ext_sel.interview_date:
-                        inter_dt = ext_sel.interview_date
-                        inter_loc = ext_sel.interview_location or 'Head Office'
-                        inter_notif = (ext_sel.interview_scheduled == 'Yes') or bool(ext_sel.interview_date)
-
-            # 4. Check if vacancy itself has written_exam_date or interview_date
-            if not exam_dt and vac:
-                try:
-                    if getattr(vac, 'written_exam_date', False):
-                        exam_dt = vac.written_exam_date
-                        exam_loc = getattr(vac, 'exam_location', False) or 'Main Branch'
-                        exam_notif = True
-                    if getattr(vac, 'interview_date', False):
-                        inter_dt = vac.interview_date
-                        inter_loc = getattr(vac, 'interview_location', False) or 'Head Office'
-                        inter_notif = True
-                except Exception:
-                    pass
-
-            # 5. Fallback search on external.recruitment.selected by job_position
-            if not exam_dt and app.job_id:
-                ext_sel_job = ExtSel.search([('job_position', '=', app.job_id.id)], limit=1, order='id desc')
-                if ext_sel_job:
-                    if ext_sel_job.written_exam_date:
-                        exam_dt = ext_sel_job.written_exam_date
-                        exam_loc = ext_sel_job.exam_location or 'Main Branch'
-                        exam_notif = True
-                    if ext_sel_job.interview_date:
-                        inter_dt = ext_sel_job.interview_date
-                        inter_loc = ext_sel_job.interview_location or 'Head Office'
-                        inter_notif = True
+                    inter_notif = True
 
             app.scheduled_exam_date = exam_dt
             app.scheduled_exam_location = exam_loc
-            app.is_exam_notified = bool(exam_dt)
+            app.is_exam_notified = exam_notif
             app.scheduled_interview_date = inter_dt
             app.scheduled_interview_location = inter_loc
-            app.is_interview_notified = bool(inter_dt)
-
+            app.is_interview_notified = inter_notif
     # ── Bunna-specific application status tracking ────────────────────────
     # NOTE: core hr.applicant already defines 'application_status' as a
     # computed field (ongoing/hired/refused/archived). We use a separate
@@ -340,7 +333,7 @@ class HrApplicantCustom(models.Model):
         ('offer', 'Offer Issued'),
         ('hired', 'Hired'),
         ('rejected', 'Rejected'),
-    ], string='Bunna Application Status', default='draft', tracking=True)
+    ], string='Bunna Application Status', default='hired', readonly=True, tracking=True)
 
     job_offer_status = fields.Selection([
         ('pending', 'Pending'),
@@ -688,7 +681,24 @@ class HrApplicantCustom(models.Model):
     employee_position = fields.Char(string='Current Position')
     manager = fields.Many2one('hr.employee', string='Direct Manager')
     promotion_date = fields.Date(string='Last Promotion Date')
-    employment_start_date = fields.Date(string='Employment Start Date')
+    employment_start_date = fields.Date(
+        string='Employment Start Date',
+        compute='_compute_employment_start_date',
+        readonly=True,
+        store=False,
+        help="Official employment start date. Automatically takes current date for new hires, readonly, and cannot accept backdates."
+    )
+
+    @api.depends('employee_id', 'employee_id.start_date', 'employee_id.service_hire_date', 'internal_employee_id', 'internal_employee_id.service_hire_date', 'internal_employee_id.start_date')
+    def _compute_employment_start_date(self):
+        today = fields.Date.context_today(self)
+        for app in self:
+            if app.employee_id:
+                app.employment_start_date = app.employee_id.service_hire_date or app.employee_id.start_date or today
+            elif app.internal_employee_id:
+                app.employment_start_date = app.internal_employee_id.service_hire_date or app.internal_employee_id.start_date or today
+            else:
+                app.employment_start_date = today
     final_work_unit = fields.Many2one('hr.department', string='Assigned Work Unit', ondelete='set null')
     cc_workunits = fields.Many2many(
         'hr.department', string='CC Work Units',
@@ -716,14 +726,48 @@ class HrApplicantCustom(models.Model):
     # ── Computed fields ────────────────────────────────────────────────────
     @api.depends('date_of_birth')
     def _compute_age(self):
-        from datetime import date
-        today = date.today()
+        today = fields.Date.today()
         for rec in self:
             if rec.date_of_birth:
                 dob = rec.date_of_birth
                 rec.age = (today - dob).days // 365
             else:
                 rec.age = 0
+
+    @api.constrains('date_of_birth')
+    def _check_applicant_minimum_age(self):
+        today = fields.Date.today()
+        for rec in self:
+            if rec.date_of_birth:
+                if rec.date_of_birth > today:
+                    raise ValidationError(_("Date of Birth cannot be in the future."))
+                age = today.year - rec.date_of_birth.year - ((today.month, today.day) < (rec.date_of_birth.month, rec.date_of_birth.day))
+                if age < 18:
+                    raise ValidationError(_("Applicants must be at least 18 years old. Current age is %d years.") % age)
+
+    @api.constrains('app_reference', 'candidate_profile_id')
+    def _check_applicant_experience_requirement(self):
+        for rec in self:
+            if rec.application_type == 'External' and rec.app_reference and rec.candidate_profile_id:
+                try:
+                    vac_id = int(rec.app_reference)
+                    vacancy = self.env['job.vacancy'].sudo().browse(vac_id)
+                    if vacancy.exists():
+                        min_exp = vacancy.minimum_experience_years or 0.0
+                        bank_exp = vacancy.banking_experience_required or 0.0
+                        cand = rec.candidate_profile_id
+                        cand_exp = cand.total_experience or cand.total_experience_years or 0.0
+                        has_exp = bool(cand.experience_ids and cand_exp > 0)
+                        if (min_exp > 0 or bank_exp > 0) and not has_exp:
+                            exp_needed = f"{min_exp:g} year(s)" if min_exp > 0 else f"{bank_exp:g} year(s) banking"
+                            raise ValidationError(_(
+                                "You are not allowed to apply for this vacancy without work experience. "
+                                "This position requires a minimum of %s of experience. "
+                                "You can only apply for fresh graduate vacancies or vacancies requiring 0 years of experience."
+                            ) % exp_needed)
+                except (ValueError, TypeError):
+                    pass
+
 
     @api.depends('internal_employee_id')
     def _compute_employee_work_unit(self):
@@ -735,7 +779,150 @@ class HrApplicantCustom(models.Model):
         for rec in self:
             rec.employee_number = rec.internal_employee_id.barcode or ''
 
+    def _sync_vacancy_candidate_scores(self, vacancy):
+        """
+        Synchronizes evaluated candidates from external / internal selection tables
+        into recruitment.candidate.score so they can be selected by candidate name on the applicant form.
+        """
+        if not vacancy:
+            return
+        Score = self.env['recruitment.candidate.score'].sudo()
+
+        # 1. External candidates
+        if 'external.recruitment.selected.candidates' in self.env:
+            ExtCand = self.env['external.recruitment.selected.candidates'].sudo()
+            ext_cands = ExtCand.search([
+                '|',
+                ('ext_rec_sel_cand.vacancy_id', '=', vacancy.id),
+                ('ext_rec_sel_cand.vacancy_reference', '=', vacancy.reference)
+            ], order='rank asc, weighted_score desc, id desc')
+            for c in ext_cands:
+                app_rec = c.applicant_name
+                cand_name = (c.emp_name or (app_rec.partner_name if app_rec else False) or (app_rec.name if app_rec else False) or '').strip()
+                if not cand_name:
+                    continue
+
+                status_map = {
+                    'selected': 'selected',
+                    'reserved': 'reserve',
+                    'rejected': 'rejected',
+                    'interview': 'pending',
+                    'exam': 'pending',
+                    'shortlisted': 'pending',
+                }
+                sel_st = status_map.get((c.selection_type or '').lower(), 'pending')
+
+                existing = Score.search([
+                    ('vacancy_id', '=', vacancy.id),
+                    '|',
+                    ('applicant_id', '=', app_rec.id if app_rec else 0),
+                    ('candidate_name', '=ilike', cand_name)
+                ], limit=1)
+
+                vals = {
+                    'vacancy_id': vacancy.id,
+                    'applicant_id': app_rec.id if app_rec else False,
+                    'candidate_name': cand_name,
+                    'written_score': c.written_exam_score or 0.0,
+                    'interview_score': c.interview_score or 0.0,
+                    'final_score': c.weighted_score or 0.0,
+                    'rank': c.rank or 0,
+                    'selection_status': sel_st,
+                }
+                if existing:
+                    existing.write(vals)
+                else:
+                    Score.create(vals)
+
+        # 2. Internal candidates
+        if 'new.internal.recruitment.selected.candidates' in self.env:
+            IntCand = self.env['new.internal.recruitment.selected.candidates'].sudo()
+            int_cands = IntCand.search([
+                '|',
+                ('new_int_sel_cand.vacancy_id', '=', vacancy.id),
+                ('new_int_sel_cand.vacancy_reference', '=', vacancy.reference)
+            ], order='rank asc, weighted_score desc, id desc')
+            for ic in int_cands:
+                emp = ic.emp_name
+                if not emp:
+                    continue
+                status_map = {
+                    'selected': 'selected',
+                    'reserve': 'reserve',
+                    'rejected': 'rejected',
+                    'disqualified': 'disqualified',
+                }
+                sel_st = status_map.get((ic.selection_status or '').lower(), 'pending')
+                existing = Score.search([
+                    ('vacancy_id', '=', vacancy.id),
+                    ('employee_id', '=', emp.id)
+                ], limit=1)
+                vals = {
+                    'vacancy_id': vacancy.id,
+                    'employee_id': emp.id,
+                    'candidate_name': emp.name,
+                    'pms_score': ic.pms_score or 0.0,
+                    'written_score': ic.written_exam_score or 0.0,
+                    'interview_score': ic.interview_score or 0.0,
+                    'final_score': ic.weighted_score or 0.0,
+                    'rank': ic.rank or 0,
+                    'selection_status': sel_st,
+                }
+                if existing:
+                    existing.write(vals)
+                else:
+                    Score.create(vals)
+
     # ── Onchange: cascade vacancy reference fields ─────────────────────────
+    def _apply_candidate_profile_data(self, cand):
+        """Populates demographics, contact, and employment availability fields directly onto applicant from ATS candidate profile."""
+        for app in self:
+            if not cand:
+                continue
+            app.candidate_profile_id = cand.id
+            if cand.name and cand.name != 'Unknown':
+                app.partner_name = cand.name
+            if cand.email:
+                app.email_from = cand.email
+            if cand.phone:
+                app.partner_phone = cand.phone
+            if hasattr(app, 'linkedin_profile') and getattr(cand, 'linkedin_url', False):
+                app.linkedin_profile = cand.linkedin_url
+
+            # 1. Demographics
+            dob = cand.dob or getattr(cand, 'birth_date', False)
+            if dob:
+                app.date_of_birth = dob
+                today = fields.Date.today()
+                app.age = (today - dob).days // 365
+            elif hasattr(cand, 'age') and cand.age:
+                app.age = cand.age
+            if cand.gender:
+                app.gender = cand.gender
+            if cand.place_of_birth or getattr(cand, 'city', False):
+                app.place_of_birth = cand.place_of_birth or getattr(cand, 'city', False)
+
+            # 2. Employment & Availability
+            if cand.worked_in_bunna_earlier:
+                app.worked_in_bunna_earlier = (cand.worked_in_bunna_earlier == 'yes')
+            if cand.current_company:
+                app.current_company = cand.current_company
+            if getattr(cand, 'city', False) or getattr(cand, 'address', False):
+                app.current_working_location = getattr(cand, 'city', False) or getattr(cand, 'address', False)
+            if cand.working_status:
+                if cand.working_status in dict(app._fields['working_status'].selection):
+                    app.working_status = cand.working_status
+                elif cand.working_status == 'employed':
+                    app.working_status = 'employed'
+                else:
+                    app.working_status = 'unemployed'
+            if hasattr(cand, 'join_immediately'):
+                app.willing_to_join_immediately = bool(cand.join_immediately)
+            if hasattr(cand, 'date_of_availability') and cand.date_of_availability:
+                app.date_of_availability = cand.date_of_availability
+
+            app.bunna_app_status = 'hired'
+
     @api.onchange('app_reference')
     def _onchange_app_reference(self):
         for rec in self:
@@ -744,6 +931,211 @@ class HrApplicantCustom(models.Model):
                     'Internal' if rec.app_reference.internal_movement_type in ('internal', 'promotion', 'lateral', 'transfer')
                     else 'External'
                 )
+                job = getattr(rec.app_reference, 'job_position', False) or getattr(rec.app_reference, 'job_id', False)
+                if job:
+                    rec.job_id = job.id
+                dept = getattr(rec.app_reference, 'department_id', False) or getattr(rec.app_reference, 'work_unit_id', False)
+                if dept:
+                    rec.department_id = dept.id
+                rec.bunna_app_status = 'hired'
+                rec._sync_vacancy_candidate_scores(rec.app_reference)
+                return {'domain': {'candidate_score_id': [('vacancy_id', '=', rec.app_reference.id)]}}
+
+    @api.onchange('candidate_score_id')
+    def _onchange_candidate_score_id(self):
+        for rec in self:
+            if rec.candidate_score_id:
+                score = rec.candidate_score_id
+                if not rec.app_reference and score.vacancy_id:
+                    rec.app_reference = score.vacancy_id.id
+                if score.vacancy_id:
+                    if score.vacancy_id.job_position:
+                        rec.job_id = score.vacancy_id.job_position.id
+                    elif score.vacancy_id.job_id:
+                        rec.job_id = score.vacancy_id.job_id.id
+
+                cand_name = score.candidate_name
+                if cand_name and cand_name != 'Unknown':
+                    rec.partner_name = cand_name
+
+                # Resolve Candidate Profile (Electronic CV / ATS profile)
+                cand_profile = False
+                if score.applicant_id and score.applicant_id.candidate_profile_id:
+                    cand_profile = score.applicant_id.candidate_profile_id
+                elif score.candidate_name:
+                    cand_profile = self.env['candidate.profile'].sudo().search([
+                        ('name', '=ilike', score.candidate_name.strip())
+                    ], limit=1)
+
+                if cand_profile:
+                    rec._apply_candidate_profile_data(cand_profile)
+                else:
+                    if score.applicant_id:
+                        app = score.applicant_id
+                        if app.email_from:
+                            rec.email_from = app.email_from
+                        if app.partner_phone:
+                            rec.partner_phone = app.partner_phone
+                        if hasattr(app, 'linkedin_profile') and app.linkedin_profile:
+                            rec.linkedin_profile = app.linkedin_profile
+                        if hasattr(app, 'date_of_birth') and app.date_of_birth:
+                            rec.date_of_birth = app.date_of_birth
+                        if hasattr(app, 'gender') and app.gender:
+                            rec.gender = app.gender
+                        if hasattr(app, 'place_of_birth') and app.place_of_birth:
+                            rec.place_of_birth = app.place_of_birth
+                    elif score.employee_id:
+                        emp = score.employee_id
+                        rec.email_from = emp.work_email or emp.private_email
+                        rec.partner_phone = emp.work_phone or emp.mobile_phone
+                        if hasattr(emp, 'gender') and emp.gender:
+                            rec.gender = emp.gender
+
+                # Check external selected candidates if email or phone still empty
+                if not rec.email_from and score.vacancy_id:
+                    ext_cand = self.env['external.recruitment.selected.candidates'].search([
+                        '|',
+                        ('ext_rec_sel_cand.vacancy_id', '=', score.vacancy_id.id),
+                        ('ext_rec_sel_cand.vacancy_reference', '=', score.vacancy_id.reference),
+                        '|',
+                        ('emp_name', '=ilike', score.candidate_name or ''),
+                        ('applicant_name', '=', score.applicant_id.id if score.applicant_id else 0)
+                    ], limit=1)
+                    if ext_cand:
+                        if ext_cand.applicant_email and not rec.email_from:
+                            rec.email_from = ext_cand.applicant_email
+                        if ext_cand.applicant_phone and not rec.partner_phone:
+                            rec.partner_phone = ext_cand.applicant_phone
+
+                rec.bunna_app_status = 'hired'
+                rec.check_candidate_blacklist()
+
+    def check_candidate_blacklist(self):
+        """Checks blacklist pool for applicant (works both on saved records and in onchange)."""
+        for rec in self:
+            blacklist = self.env["blacklist.pool"].sudo()
+            partner_name = (rec.partner_name or getattr(rec.candidate_score_id, 'candidate_name', '') or '').strip()
+            result = blacklist.is_blacklisted(name=partner_name) if partner_name else False
+            if result:
+                rec.blacklist_checked = True
+                rec.blacklist_status = "flagged"
+            elif partner_name:
+                rec.blacklist_checked = True
+                rec.blacklist_status = "clear"
+            else:
+                rec.blacklist_checked = False
+                rec.blacklist_status = "not_checked"
+            return result
+
+    # ── Duplicate Employee Registration Check ──────────────────────────────
+    def _check_duplicate_employee_registration(self):
+        """
+        Validate that the candidate is not already registered as an employee in the system
+        or from the same vacancy with identical attributes (properties: candidate profile, name, email, phone).
+        """
+        for applicant in self:
+            cand_name = (applicant.partner_name or getattr(applicant, 'name', '') or '').strip()
+            email = (applicant.email_from or '').strip().lower()
+            phone = (getattr(applicant, 'partner_phone', False) or '').strip()
+            vacancy = getattr(applicant, 'app_reference', None)
+            cand_profile = getattr(applicant, 'candidate_profile_id', None)
+
+            # 1. Applicant itself already has an employee linked
+            if applicant.employee_id:
+                raise UserError(_(
+                    "Employee Already Registered!\n\n"
+                    "Candidate '%(name)s' from this vacancy is already registered as Employee '%(emp)s' (ID: %(id)s).\n\n"
+                    "Duplicate employee registration from the same vacancy is not permitted."
+                ) % {
+                    'name': cand_name,
+                    'emp': applicant.employee_id.name,
+                    'id': applicant.employee_id.identification_id or applicant.employee_id.id,
+                })
+
+            existing_emp = False
+            matched_attributes = []
+
+            # 2. Check if another applicant for the same vacancy has already created an employee
+            if vacancy:
+                domain_vacancy = [
+                    ('id', '!=', applicant.id),
+                    ('app_reference', '=', vacancy.id),
+                    ('employee_id', '!=', False)
+                ]
+                match_or = []
+                if cand_profile:
+                    match_or.append(('candidate_profile_id', '=', cand_profile.id))
+                if email:
+                    match_or.append(('email_from', '=ilike', email))
+                if phone and len(phone) >= 7:
+                    match_or.append(('partner_phone', '=', phone))
+                if cand_name:
+                    match_or.append(('partner_name', '=ilike', cand_name))
+
+                if match_or:
+                    or_clause = ['|'] * (len(match_or) - 1) + match_or
+                    other_app = self.env['hr.applicant'].sudo().search(domain_vacancy + or_clause, limit=1)
+                    if other_app and other_app.employee_id:
+                        existing_emp = other_app.employee_id
+                        vac_ref = getattr(vacancy, 'reference', '') or getattr(vacancy, 'name', '') or str(vacancy.id)
+                        matched_attributes.append(_("Vacancy Reference '%s'") % vac_ref)
+
+            # 3. Check directly in hr.employee table for matching properties/attributes
+            if not existing_emp:
+                # Check candidate_profile_id if employee model has it
+                if cand_profile and hasattr(self.env['hr.employee'], 'candidate_profile_id'):
+                    found = self.env['hr.employee'].sudo().with_context(active_test=False).search([
+                        ('candidate_profile_id', '=', cand_profile.id)
+                    ], limit=1)
+                    if found:
+                        existing_emp = found
+                        matched_attributes.append(_("Candidate Profile #%s") % cand_profile.id)
+
+                # Check by Email (work_email or private_email)
+                if not existing_emp and email:
+                    found = self.env['hr.employee'].sudo().with_context(active_test=False).search([
+                        '|', ('work_email', '=ilike', email), ('private_email', '=ilike', email)
+                    ], limit=1)
+                    if found:
+                        existing_emp = found
+                        matched_attributes.append(_("Email: %s") % email)
+
+                # Check by Phone / Mobile
+                if not existing_emp and phone and len(phone) >= 7:
+                    clean_p = phone[-9:]
+                    found = self.env['hr.employee'].sudo().with_context(active_test=False).search([
+                        '|', ('mobile_phone', 'ilike', clean_p), ('phone_num', 'ilike', clean_p)
+                    ], limit=1)
+                    if found:
+                        existing_emp = found
+                        matched_attributes.append(_("Phone: %s") % phone)
+
+                # Check by exact Name
+                if not existing_emp and cand_name:
+                    found = self.env['hr.employee'].sudo().with_context(active_test=False).search([
+                        ('name', '=ilike', cand_name)
+                    ], limit=1)
+                    if found:
+                        existing_emp = found
+                        matched_attributes.append(_("Name: %s") % cand_name)
+
+            if existing_emp:
+                # Link applicant to this existing employee so the UI reflects it and hides button
+                applicant.sudo().write({'employee_id': existing_emp.id})
+                attr_desc = ", ".join(matched_attributes) if matched_attributes else _("identical properties")
+                raise UserError(_(
+                    "Employee Already Registered!\n\n"
+                    "The employee who has the same attributes (properties: %(attrs)s) is already registered in the system as:\n\n"
+                    "• Employee Name: %(emp)s\n"
+                    "• Employee ID: %(id)s\n"
+                    "• Status: %(status)s\n\n"
+                    "Creating a duplicate employee from the same vacancy is not permitted."
+                ) % {
+                    'attrs': attr_desc,
+                    'emp': existing_emp.name,
+                    'id': existing_emp.identification_id or existing_emp.id,
+                    'status': _('Active') if existing_emp.active else _('Archived'),
+                })
 
     # ── Onboarding & Pre-Employment Verification Check ─────────────────────
     def _check_onboarding_prerequisites(self):
@@ -783,13 +1175,18 @@ class HrApplicantCustom(models.Model):
                 if not (rec.medical_certificate or rec.medical_cleared):
                     missing_checks.append(_("• Medical Certificate: Medical Fitness / Examination Certificate must be uploaded or verified"))
 
+                # 4. Mandatory Blacklist Pool Verification
+                rec.check_candidate_blacklist()
+                if rec.blacklist_status == 'flagged':
+                    missing_checks.append(_("• Blacklist Check: Candidate '%s' is Flagged on the Inter-Bank Blacklist! Employment is strictly prohibited.") % rec.partner_name)
+
                 if missing_checks:
                     raise UserError(_(
                         "Mandatory Pre-Employment Verification Incomplete!\n\n"
                         "Before creating the Employee record or Contract for %s, all required pre-employment verification checkpoints must be completed:\n\n"
                         "%s\n\n"
                         "Please update the 'Pre-Employment Verification & Clearance' section on this application before proceeding."
-                    ) % (rec.partner_name or rec.name or 'this applicant', "\n".join(missing_checks)))
+                    ) % (rec.partner_name or 'this applicant', "\n".join(missing_checks)))
 
     # ── Resolve Job Grade & Operating Unit for New Employee ────────────────
     def _resolve_applicant_job_grade(self):
@@ -905,6 +1302,18 @@ class HrApplicantCustom(models.Model):
                 emp_write['date_of_availability'] = getattr(self, 'date_of_availability', False)
             if hasattr(employee, 'marital') and not employee.marital and hasattr(cand, 'marital_status'):
                 emp_write['marital'] = cand.marital_status
+
+        # Synchronize employment start date directly to the employee record
+        start_val = getattr(self, 'employment_start_date', False) or getattr(self, 'date_of_availability', False) or fields.Date.context_today(self)
+        if start_val:
+            if hasattr(employee, 'start_date'):
+                emp_write['start_date'] = start_val
+            if hasattr(employee, 'service_hire_date'):
+                emp_write['service_hire_date'] = start_val
+            if hasattr(employee, 'service_start_date'):
+                emp_write['service_start_date'] = start_val
+            if hasattr(employee, 'probation_start_date'):
+                emp_write['probation_start_date'] = start_val
 
         if emp_write:
             employee.sudo().write(emp_write)
@@ -1033,31 +1442,12 @@ class HrApplicantCustom(models.Model):
                                 'requirement': 100.0,
                                 'response': 100.0,
                             }))
-                elif 'recruitment.competency' in self.env:
-                    comp_fields = self.env['recruitment.competency']._fields
-                    for s_name, s_lvl in skills_list:
-                        c_rec = False
-                        if 'competencies' in comp_fields:
-                            c_rec = self.env['recruitment.competency'].sudo().search([('competencies', '=ilike', s_name)], limit=1)
-                            if not c_rec and s_name:
-                                c_rec = self.env['recruitment.competency'].sudo().create({'competencies': s_name})
-                        elif 'name' in comp_fields:
-                            c_rec = self.env['recruitment.competency'].sudo().search([('name', '=ilike', s_name)], limit=1)
-                            if not c_rec and s_name:
-                                c_rec = self.env['recruitment.competency'].sudo().create({'name': s_name})
-
-                        if c_rec and c_rec.id not in seen_comps:
-                            seen_comps.add(c_rec.id)
-                            comp_vals.append((0, 0, {
-                                'competencies': c_rec.id,
-                                'requirement': 100.0,
-                                'response': 100.0,
-                            }))
                 if comp_vals:
                     employee.sudo().write({'competencies_id': comp_vals})
 
     def create_employee_from_applicant(self):
         """Override core employee creation to enforce mandatory pre-employment verification and pass job grade."""
+        self._check_duplicate_employee_registration()
         self._check_onboarding_prerequisites()
         grade_rec = self._resolve_applicant_job_grade()
         grade_id = grade_rec.id if grade_rec else False
@@ -1070,6 +1460,20 @@ class HrApplicantCustom(models.Model):
             emp = applicant.employee_id
             if emp:
                 applicant._populate_employee_from_applicant_and_profile(emp)
+
+                # Ensure official employment start date is committed on newly registered employee
+                if applicant.employment_start_date:
+                    date_vals = {}
+                    if hasattr(emp, 'start_date'):
+                        date_vals['start_date'] = applicant.employment_start_date
+                    if hasattr(emp, 'service_hire_date'):
+                        date_vals['service_hire_date'] = applicant.employment_start_date
+                    if hasattr(emp, 'service_start_date'):
+                        date_vals['service_start_date'] = applicant.employment_start_date
+                    if hasattr(emp, 'probation_start_date'):
+                        date_vals['probation_start_date'] = applicant.employment_start_date
+                    if date_vals:
+                        emp.sudo().write(date_vals)
 
                 if grade_rec:
                     emp_write = {}
@@ -1087,6 +1491,47 @@ class HrApplicantCustom(models.Model):
                         ])
                         if versions:
                             versions.write({'job_grade': grade_rec.id})
+
+                # Automatically link created employee to any existing employment letters for this candidate
+                if 'recruitment.employment.letter' in self.env:
+                    letters = self.env['recruitment.employment.letter'].sudo().search([
+                        ('employee_id', '=', False),
+                        '|',
+                        ('applicant_id', '=', applicant.id),
+                        '|',
+                        ('candidate_email', '=ilike', (applicant.email_from or '').strip()),
+                        ('candidate_name', '=ilike', (applicant.partner_name or applicant.name or '').strip())
+                    ])
+                    if letters:
+                        letters.write({
+                            'employee_id': emp.id,
+                            'applicant_id': applicant.id
+                        })
+
+                # Automatically provision Active Directory user account
+                if hasattr(emp, 'action_sync_to_ad'):
+                    try:
+                        ad_res = emp.action_sync_to_ad()
+                        if ad_res and isinstance(ad_res, dict) and ad_res.get('params'):
+                            msg_type = ad_res['params'].get('type')
+                            msg_text = ad_res['params'].get('message', '')
+                            if msg_type == 'success':
+                                applicant.message_post(body=_(
+                                    "Active Directory account created: <b>%s</b> (%s)"
+                                ) % (emp.ad_username or emp.name, emp.ad_upn or ''))
+                            else:
+                                applicant.message_post(body=_(
+                                    "Active Directory sync notice: %s"
+                                ) % msg_text)
+                    except Exception as ad_err:
+                        _logger.warning("Active Directory auto-sync on applicant creation failed: %s", ad_err)
+
+
+        if 'hr.employee.probation' in self.env:
+            try:
+                self.env['hr.employee.probation'].sudo()._auto_sync_eligible_probations()
+            except Exception as e:
+                _logger.warning("Probation auto-sync on applicant employee creation failed: %s", e)
 
         return res
 
@@ -1365,6 +1810,61 @@ class HrApplicantCustom(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            vals.setdefault('bunna_app_status', 'hired')
+            if 'employee_position' in vals and vals['employee_position']:
+                vals['employee_position'] = clean_job_position_name(vals['employee_position'])
+
+            # Populate ATS candidate profile data if candidate_score_id or candidate_profile_id is passed
+            cand_profile = False
+            if vals.get('candidate_profile_id'):
+                cand_profile = self.env['candidate.profile'].sudo().browse(vals['candidate_profile_id'])
+            elif vals.get('candidate_score_id'):
+                score = self.env['recruitment.candidate.score'].sudo().browse(vals['candidate_score_id'])
+                if score.applicant_id and score.applicant_id.candidate_profile_id:
+                    cand_profile = score.applicant_id.candidate_profile_id
+                elif score.candidate_name:
+                    cand_profile = self.env['candidate.profile'].sudo().search([
+                        ('name', '=ilike', score.candidate_name.strip())
+                    ], limit=1)
+                if score.vacancy_id and not vals.get('job_id'):
+                    if score.vacancy_id.job_position:
+                        vals['job_id'] = score.vacancy_id.job_position.id
+                    elif score.vacancy_id.job_id:
+                        vals['job_id'] = score.vacancy_id.job_id.id
+
+            if cand_profile:
+                vals.setdefault('candidate_profile_id', cand_profile.id)
+                if cand_profile.name and cand_profile.name != 'Unknown':
+                    vals.setdefault('partner_name', cand_profile.name)
+                if cand_profile.email:
+                    vals.setdefault('email_from', cand_profile.email)
+                if cand_profile.phone:
+                    vals.setdefault('partner_phone', cand_profile.phone)
+                if getattr(cand_profile, 'linkedin_url', False):
+                    vals.setdefault('linkedin_profile', cand_profile.linkedin_url)
+                dob = cand_profile.dob or getattr(cand_profile, 'birth_date', False)
+                if dob:
+                    vals.setdefault('date_of_birth', dob)
+                    today = fields.Date.today()
+                    vals.setdefault('age', (today - dob).days // 365)
+                if cand_profile.gender:
+                    vals.setdefault('gender', cand_profile.gender)
+                if cand_profile.place_of_birth or getattr(cand_profile, 'city', False):
+                    vals.setdefault('place_of_birth', cand_profile.place_of_birth or getattr(cand_profile, 'city', False))
+                if cand_profile.worked_in_bunna_earlier:
+                    vals.setdefault('worked_in_bunna_earlier', (cand_profile.worked_in_bunna_earlier == 'yes'))
+                if cand_profile.current_company:
+                    vals.setdefault('current_company', cand_profile.current_company)
+                if getattr(cand_profile, 'city', False) or getattr(cand_profile, 'address', False):
+                    vals.setdefault('current_working_location', getattr(cand_profile, 'city', False) or getattr(cand_profile, 'address', False))
+                if cand_profile.working_status:
+                    st = cand_profile.working_status if cand_profile.working_status in ('employed', 'unemployed', 'self_employed') else ('employed' if cand_profile.working_status == 'employed' else 'unemployed')
+                    vals.setdefault('working_status', st)
+                if hasattr(cand_profile, 'join_immediately'):
+                    vals.setdefault('willing_to_join_immediately', bool(cand_profile.join_immediately))
+                if getattr(cand_profile, 'date_of_availability', False):
+                    vals.setdefault('date_of_availability', cand_profile.date_of_availability)
+        for vals in vals_list:
             if vals.get('job_id') and not vals.get('qualification_id') and not vals.get('experiance_id') and not vals.get('competencies_id'):
                 job = self.env['hr.job'].browse(vals['job_id'])
                 
@@ -1447,6 +1947,7 @@ class HrApplicantCustom(models.Model):
     @api.onchange('candidate_profile_id')
     def _onchange_candidate_profile_id(self):
         if self.candidate_profile_id:
+            self._apply_candidate_profile_data(self.candidate_profile_id)
             self._sync_from_candidate_profile()
 
     def _sync_from_candidate_profile(self):
@@ -1574,8 +2075,10 @@ class HrApplicantCustom(models.Model):
             # 5. Tab: Competencies (competencies_id)
             skills_certs = []
             for sk in cand.skill_ids:
-                if sk.skill_name:
-                    skills_certs.append((sk.skill_name, sk.proficiency or 'Proficient'))
+                s_name = getattr(sk, 'skill_name', False) or getattr(sk, 'name', False)
+                s_prof = getattr(sk, 'proficiency', False) or getattr(sk, 'level', False) or 'Proficient'
+                if s_name:
+                    skills_certs.append((s_name, s_prof))
             for crt in cand.certification_ids:
                 if crt.name:
                     skills_certs.append((crt.name, 'Certified'))
@@ -1605,33 +2108,6 @@ class HrApplicantCustom(models.Model):
                                 existing_comp_names[c_name] = True
                                 new_comp_lines.append((0, 0, {
                                     'competencies': comp_rec.id,
-                                    'requirement': 'Required',
-                                    'response': resp,
-                                }))
-                elif 'recruitment.competency' in self.env:
-                    comp_fields = self.env['recruitment.competency']._fields
-                    for name, resp in skills_certs:
-                        rec_comp = False
-                        if 'competencies' in comp_fields:
-                            rec_comp = self.env['recruitment.competency'].sudo().search([('competencies', '=ilike', name)], limit=1)
-                            if not rec_comp and name:
-                                rec_comp = self.env['recruitment.competency'].sudo().create({'competencies': name})
-                        elif 'name' in comp_fields:
-                            rec_comp = self.env['recruitment.competency'].sudo().search([('name', '=ilike', name)], limit=1)
-                            if not rec_comp and name:
-                                rec_comp = self.env['recruitment.competency'].sudo().create({'name': name})
-
-                        if rec_comp:
-                            c_name = (getattr(rec_comp, 'competencies', False) or getattr(rec_comp, 'name', '') or '').strip().lower()
-                            if c_name in existing_comp_names:
-                                existing_c = existing_comp_names[c_name]
-                                if not existing_c.response:
-                                    existing_c.sudo().write({'response': resp})
-                            elif rec_comp.id not in existing_comp_ids:
-                                existing_comp_ids.add(rec_comp.id)
-                                existing_comp_names[c_name] = True
-                                new_comp_lines.append((0, 0, {
-                                    'competencies': rec_comp.id,
                                     'requirement': 'Required',
                                     'response': resp,
                                 }))

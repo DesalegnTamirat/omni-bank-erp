@@ -25,7 +25,7 @@
                                 <td style="background: #f8f9fa;"><b>Interview Date:</b></td>
                                 <td><t t-esc="doc.interview_date"/></td>
                                 <td style="background: #f8f9fa;"><b>Interview Type:</b></td>
-                                <td><t t-esc="doc.interview_type.capitalize()"/></td>
+                                <td><t t-esc="(doc.interview_type or '').capitalize()"/></td>
                             </tr>
                         </table>
 

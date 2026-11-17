@@ -246,6 +246,20 @@ class ReslLoan(models.Model):
         string="Disbursement Role",
         compute='_compute_designated_approver', store=True,
     )
+    # ALL the people who can disburse this loan (Configuration > Approvers &
+    # Disbursors lets several be chosen; any one of them can disburse without
+    # the others). disbursement_officer_id above is the first of them.
+    disbursement_officer_ids = fields.Many2many(
+        'res.users', 'resl_loan_disb_officer_rel', 'loan_id', 'user_id',
+        string="Disbursement Officers",
+        compute='_compute_designated_approver', store=True,
+        help="Everybody who can disburse this loan.",
+    )
+    # 'rule' when the approver came from Configuration > Approvers & Disbursors,
+    # 'legacy' when the built-in job-title / group lookup was used.
+    approver_routing_source = fields.Char(
+        compute='_compute_designated_approver', store=True,
+    )
     can_disburse = fields.Boolean(
         compute='_compute_can_disburse', store=False,
         help="True when the logged-in user is allowed to disburse this loan.",
@@ -739,7 +753,8 @@ class ReslLoan(models.Model):
         return Employee.search(domain, order=order, limit=1)
 
     @api.depends('employee_id', 'employee_id.default_operating_unit_id',
-                 'employee_id.job_id', 'employee_id.user_id')
+                 'employee_id.job_id', 'employee_id.user_id',
+                 'employee_id.department_id')
     def _compute_designated_approver(self):
         """
         FR-RESL-012 (v2): approval routing is driven strictly by the
@@ -775,7 +790,9 @@ class ReslLoan(models.Model):
                 loan.designated_approver_role = False
                 loan.manager_user_id = False
                 loan.disbursement_officer_id = False
+                loan.disbursement_officer_ids = False
                 loan.disbursement_officer_role = False
+                loan.approver_routing_source = False
                 continue
 
             ou = self.env['resl.validations'].get_employee_operating_unit(emp)
@@ -786,10 +803,25 @@ class ReslLoan(models.Model):
             approver_role = False
             exclude_self = [emp.id]
 
+            # 0. Configuration > Approvers & Disbursors (resl.routing.rule).
+            #    When a rule designates somebody it wins; otherwise the
+            #    built-in chain below is used exactly as before.
+            try:
+                with self.env.cr.savepoint():
+                    rule_user, rule_role = loan._resolve_rule_approver(emp, ou, work_unit_type)
+            except Exception:
+                _logger.exception("RESL: routing rule lookup failed for loan %s", loan.id)
+                rule_user, rule_role = False, False
+            loan.approver_routing_source = 'rule' if rule_user else 'legacy'
+            if rule_user:
+                approver_user, approver_role = rule_user, rule_role
+
             # 1. Branch / Sub-branch / Service Center -> always the Manager
             #    of THAT work unit; if the borrower IS that Manager, the
             #    Accountant (Disbursement) of the same work unit approves.
-            if work_unit_type in ('branch', 'sub_branch', 'service_center'):
+            if approver_user:
+                pass
+            elif work_unit_type in ('branch', 'sub_branch', 'service_center'):
                 manager_emp = self._find_role_employee(
                     ['manager'], ou=ou,
                     exclude_keywords=['accountant', self._BRANCH_ACCOUNTANT_TITLE]
@@ -886,8 +918,9 @@ class ReslLoan(models.Model):
             loan.designated_approver_id = approver_user.id if approver_user else False
             loan.manager_user_id = approver_user.id if approver_user else False
 
-            officer_user, officer_role = loan._resolve_disbursement_officer(emp, ou, work_unit_type)
-            loan.disbursement_officer_id = officer_user.id if officer_user else False
+            officers, officer_role = loan._resolve_disbursement_officers(emp, ou, work_unit_type)
+            loan.disbursement_officer_ids = officers
+            loan.disbursement_officer_id = officers[:1].id if officers else False
             loan.disbursement_officer_role = officer_role or False
 
     @api.model
@@ -900,7 +933,92 @@ class ReslLoan(models.Model):
         loans._compute_designated_approver()
         return True
 
+    def _resolve_rule_approver(self, emp, ou, work_unit_type):
+        """Approver designated by Configuration > Approvers & Disbursors.
+
+        Returns (res.users, role label) or (False, False) when no rule applies
+        (the built-in chain is then used).
+
+          Branch   : "Approver"; when the borrower IS that approver (the
+                     Manager) -> "Manager's Approver".
+          District : "Approver" (everybody but the Director); when the
+                     borrower IS that approver (the Director) -> "Director's
+                     Approver".
+          Head Office / other : "HO Approver"; when the borrower IS the HO
+                     approver -> "HR Approver".
+        """
+        Rule = self.env['resl.routing.rule']
+        if work_unit_type in ('branch', 'sub_branch', 'service_center'):
+            tier, main, second = 'branch', 'approver', 'manager_approver'
+        elif work_unit_type in ('district_office', 'regional_office'):
+            tier, main, second = 'district', 'approver', 'director_approver'
+        else:
+            tier, main, second = 'head_office', 'ho_approver', 'hr_approver'
+        if not (Rule.has_rules(tier, main) or Rule.has_rules(tier, second)):
+            return False, False
+        labels = dict(self.env['resl.routing.rule']._fields['role'].selection)
+        others = Rule.resolve(tier, main, emp, ou, exclude_ids=[emp.id])
+        if others:
+            return others[:1].user_id, labels[main]
+        # nobody else holds the approver position: is the borrower that person?
+        if Rule.resolve(tier, main, emp, ou):
+            above = Rule.resolve(tier, second, emp, ou, exclude_ids=[emp.id])
+            if above:
+                return above[:1].user_id, labels[second]
+        return False, False
+
+    def _resolve_disbursement_officers(self, emp, ou, work_unit_type):
+        """Stage 2 of the approval chain: who disburses the loan.
+
+        Configuration > Approvers & Disbursors first (one or several people;
+        any one of them can disburse):
+          Branch   -> the chosen job position(s) / employees of the branch.
+          District -> the chosen job position(s) / employees (e.g. an employee
+                      of one of the district's branches), who disburse the
+                      district-office staff of THEIR OWN department.
+        Otherwise, as before:
+          Branch / Sub-branch / Service Center -> the Branch Accountant
+              (Supervisor-I ...) of the borrower's operating unit.
+          District / Regional Office -> the user holding the "RESL District"
+              role for the borrower's district.
+          Head Office / other -> no fixed officer: the HR Auditor -> HR
+              Accountant hand-off applies.
+
+        Returns (res.users recordset, role label or False).
+        """
+        Users = self.env['res.users']
+        Rule = self.env['resl.routing.rule']
+        try:
+            with self.env.cr.savepoint():
+                if work_unit_type in ('branch', 'sub_branch', 'service_center'):
+                    tier, label = 'branch', "Accountant (Disbursement)"
+                elif work_unit_type in ('district_office', 'regional_office'):
+                    tier, label = 'district', "RESL District (Disbursement)"
+                else:
+                    tier = label = False
+                if tier:
+                    people = Rule.resolve(tier, 'disbursor', emp, ou, exclude_ids=[emp.id])
+                    if people:
+                        return people.mapped('user_id'), label
+                    # The borrower IS the Disburser: the Disburser's Disburser
+                    # (Configuration > Approvers & Disbursors) disburses the loan.
+                    if Rule.has_rules(tier, 'disbursor_backup') and Rule.resolve(
+                            tier, 'disbursor', emp, ou):
+                        backup = Rule.resolve(tier, 'disbursor_backup', emp, ou,
+                                              exclude_ids=[emp.id])
+                        if backup:
+                            return backup.mapped('user_id'), label
+        except Exception:
+            _logger.exception("RESL: disbursor rule lookup failed")
+        user, role = self._resolve_disbursement_officer_legacy(emp, ou, work_unit_type)
+        return (user or Users), role
+
     def _resolve_disbursement_officer(self, emp, ou, work_unit_type):
+        """First disbursement officer only (kept for older callers)."""
+        officers, role = self._resolve_disbursement_officers(emp, ou, work_unit_type)
+        return officers[:1], role
+
+    def _resolve_disbursement_officer_legacy(self, emp, ou, work_unit_type):
         """Stage 2 of the approval chain: who disburses the loan.
 
           Branch / Sub-branch / Service Center -> the employee in the
@@ -1037,10 +1155,10 @@ class ReslLoan(models.Model):
         group = self.env.ref('resl.group_resl_branch_accountant', raise_if_not_found=False)
         return bool(user and group and user in group.sudo().all_user_ids)
 
-    def _live_disbursement_officer(self):
-        """Disbursement officer resolved RIGHT NOW (not the stored value,
-        which can be stale if the role holder or OU was set up after the
-        loan was created). Falls back to the stored officer."""
+    def _live_disbursement_officers(self):
+        """ALL disbursement officers resolved RIGHT NOW (not the stored
+        values, which can be stale if the role holder or OU was set up after
+        the loan was created). Falls back to the stored officers."""
         self.ensure_one()
         loan = self.sudo()
         emp = loan.employee_id
@@ -1048,8 +1166,13 @@ class ReslLoan(models.Model):
             return self.env['res.users']
         ou = self.env['resl.validations'].get_employee_operating_unit(emp)
         wut = getattr(ou, 'work_unit_type', False) if ou else False
-        res = loan._resolve_disbursement_officer(emp, ou, wut)
-        return res[0] or loan.disbursement_officer_id
+        officers, _role = loan._resolve_disbursement_officers(emp, ou, wut)
+        return officers or loan.disbursement_officer_ids or loan.disbursement_officer_id
+
+    def _live_disbursement_officer(self):
+        """The first of the live disbursement officers (truthy when any)."""
+        self.ensure_one()
+        return self._live_disbursement_officers()[:1]
 
     @api.model
     def _cron_refresh_disbursement_routing(self):
@@ -1057,6 +1180,11 @@ class ReslLoan(models.Model):
         not-yet-disbursed loan and hand it over (sets disbursement_requested
         + activity). Fixes loans approved before the routing existed or
         while the role holder was not yet set up."""
+        if not self.env.context.get('resl_syncing_groups'):
+            try:
+                self.env['resl.routing.rule'].sync_role_groups()
+            except Exception:
+                _logger.exception('Failed to synchronise the RESL Head Office role groups')
         try:
             with self.env.cr.savepoint():
                 loans = self.sudo().search([
@@ -1066,7 +1194,8 @@ class ReslLoan(models.Model):
                 for loan in loans:
                     try:
                         loan._compute_designated_approver()
-                        if (loan.status == 'approved' and loan.disbursement_officer_id
+                        if (loan.status == 'approved'
+                                and (loan.disbursement_officer_ids or loan.disbursement_officer_id)
                                 and not loan.disbursement_requested):
                             loan._route_to_disbursement_officer(loan.approver_id or self.env.user)
                     except Exception:
@@ -1113,12 +1242,18 @@ class ReslLoan(models.Model):
     def _compute_is_my_disbursement(self):
         ids = self.env.user._resl_effective_user_ids()
         for loan in self:
-            loan.is_my_disbursement = loan.disbursement_officer_id.id in ids
+            loan.is_my_disbursement = bool(
+                loan.disbursement_officer_id.id in ids
+                or set(loan.disbursement_officer_ids.ids) & set(ids))
 
     def _search_is_my_disbursement(self, operator, value):
         ids = self.env.user._resl_effective_user_ids()
         positive = (operator == '=') == bool(value)
-        return [('disbursement_officer_id', 'in' if positive else 'not in', ids)]
+        if positive:
+            return ['|', ('disbursement_officer_id', 'in', ids),
+                    ('disbursement_officer_ids', 'in', ids)]
+        return ['&', ('disbursement_officer_id', 'not in', ids),
+                ('disbursement_officer_ids', 'not in', ids)]
 
     def _compute_role_flags(self):
         user = self.env.user
@@ -1156,23 +1291,33 @@ class ReslLoan(models.Model):
         """
         self.ensure_one()
         loan = self.sudo()
-        officer = loan._live_disbursement_officer()
+        officers = loan._live_disbursement_officers()
         borrower_user = loan.employee_id.user_id
         if borrower_user and borrower_user.id == user.id:
-            is_self_officer = bool(
-                officer
-                and officer.id == user.id
-                and loan.approver_id
-                and loan.approver_id.id != user.id
-            )
-            return is_self_officer and (
-                self._is_resl_district_user(loan.employee_id)
-                or self._is_branch_accountant_employee(loan.employee_id)
-            )
+            # The borrower disburses his / her own loan only when he / she is
+            # one of the designated disbursement officers AND somebody else
+            # approved it.
+            if (officers and user in officers and loan.approver_id
+                    and loan.approver_id.id != user.id):
+                return True
+            # Head Office: the HR Disburser disburses his / her own loan only when
+            # the HR Disburser line (Configuration > Approvers & Disbursors)
+            # has "May disburse own loan" ticked; otherwise the HR Disburser's
+            # Disburser (or another HR Disburser) does it.
+            if (not officers and loan.disbursement_requested and loan.approver_id
+                    and loan.approver_id.id != user.id):
+                rules = self.env['resl.routing.rule'].sudo().search([
+                    ('tier', '=', 'head_office'), ('role', '=', 'hr_accountant'),
+                    ('allow_self_disburse', '=', True)])
+                for rule in rules:
+                    if loan.employee_id in rule._pick(
+                            self.env['hr.employee'].browse(), False, None, all_matches=True):
+                        return True
+            return False
         if user.has_group('base.group_system') or user._resl_is_admin():
             return True
-        if officer:
-            return officer.id in user._resl_effective_user_ids()
+        if officers:
+            return bool(set(officers.ids) & set(user._resl_effective_user_ids()))
         return bool(
             user._resl_has_group('resl.group_resl_hr')
             or user._resl_has_group('resl.group_resl_hr_accountant')
@@ -1484,6 +1629,60 @@ class ReslLoan(models.Model):
                 _logger.exception('Failed to schedule HR Auditor activity for loan %s', loan.id)
         loan.message_post(body=note)
 
+    # ── Progress notifications (requestor / approver / disbursors) ───────────
+
+    def _resl_stakeholder_users(self):
+        """The people who follow a request through its steps:
+        {'requester': users, 'approver': users, 'disbursor': users}.
+        Approvers / disbursors include whoever they currently delegate to.
+        Head Office loans have no fixed disbursement officer: the HR Auditors
+        and HR Accountants (who request / do the disbursement) are used."""
+        self.ensure_one()
+        loan = self.sudo()
+        Users = self.env['res.users']
+        res = {'requester': loan.employee_id.user_id or Users,
+               'approver': Users, 'disbursor': Users}
+        appr = loan.designated_approver_id or loan.manager_user_id
+        if appr:
+            res['approver'] = appr.sudo()._resl_notify_users()
+        officers = loan.disbursement_officer_ids or loan.disbursement_officer_id
+        if officers:
+            for officer in officers:
+                res['disbursor'] |= officer.sudo()._resl_notify_users()
+        else:
+            for xmlid in ('resl.group_resl_hr_auditor', 'resl.group_resl_hr_accountant'):
+                grp = self.env.ref(xmlid, raise_if_not_found=False)
+                if grp:
+                    res['disbursor'] |= grp.sudo().all_user_ids
+        return res
+
+    def _resl_notify_progress(self, subject, body, roles=('requester', 'approver', 'disbursor'),
+                              exclude_users=None):
+        """Inbox notification (bell + e-mail per the user's preference) for the
+        requestor, the approver(s) and the disbursor(s) of this request. The
+        person who just acted never gets a notification about their own act."""
+        self.ensure_one()
+        loan = self.sudo()
+        Users = self.env['res.users']
+        try:
+            groups = loan._resl_stakeholder_users()
+            users = Users
+            for role in roles:
+                users |= groups.get(role, Users)
+            users = users.sudo().filtered(lambda u: u.active and u.partner_id)
+            users -= self.env.user
+            if exclude_users:
+                users -= exclude_users
+            if not users:
+                return
+            loan.message_notify(
+                partner_ids=users.mapped('partner_id').ids,
+                subject=subject,
+                body=body,
+            )
+        except Exception:
+            _logger.exception("Failed to send the progress notification for loan %s", loan.id)
+
     def _route_to_disbursement_officer(self, approver):
         """After level-1 approval, hand the loan to its disbursement officer:
         mark disbursement as requested (no HR Auditor click needed), raise an
@@ -1493,8 +1692,8 @@ class ReslLoan(models.Model):
         """
         self.ensure_one()
         loan = self.sudo()
-        officer = loan.disbursement_officer_id
-        if not officer:
+        officers = loan.disbursement_officer_ids or loan.disbursement_officer_id
+        if not officers:
             try:
                 ou = self.env['resl.validations'].get_employee_operating_unit(loan.employee_id)
                 wut = getattr(ou, 'work_unit_type', False) if ou else False
@@ -1525,8 +1724,12 @@ class ReslLoan(models.Model):
             'role': loan.disbursement_officer_role or _("Disbursement Officer"),
         }
         try:
-            # The officer AND whoever they currently delegate to.
-            for notify_user in officer.sudo()._resl_notify_users():
+            # EVERY officer AND whoever they currently delegate to: any one of
+            # them can disburse without the others.
+            notify_users = self.env['res.users']
+            for officer in officers:
+                notify_users |= officer.sudo()._resl_notify_users()
+            for notify_user in notify_users:
                 loan.activity_schedule(
                     'mail.mail_activity_data_todo',
                     user_id=notify_user.id,
@@ -1571,7 +1774,7 @@ class ReslLoan(models.Model):
     @api.depends(
         'employee_id.user_id', 'status',
         'all_guarantors_accepted', 'guarantor_line_ids.state',
-        'needs_guarantor_replacement'
+        'needs_guarantor_replacement', 'agr_borrower_signed_on'
     )
     def _compute_can_submit_manager(self):
         for loan in self:
@@ -1586,6 +1789,8 @@ class ReslLoan(models.Model):
                 and loan.status in ('draft', 'guarantor_pending')
                 and loan.all_guarantors_accepted
                 and not loan.needs_guarantor_replacement
+                # the requestor must have agreed the agreement (Part A) first
+                and (loan.agr_borrower_complete or not loan._agr_required())
             )
 
     def action_discard_request(self):
@@ -1756,13 +1961,13 @@ class ReslLoan(models.Model):
                             "guarantor being replaced) or 'Find Guarantor' to select the second "
                             "one. The request is sent to both once they are selected."
                         )
-                elif state == 'full' and len(lines) == 2 and loan.status == 'guarantor_pending' \
+                elif state == 'full' and len(lines) >= 2 and loan.status == 'guarantor_pending' \
                         and not loan.all_guarantors_accepted:
                     accepted = len(lines.filtered(lambda l: l.state == 'accepted'))
                     notice = _(
-                        "This request has two guarantors. Both must accept before it can "
-                        "go further (%(done)s of 2 accepted)."
-                    ) % {'done': accepted}
+                        "This request has %(total)s guarantors. All must accept before it can "
+                        "go further (%(done)s of %(total)s accepted)."
+                    ) % {'done': accepted, 'total': len(lines)}
                 elif being_replaced and not loan.all_guarantors_accepted:
                     notice = _(
                         "Waiting for the replacement guarantor to accept. %(names)s stays on "
@@ -1994,10 +2199,16 @@ class ReslLoan(models.Model):
 
     def _check_can_replace_guarantor(self):
         self.ensure_one()
-        if self.env.su or self._user_can_replace_any_stage():
-            return True
         emp = self.env.user.employee_id
         is_requester = bool(emp and self.employee_id and self.employee_id.id == emp.id)
+        # The requester can never replace a guarantor once the request is approved
+        # (even if he / she also holds a Head Office / unit-head role).
+        if (is_requester and not self.env.su
+                and self.status not in self._REQUESTER_REPLACE_STATUSES):
+            raise ValidationError(_(
+                "You can no longer replace the guarantor: the request has been approved."))
+        if self.env.su or self._user_can_replace_any_stage():
+            return True
         if is_requester and (
             self.status in self._REQUESTER_REPLACE_STATUSES or self.needs_guarantor_replacement
         ):
@@ -2408,7 +2619,11 @@ class ReslLoan(models.Model):
             return False
         emp = employee.sudo() if sudo else employee
 
-        version = getattr(emp, 'version_id', False) or getattr(emp, 'current_version_id', False)
+        # The version in force TODAY (current_version_id: latest version whose
+        # date has come) is what salary / service must be read from. version_id is
+        # only the version the employee form happens to display, which can be an
+        # older one - after a raise, the old salary kept being used.
+        version = getattr(emp, 'current_version_id', False) or getattr(emp, 'version_id', False)
         if version:
             return version
 
@@ -2562,8 +2777,7 @@ class ReslLoan(models.Model):
             blockers.append(_(
                 "%(name)s already has an RSSA request (%(ref)s) that is still "
                 "awaiting guarantors or manager review. That request must be "
-                "approved, rejected, or cancelled before a new one can be "
-                "submitted."
+                "rejected or cancelled before a new one can be submitted."
             ) % {'name': emp.name, 'ref': pending_loan.name})
 
         max_term = self._max_eligible_loan_term(emp)
@@ -3415,6 +3629,19 @@ class ReslLoan(models.Model):
             except Exception:
                 _logger.exception("Failed to notify HR after manager approval")
 
+            # Tell the requestor and the disbursor(s) that it was approved
+            # (the approver acted, so he / she is not notified).
+            loan._resl_notify_progress(
+                _("Loan approved: %s") % loan.name,
+                _("Loan %(loan)s of %(employee)s (%(amount)s %(currency)s) was APPROVED by "
+                  "%(user)s.") % {
+                    'loan': loan.name,
+                    'employee': loan.sudo().employee_id.name,
+                    'amount': '{:,.2f}'.format(approved_amt or 0.0),
+                    'currency': loan.currency_id.name or '',
+                    'user': user.name},
+            )
+
             # Finalize pending replacements
             old_guarantor_ids = []
             try:
@@ -3621,6 +3848,7 @@ class ReslLoan(models.Model):
             self.sudo().message_post(body=note)
         except Exception:
             _logger.exception('Failed to post disbursement-request message for loan %s', self.id)
+        self._resl_notify_progress(_("Disbursement requested: %s") % self.name, note)
 
         return {
             'type': 'ir.actions.client',
@@ -3650,11 +3878,12 @@ class ReslLoan(models.Model):
         self.ensure_one()
         user = self.env.user
         if not self._user_can_disburse(user):
-            officer = self.sudo().disbursement_officer_id
-            if officer:
+            officers = self.sudo().disbursement_officer_ids or self.sudo().disbursement_officer_id
+            if officers:
                 raise ValidationError(_(
                     "Only %(officer)s (%(role)s) can disburse this loan."
-                ) % {'officer': officer.name, 'role': self.disbursement_officer_role or _('Disbursement Officer')})
+                ) % {'officer': ', '.join(officers.mapped('name')),
+                     'role': self.disbursement_officer_role or _('Disbursement Officer')})
             raise ValidationError(_("Only POMD / HR / HR Accountant or Administrators can record Core Banking disbursement."))
         # The disburser must pass the same employment checks as the requester.
         self.env['resl.validations'].check_actor_eligibility(
@@ -3748,6 +3977,13 @@ class ReslLoan(models.Model):
             'employee': self.employee_id.name,
             'total': '{:,.2f}'.format(new_total),
         })
+
+        self._resl_notify_progress(
+            _("Loan disbursed: %s") % self.name,
+            _("Loan %(loan)s of %(employee)s was DISBURSED by %(user)s: %(amount)s %(currency)s.") % {
+                'loan': self.name, 'employee': self.employee_id.name, 'user': user.name,
+                'amount': '{:,.2f}'.format(disbursed_amount), 'currency': currency_name},
+        )
 
         return {
             'type': 'ir.actions.client',

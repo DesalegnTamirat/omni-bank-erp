@@ -73,20 +73,21 @@
         <field name="arch" type="xml">
             <form string="Disqualification Appeal Request">
                 <header>
-                    <button name="action_approve_appeal" string="Uphold Appeal &amp; Reverse Disqualification" type="object" invisible="state != 'submitted'" class="btn-success" groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
-                    <button name="action_reject_appeal" string="Reject Appeal" type="object" invisible="state != 'submitted'" class="btn-danger" groups="custom_recruitment.group_recruitment_manager"/>
+                    <button name="action_approve_appeal" string="Uphold Appeal &amp; Reverse Disqualification" type="object" invisible="state != 'submitted'" class="btn-success" groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,hr.group_hr_manager"/>
+                    <button name="action_reject_appeal" string="Reject Appeal" type="object" invisible="state != 'submitted'" class="btn-danger" groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,hr.group_hr_manager"/>
                     <field name="state" widget="statusbar" statusbar_visible="submitted,approved,rejected"/>
                 </header>
                 <sheet>
+                        <field name="can_review" invisible="1"/>
                     <div class="oe_title">
                         <label for="name" string="Appeal Reference"/>
                         <h3><field name="name" readonly="1"/></h3>
                     </div>
                     <group>
                         <group>
+                            <field name="disqualification_log_id" readonly="state != 'submitted' and id" domain="[('is_reversed', '=', False)]"/>
                             <field name="candidate_name"/>
                             <field name="candidate_code"/>
-                            <field name="disqualification_log_id"/>
                         </group>
                         <group>
                             <field name="create_date" string="Submission Date"/>
@@ -98,7 +99,7 @@
                         <field name="appeal_reason" readonly="state != 'submitted'"/>
                     </group>
                     <group string="Review Decision">
-                        <field name="review_comments" placeholder="Provide justification for upholding or rejecting this appeal..."/>
+                        <field name="review_comments" placeholder="Provide justification for upholding or rejecting this appeal..." readonly="not can_review or state != 'submitted'"/>
                     </group>
                 </sheet>
                 <chatter/>

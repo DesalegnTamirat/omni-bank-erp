@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="bunna_hr_announcement.Dashboard">
+        <div class="o_bunna_dash h-100 overflow-auto">
+            <div class="o_bunna_dash_inner">
+
+                <t t-if="state.loading">
+                    <div class="text-center text-muted py-5">
+                        <i class="fa fa-spinner fa-spin fa-2x mb-2"/>
+                        <div>Loading the dashboard…</div>
+                    </div>
+                </t>
+                <t t-elif="state.error or !state.data">
+                    <div class="alert alert-warning m-3">
+                        The dashboard could not be loaded.
+                        <button class="btn btn-link p-0 ms-2" t-on-click="load">Try again</button>
+                    </div>
+                </t>
+                <t t-else="">
+                    <t t-set="d" t-value="state.data"/>
+
+                    <!-- Banner -->
+                    <div class="o_bunna_dash_banner">
+                        <div class="o_bunna_dash_banner_text">
+                            <div class="o_bunna_dash_banner_title">
+                                <i class="fa fa-bullhorn me-2"/>Announcements
+                            </div>
+                            <div class="o_bunna_dash_banner_sub">
+                                <span class="o_bunna_dash_role" t-esc="d.role_label"/>
+                                <span t-esc="d.today"/>
+                                <span t-if="d.scope_note" class="fst-italic" t-esc="d.scope_note"/>
+                            </div>
+                        </div>
+                        <div class="o_bunna_dash_banner_actions">
+                            <button class="btn btn-light" t-on-click="load" title="Refresh">
+                                <i class="fa fa-refresh me-1"/>Refresh
+                            </button>
+                            <button t-if="d.can_create" class="btn btn-warning fw-semibold" t-on-click="createAnnouncement">
+                                <i class="fa fa-plus me-1"/>New announcement
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KPI cards -->
+                    <div class="o_bunna_dash_kpis" t-att-class="{'o_bunna_dash_kpis_odd': kpiOdd}" t-att-style="'--cols:' + kpiCols">
+                        <t t-foreach="d.kpis" t-as="k" t-key="k.key">
+                            <div t-attf-class="o_bunna_dash_kpi tone-#{k.tone}" role="button"
+                                 t-on-click="() => this.openKpi(k)">
+                                <div class="o_bunna_dash_kpi_icon"><i t-att-class="'fa ' + kpiIcon(k.key)"/></div>
+                                <div class="o_bunna_dash_kpi_body">
+                                    <div class="o_bunna_dash_kpi_value" t-esc="k.value"/>
+                                    <div class="o_bunna_dash_kpi_label" t-esc="k.label"/>
+                                    <div class="o_bunna_dash_kpi_hint" t-esc="k.hint"/>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- Readership chart + most read -->
+                    <div t-if="d.chart" class="o_bunna_dash_split">
+                        <div class="o_bunna_dash_card">
+                            <div class="o_bunna_dash_card_head">
+                                <h5><i class="fa fa-bar-chart me-2"/><t t-esc="d.chart.title"/></h5>
+                            </div>
+                            <div class="o_bunna_dash_card_sub" t-esc="d.chart.summary"/>
+                            <div class="o_bunna_dash_bars">
+                                <t t-foreach="d.chart.points" t-as="p" t-key="p_index">
+                                    <div class="o_bunna_dash_bar_col" t-att-title="p.label + ': ' + p.value + ' views'">
+                                        <div class="o_bunna_dash_bar_num" t-esc="p.value"/>
+                                        <div class="o_bunna_dash_bar" t-att-style="'height:' + barHeight(p.value) + '%'"/>
+                                        <div class="o_bunna_dash_bar_lbl" t-esc="p.short"/>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                        <div class="o_bunna_dash_card">
+                            <div class="o_bunna_dash_card_head">
+                                <h5><i class="fa fa-trophy me-2"/>Most read</h5>
+                            </div>
+                            <div t-if="!d.top.length" class="o_bunna_dash_empty">
+                                <i class="fa fa-eye-slash"/>
+                                <span>No views yet.</span>
+                            </div>
+                            <t t-foreach="d.top" t-as="tp" t-key="tp.id">
+                                <div class="o_bunna_dash_rank" role="button" t-on-click="() => this.openRecord(tp.id)">
+                                    <span class="o_bunna_dash_rank_no" t-esc="tp_index + 1"/>
+                                    <div class="o_bunna_dash_rank_main">
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <span class="text-truncate" t-esc="tp.name"/>
+                                            <strong t-esc="tp.value"/>
+                                        </div>
+                                        <div class="o_bunna_dash_track"><div class="o_bunna_dash_fill" t-att-style="'width:' + topWidth(tp.value) + '%'"/></div>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <!-- Lists: the boxes share the full width -->
+                    <div class="o_bunna_dash_lists">
+                        <t t-foreach="d.lists" t-as="l" t-key="l.key">
+                            <div class="o_bunna_dash_card">
+                                <div class="o_bunna_dash_card_head">
+                                    <h5><i t-att-class="'fa me-2 ' + listIcon(l.key)"/><t t-esc="l.title"/></h5>
+                                    <span class="o_bunna_dash_count" t-esc="l.items.length"/>
+                                </div>
+                                <div t-if="!l.items.length" class="o_bunna_dash_empty">
+                                    <i class="fa fa-check-circle-o"/>
+                                    <span t-esc="l.empty"/>
+                                </div>
+                                <t t-foreach="l.items" t-as="it" t-key="it.id">
+                                    <div class="o_bunna_dash_row" role="button" t-on-click="() => this.openRecord(it.id)">
+                                        <div class="o_bunna_dash_row_main">
+                                            <div class="text-truncate fw-semibold" t-esc="it.name"/>
+                                            <div class="o_bunna_dash_row_meta" t-esc="it.meta"/>
+                                        </div>
+                                        <span t-att-class="badgeClass(it.status)" t-esc="it.status_label"/>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- Shortcuts -->
+                    <div class="o_bunna_dash_links">
+                        <t t-foreach="d.links" t-as="link" t-key="link.action">
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" t-on-click="() => this.openLink(link)" t-esc="link.label"/>
+                        </t>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -62,4 +62,31 @@
         <field name="padding">4</field>
         <field name="company_id" eval="False"/>
     </record>
+
+    <!-- Strategic Issue Sequence -->
+    <record id="seq_pm_strategic_issue" model="ir.sequence">
+        <field name="name">Strategic Issue Sequence</field>
+        <field name="code">pm.strategic.issue</field>
+        <field name="prefix">ISS/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Test Case Sequence -->
+    <record id="seq_pm_test_case" model="ir.sequence">
+        <field name="name">Test Case Sequence</field>
+        <field name="code">pm.test.case</field>
+        <field name="prefix">TC/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Test Execution Sequence -->
+    <record id="seq_pm_test_execution" model="ir.sequence">
+        <field name="name">Test Execution Sequence</field>
+        <field name="code">pm.test.execution</field>
+        <field name="prefix">TE/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>

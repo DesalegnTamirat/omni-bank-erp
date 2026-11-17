@@ -1,323 +1,719 @@
 <?xml version='1.0' encoding='UTF-8'?>
+
 <odoo>
 
+
+
     <record id="transfer_committee_minutes_list_view" model="ir.ui.view">
+
         <field name="name">transfer.committee.minutes.list</field>
+
         <field name="model">transfer.committee.minutes</field>
+
         <field name="arch" type="xml">
+
             <list string="Transfer Committee Minutes"
+
                   decoration-success="state == 'approved'"
+
                   decoration-info="state == 'ranked'"
+
                   decoration-muted="state == 'draft'">
+
                 <field name="name"/>
-                <field name="target_vacancy_id"/>
+
+                <field name="target_operating_unit_id"/>
+
+                <field name="target_job_position_id"/>
+
                 <field name="meeting_date"/>
+
                 <field name="state" widget="badge"
+
                        decoration-success="state == 'approved'"
+
                        decoration-info="state == 'ranked'"
+
                        decoration-muted="state == 'draft'"/>
+
             </list>
+
         </field>
+
     </record>
+
+
 
     <record id="transfer_committee_minutes_form_view" model="ir.ui.view">
+
         <field name="name">transfer.committee.minutes.form</field>
+
         <field name="model">transfer.committee.minutes</field>
+
         <field name="arch" type="xml">
+
             <form string="Transfer Committee Minutes">
+
                 <header>
+
                     <!-- Auto-sync considered requests with current vacancy / direct-transfer setting -->
+
                     <button name="action_refresh_eligible_requests" string="Refresh Eligible Requests"
+
                             type="object"
+
                             class="btn-secondary"
+
                             invisible="state != 'draft'"
-                            help="Reload the list of eligible transfer requests based on the current Target Vacancy (or direct transfers if left empty). This overwrites any manually added/removed requests."/>
+
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_user"
+
+                            help="Reload the list of eligible transfer requests based on the current Target Operating Unit and Target Job Position. This overwrites any manually added/removed requests."/>
+
                     <!-- Compute weighted ranking -->
+
                     <button name="action_compute_ranking" string="Compute Ranking" type="object"
-                            class="oe_highlight"
-                            invisible="state == 'approved'"
+                    class="oe_highlight"
+                    invisible="state != 'draft'"
+
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_user"
+
                             help="Calculate weighted Transfer Suitability Scores for all eligible candidates."/>
+
                     <!-- Submit for Digital Signatures -->
-                    <button name="action_submit_for_signatures" string="Submit for Digital Signatures" type="object"
-                            class="oe_highlight"
-                            invisible="state not in ['ranked']"
+
+                    <button name="action_dispatch_digital_signatures" string="Dispatch Digital Signature" type="object"
+                    class="oe_highlight btn-primary" icon="fa-paper-plane"
+                    invisible="state not in ['ranked']"
+
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_user"
+
                             help="Generate digital signature lines for assigned committee members and change status to Waiting Signatures."/>
-                    <!-- Approve minutes and auto-approve selected candidates -->
-                    <button name="action_approve_minutes" string="Approve &amp; Complete Transfer" type="object"
+
+                    <!-- Approve minutes and dispatch transfer acceptance offers to selected candidates -->
+
+                    <button name="action_approve_minutes" string="Approve Minutes &amp; Issue Offer" type="object"
+
                             class="oe_highlight"
-                            invisible="state not in ['ranked', 'waiting_signature']"
-                            confirm="Approving minutes will verify all mandatory digital signatures and automatically complete the transfer requests of all candidates marked as 'Selected'. Proceed?"/>
-                    <!-- Generate transfer letters for selected candidates -->
-                    <button name="action_generate_all_transfer_letters" string="Generate Transfer Letters" type="object"
-                            class="btn-success" icon="fa-file-text-o"
+
+                            invisible="state != 'waiting_signature'"
+
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_user"
+
+                            confirm="Approving minutes will verify all mandatory digital signatures, generate the official Committee Minutes (ቃለ-ጉባዔ), and dispatch transfer acceptance offers to selected candidates. Proceed?"/>
+
+                    <!-- Sign Minute Button for Logged-in Committee Member -->
+                    <button name="action_sign_my_minute_line" string="✍️ Sign Minute" type="object" class="btn-success" invisible="not current_user_can_sign"/>
+
+                    <!-- Print Minute (ቃለ-ጉባዔ) -->
+
+                    <button name="action_print_minutes" string="Print Minute (ቃለ-ጉባዔ)" type="object"
+
+                            class="oe_highlight" icon="fa-print"
+
                             invisible="state != 'approved'"
+
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_user"
+
+                            help="Print the official Ethiopian Amharic Transfer Committee Minutes (ቃለ-ጉባዔ)."/>
+
+                    <!-- Generate transfer letters for selected candidates -->
+
+                    <button name="action_generate_all_transfer_letters" string="Generate Transfer Letters" type="object"
+
+                            class="btn-success" icon="fa-file-text-o"
+
+                            invisible="state != 'approved'"
+
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_user"
+
                             help="Generate and preview lateral transfer letters for all selected candidates."/>
+
                     <field name="state" widget="statusbar" statusbar_visible="draft,ranked,waiting_signature,approved"/>
+
                 </header>
+
                 <sheet>
+                    <field name="current_user_can_sign" invisible="1"/>
+
                     <div class="oe_title">
+
                         <h1><field name="name" readonly="1"/></h1>
+
                     </div>
+
+
 
                     <!-- Info banner when approved -->
+
                     <div class="alert alert-success" role="alert" invisible="state != 'approved'">
+
                         <strong>✅ Minutes Digitally Approved</strong> – All mandatory committee members have signed. Selected candidates' transfer requests have been completed.
+
                     </div>
+
                     <div class="alert alert-warning" role="alert" invisible="state != 'waiting_signature'">
+
                         <strong>✍️ Waiting for Digital Signatures</strong> – Designated committee members must digitally sign their approval under the 'Committee Signatures' tab before HR can finalize.
+
                     </div>
+
+
 
                     <group>
+
                         <group string="Transfer Settings">
-                            <field name="target_vacancy_id" readonly="state != 'draft'"
-                                   options="{'no_create': True}"
-                                   placeholder="Leave empty for direct transfers"/>
-                            <field name="meeting_date" readonly="state == 'approved'"/>
-                            <field name="approval_hierarchy_type" widget="radio" readonly="state == 'approved'"/>
+
+                            <field name="allowed_target_operating_unit_ids" invisible="1"/>
+
+                            <field name="allowed_target_job_position_ids" invisible="1"/>
+
+                            <field name="target_operating_unit_id" readonly="state != 'draft'"
+
+                                   domain="[('id', 'in', allowed_target_operating_unit_ids)]"
+
+                                   options="{'no_create': True, 'no_open': True}" required="1"/>
+
+                            <field name="target_job_position_id" readonly="state != 'draft'"
+
+                                   domain="[('id', 'in', allowed_target_job_position_ids)]"
+
+                                   options="{'no_create': True, 'no_open': True}" required="1"/>
+
+                            <field name="available_slots" readonly="state != 'draft'"/>
+
+                            <field name="meeting_date" readonly="state in ['waiting_signature', 'approved']"/>
+
+                            <field name="approval_hierarchy_type" widget="radio" readonly="state in ['waiting_signature', 'approved']"/>
+
                         </group>
+
                         <group string="Committee Approval Roles">
-                            <field name="chairperson_id" required="1" readonly="state == 'approved'" options="{'no_create': True}"/>
-                            <field name="panel_member_id" required="1" readonly="state == 'approved'" options="{'no_create': True}"/>
-                            <field name="secretary_id" required="1" readonly="state == 'approved'" options="{'no_create': True}"/>
-                            <field name="observer_id" readonly="state == 'approved'" options="{'no_create': True}"
+
+                            <field name="allowed_chairperson_user_ids" invisible="1"/>
+
+                            <field name="allowed_panel_member_user_ids" invisible="1"/>
+
+                            <field name="allowed_secretary_user_ids" invisible="1"/>
+
+                            <field name="allowed_observer_user_ids" invisible="1"/>
+
+                            <field name="chairperson_id" required="1" readonly="state in ['waiting_signature', 'approved']"
+
+                                   domain="[('id', 'in', allowed_chairperson_user_ids)]"
+
+                                   options="{'no_create': True, 'no_open': True}"/>
+
+                            <field name="panel_member_id" required="1" readonly="state in ['waiting_signature', 'approved']"
+
+                                   domain="[('id', 'in', allowed_panel_member_user_ids)]"
+
+                                   options="{'no_create': True, 'no_open': True}"/>
+
+                            <field name="secretary_id" required="1" readonly="state in ['waiting_signature', 'approved']"
+
+                                   domain="[('id', 'in', allowed_secretary_user_ids)]"
+
+                                   options="{'no_create': True, 'no_open': True}"/>
+
+                            <field name="observer_id" readonly="state in ['waiting_signature', 'approved']"
+
+                                   domain="[('id', 'in', allowed_observer_user_ids)]"
+
+                                   options="{'no_create': True, 'no_open': True}"
+
                                    help="Labor Representative (Optional to sign)"/>
+
                             <field name="is_fully_signed" invisible="1"/>
+
                         </group>
+
                     </group>
 
+
+
                     <notebook>
+
                         <!-- Tab 1: Transfer Requests Considered -->
-                        <page string="Transfer Requests Considered">
-                            <field name="transfer_request_ids" readonly="state == 'approved'"
-                                   domain="[('target_vacancy_id', '=', target_vacancy_id), ('state', 'in', ['submitted', 'under_review', 'approved']), ('eligibility_status', '=', 'eligible')]">
+
+                        <page string="Transfer Requests Considered"
+
+                              groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_user">
+
+                            <field name="transfer_request_ids" readonly="state in ['waiting_signature', 'approved']"
+
+                                   domain="[('requested_operating_unit_id', '=', target_operating_unit_id), ('target_job_position_id', '=', target_job_position_id), ('state', 'in', ['under_review', 'approved']), ('status_group', '=', 'active'), ('eligibility_status', '=', 'eligible'), ('is_committee_selected', '=', False)]">
+
                                 <list>
+
                                     <field name="name"/>
+
                                     <field name="employee_id"/>
+
                                     <field name="current_job_grade_id"/>
+
                                     <field name="current_operating_unit_id"/>
+
                                     <field name="request_date"/>
+
                                     <field name="pms_score"
+
                                            decoration-danger="pms_score &lt; 75"/>
+
                                     <field name="total_experience_years"/>
+
+                                    <field name="service_years_current_position"/>
+
                                     <field name="service_years_current_location"/>
+
                                     <field name="disciplinary_status"/>
+
                                     <field name="eligibility_status" widget="badge"
+
                                            decoration-success="eligibility_status == 'eligible'"
+
                                            decoration-danger="eligibility_status == 'ineligible'"/>
+
                                     <field name="state" widget="badge"/>
+
                                 </list>
+
                             </field>
+
                         </page>
+
+
 
                         <!-- Tab 2: Ranked List -->
+
                         <page string="Ranked Candidates">
+
                             <field name="ranking_line_ids" readonly="state == 'approved'">
+
                                 <list editable="bottom" create="0" delete="0"
+
                                       decoration-success="selection_decision == 'selected'"
+
                                       decoration-muted="selection_decision == 'not_selected'">
+
                                     <field name="rank" readonly="1"/>
+
                                     <field name="employee_id" readonly="1"/>
+
                                     <field name="employee_gender" readonly="1" optional="hide"/>
+
+                                    <field name="service_years_current_position" readonly="1" optional="show"/>
+
+                                    <field name="service_years_current_location" readonly="1" optional="show"/>
+
                                     <field name="application_date_score" readonly="1"
+
                                            string="App Date (20%)"/>
+
                                     <field name="experience_score" readonly="1"
+
                                            string="Experience (20%)"/>
+
                                     <field name="service_location_score" readonly="1"
+
                                            string="Location (20%)"/>
+
                                     <field name="pms_score" readonly="1"
+
                                            string="PMS (30%)"/>
+
                                     <field name="recommendation_score" readonly="1"
+
                                            string="Rec (10%)"/>
+
                                     <field name="discipline_deduction_percent" readonly="1"
+
                                            string="Deduction (%)"/>
+
                                     <field name="final_score" readonly="1"
+
                                            string="Final Score"/>
+
                                     <field name="selection_decision" widget="badge"
+
                                            readonly="parent.state in ['waiting_signature', 'approved']"
+
                                            decoration-success="selection_decision == 'selected'"
+
+                                           decoration-warning="selection_decision == 'reserved'"
+
+                                           decoration-danger="selection_decision == 'declined'"
+
                                            decoration-muted="selection_decision == 'not_selected'"/>
+
                                 </list>
+
                             </field>
+
                         </page>
+
+
 
                         <!-- Tab 3: Committee Digital Signatures -->
+
                         <page string="Committee Digital Signatures">
+
                             <field name="signature_line_ids" readonly="state == 'approved'">
+
                                 <list editable="bottom" create="0" delete="0"
+
                                       decoration-success="state == 'signed'"
+
                                       decoration-warning="state == 'pending' and is_mandatory"
+
                                       decoration-muted="state == 'pending' and not is_mandatory">
+
                                     <field name="role_label" readonly="1"/>
+
                                     <field name="user_id" readonly="1"/>
+
                                     <field name="is_mandatory" readonly="1" widget="boolean_toggle" string="Mandatory?"/>
-                                    <field name="digital_signature" widget="signature"/>
+
+                                    <field name="digital_signature" widget="image" options="{'size': [140, 45]}" readonly="1" invisible="not digital_signature"/>
+
+                                    <button name="action_sign_digitally" string="✍️ Click to Sign" type="object" class="btn btn-outline-warning btn-sm" invisible="digital_signature" help="Click here to open the digital signature wizard"/>
+
                                     <field name="signed_on" readonly="1"/>
+
                                     <field name="state" widget="badge"
+
                                            decoration-success="state == 'signed'"
+
                                            decoration-warning="state == 'pending'"/>
-                                    <button name="action_sign_digitally" string="Confirm Sign" type="object" class="btn-primary" invisible="state == 'signed'"/>
+
+                                    <button name="action_sign_digitally" string="✍️ Sign" type="object" class="btn-primary" invisible="state == 'signed'"/>
+
                                 </list>
+
                             </field>
+
                         </page>
+
+
 
                         <!-- Tab 4: Selection Decision / Committee Notes -->
+
                         <page string="Committee Notes">
+
                             <field name="selection_decision"
+
                                    placeholder="Record the committee's final selection decision and any supporting notes..."
+
                                    readonly="state == 'approved'"/>
+
                         </page>
+
                     </notebook>
 
+
+
                 </sheet>
+
                 <chatter/>
+
             </form>
+
         </field>
+
     </record>
+
+
+
 
 
     <record id="action_transfer_committee_minutes" model="ir.actions.act_window">
+
         <field name="name">Transfer Committee Minutes</field>
+
         <field name="res_model">transfer.committee.minutes</field>
+
         <field name="view_mode">list,form</field>
+
         <field name="help" type="html">
+
             <p class="o_view_nocontent_smiling_face">Create Transfer Committee Minutes!</p>
+
             <p>Use this form to compute the weighted Transfer Suitability Score for all eligible
+
                transfer applicants, review the ranked list, record the committee's selection decision,
+
                and generate a printable PDF report .
+
             </p>
+
         </field>
+
     </record>
 
 
-    <record id="action_report_transfer_minute" model="ir.actions.report">
+
+
+
+    <record id="action_report_transfer_selection_notification" model="ir.actions.report">
+
         <field name="name">Transfer Selection Notification</field>
+
         <field name="model">transfer.committee.minutes</field>
+
         <field name="report_type">qweb-pdf</field>
+
         <field name="report_name">custom_recruitment.report_transfer_selection_notification</field>
+
         <field name="report_file">custom_recruitment.report_transfer_selection_notification</field>
+
         <field name="print_report_name">'Transfer Selection Notification - %s' % (object.name)</field>
+
         <field name="binding_model_id" ref="model_transfer_committee_minutes"/>
+
         <field name="binding_type">report</field>
+
     </record>
+
+
+
 
 
     <template id="report_transfer_selection_notification">
+
         <t t-call="web.html_container">
+
             <t t-foreach="docs" t-as="o">
+
                 <t t-set="selected_lines" t-value="o.ranking_line_ids.filtered(lambda l: l.selection_decision == 'selected')"/>
 
+
+
                 <t t-if="not selected_lines">
+
                     <t t-call="web.external_layout">
+
                         <div class="page">
+
                             <h3>Transfer Committee Minutes: <span t-field="o.name"/></h3>
+
                             <p>No candidates are currently marked "Selected" on this committee's
+
                                ranked list. Compute the ranking and mark selections before printing
+
                                the Selection Notification letters.</p>
+
                         </div>
+
                     </t>
+
                 </t>
 
+
+
                 <t t-foreach="selected_lines" t-as="line">
+
                     <t t-set="req" t-value="line.transfer_request_id"/>
+
                     <t t-set="emp" t-value="req.employee_id"/>
+
                     <t t-set="is_last" t-value="line_last"/>
 
+
+
                     <t t-call="web.external_layout">
+
                         <div class="page" t-attf-style="#{'' if is_last else 'page-break-after: always;'}">
 
+
+
                             <div class="text-end" style="margin-bottom: 24px;">
+
                                 <span>Date: </span>
+
                                 <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%B %d, %Y')"/>
+
                             </div>
 
+
+
                             <p>
+
                                 To: <span t-field="emp.name"/><br/>
+
                                 Employee ID:
+
                                 <span t-esc="emp.identification_id or ('EMP-%s' % emp.id)"/><br/>
+
                                 Current Position:
+
                                 <span t-esc="req.current_job_position_id.name or 'N/A'"/><br/>
+
                                 Current Department/Branch:
+
                                 <span t-esc="req.current_operating_unit_id.name or 'N/A'"/>
+
                             </p>
+
+
 
                             <p><strong>Subject: Successful Selection for Employee Transfer</strong></p>
 
+
+
                             <p>Dear <span t-field="emp.name"/>,</p>
 
-                            <p>
-                                We are pleased to inform you that your request for an internal
-                                transfer has been successfully approved following the completion
-                                of the evaluation and selection process.
-                            </p>
+
 
                             <p>
-                                Based on the approved transfer criteria, including performance
-                                evaluation, work experience, length of service, recommendation,
-                                and organizational requirements, you have been selected for
-                                transfer to the following position:
+
+                                We are pleased to inform you that your request for an internal
+
+                                transfer has been successfully approved following the completion
+
+                                of the evaluation and selection process.
+
                             </p>
+
+
+
+                            <p>
+
+                                Based on the approved transfer criteria, including performance
+
+                                evaluation, work experience, length of service, recommendation,
+
+                                and organizational requirements, you have been selected for
+
+                                transfer to the following position:
+
+                            </p>
+
+
 
                             <ul>
+
                                 <li>New Position:
+
                                     <span t-esc="req.target_job_position_id.name or 'N/A'"/></li>
+
                                 <li>New Department/Branch:
+
                                     <span t-esc="req.target_operating_unit_id.name or 'N/A'"/></li>
+
                                 <li>Reporting Manager:
+
                                     <span t-esc="req.reporting_manager_id.name or 'To be advised'"/></li>
+
                                 <li>Effective Transfer Date:
+
                                     <span t-if="req.effective_transfer_date" t-field="req.effective_transfer_date"/>
+
                                     <span t-if="not req.effective_transfer_date">To be advised</span>
+
                                 </li>
+
                                 <li>Work Location:
+
                                     <span t-esc="req.target_operating_unit_id.name or 'N/A'"/></li>
+
                             </ul>
 
+
+
                             <p>
+
                                 Please report to your new department on the effective date stated
+
                                 above. Before your transfer becomes effective, you are required to:
+
                             </p>
+
+
 
                             <ol>
+
                                 <li>Complete all pending assignments and responsibilities.</li>
+
                                 <li>Obtain the necessary clearance from your current department.</li>
+
                                 <li>Return any company property, where applicable.</li>
+
                                 <li>Coordinate with Human Resources and your current supervisor to
+
                                     ensure a smooth transition.</li>
+
                             </ol>
 
+
+
                             <p>
+
                                 Your salary, benefits, and employment terms shall continue in
+
                                 accordance with the organization's policies unless otherwise
+
                                 communicated in writing.
+
                             </p>
 
+
+
                             <p>
+
                                 Congratulations on your successful selection. We appreciate your
+
                                 continued commitment to the organization and wish you every
+
                                 success in your new role.
+
                             </p>
 
+
+
                             <p>
+
                                 If you require any clarification regarding your transfer, please
+
                                 contact the Human Resources Department.
+
                             </p>
 
+
+
                             <p>
+
                                 Sincerely,<br/>
+
                                 Human Resources Department
+
                             </p>
+
+
 
                             <div style="margin-top: 48px;">
+
                                 <p>Approved By: _______________________
+
                                 Name: _____________________________</p>
+
                                 <p>Title: ______________________________
+
                                 Signature: _________________________</p>
+
                             </div>
 
+
+
                         </div>
+
                     </t>
+
                 </t>
+
             </t>
+
         </t>
+
     </template>
+
 </odoo>

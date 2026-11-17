@@ -1,6 +1,6 @@
 {
     'name': 'HR Leave Request Custom',
-    'version': '19.0.1.0.32',
+    'version': '19.0.1.0.55',
     'summary': 'Custom Leave Request extension for hr.holidays (Time Off)',
     'description': """
         Extends the standard Time Off (hr.holidays) module with additional
@@ -22,6 +22,10 @@
         'views/hr_leave_type_custom_views.xml',
         'views/res_config_settings_views.xml',
         'views/hr_leave_dashboard_views.xml',
+        'views/hr_leave_balance_report_views.xml',
+        'views/hr_leave_balance_report_pdf.xml',
+        'views/hr_sick_leave_threshold_report_views.xml',
+        'views/hr_sick_leave_threshold_report_pdf.xml',
     ],
     'assets': {
         'web.assets_backend': [

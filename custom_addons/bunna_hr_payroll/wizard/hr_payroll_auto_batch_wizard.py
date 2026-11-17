@@ -36,6 +36,12 @@ class HrPayrollAutoBatchWizard(models.TransientModel):
         required=True,
         help='Prefix for naming the generated batches.'
     )
+    compute_sheets = fields.Boolean(
+        string='Compute Salary Sheets Immediately',
+        default=False,
+        help='When disabled (Recommended for 1000+ employees), batches and draft payslips are created in 2-3 seconds without server timeout. You can then compute batches batch-by-batch.'
+    )
+
     company_id = fields.Many2one(
         'res.company',
         string='Company',
@@ -444,11 +450,23 @@ class HrPayrollAutoBatchWizard(models.TransientModel):
                     'company_id': employee.company_id.id,
                 })
 
-            # Bulk multi-create all payslips for this chunk in ONE single SQL multi-insert
-            payslips = self.env['hr.payslip'].sudo().create(chunk_slip_vals)
+            # Bulk multi-create all payslips for this chunk with audit/tracking bypass
+            payslips = self.env['hr.payslip'].sudo().with_context(
+                tracking_disable=True,
+                mail_create_nolog=True,
+                mail_create_nosubscribe=True,
+                no_audit=True
+            ).create(chunk_slip_vals)
 
-            # Compute payslip sheets for this batch chunk
-            payslips.sudo().compute_sheet()
+            # Only compute sheets immediately if user explicitly enabled it
+            if self.compute_sheets:
+                payslips.sudo().with_context(
+                    tracking_disable=True,
+                    mail_create_nolog=True,
+                    mail_create_nosubscribe=True,
+                    no_audit=True,
+                    skip_version_sync=True
+                ).compute_sheet()
 
             # Commit after each batch: keeps memory low, saves transaction logs & avoids 504 gateway timeouts
             self.env.cr.commit()

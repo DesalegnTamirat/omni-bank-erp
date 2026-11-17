@@ -25,7 +25,7 @@
                         <button t-if="admin.isAdmin" type="button" class="o_dms_vbtn o_dms_vbtn_text" title="Open the full record" t-on-click="openDetails">
                             <i class="fa fa-pencil"/><span class="o_dms_vbtn_label">Details</span>
                         </button>
-                        <button type="button" class="o_dms_vbtn o_dms_viewer_close" title="Close (Esc)" t-on-click="() => props.close()">
+                        <button type="button" class="o_dms_vbtn o_dms_viewer_close" title="Close (Esc)" t-on-click="() => this.props.close()">
                             <i class="fa fa-times"/>
                         </button>
                     </div>
@@ -92,7 +92,7 @@
                 </div>
                 <div t-if="hasMany" class="o_dms_viewer_strip" t-ref="strip">
                     <t t-foreach="props.docs" t-as="d" t-key="d.id">
-                        <button type="button" t-att-title="d.name" t-on-click="() => goTo(d_index)"
+                        <button type="button" t-att-title="d.name" t-on-click="() => this.goTo(d_index)"
                                 t-attf-class="o_dms_thumb_btn #{d_index === state.index ? 'o_dms_thumb_active' : ''}">
                             <img t-if="thumbUrl(d)" t-att-src="thumbUrl(d)" alt="" draggable="false"/>
                             <span t-else="" t-attf-class="o_dms_thumb_ext o_dms_ext_#{d.extension}" t-out="(d.extension || 'file').toUpperCase().slice(0, 4)"/>

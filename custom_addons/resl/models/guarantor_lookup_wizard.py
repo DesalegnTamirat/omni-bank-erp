@@ -21,6 +21,10 @@ class ReslGuarantorLookup(models.TransientModel):
         help="The requester. He/she cannot guarantee his/her own request.",
     )
     notice = fields.Char(string='Notice', readonly=True)
+    pre_agreed = fields.Boolean(
+        help="Opened from a New (unsaved) request whose Part A was already agreed. "
+             "The request is created when the guarantor is selected.",
+    )
     loan_created_here = fields.Boolean(
         help="True when this dialog itself created the (previously unsaved) request, "
              "so closing it must navigate to that request.",
@@ -113,8 +117,6 @@ class ReslGuarantorLookup(models.TransientModel):
         loan_id = res.get('loan_id') or self.env.context.get('default_loan_id')
         if loan_id:
             loan = self.env['resl.loan'].browse(loan_id).exists()
-            if loan and not loan.agr_borrower_complete:
-                raise ValidationError(_("You must complete and sign your Loan Agreement (Part A) before finding or selecting a guarantor."))
             if 'line_ids' in fields_list:
                 rows = self._selected_rows(loan) if loan else []
                 if rows:
@@ -227,10 +229,13 @@ class ReslGuarantorLookup(models.TransientModel):
         employee = employee.sudo()
 
         loan = wizard.loan_id
-        if loan and not loan.agr_borrower_complete:
-            raise ValidationError(_("You must complete and sign your Loan Agreement (Part A) before selecting a guarantor."))
         if not loan:
-            raise ValidationError(_("Please save your loan request and complete the Loan Agreement (Part A) before selecting a guarantor."))
+            # New form: picking a guarantor creates the draft request
+            # (same as pressing Save would).
+            loan = self.env['resl.loan'].create({
+                'custom_saved': True,
+            })
+            wizard.write({'loan_id': loan.id, 'loan_created_here': True})
 
         # Picking a guarantor IS the save: a request the web client auto-saved
         # earlier (custom_saved False) becomes a real request now.

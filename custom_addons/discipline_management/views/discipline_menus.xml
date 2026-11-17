@@ -16,38 +16,57 @@
                   parent="menu_discipline_root"
                   sequence="10"/>
 
+        
+        <menuitem id="menu_discipline_case_followup"
+                  name="Case Tracking &amp; Expiration Follow-up"
+                  parent="menu_discipline_operations_root"
+                  action="action_discipline_case_followup"
+                  groups="discipline_management.group_discipline_secretary,discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"
+                  sequence="10"/>
+
         <menuitem id="menu_discipline_cases"
                   name="Disciplinary Cases"
                   parent="menu_discipline_operations_root"
-                  action="action_discipline_case"
+                  action="action_discipline_case_menu"
                   sequence="1"/>
+
+        <menuitem id="menu_discipline_attendance_cases"
+                  name="Attendance Cases"
+                  parent="menu_discipline_operations_root"
+                  action="action_discipline_attendance_case"
+                  groups="discipline_management.group_discipline_user"
+                  sequence="2"/>
 
         <menuitem id="menu_discipline_suspensions"
                   name="Suspensions"
                   parent="menu_discipline_operations_root"
                   action="action_discipline_suspension"
                   groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"
-                  sequence="2"/>
+                  sequence="3"/>
 
         <menuitem id="menu_discipline_appeals"
                   name="Appeals &amp; Reviews"
                   parent="menu_discipline_operations_root"
                   action="action_discipline_appeal"
-                  sequence="3"/>
+                  sequence="4"/>
 
         <menuitem id="menu_discipline_payroll_penalties"
                   name="Payroll Deductions"
                   parent="menu_discipline_operations_root"
                   action="action_discipline_payroll_penalty"
                   groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
-                  sequence="4"/>
+                  sequence="5"/>
 
         <menuitem id="menu_discipline_attendance_scan"
                   name="Scan Attendance Violations"
                   parent="menu_discipline_operations_root"
                   action="action_discipline_attendance_scan_wizard"
-                  groups="discipline_management.group_discipline_user"
-                  sequence="5"/>
+                  groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
+                  sequence="6"/>
+
+        <record id="menu_discipline_attendance_scan" model="ir.ui.menu">
+            <field name="group_ids" eval="[(6, 0, [ref('discipline_management.group_discipline_pomd'), ref('discipline_management.group_discipline_admin')])]"/>
+        </record>
 
         <!-- 3. Hearings & Investigations Group -->
         <menuitem id="menu_discipline_hearings_root"
@@ -70,41 +89,44 @@
                   groups="discipline_management.group_discipline_user"
                   sequence="2"/>
 
-        <!-- 4. Regulatory Catalog & Reference (All Policy & Regulatory Master Data) -->
+        <!-- 4. Regulatory Catalog (Offenses, Articles, Categories) -->
         <menuitem id="menu_discipline_reference_root"
                   name="Regulatory Catalog"
                   parent="menu_discipline_root"
                   sequence="30"/>
 
-        <menuitem id="menu_discipline_policy_versions_ref"
-                  name="Regulation Documents &amp; Policies"
+        <menuitem id="menu_discipline_offenses_ref"
+                  name="Offense Classifications &amp; Rules"
                   parent="menu_discipline_reference_root"
-                  action="action_discipline_policy_version"
+                  action="action_discipline_offense"
                   sequence="1"/>
 
         <menuitem id="menu_discipline_articles_ref"
-                  name="Regulatory Articles &amp; Clauses"
+                  name="Regulatory Articles"
                   parent="menu_discipline_reference_root"
                   action="action_discipline_article"
                   sequence="2"/>
-
-        <menuitem id="menu_discipline_offenses_ref"
-                  name="Misconduct &amp; Penalty Index"
-                  parent="menu_discipline_reference_root"
-                  action="action_discipline_offense"
-                  sequence="3"/>
 
         <menuitem id="menu_discipline_offense_categories"
                   name="Offense Categories"
                   parent="menu_discipline_reference_root"
                   action="action_discipline_offense_category"
-                  sequence="4"/>
+                  sequence="3"/>
 
-        <menuitem id="menu_discipline_severity_levels"
-                  name="Severity Levels"
+        <!-- Server Action & Menu for Turnkey Regulation Synchronization -->
+        <record id="action_sync_bunna_regulation_server" model="ir.actions.server">
+            <field name="name">Sync &amp; Repair Regulation Catalog</field>
+            <field name="model_id" ref="model_discipline_offense"/>
+            <field name="state">code</field>
+            <field name="code">action = model.action_sync_bunna_regulation_catalog()</field>
+        </record>
+
+        <menuitem id="menu_discipline_sync_catalog"
+                  name="Sync &amp; Repair Regulation"
                   parent="menu_discipline_reference_root"
-                  action="action_discipline_severity_level"
-                  sequence="5"/>
+                  action="action_sync_bunna_regulation_server"
+                  groups="discipline_management.group_discipline_admin"
+                  sequence="10"/>
 
         <!-- 5. Configuration Menu Group (Admin Settings & Engine Parameters) -->
         <menuitem id="menu_discipline_config"
@@ -119,6 +141,21 @@
                   action="action_discipline_config_settings"
                   groups="discipline_management.group_discipline_admin"
                   sequence="1"/>
+
+        <menuitem id="menu_discipline_severity_levels"
+                  name="Severity Levels"
+                  parent="menu_discipline_config"
+                  action="action_discipline_severity_level"
+                  groups="discipline_management.group_discipline_admin"
+                  sequence="2"/>
+
+        <menuitem id="menu_discipline_policy_versions_ref"
+                  name="Regulation Documents &amp; Policies"
+                  parent="menu_discipline_config"
+                  action="action_discipline_policy_version"
+                  groups="discipline_management.group_discipline_admin"
+                  active="False"
+                  sequence="99"/>
 
     </data>
 </odoo>

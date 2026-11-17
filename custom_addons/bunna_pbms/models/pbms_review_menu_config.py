@@ -152,6 +152,12 @@ DEFAULT_MENU_GROUPS = {
 
 
 class PbmsReviewMenuConfig(models.Model):
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_rev_menu_key_active_idx
+                ON pbms_review_menu_config (menu_key, active);
+        """)
     """
     One record per Review & Consolidation sub-menu item.
     Defines which PBMS privileges grant visibility of that menu.

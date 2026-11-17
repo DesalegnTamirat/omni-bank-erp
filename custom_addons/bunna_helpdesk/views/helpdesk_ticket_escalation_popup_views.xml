@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_helpdesk_ticket_escalation_popup_tree" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.escalation.popup.list</field>
+        <field name="model">helpdesk.ticket.escalation.popup</field>
+        <field name="arch" type="xml">
+            <list string="Escalation Pop-Up Notifications" default_order="escalation_date desc" decoration-muted="is_acknowledged">
+                <field name="ticket_number" string="Ticket #"/>
+                <field name="ticket_name" string="Sub Service"/>
+                <field name="customer_name" string="Customer"/>
+                <field name="customer_phone" string="Phone"/>
+                <field name="operating_unit_id" string="Work Unit"/>
+                <field name="escalation_level_name" string="Escalation Stage"/>
+                <field name="escalated_by_id" string="Escalated By" widget="many2one_avatar_user"/>
+                <field name="user_id" string="Concerned Person" widget="many2one_avatar_user"/>
+                <field name="escalation_date" string="Escalated On"/>
+                <field name="is_acknowledged" widget="boolean" string="Acknowledged"/>
+                <button name="action_view_ticket" string="Open Ticket" type="object" class="btn-primary" icon="fa-external-link"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_ticket_escalation_popup_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.escalation.popup.form</field>
+        <field name="model">helpdesk.ticket.escalation.popup</field>
+        <field name="arch" type="xml">
+            <form string="Escalation Notification">
+                <header>
+                    <button name="action_view_ticket" string="Open Ticket" type="object" class="btn-primary" icon="fa-external-link"/>
+                    <button name="action_acknowledge" string="Acknowledge" type="object" class="btn-secondary" invisible="is_acknowledged"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning py-2 mb-3" role="alert" invisible="is_acknowledged">
+                        <i class="fa fa-exclamation-triangle me-1" title="Warning"/>
+                        <strong>Action Required:</strong> This ticket has been escalated to you and requires your attention.
+                    </div>
+                    <group>
+                        <group string="Ticket &amp; Customer">
+                            <field name="ticket_id" readonly="1"/>
+                            <field name="ticket_number" readonly="1"/>
+                            <field name="customer_name" readonly="1"/>
+                            <field name="customer_phone" readonly="1"/>
+                            <field name="customer_account" readonly="1"/>
+                        </group>
+                        <group string="Escalation Details">
+                            <field name="operating_unit_id" readonly="1"/>
+                            <field name="escalation_level_name" readonly="1"/>
+                            <field name="escalated_by_id" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                            <field name="escalation_date" readonly="1"/>
+                            <field name="is_acknowledged" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Customer Issue Description">
+                        <field name="issue_description" readonly="1" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_escalation_popup" model="ir.actions.act_window">
+        <field name="name">Escalation Notifications</field>
+        <field name="res_model">helpdesk.ticket.escalation.popup</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('user_id', '=', uid)]</field>
+        <field name="context">{'search_default_unacknowledged': 1}</field>
+    </record>
+</odoo>

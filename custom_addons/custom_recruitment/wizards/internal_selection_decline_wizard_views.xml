@@ -4,26 +4,46 @@
         <field name="name">internal.selection.decline.wizard.form</field>
         <field name="model">internal.selection.decline.wizard</field>
         <field name="arch" type="xml">
-            <form string="Decline Promotion / Transfer Offer">
-                <div class="alert alert-warning" role="alert">
-                    <strong>⚠️ Declining Offer:</strong> You are about to record a decline/rejection response for this promotion or transfer offer. Please provide a reason below.
+            <form string="Respond to Lateral Transfer Offer">
+                <field name="candidate_id" invisible="1"/>
+                <field name="transfer_request_id" invisible="1"/>
+                <field name="transfer_letter_id" invisible="1"/>
+
+                <div class="alert alert-info" role="alert" invisible="response_action != 'accept'">
+                    <strong>✓ Accepting Offer:</strong> You are accepting this lateral transfer offer. Once confirmed, the transfer will be finalized and the lateral transfer letter prepared for sending.
                 </div>
-                <group>
-                    <field name="candidate_id" invisible="1"/>
-                    <field name="transfer_request_id" invisible="1"/>
-                    <field name="transfer_letter_id" invisible="1"/>
-                    <field name="rejection_reason" placeholder="Please enter the reason for declining this offer..." required="1"/>
+                <div class="alert alert-warning" role="alert" invisible="response_action != 'decline'">
+                    <strong>⚠️ Declining Offer:</strong> You are declining this transfer offer. The opportunity will automatically be extended to the next eligible reserve candidate in ranking. Please state your reason below.
+                </div>
+
+                <group string="Offer Summary / የዝውውር ማጠቃለያ">
+                    <group>
+                        <field name="employee_name" readonly="1" invisible="not employee_name"/>
+                        <field name="current_operating_unit_name" readonly="1" invisible="not current_operating_unit_name"/>
+                        <field name="current_job_grade_name" readonly="1" invisible="not current_job_grade_name"/>
+                    </group>
+                    <group>
+                        <field name="target_operating_unit_name" readonly="1" invisible="not target_operating_unit_name"/>
+                        <field name="target_job_position_name" readonly="1" invisible="not target_job_position_name"/>
+                    </group>
                 </group>
+
+                <group string="Your Decision / ውሳኔዎ">
+                    <field name="response_action" widget="radio"/>
+                    <field name="rejection_reason" placeholder="Please enter your specific reason for declining this offer..." invisible="response_action != 'decline'" required="response_action == 'decline'"/>
+                </group>
+
                 <footer>
-                    <button string="Confirm Decline" name="action_confirm_decline" type="object" class="btn-danger"/>
-                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    <button string="Accept Transfer / ዝውውሩን ተቀበል" name="action_confirm_response" type="object" class="btn-success" invisible="response_action != 'accept'"/>
+                    <button string="Confirm Decline / ውድቅ አድርግ" name="action_confirm_response" type="object" class="btn-danger" invisible="response_action != 'decline'"/>
+                    <button string="Cancel / ሰርዝ" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>
         </field>
     </record>
 
     <record id="action_internal_selection_decline_wizard" model="ir.actions.act_window">
-        <field name="name">Decline Promotion / Transfer Offer</field>
+        <field name="name">Respond to Transfer Offer</field>
         <field name="res_model">internal.selection.decline.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>

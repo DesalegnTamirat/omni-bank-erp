@@ -320,8 +320,7 @@
                 <button name="action_check_blacklist"
                         string="Check Blacklist"
                         type="object"
-                        class="btn-secondary"
-                        invisible="blacklist_checked"/>
+                        class="btn-secondary"/>
                 <widget name="web_ribbon"
                         title="BLACKLISTED"
                         bg_color="text-bg-danger"

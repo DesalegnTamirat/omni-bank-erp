@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from . import clean_utils
+from . import cc_dispatch_service
 from . import candidate_profile
 from . import applicant_shortlist
 from . import blacklist_pool
@@ -7,12 +9,13 @@ from . import candidate_shortlist
 from . import internal_job_position
 from . import internal_recruitment
 from . import job_vacancy_competency
+from . import selected_internal
 from . import job_vacancy
 from . import recruitment_process_external
 from . import recruitment_process_internal
 from . import selected_external
-from . import selected_internal
 from . import employee_probation
+from . import transfer_letter
 from . import employee_transfer
 from . import transfer_ranking
 from . import recruitment_request
@@ -38,7 +41,13 @@ from . import recruitment_selection_minute
 from . import recruitment_manpower_dashboard_service
 from . import recruitment_employment_letter
 from . import recruitment_signatory_config
-from . import transfer_letter
 from . import ir_ui_menu
 from . import ir_model_fields
+from . import report_font_utils
 
+from . import committee_role_config
+from . import panel_member_config
+from . import hr_recruitment_policy
+from . import hr_employee
+from . import vacancy_approver_config
+from . import cc_dispatch_service

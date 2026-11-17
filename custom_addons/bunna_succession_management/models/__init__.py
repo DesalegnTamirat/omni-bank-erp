@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 from . import (
+    succession_candidate_invitation,
     succession_critical_position,
-    succession_talent_pool,
+    succession_assessment,
     succession_candidate,
     succession_development_plan,
-    succession_workforce_plan,
+    succession_career_discussion,
     succession_ninebox_cell,
     succession_settings_storage,
-    res_config_settings,
+    succession_competency_mapping,
 )
 from . import hr_career_framework

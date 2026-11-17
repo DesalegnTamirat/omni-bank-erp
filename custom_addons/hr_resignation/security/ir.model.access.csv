@@ -1,5 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_hr_resignation_user,hr.resignation user,hr_resignation.model_hr_resignation,base.group_user,1,1,1,0
+access_hr_resignation_user,hr.resignation user,hr_resignation.model_hr_resignation,base.group_user,1,1,1,1
 access_hr_resignation_manager,hr.resignation manager,hr_resignation.model_hr_resignation,hr_resignation.group_resignation_manager,1,1,0,0
 access_hr_resignation_clearance_officer,hr.resignation clearance_officer,hr_resignation.model_hr_resignation,hr_resignation.group_clearance_officer,1,0,0,0
 access_hr_resignation_pomd,hr.resignation pomd,hr_resignation.model_hr_resignation,hr_resignation.group_pomd_officer,1,1,1,0
@@ -33,7 +33,7 @@ access_hr_clearance_line_pomd,hr.clearance.line pomd,hr_resignation.model_hr_res
 access_hr_clearance_line_auditor,hr.clearance.line auditor,hr_resignation.model_hr_resignation_clearance,hr_resignation.group_resignation_auditor,1,1,1,0
 access_hr_clearance_line_hr,hr.clearance.line hr,hr_resignation.model_hr_resignation_clearance,hr.group_hr_user,1,1,1,1
 
-access_hr_clearance_line_item_user,hr.clearance.line.item user,hr_resignation.model_hr_resignation_clearance_line_item,base.group_user,1,0,0,0
+access_hr_clearance_line_item_user,hr.clearance.line.item user,hr_resignation.model_hr_resignation_clearance_line_item,base.group_user,1,1,0,0
 access_hr_clearance_line_item_manager,hr.clearance.line.item manager,hr_resignation.model_hr_resignation_clearance_line_item,hr_resignation.group_resignation_manager,1,0,0,0
 access_hr_clearance_line_item_officer,hr.clearance.line.item officer,hr_resignation.model_hr_resignation_clearance_line_item,hr_resignation.group_clearance_officer,1,1,0,0
 access_hr_clearance_line_item_pomd,hr.clearance.line.item pomd,hr_resignation.model_hr_resignation_clearance_line_item,hr_resignation.group_pomd_officer,1,1,1,0
@@ -41,8 +41,8 @@ access_hr_clearance_line_item_auditor,hr.clearance.line.item auditor,hr_resignat
 access_hr_clearance_line_item_hr,hr.clearance.line.item hr,hr_resignation.model_hr_resignation_clearance_line_item,hr.group_hr_user,1,1,1,1
 
 access_hr_exit_interview_user,hr.exit.interview user,hr_resignation.model_hr_exit_interview,base.group_user,1,1,1,0
-access_hr_exit_interview_manager,hr.exit.interview manager,hr_resignation.model_hr_exit_interview,hr_resignation.group_resignation_manager,0,0,0,0
-access_hr_exit_interview_officer,hr.exit.interview officer,hr_resignation.model_hr_exit_interview,hr_resignation.group_clearance_officer,0,0,0,0
+access_hr_exit_interview_manager,hr.exit.interview manager,hr_resignation.model_hr_exit_interview,hr_resignation.group_resignation_manager,1,1,0,0
+access_hr_exit_interview_officer,hr.exit.interview officer,hr_resignation.model_hr_exit_interview,hr_resignation.group_clearance_officer,1,1,0,0
 access_hr_exit_interview_pomd,hr.exit.interview pomd,hr_resignation.model_hr_exit_interview,hr_resignation.group_pomd_officer,1,1,1,1
 access_hr_exit_interview_auditor,hr.exit.interview auditor,hr_resignation.model_hr_exit_interview,hr_resignation.group_resignation_auditor,1,1,1,1
 access_hr_exit_interview_hr,hr.exit.interview hr,hr_resignation.model_hr_exit_interview,hr.group_hr_user,1,1,1,1
@@ -93,3 +93,9 @@ access_hr_settlement_line_hr,hr.resignation.settlement.line hr,model_hr_resignat
 access_hr_separation_severance_rule_user,hr.separation.severance.rule user,hr_resignation.model_hr_separation_severance_rule,base.group_user,1,0,0,0
 access_hr_separation_severance_rule_hr,hr.separation.severance.rule hr,hr_resignation.model_hr_separation_severance_rule,hr.group_hr_user,1,1,1,1
 access_hr_resignation_tax_bracket,hr.resignation.tax.bracket,model_hr_resignation_tax_bracket,base.group_user,1,1,1,1
+access_hr_resignation_report_wizard_user,hr.resignation.report.wizard user,model_hr_resignation_report_wizard,base.group_user,1,1,1,1
+access_hr_resignation_letter_log_user,hr.resignation.letter.log user,hr_resignation.model_hr_resignation_letter_log,base.group_user,1,0,0,0
+access_hr_resignation_letter_log_manager,hr.resignation.letter.log manager,hr_resignation.model_hr_resignation_letter_log,hr_resignation.group_resignation_manager,1,0,0,0
+access_hr_resignation_letter_log_pomd,hr.resignation.letter.log pomd,hr_resignation.model_hr_resignation_letter_log,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_resignation_letter_log_hr_mgr,hr.resignation.letter.log hr_manager,hr_resignation.model_hr_resignation_letter_log,hr_resignation.group_resignation_hr_manager,1,1,1,1
+access_hr_resignation_letter_log_hr_user,hr.resignation.letter.log hr_user,hr_resignation.model_hr_resignation_letter_log,hr.group_hr_user,1,1,1,1

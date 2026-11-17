@@ -6,6 +6,12 @@ from datetime import timedelta
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    name_amharic = fields.Char(
+        string='Name (Amharic / ሙሉ ስም በአማርኛ)',
+        tracking=True,
+        help='Official employee name in Amharic script used for legal notices and memos.'
+    )
+
     # Disciplinary History Smart Fields
     executive_level = fields.Selection([
         ('ceo', 'Chief Executive Officer (CEO)'),
@@ -92,7 +98,7 @@ class HrEmployee(models.Model):
         
         today = fields.Date.context_today(self)
         active_cases = self.discipline_case_ids.filtered(
-            lambda c: c.state == 'enforced' and (
+            lambda c: c.state in ('enforced', 'closed', 'appealed') and (
                 (c.active_penalty_end_date and c.active_penalty_end_date >= today) or
                 (not c.active_penalty_end_date and c.final_decision_date and c.final_decision_date >= (today - timedelta(days=365)))
             ) and (c.severity_level in ['level_1', 'level_2'] or c.punishment_type in ['dismissal', 'demotion', 'final_warning_penalty'])
@@ -113,7 +119,7 @@ class HrEmployee(models.Model):
         ])
         for emp in ineligible_employees:
             active_recent_cases = emp.discipline_case_ids.filtered(
-                lambda c: c.state == 'enforced' and (
+                lambda c: c.state in ('enforced', 'closed', 'appealed') and (
                     (c.active_penalty_end_date and c.active_penalty_end_date >= today) or
                     (not c.active_penalty_end_date and c.final_decision_date and c.final_decision_date >= (today - timedelta(days=365)))
                 ) and (c.severity_level in ['level_1', 'level_2'] or c.punishment_type in ['dismissal', 'demotion', 'final_warning_penalty'])
@@ -130,41 +136,126 @@ class HrEmployee(models.Model):
             job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
             if any(kw in job_name for kw in ['ceo', 'chief executive officer', 'president']):
                 emp.executive_level = 'ceo'
-            elif any(kw in job_name for kw in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+            elif any(kw in job_name for kw in ['deputy chief', 'chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
                 emp.executive_level = 'chief'
-            elif any(kw in job_name for kw in ['director', 'directorate']):
+            elif any(kw in job_name for kw in ['director', 'directorate', 'regional manager']):
                 emp.executive_level = 'director'
             elif emp.is_managerial or any(kw in job_name for kw in ['manager', 'head', 'supervisor', 'division', 'branch manager']):
                 emp.executive_level = 'manager'
             else:
                 emp.executive_level = 'employee'
 
+    @api.model
+    def get_user_hierarchy_role(self, user):
+        """
+        Dynamically determine user's governance hierarchy tier from organizational structure:
+        - 'ceo': Chief Executive Officer / Superuser / Discipline Admin
+        - 'chief': Chief Officer / Deputy Chief / C-Level Executive
+        - 'director': Directorate Director / Regional Director
+        - 'manager': Line Coach / Division Manager / Branch Manager
+        - 'employee': Individual Contributor
+        """
+        if not user:
+            return 'employee'
+        
+        # Superuser / Admin
+        if user._is_superuser() or user.has_group('base.group_system'):
+            return 'ceo'
+            
+        EmpModel = self.sudo()
+        ceo_user = EmpModel.get_ceo_user()
+        if ceo_user and user.id == ceo_user.id:
+            return 'ceo'
+        if user.has_group('discipline_management.group_discipline_ceo'):
+            return 'ceo'
+
+        emp = user.employee_id.sudo() if user.employee_id else False
+        if not emp:
+            if user.has_group('discipline_management.group_discipline_admin'):
+                return 'ceo'
+            return 'employee'
+
+        job_name = (emp.job_id.name or '').lower() if emp.job_id else ''
+        exec_level = getattr(emp, 'executive_level', False)
+
+        # 1. CEO check
+        if any(kw in job_name for kw in ['ceo', 'chief executive officer', 'president']) or exec_level == 'ceo':
+            return 'ceo'
+
+        # 2. Chief / Deputy Chief / C-Level Executive check
+        is_chief_kw = any(kw in job_name for kw in ['deputy chief', 'chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp'])
+        if is_chief_kw or exec_level == 'chief':
+            return 'chief'
+        # Check if they supervise any Directors in reporting tree
+        has_director_subs = bool(EmpModel.search_count([
+            ('id', 'child_of', emp.id),
+            ('id', '!=', emp.id),
+            '|', ('executive_level', '=', 'director'), ('job_id.name', 'ilike', 'director')
+        ]))
+        if has_director_subs:
+            return 'chief'
+
+        # 3. Director check
+        is_dir_kw = any(kw in job_name for kw in ['director', 'directorate', 'regional manager'])
+        if is_dir_kw or exec_level == 'director' or user.has_group('discipline_management.group_discipline_director'):
+            return 'director'
+        # Check if department manager of directorate-level department or supervises managers
+        if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.id == emp.id:
+            dept_name = (emp.department_id.name or '').lower()
+            if 'director' in dept_name or 'directorate' in dept_name or 'region' in dept_name:
+                return 'director'
+        has_mgr_subs = bool(EmpModel.search_count([
+            ('id', 'child_of', emp.id),
+            ('id', '!=', emp.id),
+            '|', ('executive_level', '=', 'manager'), ('job_id.name', 'ilike', 'manager')
+        ]))
+        if has_mgr_subs:
+            return 'director'
+
+        # 4. Manager / Coach check
+        has_subs = bool(EmpModel.search_count([('id', 'child_of', emp.id), ('id', '!=', emp.id)]))
+        if has_subs or emp.is_managerial or any(kw in job_name for kw in ['manager', 'head', 'supervisor', 'division', 'branch manager', 'coach']):
+            return 'manager'
+
+        return 'employee'
+
+    def get_subordinate_employee_ids(self, scope='all_hierarchy'):
+        """
+        Retrieve subordinate hr.employee IDs based on hierarchy scope:
+        - 'all_hierarchy': Entire downstream reporting tree (child_of)
+        - 'direct_reports': Direct reports only (child_ids)
+        """
+        self.ensure_one()
+        if scope == 'direct_reports':
+            return self.child_ids.ids + [self.id]
+        # all_hierarchy
+        return self.env['hr.employee'].sudo().search([('id', 'child_of', self.id)]).ids
+
     def get_supervisor_chain(self):
         """Return ordered list of supervisor hr.employee records from direct coach/manager up to CEO."""
         self.ensure_one()
         chain = []
-        current = self.coach_id or self.parent_id
+        current = (self.coach_id or self.parent_id).sudo()
         visited = set()
         while current and current.id not in visited:
             visited.add(current.id)
             chain.append(current)
-            current = current.coach_id or current.parent_id
+            current = (current.coach_id or current.parent_id).sudo()
         return chain
 
     def is_supervisor_of(self, target_employee):
         """Return True if self is in the supervisory chain of target_employee."""
         if not target_employee:
             return False
-        return self in target_employee.get_supervisor_chain()
+        return self.id in [s.id for s in target_employee.sudo().get_supervisor_chain()]
 
     @api.model
     def get_cpco_user(self):
         """
         Unified CPCO Resolution Engine:
         1. Explicit UI Setting in Discipline & Governance Settings (discipline.cpco_user_id)
-        2. Security Group Membership (group_discipline_cpco)
-        3. Job Position / Employee matching CPCO / Chief People
-        4. Fallback to System Administrator
+        2. Pure Security Group Membership (group_discipline_cpco)
+        3. Fallback to System Administrator or current user
         """
         ICP = self.env['ir.config_parameter'].sudo()
         cpco_user_id_param = ICP.get_param('discipline.cpco_user_id')
@@ -176,27 +267,30 @@ class HrEmployee(models.Model):
             except (ValueError, TypeError):
                 pass
 
-        # 2. Check Security Group
+        # 2. Check Pure Security Group
         cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+        ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+        admin_group = self.env.ref('discipline_management.group_discipline_admin', raise_if_not_found=False)
         if cpco_group:
             cpco_users = cpco_group.all_user_ids or cpco_group.user_ids
+            higher_users = (ceo_group.all_user_ids if ceo_group else self.env['res.users']) | (admin_group.all_user_ids if admin_group else self.env['res.users'])
+            dedicated_cpco = cpco_users - higher_users
+            if dedicated_cpco:
+                return dedicated_cpco[0]
             if cpco_users:
                 return cpco_users[0]
 
-        # 3. Check Job Title
-        cpco_emp = self.search([
-            '|', ('job_id.name', 'ilike', 'Chief People'),
-            ('job_id.name', 'ilike', 'CPCO')
-        ], limit=1)
-        if cpco_emp and cpco_emp.user_id:
-            return cpco_emp.user_id
-
-        # 4. Fallback Admin
+        # 3. Fallback Admin
         return self.env.ref('base.user_admin', raise_if_not_found=False) or self.env.user
 
     @api.model
     def get_secretary_user(self):
-        """Resolve Disciplinary Committee Secretary (POMD Director)."""
+        """
+        Resolve Disciplinary Committee Secretary (POMD Director):
+        1. Explicit UI Setting in Discipline & Governance Settings (discipline.secretary_user_id)
+        2. Pure Security Group Membership (group_discipline_pomd_director or group_discipline_pomd)
+        3. Fallback to System Administrator or current user
+        """
         ICP = self.env['ir.config_parameter'].sudo()
         sec_id_param = ICP.get_param('discipline.secretary_user_id')
         if sec_id_param:
@@ -207,24 +301,51 @@ class HrEmployee(models.Model):
             except (ValueError, TypeError):
                 pass
 
-        pomd_emp = self.search([
-            '|', ('job_id.name', 'ilike', 'People Operations Management Director'),
-            ('job_id.name', 'ilike', 'People Operation')
-        ], limit=1)
-        if pomd_emp and pomd_emp.user_id:
-            return pomd_emp.user_id
-
+        pomd_dir_group = self.env.ref('discipline_management.group_discipline_pomd_director', raise_if_not_found=False)
         pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
-        if pomd_group:
-            pomd_users = pomd_group.all_user_ids or pomd_group.user_ids
-            if pomd_users:
-                return pomd_users[0]
+        cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+        ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+        admin_group = self.env.ref('discipline_management.group_discipline_admin', raise_if_not_found=False)
+
+        higher_users = (
+            (cpco_group.all_user_ids if cpco_group else self.env['res.users']) |
+            (ceo_group.all_user_ids if ceo_group else self.env['res.users']) |
+            (admin_group.all_user_ids if admin_group else self.env['res.users'])
+        )
+
+        # Check dedicated POMD Director group first, then general POMD group
+        for group in (pomd_dir_group, pomd_group):
+            if group:
+                users = (group.all_user_ids or group.user_ids) - higher_users
+                if users:
+                    return users[0]
+
+        # Fallback to employee with Talent Management / People Operations Directorate role
+        sec_emp = self.sudo().search([
+            '|', '|',
+            ('name', 'ilike', 'Abayneh Habtie'),
+            ('job_id.name', 'ilike', 'Talent Management'),
+            ('job_id.name', 'ilike', 'People Operations'),
+            ('user_id', '!=', False),
+            ('user_id', 'not in', higher_users.ids if higher_users else [0])
+        ], limit=1)
+        if sec_emp and sec_emp.user_id:
+            return sec_emp.user_id
 
         return self.env.ref('base.user_admin', raise_if_not_found=False) or self.env.user
 
     @api.model
+    def get_pomd_user(self):
+        """Alias for get_secretary_user (POMD Director / Committee Secretary)."""
+        return self.get_secretary_user()
+
+    @api.model
     def get_legal_user(self):
-        """Resolve Legal Directorate Representative."""
+        """
+        Resolve Legal Directorate Representative:
+        1. Explicit UI Setting in Discipline & Governance Settings (discipline.legal_user_id)
+        2. Security Group Membership (group_discipline_legal)
+        """
         ICP = self.env['ir.config_parameter'].sudo()
         legal_id_param = ICP.get_param('discipline.legal_user_id')
         if legal_id_param:
@@ -234,15 +355,6 @@ class HrEmployee(models.Model):
                     return legal_user
             except (ValueError, TypeError):
                 pass
-
-        legal_emp = self.search([
-            '|', ('job_id.name', 'ilike', 'Legal Director'),
-            ('job_id.name', 'ilike', 'Legal Services Director')
-        ], limit=1)
-        if not legal_emp:
-            legal_emp = self.search([('job_id.name', 'ilike', 'Legal')], limit=1)
-        if legal_emp and legal_emp.user_id:
-            return legal_emp.user_id
 
         legal_group = self.env.ref('discipline_management.group_discipline_legal', raise_if_not_found=False)
         if legal_group:
@@ -254,7 +366,10 @@ class HrEmployee(models.Model):
 
     @api.model
     def get_union_user(self):
-        """Resolve Labour Union Representative for Disciplinary Committee meetings."""
+        """
+        Resolve Labour Union Representative for Disciplinary Committee meetings:
+        Strictly configured via Settings (discipline.union_user_id).
+        """
         ICP = self.env['ir.config_parameter'].sudo()
         union_id_param = ICP.get_param('discipline.union_user_id')
         if union_id_param:
@@ -268,7 +383,11 @@ class HrEmployee(models.Model):
 
     @api.model
     def get_audit_director_user(self):
-        """Resolve Internal Audit Directorate Director."""
+        """
+        Resolve Internal Audit Directorate Director:
+        1. Explicit UI Setting in Discipline & Governance Settings (discipline.audit_user_id)
+        2. Security Group Membership (group_discipline_auditor)
+        """
         ICP = self.env['ir.config_parameter'].sudo()
         audit_id_param = ICP.get_param('discipline.audit_user_id')
         if audit_id_param:
@@ -278,13 +397,6 @@ class HrEmployee(models.Model):
                     return audit_user
             except (ValueError, TypeError):
                 pass
-
-        audit_emp = self.search([
-            '|', ('job_id.name', 'ilike', 'Internal Audit Director'),
-            ('job_id.name', 'ilike', 'Audit Director')
-        ], limit=1)
-        if audit_emp and audit_emp.user_id:
-            return audit_emp.user_id
 
         audit_group = self.env.ref('discipline_management.group_discipline_auditor', raise_if_not_found=False)
         if audit_group:
@@ -296,26 +408,47 @@ class HrEmployee(models.Model):
 
     @api.model
     def get_ceo_user(self):
-        """Resolve Chief Executive Officer (CEO)."""
+        """
+        Resolve Chief Executive Officer (CEO):
+        1. Pure Security Group Membership (group_discipline_ceo)
+        2. Executive Level on Employee record ('ceo')
+        """
         ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+        admin_user = self.env.ref('base.user_admin', raise_if_not_found=False)
         if ceo_group:
-            ceo_users = ceo_group.all_user_ids or ceo_group.user_ids
+            ceo_users = (ceo_group.all_user_ids or ceo_group.user_ids)
+            non_admin_ceo = ceo_users - (admin_user if admin_user else self.env['res.users'])
+            if non_admin_ceo:
+                return non_admin_ceo[0]
             if ceo_users:
                 return ceo_users[0]
 
-        ceo_emp = self.search([('executive_level', '=', 'ceo')], limit=1)
+        ceo_emp = self.sudo().search([
+            ('user_id', '!=', False),
+            ('executive_level', '=', 'ceo'),
+        ], limit=1)
         if ceo_emp and ceo_emp.user_id:
             return ceo_emp.user_id
 
         return False
 
-    @api.depends('job_id', 'job_id.name')
+    @api.depends('job_id', 'job_id.name', 'job_id.employee_category')
     def _compute_is_managerial(self):
         for emp in self:
-            job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
-            if emp.job_id and getattr(emp.job_id, 'is_managerial', False):
+            job = emp.job_id or getattr(emp, 'job_position', False)
+            job_name = (job.name or '').lower() if job else ''
+            job_cat = getattr(job, 'employee_category', False) if job else False
+            if job and getattr(job, 'is_managerial', False):
                 emp.is_managerial = True
-            elif any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor', 'president', 'officer in charge']):
+            elif job_cat == 'Managerial':
+                emp.is_managerial = True
+            elif job_cat == 'Non Managerial':
+                # Respect explicit Non Managerial category on job (e.g. Relationship Manager), unless acting managerial role
+                if any(kw in job_name for kw in ['acting manager', 'acting director', 'acting branch manager', 'acting chief']):
+                    emp.is_managerial = True
+                else:
+                    emp.is_managerial = False
+            elif any(kw in job_name for kw in ['manager', 'director', 'chief', 'team leader', 'head', 'vp', 'supervisor', 'president', 'officer in charge']) and 'relationship manager' not in job_name:
                 emp.is_managerial = True
             else:
                 emp.is_managerial = False

@@ -5,7 +5,7 @@
         <field name="name">hr.employee.probation.list</field>
         <field name="model">hr.employee.probation</field>
         <field name="arch" type="xml">
-            <list string="Probationer Performance Evaluations" 
+            <list create="false" string="Probationer Performance Evaluations" 
                   decoration-info="state=='in_progress'" 
                   decoration-warning="state=='notified' or state=='extended'" 
                   decoration-success="state=='completed' or outcome=='satisfactory'" 
@@ -30,13 +30,15 @@
         <field name="name">hr.employee.probation.form</field>
         <field name="model">hr.employee.probation</field>
         <field name="arch" type="xml">
-            <form string="Probationer Performance Evaluation Form">
+            <form create="false" string="Probationer Performance Evaluation Form">
                 <header>
                     <button name="action_start" string="Start Probation" type="object" class="oe_highlight" invisible="state != 'draft'"/>
                     <button name="action_populate_criteria" string="Reload Evaluation Criteria" type="object" invisible="state in ('completed', 'terminated')"/>
                     <button name="action_notify_supervisor" string="Notify Evaluator" type="object" class="oe_highlight" invisible="state not in ('in_progress',) or notification_sent"/>
-                    <button name="action_committee_evaluate" string="Committee Vote" type="object" class="oe_highlight" invisible="state not in ('notified', 'in_progress') or not delegation_team_ids"/>
+
                     <button name="action_record_outcome" string="Record Outcome &amp; Confirm/Terminate" type="object" class="oe_highlight" invisible="state in ('completed', 'terminated')"/>
+                    <button name="action_print_permanent_letter" string="Print Permanent Letter" type="object" class="oe_highlight" icon="fa-print" invisible="state != 'completed' or outcome != 'satisfactory'"/>
+                    <button name="action_send_permanent_letter" string="Send Permanent Letter" type="object" class="oe_highlight" icon="fa-envelope" invisible="state != 'completed' or outcome != 'satisfactory'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,notified,evaluated,completed"/>
                 </header>
                 <sheet>
@@ -59,16 +61,18 @@
                     <div class="card p-3 mb-4 bg-light">
                         <group>
                             <group>
-                                <field name="employee_id" string="NAME OF PROBATIONER" readonly="state != 'draft'"/>
+                                <field name="id" invisible="1"/>
+                                <field name="eligible_employee_ids" invisible="1"/>
+                                <field name="employee_id" string="NAME OF PROBATIONER" readonly="1"/>
                                 <field name="job_position_id" string="POSITION TITLE" readonly="1"/>
                                 <field name="operating_unit_id" string="PLACE OF ASSIGNMENT" readonly="1"/>
                                 <field name="department_id" string="DEPARTMENT" readonly="1"/>
                             </group>
                             <group>
-                                <field name="probation_start_date" string="EMPLOYMENT DATE" readonly="state != 'draft'"/>
+                                <field name="probation_start_date" string="EMPLOYMENT DATE" readonly="1"/>
                                 <field name="duration_days" string="PROBATION DURATION (DAYS)" readonly="1"/>
                                 <field name="probation_end_date" string="PROBATION END DATE" readonly="1"/>
-                                <field name="employee_category" string="JOB CATEGORY" readonly="state != 'draft'"/>
+                                <field name="employee_category" string="JOB CATEGORY" readonly="1"/>
                             </group>
                         </group>
                     </div>
@@ -101,36 +105,16 @@
                             </div>
                         </page>
 
-                        <page string="Committee Delegation (Approvals)">
-                            <button name="action_committee_evaluate" string="Register Committee Vote" type="object" class="oe_link" invisible="state in ('completed', 'terminated')"/>
-                            <field name="delegation_team_ids" readonly="state in ('completed', 'terminated')">
-                                <list editable="bottom">
-                                    <field name="role"/>
-                                    <field name="employee_name"/>
-                                    <field name="operating_unit"/>
-                                    <field name="status"/>
-                                    <field name="alternate_committee_member"/>
-                                    <field name="alter_operating_unit"/>
-                                    <field name="approve" readonly="1"/>
-                                </list>
-                            </field>
-                        </page>
 
-                        <page string="Recruitment &amp; System Metadata">
-                            <group>
-                                <group>
-                                    <field name="source_recruitment"/>
-                                    <field name="recruitment_reference"/>
-                                </group>
-                                <group>
-                                    <field name="notification_sent" readonly="1"/>
-                                    <field name="notification_date" readonly="1"/>
-                                    <field name="in_charge_id"/>
-                                    <field name="signatory_config_id" string="Permanency Signatory Config"/>
-                                </group>
-                            </group>
-                        </page>
+
                     </notebook>
+
+                    <!-- Hidden system metadata fields -->
+                    <field name="evaluator_name" invisible="1"/>
+                    <field name="source_recruitment" invisible="1"/>
+                    <field name="recruitment_reference" invisible="1"/>
+                    <field name="in_charge_id" invisible="1"/>
+                    <field name="signatory_config_id" invisible="1"/>
 
                     <!-- Footer Section matching Word document -->
                     <div class="card p-3 mt-4">
@@ -138,18 +122,30 @@
                         <group>
                             <field name="recommend_permanent" string="Do you recommend him/her for permanent employment?" widget="radio"/>
                         </group>
-                        <group invisible="recommend_permanent != 'yes'">
+                        <group invisible="not recommend_permanent">
                             <field name="outcome_notes" string="Comments and State Observation" placeholder="Please comment and state your observation..."/>
                         </group>
                         <group>
                             <group>
-                                <field name="supervisor_id" string="EVALUATOR"/>
-                                <field name="evaluator_name" string="Name of Evaluator" readonly="1"/>
+                                <field name="supervisor_id" string="EVALUATOR" readonly="1"/>
+                                <field name="evaluator_position" string="Position" readonly="1"/>
+                                <field name="notification_sent" string="Supervisor Notified" readonly="1"/>
+                                <field name="notification_date" string="Notification Sent On" readonly="1"/>
                             </group>
                             <group>
-                                <field name="evaluator_position" string="Position" readonly="1"/>
                                 <field name="outcome" string="FINAL OUTCOME DECISION"/>
                                 <field name="outcome_date" string="Date" readonly="1"/>
+                                <field name="permanent_letter_ref" string="Permanent Letter Ref" invisible="outcome != 'satisfactory'"/>
+                            </group>
+                        </group>
+                        <group string="Confirmation Letter &amp; Email Dispatch" invisible="outcome != 'satisfactory'">
+                            <group>
+                                <field name="employee_email" string="Employee Email" placeholder="e.g. employee@bunnabanksc.com"/>
+                                <field name="supervisor_email" string="Supervisor Email" placeholder="e.g. supervisor@bunnabanksc.com"/>
+                            </group>
+                            <group>
+                                <field name="permanent_letter_sent" string="Letter Sent via Email" readonly="1" widget="boolean_toggle"/>
+                                <field name="permanent_letter_sent_date" string="Dispatched On" readonly="1"/>
                             </group>
                         </group>
                     </div>
@@ -171,6 +167,10 @@
                 <field name="job_position_id"/>
                 <field name="supervisor_id"/>
                 <separator/>
+                <filter name="filter_not_completed" string="Exclude Completed" domain="[('state', 'not in', ('completed', 'terminated'))]"/>
+                <filter name="filter_within_duration" string="Within Probation Period (≤60/75 Days)" domain="[('probation_end_date', '&gt;=', context_today()), ('state', 'not in', ('completed', 'terminated'))]"/>
+                <filter name="filter_exceeded_duration" string="Exceeded Probation Period" domain="[('probation_end_date', '&lt;', context_today())]"/>
+                <separator/>
                 <filter name="filter_in_progress" string="In Progress" domain="[('state', '=', 'in_progress')]"/>
                 <filter name="filter_notified" string="Notified" domain="[('state', '=', 'notified')]"/>
                 <filter name="filter_completed" string="Completed (Confirmed)" domain="[('state', '=', 'completed')]"/>
@@ -191,9 +191,20 @@
         <field name="name">Probationer Performance Evaluations</field>
         <field name="res_model">hr.employee.probation</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">[('probation_end_date', '&gt;=', context_today()), ('state', '!=', 'completed')]</field>
+        <field name="context">{'search_default_filter_within_duration': 1, 'search_default_filter_not_completed': 1}</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Create a Probationer Performance Evaluation Form!</p>
+            <p class="o_view_nocontent_smiling_face">Probationer Performance Evaluations</p>
             <p>Conduct official Bunna Bank S.C. Probationer Performance Evaluations: rating out of 100 across Quality of Work, Dependability, Integrity, Punctuality, Efficiency, and Cooperation with statutory duration tracking (60/75 days) and automated HR contract actions.</p>
+        </field>
+    </record>
+
+    <record id="action_server_hr_employee_probation" model="ir.actions.server">
+        <field name="name">Probation Management</field>
+        <field name="model_id" ref="custom_recruitment.model_hr_employee_probation"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_probation_management()
         </field>
     </record>
 </odoo>

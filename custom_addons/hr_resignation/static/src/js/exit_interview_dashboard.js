@@ -28,11 +28,12 @@ export class ExitInterviewDashboard extends Component {
             cg:         "#e5e7eb 0% 100%",
             likerts:    [],
             yes_no:     [],
-            themes:     [],
-            quotes:     [],
+            text_qs:    [],
             interviews: [],
             // report view
             cur_interview: null,
+            // bars collapse
+            showAllBars: false,
         });
 
         onWillStart(async () => {
@@ -94,6 +95,10 @@ export class ExitInterviewDashboard extends Component {
             context: { active_ids: [id], active_model: 'hr.exit.interview' }
         });
     }
+    toggleShowAllBars() {
+        this.state.showAllBars = !this.state.showAllBars;
+    }
+
     async _loadData() {
         this.state.loading = true;
         try {
@@ -112,9 +117,22 @@ export class ExitInterviewDashboard extends Component {
             this.state.cg         = data.cg          || "#e5e7eb 0% 100%";
             this.state.likerts    = data.likerts     || [];
             this.state.yes_no     = data.yes_no      || [];
-            this.state.themes     = data.themes      || [];
-            this.state.quotes     = data.quotes      || [];
+            this.state.text_qs    = data.text_qs     || [];
             this.state.interviews = data.interviews  || [];
+
+            // Keep selected interview in sync when filtering in report view
+            if (this.state.view === 'rep') {
+                if (this.state.interviews && this.state.interviews.length > 0) {
+                    const currentId = this.state.cur_interview ? this.state.cur_interview.id : null;
+                    const exists = this.state.interviews.some(inv => inv.id === currentId);
+                    if (!exists) {
+                        const first_id = this.state.interviews[0].id;
+                        this.state.cur_interview = await this.orm.call("hr.exit.interview.dashboard", "get_employee_report", [first_id]);
+                    }
+                } else {
+                    this.state.cur_interview = null;
+                }
+            }
         } catch (e) {
             console.error("Failed to load analytics data:", e);
         }
@@ -135,12 +153,13 @@ export class ExitInterviewDashboard extends Component {
 
     // Click row → open the exit interview form
     openInterview(interview) {
-        if (interview.id) {
+        const interviewId = (interview && typeof interview === 'object') ? interview.id : interview;
+        if (interviewId) {
             this.action.doAction({
                 type:      "ir.actions.act_window",
                 name:      "Exit Interview",
                 res_model: "hr.exit.interview",
-                res_id:    interview.id,
+                res_id:    interviewId,
                 view_mode: "form",
                 views:     [[false, "form"]],
                 target:    "current",
@@ -180,7 +199,7 @@ export class ExitInterviewDashboard extends Component {
         let res_model = 'hr.exit.interview';
         let name = "Exit Interviews";
 
-        if (['answer', 'text', 'question'].includes(type)) {
+        if (['answer', 'text', 'question', 'rating', 'recommend'].includes(type)) {
             res_model = 'hr.exit.interview.line';
             domain = [['interview_id.state', '=', 'completed']];
             if (type === 'answer' && answer) {
@@ -192,13 +211,31 @@ export class ExitInterviewDashboard extends Component {
             } else if (type === 'text') {
                 domain.push(['question_type', 'in', ['text', 'custom']]);
                 name = "All Text Responses";
+            } else if (type === 'rating') {
+                domain.push(['question_type', 'in', ['rating', 'satisfaction']]);
+                name = "Manager & Satisfaction Ratings";
+            } else if (type === 'recommend') {
+                domain.push(['question_name', 'ilike', 'recommend']);
+                name = "Would Recommend Responses";
             }
             
             if (this.state.f_ou && this.state.f_ou !== 'all') {
-                domain.push(['interview_id.employee_id.department_id.operating_unit_id.name', '=', this.state.f_ou]);
+                domain.push(
+                    '|', '|', '|', '|', '|',
+                    ['interview_id.employee_id.department_id.name', '=', this.state.f_ou],
+                    ['interview_id.employee_id.default_operating_unit_id.name', '=', this.state.f_ou],
+                    ['interview_id.employee_id.department_id.operating_unit_id.name', '=', this.state.f_ou],
+                    ['interview_id.employee_id.operating_unit_ids.name', '=', this.state.f_ou],
+                    ['interview_id.resignation_id.operating_unit_id.name', '=', this.state.f_ou],
+                    ['interview_id.resignation_id.department_id.name', '=', this.state.f_ou]
+                );
             }
             if (this.state.f_pos && this.state.f_pos !== 'all') {
-                domain.push(['interview_id.employee_id.job_id.name', '=', this.state.f_pos]);
+                domain.push(
+                    '|',
+                    ['interview_id.employee_id.job_id.name', '=', this.state.f_pos],
+                    ['interview_id.employee_id.job_position.name', '=', this.state.f_pos]
+                );
             }
             if (this.state.f_sep && this.state.f_sep !== 'all') {
                 domain.push(['interview_id.resignation_id.resignation_type_id.name', '=', this.state.f_sep]);
@@ -207,18 +244,30 @@ export class ExitInterviewDashboard extends Component {
             if (type === 'regrettable') {
                 domain.push(['resignation_id.performance_rating', 'in', ['high', 'excellent']]);
                 name = "Regrettable Exits";
-            } else if (type === 'recommend') {
-                domain.push(['line_ids.answer', 'ilike', 'Yes']);
-                name = "Would Recommend";
+            } else if (type === 'completion') {
+                domain = [['resignation_id', '!=', false]];
+                name = "Exit Interviews (Completion Status)";
             } else if (type === 'all') {
-                name = "Completed Interviews";
+                name = "Completed Exit Interviews";
             }
 
             if (this.state.f_ou && this.state.f_ou !== 'all') {
-                domain.push(['employee_id.department_id.operating_unit_id.name', '=', this.state.f_ou]);
+                domain.push(
+                    '|', '|', '|', '|', '|',
+                    ['employee_id.department_id.name', '=', this.state.f_ou],
+                    ['employee_id.default_operating_unit_id.name', '=', this.state.f_ou],
+                    ['employee_id.department_id.operating_unit_id.name', '=', this.state.f_ou],
+                    ['employee_id.operating_unit_ids.name', '=', this.state.f_ou],
+                    ['resignation_id.operating_unit_id.name', '=', this.state.f_ou],
+                    ['resignation_id.department_id.name', '=', this.state.f_ou]
+                );
             }
             if (this.state.f_pos && this.state.f_pos !== 'all') {
-                domain.push(['employee_id.job_id.name', '=', this.state.f_pos]);
+                domain.push(
+                    '|',
+                    ['employee_id.job_id.name', '=', this.state.f_pos],
+                    ['employee_id.job_position.name', '=', this.state.f_pos]
+                );
             }
             if (this.state.f_sep && this.state.f_sep !== 'all') {
                 domain.push(['resignation_id.resignation_type_id.name', '=', this.state.f_sep]);
@@ -251,6 +300,14 @@ export class ExitInterviewDashboard extends Component {
 
     onKpiClickAll() {
         this.openListView('all');
+    }
+
+    onKpiClickCompletion() {
+        this.openListView('completion');
+    }
+
+    onKpiClickRating() {
+        this.openListView('rating');
     }
 
     onKpiClickRecommend() {

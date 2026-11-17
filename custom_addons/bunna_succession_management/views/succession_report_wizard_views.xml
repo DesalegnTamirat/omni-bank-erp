@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Succession Report Wizard Form View -->
+        <record id="view_succession_report_wizard_form" model="ir.ui.view">
+            <field name="name">succession.report.wizard.form</field>
+            <field name="model">succession.report.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Succession Reporting &amp; Excel Generator">
+                    <sheet>
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                            <i class="fa fa-info-circle fa-2x me-3 text-info" title="Info"/>
+                            <div>
+                                <strong>PPDD Succession Analytics &amp; Printable Excel Reports</strong>
+                                <div class="text-muted small">
+                                    Generate clean, printable Excel (.xlsx) workbooks configured with Bunna Bank corporate branding,
+                                    landscape print scaling, and automated summary analytics.
+                                </div>
+                            </div>
+                        </div>
+
+                        <group string="Select Report Format">
+                            <field name="report_type" widget="radio"/>
+                        </group>
+
+                        <group string="Report Scope &amp; Filters" col="2">
+                            <group>
+                                <field name="department_id" options="{'no_create': True, 'no_open': True}" placeholder="All Departments"/>
+                                <field name="critical_position_id"
+                                       options="{'no_create': True, 'no_open': True}"
+                                       placeholder="All Critical Positions"
+                                       domain="department_id and [('department_id', '=', department_id), ('active', '=', True), ('state', 'in', ['approved', 'placed'])] or [('active', '=', True), ('state', 'in', ['approved', 'placed'])]"/>
+                            </group>
+                            <group>
+                                <field name="risk_level_id" options="{'no_create': True, 'no_open': True}" placeholder="All Risk Levels"/>
+                                <field name="readiness_level_id" options="{'no_create': True, 'no_open': True}" placeholder="All Readiness Levels"/>
+                            </group>
+                        </group>
+                    </sheet>
+                    <footer>
+                        <button name="action_export_xlsx"
+                                string="Generate Excel Report"
+                                type="object"
+                                class="btn-primary"
+                                icon="fa-file-excel-o"/>
+                        <button string="Cancel"
+                                class="btn-secondary"
+                                special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- Succession Report Wizard Action -->
+        <record id="action_succession_report_wizard" model="ir.actions.act_window">
+            <field name="name">Generate Succession Excel Report</field>
+            <field name="res_model">succession.report.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="view_id" ref="view_succession_report_wizard_form"/>
+        </record>
+
+    </data>
+</odoo>

@@ -14,6 +14,53 @@
 
 <div t-if="state.view == 'dash'" class="eid_body">
 
+        <!-- ── Filters bar ── -->
+        <div class="eid_filters">
+
+            <!-- Operating Unit -->
+            <div class="eid_filter_group">
+                <label class="eid_filter_lbl">WORK UNITS</label>
+                <select class="eid_sel" t-att-value="state.f_ou" t-on-change="onFilterChangeOU">
+                    <option value="all">All units</option>
+                    <t t-foreach="state.operating_units" t-as="ou" t-key="ou.value">
+                        <option t-att-value="ou.value" t-att-selected="state.f_ou == ou.value">
+                            <t t-esc="ou.label"/>
+                        </option>
+                    </t>
+                </select>
+            </div>
+
+            <!-- Position -->
+            <div class="eid_filter_group">
+                <label class="eid_filter_lbl">POSITION</label>
+                <select class="eid_sel" t-att-value="state.f_pos" t-on-change="onFilterChangePos">
+                    <option value="all">All positions</option>
+                    <t t-foreach="state.positions" t-as="p" t-key="p.value">
+                        <option t-att-value="p.value" t-att-selected="state.f_pos == p.value">
+                            <t t-esc="p.label"/>
+                        </option>
+                    </t>
+                </select>
+            </div>
+
+            <!-- Separation type -->
+            <div class="eid_filter_group">
+                <label class="eid_filter_lbl">SEPARATION TYPE</label>
+                <select class="eid_sel" t-att-value="state.f_sep" t-on-change="onFilterChangeSep">
+                    <option value="all">All types</option>
+                    <t t-foreach="state.sep_types" t-as="s" t-key="s.value">
+                        <option t-att-value="s.value" t-att-selected="state.f_sep == s.value">
+                            <t t-esc="s.label"/>
+                        </option>
+                    </t>
+                </select>
+            </div>
+
+            <span class="eid_lock">
+                <i class="fa fa-lock" title="Anonymized"/> Anonymized · min. 5 responses per segment
+            </span>
+        </div>
+
         <!-- Loading -->
         <div t-if="state.loading" class="eid_loading">
             <i class="fa fa-spinner fa-spin fa-2x" title="Loading"/> Loading analytics…
@@ -21,83 +68,36 @@
 
         <t t-if="!state.loading">
 
-            <!-- ── Filters bar ── -->
-            <div class="eid_filters">
-
-                <!-- Operating Unit -->
-                <div class="eid_filter_group">
-                    <label class="eid_filter_lbl">Work units</label>
-                    <select class="eid_sel" t-on-change="onFilterChangeOU">
-                        <option value="all">All units</option>
-                        <t t-foreach="state.operating_units" t-as="ou" t-key="ou.value">
-                            <option t-att-value="ou.value" t-att-selected="state.f_ou == ou.value">
-                                <t t-esc="ou.label"/>
-                            </option>
-                        </t>
-                    </select>
-                </div>
-
-                <!-- Position -->
-                <div class="eid_filter_group">
-                    <label class="eid_filter_lbl">Position</label>
-                    <select class="eid_sel" t-on-change="onFilterChangePos">
-                        <option value="all">All positions</option>
-                        <t t-foreach="state.positions" t-as="p" t-key="p.value">
-                            <option t-att-value="p.value" t-att-selected="state.f_pos == p.value">
-                                <t t-esc="p.label"/>
-                            </option>
-                        </t>
-                    </select>
-                </div>
-
-                <!-- Separation type -->
-                <div class="eid_filter_group">
-                    <label class="eid_filter_lbl">Separation type</label>
-                    <select class="eid_sel" t-on-change="onFilterChangeSep">
-                        <option value="all">All types</option>
-                        <t t-foreach="state.sep_types" t-as="s" t-key="s.value">
-                            <option t-att-value="s.value" t-att-selected="state.f_sep == s.value">
-                                <t t-esc="s.label"/>
-                            </option>
-                        </t>
-                    </select>
-                </div>
-
-                <span class="eid_lock">
-                    <i class="fa fa-lock" title="Anonymized"/> Anonymized · min. 5 responses per segment
-                </span>
-            </div>
-
             <!-- ── KPI cards ── -->
-            <div class="eid_kpis">
-                <div class="eid_kpi eid_kpi_blue" style="cursor: pointer;" t-on-click="onKpiClickAll">
-                    <div class="eid_kpi_label">Interviews completed</div>
-                    <div class="eid_kpi_val"><t t-esc="state.kpis.total || 0"/></div>
-                    <div class="eid_kpi_sub">
-                        <span class="eid_badge_up">▲ <t t-esc="state.kpis.completion_pct || 0"/>%</span> completion rate
-                    </div>
+            <div class="eid_kpis" style="grid-template-columns: repeat(4, 1fr);">
+                <div class="eid_kpi" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-top: 1px solid var(--line); padding: 24px 16px; cursor: pointer;"
+                     title="Click to view Completed Exit Interviews"
+                     t-on-click="onKpiClickAll">
+                    <div style="font-size: 32px; font-weight: 800; color: var(--ink); line-height: 1; margin-bottom: 8px;"><t t-esc="state.kpis.total || 0"/></div>
+                    <div style="font-size: 15px; font-weight: 500; color: var(--ink);">Responses</div>
                 </div>
-                <div class="eid_kpi eid_kpi_teal" style="cursor: pointer;" t-on-click="onKpiClickAll">
-                    <div class="eid_kpi_label">Avg. satisfaction</div>
-                    <div class="eid_kpi_val"><t t-esc="state.kpis.avg_sat || '—'"/> / 5</div>
-                    <div class="eid_kpi_sub">Overall experience rating</div>
+                <div class="eid_kpi" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-top: 1px solid var(--line); padding: 24px 16px; cursor: pointer;"
+                     title="Click to view Completion Status (All Exit Interviews)"
+                     t-on-click="onKpiClickCompletion">
+                    <div style="font-size: 32px; font-weight: 800; color: var(--ink); line-height: 1; margin-bottom: 8px;"><t t-esc="state.kpis.completion_pct || 0"/>%</div>
+                    <div style="font-size: 15px; font-weight: 500; color: var(--ink);">Completion Rate</div>
                 </div>
-                <div class="eid_kpi eid_kpi_green" style="cursor: pointer;" t-on-click="onKpiClickRecommend">
-                    <div class="eid_kpi_label">Would recommend bank</div>
-                    <div class="eid_kpi_val"><t t-esc="state.kpis.recommend_pct || 0"/>%</div>
-                    <div class="eid_kpi_sub">Yes / No question</div>
+                <div class="eid_kpi" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-top: 1px solid var(--line); padding: 24px 16px; cursor: pointer;"
+                     title="Click to view Manager &amp; Satisfaction Ratings"
+                     t-on-click="onKpiClickRating">
+                    <div style="font-size: 32px; font-weight: 800; color: var(--ink); line-height: 1; margin-bottom: 8px;"><t t-esc="state.kpis.avg_sat || '—'"/> / 5</div>
+                    <div style="font-size: 15px; font-weight: 500; color: var(--ink);">Manager Rating</div>
                 </div>
-
-
-                <div class="eid_kpi eid_kpi_amber" style="cursor: pointer;" t-on-click="onKpiClickAll">
-                    <div class="eid_kpi_label">Avg. tenure at exit</div>
-                    <div class="eid_kpi_val"><t t-esc="state.kpis.avg_tenure || '—'"/></div>
-                    <div class="eid_kpi_sub"><t t-esc="state.kpis.avg_tenure_median || '—'"/></div>
+                <div class="eid_kpi" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-top: 1px solid var(--line); padding: 24px 16px; cursor: pointer;"
+                     title="Click to view Recommendation Responses"
+                     t-on-click="onKpiClickRecommend">
+                    <div style="font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 8px;">Would Recommend:</div>
+                    <div style="font-size: 32px; font-weight: 800; color: var(--ink); line-height: 1;"><t t-esc="state.kpis.recommend_pct || 0"/>%</div>
                 </div>
             </div>
 
             <!-- ── Row 1: Bars + Donut ── -->
-            <div class="eid_row3">
+            <div class="eid_row2">
 
                 <!-- Primary reason for leaving -->
                 <div class="eid_card">
@@ -109,7 +109,7 @@
                     </t>
                     <div class="eid_bars mt12">
                         <t t-foreach="state.bars" t-as="b" t-key="b.l">
-                            <div class="eid_bar_row" style="cursor: pointer;" t-att-data-answer="b.l" t-on-click="onBarClick">
+                            <div t-if="b_index &lt; 4 || state.showAllBars" class="eid_bar_row" style="cursor: pointer;" t-att-data-answer="b.l" t-on-click="onBarClick">
                                 <span class="eid_bar_lbl" t-att-title="b.l"><t t-esc="b.l"/></span>
                                 <div class="eid_bar_track">
                                     <div class="eid_bar_fill eid_fill_teal" t-att-style="'width:' + b.v + '%'"/>
@@ -117,27 +117,18 @@
                                 <span class="eid_bar_pct"><t t-esc="b.v"/>%</span>
                             </div>
                         </t>
-                    </div>
-                </div>
-
-                <!-- What would have kept you -->
-                <div class="eid_card">
-                    <div class="eid_card_tag">MULTIPLE CHOICE · MULTIPLE ANSWERS</div>
-                    <div class="eid_card_title">What would have kept you?</div>
-                    <div class="eid_card_sub">Respondents could tick several</div>
-                    <t t-if="state.keeps.length == 0">
-                        <div class="eid_empty mt12">No data available</div>
-                    </t>
-                    <div class="eid_bars mt12">
-                        <t t-foreach="state.keeps" t-as="b" t-key="b.l">
-                            <div class="eid_bar_row" style="cursor: pointer;" t-att-data-answer="b.l" t-on-click="onBarClick">
-                                <span class="eid_bar_lbl" t-att-title="b.l"><t t-esc="b.l"/></span>
-                                <div class="eid_bar_track">
-                                    <div class="eid_bar_fill eid_fill_amber" t-att-style="'width:' + b.v + '%'"/>
-                                </div>
-                                <span class="eid_bar_pct"><t t-esc="b.v"/>%</span>
-                            </div>
-                        </t>
+                        <div t-if="state.bars.length &gt; 4" class="eid_collapse_toggle" t-on-click="toggleShowAllBars">
+                            <span class="eid_collapse_btn">
+                                <t t-if="!state.showAllBars">
+                                    <i class="fa fa-chevron-down" style="font-size: 10px; margin-right: 4px;"/>
+                                    <span>Show <t t-esc="state.bars.length - 4"/> more reasons</span>
+                                </t>
+                                <t t-if="state.showAllBars">
+                                    <i class="fa fa-chevron-up" style="font-size: 10px; margin-right: 4px;"/>
+                                    <span>Show fewer reasons</span>
+                                </t>
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -216,41 +207,17 @@
                 </div>
             </div>
 
-            <!-- ── Row 3: Top Themes + Quotes ── -->
-            <div class="eid_row2">
-
-                <!-- Top themes -->
-                <div class="eid_card">
-                    <div class="eid_card_tag">SHORT ANSWER</div>
-                    <div class="eid_card_title">Top themes</div>
-                    <div class="eid_card_sub">Auto-tagged keywords · count</div>
-                    <t t-if="state.themes.length == 0">
-                        <div class="eid_empty mt12">No text responses yet</div>
-                    </t>
-                    <div class="eid_chips mt12" style="max-height: 250px; overflow-y: auto; padding-right: 8px;">
-                        <t t-foreach="state.themes" t-as="th" t-key="th.t">
-                            <span t-att-class="'eid_chip eid_chip_' + th.size" style="cursor: pointer;" t-att-data-answer="th.t" t-on-click="onBarClick">
-                                <t t-esc="th.t"/> <b><t t-esc="th.n"/></b>
-                            </span>
-                        </t>
+            <!-- ── Row 3: Text Questions ── -->
+            <div t-if="state.text_qs.length > 0" class="eid_row3" style="grid-template-columns: repeat(4, 1fr);">
+                <t t-foreach="state.text_qs" t-as="tq" t-key="tq.id">
+                    <div class="eid_card" style="text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 1px solid var(--line);">
+                        <div class="eid_card_title" style="min-height: 44px; margin-bottom: 12px; font-size: 14px;"><t t-esc="tq.l"/></div>
+                        <i class="fa fa-pencil-square-o" style="font-size: 20px; color: var(--ink); margin-bottom: 8px;"/>
+                        <div style="font-size: 36px; font-weight: 800; color: var(--ink); line-height: 1;"><t t-esc="tq.count"/></div>
+                        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 16px; margin-top: 4px;">text responses</div>
+                        <button class="eid_btn_sm" style="font-weight: 600; color: var(--mut);" t-on-click="() => this.openListView('question', tq.l)">[ View Responses → ]</button>
                     </div>
-                </div>
-
-                <!-- Open-ended quotes -->
-                <div class="eid_card" style="display: flex; flex-direction: column;">
-                    <div class="eid_card_tag">PARAGRAPH  OPEN-ENDED</div>
-                    <div class="eid_card_title">Comments &amp; feedback</div>
-                    <div class="eid_card_sub">Anonymized excerpts from text responses</div>
-                    <button class="btn btn-sm btn-outline-secondary mt12" t-on-click="() => this.openListView('text')">View All Text Responses</button>
-                    <t t-if="state.quotes.length == 0">
-                        <div class="eid_empty mt12">No open-ended responses yet</div>
-                    </t>
-                    <div class="eid_quotes mt12" style="max-height: 250px; overflow-y: auto; padding-right: 8px; flex-grow: 1;">
-                        <t t-foreach="state.quotes" t-as="q" t-key="q.id">
-                            <div class="eid_quote" style="padding: 10px; border-left: 4px solid #0f766e; background: #f8fafc; margin-bottom: 10px; border-radius: 4px;">"<t t-esc="q.text"/>"</div>
-                        </t>
-                    </div>
-                </div>
+                </t>
             </div>
 
         </t><!-- /!loading -->
@@ -309,7 +276,7 @@
                     </t>
                 </select>
             </div>
-            <button class="btn btn-teal" style="background-color: #0f766e; color: white;" t-on-click="onPrintReport" t-if="state.cur_interview">
+            <button class="btn btn-teal" style="background-color: #6d382d; color: white;" t-on-click="onPrintReport" t-if="state.cur_interview">
                 <i class="fa fa-print"/> Print / Save PDF
             </button>
         </div>
@@ -337,7 +304,7 @@
             </div>
 
             <!-- QUESTIONS: REASON -->
-            <h3 class="eid_section_title" style="color: #0f766e; font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #0f766e; padding-bottom: 5px; margin-bottom: 20px;">1 &#183; REASON FOR LEAVING</h3>
+            <h3 class="eid_section_title" style="color: #6d382d; font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #6d382d; padding-bottom: 5px; margin-bottom: 20px;">1 &#183; REASON FOR LEAVING</h3>
             <t t-foreach="state.cur_interview.questions_reason" t-as="q" t-key="q.id">
                 <div class="eid_q_block" style="margin-bottom: 25px;">
                     <div class="eid_q_title" style="font-weight: bold; margin-bottom: 10px; color: #1e293b;"><t t-esc="q.question"/> <span class="eid_q_type" style="font-size: 10px; font-weight: normal; color: #64748b; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 10px; margin-left: 8px;"><t t-esc="q.type_label"/></span></div>
@@ -345,7 +312,7 @@
                         <t t-if="q.options.length &gt; 0 and q.type != 'dropdown'">
                             <div class="eid_options_inline" style="display: flex; flex-wrap: wrap; gap: 15px;">
                                 <t t-foreach="q.options" t-as="opt" t-key="opt.name">
-                                    <label t-att-style="opt.selected ? 'color: #0f766e; font-weight: bold; display: flex; align-items: center; gap: 5px;' : 'color: #64748b; display: flex; align-items: center; gap: 5px;'">
+                                    <label t-att-style="opt.selected ? 'color: #6d382d; font-weight: bold; display: flex; align-items: center; gap: 5px;' : 'color: #64748b; display: flex; align-items: center; gap: 5px;'">
                                         <i t-if="q.type == 'custom'" t-att-class="opt.selected ? 'fa fa-dot-circle-o' : 'fa fa-circle-o'"/>
                                         <i t-if="q.type == 'checkbox'" t-att-class="opt.selected ? 'fa fa-check-square' : 'fa fa-square-o'"/>
                                         <t t-esc="opt.name"/>
@@ -358,19 +325,19 @@
                                 <t t-esc="q.answer"/> <i class="fa fa-caret-down" style="float: right; color: #64748b; margin-top: 3px;"/>
                             </div>
                         </t>
-                        <t t-if="q.type == 'text'"><div class="eid_ans_box" style="padding: 10px; background: #f8fafc; border-left: 3px solid #0f766e; color: #334155;"><t t-esc="q.answer"/></div></t>
+                        <t t-if="q.type == 'text'"><div class="eid_ans_box" style="padding: 10px; background: #f8fafc; border-left: 3px solid #6d382d; color: #334155;"><t t-esc="q.answer"/></div></t>
                     </div>
                 </div>
             </t>
 
             <!-- QUESTIONS: RATINGS -->
-            <h3 class="eid_section_title" style="color: #0f766e; font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #0f766e; padding-bottom: 5px; margin-bottom: 20px; margin-top: 40px;">2 &#183; EXPERIENCE RATINGS</h3>
+            <h3 class="eid_section_title" style="color: #6d382d; font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #6d382d; padding-bottom: 5px; margin-bottom: 20px; margin-top: 40px;">2 &#183; EXPERIENCE RATINGS</h3>
             <t t-foreach="state.cur_interview.questions_rating" t-as="q" t-key="q.id">
                  <div class="eid_q_block" style="margin-bottom: 20px;">
                     <div class="eid_q_title" style="font-weight: bold; margin-bottom: 8px; color: #1e293b;"><t t-esc="q.question"/> <span class="eid_q_type" style="font-size: 10px; font-weight: normal; color: #64748b; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 10px; margin-left: 8px;"><t t-esc="q.type_label"/></span></div>
                     <div class="eid_rating_row" style="display: flex; align-items: center; gap: 10px;">
                         <t t-foreach="[1,2,3,4,5]" t-as="r" t-key="r">
-                            <div t-att-style="q.rating_val == r ? 'width: 28px; height: 28px; border-radius: 50%; background: #0f766e; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;' : 'width: 28px; height: 28px; border-radius: 50%; border: 1px solid #cbd5e1; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 12px;'">
+                            <div t-att-style="q.rating_val == r ? 'width: 28px; height: 28px; border-radius: 50%; background: #6d382d; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;' : 'width: 28px; height: 28px; border-radius: 50%; border: 1px solid #cbd5e1; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 12px;'">
                                 <t t-esc="r"/>
                             </div>
                         </t>

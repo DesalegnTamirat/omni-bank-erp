@@ -7,12 +7,16 @@ import { useService } from "@web/core/utils/hooks";
 const ADMIN_GROUP = "documents_lite.group_dms_manager";
 
 /** What the browser can show inline for a mimetype. */
-export function dmsKind(mimetype) {
-    const m = mimetype || "";
+export function dmsKind(mimetype, extension) {
+    const m = (mimetype || "").toLowerCase();
+    const ext = (extension || "").toLowerCase();
     if (m.startsWith("image/")) {
         return "image";
     }
-    if (m === "application/pdf") {
+    if (m === "application/pdf" || ext === "pdf") {
+        return "pdf";
+    }
+    if (ext === "doc" || ext === "docx" || m === "application/msword" || m.includes("wordprocessingml")) {
         return "pdf";
     }
     if (m.startsWith("video/")) {
@@ -155,7 +159,7 @@ export class DmsViewer extends Component {
         return this.props.docs[this.state.index];
     }
     get kind() {
-        return dmsKind(this.doc.mimetype);
+        return dmsKind(this.doc.mimetype, this.doc.extension);
     }
     get src() {
         return dmsPreviewUrl(this.doc);

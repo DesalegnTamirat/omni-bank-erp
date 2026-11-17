@@ -49,7 +49,7 @@
         <record id="account_payroll_0127020305" model="hr.payroll.account">
             <field name="code">0127020305</field>
             <field name="name">CASH INDEMNITY ALLOWANCE PAYABLE</field>
-            <field name="account_type">debit</field>
+            <field name="account_type">both</field>
             <field name="active" eval="True"/>
             <field name="company_id" ref="base.main_company"/>
         </record>

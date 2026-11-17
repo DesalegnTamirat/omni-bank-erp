@@ -1,77 +1,67 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models
+from odoo import fields, models, api
 
 
-class ResCompany(models.Model):
-    _inherit = 'res.company'
+class SuccessionGovernancePolicy(models.Model):
+    _name = 'succession.governance.policy'
+    _description = 'Succession Governance Policy'
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 9-BOX GRID THRESHOLDS
-    # ─────────────────────────────────────────────────────────────────────────
-    succ_high_perf_threshold = fields.Float(
-        string='High Performance Threshold (≥ PMS Score)',
-        default=85.0,
-        help="Employees scoring at or above this PMS score are classified as "
-             "High Performers on the 9-Box Grid (top row). Recommended: 80–90."
-    )
-    succ_med_perf_threshold = fields.Float(
-        string='Medium Performance Threshold (≥ PMS Score)',
-        default=70.0,
-        help="Employees scoring at or above this PMS score (but below the High "
-             "threshold) are classified as Medium Performers (middle row). "
-             "Recommended: 65–79. Must be less than the High threshold."
-    )
-    succ_high_pot_threshold = fields.Float(
-        string='High Potential Threshold (≥ Match %)',
-        default=80.0,
-        help="Candidates with a competency match of at or above this percentage "
-             "are classified as High Potential on the 9-Box Grid (right column). "
-             "Recommended: 75–85%."
-    )
-    succ_med_pot_threshold = fields.Float(
-        string='Medium Potential Threshold (≥ Match %)',
-        default=60.0,
-        help="Candidates with a competency match at or above this percentage "
-             "(but below the High threshold) are Medium Potential (middle column). "
-             "Recommended: 50–74%. Must be less than the High threshold."
-    )
+    name = fields.Char(default='Global Succession Policy', required=True, index=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
+    @api.model
+    def get_policy(self):
+        policy = self.sudo().search([], limit=1)
+        ready_now = self.env['succession.readiness.level'].sudo().search([
+            ('name', 'ilike', 'Ready Now')
+        ], order='sequence asc', limit=1)
+        if not policy:
+            policy = self.sudo().create({
+                'name': 'Global Succession Policy',
+                'deployment_readiness_level_id': ready_now.id if ready_now else False,
+            })
+        elif not policy.deployment_readiness_level_id and ready_now:
+            policy.sudo().write({'deployment_readiness_level_id': ready_now.id})
+        return policy
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'deployment_readiness_level_id' in vals:
+            target_level = self.deployment_readiness_level_id
+            target_seq = target_level.sequence if target_level else 10
+            for lvl in self.env['succession.readiness.level'].search([]):
+                lvl.write({'is_ready_for_deployment': bool(lvl.sequence and lvl.sequence <= target_seq)})
+        return res
+
     # SUCCESSION GOVERNANCE RULES
-    # ─────────────────────────────────────────────────────────────────────────
+    deployment_readiness_level_id = fields.Many2one(
+        'succession.readiness.level', domain="[('active', '=', True)]",
+        string='Minimum Readiness for Immediate Deployment',
+        index=True,
+        help="The minimum readiness level an employee must attain to be eligible for immediate deployment/placement into a Critical Position. Candidates with lower readiness must complete a Development Plan (IDP)."
+    )
     succ_min_successors_global = fields.Integer(
         string='Minimum Successors Required (Global Default)',
         default=2,
         help="The minimum number of approved successor candidates required for "
              "any Critical Position before its succession risk can drop below "
              "'High'. This is the bank-wide default; each position can override "
-             "it individually. Best practice: 2–3 successors."
-    )
-    succ_risk_review_months = fields.Integer(
-        string='Succession Risk Review Cycle (Months)',
-        default=6,
-        help="How often (in months) the system should automatically trigger a "
-             "risk recalculation and alert PPDD to review critical positions. "
-             "Recommended: every 6 months (twice a year)."
+             "it individually. Best practice: 2-3 successors."
     )
     succ_require_spmc_approval = fields.Boolean(
         string='Require SPMC Approval for Critical Positions',
         default=True,
         help="When enabled, all Critical Positions must pass through the full "
-             "PPDD → SPMC governance workflow before candidates can be formally "
+             "PPDD to SPMC governance workflow before candidates can be formally "
              "nominated. Disable only during initial system setup or data migration."
     )
-    succ_auto_deactivate_on_fill = fields.Boolean(
-        string='Auto-Deactivate Position When Vacancy is Filled',
-        default=False,
-        help="When enabled, a Critical Position will be automatically moved to "
-             "'Deactivated' state once a candidate is marked as 'Placed' in the "
-             "role, removing it from the active succession pipeline."
+
+    invitation_expiry_days = fields.Integer(
+        string='Invitation Expiration Window (Days)',
+        default=3,
+        help="Number of days an employee has to accept or decline a succession invitation before it expires (e.g. 3 or 4 days). After expiration, status becomes Expired and acceptance is blocked."
     )
 
-    # ─────────────────────────────────────────────────────────────────────────
     # READINESS & PIPELINE RULES
-    # ─────────────────────────────────────────────────────────────────────────
     succ_readiness_review_months = fields.Integer(
         string='Readiness Review Reminder (Months)',
         default=6,
@@ -80,57 +70,44 @@ class ResCompany(models.Model):
              "level will be flagged for update by PPDD. Recommended: 6 months."
     )
     succ_idp_mandatory = fields.Boolean(
-        string='Require Development Plan (IDP) Before Candidate Approval',
+        string='Require Successor Development Plan Before Candidate Approval',
         default=True,
-        help="When enabled, a Succession Development Plan (IDP) must be created "
+        help="When enabled, a Successor Development Plan must be created "
              "for a candidate before SPMC can mark them as 'Approved'. Enforces "
              "best-practice development governance."
     )
     succ_career_discussion_mandatory = fields.Boolean(
-        string='Require Career Discussion Before IDP Creation',
+        string='Require Career Discussion for Development Plan (IDP)',
         default=True,
-        help="When enabled, at least one confirmed Career Discussion must exist "
-             "for an employee before a Succession Development Plan (IDP) can be "
-             "created for them. Ensures employee buy-in before development begins."
+        help="When enabled, a confirmed Career Discussion between the Line Manager "
+             "and employee is required after the Successor Development Plan "
+             "is created, before the plan can be activated. Ensures alignment and "
+             "mutual commitment to the development roadmap."
+    )
+    succ_idp_max_duration_months = fields.Integer(
+        string='Max Plan Duration (Months)',
+        default=12,
+        help='Maximum duration in months for a successor development plan.'
+    )
+    succ_min_idp_progress_for_pool = fields.Float(
+        string='Min Plan Progress to Enter Pool (%)',
+        default=70.0,
+        help='Minimum development plan progress percentage required to enter the active pool.'
     )
     succ_auto_match_min_score = fields.Float(
         string='Auto-Match Minimum Eligibility Score (%)',
         default=30.0,
         help="Minimum competency match percentage for a candidate to appear."
     )
-    succ_ready_now_min_match = fields.Float(
-        string='Ready Now Minimum Match (%)',
-        default=90.0,
-        help="Minimum competency match percentage to be automatically suggested as Ready Now."
-    )
-    succ_ready_soon_min_match = fields.Float(
-        string='Ready Soon Minimum Match (%)',
-        default=70.0,
-        help="Minimum competency match percentage to be automatically suggested as Ready Soon."
-    )
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # BENCH STRENGTH SCORING WEIGHTS
-    # ─────────────────────────────────────────────────────────────────────────
-    succ_score_weight_competency = fields.Float(
-        string='Competency Match Weight (%)',
-        default=60.0,
-        help="The percentage weight given to Competency Match when calculating "
-             "a candidate's overall succession readiness score. Must sum to 100% "
-             "together with the PMS weight. Recommended: 60% (competency-led "
-             "succession is more forward-looking)."
-    )
-    succ_score_weight_pms = fields.Float(
-        string='PMS Score Weight (%)',
-        default=40.0,
-        help="The percentage weight given to PMS (Performance) Score when "
-             "calculating a candidate's overall succession readiness score. "
-             "Must sum to 100% with the Competency weight. Recommended: 40%."
-    )
-
-    # ─────────────────────────────────────────────────────────────────────────
     # ALERTS & NOTIFICATIONS
-    # ─────────────────────────────────────────────────────────────────────────
+    succ_risk_review_months = fields.Integer(
+        string='Succession Risk Review Cycle (Months)',
+        default=6,
+        help="How often (in months) the system should automatically trigger a "
+             "risk recalculation and alert PPDD to review critical positions. "
+             "Recommended: every 6 months (twice a year)."
+    )
     succ_alert_critical_no_successors = fields.Boolean(
         string='Alert PPDD When Critical Position Has No Successors',
         default=True,
@@ -139,7 +116,7 @@ class ResCompany(models.Model):
              "nominated candidates. Triggered weekly by the scheduled cron job."
     )
     succ_alert_idp_overdue = fields.Boolean(
-        string='Alert When IDP Activities Are Overdue',
+        string='Alert When Development Plan Activities Are Overdue',
         default=True,
         help="When enabled, email notifications are sent to the responsible "
              "manager and PPDD when a Succession Development Plan activity "
@@ -152,3 +129,12 @@ class ResCompany(models.Model):
              "exceeds the configured Readiness Review Cycle without update. "
              "Ensures the pipeline data remains current and reliable."
     )
+
+    # DEVELOPMENT PLAN PRIORITIZATION & URGENCY (Configurable Rules)
+    urgency_rule_ids = fields.One2many(
+        'succession.development.urgency.level',
+        'policy_id',
+        string='Urgency Level Rules',
+        help='Flexible score ranges (1-10) and their corresponding Urgency Levels.'
+    )
+

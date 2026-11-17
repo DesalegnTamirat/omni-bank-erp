@@ -114,7 +114,7 @@ class SupervisorEvaluationController(http.Controller):
             'current_work_unit': c.emp_name.default_operating_unit_id.name if c.emp_name.default_operating_unit_id else '',
             'service_in_company': c.service_in_company or 0.0,
             'pms_score': c.pms_score or 0.0,
-            'recommendation_score': c.supervisor_recommendation_score if c.supervisor_recommendation_score > 0 else 100.0,
+            'recommendation_score': c.supervisor_recommendation_score or 0.0,
             'recommendation_remarks': c.supervisor_remarks or '',
         }) for c in cands]
 
@@ -133,11 +133,96 @@ class SupervisorEvaluationController(http.Controller):
             'pms_score': first_cand.pms_score or 0.0,
             'supervisor_id': sup.id if sup else False,
             'evaluator_user_id': user.id,
-            'recommendation_score': first_cand.supervisor_recommendation_score if first_cand.supervisor_recommendation_score > 0 else 100.0,
+            'recommendation_score': first_cand.supervisor_recommendation_score or 0.0,
             'recommendation_remarks': first_cand.supervisor_remarks or '',
             'line_ids': lines,
         }
         wiz = request.env['supervisor.recommendation.wizard'].sudo().create(wiz_vals)
 
         action = request.env.ref('custom_recruitment.action_supervisor_recommendation_wizard')
+        return request.redirect(f'/odoo/action-{action.id}/{wiz.id}')
+
+    @http.route('/recruitment/transfer_recommendation/<int:transfer_id>', type='http', auth='user', website=False)
+    def transfer_recommendation(self, transfer_id, **kw):
+        """
+        Direct landing route for supervisors to evaluate a subordinate's transfer request.
+        Pops up the transfer.recommendation.wizard with the subordinate's transfer request details.
+        """
+        req = request.env['employee.transfer.request'].sudo().browse(transfer_id)
+        if not req.exists():
+            return request.not_found()
+
+        user = request.env.user
+        user_emp = user.employee_id or request.env['hr.employee'].sudo().search([('user_id', '=', user.id)], limit=1)
+
+        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
+
+        # Check authorization: user must be HR or the employee's coach/manager
+        is_supervisor = False
+        emp = req.employee_id
+        if user_emp and emp:
+            if (emp.coach_id and emp.coach_id.id == user_emp.id) or (emp.parent_id and emp.parent_id.id == user_emp.id):
+                is_supervisor = True
+
+        if not is_hr and not is_supervisor:
+            return request.make_response(
+                """<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:50px;">
+                <h3 style="color:#541718;">Access Restricted</h3>
+                <p>Only the direct supervisor (coach/manager) or HR may provide recommendation marks for this transfer request.</p>
+                <a href="/web" style="display:inline-block;padding:10px 20px;background:#541718;color:white;text-decoration:none;border-radius:4px;">Back to Home</a>
+                </body></html>""",
+                headers=[('Content-Type', 'text/html;charset=utf-8')]
+            )
+
+        if req.state != 'under_review':
+            ref_str = req.name or _('Transfer Request')
+            return request.make_response(
+                f"""<!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Recommendation Not Pending</title>
+                    <style>
+                        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8f9fa; }}
+                        .card {{ background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 520px; text-align: center; }}
+                        h2 {{ color: #541718; margin-top: 0; margin-bottom: 12px; }}
+                        p {{ color: #555; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }}
+                        .btn {{ display: inline-block; padding: 10px 22px; background: #541718; color: white; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; }}
+                        .btn:hover {{ background: #3d1011; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h2>Recommendation Not Pending</h2>
+                        <p>Transfer request <b>{ref_str}</b> is currently in status <b>{req.state.replace('_', ' ').title()}</b> (must be Under Review to submit marks).</p>
+                        <a href="/web" class="btn">Return to Odoo</a>
+                    </div>
+                </body>
+                </html>""",
+                headers=[('Content-Type', 'text/html;charset=utf-8')]
+            )
+
+        sup = emp.coach_id or emp.parent_id
+        wiz_vals = {
+            'transfer_request_id': req.id,
+            'employee_id': emp.id if emp else False,
+            'current_position': req.current_job_position_id.name if req.current_job_position_id else (emp.job_id.name if emp and emp.job_id else ''),
+            'current_grade': req.current_job_grade_id.grade_name if req.current_job_grade_id else '',
+            'current_work_unit': req.current_operating_unit_id.name if req.current_operating_unit_id else '',
+            'current_department': req.department_id.name if req.department_id else '',
+            'service_in_current_position': req.service_years_current_position or 0.0,
+            'service_in_current_location': req.service_years_current_location or 0.0,
+            'service_in_company': req.company_experience_years or 0.0,
+            'total_experience': req.total_experience_years or 0.0,
+            'pms_score': req.pms_score or 0.0,
+            'requested_operating_unit': req.requested_operating_unit_id.name if req.requested_operating_unit_id else '',
+            'alternate_location': req.alternate_location_preference_id.name if req.alternate_location_preference_id else '',
+            'reason_for_transfer': req.reason_for_transfer or '',
+            'supervisor_id': sup.id if sup else (user_emp.id if user_emp else False),
+            'evaluator_user_id': user.id,
+            'recommendation_score': req.supervisor_recommendation_score or 0.0,
+            'recommendation_remarks': getattr(req, 'supervisor_remarks', '') or '',
+        }
+        wiz = request.env['transfer.recommendation.wizard'].sudo().create(wiz_vals)
+
+        action = request.env.ref('custom_recruitment.action_transfer_recommendation_wizard')
         return request.redirect(f'/odoo/action-{action.id}/{wiz.id}')

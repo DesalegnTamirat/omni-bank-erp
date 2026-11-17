@@ -17,3 +17,8 @@ class PmStrategicSource(models.Model):
             if not vals.get('code') or vals.get('code') == _('New'):
                 vals['code'] = self.env['ir.sequence'].next_by_code('pm.strategic.source') or _('New')
         return super().create(vals_list)
+
+    def unlink(self):
+        """Soft delete: archive strategic source instead of permanent deletion."""
+        return self.write({'active': False})
+

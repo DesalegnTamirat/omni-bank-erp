@@ -27,7 +27,7 @@ class RecruitmentProcessExternal(models.Model):
     recruitment_reference = fields.Char(string="Recruitment Reference")
     job_location = fields.Char(string="Work Unit")
     workunit_id = fields.Integer(string="Work Unit Id")
-    job_grade_id = fields.Integer(string="Work Unit Id")
+    job_grade_id = fields.Integer(string="Job Grade Id")
     job_grade = fields.Char(string="Grade")
     job_category = fields.Char(string="Category")
     relevant_experience = fields.Float(string="Relevant Experience")
@@ -89,6 +89,63 @@ class RecruitmentProcessExternal(models.Model):
             'target': 'new',
             'context': {
                 'default_recruitment_id': self.id,
+            }
+        }
+
+    def action_reset_to_draft(self):
+        """Reset this recruitment process and release all candidate states to draft."""
+        for rec in self:
+            rec.write({
+                'shortlisting_done': False,
+                'status': False,
+            })
+            if rec.eligible_emp_external:
+                rec.eligible_emp_external.write({
+                    'application_status': 'submitted',
+                    'select_flag': False,
+                })
+            if rec.vacancy_id:
+                rec.vacancy_id._release_all_candidate_states()
+                rec.vacancy_id.write({
+                    'shortlist_done': False,
+                    'recruitment_step': 'shortlist',
+                    'ext_selected_recruitment_id': False,
+                })
+            else:
+                ext_sels = self.env['external.recruitment.selected'].sudo().search([
+                    ('vacancy_reference', '=', rec.vacancy_reference)
+                ])
+                for sel in ext_sels:
+                    cands = getattr(sel, 'ext_rec_sel', False) or getattr(sel, 'ext_rec_sel_cand', False)
+                    if cands:
+                        cands.unlink()
+                    sel.write({
+                        'active': False,
+                        'exam_scheduled': 'No',
+                        'interview_scheduled': 'No',
+                        'scores_computed': False,
+                    })
+                apps = self.env['hr.applicant'].sudo().search([
+                    ('vacancy_reference', '=', rec.vacancy_reference)
+                ])
+                if apps:
+                    app_vals = {'bunna_app_status': 'draft'}
+                    for f in ['is_written_exam_notified', 'scheduled_written_exam_date', 'scheduled_written_exam_location',
+                              'is_interview_notified', 'scheduled_interview_date', 'scheduled_interview_location',
+                              'candidate_score_id']:
+                        if f in apps._fields and not apps._fields[f].readonly:
+                            app_vals[f] = False
+                    apps.write(app_vals)
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Reset Completed'),
+                'message': _('Recruitment process and all candidate states have been successfully released to draft.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
 
@@ -338,14 +395,15 @@ class EligibleEmployeesexternal(models.Model):
             email = rec.applicant_email or (rec.applicant_name.email_from if rec.applicant_name else False)
             phone = rec.applicant_phone or (rec.applicant_name.partner_phone if rec.applicant_name else False)
 
+            pool_fields = blacklist_pool._fields
             or_conditions = []
-            if nid:
+            if nid and 'national_id' in pool_fields:
                 or_conditions.append(('national_id', '=ilike', str(nid).strip()))
-            if cand_name:
+            if cand_name and 'candidate' in pool_fields:
                 or_conditions.append(('candidate', '=ilike', str(cand_name).strip()))
-            if email:
+            if email and 'email' in pool_fields:
                 or_conditions.append(('email', '=ilike', str(email).strip()))
-            if phone:
+            if phone and 'phone' in pool_fields:
                 or_conditions.append(('phone', '=ilike', str(phone).strip()))
 
             if or_conditions:
@@ -353,7 +411,15 @@ class EligibleEmployeesexternal(models.Model):
                 match = blacklist_pool.search(domain, limit=1)
                 if match:
                     is_black = True
-                    reason = match.reason or f"Matched in Blacklist Pool: {match.candidate} (NID: {match.national_id or 'N/A'})"
+                    info_items = []
+                    if getattr(match, 'name_of_bank', False):
+                        info_items.append(f"Bank: {match.name_of_bank}")
+                    if match.reason:
+                        info_items.append(f"Reason: {match.reason}")
+                    if getattr(match, 'date_of_termination', False):
+                        info_items.append(f"Date: {match.date_of_termination}")
+                    info_str = f" ({', '.join(info_items)})" if info_items else ""
+                    reason = f"Matched in Blacklist Pool: {match.candidate}{info_str}"
 
             rec.is_blacklisted = is_black
             rec.blacklist_reason = reason
@@ -591,7 +657,7 @@ class ExternalApplicantCertification(models.Model):
     )
 
     attachment_filename = fields.Char(
-        string='Certificate File',
+        string='Certificate Filename',
         compute='_compute_attachment', store=False,
         help='Name of the uploaded certificate file (read-only display).'
     )
@@ -711,7 +777,7 @@ class ExternalSelectedCandidates(models.Model):
     job_location = fields.Char(string="Work Unit")
     job_grade = fields.Char(string="Grade")
     workunit_id = fields.Integer(string="Work Unit Id")
-    job_grade_id = fields.Integer(string="Work Unit Id")
+    job_grade_id = fields.Integer(string="Job Grade Id")
     job_category = fields.Char(string="Category")
     emp_type = fields.Char(string="Employment Type")
     recruitment_reference = fields.Char(string="Recruitment Reference")

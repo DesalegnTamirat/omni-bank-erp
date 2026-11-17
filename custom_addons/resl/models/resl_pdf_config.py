@@ -13,13 +13,12 @@ DEFAULT_PAGES = [
     "/resl/static/agreement/page3.png",
     "/resl/static/agreement/page4.png",
     "/resl/static/agreement/page5.png",
-    "/resl/static/agreement/page6.png",
 ]
 
 DEFAULT_SLOTS_A = [
     {"p": "1", "r": [[158, 140, 257, 154]], "t": "{a_date}"},
     {"p": "1", "r": [[258, 140, 383, 154]], "t": "{a_name}"},
-    {"p": "1", "r": [[446, 140, 520, 154], [72, 156, 407, 168]], "t": "ከተማ\u00a0{a_city} ክፍለ\u00a0ከተማ፤\u00a0{a_subcity} ወረዳ\u00a0{a_woreda} ቤት.ቁጥር-\u00a0{a_house} ቁጥር\u00a0{a_phone}"},
+    {"p": "1", "r": [[446, 140, 520, 154], [72, 156, 407, 168]], "t": "{a_city}\u00a0ከተማ {a_subcity} ክፍለ\u00a0ከተማ፤ ወረዳ\u00a0{a_woreda} ቤት.ቁጥር-\u00a0{a_house} ቁጥር\u00a0{a_phone}"},
     {"p": "1", "r": [[528, 156, 580, 168]], "t": "{a_tax}"},
     {"p": "1", "r": [[248, 170, 352, 183]], "t": "መታወቂያ\u00a0ቁጥር-\u00a0{a_emp}"},
     {"p": "2", "r": [[221, 122, 540, 134]], "t": "{a_amt} ({a_amtw})"},
@@ -29,15 +28,13 @@ DEFAULT_SLOTS_A = [
 DEFAULT_SLOTS_B = [
     {"p": "4", "r": [[135, 154, 236, 168]], "t": "{b_date}"},
     {"p": "4", "r": [[237, 154, 362, 168]], "t": "{b_name}"},
-    {"p": "4", "r": [[427, 154, 540, 168], [72, 168, 257, 180]], "t": "{b_address} የቤት. ቁጥር {b_house}"},
-    {"p": "4", "r": [[498, 168, 540, 180], [72, 180, 209, 192]], "t": "{b_tax}፤ የ.መ.ቁ {b_emp} ፤ስ.ቁጥር {b_phone}"},
+    {"p": "4", "r": [[427, 154, 540, 168], [72, 168, 257, 180]], "t": "{b_city}\u00a0ከተማ {b_subcity} ክፍለ\u00a0ከተማ፤ ወረዳ\u00a0{b_woreda} የቤት.\u00a0ቁጥር\u00a0{b_house}"},
+    {"p": "4", "r": [[498, 168, 540, 180]], "t": "{b_tax}፤"},
+    {"p": "4", "r": [[72, 180, 209, 192]], "t": "የ.መ.ቁ\u00a0{b_emp} ፤ስ.ቁጥር\u00a0{b_phone}"},
     {"p": "4", "r": [[302, 221, 433, 234]], "t": "{b_borrower}"},
     {"p": "4", "r": [[440, 221, 540, 234]], "t": "{b_bdate}"},
     {"p": "4", "r": [[253, 241, 540, 254], [72, 260, 107, 272]], "t": "{b_amt} ({b_amtw})"},
     {"p": "4", "r": [[423, 382, 540, 395], [144, 401, 350, 413]], "t": "{b_amt} ({b_amtw})"},
-    {"p": "5", "r": [[529, 485, 541, 497]], "t": ""},
-    {"p": "5", "r": [[144, 503, 266, 516]], "t": "{b_branch1}/ዳይሬክቶሬት)እና("},
-    {"p": "5", "r": [[271, 503, 376, 516]], "t": "{b_branch2}/ዳይሬክቶሬት)"},
 ]
 
 DEFAULT_SIGS_A = [
@@ -93,11 +90,11 @@ class ReslPdfConfig(models.Model):
     page_1_image = fields.Binary(string="Page 1 Image (Cover & Details)", attachment=True)
     page_2_image = fields.Binary(string="Page 2 Image (Articles 1-7)", attachment=True)
     page_3_image = fields.Binary(string="Page 3 Image (Articles 8-12 & Borrower Signatures)", attachment=True)
-    page_4_image = fields.Binary(string="Page 4 Image (Part B - Guarantee Agreement)", attachment=True)
-    page_5_image = fields.Binary(string="Page 5 Image (Part B - Articles 9-13 & Guarantor Signatures)", attachment=True)
+    page_4_image = fields.Binary(string="Page 4 Image (Guarantor - Guarantee Agreement)", attachment=True)
+    page_5_image = fields.Binary(string="Page 5 Image (Guarantor - Articles 9-13 & Guarantor Signatures)", attachment=True)
     page_6_image = fields.Binary(string="Page 6 Image (Back / Final Page)", attachment=True)
 
-    # ── Part A: Borrower Detailed Words & Clauses ───────────────────────────
+    # ── Borrower: Detailed Words & Clauses ───────────────────────────
     a_date_slot = fields.Char(string="Date Format", default="{a_date}")
     a_name_slot = fields.Char(string="Borrower Name Format", default="{a_name}")
     a_city_label = fields.Char(string="City Word (ከተማ)", default="ከተማ")
@@ -111,7 +108,7 @@ class ReslPdfConfig(models.Model):
     a_article_7_prefix = fields.Char(string="Article 7 (Start Date Clause)", default="{a_start} ጀምሮ በየወሩ")
     a_article_7_inst = fields.Char(string="Article 7 (Installment Clause)", default="{a_inst} ({a_instw})")
 
-    # ── Part B: Guarantor Detailed Words & Clauses ──────────────────────────
+    # ── Guarantor: Detailed Words & Clauses ──────────────────────────
     b_date_slot = fields.Char(string="Date Format", default="{b_date}")
     b_name_slot = fields.Char(string="Guarantor Name Format", default="{b_name}")
     b_house_label = fields.Char(string="House No. Word (የቤት. ቁጥር)", default="የቤት. ቁጥር")
@@ -130,19 +127,19 @@ class ReslPdfConfig(models.Model):
         default=lambda self: json.dumps(DEFAULT_PAGES, indent=2, ensure_ascii=False)
     )
     slots_a_json = fields.Text(
-        string="Part A Slots Coordinates & Format",
+        string="Borrower Slots Coordinates & Format",
         default=lambda self: json.dumps(DEFAULT_SLOTS_A, indent=2, ensure_ascii=False)
     )
     slots_b_json = fields.Text(
-        string="Part B Slots Coordinates & Format",
+        string="Guarantor Slots Coordinates & Format",
         default=lambda self: json.dumps(DEFAULT_SLOTS_B, indent=2, ensure_ascii=False)
     )
     sigs_a_json = fields.Text(
-        string="Part A Signatures",
+        string="Borrower Signatures",
         default=lambda self: json.dumps(DEFAULT_SIGS_A, indent=2, ensure_ascii=False)
     )
     sigs_b_json = fields.Text(
-        string="Part B Signatures",
+        string="Guarantor Signatures",
         default=lambda self: json.dumps(DEFAULT_SIGS_B, indent=2, ensure_ascii=False)
     )
 
@@ -156,16 +153,41 @@ class ReslPdfConfig(models.Model):
             })
 
     def _compile_slots_from_fields(self):
-        """Assemble the active slot wording from individual fields."""
+        """Assemble the active slot wording from individual fields.
+
+        The wording and the ORDER of the words are the ones of the original Word
+        agreement: for city and sub-city the value comes first
+        (<city> ከተማ <sub-city> ክፍለ ከተማ፤), for woreda / house / phone the label
+        comes first (ወረዳ <woreda> ቤት.ቁጥር- <house> ቁጥር <phone>).  A label is glued
+        to its value with a no-break space so they are never split over two lines.
+        An empty value is always written as "-" by the agreement page."""
         self.ensure_one()
         nb = "\u00a0"
+
+        def lab(text, default):
+            return (text or default).strip().replace(' ', nb)
+
+        city = lab(self.a_city_label, 'ከተማ')
+        subcity = lab(self.a_subcity_label, 'ክፍለ ከተማ፤')
+        woreda = lab(self.a_woreda_label, 'ወረዳ')
+        house_a = lab(self.a_house_label, 'ቤት.ቁጥር-')
+        phone_a = lab(self.a_phone_label, 'ቁጥር')
+        emp_a = lab(self.a_emp_label, 'መታወቂያ ቁጥር-')
+        house_b = lab(self.b_house_label, 'የቤት. ቁጥር')
+        emp_b = lab(self.b_emp_label, 'የ.መ.ቁ')
+        phone_b = lab(self.b_phone_label, '፤ስ.ቁጥር')
+        tax_b = (self.b_tax_label or '{b_tax}፤').strip()
+
         slots_a = [
             {"p": "1", "r": [[158, 140, 257, 154]], "t": self.a_date_slot or "{a_date}"},
             {"p": "1", "r": [[258, 140, 383, 154]], "t": self.a_name_slot or "{a_name}"},
             {"p": "1", "r": [[446, 140, 520, 154], [72, 156, 407, 168]],
-             "t": f"{self.a_city_label or 'ከተማ'}{nb}{{a_city}} {self.a_subcity_label or 'ክፍለ ከተማ፤'}{nb}{{a_subcity}} {self.a_woreda_label or 'ወረዳ'}{nb}{{a_woreda}} {self.a_house_label or 'ቤት.ቁጥር-'}{nb}{{a_house}} {self.a_phone_label or 'ቁጥር'}{nb}{{a_phone}}"},
+             # the value comes FIRST for city and sub-city ("አ.አ ከተማ ንፋስ ስልክ ላፍቶ ክፍለ ከተማ፤"),
+             # the label comes first for woreda, house number and phone ("ወረዳ 11 ቤት.ቁጥር- አዲስ ቁጥር 0913...")
+             "t": f"{{a_city}}{nb}{city} {{a_subcity}} {subcity} {woreda}{nb}{{a_woreda}} "
+                  f"{house_a}{nb}{{a_house}} {phone_a}{nb}{{a_phone}}"},
             {"p": "1", "r": [[528, 156, 580, 168]], "t": self.a_tax_slot or "{a_tax}"},
-            {"p": "1", "r": [[248, 170, 352, 183]], "t": f"{self.a_emp_label or 'መታወቂያ ቁጥር-'}{nb}{{a_emp}}"},
+            {"p": "1", "r": [[248, 170, 352, 183]], "t": f"{emp_a}{nb}{{a_emp}}"},
             {"p": "2", "r": [[221, 122, 540, 134]], "t": self.a_article_6_text or "{a_amt} ({a_amtw})"},
             {"p": "2", "r": [[165, 249, 540, 262], [126, 268, 204, 280]],
              "t": f"{self.a_article_7_prefix or '{a_start} ጀምሮ በየወሩ'} {self.a_article_7_inst or '{a_inst} ({a_instw})'}"},
@@ -173,21 +195,20 @@ class ReslPdfConfig(models.Model):
         slots_b = [
             {"p": "4", "r": [[135, 154, 236, 168]], "t": self.b_date_slot or "{b_date}"},
             {"p": "4", "r": [[237, 154, 362, 168]], "t": self.b_name_slot or "{b_name}"},
+            # address: "<city> ከተማ <sub-city> ክፍለ ከተማ፤ ወረዳ <woreda>" then "የቤት. ቁጥር <house>"
             {"p": "4", "r": [[427, 154, 540, 168], [72, 168, 257, 180]],
-             "t": f"{{b_address}} {self.b_house_label or 'የቤት. ቁጥር'} {{b_house}}"},
-            {"p": "4", "r": [[498, 168, 540, 180], [72, 180, 209, 192]],
-             "t": f"{self.b_tax_label or '{b_tax}፤'} {self.b_emp_label or 'የ.መ.ቁ'} {{b_emp}} {self.b_phone_label or '፤ስ.ቁጥር'} {{b_phone}}"},
+             "t": f"{{b_city}}{nb}{city} {{b_subcity}} {subcity} {woreda}{nb}{{b_woreda}} "
+                  f"{house_b}{nb}{{b_house}}"},
+            # tax ID (own blank, own font size) and, on the next line, employee ID + phone
+            {"p": "4", "r": [[498, 168, 540, 180]], "t": tax_b},
+            {"p": "4", "r": [[72, 180, 209, 192]], "t": f"{emp_b}{nb}{{b_emp}} {phone_b}{nb}{{b_phone}}"},
             {"p": "4", "r": [[302, 221, 433, 234]], "t": self.b_borrower_slot or "{b_borrower}"},
             {"p": "4", "r": [[440, 221, 540, 234]], "t": self.b_bdate_slot or "{b_bdate}"},
             {"p": "4", "r": [[253, 241, 540, 254], [72, 260, 107, 272]],
              "t": self.b_article_loan_amt or "{b_amt} ({b_amtw})"},
             {"p": "4", "r": [[423, 382, 540, 395], [144, 401, 350, 413]],
              "t": self.b_article_loan_amt or "{b_amt} ({b_amtw})"},
-            {"p": "5", "r": [[529, 485, 541, 497]], "t": ""},
-            {"p": "5", "r": [[144, 503, 266, 516]],
-             "t": f"{{b_branch1}}{self.b_branch1_suffix or '/ዳይሬክቶሬት)እና('}"},
-            {"p": "5", "r": [[271, 503, 376, 516]],
-             "t": f"{{b_branch2}}{self.b_branch2_suffix or '/ዳይሬክቶሬት)'}"},
+            # Article 11 (page 5) has NO slot: it stays exactly as printed in the document
         ]
         return slots_a, slots_b
 
@@ -295,4 +316,3 @@ class ReslPdfConfig(models.Model):
             'agreement_pdf': False,
             'agreement_pdf_filename': False,
         })
-

@@ -12,8 +12,8 @@
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
                 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
                 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-                <script src="/assessment_system/static/src/js/proctoring.js"></script>
-                <script src="/assessment_system/static/src/js/exam_timer.js"></script>
+                <script src="/assessment_system/static/src/js/proctoring.js?v=2.1"></script>
+                <script src="/assessment_system/static/src/js/exam_timer.js?v=2.1"></script>
                 
                 <style>
                     :root {
@@ -458,8 +458,11 @@
                 <!-- Exam Main Workspace -->
                 <div class="container my-4" id="exam_session_container"
                      t-att-data-token="attempt.access_token"
-                     t-att-data-duration-seconds="exam.duration_minutes * 60"
-                     t-att-data-max-tab-switches="exam.tab_switch_violation_limit">
+                     t-att-data-duration-seconds="remaining_seconds"
+                     t-att-data-total-duration-seconds="total_duration_seconds"
+                     t-att-data-tab-switch-count="attempt.tab_switch_count"
+                     t-att-data-max-tab-switches="exam.tab_switch_violation_limit or 3"
+                     t-att-data-block-screenshot="'1' if exam.block_screenshot else '0'">
 
                     <!-- Proctoring Alert -->
                     <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center gap-2 mb-4 py-2 px-3 rounded-3" role="status">
@@ -538,7 +541,7 @@
                                             <t t-if="ans.question_type == 'mcq_single'">
                                                 <div class="mcq-option-grid">
                                                     <t t-if="ans.question_id.option_ids">
-                                                        <t t-foreach="ans.question_id.option_ids" t-as="opt">
+                                                        <t t-foreach="ans.get_shuffled_options()" t-as="opt">
                                                             <label t-attf-class="mcq-option-card #{'selected' if ans.selected_option_id.id == opt.id else ''}">
                                                                 <input type="radio" class="d-none" t-att-name="'q_radio_' + str(ans.id)" t-att-value="opt.id"
                                                                        t-att-checked="ans.selected_option_id.id == opt.id"/>
@@ -553,7 +556,7 @@
                                             <!-- Multi Choice MCQ -->
                                             <t t-elif="ans.question_type == 'mcq_multiple'">
                                                 <div class="mcq-option-grid">
-                                                    <t t-foreach="ans.question_id.option_ids" t-as="opt">
+                                                    <t t-foreach="ans.get_shuffled_options()" t-as="opt">
                                                         <label t-attf-class="mcq-option-card #{'selected' if opt.id in ans.selected_option_ids.ids else ''}">
                                                             <input type="checkbox" class="mcq-opt form-check-input" t-att-value="opt.id"
                                                                    t-att-checked="opt.id in ans.selected_option_ids.ids"/>
@@ -572,7 +575,7 @@
                                             <div class="tf-container">
                                                 <!-- If option_ids records exist in database -->
                                                 <t t-if="ans.question_id.option_ids">
-                                                    <t t-foreach="ans.question_id.option_ids" t-as="opt">
+                                                    <t t-foreach="ans.get_shuffled_options()" t-as="opt">
                                                         <label t-attf-class="tf-pill-button #{'selected' if (ans.selected_option_id.id == opt.id or ans.text_answer == opt.option_text) else ''}">
                                                             <input type="radio" class="d-none" t-att-name="'q_tf_' + str(ans.id)" t-att-value="opt.id"
                                                                    t-att-checked="ans.selected_option_id.id == opt.id or ans.text_answer == opt.option_text"/>
@@ -941,6 +944,18 @@
                 </header>
 
                 <div class="container py-5" style="max-width: 780px;">
+                    <!-- Exam Rules Card -->
+                    <div class="card p-4 shadow-sm border-0 bg-white mb-4">
+                        <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-shield-halved text-danger me-2"></i>Assessment Instructions &amp; Security Rules</h6>
+                        <ul class="text-muted small mb-0 ps-3">
+                            <li class="mb-2"><b>Continuous Timer:</b> Once the examination begins, the countdown timer runs continuously and cannot be paused.</li>
+                            <li class="mb-2"><b>Anti-Cheating Proctoring:</b> Copy/paste operations, screen captures, and switching browser tabs are strictly logged and will trigger automated disqualification.</li>
+                            <li class="mb-2"><b>Auto-Save:</b> All your answers are securely auto-saved in real-time as you progress.</li>
+                            <li><b>Submission:</b> Click the <b>Submit Examination</b> button when finished or the exam will automatically submit when time expires.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Countdown & Session Details Card -->
                     <div class="card countdown-box text-center mb-4">
                         <div class="mb-3">
                             <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2 rounded-pill fs-6">
@@ -997,17 +1012,6 @@
                                 <i class="fa-solid fa-arrows-rotate me-1"></i> Refresh Status
                             </button>
                         </div>
-                    </div>
-
-                    <!-- Exam Rules Card -->
-                    <div class="card p-4 shadow-sm border-0 bg-white">
-                        <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-shield-halved text-danger me-2"></i>Assessment Instructions &amp; Security Rules</h6>
-                        <ul class="text-muted small mb-0 ps-3">
-                            <li class="mb-2"><b>Continuous Timer:</b> Once the examination begins, the countdown timer runs continuously and cannot be paused.</li>
-                            <li class="mb-2"><b>Anti-Cheating Proctoring:</b> Copy/paste operations, screen captures, and switching browser tabs are strictly logged and will trigger automated disqualification.</li>
-                            <li class="mb-2"><b>Auto-Save:</b> All your answers are securely auto-saved in real-time as you progress.</li>
-                            <li><b>Submission:</b> Click the <b>Submit Examination</b> button when finished or the exam will automatically submit when time expires.</li>
-                        </ul>
                     </div>
                 </div>
 

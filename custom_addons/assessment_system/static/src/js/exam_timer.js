@@ -255,7 +255,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (checked) {
                     const parsedInt = parseInt(checked.value, 10);
                     item.selected_option_id = isNaN(parsedInt) ? false : parsedInt;
-                    item.text_answer = checked.value;
+                    const optTextSpan = checked.closest("label") ? (checked.closest("label").querySelector(".mcq-option-text") || checked.closest("label")) : null;
+                    item.text_answer = optTextSpan ? optTextSpan.textContent.trim() : checked.value;
                 } else {
                     item.selected_option_id = false;
                     item.text_answer = "";
@@ -285,10 +286,20 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch(`/exam/session/${token}/save`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ params: { answers: payload } })
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "call",
+                params: { answers: payload },
+                id: Date.now()
+            })
         })
         .then(res => res.json())
         .then(data => {
+            const result = data.result || data;
+            if (result && result.status === "disqualified") {
+                window.location.reload();
+                return;
+            }
             if (saveIndicator) {
                 const now = new Date();
                 saveIndicator.textContent = `Auto-saved at ${now.toLocaleTimeString()}`;
@@ -351,7 +362,12 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch(`/exam/session/${token}/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ params: { answers: payload } })
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "call",
+                params: { answers: payload },
+                id: Date.now()
+            })
         })
         .then(res => res.json())
         .then(data => {
@@ -367,7 +383,12 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch(`/exam/session/${token}/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ params: { answers: payload } })
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "call",
+                params: { answers: payload },
+                id: Date.now()
+            })
         })
         .then(() => window.location.reload());
     }

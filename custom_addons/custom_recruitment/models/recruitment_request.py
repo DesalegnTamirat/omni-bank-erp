@@ -32,13 +32,6 @@ class RecruitmentRequest(models.Model):
         return False
 
     def _default_department_id(self):
-        unit_id = self._default_operating_unit_id()
-        if unit_id:
-            ou = self.env["operating.unit"].browse(unit_id)
-            if ou and getattr(ou, "department", False):
-                return ou.department.id
-            if ou and getattr(ou, "parent_unit", False) and getattr(ou.parent_unit, "department", False):
-                return ou.parent_unit.department.id
         user = self.env.user
         employee = user.employee_id or self.env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
         return employee.department_id.id if employee and employee.department_id else False
@@ -87,6 +80,14 @@ class RecruitmentRequest(models.Model):
              "read-only in Draft."
     )
 
+    exceptional_workforce_id = fields.Many2one(
+        "pbms.exceptional.workforce.request",
+        string="Exceptional Workforce Requisition",
+        tracking=True,
+        domain="[('state', '=', 'approved')]",
+        help="Linked approved exceptional workforce requisition from PBMS for unplanned requests."
+    )
+
     workforce_plan_id = fields.Many2one(
         "pbms.planning.category", string="Approved Workforce Plan",
         tracking=True,
@@ -104,32 +105,11 @@ class RecruitmentRequest(models.Model):
 
     job_position_id = fields.Many2one("hr.job", string="Job Position", required=True, tracking=True)
     job_grade_id = fields.Many2one("employee.grade", string="Job Grade")
-
-    @api.depends("operating_unit_id", "operating_unit_id.department", "operating_unit_id.parent_unit")
-    def _compute_department_id(self):
-        for rec in self:
-            if rec.operating_unit_id and getattr(rec.operating_unit_id, "department", False):
-                rec.department_id = rec.operating_unit_id.department
-            elif rec.operating_unit_id and getattr(rec.operating_unit_id, "parent_unit", False) and getattr(rec.operating_unit_id.parent_unit, "department", False):
-                rec.department_id = rec.operating_unit_id.parent_unit.department
-            elif rec.requested_by and rec.requested_by.department_id:
-                rec.department_id = rec.requested_by.department_id
-            else:
-                user = rec.env.user
-                emp = user.employee_id or rec.env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
-                rec.department_id = emp.department_id if emp and emp.department_id else False
-
     department_id = fields.Many2one(
         "hr.department", string="Department", required=True,
-        compute="_compute_department_id", store=True, readonly=False, precompute=True,
-        default=lambda self: self._default_department_id(),
-        help="Defaults to the hiring Work Unit's Department."
-    )
-    work_unit_type = fields.Selection(
-        related="operating_unit_id.work_unit_type",
-        string="Work Unit Type",
-        readonly=True,
-        store=True,
+        default=lambda self: self._default_department_id(),readonly= True,
+        help="Defaults to the logged-in user's own Department and is "
+             "read-only in Draft."
     )
     employment_type = fields.Selection(
         [("permanent", "Permanent"), ("contractual", "Contractual"), ("internship", "Internship")],
@@ -228,12 +208,24 @@ class RecruitmentRequest(models.Model):
     )
 
 
-    @api.depends("operating_unit_id", "workforce_plan_id", "request_type")
+    @api.depends("operating_unit_id", "workforce_plan_id", "request_type", "exceptional_workforce_id")
     def _compute_allowed_jobs(self):
         for rec in self:
             jobs = self.env["hr.job"]
             if rec.request_type == "unplanned":
-                jobs = self.env["hr.job"].search([])
+                domain = [("state", "=", "approved")]
+                if rec.operating_unit_id:
+                    domain.append(("operating_unit_id", "=", rec.operating_unit_id.id))
+                exc_reqs = self.env["pbms.exceptional.workforce.request"].search(domain)
+                valid_jobs = self.env["hr.job"]
+                for exc in exc_reqs:
+                    if exc.job_id:
+                        consumed = rec._get_exceptional_consumed_headcount(exc, exclude=rec if rec.id else None)
+                        remaining = exc.headcount - consumed
+                        # Show in dropdown if remaining headcount > 0 or if already linked to this request
+                        if remaining > 0 or (rec.exceptional_workforce_id and rec.exceptional_workforce_id == exc):
+                            valid_jobs |= exc.job_id
+                jobs = valid_jobs
             elif rec.workforce_plan_id:
                 lines = rec.workforce_plan_id.line_ids.filtered(lambda l: l.line_type == "manpower" and l.job_id)
                 jobs = lines.mapped("job_id")
@@ -329,6 +321,39 @@ class RecruitmentRequest(models.Model):
                 vals["reference"] = (
                         self.env["ir.sequence"].next_by_code("recruitment.request") or _("New")
                 )
+            if vals.get("request_type") == "unplanned":
+                exc_id = vals.get("exceptional_workforce_id")
+                if not exc_id and vals.get("job_position_id"):
+                    domain = [
+                        ("state", "=", "approved"),
+                        ("job_id", "=", vals["job_position_id"]),
+                    ]
+                    if vals.get("operating_unit_id"):
+                        domain.append(("operating_unit_id", "=", vals["operating_unit_id"]))
+                    exc = self.env["pbms.exceptional.workforce.request"].search(domain, order="id desc", limit=1)
+                    if not exc:
+                        exc = self.env["pbms.exceptional.workforce.request"].search([
+                            ("state", "=", "approved"),
+                            ("job_id", "=", vals["job_position_id"]),
+                        ], order="id desc", limit=1)
+                    if exc:
+                        vals["exceptional_workforce_id"] = exc.id
+                        exc_id = exc.id
+
+                if exc_id:
+                    exc = self.env["pbms.exceptional.workforce.request"].browse(exc_id)
+                    if not vals.get("justification"):
+                        cat_name = exc.justification_category_id.name if getattr(exc, 'justification_category_id', False) else ""
+                        text = f"{cat_name}: {exc.justification}" if cat_name and exc.justification else (cat_name or exc.justification)
+                        vals["justification"] = f"[{exc.name}] {text}" if text else f"[{exc.name}] Exceptional workforce need"
+                    if not vals.get("required_headcount") and exc.headcount:
+                        vals["required_headcount"] = exc.headcount
+                    if not vals.get("job_grade_id") and exc.job_grade_id:
+                        vals["job_grade_id"] = exc.job_grade_id.id
+                    if not vals.get("sourcing_type") and exc.sourcing_type:
+                        vals["sourcing_type"] = exc.sourcing_type
+                    if not vals.get("employment_type") and exc.employment_type:
+                        vals["employment_type"] = exc.employment_type
             if vals.get("job_position_id"):
                 job = self.env["hr.job"].browse(vals["job_position_id"])
                 if job.exists():
@@ -386,43 +411,124 @@ class RecruitmentRequest(models.Model):
             others = others - exclude
         return sum(others.mapped("required_headcount"))
 
+    def _get_exceptional_consumed_headcount(self, exc_req, exclude=None):
+        """Sum of required_headcount from active (submitted, under_review, approved)
+        unplanned requests referencing this exceptional workforce request or matching position & unit."""
+        if not exc_req:
+            return 0
+        job_id = exc_req.job_id.id if exc_req.job_id else False
+        ou_id = exc_req.operating_unit_id.id if exc_req.operating_unit_id else False
+        
+        domain = [
+            ("request_type", "=", "unplanned"),
+            ("state", "in", list(self._ACTIVE_STATES)),
+            "|",
+            ("exceptional_workforce_id", "=", exc_req.id),
+            "&",
+            ("job_position_id", "=", job_id),
+            ("operating_unit_id", "=", ou_id),
+        ]
+        others = self.search(domain)
+        if exclude:
+            others = others - exclude
+        return sum(others.mapped("required_headcount"))
+
     @api.depends(
         "workforce_plan_id", "job_position_id", "job_grade_id",
-        "required_headcount", "request_type", "state",
+        "required_headcount", "request_type", "state", "exceptional_workforce_id",
     )
     def _compute_plan_headcount_info(self):
         for rec in self:
             plan = rec.workforce_plan_id
             job = rec.job_position_id
             grade = rec.job_grade_id
-            if rec.request_type != "planned" or not plan or not job:
+            if rec.request_type == "planned":
+                if not plan or not job:
+                    rec.plan_total_headcount = 0
+                    rec.plan_consumed_headcount = 0
+                    rec.plan_remaining_headcount = 0
+                    continue
+                total = rec._get_plan_total_headcount(plan, job, grade)
+                consumed = rec._get_plan_consumed_headcount(plan, job, grade, exclude=rec)
+                rec.plan_total_headcount = total
+                rec.plan_consumed_headcount = consumed
+                rec.plan_remaining_headcount = max(0, total - consumed)
+            elif rec.request_type == "unplanned":
+                exc = rec.exceptional_workforce_id
+                if not exc and rec.job_position_id:
+                    domain = [("state", "=", "approved"), ("job_id", "=", rec.job_position_id.id)]
+                    if rec.operating_unit_id:
+                        domain.append(("operating_unit_id", "=", rec.operating_unit_id.id))
+                    exc = self.env["pbms.exceptional.workforce.request"].search(domain, order="id desc", limit=1)
+                if exc:
+                    total = exc.headcount
+                    consumed = rec._get_exceptional_consumed_headcount(exc, exclude=rec)
+                    rec.plan_total_headcount = total
+                    rec.plan_consumed_headcount = consumed
+                    rec.plan_remaining_headcount = max(0, total - consumed)
+                else:
+                    rec.plan_total_headcount = 0
+                    rec.plan_consumed_headcount = 0
+                    rec.plan_remaining_headcount = 0
+            else:
                 rec.plan_total_headcount = 0
                 rec.plan_consumed_headcount = 0
                 rec.plan_remaining_headcount = 0
-                continue
-            total = rec._get_plan_total_headcount(plan, job, grade)
-            consumed = rec._get_plan_consumed_headcount(plan, job, grade, exclude=rec)
-            rec.plan_total_headcount = total
-            rec.plan_consumed_headcount = consumed
-            rec.plan_remaining_headcount = total - consumed
 
     # ---------------------------------------------------------------------
     # Constraints
     # ---------------------------------------------------------------------
-    @api.constrains("request_type", "justification")
+    @api.constrains("request_type", "justification", "exceptional_workforce_id")
     def _check_unplanned_justification(self):
         """: Unplanned requests must have a business justification."""
         for rec in self:
-            if rec.request_type == "unplanned" and not rec.justification:
-                raise ValidationError(
-                    _(": Business Justification is required for Unplanned recruitment requests.")
-                )
+            if rec.request_type == "unplanned":
+                if not rec.justification and rec.exceptional_workforce_id:
+                    exc = rec.exceptional_workforce_id
+                    cat_name = exc.justification_category_id.name if getattr(exc, 'justification_category_id', False) else ""
+                    text = f"{cat_name}: {exc.justification}" if cat_name and exc.justification else (cat_name or exc.justification)
+                    rec.justification = f"[{exc.name}] {text}" if text else f"[{exc.name}] Exceptional workforce need"
+                elif not rec.justification:
+                    raise ValidationError(
+                        _(": Business Justification is required for Unplanned recruitment requests.")
+                    )
 
     def _validate_against_workforce_plan(self):
 
         self.ensure_one()
         failures = []
-        if self.request_type != "planned":
+        if self.request_type == "unplanned":
+            exc = self.exceptional_workforce_id
+            if not exc and self.job_position_id:
+                domain = [("state", "=", "approved"), ("job_id", "=", self.job_position_id.id)]
+                if self.operating_unit_id:
+                    domain.append(("operating_unit_id", "=", self.operating_unit_id.id))
+                exc = self.env["pbms.exceptional.workforce.request"].search(domain, order="id desc", limit=1)
+            if not exc:
+                failures.append((
+                    "no_exceptional_request",
+                    _("There is no approved PBMS Exceptional Workforce Requisition for position '%s' in your Work Unit.") % (
+                        self.job_position_id.name if self.job_position_id else ""
+                    )
+                ))
+                return failures
+            total = exc.headcount
+            consumed = self._get_exceptional_consumed_headcount(exc, exclude=self)
+            available = total - consumed
+            if available <= 0:
+                failures.append((
+                    "headcount_exhausted",
+                    _("The approved headcount (%(total)s) on Exceptional Workforce Requisition '%(exc)s' for position '%(job)s' has already been fully consumed by other active requests (%(consumed)s committed). No further requests can be submitted.") % {
+                        "total": total, "exc": exc.name, "job": self.job_position_id.name if self.job_position_id else exc.job_id.name, "consumed": consumed
+                    }
+                ))
+            elif self.required_headcount > available:
+                failures.append((
+                    "headcount_exceeded",
+                    _("Requested Headcount (%(req)s) exceeds remaining headcount (%(avail)s) on Exceptional Requisition '%(exc)s' (Total approved: %(total)s, committed: %(consumed)s).") % {
+                        "req": self.required_headcount, "avail": available, "exc": exc.name, "total": total, "consumed": consumed
+                    }
+                ))
             return failures
 
         plan = self.workforce_plan_id
@@ -520,36 +626,68 @@ class RecruitmentRequest(models.Model):
 
     @api.constrains(
         "request_type", "workforce_plan_id", "job_position_id",
-        "job_grade_id", "required_headcount",
+        "job_grade_id", "required_headcount", "exceptional_workforce_id", "state",
     )
     def _check_headcount_against_plan_on_save(self):
-
         for rec in self:
-            if rec.request_type != "planned":
+            if rec.state == "cancelled":
                 continue
-            plan = rec.workforce_plan_id
-            job = rec.job_position_id
-            if not plan or not job or not rec.required_headcount:
-                continue
-            matching_lines = rec._get_matching_plan_lines(plan, job, rec.job_grade_id)
-            if not matching_lines:
-                continue  # "position not on plan" stays a Submit-time error
-            plan_total = rec._get_plan_total_headcount(plan, job, rec.job_grade_id)
-            consumed_by_others = rec._get_plan_consumed_headcount(
-                plan, job, rec.job_grade_id, exclude=rec
-            )
-            available = plan_total - consumed_by_others
-            if rec.required_headcount > available:
-                raise ValidationError(_(
-                    "Requested Headcount (%(req)s) for '%(job)s' exceeds the "
-                    "Approved Budgeted Headcount remaining on plan '%(plan)s'. "
-                    "Approved Budgeted Headcount: %(total)s, already committed "
-                    "to other active requests: %(consumed)s, remaining: %(avail)s."
-                ) % {
-                                          "req": rec.required_headcount, "job": job.name,
-                                          "plan": plan.name, "total": plan_total,
-                                          "consumed": consumed_by_others, "avail": available,
-                                      })
+            if rec.request_type == "planned":
+                plan = rec.workforce_plan_id
+                job = rec.job_position_id
+                if not plan or not job or not rec.required_headcount:
+                    continue
+                matching_lines = rec._get_matching_plan_lines(plan, job, rec.job_grade_id)
+                if not matching_lines:
+                    continue  # "position not on plan" stays a Submit-time error
+                plan_total = rec._get_plan_total_headcount(plan, job, rec.job_grade_id)
+                consumed_by_others = rec._get_plan_consumed_headcount(
+                    plan, job, rec.job_grade_id, exclude=rec
+                )
+                available = plan_total - consumed_by_others
+                if rec.required_headcount > available:
+                    raise ValidationError(_(
+                        "Requested Headcount (%(req)s) for '%(job)s' exceeds the "
+                        "Approved Budgeted Headcount remaining on plan '%(plan)s'. "
+                        "Approved Budgeted Headcount: %(total)s, already committed "
+                        "to other active requests: %(consumed)s, remaining: %(avail)s."
+                    ) % {
+                        "req": rec.required_headcount, "job": job.name,
+                        "plan": plan.name, "total": plan_total,
+                        "consumed": consumed_by_others, "avail": max(0, available),
+                    })
+            elif rec.request_type == "unplanned":
+                exc = rec.exceptional_workforce_id
+                if not exc and rec.job_position_id:
+                    domain = [("state", "=", "approved"), ("job_id", "=", rec.job_position_id.id)]
+                    if rec.operating_unit_id:
+                        domain.append(("operating_unit_id", "=", rec.operating_unit_id.id))
+                    exc = self.env["pbms.exceptional.workforce.request"].search(domain, order="id desc", limit=1)
+                if exc and rec.required_headcount:
+                    plan_total = exc.headcount
+                    consumed_by_others = rec._get_exceptional_consumed_headcount(exc, exclude=rec)
+                    available = plan_total - consumed_by_others
+                    if available <= 0:
+                        raise ValidationError(_(
+                            "The approved headcount (%(total)s) for position '%(job)s' on "
+                            "Exceptional Workforce Requisition '%(exc)s' has already been fully "
+                            "consumed by active requests (%(consumed)s requested). "
+                            "No additional recruitment requests can be created or submitted for this position."
+                        ) % {
+                            "total": plan_total, "job": rec.job_position_id.name if rec.job_position_id else exc.job_id.name,
+                            "exc": exc.name, "consumed": consumed_by_others
+                        })
+                    if rec.required_headcount > available:
+                        raise ValidationError(_(
+                            "Requested Headcount (%(req)s) for '%(job)s' exceeds the "
+                            "approved headcount remaining on Exceptional Workforce Requisition '%(exc)s'. "
+                            "Approved Headcount: %(total)s, already committed to other requests: %(consumed)s, "
+                            "remaining available: %(avail)s."
+                        ) % {
+                            "req": rec.required_headcount, "job": rec.job_position_id.name if rec.job_position_id else exc.job_id.name,
+                            "exc": exc.name, "total": plan_total,
+                            "consumed": consumed_by_others, "avail": available,
+                        })
 
     @api.constrains("is_replacement", "replaced_employee_id")
     def _check_replacement(self):
@@ -562,8 +700,12 @@ class RecruitmentRequest(models.Model):
 
     @api.constrains("employee_category", "sourcing_type", "job_level")
     def _check_job_level_required(self):
-        """Job Level is optional."""
+        """Job Level is only required for Non-Managerial when Sourcing Type is External."""
         for rec in self:
+            if rec.employee_category == "Non Managerial" and rec.sourcing_type == "external" and not rec.job_level:
+                raise ValidationError(_(
+                    "Job Level (Junior / Senior) is required for Non-Managerial external requests."
+                ))
             if rec.employee_category == "Managerial" and rec.job_level:
                 rec.job_level = False
 
@@ -598,14 +740,12 @@ class RecruitmentRequest(models.Model):
 
             if hasattr(self.operating_unit_id, "department") and self.operating_unit_id.department:
                 self.department_id = self.operating_unit_id.department
-            elif getattr(self.operating_unit_id, "parent_unit", False) and getattr(self.operating_unit_id.parent_unit, "department", False):
-                self.department_id = self.operating_unit_id.parent_unit.department
 
         if self.workforce_plan_id and self.workforce_plan_id.org_unit_id != self.operating_unit_id:
             self.workforce_plan_id = False
 
-        # Always clear job_position_id when operating_unit_id changes so user picks a valid position for the new unit
-        self.job_position_id = False
+        if self.job_position_id and self.allowed_job_ids and self.job_position_id not in self.allowed_job_ids:
+            self.job_position_id = False
 
     @api.onchange("job_position_id", "workforce_plan_id", "operating_unit_id")
     def _onchange_job_position_id_sync_fields(self):
@@ -614,20 +754,22 @@ class RecruitmentRequest(models.Model):
         if not self.job_position_id:
             return
 
-        # Auto-sync department strictly from Hiring Work Unit
-        if self.operating_unit_id and getattr(self.operating_unit_id, "department", False):
+        # Auto-sync department from job position or operating unit
+        if self.job_position_id.department_id:
+            self.department_id = self.job_position_id.department_id
+        elif self.operating_unit_id and hasattr(self.operating_unit_id,
+                                                "department") and self.operating_unit_id.department:
             self.department_id = self.operating_unit_id.department
-        elif self.operating_unit_id and getattr(self.operating_unit_id, "parent_unit", False) and getattr(self.operating_unit_id.parent_unit, "department", False):
-            self.department_id = self.operating_unit_id.parent_unit.department
 
-        # Auto-sync description and qualification from Job Position
-        job_desc = getattr(self.job_position_id, 'job_description', False) or getattr(self.job_position_id, 'description', False)
+        # Auto-sync description and qualification from Job Position using sudo() to avoid field-level security checks
+        job_pos = self.job_position_id.sudo()
+        job_desc = getattr(job_pos, 'job_description', False) or getattr(job_pos, 'description', False)
         if job_desc:
             self.job_description = job_desc
 
         qual = False
-        if hasattr(self.job_position_id, 'qualification_id') and self.job_position_id.qualification_id:
-            q_field = self.job_position_id.qualification_id
+        if hasattr(job_pos, 'qualification_id') and job_pos.qualification_id:
+            q_field = job_pos.qualification_id
             if hasattr(q_field, '_name') and q_field._name == 'recruitment.qualification':
                 qual = q_field
             elif hasattr(q_field, 'filtered'):
@@ -639,9 +781,55 @@ class RecruitmentRequest(models.Model):
         if qual:
             self.qualification_id = qual.id
 
-        if hasattr(self.job_position_id,
-                   'requirements') and self.job_position_id.requirements and not self.required_qualifications:
-            self.required_qualifications = self.job_position_id.requirements
+        if hasattr(job_pos,
+                   'requirements') and job_pos.requirements and not self.required_qualifications:
+            self.required_qualifications = job_pos.requirements
+
+        # For Unplanned requests, automatically find and sync with the corresponding Exceptional Workforce Request
+        if self.request_type == "unplanned":
+            job_db_id = getattr(self.job_position_id._origin, 'id', False) or (self.job_position_id.id if isinstance(self.job_position_id.id, int) else False)
+            ou_db_id = getattr(self.operating_unit_id._origin, 'id', False) if self.operating_unit_id else (self.operating_unit_id.id if self.operating_unit_id and isinstance(self.operating_unit_id.id, int) else False)
+
+            domain = [
+                ("state", "=", "approved"),
+                ("job_id", "=", job_db_id),
+            ]
+            if ou_db_id:
+                domain.append(("operating_unit_id", "=", ou_db_id))
+            exc_req = self.env["pbms.exceptional.workforce.request"].search(domain, order="id desc", limit=1)
+            if not exc_req and self.exceptional_workforce_id and (getattr(self.exceptional_workforce_id.job_id, 'id', False) == job_db_id):
+                exc_req = self.exceptional_workforce_id
+            if not exc_req:
+                exc_req = self.env["pbms.exceptional.workforce.request"].search([
+                    ("state", "=", "approved"),
+                    ("job_id", "=", job_db_id),
+                ], order="id desc", limit=1)
+
+            if exc_req:
+                self.exceptional_workforce_id = exc_req.id
+                self._onchange_exceptional_workforce_id()
+                consumed = self._get_exceptional_consumed_headcount(exc_req, exclude=self if self.id else None)
+                remaining = exc_req.headcount - consumed
+                if remaining <= 0:
+                    return {
+                        "warning": {
+                            "title": _("Approved Headcount Exhausted"),
+                            "message": _(
+                                "The approved headcount (%(total)s) for position '%(job)s' on "
+                                "Exceptional Workforce Requisition '%(exc)s' has already been fully "
+                                "consumed by active requests (%(consumed)s committed).\n\n"
+                                "You cannot request additional headcount for this position."
+                            ) % {
+                                "total": exc_req.headcount,
+                                "job": self.job_position_id.name,
+                                "exc": exc_req.name,
+                                "consumed": consumed,
+                            }
+                        }
+                    }
+                elif self.required_headcount > remaining:
+                    self.required_headcount = remaining
+            return
 
         # Auto-sync grade if exactly one grade planned
         lines = self.env["pbms.plan.category.line"]
@@ -706,11 +894,11 @@ class RecruitmentRequest(models.Model):
     # ---------------------------------------------------------------------
     # Security Helper Methods
     # ---------------------------------------------------------------------
-    def _check_hr_role_or_raise(self, require_manager=False):
-        """Verify that the current user belongs to Recruitment Officer or Manager group."""
+    def _check_hr_role_or_raise(self):
+        """Verify that the current user belongs to group_recruitment_manager / Recruitment Manager group."""
         user = self.env.user
         if user.id in (1, 2) or self.env.is_admin():
-            return
+            return True
 
         has_manager_group = (
             user.has_group("custom_recruitment.group_recruitment_manager") or
@@ -718,24 +906,11 @@ class RecruitmentRequest(models.Model):
             user.has_group("hr_recruitment.group_hr_recruitment_manager")
         )
 
-        if require_manager:
-            if not has_manager_group:
-                raise UserError(_(
-                    "Access Denied: Only members of the Recruitment Manager group (group_recruitment_manager) are authorized to approve recruitment requests."
-                ))
-            return
-
-        has_hr_group = has_manager_group or (
-            user.has_group("custom_recruitment.group_recruitment_officer") or
-            user.has_group("hr.group_hr_user") or
-            user.has_group("hr.group_hr_manager") or
-            user.has_group("hr_recruitment.group_hr_recruitment_user")
-        )
-
-        if not has_hr_group:
+        if not has_manager_group:
             raise UserError(_(
-                "Access Denied: Only members of the HR / Recruitment team are authorized to review or manage recruitment requests."
+                "Access Denied: Only members of the Recruitment Manager group (group_recruitment_manager) are authorized to review, approve, or reject recruitment requests."
             ))
+        return True
 
 
 
@@ -751,15 +926,25 @@ class RecruitmentRequest(models.Model):
             return
 
         user_emp = self.env.user.employee_id
-        user_ou = user_emp.default_operating_unit_id if user_emp else False
-        user_ous = getattr(self.env.user, "operating_unit_ids", self.env["operating.unit"])
-        if user_emp and hasattr(user_emp, "operating_unit_ids"):
-            user_ous |= user_emp.operating_unit_ids
+        user_ous = self.env["operating.unit"]
+        if getattr(self.env.user, "default_operating_unit_id", False):
+            user_ous |= self.env.user.default_operating_unit_id
+        if getattr(self.env.user, "operating_unit_ids", False):
+            user_ous |= self.env.user.operating_unit_ids
+        if user_emp:
+            if getattr(user_emp, "default_operating_unit_id", False):
+                user_ous |= user_emp.default_operating_unit_id
+            if hasattr(user_emp, "operating_unit_ids") and user_emp.operating_unit_ids:
+                user_ous |= user_emp.operating_unit_ids
+            if hasattr(self.env["operating.unit"], "manager_id"):
+                user_ous |= self.env["operating.unit"].search([("manager_id", "=", user_emp.id)])
+            if hasattr(self.env["operating.unit"], "manager"):
+                user_ous |= self.env["operating.unit"].search([("manager", "=", user_emp.id)])
 
-        if self.operating_unit_id and self.operating_unit_id != user_ou and self.operating_unit_id not in user_ous:
+        if self.operating_unit_id and self.operating_unit_id not in user_ous:
             raise UserError(_(
                 "You can only submit recruitment requests for your own Work Unit (%s)."
-            ) % (user_ou.name if user_ou else _("Unassigned")))
+            ) % (", ".join(user_ous.mapped("name")) if user_ous else _("Unassigned")))
 
     # ---------------------------------------------------------------------
     # Workflow actions
@@ -786,13 +971,13 @@ class RecruitmentRequest(models.Model):
         }
 
     def _check_segregation_of_duties(self, action_type):
-        """Enforces Segregation of Duties (SoD):
-        1. Requester / Initiator cannot Review or Approve their own request.
-        2. Reviewer and Approver can be the same user (relaxed SoD between review and approval)."""
+        """Enforces Segregation of Duties (SoD / Four-Eyes Principle):
+        1. Requester cannot Review or Approve their own request.
+        2. Reviewer cannot Approve the request (must be a distinct manager)."""
         self.ensure_one()
         current_uid = self.env.uid
 
-        # Requester check: Initiator cannot review or approve their own request
+        # Requester check
         is_requester = (
             (self.create_uid and self.create_uid.id == current_uid) or
             (self.requested_by and self.requested_by.user_id and self.requested_by.user_id.id == current_uid)
@@ -802,7 +987,7 @@ class RecruitmentRequest(models.Model):
             if is_requester and not self.env.su:
                 raise UserError(_(
                     "Segregation of Duties (SoD) Violation: The initiator/requester cannot review their own recruitment request. "
-                    "Verification must be performed by an independent HR Officer/Manager."
+                    "Verification must be performed by an independent HR Officer."
                 ))
 
         elif action_type == "approve":
@@ -810,10 +995,15 @@ class RecruitmentRequest(models.Model):
                 raise UserError(_(
                     "Segregation of Duties (SoD) Violation: The initiator/requester cannot approve their own recruitment request."
                 ))
+            if self.reviewed_by and self.reviewed_by.id == current_uid and not self.env.su:
+                raise UserError(_(
+                    "Segregation of Duties (SoD) Violation: The HR Reviewer (%(reviewer)s) cannot also approve this request. "
+                    "Approval must be completed by a separate authorized manager (Four-Eyes Principle)."
+                ) % {"reviewer": self.reviewed_by.name})
 
     def action_start_review(self):
         for rec in self:
-            rec._check_hr_role_or_raise(require_manager=False)
+            rec._check_hr_role_or_raise()
             rec._check_segregation_of_duties("review")
             rec.write({"state": "under_review", "reviewed_by": self.env.uid})
             rec.message_post(body=_("Request is now under HR review by %s.") % self.env.user.name)
@@ -826,7 +1016,7 @@ class RecruitmentRequest(models.Model):
 
     def action_approve(self):
         for rec in self:
-            rec._check_hr_role_or_raise(require_manager=True)
+            rec._check_hr_role_or_raise()
             rec._check_segregation_of_duties("approve")
             # Re-run checks at approval time since other requests may have consumed headcount.
             rec._check_workforce_plan_or_raise()
@@ -845,7 +1035,7 @@ class RecruitmentRequest(models.Model):
 
     def action_reject(self):
         for rec in self:
-            rec._check_hr_role_or_raise(require_manager=False)
+            rec._check_hr_role_or_raise()
             if not rec.rejection_reason:
                 raise UserError(_("Please enter a Rejection Reason before rejecting."))
             rec.write({"state": "rejected"})
@@ -874,13 +1064,7 @@ class RecruitmentRequest(models.Model):
         for rec in self:
             if rec.state not in ("rejected", "cancelled"):
                 raise UserError(_("Only rejected or cancelled requests can be reset to Draft."))
-            rec.write({
-                "state": "draft",
-                "rejection_reason": False,
-                "reviewed_by": False,
-                "approved_by": False,
-                "approved_on": False,
-            })
+            rec.write({"state": "draft", "rejection_reason": False})
             rec.message_post(body=_("Request reset to Draft."))
 
         # Reload the form to reflect status change immediately
@@ -892,7 +1076,7 @@ class RecruitmentRequest(models.Model):
     def action_create_vacancy(self):
         """Create a Job Vacancy directly from an approved request."""
         self.ensure_one()
-        self._check_hr_role_or_raise(require_manager=False)
+        self._check_hr_role_or_raise()
         if self.state != "approved":
             raise UserError(_("Only approved requests can be converted to a vacancy."))
         if self.vacancy_id:
@@ -958,7 +1142,7 @@ class RecruitmentRequest(models.Model):
             self.job_position_id.grade.id if getattr(self.job_position_id, 'grade', False) else False
         )
 
-        resp_id = self.requested_by.id if self.requested_by else (self.env.user.employee_id.id if self.env.user.employee_id else False)
+        resp_id = self.env.user.employee_id.id if self.env.user.employee_id else False
         vacancy = self.env["job.vacancy"].create({
             "recruitment_request_id": self.id,
             "recruitment_reference": self.reference,
@@ -999,53 +1183,98 @@ class RecruitmentRequest(models.Model):
     # Notifications
     # ---------------------------------------------------------------------
     def _notify_hr(self):
-        """Notify HR managers of new recruitment request. Uses chat for
-        1-2 recipients (Odoo's chat limit) and group channel for 3+ recipients."""
+        """Notify HR managers/responsible of new recruitment request cleanly without spamming group channels."""
         self.ensure_one()
-        hr_group = self.env.ref("hr.group_hr_manager", raise_if_not_found=False)
-        if not hr_group:
-            return
-        # Odoo 19: group_ids (renamed from groups_id)
-        hr_users = self.env["res.users"].search([("group_ids", "in", [hr_group.id])])
-        partners = hr_users.mapped("partner_id")
-        if partners:
-            body = _(
-                "A new Recruitment Request %(ref)s has been submitted by %(user)s "
-                "for the position %(pos)s in %(unit)s. Please review."
-            ) % {
-                "ref": self.reference,
-                "user": self.requested_by.name if self.requested_by else self.env.user.name,
-                "pos": self.job_position_id.name or "",
-                "unit": self.operating_unit_id.name or "",
-            }
-            # Use chat for 1-2 people, group for 3+ people
-            if len(partners) <= 2:
-                channel = self.env["discuss.channel"]._get_or_create_chat(
-                    partners_to=partners.ids
-                )
-            else:
-                # Create the group channel first, then add members via write
-                channel = self.env["discuss.channel"].create({
-                    "name": _("Recruitment Request Review - %s") % self.reference,
-                    "channel_type": "group",
-                })
-                # Add partners using write with proper ORM syntax
-                channel.write({
-                    "channel_partner_ids": [(4, partner_id) for partner_id in partners.ids],
-                })
-            channel.message_post(
-                body=body, message_type="comment", subtype_xmlid="mail.mt_comment"
-            )
+        body = _(
+            "A new Recruitment Request %(ref)s has been submitted by %(user)s "
+            "for the position %(pos)s in %(unit)s. Please review."
+        ) % {
+            "ref": self.reference,
+            "user": self.requested_by.name if self.requested_by else self.env.user.name,
+            "pos": self.job_position_id.name or "",
+            "unit": self.operating_unit_id.name or "",
+        }
 
+        # Route to specific recruitment responsible if defined on the job position
+        target_user = self.job_position_id.user_id if self.job_position_id and self.job_position_id.user_id else False
+        if target_user and target_user.partner_id:
+            channel = self.env["discuss.channel"]._get_or_create_chat(
+                partners_to=[target_user.partner_id.id]
+            )
+            channel.message_post(body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
+        else:
+            # Log directly on the recruitment request chatter
+            self.message_post(body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
+
+
+
+    @api.onchange("request_type")
+    def _onchange_request_type_reset(self):
+        if self.request_type == "planned":
+            self.exceptional_workforce_id = False
+        elif self.request_type == "unplanned":
+            self.workforce_plan_id = False
+            self.job_position_id = False
+            self.job_grade_id = False
+
+    @api.onchange("exceptional_workforce_id")
+    def _onchange_exceptional_workforce_id(self):
+        """Auto-populate headcount, position, grade, justification, sourcing,
+        employment type, department, category, and level from the approved
+        PBMS Exceptional Workforce Requisition."""
+        req = self.exceptional_workforce_id
+        if not req:
+            return
+
+        if req.department_id:
+            self.department_id = req.department_id
+        elif self.operating_unit_id and getattr(self.operating_unit_id, "department", False):
+            self.department_id = self.operating_unit_id.department
+
+        if req.job_id:
+            self.job_position_id = req.job_id
+
+        # Grade
+        target_grade = req.job_grade_id
+        if not target_grade and hasattr(req.job_id, "grade") and req.job_id.grade:
+            target_grade = req.job_id.grade
+        if target_grade:
+            self.job_grade_id = target_grade
+
+        # Headcount & Justification
+        if req.headcount:
+            self.required_headcount = req.headcount
+
+        if hasattr(req, "justification_category_id") and req.justification_category_id:
+            if req.justification:
+                self.justification = f"[{req.name}] {req.justification_category_id.name}: {req.justification}"
+            else:
+                self.justification = f"[{req.name}] {req.justification_category_id.name}"
+        elif req.justification:
+            self.justification = f"[{req.name}] {req.justification}"
+        elif req.name:
+            self.justification = f"[{req.name}] Exceptional workforce need"
+
+        # Sourcing Type & Employment Type
+        if req.sourcing_type and req.sourcing_type in dict(self._fields["sourcing_type"].selection):
+            self.sourcing_type = req.sourcing_type
+        if req.employment_type and req.employment_type in dict(self._fields["employment_type"].selection):
+            self.employment_type = req.employment_type
+
+        # Job Category and Job Level based on Job Grade
+        grade = target_grade or self.job_grade_id
+        if grade and getattr(grade, "category", False) and getattr(grade.category, "category_name", "") == "Managerial":
+            self.employee_category = "Managerial"
+            self.job_level = False
+        else:
+            self.employee_category = "Non Managerial"
+            if grade and getattr(grade, "grade_level", False) in ("junior", "senior"):
+                self.job_level = grade.grade_level
+            else:
+                self.job_level = "senior"
 
 class OperatingUnitRecruitment(models.Model):
     _inherit = "operating.unit"
-
-    full_non_banking_credit = fields.Boolean(
-        string="Full Non-Banking Experience Credit (100%)",
-        default=False,
-        help="If checked, candidates applying to vacancies in this work unit receive 100% credit for non-banking experience. Otherwise 50% for external vacancies."
-    )
 
     recruitment_request_ids = fields.One2many(
         "recruitment.request", "operating_unit_id", string="Recruitment Requests"

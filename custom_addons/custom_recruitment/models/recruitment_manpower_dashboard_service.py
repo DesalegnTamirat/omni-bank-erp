@@ -15,7 +15,10 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
 
         cycles = []
         if Cycle is not None:
-            active_cycles = Cycle.search([("active", "=", True)], order="id desc")
+            cycle_domain = [("active", "=", True)]
+            if "state" in Cycle._fields:
+                cycle_domain.append(("state", "!=", "closed"))
+            active_cycles = Cycle.search(cycle_domain, order="id desc")
             for c in active_cycles:
                 is_curr = getattr(c, "is_current", False) or (getattr(c, "state", "") == "open")
                 cycles.append({
@@ -183,11 +186,15 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
                 establishment_lines.append(line)
 
         # 3. Query in-flight recruitment requests
+        eff_cycle_id = int(cycle_id) if cycle_id else False
+
         rec_req_domain = [
             ("operating_unit_id", "in", matched_ou_ids),
             ("request_type", "=", "planned"),
             ("state", "in", ["submitted", "under_review", "approved"]),
         ]
+        if eff_cycle_id:
+            rec_req_domain.append(("workforce_plan_id.cycle_id", "=", eff_cycle_id))
         rec_requests = RecRequest.search(rec_req_domain)
         inflight_map = {}
         for req in rec_requests:
@@ -195,39 +202,25 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
             inflight_map[key] = inflight_map.get(key, 0) + (req.required_headcount or 0)
 
         # 4. Fetch Approved Plan from pbms_plan_category_line (display_approved_annual_total)
-        # Default cycle must be active cycle if no cycle selected
-        Cycle = self.env.get("pbms.planning.cycle")
-        eff_cycle_id = int(cycle_id) if cycle_id else False
-        if not eff_cycle_id and Cycle is not None:
-            active_c = Cycle.sudo().search([("active", "=", True)], order="id desc")
-            open_c = active_c.filtered(lambda c: getattr(c, "state", "") == "open")
-            target_c = open_c[:1] or active_c[:1]
-            if target_c:
-                eff_cycle_id = target_c.id
-
         PbmsPlanLine = self.env.get("pbms.plan.category.line")
         approved_plan_map = {}
         if PbmsPlanLine is not None:
             plan_domain = [
                 ("line_type", "=", "manpower"),
                 ("org_unit_id", "in", matched_ou_ids),
+                ("plan_id.state", "=", "approved"),
             ]
             if eff_cycle_id:
                 plan_domain.append(("cycle_id", "=", eff_cycle_id))
             plan_lines = PbmsPlanLine.sudo().search(plan_domain)
-            if not plan_lines and eff_cycle_id:
-                plan_lines = PbmsPlanLine.sudo().search([
-                    ("line_type", "=", "manpower"),
-                    ("org_unit_id", "in", matched_ou_ids),
-                ])
             for pl in plan_lines:
                 if pl.org_unit_id and pl.job_id:
                     k = (pl.org_unit_id.id, pl.job_id.id)
                     approved_total = getattr(pl, "approved_annual_total", 0.0) or (getattr(pl, "quantity", 0.0) or 0.0)
                     fulfilled = getattr(pl, "fulfilled_quantity", 0.0) or 0.0
-                    val = getattr(pl, "remaining_approved_annual_total", None)
-                    if val is None:
-                        val = getattr(pl, "display_approved_annual_total", None)
+                    val = getattr(pl, "display_approved_annual_total", None)
+                    if val is None or val == 0:
+                        val = getattr(pl, "remaining_approved_annual_total", None)
                     if val is None or (fulfilled > 0 and val == approved_total):
                         val = max(0.0, approved_total - fulfilled)
                     approved_plan_map[k] = approved_plan_map.get(k, 0.0) + (val or 0.0)
@@ -275,15 +268,29 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
 
             key = (ou.id, job.id if job else False)
 
-            # 1) Active employee count
-            act = active_emp_map.get(key, 0)
-            # 2) Remaining Approved plan fetched from pbms_plan_category_line (remaining_approved_annual_total)
-            plan = int(round(approved_plan_map.get(key, line.approved_plan_count or 0)))
-            # Authorized Establishment Baseline (Active + Remaining Approved Plan)
-            base = act + plan
-            tot = base
-            # Vacant positions: remaining unfulfilled approved plan additions
-            vac = plan
+            # 1) Active employee count: prefer position active_employee_count, fallback to active_emp_map
+            act = line.active_employee_count if hasattr(line, 'active_employee_count') and line.active_employee_count is not False else active_emp_map.get(key, 0)
+            # 2) Remaining Approved plan: prefer PBMS plan line if mapped, else fallback to position approved_plan_count ONLY when All Cycles is selected
+            if key in approved_plan_map:
+                plan = int(round(approved_plan_map[key]))
+                if line.approved_plan_count != plan:
+                    line.sudo().write({'approved_plan_count': plan})
+            elif not eff_cycle_id:
+                plan = int(round(line.approved_plan_count or 0))
+            else:
+                plan = 0
+            # 3) Headcount & Baseline
+            tot = line.total_headcount if line.total_headcount else (act + plan)
+            base = line.baseline_count if line.baseline_count else act
+
+            # 4) Vacant positions: Headcount - Active Employees
+            if eff_cycle_id:
+                if key in approved_plan_map or key in inflight_map:
+                    vac = max(0, tot - act)
+                else:
+                    vac = 0
+            else:
+                vac = max(0, tot - act)
 
             inflight = inflight_map.get(key, 0)
 
@@ -356,7 +363,8 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
 
         # Ensure total_active reflects all active employees in scope
         total_active = max(total_active, scope_total_active)
-        total_authorized = total_baseline
+        total_baseline = total_active
+        total_authorized = total_baseline + total_approved_plan
 
         # Calculate fulfillment rate
         fulfillment_rate = round((total_active / total_authorized * 100), 1) if total_authorized > 0 else 100.0

@@ -102,15 +102,17 @@
     <!-- Every internal user automatically gets Employee/User role   -->
     <!-- ========================================================== -->
 
-    <record id="base.group_user" model="res.groups">
-        <field name="implied_ids"
-               eval="[(4, ref('group_performance_user'))]"/>
-    </record>
+        <!-- ========================================================== -->
+    <!-- INTERNAL USERS DEFAULT ACCESS                               -->
+    <!-- Every internal user automatically gets Employee/User role   -->
+    <!-- ========================================================== -->
 
-    <record id="base.default_user_group" model="res.groups">
-        <field name="implied_ids"
-               eval="[(4, ref('group_performance_user'))]"/>
-    </record>
+    <!-- Plain <function> instead of <record>, because base.group_user lives in a
+         noupdate file and a <record> write would be skipped on module upgrade -->
+    <function model="res.groups" name="write">
+        <value eval="[ref('base.group_user')]"/>
+        <value eval="{'implied_ids': [(4, ref('group_performance_user'))]}"/>
+    </function>
 
 
     <!-- ========================================================== -->
@@ -150,11 +152,11 @@
         <field name="model_id" ref="model_t2_scorecard"/>
         <field name="domain_force">
             ['|', '|', '|', '|',
-                ('manager_id.user_id', '=', user.id),
-                ('manager_id', '=', user.employee_id.id),
-                ('employee_id.coach_id.user_id', '=', user.id),
-                ('employee_id.user_id', '=', user.id),
-                ('employee_id', 'in', user.employee_ids.ids)
+            ('manager_id.user_id', '=', user.id),
+            ('manager_id', '=', user.employee_id.id),
+            ('employee_id.coach_id.user_id', '=', user.id),
+            ('employee_id.user_id', '=', user.id),
+            ('employee_id', 'in', user.employee_ids.ids)
             ]
         </field>
         <field name="groups"
@@ -193,11 +195,11 @@
         <field name="model_id" ref="model_t2_appraisal"/>
         <field name="domain_force">
             ['|', '|', '|', '|',
-                ('manager_id.user_id', '=', user.id),
-                ('manager_id', '=', user.employee_id.id),
-                ('employee_id.coach_id.user_id', '=', user.id),
-                ('employee_id.user_id', '=', user.id),
-                ('employee_id', 'in', user.employee_ids.ids)
+            ('manager_id.user_id', '=', user.id),
+            ('manager_id', '=', user.employee_id.id),
+            ('employee_id.coach_id.user_id', '=', user.id),
+            ('employee_id.user_id', '=', user.id),
+            ('employee_id', 'in', user.employee_ids.ids)
             ]
         </field>
         <field name="groups"
@@ -240,11 +242,11 @@
         <field name="model_id" ref="model_t3_scorecard"/>
         <field name="domain_force">
             ['|', '|', '|', '|',
-                ('manager_id.user_id', '=', user.id),
-                ('manager_id', '=', user.employee_id.id),
-                ('employee_id.coach_id.user_id', '=', user.id),
-                ('employee_id.user_id', '=', user.id),
-                ('employee_id', 'in', user.employee_ids.ids)
+            ('manager_id.user_id', '=', user.id),
+            ('manager_id', '=', user.employee_id.id),
+            ('employee_id.coach_id.user_id', '=', user.id),
+            ('employee_id.user_id', '=', user.id),
+            ('employee_id', 'in', user.employee_ids.ids)
             ]
         </field>
         <field name="groups"
@@ -283,11 +285,11 @@
         <field name="model_id" ref="model_t3_appraisal"/>
         <field name="domain_force">
             ['|', '|', '|', '|',
-                ('manager_id.user_id', '=', user.id),
-                ('manager_id', '=', user.employee_id.id),
-                ('employee_id.coach_id.user_id', '=', user.id),
-                ('employee_id.user_id', '=', user.id),
-                ('employee_id', 'in', user.employee_ids.ids)
+            ('manager_id.user_id', '=', user.id),
+            ('manager_id', '=', user.employee_id.id),
+            ('employee_id.coach_id.user_id', '=', user.id),
+            ('employee_id.user_id', '=', user.id),
+            ('employee_id', 'in', user.employee_ids.ids)
             ]
         </field>
         <field name="groups"

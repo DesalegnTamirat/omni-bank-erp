@@ -253,12 +253,14 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
     coach_id = fields.Many2one(
         "hr.employee",
         string="Releasing Coach / Manager",
+        readonly=True,
         required=True,
         help="The immediate supervisor, coach, or department manager authorizing the employee release."
     )
     release_date = fields.Date(
         string="Release Effective Date",
         default=fields.Date.context_today,
+        readonly=True,
         required=True,
         help="Date when the candidate is officially released from the current work unit."
     )
@@ -282,6 +284,25 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
             cand = self.env['new.internal.recruitment.selected.candidates'].sudo().browse(active_id)
             if cand and cand.exists():
                 emp = cand.emp_name.sudo() if cand.emp_name else False
+                if getattr(cand, 'transfer_request_id', False) and cand.transfer_request_id:
+                    tr = cand.transfer_request_id.sudo()
+                    curr_pos = tr.current_job_position_id.name if tr.current_job_position_id else (emp.job_position.name if emp and emp.job_position else False)
+                    curr_unit = tr.current_operating_unit_id.name if tr.current_operating_unit_id else (emp.default_operating_unit_id.name if emp and emp.default_operating_unit_id else False)
+                    target_unit = tr.target_operating_unit_id.name or tr.requested_operating_unit_id.name or 'Target Branch'
+                    new_job = tr.target_job_position_id
+                    new_grade_str = tr.target_job_grade_id.grade_name if tr.target_job_grade_id else (tr.current_job_grade_id.grade_name if tr.current_job_grade_id else False)
+                    coach = cand.coach_id or tr.releasing_manager_id or (emp.coach_id or emp.parent_id if emp else False)
+                    res.update({
+                        'candidate_id': cand.id,
+                        'employee_id': emp.id if emp else False,
+                        'current_position': _format_clean_text(curr_pos) or 'N/A',
+                        'current_work_unit': _format_clean_text(curr_unit) or 'N/A',
+                        'target_work_unit': _format_clean_text(target_unit) or 'N/A',
+                        'new_job_position_id': new_job.id if new_job else False,
+                        'new_job_grade': _format_clean_text(new_grade_str) or 'N/A',
+                        'coach_id': coach.id if coach else False,
+                    })
+                    return res
                 parent_rec = cand.new_int_sel_cand.sudo() if cand.new_int_sel_cand else False
 
                 # Find the linked vacancy record
@@ -406,11 +427,14 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
         return res
 
     def action_confirm_release(self):
-        self = self.sudo()
         self.ensure_one()
-        cand = self.candidate_id.sudo()
+        cand = self.candidate_id
         if not cand or not cand.emp_name:
             raise UserError(_("No valid candidate employee found for release."))
+        if hasattr(cand, '_check_current_user_is_releasing_manager'):
+            cand._check_current_user_is_releasing_manager()
+        self = self.sudo()
+        cand = cand.sudo()
 
         emp = cand.emp_name.sudo()
         parent_rec = cand.new_int_sel_cand.sudo()
@@ -422,10 +446,17 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
         old_grade = emp.job_grade if hasattr(emp, 'job_grade') else (emp.grade if hasattr(emp, 'grade') else False)
 
         # 2. Resolve destination values
-        dest_ou = _resolve_operating_unit(self.env, cand, parent_rec)
-        grade_val = parent_rec.job_grade or getattr(parent_rec, 'job_grade_id', False) if parent_rec else False
-        grade_rec = _resolve_grade_record(self.env, grade_val, parent_rec=parent_rec)
-        job_pos = parent_rec.job_position if parent_rec else False
+        if getattr(cand, 'transfer_request_id', False) and cand.transfer_request_id:
+            tr = cand.transfer_request_id.sudo()
+            dest_ou = tr.target_operating_unit_id or tr.requested_operating_unit_id
+            job_pos = tr.target_job_position_id
+            grade_rec = tr.target_job_grade_id or tr.current_job_grade_id
+            grade_val = grade_rec.grade_name if grade_rec else False
+        else:
+            dest_ou = _resolve_operating_unit(self.env, cand, parent_rec)
+            grade_val = parent_rec.job_grade or getattr(parent_rec, 'job_grade_id', False) if parent_rec else False
+            grade_rec = _resolve_grade_record(self.env, grade_val, parent_rec=parent_rec)
+            job_pos = parent_rec.job_position if parent_rec else False
 
         # 3. Build unified write vals for hr.employee
         vals = {}
@@ -454,10 +485,49 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
                 vals['default_operating_unit_id'] = dest_ou.id
             if hasattr(emp, 'operating_unit_id'):
                 vals['operating_unit_id'] = dest_ou.id
+            dept, new_mgr = emp._resolve_workunit_manager_and_department(dest_ou, job_pos or emp.job_id, emp) if hasattr(emp, '_resolve_workunit_manager_and_department') else (False, False)
+            if not dept and getattr(dest_ou, 'department', False):
+                dept = dest_ou.department
+            if dept and hasattr(emp, 'department_id') and not vals.get('department_id'):
+                vals['department_id'] = dept.id
+            if not new_mgr:
+                new_mgr = dest_ou.manager_id if getattr(dest_ou, 'manager_id', False) else (job_pos.department_id.manager_id if job_pos and getattr(job_pos, 'department_id', False) and getattr(job_pos.department_id, 'manager_id', False) else False)
+            if new_mgr and new_mgr.id != emp.id:
+                if hasattr(emp, 'coach_id'):
+                    vals['coach_id'] = new_mgr.id
+                if hasattr(emp, 'parent_id'):
+                    vals['parent_id'] = new_mgr.id
+                if hasattr(emp, 'planning_parent_id'):
+                    vals['planning_parent_id'] = new_mgr.id
 
-        # 4. Perform write with job_history_reason='promotion'
+        old_grade_id = emp.job_grade.id if emp.job_grade else False
+        new_grade_id = grade_rec.id if grade_rec and grade_rec.exists() else old_grade_id
+        old_pos_id = emp.job_position.id if emp.job_position else (emp.job_id.id if emp.job_id else False)
+        new_pos_id = job_pos.id if job_pos else old_pos_id
+        old_ou_id = emp.default_operating_unit_id.id if emp.default_operating_unit_id else False
+        new_ou_id = dest_ou.id if dest_ou else old_ou_id
+
+        grade_changed = bool(old_grade_id and new_grade_id and old_grade_id != new_grade_id)
+        pos_changed = bool(old_pos_id != new_pos_id)
+        ou_changed = bool(old_ou_id != new_ou_id)
+
+        if grade_changed:
+            determined_movement = 'promotion'
+        elif not pos_changed and ou_changed:
+            determined_movement = 'transfer'
+        elif pos_changed:
+            determined_movement = 'lateral_transfer'
+        else:
+            determined_movement = 'transfer' if ou_changed else 'lateral_transfer'
+
+        # 4. Perform write with determined movement reason
+        determined_change_reason = 'transfer' if determined_movement in ('transfer', 'lateral_transfer') else determined_movement
         if vals:
-            emp.sudo().with_context(job_history_reason='promotion').write(vals)
+            emp.sudo().with_context(
+                job_history_reason=determined_movement,
+                reason_for_movement=determined_movement,
+                reason_for_change=determined_change_reason,
+            ).write(vals)
 
         # Increment PBMS Plan fulfilled_quantity and recompute operating.unit.job.position metrics
         _update_pbms_and_operating_unit_counts(self.env, dest_ou or emp.default_operating_unit_id, job_pos or emp.job_id, count=1)
@@ -466,12 +536,16 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
         v_vals = {}
         if cand.promoted_salary and cand.promoted_salary > 0:
             v_vals['wage'] = cand.promoted_salary
+            if 'salary' in self.env['hr.version']._fields:
+                v_vals['salary'] = cand.promoted_salary
         if job_pos:
             v_vals['job_id'] = job_pos.id
         if grade_rec and 'job_grade' in self.env['hr.version']._fields:
             v_vals['job_grade'] = grade_rec.id
         if dest_ou and 'operating_unit_id' in self.env['hr.version']._fields:
             v_vals['operating_unit_id'] = dest_ou.id
+        if vals.get('department_id') and 'department_id' in self.env['hr.version']._fields:
+            v_vals['department_id'] = vals['department_id']
 
         if v_vals:
             if hasattr(emp, 'version_id') and emp.version_id:
@@ -532,6 +606,62 @@ class InternalRecruitmentReleaseWizard(models.TransientModel):
         })
 
         target_unit_name = dest_ou.name if dest_ou else (cand.preferred_location or (parent_rec.job_location if parent_rec else 'N/A'))
+
+        # Also update linked transfer request if applicable
+        if getattr(cand, 'transfer_request_id', False) and cand.transfer_request_id:
+            tr = cand.transfer_request_id.sudo()
+            tr.with_context(skip_transfer_write_check=True).write({
+                'release_date': self.release_date,
+                'handover_status': self.handover_status,
+                'release_remarks': self.release_remarks,
+                'releasing_manager_id': self.coach_id.id if self.coach_id else tr.releasing_manager_id.id,
+                'state': 'transferred',
+            })
+            # Close activities on transfer request
+            activities = self.env["mail.activity"].sudo().search([
+                ("res_model", "=", "employee.transfer.request"),
+                ("res_id", "=", tr.id),
+            ])
+            for act in activities:
+                try:
+                    act.action_done()
+                except Exception:
+                    pass
+            # Create transfer history record
+            try:
+                self.env["hr.employee.transfer.history"].sudo().create({
+                    "employee_id": emp.id,
+                    "date": self.release_date or fields.Date.today(),
+                    "transfer_reason": tr.reason_for_transfer or False,
+                    "from_operating_unit_id": tr.current_operating_unit_id.id if tr.current_operating_unit_id else False,
+                    "from_department_id": tr.department_id.id if tr.department_id else False,
+                    "from_job_id": tr.current_job_position_id.id if tr.current_job_position_id else False,
+                    "from_grade_id": tr.current_job_grade_id.id if tr.current_job_grade_id else False,
+                    "to_operating_unit_id": dest_ou.id if dest_ou else False,
+                    "to_department_id": emp.department_id.id if emp.department_id else False,
+                    "to_job_id": job_pos.id if job_pos else False,
+                    "to_grade_id": grade_rec.id if grade_rec else False,
+                })
+            except Exception as hist_err:
+                _logger.warning("Could not create transfer history: %s", hist_err)
+            try:
+                tr.message_post(
+                    body=_(
+                        "<p><b>✅ Transfer Release Form Completed by Manager %s</b></p>"
+                        "<p>Employee officially released effective <b>%s</b>.</p>"
+                        "<p><b>Handover Status:</b> %s<br/>"
+                        "<b>Remarks:</b> %s</p>"
+                        "<p>Employee master profile (Operating Unit, Job Position, Coach/Manager) successfully updated to <b>%s</b>.</p>"
+                    ) % (
+                        self.coach_id.name,
+                        self.release_date,
+                        dict(self._fields['handover_status'].selection).get(self.handover_status, self.handover_status),
+                        self.release_remarks or 'None',
+                        dest_ou.name if dest_ou else 'Target Unit'
+                    )
+                )
+            except Exception as e:
+                _logger.warning("Could not post chatter on transfer request: %s", e)
 
         # Post message in chatter using sudo
         if parent_rec:

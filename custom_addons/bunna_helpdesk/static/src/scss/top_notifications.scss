@@ -1,0 +1,47 @@
+/* ==========================================================================
+   Bunna Bank Helpdesk — Top Screen Notifications
+   Ensures notifications and toast alerts appear prominently at the top center
+   of the screen when operating inside Bunna Bank Helpdesk, while leaving
+   standard notification positioning intact for other ERP modules.
+   ========================================================================== */
+
+body:has([class*="helpdesk"]) .o_notification_manager,
+body:has([class*="bunna"]) .o_notification_manager,
+body:has(.o_helpdesk_ticket_form) .o_notification_manager,
+body:has(.o_bunna_helpdesk_dashboard) .o_notification_manager,
+body:has(.o_helpdesk_wizard) .o_notification_manager {
+    position: fixed !important;
+    top: 18px !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translateX(-50%) !important;
+    width: 92vw !important;
+    max-width: 540px !important;
+    z-index: 999999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    pointer-events: none !important;
+
+    .o_notification {
+        pointer-events: auto !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.28), 0 8px 12px -4px rgba(0, 0, 0, 0.16) !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(0, 0, 0, 0.12) !important;
+        animation: notificationTopSlideDown 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+}
+
+@keyframes notificationTopSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-24px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}

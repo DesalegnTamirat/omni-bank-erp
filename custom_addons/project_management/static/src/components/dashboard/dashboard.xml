@@ -2,71 +2,142 @@
 <templates xml:space="preserve">
     <t t-name="project_management.ExecutiveDashboard">
         <div class="o_pm_executive_dashboard container-fluid py-4 px-4 overflow-auto h-100">
-            <!-- 1. Bunna Bank Header & Filter Ribbon -->
-            <div class="row align-items-center mb-4 o_bunna_header p-3 shadow-sm">
-                <div class="col-md-5 mb-2 mb-md-0">
-                    <div class="d-flex align-items-center">
-                        <div class="p-2 rounded-3 me-3 bg-white text-dark shadow-sm">
-                            <i class="fa fa-coffee fs-4" style="color: #541718;"/>
-                        </div>
-                        <div>
-                            <h5 class="fw-bold mb-0 text-white d-flex align-items-center">
-                                Bunna Bank | Project Management Executive Dashboard
-                            </h5>
-                            <span class="text-bunna-gold small">Strategic Portfolio Health, Milestone Velocity &amp; Resource Command Center</span>
-                        </div>
+            <!-- 1. Bunna Bank Executive Title Banner -->
+            <div class="row align-items-center mb-3 o_bunna_header py-3 px-4 shadow-sm mx-0">
+                <div class="col-md-7 d-flex align-items-center mb-2 mb-md-0">
+                    <div class="p-2 rounded-3 me-3 bg-white text-dark shadow-sm d-flex align-items-center justify-content-center" style="width: 46px; height: 46px;">
+                        <i class="fa fa-coffee fs-4" style="color: #541718;"/>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0 text-white">
+                            Bunna Bank | Project Management Executive Dashboard
+                        </h4>
+                        <span class="text-bunna-gold small">Strategic Portfolio Health, Milestone Velocity &amp; Resource Command Center</span>
                     </div>
                 </div>
-                <div class="col-md-7">
-                    <div class="d-flex flex-wrap gap-2 justify-content-md-end align-items-center">
-                        <!-- Strategic Issue Filter -->
-                        <div class="d-flex align-items-center">
-                            <span class="me-1 small text-white fw-semibold">Strategic Issue:</span>
-                            <select class="form-select form-select-sm shadow-none" t-model="state.filters.initiative_id" t-on-change="onInitiativeChange">
-                                <option value="">All Strategic Issues</option>
-                                <t t-foreach="state.data.filters_data.initiatives" t-as="init" t-key="init.id">
-                                    <option t-att-value="init.id" t-esc="init.name"/>
-                                </t>
-                            </select>
-                        </div>
-                        <!-- Project Filter (Cascades with Initiative) -->
-                        <div class="d-flex align-items-center">
-                            <span class="me-1 small text-white fw-semibold">Project:</span>
-                            <select class="form-select form-select-sm shadow-none" t-model="state.filters.project_id" t-on-change="onProjectChange">
-                                <option value="">All Projects</option>
-                                <t t-if="!state.filters.initiative_id">
-                                    <option value="non_project">Non-Project Tasks</option>
-                                </t>
-                                <t t-foreach="availableProjects" t-as="proj" t-key="proj.id">
-                                    <option t-att-value="proj.id" t-esc="proj.name"/>
-                                </t>
-                            </select>
-                        </div>
-                        <!-- Task Filter -->
-                        <div class="d-flex align-items-center">
-                            <span class="me-1 small text-white fw-semibold">Task Filter:</span>
-                            <select class="form-select form-select-sm shadow-none" t-model="state.filters.task_filter" t-on-change="onTaskFilterChange">
-                                <option value="all">All Tasks</option>
-                                <option value="open">Open Tasks</option>
-                                <option value="completed">Completed Tasks</option>
-                                <option value="blocked">Blocked Tasks</option>
-                                <option value="overdue">Overdue Tasks</option>
-                            </select>
-                        </div>
+                <div class="col-md-5 text-md-end d-flex justify-content-md-end align-items-center gap-2">
+                    <span class="badge bg-white text-dark shadow-sm px-3 py-2 fw-semibold d-inline-flex align-items-center">
+                        <i class="fa fa-circle text-success me-2" style="font-size: 0.60rem;"/> Live Enterprise Portfolio
+                    </span>
+                    <button class="btn btn-sm btn-bunna-reset d-inline-flex align-items-center gap-2 px-3 py-2 shadow-sm" t-on-click="resetFilters" title="Reset All Filters">
+                        <i class="fa fa-undo"/> Reset Filters
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. Governance & Execution Filter Ribbon (Dedicated 6-Column Control Bar) -->
+            <div class="card border-0 shadow-sm p-3 mb-4 bg-white rounded-3 o_bunna_filter_bar">
+                <div class="row g-2 align-items-end">
+                    <!-- Filter 1: Lead Office (Feedback Line 53) -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-building-o text-bunna-maroon me-1"/> Lead Office
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.lead_office_id" t-on-change="onLeadOfficeChange">
+                            <option value="">All Offices</option>
+                            <t t-foreach="state.data.filters_data.lead_offices" t-as="off" t-key="off.id">
+                                <option t-att-value="off.id" t-esc="off.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Filter 2: Project Manager (Feedback Line 53) -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-user-circle-o text-bunna-green me-1"/> Project Manager
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.manager_id" t-on-change="onManagerChange">
+                            <option value="">All Managers</option>
+                            <t t-foreach="state.data.filters_data.managers" t-as="mgr" t-key="mgr.id">
+                                <option t-att-value="mgr.id" t-esc="mgr.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Filter 3: Process Owner (Feedback Line 53) -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-users text-bunna-bronze me-1"/> Process Owner
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.process_owner_id" t-on-change="onProcessOwnerChange">
+                            <option value="">All Owners</option>
+                            <t t-foreach="state.data.filters_data.process_owners" t-as="po" t-key="po.id">
+                                <option t-att-value="po.id" t-esc="po.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Filter 4: Strategic Initiative -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-compass text-bunna-maroon me-1"/> Initiative
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.initiative_id" t-on-change="onInitiativeChange">
+                            <option value="">All Initiatives</option>
+                            <t t-foreach="state.data.filters_data.initiatives" t-as="init" t-key="init.id">
+                                <option t-att-value="init.id" t-esc="init.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Filter 5: Project -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-folder-open-o text-bunna-green me-1"/> Project
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.project_id" t-on-change="onProjectChange">
+                            <option value="">All Projects</option>
+                            <t t-foreach="availableProjects" t-as="proj" t-key="proj.id">
+                                <option t-att-value="proj.id" t-esc="proj.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Filter 6: Task Status -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-filter text-bunna-navy me-1"/> Task Filter
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.task_filter" t-on-change="onTaskFilterChange">
+                            <option value="all">All Tasks</option>
+                            <option value="open">Open Tasks</option>
+                            <option value="completed">Completed Tasks</option>
+                            <option value="blocked">Blocked Tasks</option>
+                            <option value="overdue">Overdue Tasks</option>
+                        </select>
                     </div>
                 </div>
             </div>
 
             <!-- 2. Dual-Row KPI Command Ribbon -->
-            <!-- ROW 1: Strategic & Portfolio Governance (6 Cards) -->
+            <!-- ROW 1: Strategic & Portfolio Governance (6 Cards - Feedback Line 52 Order) -->
             <div class="row g-3 mb-3">
-                <!-- Card 1.1: Strategic Issues -->
+                <!-- Card 1.1: Strategic Objectives (Order 1) -->
+                <div class="col-xl-2 col-md-4 col-sm-6">
+                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-maroon" t-on-click="() => this.openStrategicObjectives()">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Strategic Objectives</div>
+                                <h3 class="fw-bold my-1" style="color: #541718;" t-esc="state.data.kpi.total_strategic_objectives"/>
+                            </div>
+                            <div class="p-2 rounded-circle bg-bunna-maroon-subtle">
+                                <i class="fa fa-bullseye fs-5"/>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-muted small">
+                            <span class="badge badge-bunna-maroon">Corporate Mandates</span>
+                            <div class="mt-2 small text-muted">Catalog &amp; Alignment</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 1.2: Strategic Initiatives (Order 2) -->
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-maroon" t-on-click="() => this.openInitiatives()">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <div class="text-muted small fw-semibold text-uppercase">Strategic Issues</div>
-                                <h3 class="fw-bold my-1" style="color: #541718;" t-esc="state.data.kpi.total_strategic_issues || state.data.kpi.total_initiatives"/>
+                                <div class="text-muted small fw-semibold text-uppercase">Initiatives</div>
+                                <h3 class="fw-bold my-1" style="color: #541718;" t-esc="state.data.kpi.total_initiatives"/>
                             </div>
                             <div class="p-2 rounded-circle bg-bunna-maroon-subtle">
                                 <i class="fa fa-compass fs-5"/>
@@ -88,7 +159,7 @@
                     </div>
                 </div>
 
-                <!-- Card 1.2: Projects Portfolio -->
+                <!-- Card 1.3: Projects Portfolio (Order 3) -->
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-green" t-on-click="() => this.openProjects()">
                         <div class="d-flex justify-content-between align-items-start">
@@ -115,7 +186,7 @@
                     </div>
                 </div>
 
-                <!-- Card 1.3: Project Health Status -->
+                <!-- Card 1.4: Project Health Status (Order 4) -->
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-green" t-on-click="() => this.openProjects([['health_state', '=', 'on_track']])">
                         <div class="d-flex justify-content-between align-items-start">
@@ -134,7 +205,7 @@
                     </div>
                 </div>
 
-                <!-- Card 1.4: Milestones (NEW) -->
+                <!-- Card 1.5: Milestones (Order 5) -->
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-olive" t-on-click="() => this.openMilestones()">
                         <div class="d-flex justify-content-between align-items-start">
@@ -159,7 +230,7 @@
                     </div>
                 </div>
 
-                <!-- Card 1.5: Deliverables / Major Activities -->
+                <!-- Card 1.6: Deliverables / Major Activities (Order 6) -->
                 <div class="col-xl-2 col-md-4 col-sm-6">
                     <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-olive" t-on-click="() => this.openDeliverables()">
                         <div class="d-flex justify-content-between align-items-start">
@@ -180,25 +251,6 @@
                                 <div class="progress-bar progress-bar-bunna" t-att-style="'width: ' + (state.data.kpi.total_deliverables > 0 ? (state.data.kpi.completed_deliverables / state.data.kpi.total_deliverables) * 100 : 0) + '%'"/>
                             </div>
                             <div class="mt-2 small text-muted">Major Activities</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card 1.6: Strategic Objectives (NEW) -->
-                <div class="col-xl-2 col-md-4 col-sm-6">
-                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-maroon" t-on-click="() => this.openStrategicObjectives()">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <div class="text-muted small fw-semibold text-uppercase">Strategic Objectives</div>
-                                <h3 class="fw-bold my-1" style="color: #541718;" t-esc="state.data.kpi.total_strategic_objectives"/>
-                            </div>
-                            <div class="p-2 rounded-circle bg-bunna-maroon-subtle">
-                                <i class="fa fa-bullseye fs-5"/>
-                            </div>
-                        </div>
-                        <div class="mt-3 text-muted small">
-                            <span class="badge badge-bunna-maroon">Corporate Mandates</span>
-                            <div class="mt-2 small text-muted">Catalog &amp; Alignment</div>
                         </div>
                     </div>
                 </div>
@@ -755,6 +807,389 @@
                     </div>
                 </div>
             </t>
+        </div>
+    </t>
+
+    <!-- ========================================================= -->
+    <!-- Non-Project Operational Tasks Dashboard (Feedback Lines 55-61) -->
+    <!-- ========================================================= -->
+    <t t-name="project_management.NonProjectDashboard">
+        <div class="o_pm_non_project_dashboard container-fluid py-4 px-4 overflow-auto h-100">
+            <!-- 1. Bunna Bank Operational Title Banner -->
+            <div class="row align-items-center mb-3 o_bunna_header py-3 px-4 shadow-sm mx-0">
+                <div class="col-md-7 d-flex align-items-center mb-2 mb-md-0">
+                    <div class="p-2 rounded-3 me-3 bg-white text-dark shadow-sm d-flex align-items-center justify-content-center" style="width: 46px; height: 46px;">
+                        <i class="fa fa-tasks fs-4" style="color: #541718;"/>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0 text-white">
+                            Bunna Bank | Non-Project Tasks Dashboard
+                        </h4>
+                        <span class="text-bunna-gold small">Operational Requests, Support Backlog &amp; Ad-Hoc Task Governance</span>
+                    </div>
+                </div>
+                <div class="col-md-5 text-md-end d-flex justify-content-md-end align-items-center gap-2">
+                    <span class="badge bg-white text-dark shadow-sm px-3 py-2 fw-semibold d-inline-flex align-items-center">
+                        <i class="fa fa-circle text-primary me-2" style="font-size: 0.60rem;"/> Operational Backlog
+                    </span>
+                    <button class="btn btn-sm btn-bunna-reset d-inline-flex align-items-center gap-2 px-3 py-2 shadow-sm" t-on-click="resetFilters" title="Reset All Filters">
+                        <i class="fa fa-undo"/> Reset Filters
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. Operational Filter Ribbon (Dedicated 6-Column Control Bar) -->
+            <div class="card border-0 shadow-sm p-3 mb-4 bg-white rounded-3 o_bunna_filter_bar">
+                <div class="row g-2 align-items-end">
+                    <!-- Filter 1: Requester (Feedback Line 57) -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-user-circle-o text-bunna-maroon me-1"/> Requester
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.customer_id" t-on-change="(ev) => this.onFilterChange('customer_id', ev)">
+                            <option value="">All Requesters</option>
+                            <t t-foreach="state.data.filters_data.requesters" t-as="req" t-key="req.id">
+                                <option t-att-value="req.id" t-esc="req.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Filter 2: Task Owner (Feedback Line 57) -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-user text-bunna-green me-1"/> Task Owner
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.user_id" t-on-change="(ev) => this.onFilterChange('user_id', ev)">
+                            <option value="">All Owners</option>
+                            <t t-foreach="state.data.filters_data.task_owners" t-as="owner" t-key="owner.id">
+                                <option t-att-value="owner.id" t-esc="owner.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Filter 3: Task Type (Feedback Line 57) -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-tag text-bunna-bronze me-1"/> Task Type
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.tag_id" t-on-change="(ev) => this.onFilterChange('tag_id', ev)">
+                            <option value="">All Types</option>
+                            <t t-foreach="state.data.filters_data.tags" t-as="tag" t-key="tag.id">
+                                <option t-att-value="tag.id" t-esc="tag.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Filter 4: Date From (Feedback Line 57) -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-calendar text-bunna-olive me-1"/> Date From
+                        </label>
+                        <input type="date" class="form-control form-control-sm shadow-none" t-model="state.filters.date_from" t-on-change="(ev) => this.onFilterChange('date_from', ev)"/>
+                    </div>
+
+                    <!-- Filter 5: Date To (Feedback Line 57) -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-calendar-check-o text-bunna-olive me-1"/> Date To
+                        </label>
+                        <input type="date" class="form-control form-control-sm shadow-none" t-model="state.filters.date_to" t-on-change="(ev) => this.onFilterChange('date_to', ev)"/>
+                    </div>
+
+                    <!-- Filter 6: Task State -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        <label class="o_filter_label">
+                            <i class="fa fa-filter text-bunna-navy me-1"/> State Filter
+                        </label>
+                        <select class="form-select form-select-sm shadow-none" t-model="state.filters.task_filter" t-on-change="(ev) => this.onFilterChange('task_filter', ev)">
+                            <option value="all">All States</option>
+                            <option value="open">Open</option>
+                            <option value="completed">Completed</option>
+                            <option value="blocked">Blocked</option>
+                            <option value="overdue">Overdue</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Row 1: Operational Task KPIs (Feedback Line 56) -->
+            <div class="row g-3 mb-4">
+                <!-- Total Tasks -->
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-pine" t-on-click="() => this.openTasks()">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Total Tasks</div>
+                                <h3 class="fw-bold my-1" style="color: #1E2917;" t-esc="state.data.kpi.total_tasks"/>
+                            </div>
+                            <div class="p-2 rounded-circle bg-bunna-pine-subtle">
+                                <i class="fa fa-tasks fs-5"/>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small">All Logged Tasks</div>
+                    </div>
+                </div>
+
+                <!-- Completed Tasks -->
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-navy" t-on-click="() => this.openTasks([['is_closed', '=', true]])">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Completed</div>
+                                <h3 class="fw-bold my-1" style="color: #1D2B32;" t-esc="state.data.kpi.completed_tasks"/>
+                            </div>
+                            <div class="p-2 rounded-circle bg-bunna-navy-subtle">
+                                <i class="fa fa-check-square-o fs-5"/>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small">
+                            <span class="badge badge-bunna-navy">Closed &amp; Done</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Open Tasks -->
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-olive" t-on-click="() => this.openTasks([['is_closed', '=', false]])">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Open Tasks</div>
+                                <h3 class="fw-bold my-1" style="color: #726732;" t-esc="state.data.kpi.open_tasks"/>
+                            </div>
+                            <div class="p-2 rounded-circle bg-bunna-olive-subtle">
+                                <i class="fa fa-folder-open fs-5"/>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small">Active Backlog</div>
+                    </div>
+                </div>
+
+                <!-- In Progress Tasks -->
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-green" t-on-click="() => this.openTasks([['state', '=', 'in_progress']])">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">In Progress</div>
+                                <h3 class="fw-bold my-1" style="color: #425727;" t-esc="state.data.kpi.in_progress_tasks"/>
+                            </div>
+                            <div class="p-2 rounded-circle bg-bunna-green-subtle">
+                                <i class="fa fa-cogs fs-5"/>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small">
+                            <span class="badge badge-bunna-green">Ongoing Work</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Overdue Tasks -->
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-maroon" t-on-click="() => this.openOverdueTasks()">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Overdue</div>
+                                <h3 class="fw-bold my-1" style="color: #541718;" t-esc="state.data.kpi.overdue_tasks"/>
+                            </div>
+                            <div class="p-2 rounded-circle bg-bunna-maroon-subtle">
+                                <i class="fa fa-calendar-times-o fs-5"/>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small">
+                            <span t-if="state.data.kpi.overdue_tasks > 0" class="badge badge-bunna-maroon">Action Required</span>
+                            <span t-else="" class="badge badge-bunna-green">On Schedule</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Blocked Tasks -->
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-bronze" t-on-click="() => this.openTasks([['is_blocked', '=', true], ['is_closed', '=', false]])">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Blocked</div>
+                                <h3 class="fw-bold my-1" style="color: #C17540;" t-esc="state.data.kpi.blocked_tasks"/>
+                            </div>
+                            <div class="p-2 rounded-circle bg-bunna-bronze-subtle">
+                                <i class="fa fa-ban fs-5"/>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small">
+                            <span t-if="state.data.kpi.blocked_tasks > 0" class="badge badge-bunna-maroon">Impediment</span>
+                            <span t-else="" class="badge badge-bunna-green">No Blockers</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Completion Rate -->
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="card border-0 shadow-sm h-100 p-3 bg-white cursor-pointer border-bunna-green">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Completion Rate</div>
+                                <h3 class="fw-bold my-1" style="color: #425727;" t-esc="state.data.kpi.completion_rate + '%'"/>
+                            </div>
+                            <div class="p-2 rounded-circle bg-bunna-green-subtle">
+                                <i class="fa fa-pie-chart fs-5"/>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar progress-bar-bunna" t-att-style="'width: ' + state.data.kpi.completion_rate + '%'"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Analytical Charts & Stage Pipeline (Feedback Line 58) -->
+            <div class="row g-3 mb-4">
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm bg-white p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="card-header-bunna mb-0">
+                                <i class="fa fa-bar-chart me-2" style="color: #541718;"/> Tasks by Stage
+                            </h6>
+                            <span class="badge badge-bunna-maroon">Operational Pipeline</span>
+                        </div>
+                        <div style="height: 260px; position: relative;">
+                            <canvas t-ref="nonProjectStageChart"/>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm bg-white p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="card-header-bunna mb-0">
+                                <i class="fa fa-list-ol me-2" style="color: #425727;"/> Stage Breakdown
+                            </h6>
+                            <span class="badge badge-bunna-green">Stage Distribution</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Stage</th>
+                                        <th class="text-center">Tasks</th>
+                                        <th style="width: 180px;">Share</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="state.data.stages" t-as="st" t-key="st.id">
+                                        <tr class="cursor-pointer" t-on-click="() => this.openStageTasks(st.id)">
+                                            <td class="fw-semibold">
+                                                <i class="fa fa-tag me-1 text-muted"/>
+                                                <span t-esc="st.name"/>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge rounded-pill bg-light text-dark border px-3" t-esc="st.count"/>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="progress flex-grow-1" style="height: 6px;">
+                                                        <div class="progress-bar progress-bar-bunna" t-att-style="'width: ' + st.percentage + '%'"/>
+                                                    </div>
+                                                    <span class="small text-muted" style="width: 45px;" t-esc="st.percentage + '%'"/>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Tables: Overdue & Blocked Operational Tasks (Feedback Lines 60 & 61) -->
+            <div class="row g-3">
+                <!-- Overdue Tasks (Line 60) -->
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm bg-white p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="card-header-bunna mb-0">
+                                <i class="fa fa-calendar-times-o me-2" style="color: #541718;"/> Overdue Tasks
+                            </h6>
+                            <span class="badge badge-bunna-maroon"><t t-esc="state.data.tables.overdue_table.length"/> Overdue</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Task</th>
+                                        <th>Requester</th>
+                                        <th>Owner</th>
+                                        <th>Deadline</th>
+                                        <th>Stage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="!state.data.tables.overdue_table or state.data.tables.overdue_table.length === 0">
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-3">No overdue tasks.</td>
+                                        </tr>
+                                    </t>
+                                    <t t-foreach="state.data.tables.overdue_table" t-as="ot" t-key="ot.id">
+                                        <tr class="cursor-pointer" t-on-click="() => this.openTaskForm(ot.id)">
+                                            <td class="fw-semibold text-danger" t-esc="ot.name"/>
+                                            <td class="small text-muted" t-esc="ot.customer_name"/>
+                                            <td class="small text-muted" t-esc="ot.assignees"/>
+                                            <td>
+                                                <span class="badge badge-bunna-maroon" t-esc="ot.date_deadline"/>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-light text-dark border" t-esc="ot.stage"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Blocked Tasks (Line 61) -->
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm bg-white p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="card-header-bunna mb-0">
+                                <i class="fa fa-ban me-2" style="color: #C17540;"/> Blocked Tasks
+                            </h6>
+                            <span class="badge badge-bunna-bronze"><t t-esc="state.data.tables.blocked_table.length"/> Blocked</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Task</th>
+                                        <th>Requester</th>
+                                        <th>Owner</th>
+                                        <th>Deadline</th>
+                                        <th>Stage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="!state.data.tables.blocked_table or state.data.tables.blocked_table.length === 0">
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-3">No blocked tasks.</td>
+                                        </tr>
+                                    </t>
+                                    <t t-foreach="state.data.tables.blocked_table" t-as="bt" t-key="bt.id">
+                                        <tr class="cursor-pointer" t-on-click="() => this.openTaskForm(bt.id)">
+                                            <td class="fw-semibold" style="color: #C17540;" t-esc="bt.name"/>
+                                            <td class="small text-muted" t-esc="bt.customer_name"/>
+                                            <td class="small text-muted" t-esc="bt.assignees"/>
+                                            <td class="small text-muted" t-esc="bt.date_deadline"/>
+                                            <td>
+                                                <span class="badge badge-bunna-bronze" t-esc="bt.stage"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </t>
 </templates>

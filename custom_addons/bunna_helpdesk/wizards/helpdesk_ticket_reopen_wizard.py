@@ -14,8 +14,15 @@ class HelpdeskTicketReopenWizard(models.TransientModel):
         readonly=True,
     )
     ticket_number = fields.Char(related="ticket_id.number", string="Ticket Number", readonly=True)
-    ticket_name = fields.Char(related="ticket_id.name", string="Subject", readonly=True)
+    ticket_name = fields.Char(related="ticket_id.name", string="Sub Service", readonly=True)
     current_stage_id = fields.Many2one(related="ticket_id.stage_id", string="Current Stage", readonly=True)
+    resolution = fields.Text(
+        related="ticket_id.resolution",
+        string="Previous Resolution",
+        readonly=True,
+        help="Previous resolution and actions documented when the case was resolved.",
+    )
+
     target_stage_id = fields.Many2one("helpdesk.ticket.stage", string="Target Stage")
 
     reopen_reason = fields.Text(

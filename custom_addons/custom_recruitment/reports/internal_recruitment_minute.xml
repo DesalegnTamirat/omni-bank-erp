@@ -7,11 +7,11 @@
         <field name="orientation">Portrait</field>
         <field name="margin_top">10</field>
         <field name="margin_bottom">12</field>
-        <field name="margin_left">12</field>
-        <field name="margin_right">12</field>
+        <field name="margin_left">14</field>
+        <field name="margin_right">14</field>
         <field name="header_line" eval="False"/>
         <field name="header_spacing">0</field>
-        <field name="dpi">90</field>
+        <field name="dpi">96</field>
     </record>
 
     <record id="action_report_internal_recruitment_minute" model="ir.actions.report">
@@ -29,222 +29,626 @@
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
                 <t t-call="web.basic_layout">
-                    <div class="page" style="font-size: 13px; font-family: Arial, sans-serif; line-height: 1.5; margin-top: 0px; padding-top: 0px;">
-                        <t t-set="stats" t-value="doc_stats.get(o.id, {})"/>
-                        
-                        <div class="text-center mb-3">
-                            <div class="mb-2">
-                                <t t-if="bunna_logo_data_uri">
-                                    <img t-att-src="bunna_logo_data_uri" style="max-height: 90px; max-width: 260px;" alt="Bunna Bank Logo"/>
-                                </t>
-                                <t t-elif="res_company and res_company.logo">
-                                    <img t-att-src="image_data_uri(res_company.logo)" style="max-height: 90px; max-width: 260px;" alt="Bunna Bank Logo"/>
-                                </t>
-                                <t t-elif="env.company and env.company.logo">
-                                    <img t-att-src="image_data_uri(env.company.logo)" style="max-height: 90px; max-width: 260px;" alt="Bunna Bank Logo"/>
-                                </t>
-                                <t t-else="">
-                                    <img src="/custom_recruitment/static/src/img/bunna_logo.jpg" style="max-height: 90px; max-width: 260px;" alt="Bunna Bank Logo"/>
-                                </t>
-                            </div>
-                            <h4 class="font-weight-bold mb-1">Executive Management Committee/ Head Office Promotion and Recruitment Committee</h4>
-                            <h5 class="font-weight-bold">Minute No. <span t-field="o.vacancy_reference"/></h5>
-                        </div>
+                    <style type="text/css">
+                        <t t-out="ethiopic_font_css"/>
+                        body, .page, table, td, th, p, span, h4, h5, div {
+                            font-family: 'Ebrima', 'Ethiopic Sadiss', 'Nyala', sans-serif !important;
+                        }
+                    </style>
 
-                        <div class="row mb-3">
-                            <div class="col-4">
-                                <strong>Place of Interview:</strong> <span t-field="o.interview_location"/>
-                            </div>
-                            <div class="col-4 text-center">
-                                <strong>Date of Interview:</strong> <span t-field="o.interview_date" t-options='{"widget": "date"}'/>
-                            </div>
-                            <div class="col-4 text-right">
-                                <strong>Time of Interview:</strong> <span t-field="o.interview_date" t-options='{"widget": "datetime", "format": "HH:mm"}'/>
-                            </div>
-                        </div>
-
-                        <!-- List of committee members -->
-                        <h6 class="font-weight-bold mt-3 mb-2">List of committee members</h6>
-                        <table class="table table-bordered table-sm mb-4">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th style="width: 10%;" class="text-center">S.N</th>
-                                    <th style="width: 45%;">Committee Members</th>
-                                    <th style="width: 25%;">Role</th>
-                                    <th style="width: 20%;" class="text-center">Signature</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-set="sn" t-value="1"/>
-                                <t t-if="o.recr_selected_team_id">
-                                    <t t-foreach="o.recr_selected_team_id" t-as="member">
-                                        <tr>
-                                            <td class="text-center"><t t-esc="sn"/></td>
-                                            <td>
-                                                <t t-if="member.employee_name">
-                                                    <span t-field="member.employee_name.name"/>
-                                                </t>
-                                                <t t-if="not member.employee_name and member.alternate_committee_member">
-                                                    <span t-field="member.alternate_committee_member.name"/> (Alternate)
-                                                </t>
-                                            </td>
-                                            <td><span t-field="member.role"/></td>
-                                            <td></td>
-                                        </tr>
-                                        <t t-set="sn" t-value="sn + 1"/>
+                    <!-- ============================================================== -->
+                    <!-- CASE 0: TRANSFER / LATERAL COMMITTEE SELECTION MINUTE          -->
+                    <!-- Formatted exactly according to ዝውውር  Min.docx template         -->
+                    <!-- ============================================================== -->
+                    <t t-if="o.is_transfer_or_lateral()">
+                        <div class="page" style="font-size: 13.5px; line-height: 1.6; color: #111; padding: 10px 15px;">
+                            <!-- Official Header with Bunna Bank Logo & Minute Title -->
+                            <div class="text-center" style="margin-bottom: 12px;">
+                                <div class="mb-2">
+                                    <t t-if="bunna_logo_data_uri">
+                                        <img t-att-src="bunna_logo_data_uri" style="max-height: 75px; max-width: 220px;" alt="Bunna Bank S.C."/>
                                     </t>
-                                </t>
-                                <t t-else="">
-                                    <tr><td class="text-center">1</td><td></td><td>Chairperson</td><td></td></tr>
-                                    <tr><td class="text-center">2</td><td></td><td>Member</td><td></td></tr>
-                                    <tr><td class="text-center">3</td><td></td><td>Secretary</td><td></td></tr>
-                                </t>
-                            </tbody>
-                        </table>
-
-                        <!-- Agenda & Metrics -->
-                        <table class="table table-bordered table-sm mb-4">
-                            <tbody>
-                                <tr>
-                                    <td class="font-weight-bold" style="width: 45%;">Agenda</td>
-                                    <td style="width: 55%;">Internal Vacancy Promotion &amp; Recruitment Selection</td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Vacancy announcement no.</td>
-                                    <td><span t-field="o.vacancy_reference"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Position</td>
-                                    <td><span t-field="o.job_position.name"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Job Grade:</td>
-                                    <td><span t-field="o.job_grade"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Place of Assignment</td>
-                                    <td><span t-field="o.job_location"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">No. of vacant posts</td>
-                                    <td><span t-field="o.no_of_vacancies"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Purpose for promotion (Reason)</td>
-                                    <td><span t-field="o.recruitment_reference"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">No. of Applicants</td>
-                                    <td><t t-esc="stats.get('total_applicants', 0)"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Short listed applicants</td>
-                                    <td><t t-esc="stats.get('shortlisted_applicants', 0)"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Total participants for Written Exam</td>
-                                    <td><t t-esc="stats.get('written_participants', 0)"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Not selected</td>
-                                    <td><t t-esc="stats.get('not_selected', 0)"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">No. of applicants who are absent from written exam</td>
-                                    <td><t t-esc="stats.get('written_absents', 0)"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">No. of applicants who passed written exam</td>
-                                    <td><t t-esc="stats.get('written_passed', 0)"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">Total participants for Interview</td>
-                                    <td><t t-esc="stats.get('interview_participants', 0)"/></td>
-                                </tr>
-                                <tr>
-                                    <td class="font-weight-bold">No. of applicants who are absent from Interview</td>
-                                    <td><t t-esc="stats.get('interview_absents', 0)"/></td>
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        <!-- Result Summary and Rank -->
-                        <h6 class="font-weight-bold mt-4 mb-2">Result Summary and Rank</h6>
-                        <table class="table table-bordered table-sm mb-4">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="text-center" style="width: 7%;">No.</th>
-                                    <th style="width: 28%;">Applicant Name</th>
-                                    <th class="text-center" style="width: 13%;">PMS</th>
-                                    <th class="text-center" style="width: 15%;">Written Exam</th>
-                                    <th class="text-center" style="width: 14%;">Interview</th>
-                                    <th class="text-center" style="width: 10%;">Rank</th>
-                                    <th class="text-center" style="width: 13%;">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-set="all_cands" t-value="doc_all_candidates.get(o.id, [])"/>
-                                <t t-if="all_cands">
-                                    <t t-set="row_num" t-value="1"/>
-                                    <t t-foreach="all_cands" t-as="cand">
-                                        <tr>
-                                            <td class="text-center"><t t-esc="row_num"/>.</td>
-                                            <td><span t-field="cand.emp_name.name"/></td>
-                                            <td class="text-center"><span t-field="cand.pms_score"/></td>
-                                            <td class="text-center"><span t-field="cand.written_exam_score"/></td>
-                                            <td class="text-center"><span t-field="cand.interview_score"/></td>
-                                            <td class="text-center font-weight-bold"><span t-field="cand.rank"/></td>
-                                            <td class="text-center font-weight-bold">
-                                                <t t-if="cand.selection_type in ('selected', 'Selected')">
-                                                    <span style="color: #28a745;">Selected</span>
-                                                </t>
-                                                <t t-elif="cand.selection_type in ('reserve', 'Reserved')">
-                                                    <span style="color: #fd7e14;">Reserved</span>
-                                                </t>
-                                                <t t-else="">
-                                                    <span style="color: #dc3545;">Disqualified</span>
-                                                </t>
-                                            </td>
-                                        </tr>
-                                        <t t-set="row_num" t-value="row_num + 1"/>
+                                    <t t-elif="res_company and res_company.logo">
+                                        <img t-att-src="image_data_uri(res_company.logo)" style="max-height: 75px; max-width: 220px;" alt="Bunna Bank S.C."/>
                                     </t>
-                                </t>
-                                <t t-else="">
+                                    <t t-else="">
+                                        <img src="/custom_recruitment/static/src/img/bunna_bank_official_logo.png" style="max-height: 75px; max-width: 220px;" alt="Bunna Bank S.C."/>
+                                    </t>
+                                </div>
+                                <h3 style="font-weight: bold; color: #541718; text-align: center; margin: 10px 0 8px 0; font-size: 18px; letter-spacing: 0.5px;">
+                                    ቃለ-ጉባዔ ቁጥር <span t-esc="o.get_transfer_minute_number_display()"/> (<span t-esc="o.get_transfer_fiscal_year_display()"/>)
+                                </h3>
+                            </div>
+
+                            <!-- TABLE 1: Meeting & Position Details (5 rows matching ዝውውር Min.docx Table 1) -->
+                            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #333; margin-bottom: 12px; font-size: 13.5px;">
+                                <tbody>
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-3">
-                                            No candidates recorded yet.
+                                        <td style="width: 32%; font-weight: bold; background-color: #f8f9fa; border: 1.5px solid #333; padding: 6px 10px;">የስብሰባው ቀን</td>
+                                        <td style="width: 68%; border: 1.5px solid #333; padding: 6px 10px;"><span t-esc="o.get_transfer_ethiopic_meeting_date()"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1.5px solid #333; padding: 6px 10px;">የስብሰባው ሰዓት</td>
+                                        <td style="border: 1.5px solid #333; padding: 6px 10px;"><span t-esc="o.get_transfer_meeting_time_display()"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1.5px solid #333; padding: 6px 10px;">የስራ መደብ</td>
+                                        <td style="border: 1.5px solid #333; padding: 6px 10px;"><span t-esc="o.get_transfer_job_position_name()"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1.5px solid #333; padding: 6px 10px;">የስራ ደረጃ</td>
+                                        <td style="border: 1.5px solid #333; padding: 6px 10px;"><span t-esc="o.get_transfer_job_grade_name()"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1.5px solid #333; padding: 6px 10px;">የስራ መደቡ የሚገኝበት ክፍል</td>
+                                        <td style="border: 1.5px solid #333; padding: 6px 10px;"><span t-esc="o.get_transfer_work_unit_name()"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- TABLE 2: Committee Members Attended & Signatures (Above) & Agenda (Matching ዝውውር Min.docx) -->
+                            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #333; margin-bottom: 12px; font-size: 13px;">
+                                <tbody>
+                                    <tr>
+                                        <td colspan="4" style="font-weight: bold; background-color: #f8f9fa; border: 1.5px solid #333; padding: 6px 10px; font-size: 13.5px;">
+                                            በስብሰባው ላይ የተገኙ የኮሚቴ አባላት
                                         </td>
                                     </tr>
-                                </t>
-                            </tbody>
-                        </table>
+                                    <tr style="background-color: #f1f3f5; font-weight: bold; text-align: center; font-size: 12.5px;">
+                                        <td style="border: 1.5px solid #333; padding: 5px; width: 6%;">ተ.ቁ</td>
+                                        <td style="border: 1.5px solid #333; padding: 5px 8px; width: 44%; text-align: left;">የኮሚቴው አባል ሙሉ ስም</td>
+                                        <td style="border: 1.5px solid #333; padding: 5px 8px; width: 25%;">ኃላፊነት / ሚና</td>
+                                        <td style="border: 1.5px solid #333; padding: 5px; width: 25%;">ፊርማ</td>
+                                    </tr>
+                                    <t t-set="sigs" t-value="o.get_committee_signatures_list()"/>
+                                    <t t-if="sigs">
+                                        <t t-set="sig_num" t-value="1"/>
+                                        <t t-foreach="sigs" t-as="sig">
+                                            <tr style="text-align: center; vertical-align: middle;">
+                                                <td style="border: 1.5px solid #333; padding: 4px; font-weight: bold;"><t t-esc="sig_num"/></td>
+                                                <td style="border: 1.5px solid #333; padding: 4px 8px; text-align: left; font-weight: bold;">
+                                                    <span t-esc="sig.user_id.name if sig.user_id else (sig.get('name', '') if str(type(sig)) == '&lt;class \'dict\'&gt;' else '')"/>
+                                                </td>
+                                                <td style="border: 1.5px solid #333; padding: 4px 8px; font-weight: 500;">
+                                                    <span t-esc="sig.role_amharic if sig.role_amharic else (sig.get('role_amharic', '') if str(type(sig)) == '&lt;class \'dict\'&gt;' else '')"/>
+                                                </td>
+                                                <td style="border: 1.5px solid #333; padding: 2px;">
+                                                    <t t-set="s_img" t-value="sig.signature_img if sig.signature_img else (sig.get('signature_img', False) if str(type(sig)) == '&lt;class \'dict\'&gt;' else False)"/>
+                                                    <t t-if="s_img">
+                                                        <img t-att-src="image_data_uri(s_img) if not str(s_img).startswith('data:') else s_img" style="max-height: 40px; max-width: 130px;"/>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <span style="color: #28a745; font-size: 11px; font-weight: bold;">(የተፈረመ)</span>
+                                                    </t>
+                                                </td>
+                                            </tr>
+                                            <t t-set="sig_num" t-value="sig_num + 1"/>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-set="sig_num" t-value="1"/>
+                                        <t t-foreach="o.get_transfer_committee_members_list()" t-as="m_line">
+                                            <tr>
+                                                <td style="border: 1.5px solid #333; padding: 4px; text-align: center;"><t t-esc="sig_num"/></td>
+                                                <td colspan="3" style="border: 1.5px solid #333; padding: 6px 10px;">
+                                                    <span t-esc="m_line"/>
+                                                </td>
+                                            </tr>
+                                            <t t-set="sig_num" t-value="sig_num + 1"/>
+                                        </t>
+                                    </t>
+                                    <tr>
+                                        <td colspan="4" style="font-weight: bold; border: 1.5px solid #333; padding: 8px 10px; font-size: 13.5px; background-color: #fff;">
+                                            አጀንዳ ፡- ለ <span t-esc="o.get_transfer_work_unit_name()"/> <span t-esc="o.get_transfer_job_position_name()"/> በዝውውር ስለመምረጥ
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
 
-                        <!-- Decision / Comment -->
-                        <div class="mt-4 mb-4" style="text-align: justify;">
-                            <p class="font-weight-bold mb-1">Decision/ Comment-</p>
-                            <p>
-                                The committee has decided to <t t-esc="stats.get('action_verb', 'promote')"/> <t t-esc="stats.get('emp_word', 'the top-ranked employee')"/>, 
-                                <strong><t t-esc="stats.get('selected_cands_str') or ((stats.get('top_cand_salutation', 'Ato/Wy') + ' ') if stats.get('top_cand_salutation') else '') + stats.get('top_cand_name', '____________')"/></strong> 
-                                on the position of <strong><span t-field="o.job_position.name"/></strong> 
-                                (Job Grade <strong><span t-field="o.job_grade"/></strong>) at 
-                                <strong><t t-esc="stats.get('top_cand_unit', '____________')"/></strong> (work unit). 
-                                Regarding the salary, in accordance with the bank’s procedure, 
-                                <strong><t t-esc="stats.get('selected_cands_str') or ((stats.get('top_cand_salutation', 'Ato/Wy') + ' ') if stats.get('top_cand_salutation') else '') + stats.get('top_cand_name', '____________')"/></strong> 
-                                will be entitled a base salary of Birr________(figure) (Words). 
-                                <t t-if="stats.get('res_rank_start') and stats.get('res_rank_end')">
-                                    Employees ranked from <strong><t t-esc="stats.get('res_rank_start')"/></strong> 
-                                    to <strong><t t-esc="stats.get('res_rank_end')"/></strong> 
-                                    will be placed on a reserve list for the next six months and will be considered for promotion when vacant positions arise.
+                            <!-- Narrative Paragraph 1 & 2 (Matching ዝውውር Min.docx) -->
+                            <div style="text-align: justify; line-height: 1.8; font-size: 13.5px; margin-bottom: 10px;">
+                                <p style="margin-bottom: 8px;">
+                                    በባንኩ <span t-esc="o.get_transfer_work_unit_name()"/> ውስጥ በ <span t-esc="o.get_transfer_job_position_name()"/> የስራ መደብ ላይ <t t-esc="o.get_transfer_predecessor_narrative()"/> በተፈጠረ ክፍተተት ለመመደብ እ.ኤ.አ <span t-esc="o.get_transfer_vacancy_announcement_date_display()"/> Lateral Transfer Vacancy Number <span t-esc="o.get_transfer_vacancy_reference_display()"/> ባወጣው የውስጥ የዝውውር ማስታወቂያ መሰረት የስራ መደቡ ላይ ለመወዳደር <span t-esc="o.get_transfer_candidate_count_amharic()"/> ተወዳዳሪ ያመለከቱ ሲሆን የስራ መደቡ የሚጠይቀውን ዝቅተኛ መስፈርት አሟልተው የተገኙ በመሆኑ የተወዳዳሪውን መረጃ አጠናክሮ ከታለንት ማኔጅመንት ቢሮ መረጃ መቅረቡን ኮሚቴው ተገነዝቧል፡፡
+                                </p>
+                                <p style="margin-bottom: 8px;">
+                                    በባንኩ የውስጥ ዝውውር መመሪያ አንቀፅ 5.3 ንዑስ አንቀፅ 5.3.3 መሰረት የተወዳዳሪዎች በበጀት ዓመቱ ያላቸውን የስራ አፈጻጸም ከ30% ፤ በባንኩ ባላቸው የስራ ልምድ ከ20% ፤ በቅርንጫፉ ባላቸው ቆይታ ከ20% ፤ ያመለከቱበት ጊዜ ከ20% ፤ እና ከቅርብ ሀላፊ የተሰጠ አሰስተያየት ከ10% በደምሩ ከ100% በመያዝ የተጠቃለለ ውጤት ከዚህ በታች በቀረበው አግባብ ተዘጋጅቷል ፡፡
+                                </p>
+                            </div>
+
+                            <!-- TABLE 3: Candidate Scoring Breakdown Table (9 Columns matching ዝውውር Min.docx Table 3) -->
+                            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #333; margin-bottom: 12px; font-size: 12px;">
+                                <thead>
+                                    <tr style="background-color: #f8f9fa; font-weight: bold; text-align: center;">
+                                        <th style="border: 1.5px solid #333; padding: 6px 3px; width: 5%;">ተቁ</th>
+                                        <th style="border: 1.5px solid #333; padding: 6px 5px; width: 23%; text-align: left;">ስም ዝርዝር</th>
+                                        <th style="border: 1.5px solid #333; padding: 6px 3px; width: 11%;">የስራአፈጻጸም 30%</th>
+                                        <th style="border: 1.5px solid #333; padding: 6px 3px; width: 11%;">ቡና የስራልምድ 20%</th>
+                                        <th style="border: 1.5px solid #333; padding: 6px 3px; width: 11%;">በቅርንጫፉ ቆይታ 20%</th>
+                                        <th style="border: 1.5px solid #333; padding: 6px 3px; width: 11%;">ያመለከቱበትጊዜ 20%</th>
+                                        <th style="border: 1.5px solid #333; padding: 6px 3px; width: 10%;">ከቅርብሀላፊየተሰጠ 10%</th>
+                                        <th style="border: 1.5px solid #333; padding: 6px 3px; width: 8%;">ጠቅላላ100%</th>
+                                        <th style="border: 1.5px solid #333; padding: 6px 4px; width: 10%;">ምርመራ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="o.get_transfer_table_data()" t-as="row">
+                                        <tr style="text-align: center;">
+                                            <td style="border: 1.5px solid #333; padding: 5px 3px;"><span t-esc="row['rank']"/></td>
+                                            <td style="border: 1.5px solid #333; padding: 5px 6px; text-align: left; font-weight: bold;"><span t-esc="row['name']"/></td>
+                                            <td style="border: 1.5px solid #333; padding: 5px 3px;"><span t-esc="row['pms']"/></td>
+                                            <td style="border: 1.5px solid #333; padding: 5px 3px;"><span t-esc="row['exp']"/></td>
+                                            <td style="border: 1.5px solid #333; padding: 5px 3px;"><span t-esc="row['loc']"/></td>
+                                            <td style="border: 1.5px solid #333; padding: 5px 3px;"><span t-esc="row['app']"/></td>
+                                            <td style="border: 1.5px solid #333; padding: 5px 3px;"><span t-esc="row['rec']"/></td>
+                                            <td style="border: 1.5px solid #333; padding: 5px 3px; font-weight: bold;"><span t-esc="row['total']"/></td>
+                                            <td style="border: 1.5px solid #333; padding: 5px 3px; font-weight: bold;"><span t-esc="row['decision']"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- Final Committee Decision & Closing (Matching ዝውውር Min.docx) -->
+                            <div style="text-align: justify; line-height: 1.8; font-size: 13.5px; margin-bottom: 12px;">
+                                <p style="margin-bottom: 8px;">
+                                    በመጨረሻም ኮሚቴው <span t-esc="o.get_transfer_selection_adjective()"/> <span t-esc="o.get_transfer_selected_candidate_names()"/> በ <span t-esc="o.get_transfer_work_unit_name()"/> ውስጥ በ <span t-esc="o.get_transfer_job_position_name()"/> የስራ መደብ ላይ በያዙት ደመወዝ እና ደረጃ በዝውውር እንዲመደቡ ኮሚቴው ወስኗል፡፡
+                                </p>
+                                <p style="margin-bottom: 4px;">
+                                    ኮሚቴው በአጀንዳው ላይ ያደረገውን ስብሰባ <span t-esc="o.get_transfer_meeting_end_time_display()"/> አጠናቋል፡፡
+                                </p>
+                                <p style="font-weight: bold; margin-bottom: 14px;">
+                                    የውጤት ማጠቃለያ ተያይዟል፡፡
+                                </p>
+                            </div>
+
+
+                        </div>
+                    </t>
+
+                    <!-- ============================================================== -->
+                    <!-- CASE 1: DISTRICT SELECTION COMMITTEE MINUTE                    -->
+                    <!-- Applicable when Approval Hierarchy is 'non_managerial_district'-->
+                    <!-- ============================================================== -->
+                    <t t-elif="o.approval_hierarchy_type == 'non_managerial_district'">
+                        <div class="page" style="font-size: 14.5px; font-family: 'Ebrima', 'Ethiopic Sadiss', 'Nyala', sans-serif !important; line-height: 1.7; color: #1c2434;">
+                            <t t-set="stats" t-value="doc_stats.get(o.id, {})"/>
+                            
+                            <!-- Header with Bunna Bank Logo & Minute Title -->
+                            <div class="text-center mb-3">
+                                <div class="mb-2">
+                                    <t t-if="bunna_logo_data_uri">
+                                        <img t-att-src="bunna_logo_data_uri" style="max-height: 85px; max-width: 250px;" alt="Bunna Bank Logo"/>
+                                    </t>
+                                    <t t-elif="res_company and res_company.logo">
+                                        <img t-att-src="image_data_uri(res_company.logo)" style="max-height: 85px; max-width: 250px;" alt="Bunna Bank Logo"/>
+                                    </t>
+                                    <t t-elif="env.company and env.company.logo">
+                                        <img t-att-src="image_data_uri(env.company.logo)" style="max-height: 85px; max-width: 250px;" alt="Bunna Bank Logo"/>
+                                    </t>
+                                    <t t-else="">
+                                        <img src="/custom_recruitment/static/src/img/bunna_logo.jpg" style="max-height: 85px; max-width: 250px;" alt="Bunna Bank Logo"/>
+                                    </t>
+                                </div>
+                                <h4 class="font-weight-bold" style="font-size: 18px; letter-spacing: 0.5px; margin-top: 10px; margin-bottom: 8px;">
+                                    ቃለ-ጉባዔ ቁጥር <t t-esc="stats.get('minute_number_display')"/>
+                                </h4>
+                            </div>
+
+                            <!-- 1. Meeting & Position Details Table (District) -->
+                            <table class="table table-bordered table-sm mb-3" style="border-collapse: collapse; width: 100%; border: 1px solid #444; font-size: 14px;">
+                                <tbody>
+                                    <tr>
+                                        <td style="width: 35%; font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስብሰባው ቀን</td>
+                                        <td style="width: 65%; border: 1px solid #444; padding: 6px 10px;"><t t-esc="stats.get('meeting_date_et')"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስብሰባው ሰዓት</td>
+                                        <td style="border: 1px solid #444; padding: 6px 10px;"><t t-esc="stats.get('meeting_time_et')"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስራ መደብ</td>
+                                        <td style="border: 1px solid #444; padding: 6px 10px;"><span t-field="o.job_position.name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስራ ደረጃ</td>
+                                        <td style="border: 1px solid #444; padding: 6px 10px;"><span t-field="o.job_grade"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስራ መደቡ የሚገኝበት ክፍል</td>
+                                        <td style="border: 1px solid #444; padding: 6px 10px;"><t t-esc="stats.get('work_unit')"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- 2. Committee Members List with Signatures -->
+                            <div class="font-weight-bold mb-2" style="font-size: 14.5px;">
+                                <u>በስብሰባው ላይ የተገኙ የኮሚቴ አባላት</u>
+                            </div>
+                            <table class="table table-bordered table-sm mb-3" style="border-collapse: collapse; width: 100%; border: 1px solid #444; font-size: 14px;">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="text-center" style="width: 8%; border: 1px solid #444; padding: 5px;">ተ.ቁ</th>
+                                        <th style="width: 42%; border: 1px solid #444; padding: 5px;">የኮሚቴው አባል ሙሉ ስም</th>
+                                        <th style="width: 30%; border: 1px solid #444; padding: 5px;">ኃላፊነት / ሚና</th>
+                                        <th class="text-center" style="width: 20%; border: 1px solid #444; padding: 5px;">ፊርማ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-set="com_members" t-value="doc_committee_members.get(o.id, [])"/>
+                                    <t t-if="com_members">
+                                        <t t-set="idx" t-value="1"/>
+                                        <t t-foreach="com_members" t-as="m">
+                                            <tr>
+                                                <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="idx"/></td>
+                                                <td style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="m.get('name')"/></td>
+                                                <td style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="m.get('role')"/></td>
+                                                <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 2px;">
+                                                    <t t-set="sig" t-value="m.get('signature')"/>
+                                                    <t t-if="sig">
+                                                        <img t-att-src="sig if str(sig).startswith('data:') else image_data_uri(sig)" 
+                                                             style="max-height: 40px; max-width: 110px; object-fit: contain;"/>
+                                                    </t>
+                                                </td>
+                                            </tr>
+                                            <t t-set="idx" t-value="idx + 1"/>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <tr>
+                                            <td class="text-center" style="border: 1px solid #444; padding: 4px;">1</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                            <td style="border: 1px solid #444; padding: 4px;">ሰብሳቢ</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-center" style="border: 1px solid #444; padding: 4px;">2</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                            <td style="border: 1px solid #444; padding: 4px;">አባል</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-center" style="border: 1px solid #444; padding: 4px;">3</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                            <td style="border: 1px solid #444; padding: 4px;">አባል እና ፀሐፊ</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- 3. Agenda -->
+                            <div class="mb-3 p-2 font-weight-bold" style="background-color: #f8f9fa; border: 1px solid #444; border-radius: 3px; font-size: 15px; line-height: 1.6;">
+                                አጀንዳ ፡- “<span t-field="o.job_position.name"/>” በደረጃ እድገት ስለመመደብ፤
+                            </div>
+
+                            <!-- 4. Narrative Paragraphs (District Template) -->
+                            <div class="mb-3" style="text-align: justify; line-height: 1.8; font-size: 14.5px;">
+                                <p class="mb-2">
+                                    ባንካችን በ<t t-esc="stats.get('fiscal_year')"/> በጀት ዓመት አዲስ የቀጠራቸውን እና ከዚህ በፊት በባንኩ ውስጥ በተለያዬ ጊዜ ዕድገት ያገኙት ጀማሪ <span t-field="o.job_position.name"/> ባለው ክፍት የሥራ ቦታ ላይ በተለያዩ የባንኩ ቅርንጫፎች በመመደብ ለ6 (ስድስት) ወራት በመስራት ላይ የሚገኙ ሲሆን ፤ ሰራተኞቹ ባላቸው የስድስት ወራት ቆይታ የነበራቸውን አፈጻጸም አስተያየት በመቀበል እና የ60ቀን የሙከራ ጊዜ ያላቸውን የስራ አፈጻጸም ከግምት ውስጥ በማስገባት በኮሚቴ ተገምግመው በደረጃ እድገት “<span t-field="o.job_position.name"/>” ሆነው የሚመደቡበት አሰራር መኖሩ ይታወቃል፡፡
+                                </p>
+                                <p class="mb-2">
+                                    በዚህም መሰረት የተወዳዳሪዎችን የተጠቃለለ ውጤት በተመለከተ በባንኩ የደረጃ ዕድገት የውስጥ አሰራር መሰረት የተወዳዳሪዎቹ በ6 ወር ውስጥ ያላቸው የስራ አፈጻጸም በመውሰድ አጠቃላይ ከ100% ከዚህ በታች በሰንጠረዥ የተጠናቀረ መረጃ ከ “People Operation Management Directorate” በኩል መቅረቡን ኮሚቴው ተረድቷል፡፡
+                                </p>
+                            </div>
+
+                            <!-- 5. District Candidate Table (5 Columns from District Min Doc) -->
+                            <table class="table table-bordered table-sm mb-3" style="border-collapse: collapse; width: 100%; border: 1px solid #444; font-size: 13.5px;">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="text-center" style="width: 8%; border: 1px solid #444; vertical-align: middle; padding: 5px;">ተ.ቁ</th>
+                                        <th style="width: 35%; border: 1px solid #444; vertical-align: middle; padding: 5px;">የተወዳዳሪው ሙሉ ስም</th>
+                                        <th style="width: 25%; border: 1px solid #444; vertical-align: middle; padding: 5px;">የስራ ቦታ</th>
+                                        <th class="text-center" style="width: 18%; border: 1px solid #444; vertical-align: middle; padding: 5px;">የስራ አፈፃፀም ውጤት</th>
+                                        <th class="text-center" style="width: 14%; border: 1px solid #444; vertical-align: middle; padding: 5px;">ደረጃ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-set="all_cands" t-value="doc_all_candidates.get(o.id, [])"/>
+                                    <t t-if="all_cands">
+                                        <t t-set="r_idx" t-value="1"/>
+                                        <t t-foreach="all_cands" t-as="cand">
+                                            <tr>
+                                                <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="r_idx"/></td>
+                                                <td style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="stats.get('cand_names', {}).get(cand.id, cand.emp_name.name if cand.emp_name else '')"/></td>
+                                                <td style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="stats.get('cand_workplaces', {}).get(cand.id, '')"/></td>
+                                                <td class="text-center font-weight-bold" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><span t-esc="'%.2f' % (cand.pms_score or cand.weighted_score or 0.0)"/></td>
+                                                <td class="text-center font-weight-bold" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="stats.get('cand_ranks', {}).get(cand.id, str(cand.rank) + 'ኛ' if cand.rank else '-')"/></td>
+                                            </tr>
+                                            <t t-set="r_idx" t-value="r_idx + 1"/>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-3" style="border: 1px solid #444;">
+                                                ምንም የተመዘገበ ተወዳዳሪ አልተገኘም፡፡
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- 6. District Decision & Adjournment -->
+                            <div class="mt-3 mb-3" style="text-align: justify; line-height: 1.8; font-size: 14.5px;">
+                                <t t-set="sel_info" t-value="stats.get('selected_info_list', [])"/>
+                                <t t-if="len(sel_info) &lt;= 1">
+                                    <p class="mb-2">
+                                        በመጨረሻም ኮሚቴው በባንኩ ውስጥ ባላቸው ቆይታ በቅርንጫፍ ሥራ አስኪያጆች እና በደረጃ ዕድገት ኮሚቴው አማካኝነት ችሎታቸው ተገምግሞ ለስራ መደቡ በቂ እውቀት እንዳዳበሩ የታመነባቸው እና ሥራቸውን በአጥጋቢ ሁኔታ እየተወጡ መሆኑ የተረጋገጠ <t t-esc="stats.get('selected_count', 0)"/> (<t t-esc="stats.get('selected_count_words', '')"/>) ጀማሪ <span t-field="o.job_position.name"/> በሥራ ቆይታቸው ያገኙትን ሙያ እና ወቅታዊ የስራ አፈጻጸማቸውን ከግምት ውስጥ በማስገባት ኮሚቴው <strong><t t-esc="stats.get('district_ranks_text', '')"/></strong> የተጠቀሱት ሰራተኞች እንደየቅድም ተከተላቸው በያሉበት ቅርንጫፍ <strong><span t-field="o.job_position.name"/></strong> ሆነው በእድገት እንዲመደቡ፤ የደመወዝ ክፍያን በተመለከተ፤ <t t-if="sel_info and sel_info[0].get('name')"><strong><t t-esc="sel_info[0]['name']"/></strong> </t><t t-esc="stats.get('salary_clause_amharic', 'በባንኩ የደመወዝ ስኬል መመሪያ መሰረት')"/> የስራ ደረጃ <strong><span t-field="o.job_grade"/></strong> የስራ መደቡ <t t-esc="stats.get('top_cand_salary_step', '1ኛ እርከን')"/> ላይ የተቀመጠውን ደመወዝ 
+                                        <t t-if="stats.get('top_cand_salary_figure')">
+                                            ብር <strong><t t-esc="stats.get('top_cand_salary_figure')"/></strong> (<strong><t t-esc="stats.get('top_cand_salary_words')"/></strong>)
+                                        </t>
+                                        <t t-else="">
+                                            ብር ________ (________________________)
+                                        </t> 
+                                        እንዲከፈላቸው ኮሚቴው ወስኗል፡፡
+                                    </p>
                                 </t>
                                 <t t-else="">
-                                    Employees ranked beyond the selected vacancy slots will be placed on a reserve list for the next six months and will be considered for promotion when vacant positions arise.
+                                    <p class="mb-2">
+                                        በመጨረሻም ኮሚቴው በባንኩ ውስጥ ባላቸው ቆይታ በቅርንጫፍ ሥራ አስኪያጆች እና በደረጃ ዕድገት ኮሚቴው አማካኝነት ችሎታቸው ተገምግሞ ለስራ መደቡ በቂ እውቀት እንዳዳበሩ የታመነባቸው እና ሥራቸውን በአጥጋቢ ሁኔታ እየተወጡ መሆኑ የተረጋገጠ <t t-esc="stats.get('selected_count', 0)"/> (<t t-esc="stats.get('selected_count_words', '')"/>) ጀማሪ <span t-field="o.job_position.name"/> በሥራ ቆይታቸው ያገኙትን ሙያ እና ወቅታዊ የስራ አፈጻጸማቸውን ከግምት ውስጥ በማስገባት ኮሚቴው <strong><t t-esc="stats.get('district_ranks_text', '')"/></strong> የተጠቀሱት ሰራተኞች እንደየቅድም ተከተላቸው በያሉበት ቅርንጫፍ <strong><span t-field="o.job_position.name"/></strong> ሆነው በእድገት እንዲመደቡ፤ የደመወዝ ክፍያን በተመለከተ፡-
+                                    </p>
+                                    <div class="mb-2" style="padding-left: 15px;">
+                                        <t t-set="cand_idx" t-value="1"/>
+                                        <t t-foreach="sel_info" t-as="s_cand">
+                                            <p class="mb-1" style="line-height: 1.7;">
+                                                <t t-esc="cand_idx"/>. <strong><t t-esc="s_cand['name']"/></strong> (<t t-esc="s_cand['rank']"/> ደረጃ)<t t-if="s_cand.get('work_unit')"> በ “<strong><t t-esc="s_cand['work_unit']"/></strong>” ውስጥ</t> ፡- <t t-esc="s_cand['salary_clause']"/> የስራ ደረጃ <strong><span t-field="o.job_grade"/></strong> የስራ መደቡ <t t-esc="s_cand['salary_step']"/> ላይ የተቀመጠውን ደመወዝ 
+                                                <t t-if="s_cand['salary_fig']">
+                                                    ብር <strong><t t-esc="s_cand['salary_fig']"/></strong> (<strong><t t-esc="s_cand['salary_words']"/></strong>)
+                                                </t>
+                                                <t t-else="">
+                                                    በባንኩ የደመወዝ ስኬል መመሪያ መሰረት
+                                                </t>
+                                                እንዲከፈላቸው፤
+                                            </p>
+                                            <t t-set="cand_idx" t-value="cand_idx + 1"/>
+                                        </t>
+                                    </div>
+                                    <p class="mb-2">
+                                        ኮሚቴው ወስኗል፡፡
+                                    </p>
                                 </t>
-                            </p>
-                            <p class="mt-3">
-                                The meeting was adjourned at ______(time).
-                            </p>
+                                <p class="mt-3">
+                                    ኮሚቴው በአጀንዳው ላይ ያደረገውን ስብሰባ <t t-esc="stats.get('meeting_time_end_et')"/> አጠናቋል፡፡
+                                </p>
+                            </div>
                         </div>
-                    </div>
+                    </t>
+
+                    <!-- ============================================================== -->
+                    <!-- CASE 2: HEAD OFFICE SELECTION COMMITTEE MINUTE                 -->
+                    <!-- Applicable when Approval Hierarchy is 'non_managerial_ho' etc. -->
+                    <!-- ============================================================== -->
+                    <t t-else="">
+                        <div class="page" style="font-size: 14.5px; font-family: 'Ebrima', 'Ethiopic Sadiss', 'Nyala', sans-serif !important; line-height: 1.7; color: #1c2434;">
+                            <t t-set="stats" t-value="doc_stats.get(o.id, {})"/>
+                            
+                            <!-- Header with Bunna Bank Logo & Minute Title -->
+                            <div class="text-center mb-3">
+                                <div class="mb-2">
+                                    <t t-if="bunna_logo_data_uri">
+                                        <img t-att-src="bunna_logo_data_uri" style="max-height: 85px; max-width: 250px;" alt="Bunna Bank Logo"/>
+                                    </t>
+                                    <t t-elif="res_company and res_company.logo">
+                                        <img t-att-src="image_data_uri(res_company.logo)" style="max-height: 85px; max-width: 250px;" alt="Bunna Bank Logo"/>
+                                    </t>
+                                    <t t-elif="env.company and env.company.logo">
+                                        <img t-att-src="image_data_uri(env.company.logo)" style="max-height: 85px; max-width: 250px;" alt="Bunna Bank Logo"/>
+                                    </t>
+                                    <t t-else="">
+                                        <img src="/custom_recruitment/static/src/img/bunna_logo.jpg" style="max-height: 85px; max-width: 250px;" alt="Bunna Bank Logo"/>
+                                    </t>
+                                </div>
+                                <h4 class="font-weight-bold" style="font-size: 18px; letter-spacing: 0.5px; margin-top: 10px; margin-bottom: 8px;">
+                                    ቃለ-ጉባዔ ቁጥር <t t-esc="stats.get('minute_number_display')"/>
+                                </h4>
+                            </div>
+
+                            <!-- 1. Meeting & Position Details Table (Head Office) -->
+                            <table class="table table-bordered table-sm mb-3" style="border-collapse: collapse; width: 100%; border: 1px solid #444; font-size: 14px;">
+                                <tbody>
+                                    <tr>
+                                        <td style="width: 35%; font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስብሰባው ቀን</td>
+                                        <td style="width: 65%; border: 1px solid #444; padding: 6px 10px;"><t t-esc="stats.get('meeting_date_et')"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስብሰባው ሰዓት</td>
+                                        <td style="border: 1px solid #444; padding: 6px 10px;"><t t-esc="stats.get('meeting_time_et')"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስራ መደብ</td>
+                                        <td style="border: 1px solid #444; padding: 6px 10px;"><span t-field="o.job_position.name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስራ ደረጃ</td>
+                                        <td style="border: 1px solid #444; padding: 6px 10px;"><span t-field="o.job_grade"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; background-color: #f8f9fa; border: 1px solid #444; padding: 6px 10px;">የስራ መደቡ የሚገኝበት ክፍል</td>
+                                        <td style="border: 1px solid #444; padding: 6px 10px;"><t t-esc="stats.get('work_unit')"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- 2. Committee Members List with Signatures -->
+                            <div class="font-weight-bold mb-2" style="font-size: 14.5px;">
+                                <u>በስብሰባው ላይ የተገኙ የኮሚቴ አባላት</u>
+                            </div>
+                            <table class="table table-bordered table-sm mb-3" style="border-collapse: collapse; width: 100%; border: 1px solid #444; font-size: 14px;">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="text-center" style="width: 8%; border: 1px solid #444; padding: 5px;">ተ.ቁ</th>
+                                        <th style="width: 42%; border: 1px solid #444; padding: 5px;">የኮሚቴው አባል ሙሉ ስም</th>
+                                        <th style="width: 30%; border: 1px solid #444; padding: 5px;">ኃላፊነት / ሚና</th>
+                                        <th class="text-center" style="width: 20%; border: 1px solid #444; padding: 5px;">ፊርማ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-set="com_members" t-value="doc_committee_members.get(o.id, [])"/>
+                                    <t t-if="com_members">
+                                        <t t-set="idx" t-value="1"/>
+                                        <t t-foreach="com_members" t-as="m">
+                                            <tr>
+                                                <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="idx"/></td>
+                                                <td style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="m.get('name')"/></td>
+                                                <td style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="m.get('role')"/></td>
+                                                <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 2px;">
+                                                    <t t-set="sig" t-value="m.get('signature')"/>
+                                                    <t t-if="sig">
+                                                        <img t-att-src="sig if str(sig).startswith('data:') else image_data_uri(sig)" 
+                                                             style="max-height: 40px; max-width: 110px; object-fit: contain;"/>
+                                                    </t>
+                                                </td>
+                                            </tr>
+                                            <t t-set="idx" t-value="idx + 1"/>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <tr>
+                                            <td class="text-center" style="border: 1px solid #444; padding: 4px;">1</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                            <td style="border: 1px solid #444; padding: 4px;">ሰብሳቢ</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-center" style="border: 1px solid #444; padding: 4px;">2</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                            <td style="border: 1px solid #444; padding: 4px;">አባል</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-center" style="border: 1px solid #444; padding: 4px;">3</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                            <td style="border: 1px solid #444; padding: 4px;">አባል እና ፀሐፊ</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-center" style="border: 1px solid #444; padding: 4px;">4</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                            <td style="border: 1px solid #444; padding: 4px;">ከሰራተኛ ማህበር የተገኙ ተወካይ</td>
+                                            <td style="border: 1px solid #444; padding: 4px;"></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- 3. Agenda -->
+                            <div class="mb-3 p-2 font-weight-bold" style="background-color: #f8f9fa; border: 1px solid #444; border-radius: 3px; font-size: 15px; line-height: 1.6;">
+                                አጀንዳ ፡- ለ<t t-esc="stats.get('work_unit')"/> የ“<span t-field="o.job_position.name"/>” በደረጃ እድገት ስለመምረጥ፤
+                            </div>
+
+                            <!-- 4. Narrative Paragraphs (Matching Template Format) -->
+                            <div class="mb-3" style="text-align: justify; line-height: 1.8; font-size: 14.5px;">
+                                <p class="mb-2">
+                                    በባንኩ “<t t-esc="stats.get('work_unit')"/>” ውስጥ በ “<span t-field="o.job_position.name"/>” የስራ መደብ ላይ በተፈጠረ ክፍተት ብቁ ተወዳዳሪዎችን አወዳድሮ ለመመደብ <t t-esc="stats.get('vacancy_date_str')"/> Vacancy No <t t-esc="stats.get('vacancy_reference')"/> ባወጣው የደረጃ እድገት ማስታወቂያ መሰረት የስራ መደቡ ላይ ለመወዳደር <t t-esc="stats.get('total_applicants')"/> ተወዳዳሪዎች አመልክተው ዝቅተኛውን መስፈርት አሟልተው የተገኙትን <t t-esc="stats.get('shortlisted_applicants')"/> ተወዳዳሪዎች <t t-if="stats.get('written_weight')">ለፅሁፍ ፈተና እንዲቀርቡ ጥሪ ተደርጎላቸዋል፤ በጥሪውም መሰረት <t t-esc="stats.get('written_participants')"/> ተወዳዳሪዎች <t t-esc="stats.get('exam_venue')"/> በአካል በመገኘት እንዲሁም ከአዲስ አበባ ውጪ የሆኑ ተወዳዳሪዎች በያሉበት አካባቢ ቢሮ በመገኘት በስራ ክፍሉ የተዘጋጀውን የፅሁፍ ፈተና እንዲወስዱ የተደረገ ሲሆን <t t-esc="stats.get('written_absents')"/> ተወዳዳሪዎች ፈተና ላይ አለመቅረባቸውን ኮሚቴው ተረድቷል፡፡ በፅሁፍ ፈተና ከፍተኛ ውጤት ያመጡትን <t t-esc="stats.get('interview_participants')"/> ተወዳዳሪዎች </t>ለቃለ መጠይቅ ፈተና እንዲቀርቡ ጥሪ ተደርጎላቸው በኮሚቴው ከስራው ጋር ተዛማጅነት ያላቸውን ልዩ ልዩ ጥያቄዎች በማቅረብ እንዲመልሱ የተደረገ ሲሆን <t t-if="stats.get('interview_absents')"><t t-esc="stats.get('interview_absents')"/> ተወዳዳሪ በቃለ መጠይቁ ላይ አለመገኘታቸውን </t>ኮሚቴው ተረድቷል፡፡
+                                </p>
+                                <p class="mb-2">
+                                    በመጨረሻም በባንኩ የደረጃ ዕድገት መመሪያ አንቀፅ 4.6 ንዑስ አንቀፅ 4.6.14 መሰረት ተወዳዳሪዎቹ በበጀት ዓመቱ ያላቸውን የስራ አፈጻጸም ውጤት ከ<t t-esc="stats.get('pms_weight')"/>% ፤ <t t-if="stats.get('written_weight')">የጽሁፍ ፈተና ውጤት ከ<t t-esc="stats.get('written_weight')"/>% እና </t>የቃለ መጠይቅ ፈተና ውጤት ከ<t t-esc="stats.get('interview_weight')"/>% በመያዝ የተጠቃለለውን ውጤት ከ100% በመውሰድ አጠቃላይ ከዚህ በታች በቀረበው አግባብ ተዘጋጅቷል ፡፡
+                                </p>
+                            </div>
+
+                            <!-- 5. Results and Ranking Table (Matching Template with Converted Scores & Remarks Column) -->
+                            <table class="table table-bordered table-sm mb-3" style="border-collapse: collapse; width: 100%; border: 1px solid #444; font-size: 13.5px;">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="text-center" style="width: 5%; border: 1px solid #444; vertical-align: middle; padding: 5px;">ተ.ቁ</th>
+                                        <th style="width: 27%; border: 1px solid #444; vertical-align: middle; padding: 5px;">የተወዳዳሪው ሙሉ ስም</th>
+                                        <th class="text-center" style="width: 12%; border: 1px solid #444; vertical-align: middle; padding: 5px;">የስራ አፈጻጸም (<t t-esc="stats.get('pms_weight')"/>%)</th>
+                                        <t t-if="stats.get('written_weight')">
+                                            <th class="text-center" style="width: 12%; border: 1px solid #444; vertical-align: middle; padding: 5px;">የፅሁፍ ፈተና ውጤት (<t t-esc="stats.get('written_weight')"/>%)</th>
+                                        </t>
+                                        <th class="text-center" style="width: 12%; border: 1px solid #444; vertical-align: middle; padding: 5px;">የቃል ፈተና ውጤት (<t t-esc="stats.get('interview_weight')"/>%)</th>
+                                        <th class="text-center" style="width: 12%; border: 1px solid #444; vertical-align: middle; padding: 5px;">ጠቅላላ ውጤት (100%)</th>
+                                        <th class="text-center" style="width: 8%; border: 1px solid #444; vertical-align: middle; padding: 5px;">ደረጃ</th>
+                                        <th class="text-center" style="width: 12%; border: 1px solid #444; vertical-align: middle; padding: 5px;">ምርመራ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-set="all_cands" t-value="doc_all_candidates.get(o.id, [])"/>
+                                    <t t-if="all_cands">
+                                        <t t-set="r_idx" t-value="1"/>
+                                        <t t-foreach="all_cands" t-as="cand">
+                                            <t t-set="c_info" t-value="stats.get('cand_scores', {}).get(cand.id, {})"/>
+                                            <tr>
+                                                <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="r_idx"/></td>
+                                                <td style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="stats.get('cand_names', {}).get(cand.id, cand.emp_name.name if cand.emp_name else '')"/></td>
+                                                <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="c_info.get('pms_weighted', '0.00')"/></td>
+                                                <t t-if="stats.get('written_weight')">
+                                                    <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="c_info.get('written_weighted', '0.00')"/></td>
+                                                </t>
+                                                <td class="text-center" style="vertical-align: middle; border: 1px solid #444; padding: 4px;">
+                                                    <t t-if="c_info.get('is_interview_absent')">
+                                                        <span style="font-size: 11px;">በቃለ መጠይቁ ያልተገኙ</span>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <t t-esc="c_info.get('interview_weighted', '0.00')"/>
+                                                    </t>
+                                                </td>
+                                                <td class="text-center font-weight-bold" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="c_info.get('total_score', '0.00')"/></td>
+                                                <td class="text-center font-weight-bold" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="c_info.get('rank', '-')"/></td>
+                                                <td class="text-center font-weight-bold" style="vertical-align: middle; border: 1px solid #444; padding: 4px;"><t t-esc="c_info.get('remarks', '-')"/></td>
+                                            </tr>
+                                            <t t-set="r_idx" t-value="r_idx + 1"/>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <tr>
+                                            <td t-att-colspan="8 if stats.get('written_weight') else 7" class="text-center text-muted py-3" style="border: 1px solid #444;">
+                                                ምንም የተመዘገበ ተወዳዳሪ አልተገኘም፡፡
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- 6. Committee Decision / Resolution & Adjournment -->
+                            <div class="mt-3 mb-3" style="text-align: justify; line-height: 1.8; font-size: 14.5px;">
+                                <t t-set="sel_info" t-value="stats.get('selected_info_list', [])"/>
+                                <t t-if="len(sel_info) == 1">
+                                    <p class="mb-2">
+                                        በመጨረሻም ኮሚቴው በውድድሩ 1ኛ ደረጃ የወጡትን <strong><t t-esc="sel_info[0]['name']"/></strong> በ “<strong><t t-esc="stats.get('work_unit')"/></strong>” ውስጥ “<strong><span t-field="o.job_position.name"/></strong>” ሆነው በእድገት እንዲመደቡ፤ የደመወዝ ክፍያን በተመለከተ <t t-esc="sel_info[0]['salary_clause']"/> <t t-if="o.job_grade">የስራ ደረጃ <strong><span t-field="o.job_grade"/></strong> </t>የስራ መደቡ <t t-esc="sel_info[0]['salary_step']"/> ላይ የተቀመጠውን ደመወዝ 
+                                        <t t-if="sel_info[0]['salary_fig']">
+                                            ብር <strong><t t-esc="sel_info[0]['salary_fig']"/></strong> (<strong><t t-esc="sel_info[0]['salary_words']"/></strong>)
+                                        </t>
+                                        <t t-else="">
+                                            በባንኩ የደመወዝ ስኬል መመሪያ መሰረት
+                                        </t> 
+                                        እንዲከፈላቸው
+                                        <t t-if="stats.get('has_reserve')">
+                                            እንዲሁም በውድድሩ <strong><t t-esc="stats.get('res_range_amharic')"/></strong> የወጡትን ተወዳዳሪዎች በተጠባባቂነት ለ6ወር እንዲያዙ
+                                        </t>
+                                        ኮሚቴው ወስኗል፡፡
+                                    </p>
+                                </t>
+                                <t t-elif="len(sel_info) > 1">
+                                    <p class="mb-2">
+                                        በመጨረሻም ኮሚቴው በውድድሩ <strong><t t-esc="stats.get('sel_ranks_text')"/></strong> የወጡትን ተወዳዳሪዎች በ “<strong><t t-esc="stats.get('work_unit')"/></strong>” ውስጥ “<strong><span t-field="o.job_position.name"/></strong>” ሆነው በእድገት እንዲመደቡ ኮሚቴው ወስኗል፡፡ የደመወዝ ክፍያን በተመለከተ፡-
+                                    </p>
+                                    <div class="mb-2" style="padding-left: 15px;">
+                                        <t t-set="s_idx" t-value="1"/>
+                                        <t t-foreach="sel_info" t-as="s_cand">
+                                            <p class="mb-1" style="line-height: 1.7;">
+                                                <t t-esc="s_idx"/>. <strong><t t-esc="s_cand['name']"/></strong> (<t t-esc="s_cand['rank']"/> ደረጃ)<t t-if="s_cand.get('work_unit')"> በ “<strong><t t-esc="s_cand['work_unit']"/></strong>” ውስጥ</t> ፡- <t t-esc="s_cand['salary_clause']"/> <t t-if="o.job_grade">የስራ ደረጃ <strong><span t-field="o.job_grade"/></strong> </t>የስራ መደቡ <t t-esc="s_cand['salary_step']"/> ላይ የተቀመጠውን ደመወዝ 
+                                                <t t-if="s_cand['salary_fig']">
+                                                    ብር <strong><t t-esc="s_cand['salary_fig']"/></strong> (<strong><t t-esc="s_cand['salary_words']"/></strong>)
+                                                </t>
+                                                <t t-else="">
+                                                    በባንኩ የደመወዝ ስኬል መመሪያ መሰረት
+                                                </t>
+                                                እንዲከፈላቸው፤
+                                            </p>
+                                            <t t-set="s_idx" t-value="s_idx + 1"/>
+                                        </t>
+                                    </div>
+                                    <t t-if="stats.get('has_reserve')">
+                                        <p class="mb-2">
+                                            እንዲሁም በውድድሩ <strong><t t-esc="stats.get('res_range_amharic')"/></strong> የወጡትን ተወዳዳሪዎች በተጠባባቂነት ለ6ወር እንዲያዙ ኮሚቴው ወስኗል፡፡
+                                        </p>
+                                    </t>
+                                </t>
+                                <p class="mt-2">
+                                    የውጤት ማጠቃለያ ተያይዟል፡፡ ኮሚቴው በአጀንዳው ላይ ያደረገውን ስብሰባ <t t-esc="stats.get('meeting_time_end_et')"/> አጠናቋል፡፡
+                                </p>
+                            </div>
+                        </div>
+                    </t>
                 </t>
             </t>
         </t>

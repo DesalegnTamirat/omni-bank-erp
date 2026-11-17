@@ -29,7 +29,7 @@ class SupervisorRecommendationWizard(models.TransientModel):
     recommendation_score = fields.Float(
         string='Supervisor Recommendation Score (0 - 100%)',
         required=True,
-        default=100.0,
+        default=0.0,
         help="Enter the evaluation recommendation mark between 0 and 100%."
     )
     recommendation_remarks = fields.Text(
@@ -180,7 +180,7 @@ class SupervisorRecommendationLine(models.TransientModel):
     current_work_unit = fields.Char(string='Work Unit', readonly=True)
     pms_score = fields.Float(string='PMS Score', readonly=True)
     service_in_company = fields.Float(string='Service (Yrs)', readonly=True)
-    recommendation_score = fields.Float(string='Rec. Score (0 - 100%)', default=100.0, required=True)
+    recommendation_score = fields.Float(string='Rec. Score (0 - 100%)', default=0.0, required=True)
     recommendation_remarks = fields.Char(string='Supervisor Remarks')
 
     def read(self, fields=None, load='_classic_read'):

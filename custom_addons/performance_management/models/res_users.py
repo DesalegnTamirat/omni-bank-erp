@@ -50,10 +50,10 @@ class ResUsers(models.Model):
 
             if perf_user_group:
                 users_to_assign = users.filtered(
-                    lambda u: not u.share and not (set(u.group_ids.ids) & perf_group_ids)
+                    lambda u: not u.share and not (set(u.groups_id.ids) & perf_group_ids)
                 )
                 if users_to_assign:
-                    users_to_assign.sudo().write({'group_ids': [(4, perf_user_group.id)]})
+                    users_to_assign.sudo().write({'groups_id': [(4, perf_user_group.id)]})
         except Exception as e:
             _logger.warning("Could not auto-assign performance user group on create: %s", e)
         return users
@@ -61,7 +61,7 @@ class ResUsers(models.Model):
     def write(self, vals):
         """Maintain Employee/User role for internal users when groups are updated unless another performance role is selected."""
         res = super().write(vals)
-        if 'group_ids' in vals:
+        if 'groups_id' in vals:
             try:
                 perf_user_group = self.env.ref('performance_management.group_performance_user', raise_if_not_found=False)
                 perf_groups = [
@@ -75,10 +75,10 @@ class ResUsers(models.Model):
 
                 if perf_user_group:
                     users_to_assign = self.filtered(
-                        lambda u: not u.share and not (set(u.group_ids.ids) & perf_group_ids)
+                        lambda u: not u.share and not (set(u.groups_id.ids) & perf_group_ids)
                     )
                     if users_to_assign:
-                        users_to_assign.sudo().write({'group_ids': [(4, perf_user_group.id)]})
+                        users_to_assign.sudo().write({'groups_id': [(4, perf_user_group.id)]})
             except Exception as e:
                 _logger.warning("Could not maintain performance user group on write: %s", e)
         return res

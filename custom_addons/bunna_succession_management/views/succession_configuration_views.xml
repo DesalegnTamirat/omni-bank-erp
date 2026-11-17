@@ -28,19 +28,15 @@
                                 </group>
                             </page>
 
-                            <page string="Prioritization &amp; Urgency Rules" name="urgency_rules">
-                                <div class="alert alert-info border-info mb-3" role="alert">
-                                    <i class="fa fa-sliders me-2" title="Sliders"/>
-                                    Configure <strong>Business Impact Score (1-10)</strong> ranges and their corresponding <strong>Urgency Levels</strong>. 
-                                    You can dynamically add, reorder, edit, or remove urgency levels below. When an impact score is selected on a Successor Development Plan, the matching Urgency Level will be determined automatically.
+                            <page string="Urgency Level" name="urgency_levels">
+                                <div class="alert alert-info py-2 px-3 mb-3" role="alert">
+                                    <i class="fa fa-info-circle me-1"/> Configure <strong>Urgency Levels</strong>. You can dynamically add, reorder, edit, or remove urgency levels below for use on Successor Development Plans.
                                 </div>
                                 <field name="urgency_rule_ids">
-                                    <list editable="bottom" string="Urgency Level Rules">
+                                    <list editable="bottom">
                                         <field name="sequence" widget="handle"/>
-                                        <field name="name" string="Urgency Level Name" required="1" class="fw-bold"/>
-                                        <field name="min_score" string="Min Score"/>
-                                        <field name="max_score" string="Max Score"/>
-                                        <field name="description" string="Description"/>
+                                        <field name="name" string="Urgency Level Name"/>
+                                        <field name="description"/>
                                         <field name="active" widget="boolean_toggle"/>
                                     </list>
                                 </field>
@@ -65,6 +61,7 @@ action = {
     'res_model': 'succession.governance.policy',
     'res_id': policy.id,
     'view_mode': 'form',
+    'context': {'active_test': False},
     'target': 'current',
 }
             </field>

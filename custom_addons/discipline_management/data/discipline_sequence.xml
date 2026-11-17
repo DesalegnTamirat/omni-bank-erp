@@ -60,5 +60,15 @@
             <field name="implementation">no_gap</field>
             <field name="company_id" eval="False"/>
         </record>
+
+        <!-- Sequence for Dedicated Attendance Disciplinary Case -->
+        <record id="seq_discipline_attendance_case" model="ir.sequence">
+            <field name="name">Attendance Disciplinary Case Sequence</field>
+            <field name="code">discipline.attendance.case</field>
+            <field name="prefix">ATT-DISC/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="implementation">standard</field>
+            <field name="company_id" eval="False"/>
+        </record>
     </data>
 </odoo>

@@ -95,39 +95,6 @@
             </field>
         </record>
 
-        <!-- REVIEW CYCLE VIEWS -->
-        <record id="view_succession_review_cycle_list" model="ir.ui.view">
-            <field name="name">succession.review.cycle.list</field>
-            <field name="model">succession.review.cycle</field>
-            <field name="arch" type="xml">
-                <list string="Review Cycles">
-                    <field name="sequence" widget="handle"/>
-                    <field name="name" string="Cycle Name" class="fw-bold"/>
-                    <field name="months" string="Interval (Months)"/>
-                    <field name="active" widget="boolean_toggle"/>
-                </list>
-            </field>
-        </record>
-
-        <record id="view_succession_review_cycle_form" model="ir.ui.view">
-            <field name="name">succession.review.cycle.form</field>
-            <field name="model">succession.review.cycle</field>
-            <field name="arch" type="xml">
-                <form string="Review Cycle">
-                    <sheet>
-                        <div class="oe_title">
-                            <label for="name" string="Cycle Name"/>
-                            <h1><field name="name" placeholder="e.g. Annually"/></h1>
-                        </div>
-                        <group>
-                            <field name="months" string="Interval (Months)"/>
-                            <field name="active" widget="boolean_toggle"/>
-                        </group>
-                    </sheet>
-                </form>
-            </field>
-        </record>
-
         <!-- DEVELOPMENT URGENCY LEVEL VIEWS -->
         <record id="view_succession_development_urgency_level_list" model="ir.ui.view">
             <field name="name">succession.development.urgency.level.list</field>
@@ -212,7 +179,7 @@
                             </group>
                         </group>
                         <separator string="Child Sub-Activities"/>
-                        <field name="child_sub_activity_ids" nolabel="1">
+                        <field name="child_sub_activity_ids" nolabel="1" context="{'active_test': False}">
                             <list editable="bottom" string="Child Sub-Activities">
                                 <field name="sequence" widget="handle"/>
                                 <field name="name" string="Sub-Activity Name" required="1"

@@ -6,11 +6,11 @@
         <field name="arch" type="xml">
             <list string="Operational Level Agreements (OLA)">
                 <field name="name" />
-                <field name="service_id" />
-                <field name="sub_category_id" />
-                <field name="requesting_team_id" />
-                <field name="providing_team_id" />
-                <field name="operating_unit_id" />
+                <field name="service_id" string="Service" />
+                <field name="sub_category_id" string="Sub Service" />
+                <field name="requesting_team_id" string="First Level Operating Unit" />
+                <field name="providing_team_id" string="Service Provider" />
+                <field name="operating_unit_id" string="Sub Service Provider" />
                 <field name="delivery_time_value" />
                 <field name="delivery_time_unit" />
                 <field name="target_hours" string="Target (Hours)" />
@@ -23,7 +23,7 @@
         <field name="name">helpdesk.ola.form</field>
         <field name="model">helpdesk.ola</field>
         <field name="arch" type="xml">
-            <form string="Operational Level Agreement (OLA)">
+            <form string="Operational Level Agreement (OLA)" class="o_helpdesk_form">
                 <sheet>
                     <div class="oe_title">
                         <label for="name" string="OLA Policy Name" />
@@ -33,14 +33,14 @@
                     </div>
                     <group>
                         <group string="Service Mapping">
-                            <field name="service_id" options="{'no_create': True}" />
-                            <field name="sub_category_id" options="{'no_create': True}" />
+                            <field name="service_id" string="Service" options="{'no_create': True}" />
+                            <field name="sub_category_id" string="Sub Service" options="{'no_create': True}" />
                             <field name="active" widget="boolean_toggle" />
                         </group>
                         <group string="Responsible Parties">
-                            <field name="requesting_team_id" options="{'no_create': True}" />
-                            <field name="providing_team_id" options="{'no_create': True}" />
-                            <field name="operating_unit_id" options="{'no_create': True}" />
+                            <field name="requesting_team_id" options="{'no_create': True}" placeholder="Select First Level Operating Unit (e.g. Contact Center)..." string="First Level Operating Unit" />
+                            <field name="providing_team_id" options="{'no_create': True}" placeholder="Select Service Provider..." string="Service Provider" />
+                            <field name="operating_unit_id" options="{'no_create': True}" placeholder="Select Sub Service Provider..." string="Sub Service Provider" />
                         </group>
                     </group>
                     <group string="Service Delivery Time (SDT) Target">
@@ -52,7 +52,7 @@
                             </div>
                         </group>
                         <group>
-                            <field name="target_hours" readonly="1" />
+                            <field name="target_hours" />
                         </group>
                     </group>
                     <notebook>
@@ -88,13 +88,13 @@
                                 <field name="service_id" />
                             </span>
                             <span class="badge text-bg-warning" t-if="record.target_hours.value">
-                                <i class="fa fa-clock-o me-1" />
+                                <i class="fa fa-clock-o me-1" title="Target Hours" />
                                 <field name="target_hours" /> hrs Target
                             </span>
                         </div>
                         <field class="fw-bold fs-5 text-truncate" name="name" />
                         <div class="text-muted small mt-1">
-                            <i class="fa fa-exchange me-1" />
+                            <i class="fa fa-exchange me-1" title="Routing" />
                             <field name="requesting_team_id" /> &amp;rarr; <field name="providing_team_id" />
                         </div>
                         <footer class="pt-2 d-flex justify-content-between align-items-center">

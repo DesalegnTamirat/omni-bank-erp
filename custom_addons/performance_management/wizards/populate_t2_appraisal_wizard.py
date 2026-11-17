@@ -29,19 +29,19 @@ class PopulateT2AppraisalWizard(models.TransientModel):
         scorecards = self.env['t2.scorecard'].search([
             ('appraisal_period_id', '=', self.appraisal_period_id.id),
             ('start_date', '=', fyl.date_start),
-            ('state', 'in', ('accepted', 'confirmed', 'appraisal_started')),
+            ('state', 'in', ('accepted', 'auto_accepted', 'confirmed', 'appraisal_started')),
         ])
 
         if not scorecards:
             scorecards = self.env['t2.scorecard'].search([
                 ('appraisal_period_id', '=', self.appraisal_period_id.id),
-                ('state', 'in', ('accepted', 'confirmed', 'appraisal_started')),
+                ('state', 'in', ('accepted', 'auto_accepted', 'confirmed', 'appraisal_started')),
             ])
 
         if not scorecards:
             scorecards = self.env['t2.scorecard'].search([
                 ('fiscal_year_id', '=', self.fiscal_year_id.id),
-                ('state', 'in', ('accepted', 'confirmed', 'appraisal_started')),
+                ('state', 'in', ('accepted', 'auto_accepted', 'confirmed', 'appraisal_started')),
             ])
 
         if not scorecards:

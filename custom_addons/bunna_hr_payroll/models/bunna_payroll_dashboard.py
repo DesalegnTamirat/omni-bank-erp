@@ -19,6 +19,24 @@ GROUP_NAMES = {
 }
 
 
+def _extract_name(val, fallback=''):
+    if not val:
+        return fallback
+    if isinstance(val, dict):
+        return val.get('en_US') or val.get('en') or next(iter(val.values()), fallback)
+    if isinstance(val, str):
+        if val.startswith('{') and val.endswith('}'):
+            try:
+                import json
+                parsed = json.loads(val)
+                if isinstance(parsed, dict):
+                    return parsed.get('en_US') or parsed.get('en') or next(iter(parsed.values()), fallback)
+            except Exception:
+                pass
+        return val
+    return str(val)
+
+
 class BunnaPayrollDashboard(models.AbstractModel):
     """Payroll Process Dashboard backend service for Bunna Bank ERP."""
     _name = 'bunna.payroll.dashboard'
@@ -28,9 +46,10 @@ class BunnaPayrollDashboard(models.AbstractModel):
     def get_dashboard_data(self, period_id=None):
         """Aggregate end-to-end payroll process data, KPIs, process stepper,
         CBS Finacle balance matrix, and department distributions.
+        Highly optimized with bulk SQL aggregations for 4000+ employees.
         """
         Period = self.env['hr.payroll.period'].sudo()
-        all_periods = Period.search([], order='date_from desc, id desc')
+        all_periods = Period.with_context(active_test=False).search([], order='date_from desc, id desc')
 
         if not all_periods:
             return {
@@ -81,7 +100,6 @@ class BunnaPayrollDashboard(models.AbstractModel):
                 selected_period = False
 
         if not selected_period:
-            # Prefer currently open period, else latest
             open_periods = all_periods.filtered(lambda p: p.state == 'open')
             selected_period = open_periods[0] if open_periods else all_periods[0]
 
@@ -97,6 +115,7 @@ class BunnaPayrollDashboard(models.AbstractModel):
                 'name': p.name or _("Period %s") % p.id,
                 'fiscal_year': p.fiscal_year or '',
                 'state': p.state or 'draft',
+                'state_display': (p.state or 'draft').upper(),
                 'is_selected': p.id == pid,
             })
 
@@ -129,22 +148,33 @@ class BunnaPayrollDashboard(models.AbstractModel):
         }
 
         # -------------------------------------------------------------
-        # 3. Payslips & Batches Aggregations for this Period
+        # 3. Payslips & Batches Aggregations for this Period (Single Query)
         # -------------------------------------------------------------
-        payslips = self.env['hr.payslip'].sudo().search([('period_id', '=', pid)])
-        total_slips = len(payslips)
-        done_slips = len(payslips.filtered(lambda s: s.state == 'done'))
-        waiting_slips = len(payslips.filtered(lambda s: s.state == 'verify'))
-        draft_slips = len(payslips.filtered(lambda s: s.state == 'draft'))
-        cancelled_slips = len(payslips.filtered(lambda s: s.state == 'cancel'))
+        self.env.cr.execute("""
+            SELECT state, COUNT(*)
+            FROM hr_payslip
+            WHERE period_id = %s
+            GROUP BY state
+        """, (pid,))
+        slip_counts = dict(self.env.cr.fetchall())
+        done_slips = slip_counts.get('done', 0)
+        waiting_slips = slip_counts.get('verify', 0)
+        draft_slips = slip_counts.get('draft', 0)
+        cancelled_slips = slip_counts.get('cancel', 0)
+        total_slips = sum(slip_counts.values())
 
-        batches = self.env['hr.payslip.run'].sudo().search([('period_id', '=', pid)])
-        total_batches = len(batches)
-        done_batches = len(batches.filtered(lambda b: b.state in ('close', 'done')))
-        draft_batches = len(batches.filtered(lambda b: b.state == 'draft'))
+        self.env.cr.execute("""
+            SELECT state, COUNT(*)
+            FROM hr_payslip_run
+            WHERE period_id = %s
+            GROUP BY state
+        """, (pid,))
+        batch_counts = dict(self.env.cr.fetchall())
+        done_batches = batch_counts.get('close', 0) + batch_counts.get('done', 0)
+        draft_batches = batch_counts.get('draft', 0)
+        total_batches = sum(batch_counts.values())
 
-        # Financial totals from payslip lines
-        slip_ids = payslips.ids
+        # Financial totals from payslip lines (One bulk aggregation query)
         gross_salary = 0.0
         net_salary = 0.0
         basic_salary = 0.0
@@ -161,17 +191,18 @@ class BunnaPayrollDashboard(models.AbstractModel):
         labour_union_amount = 0.0
         loans_amount = 0.0
 
-        if slip_ids:
+        if total_slips > 0:
             self.env.cr.execute("""
                 SELECT 
                     pl.code,
                     rc.code as cat_code,
                     SUM(pl.amount) as line_sum
                 FROM hr_payslip_line pl
+                JOIN hr_payslip p ON p.id = pl.slip_id
                 LEFT JOIN hr_salary_rule_category rc ON rc.id = pl.category_id
-                WHERE pl.slip_id IN %s
+                WHERE p.period_id = %s
                 GROUP BY pl.code, rc.code
-            """, (tuple(slip_ids),))
+            """, (pid,))
 
             for code, cat_code, line_sum in self.env.cr.fetchall():
                 val = float(line_sum or 0.0)
@@ -190,13 +221,13 @@ class BunnaPayrollDashboard(models.AbstractModel):
                     total_deduction += val
 
                 # Detailed rule breakdowns
-                if code_u in ('TAX', 'INCOME_TAX', 'PAYE'):
+                if code_u in ('TAX', 'INCOME_TAX', 'PAYE', 'IT'):
                     tax_amount += val
                 elif code_u in ('PEN_EMP', 'PENSION', 'PENSION_EMP', 'PENSION7'):
                     pension_emp += val
-                elif code_u in ('PEN_COMP', 'PENSION_COMP', 'PENSION11'):
+                elif code_u in ('PEN_COMP', 'PENSION_COMP', 'PENSION11', 'PENSION_BNK'):
                     pension_comp += val
-                elif code_u in ('PF_EMP', 'PF5', 'PROVIDENT_FUND'):
+                elif code_u in ('PF_EMP', 'PF5', 'PROVIDENT_FUND', 'PF'):
                     pf_emp += val
                 elif code_u in ('PF_COMP', 'PF10', 'PROVIDENT_FUND_COMP'):
                     pf_comp += val
@@ -211,7 +242,6 @@ class BunnaPayrollDashboard(models.AbstractModel):
                 elif 'LOAN' in code_u or 'STAFF_LOAN' in code_u:
                     loans_amount += val
 
-        # If gross was not explicitly computed, calculate as basic + allowances
         if gross_salary == 0.0 and (basic_salary > 0 or total_allowance > 0):
             gross_salary = basic_salary + total_allowance
 
@@ -219,7 +249,13 @@ class BunnaPayrollDashboard(models.AbstractModel):
             total_deduction = gross_salary - net_salary
 
         total_employer_cost = gross_salary + pension_comp + pf_comp
-        unique_employees = len(set(payslips.mapped('employee_id').ids))
+
+        self.env.cr.execute("""
+            SELECT COUNT(DISTINCT employee_id)
+            FROM hr_payslip
+            WHERE period_id = %s AND employee_id IS NOT NULL
+        """, (pid,))
+        unique_employees = (self.env.cr.fetchone() or [0])[0]
 
         # -------------------------------------------------------------
         # 4. CBS Finacle Journal Entries Audit & Matrix
@@ -279,26 +315,23 @@ class BunnaPayrollDashboard(models.AbstractModel):
         od_asbeza_synced = bool(od_asbeza_amount > 0)
         cash_indemnity_synced = bool(cash_indemnity_amount > 0)
 
-        # Also check if cbs_integration is enabled in DB
-        self.env.cr.execute("""
-            SELECT count(*) FROM cbs_integration WHERE environment = 'CBS' AND status = 'true';
-        """)
-        cbs_config_active = bool((self.env.cr.fetchone() or [0])[0] > 0)
+        cbs_config_active = False
+        try:
+            self.env.cr.execute("""
+                SELECT count(*) FROM cbs_integration WHERE environment = 'CBS' AND status = 'true';
+            """)
+            cbs_config_active = bool((self.env.cr.fetchone() or [0])[0] > 0)
+        except Exception:
+            cbs_config_active = False
 
         # -------------------------------------------------------------
         # 6. End-to-End Payroll Process Stepper (6 Stages)
         # -------------------------------------------------------------
-        # Stage 1: Setup
         st1_done = selected_period.state in ('open', 'closed')
-        # Stage 2: CBS Sync
         st2_done = od_asbeza_synced or cash_indemnity_synced or (total_slips > 0)
-        # Stage 3: Batch Gen
         st3_done = total_batches > 0
-        # Stage 4: Calculation
         st4_done = total_slips > 0 and (done_slips == total_slips)
-        # Stage 5: CBS Journal
         st5_done = total_entries_count > 0 and cbs_is_balanced
-        # Stage 6: Close
         st6_done = selected_period.state == 'closed'
 
         completed_steps = sum([1 for s in (st1_done, st2_done, st3_done, st4_done, st5_done, st6_done) if s])
@@ -371,23 +404,46 @@ class BunnaPayrollDashboard(models.AbstractModel):
         ]
 
         # -------------------------------------------------------------
-        # 7. Employee Payroll Coverage & Eligibility Intelligence
+        # 7. Employee Payroll Coverage & Eligibility Intelligence (Bulk Queries)
         # -------------------------------------------------------------
-        # 1. Total Active Employees in Company
         company_id = selected_period.company_id.id if selected_period.company_id else self.env.company.id
-        all_active_employees = self.env['hr.employee'].sudo().search([
-            ('active', '=', True),
-            '|', ('company_id', '=', False), ('company_id', '=', company_id)
-        ])
-        total_active_emp_count = len(all_active_employees)
+
+        # 1. Total Active Employees in Company
+        self.env.cr.execute("""
+            SELECT COUNT(*)
+            FROM hr_employee
+            WHERE active = true AND (company_id IS NULL OR company_id = %s)
+        """, (company_id,))
+        total_active_emp_count = (self.env.cr.fetchone() or [0])[0]
 
         # 2. Employees With Payslip in this Period
-        slip_emp_ids = set(payslips.mapped('employee_id').ids)
-        emp_with_slip_count = len(slip_emp_ids)
+        emp_with_slip_count = unique_employees
 
-        # 3. Employees Without Payslip in this Period
-        missing_emp_records = all_active_employees.filtered(lambda e: e.id not in slip_emp_ids)
-        emp_without_slip_count = len(missing_emp_records)
+        # 3. Employees Without Payslip in this Period (Bulk SQL)
+        missing_emps = []
+        try:
+            self.env.cr.execute("""
+                SELECT 
+                    e.id,
+                    e.name,
+                    d.name AS dept_raw,
+                    e.job_name AS job_raw
+                FROM hr_employee e
+                LEFT JOIN hr_department d ON d.id = e.department_id
+                WHERE e.active = true
+                  AND (e.company_id IS NULL OR e.company_id = %s)
+                  AND e.id NOT IN (
+                      SELECT DISTINCT employee_id 
+                      FROM hr_payslip 
+                      WHERE period_id = %s AND employee_id IS NOT NULL
+                  )
+                ORDER BY e.name
+            """, (company_id, pid))
+            missing_emps = self.env.cr.fetchall()
+        except Exception as e:
+            _logger.warning("Could not fetch missing employees for dashboard: %s", e)
+            missing_emps = []
+        emp_without_slip_count = len(missing_emps)
 
         missing_breakdown = {
             'no_contract': 0,
@@ -396,15 +452,43 @@ class BunnaPayrollDashboard(models.AbstractModel):
             'contract_ended': 0,
             'draft_contract': 0,
         }
-
         missing_employees_list = []
         p_from = selected_period.date_from
         p_to = selected_period.date_to
 
-        for emp in missing_emp_records:
-            versions = self.env['hr.version'].sudo().search([
-                ('employee_id', '=', emp.id),
-            ], order='contract_date_start desc, id desc')
+        missing_emp_ids = [r[0] for r in missing_emps]
+        versions_by_emp = {}
+        if missing_emp_ids:
+            self.env.cr.execute("""
+                SELECT 
+                    employee_id,
+                    id,
+                    name,
+                    contract_date_start,
+                    contract_date_end,
+                    active,
+                    state
+                FROM hr_version
+                WHERE employee_id IN %s
+                ORDER BY employee_id, contract_date_start DESC NULLS LAST, id DESC
+            """, (tuple(missing_emp_ids),))
+            for v_row in self.env.cr.fetchall():
+                emp_id = v_row[0]
+                if emp_id not in versions_by_emp:
+                    versions_by_emp[emp_id] = []
+                versions_by_emp[emp_id].append({
+                    'id': v_row[1],
+                    'name': v_row[2],
+                    'contract_date_start': v_row[3],
+                    'contract_date_end': v_row[4],
+                    'active': v_row[5],
+                    'state': v_row[6],
+                })
+
+        for emp_id, emp_name, dept_raw, job_raw in missing_emps:
+            dept_name = _extract_name(dept_raw, _('Unassigned'))
+            job_name = _extract_name(job_raw, _('N/A'))
+            versions = versions_by_emp.get(emp_id, [])
 
             reason_key = 'no_contract'
             reason_label = _('No Contract Defined')
@@ -417,18 +501,22 @@ class BunnaPayrollDashboard(models.AbstractModel):
                 reason_badge = 'bpd-pill-error'
                 details = _('No contract record found in HR.')
             else:
-                overlapping = versions.filtered(lambda v: (
-                    (not v.contract_date_start or (p_to and v.contract_date_start <= p_to)) and
-                    (not v.contract_date_end or (p_from and v.contract_date_end >= p_from))
-                ))
+                overlapping = [
+                    v for v in versions if (
+                        (not v['contract_date_start'] or (p_to and v['contract_date_start'] <= p_to)) and
+                        (not v['contract_date_end'] or (p_from and v['contract_date_end'] >= p_from))
+                    )
+                ]
 
                 if overlapping:
-                    active_running = overlapping.filtered(lambda v: v.active and v.state in ('open', 'running', 'draft'))
+                    active_running = [
+                        v for v in overlapping if v['active'] and v['state'] in ('open', 'running', 'draft')
+                    ]
                     if active_running:
                         reason_key = 'unbatched_eligible'
                         reason_label = _('Eligible (Not in Batch)')
                         reason_badge = 'bpd-pill-warning'
-                        v_name = active_running[0].name or _("Contract")
+                        v_name = active_running[0]['name'] or _("Contract")
                         details = _('Has active contract (%s), but not included in any payslip batch.') % v_name
                     else:
                         reason_key = 'draft_contract'
@@ -437,16 +525,16 @@ class BunnaPayrollDashboard(models.AbstractModel):
                         details = _('Contract exists but is inactive or cancelled.')
                 else:
                     latest_v = versions[0]
-                    if latest_v.contract_date_start and p_to and latest_v.contract_date_start > p_to:
+                    if latest_v['contract_date_start'] and p_to and latest_v['contract_date_start'] > p_to:
                         reason_key = 'future_hire'
                         reason_label = _('New Hire (After Period)')
                         reason_badge = 'bpd-pill-info'
-                        details = _('Hired on %s (after period end %s).') % (latest_v.contract_date_start, p_to)
-                    elif latest_v.contract_date_end and p_from and latest_v.contract_date_end < p_from:
+                        details = _('Hired on %s (after period end %s).') % (latest_v['contract_date_start'], p_to)
+                    elif latest_v['contract_date_end'] and p_from and latest_v['contract_date_end'] < p_from:
                         reason_key = 'contract_ended'
                         reason_label = _('Separated Before Period')
                         reason_badge = 'bpd-pill-secondary'
-                        details = _('Contract ended on %s (prior to period start %s).') % (latest_v.contract_date_end, p_from)
+                        details = _('Contract ended on %s (prior to period start %s).') % (latest_v['contract_date_end'], p_from)
                     else:
                         reason_key = 'no_contract'
                         reason_label = _('No Active Period Contract')
@@ -456,104 +544,133 @@ class BunnaPayrollDashboard(models.AbstractModel):
             missing_breakdown[reason_key] = missing_breakdown.get(reason_key, 0) + 1
 
             missing_employees_list.append({
-                'id': emp.id,
-                'name': emp.name,
-                'department': emp.department_id.name if emp.department_id else _('Unassigned'),
-                'job': emp.job_id.name if emp.job_id else _('N/A'),
+                'id': emp_id,
+                'name': emp_name,
+                'department': dept_name,
+                'job': job_name,
                 'reason_key': reason_key,
                 'reason_label': reason_label,
                 'reason_badge': reason_badge,
                 'details': details,
             })
 
-        # 4. Proportional (Prorated) Payslips Detection
+        # 4. Proportional (Prorated) Payslips Detection (Single Bulk SQL Query)
         proportional_slips_list = []
-        for slip in payslips:
-            emp = slip.employee_id
-            v = slip.version_id
-            if not v:
-                try:
-                    v_ids = self.env['hr.payslip'].sudo().get_versions(emp, slip.date_from, slip.date_to)
-                    if v_ids:
-                        v = self.env['hr.version'].sudo().browse(v_ids[0])
-                except Exception:
-                    v = False
+        period_calendar_days = ((p_to - p_from).days + 1) if (p_from and p_to) else 30
 
-            is_proportional = False
-            prop_reasons = []
-
-            # Check mid-month hire
-            if v and v.contract_date_start and p_from and v.contract_date_start > p_from:
-                is_proportional = True
-                prop_reasons.append(_("Joined mid-period: %s") % v.contract_date_start)
-
-            # Check mid-month separation
-            if v and v.contract_date_end and p_to and v.contract_date_end < p_to:
-                is_proportional = True
-                prop_reasons.append(_("Left mid-period: %s") % v.contract_date_end)
-
-            # Check worked days lines
-            worked_days_records = slip.worked_days_line_ids
-            total_worked_days = sum(worked_days_records.mapped('number_of_days')) if worked_days_records else 0
-            if p_from and p_to:
-                period_calendar_days = (p_to - p_from).days + 1
-                if 0 < total_worked_days < 20 and period_calendar_days >= 20:
-                    is_proportional = True
-                    prop_reasons.append(_("%s days worked") % int(total_worked_days))
-
-            # Query net salary for slip
-            net_amt = 0.0
+        prop_rows = []
+        try:
             self.env.cr.execute("""
-                SELECT COALESCE(SUM(pl.amount), 0)
-                FROM hr_payslip_line pl
-                JOIN hr_salary_rule_category rc ON rc.id = pl.category_id
-                WHERE pl.slip_id = %s AND (rc.code = 'NET' OR pl.code = 'NET')
-            """, (slip.id,))
-            row = self.env.cr.fetchone()
-            if row:
-                net_amt = float(row[0] or 0.0)
+                SELECT 
+                    p.id,
+                    p.number,
+                    e.id,
+                    e.name,
+                    d.name AS dept_raw,
+                    v.contract_date_start,
+                    v.contract_date_end,
+                    COALESCE(wd.total_days, 0),
+                    COALESCE(net.amount, 0)
+                FROM hr_payslip p
+                JOIN hr_employee e ON e.id = p.employee_id
+                LEFT JOIN hr_department d ON d.id = e.department_id
+                LEFT JOIN hr_version v ON v.id = p.version_id
+                LEFT JOIN (
+                    SELECT payslip_id, SUM(number_of_days) as total_days
+                    FROM hr_payslip_worked_days
+                    GROUP BY payslip_id
+                ) wd ON wd.payslip_id = p.id
+                LEFT JOIN (
+                    SELECT pl.slip_id, SUM(pl.amount) as amount
+                    FROM hr_payslip_line pl
+                    LEFT JOIN hr_salary_rule_category rc ON rc.id = pl.category_id
+                    WHERE pl.code = 'NET' OR rc.code = 'NET'
+                    GROUP BY pl.slip_id
+                ) net ON net.slip_id = p.id
+                WHERE p.period_id = %s
+                  AND (
+                      (v.contract_date_start IS NOT NULL AND %s IS NOT NULL AND v.contract_date_start > %s)
+                      OR (v.contract_date_end IS NOT NULL AND %s IS NOT NULL AND v.contract_date_end < %s)
+                      OR (COALESCE(wd.total_days, 0) > 0 AND COALESCE(wd.total_days, 0) < 20 AND %s >= 20)
+                  )
+                ORDER BY p.id
+            """, (pid, p_from, p_from, p_to, p_to, period_calendar_days))
+            prop_rows = self.env.cr.fetchall()
+        except Exception as e:
+            _logger.warning("Error fetching proportional slips: %s", e)
+            prop_rows = []
 
-            if is_proportional:
-                proportional_slips_list.append({
-                    'id': slip.id,
-                    'number': slip.number or _('Draft Slip'),
-                    'employee_id': emp.id,
-                    'employee_name': emp.name,
-                    'department': emp.department_id.name if emp.department_id else _('Unassigned'),
-                    'reason': " & ".join(prop_reasons) if prop_reasons else _('Prorated period'),
-                    'contract_start': str(v.contract_date_start) if v and v.contract_date_start else '',
-                    'contract_end': str(v.contract_date_end) if v and v.contract_date_end else '',
-                    'worked_days': total_worked_days or 'N/A',
-                    'net_amount': round(net_amt, 2),
-                })
+        for row in prop_rows:
+            slip_id, slip_num, emp_id, emp_name, dept_raw, c_start, c_end, worked_days, net_amt = row
+            dept_name = _extract_name(dept_raw, _('Unassigned'))
+            slip_num = slip_num or _('Draft Slip')
+            prop_reasons = []
+            if c_start and p_from and c_start > p_from:
+                prop_reasons.append(_("Joined mid-period: %s") % c_start)
+            if c_end and p_to and c_end < p_to:
+                prop_reasons.append(_("Left mid-period: %s") % c_end)
+            if 0 < worked_days < 20 and period_calendar_days >= 20:
+                prop_reasons.append(_("%s days worked") % int(worked_days))
+
+            proportional_slips_list.append({
+                'id': slip_id,
+                'number': slip_num,
+                'employee_id': emp_id,
+                'employee_name': emp_name,
+                'department': dept_name,
+                'reason': " & ".join(prop_reasons) if prop_reasons else _('Prorated period'),
+                'contract_start': str(c_start) if c_start else '',
+                'contract_end': str(c_end) if c_end else '',
+                'worked_days': worked_days or 'N/A',
+                'net_amount': round(float(net_amt or 0.0), 2),
+            })
 
         proportional_count = len(proportional_slips_list)
 
         # -------------------------------------------------------------
-        # 8. Recent Batches Table (Top 5)
+        # 8. Recent Batches Table (Top 5 - Single Bulk SQL Query)
         # -------------------------------------------------------------
+        self.env.cr.execute("""
+            SELECT 
+                b.id,
+                b.name,
+                b.state,
+                b.date_start,
+                b.date_end,
+                COUNT(p.id) as slip_count,
+                COALESCE(SUM(net.amount), 0) as net_amount
+            FROM hr_payslip_run b
+            LEFT JOIN hr_payslip p ON p.payslip_run_id = b.id
+            LEFT JOIN (
+                SELECT pl.slip_id, SUM(pl.amount) as amount
+                FROM hr_payslip_line pl
+                LEFT JOIN hr_salary_rule_category rc ON rc.id = pl.category_id
+                WHERE pl.code = 'NET' OR rc.code = 'NET'
+                GROUP BY pl.slip_id
+            ) net ON net.slip_id = p.id
+            WHERE b.period_id = %s
+            GROUP BY b.id, b.name, b.state, b.date_start, b.date_end
+            ORDER BY b.id DESC
+            LIMIT 5
+        """, (pid,))
+        batch_rows = self.env.cr.fetchall()
         recent_batches = []
-        for b in batches[:5]:
-            b_slips = b.slip_ids
-            b_net = sum(b_slips.mapped('net_salary')) if hasattr(b_slips, 'net_salary') else 0.0
-            if b_net == 0.0 and b_slips:
-                self.env.cr.execute("""
-                    SELECT COALESCE(SUM(pl.amount), 0)
-                    FROM hr_payslip_line pl
-                    JOIN hr_salary_rule_category rc ON rc.id = pl.category_id
-                    WHERE pl.slip_id IN %s AND (rc.code = 'NET' OR pl.code = 'NET')
-                """, (tuple(b_slips.ids),))
-                b_net = float(self.env.cr.fetchone()[0] or 0.0)
-
+        state_labels = {
+            'draft': _('Draft'),
+            'close': _('Closed'),
+            'done': _('Confirmed'),
+            'cancel': _('Cancelled'),
+        }
+        for b_id, b_name, b_state, b_dstart, b_dend, b_slip_count, b_net in batch_rows:
             recent_batches.append({
-                'id': b.id,
-                'name': b.name,
-                'state': b.state,
-                'state_label': dict(b._fields['state'].selection).get(b.state, b.state),
-                'slip_count': len(b_slips),
-                'net_amount': b_net,
-                'date_start': str(b.date_start) if b.date_start else '',
-                'date_end': str(b.date_end) if b.date_end else '',
+                'id': b_id,
+                'name': b_name or '',
+                'state': b_state,
+                'state_label': state_labels.get(b_state, (b_state or '').capitalize()),
+                'slip_count': b_slip_count,
+                'net_amount': round(float(b_net or 0.0), 2),
+                'date_start': str(b_dstart) if b_dstart else '',
+                'date_end': str(b_dend) if b_dend else '',
             })
 
         # Return full payload

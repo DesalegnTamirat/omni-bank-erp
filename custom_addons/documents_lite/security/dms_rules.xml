@@ -53,7 +53,7 @@
         <field name="name">Document: read in allowed folders</field>
         <field name="model_id" ref="model_dms_document"/>
         <field name="groups" eval="[(4, ref('documents_lite.group_dms_user'))]"/>
-        <field name="domain_force">[('active','=',True),('folder_id.active','=',True),'|','|','|','|','|',('folder_id.restricted','=',False),('folder_id.read_user_ids','in',[user.id]),('folder_id.read_group_ids','in',user.all_group_ids.ids),('folder_id.read_department_ids','in',user.dms_department_ids.ids),('folder_id.read_operating_unit_ids','in',user.dms_operating_unit_ids.ids),('create_uid','=',user.id)]</field>
+        <field name="domain_force">['&amp;', ('active','=',True), '|', ('folder_id', '=', False), ('folder_id.active','=',True), '|', ('create_uid', '=', user.id), '|', '&amp;', ('custom_permission', '=', True), '|', ('is_restricted', '=', False), '|', ('read_user_ids', 'in', [user.id]), '|', ('read_group_ids', 'in', user.all_group_ids.ids), '|', ('read_department_ids', 'in', user.dms_department_ids.ids), ('read_operating_unit_ids', 'in', user.dms_operating_unit_ids.ids), '&amp;', ('custom_permission', '=', False), '|', ('folder_id.restricted','=',False), '|', ('folder_id.read_user_ids','in',[user.id]), '|', ('folder_id.read_group_ids','in',user.all_group_ids.ids), '|', ('folder_id.read_department_ids','in',user.dms_department_ids.ids), ('folder_id.read_operating_unit_ids','in',user.dms_operating_unit_ids.ids)]</field>
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="False"/>
         <field name="perm_create" eval="False"/>
@@ -82,7 +82,7 @@
         <field name="name">Version: read</field>
         <field name="model_id" ref="model_dms_document_version"/>
         <field name="groups" eval="[(4, ref('documents_lite.group_dms_user'))]"/>
-        <field name="domain_force">[('document_id.active','=',True),('document_id.folder_id.active','=',True),'|','|','|','|',('document_id.folder_id.restricted','=',False),('document_id.folder_id.read_user_ids','in',[user.id]),('document_id.folder_id.read_group_ids','in',user.all_group_ids.ids),('document_id.folder_id.read_department_ids','in',user.dms_department_ids.ids),('document_id.folder_id.read_operating_unit_ids','in',user.dms_operating_unit_ids.ids)]</field>
+        <field name="domain_force">['&amp;', ('document_id.active','=',True), '|', ('document_id.folder_id', '=', False), ('document_id.folder_id.active','=',True), '|', ('document_id.create_uid', '=', user.id), '|', '&amp;', ('document_id.custom_permission', '=', True), '|', ('document_id.is_restricted', '=', False), '|', ('document_id.read_user_ids', 'in', [user.id]), '|', ('document_id.read_group_ids', 'in', user.all_group_ids.ids), '|', ('document_id.read_department_ids', 'in', user.dms_department_ids.ids), ('document_id.read_operating_unit_ids', 'in', user.dms_operating_unit_ids.ids), '&amp;', ('document_id.custom_permission', '=', False), '|', ('document_id.folder_id.restricted','=',False), '|', ('document_id.folder_id.read_user_ids','in',[user.id]), '|', ('document_id.folder_id.read_group_ids','in',user.all_group_ids.ids), '|', ('document_id.folder_id.read_department_ids','in',user.dms_department_ids.ids), ('document_id.folder_id.read_operating_unit_ids','in',user.dms_operating_unit_ids.ids)]</field>
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="False"/>
         <field name="perm_create" eval="False"/>

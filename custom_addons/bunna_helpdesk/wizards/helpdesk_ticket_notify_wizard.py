@@ -87,9 +87,10 @@ class HelpdeskTicketNotifyWizard(models.TransientModel):
             elif wiz.channel == "email":
                 partner_name = wiz.ticket_id.partner_id.name or wiz.ticket_id.partner_name or _("Valued Customer")
                 event_title = _("Accepted and In Progress") if wiz.notification_type == "acceptance" else _("Successfully Resolved")
+                clean_name = re.sub(r'<[^>]+>', '', wiz.ticket_id.name or '').strip()
                 wiz.message_preview = _(
                     "Dear %s,\n\nYour service request '%s' (%s) has been %s.\n\nThank you for banking with Bunna Bank!\nHotline: 8501"
-                ) % (partner_name, wiz.ticket_id.name or "", wiz.ticket_id.number or "", event_title)
+                ) % (partner_name, clean_name, wiz.ticket_id.number or "", event_title)
 
     @api.model
     def default_get(self, fields_list):

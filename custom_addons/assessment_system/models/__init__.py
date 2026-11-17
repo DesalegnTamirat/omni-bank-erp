@@ -20,3 +20,4 @@ from . import assessment_criteria
 from . import applicant_assessment
 from . import interview_assessment
 from . import interview_rate_sheet
+from . import panel_invitation

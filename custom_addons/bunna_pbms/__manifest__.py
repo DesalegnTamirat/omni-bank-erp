@@ -47,6 +47,7 @@ Core capabilities:
         "mail",
         "web",
         "hr_employee_custom",
+        "bunna_hr_payroll",
     ],
     "data": [
         "security/pbms_security.xml",
@@ -55,6 +56,7 @@ Core capabilities:
         "data/pbms_planning_config_data.xml",
         "data/pbms_cron.xml",
         "data/pbms_mail_templates.xml",
+        "data/pbms_dynamic_defaults.xml",
         "wizard/pbms_review_action_wizard_views.xml",
         "wizard/pbms_excel_import_wizard_views.xml",
         "wizard/pbms_target_cascade_wizard_views.xml",
@@ -66,18 +68,21 @@ Core capabilities:
         "views/pbms_master_data_views.xml",
         "views/pbms_dashboard_views.xml",
         "views/pbms_exceptional_workforce_views.xml",
+        "views/pbms_dynamic_config_views.xml",
+        "views/pbms_review_menu_config_views.xml",
         "views/pbms_menus.xml",
+        "views/pbms_dynamic_config_menus.xml",
         "data/pbms_resync.xml",
+        "data/pbms_review_menu_config_defaults.xml",
         "report/pbms_consolidated_report.xml",
         "report/pbms_consolidated_report_templates.xml",
     ],
     "assets": {
         "web.assets_backend": [
-            # Chart.js must load before pbms_dashboard.js, which calls the
-            # global `Chart` constructor. Loaded locally from Odoo without external CDN.
             ("include", "web.chartjs_lib"),
+            "bunna_pbms/static/src/js/pbms_form_helpers.js",
             "bunna_pbms/static/src/js/pbms_dashboard.js",
-            "bunna_pbms/static/src/js/pbms_list_renderer_patch.js",
+            "bunna_pbms/static/src/js/pbms_list_group_select.js",
             "bunna_pbms/static/src/xml/**/*.xml",
             "bunna_pbms/static/src/scss/**/*.scss",
         ],

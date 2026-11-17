@@ -29,6 +29,7 @@ class InternalJobPosition(models.Model):
     number_of_vacancies = fields.Integer("Number of Vacancies")
     vacancy_announced_on = fields.Date("Vacancy Announced On", readonly=True)
     last_date_to_apply = fields.Date("Last Date to Apply", readonly=True)
+    is_expired = fields.Boolean("Is Expired", compute="_compute_is_expired", store=False)
     job_description = fields.Text("Job Description", readonly=True)
     application_reason = fields.Text("Application Reason")
     allowance_difference = fields.Float("Difference in Allowance")
@@ -36,7 +37,7 @@ class InternalJobPosition(models.Model):
     preferred_location = fields.Many2one('operating.unit', string="Preferred Location")
     employee_user_id = fields.Integer("Employee User Id")
     job_position_id = fields.Integer("Job Position Id")
-    application_status = fields.Char("Application Status", default='New')
+    application_status = fields.Char("Application Status", default='New' , readonly=True)
     employee_vacancy_ids = fields.One2many('employee.vacancy.available', 'vacancy_id', 'Vacancy Info')
     rejection_reason = fields.Text("Rejection Reason")
 
@@ -81,6 +82,16 @@ class InternalJobPosition(models.Model):
 
         return case_names
 
+    @api.depends('last_date_to_apply')
+    def _compute_is_expired(self):
+        today = date.today()
+        for rec in self:
+            rec.is_expired = bool(rec.last_date_to_apply and rec.last_date_to_apply < today)
+
+    def action_expired(self):
+        """Non-clickable placeholder action when vacancy deadline has expired."""
+        pass
+
     def apply(self):
         p_id = self.id
         today = date.today()
@@ -110,6 +121,75 @@ class InternalJobPosition(models.Model):
                     raise ValidationError(_(
                         "You cannot apply for this vacancy because you have active disciplinary record(s):\n%s"
                     ) % "\n".join(active_cases))
+
+                # Check 1-year tenure restriction on position and location for movements:
+                # Promotion, Lateral Transfer, Transfer, Assignment, Placement
+                CONSIDERED_MOVEMENTS = ['promotion', 'lateral_transfer', 'transfer', 'assignment', 'placement']
+                pos_id = emp_rec.job_position.id if emp_rec.job_position else (emp_rec.job_id.id if getattr(emp_rec, 'job_id', False) else False)
+                ou_id = emp_rec.default_operating_unit_id.id if getattr(emp_rec, 'default_operating_unit_id', False) else False
+                pos_date = False
+                loc_date = False
+                if 'hr.job.history' in self.env:
+                    if pos_id:
+                        pos_hist = self.env['hr.job.history'].sudo().search([
+                            ('employee_id', '=', emp_rec.id),
+                            '|', ('to_job_id', '=', pos_id), ('job_id', '=', pos_id),
+                            '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+                        ], order='job_history_start_date desc, id desc', limit=1)
+                        if pos_hist and pos_hist.job_history_start_date:
+                            pos_date = pos_hist.job_history_start_date
+                    if not pos_date:
+                        curr_hist = self.env['hr.job.history'].sudo().search([
+                            ('employee_id', '=', emp_rec.id),
+                            ('is_current', '=', True),
+                            '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+                        ], order='job_history_start_date desc, id desc', limit=1)
+                        if curr_hist and curr_hist.job_history_start_date:
+                            pos_date = curr_hist.job_history_start_date
+
+                    if ou_id:
+                        loc_hist = self.env['hr.job.history'].sudo().search([
+                            ('employee_id', '=', emp_rec.id),
+                            '|', ('to_operating_unit_id', '=', ou_id), ('operating_unit_id', '=', ou_id),
+                            '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+                        ], order='job_history_start_date desc, id desc', limit=1)
+                        if loc_hist and loc_hist.job_history_start_date:
+                            loc_date = loc_hist.job_history_start_date
+                    if not loc_date:
+                        curr_loc_hist = self.env['hr.job.history'].sudo().search([
+                            ('employee_id', '=', emp_rec.id),
+                            ('is_current', '=', True),
+                            '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+                        ], order='job_history_start_date desc, id desc', limit=1)
+                        if curr_loc_hist and curr_loc_hist.job_history_start_date:
+                            loc_date = curr_loc_hist.job_history_start_date
+
+                if not loc_date and ou_id and 'hr.employee.transfer.history' in self.env:
+                    trans_hist = self.env['hr.employee.transfer.history'].sudo().search([
+                        ('employee_id', '=', emp_rec.id),
+                        ('to_operating_unit_id', '=', ou_id),
+                        ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS),
+                    ], order='is_current desc, start_date desc, date desc, id desc', limit=1)
+                    if trans_hist and (trans_hist.start_date or trans_hist.date):
+                        loc_date = trans_hist.start_date or trans_hist.date
+
+                if pos_date:
+                    pos_years = round((today - pos_date).days / 365.25, 2)
+                    if pos_years < 1.0:
+                        raise ValidationError(_(
+                            "You cannot apply for this vacancy. Employees must have at least 1 full year of service "
+                            "in their current position following a Promotion, Lateral Transfer, Transfer, Assignment, or Placement. "
+                            "Current position tenure: %.2f years (since %s)."
+                        ) % (pos_years, pos_date))
+
+                if loc_date:
+                    loc_years = round((today - loc_date).days / 365.25, 2)
+                    if loc_years < 1.0:
+                        raise ValidationError(_(
+                            "You cannot apply for this vacancy. Employees must have at least 1 full year of service "
+                            "in their current location following a Promotion, Lateral Transfer, Transfer, Assignment, or Placement. "
+                            "Current location tenure: %.2f years (since %s)."
+                        ) % (loc_years, loc_date))
 
         self.env.cr.execute('SELECT internal_application(%s)', (p_id,))
         self.env.invalidate_all()
@@ -235,7 +315,7 @@ class InternalJobPosition(models.Model):
                 FOR rec_h IN 
                     SELECT DISTINCT ON (era.id)
                            era.id AS recruitment_available_id,
-                           CONCAT(he.name, ' - ', COALESCE(era.job_position, hj.name->>'en_US', 'Position')) AS application_name,
+                           CONCAT(he.name, ' - ', COALESCE(hj.name->>'en_US', hj.name::text, era.job_position, 'Position')) AS application_name,
                            COALESCE(jv.job_position, era.job_position_id, hj.id) AS job_position_id,
                            CAST('Y' AS boolean) AS active, 
                            1 AS stage_id,
@@ -265,7 +345,7 @@ class InternalJobPosition(models.Model):
                            ou.name AS employee_work_unit,
                            he.employee_identification AS employee_number,
                            eg.grade_name AS employee_grade,
-                           COALESCE(hj.name->>'en_US', era.job_position) AS employee_position,
+                           COALESCE(hj.name->>'en_US', hj.name::text, era.job_position) AS employee_position,
                            he.name AS internal_employee_name,
                            COALESCE((SELECT pms_score FROM internal_candidates_v WHERE employee_id = he.id LIMIT 1), 0.0) AS pms_score,
                            hd.name AS current_department,

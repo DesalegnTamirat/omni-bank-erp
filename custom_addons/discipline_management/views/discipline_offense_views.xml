@@ -62,16 +62,24 @@
             <field name="model">discipline.offense</field>
             <field name="arch" type="xml">
                 <search string="Disciplinary Offenses">
-                    <field name="name"/>
-                    <field name="sub_article_code"/>
+                    <field name="name" string="Title / Keyword" filter_domain="['|', '|', ('name', 'ilike', self), ('full_clause_text', 'ilike', self), ('description', 'ilike', self)]"/>
+                    <field name="sub_article_code" string="Clause Code"/>
                     <field name="article_id"/>
+                    <field name="severity_level_id"/>
                     <field name="category_id"/>
-                    <field name="penalty_mode"/>
+                    <field name="full_clause_text" string="Statutory Text Search"/>
+                    <separator/>
+                    <filter string="Level 1: Dismissal" name="filter_level_1" domain="[('severity_level', '=', 'level_1')]"/>
+                    <filter string="Level 2: Final Warning + 20%" name="filter_level_2" domain="[('severity_level', '=', 'level_2')]"/>
+                    <filter string="Level 3: 2nd Warning + 10%" name="filter_level_3" domain="[('severity_level', '=', 'level_3')]"/>
+                    <filter string="Level 4: 1st Warning + 5%" name="filter_level_4" domain="[('severity_level', '=', 'level_4')]"/>
+                    <filter string="Level 5: Verbal Warning" name="filter_level_5" domain="[('severity_level', '=', 'level_5')]"/>
+                    <filter string="Cash Shortages (Art 33.9)" name="filter_cash_shortage" domain="[('sub_article_code', 'ilike', '33.9')]"/>
+                    <separator/>
                     <filter string="Non-Managerial" name="filter_non_mgr" domain="[('staff_category', '=', 'non_managerial')]"/>
                     <filter string="Managerial" name="filter_mgr" domain="[('staff_category', '=', 'managerial')]"/>
-                    <filter string="Level Default" name="filter_mode_level" domain="[('penalty_mode', '=', 'level_default')]"/>
-                    <filter string="Article Override" name="filter_mode_override" domain="[('penalty_mode', '=', 'article_override')]"/>
-                    <filter string="Repetition Ladder" name="filter_mode_escalation" domain="[('penalty_mode', '=', 'repetition_escalation')]"/>
+                    <separator/>
+                    <filter string="Severity Level" name="group_severity_level" context="{'group_by': 'severity_level_id'}"/>
                     <filter string="Article / Regulation" name="group_article" context="{'group_by': 'article_id'}"/>
                     <filter string="Category" name="group_category" context="{'group_by': 'category_id'}"/>
                     <filter string="Penalty Mode" name="group_penalty_mode" context="{'group_by': 'penalty_mode'}"/>
@@ -85,17 +93,23 @@
             <field name="name">discipline.offense.list</field>
             <field name="model">discipline.offense</field>
             <field name="arch" type="xml">
-                <list string="Offenses &amp; Misconduct Catalog">
-                    <field name="sub_article_code"/>
-                    <field name="name"/>
-                    <field name="article_id"/>
-                    <field name="staff_category" widget="badge"
+                <list string="Bunna Bank Disciplinary Regulation &amp; Offense Catalog" default_order="sequence, id">
+                    <field name="severity_level" column_invisible="1"/>
+                    <field name="sub_article_code" string="Sub-Article / Clause" decoration-bf="1"/>
+                    <field name="governing_article_display" string="Governing Article" widget="badge"/>
+                    <field name="name" string="Offense Title / Misconduct"/>
+                    <field name="category_id" string="Category" widget="badge"/>
+                    <field name="staff_category" string="Staff Scope" widget="badge"
                            decoration-info="staff_category == 'non_managerial'"
                            decoration-warning="staff_category == 'managerial'"
                            decoration-success="staff_category == 'all'"/>
-                    <field name="penalty_mode" widget="badge"/>
-                    <field name="category_id"/>
-                    <field name="active" widget="boolean_toggle"/>
+                    <field name="severity_level_id" string="Default Severity Level" widget="badge"
+                           decoration-danger="severity_level == 'level_1'"
+                           decoration-warning="severity_level in ('level_2', 'level_3')"
+                           decoration-info="severity_level == 'level_4'"
+                           decoration-muted="severity_level == 'level_5'"/>
+                    <field name="sanction_summary" string="Prescribed Sanction"/>
+                    <field name="full_clause_text" string="Verbatim Statutory Clause Text" optional="hide"/>
                 </list>
             </field>
         </record>
@@ -106,33 +120,43 @@
             <field name="model">discipline.offense</field>
             <field name="arch" type="xml">
                 <form string="Offense Classification &amp; Rule">
-                    <header>
-                        <button name="action_create_case" string="Initiate Disciplinary Case"
-                                type="object" class="oe_highlight" icon="fa-gavel"/>
-                    </header>
                     <sheet>
                         <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
-                        <div class="oe_title">
-                            <span class="o_form_label">Clause / Sub-Article Code</span>
-                            <h1>
-                                <field name="sub_article_code" placeholder="e.g., 33.4.1(ሀ) or 10.4.1(a)"/>
-                            </h1>
-                            <h2>
-                                <field name="name" placeholder="Concise title / misconduct summary"/>
-                            </h2>
+                        <div class="oe_title mb-3">
+                            <div class="d-inline-flex align-items-center badge bg-primary text-white fs-6 px-3 py-2 mb-2" invisible="not sub_article_code">
+                                <i class="fa fa-bookmark me-2" title="Sub-Article Code"/>
+                                <field name="sub_article_code" readonly="1" nolabel="1" class="oe_inline text-white fw-bold" style="overflow: visible !important; text-overflow: clip !important; display: inline !important;"/>
+                            </div>
+                            <div>
+                                <span class="o_form_label text-muted">Offense Title / Misconduct</span>
+                                <h1 class="mb-0">
+                                    <field name="name" placeholder="e.g. ስርቆትና ዘረፋ or Unexcused Absence" required="1"/>
+                                </h1>
+                            </div>
                         </div>
                         <group>
-                            <group string="Regulatory Context &amp; Scope">
-                                <field name="article_id"/>
-                                <field name="policy_version_id" readonly="1"/>
+                            <group string="Article &amp; Classification">
+                                <field name="article_id" string="Governing Article" placeholder="Select or create Article (e.g. Article 33.4)..."/>
+                                <field name="sub_article_code" string="Sub-Article / Clause" placeholder="e.g. 33.4.1(ሀ) or 10.4.1(a)"/>
+                                <field name="category_id" required="0"/>
                                 <field name="staff_category" widget="radio" options="{'horizontal': true}"/>
-                                <field name="category_id"/>
                             </group>
-                            <group string="Penalty Architecture &amp; Mode">
-                                <field name="penalty_mode" widget="radio"/>
-                                <field name="active"/>
+                            <group string="Prescribed Sanction &amp; Measure">
+                                <field name="severity_level_id" required="1"/>
+                                <field name="punishment_type"/>
+                                <field name="penalty_percentage" invisible="staff_category == 'managerial' or penalty_percentage == 0"/>
+                                <field name="fine_days" invisible="staff_category != 'managerial' or fine_days == 0"/>
+                                <field name="active" widget="boolean_toggle"/>
                             </group>
                         </group>
+
+                        <!-- Verbatim Statutory Legal Clause Provision Card -->
+                        <div class="card bg-light border-0 mt-3 p-3 shadow-sm rounded" invisible="not full_clause_text">
+                            <h6 class="fw-bold text-primary mb-2">
+                                <i class="fa fa-balance-scale me-2" title="Statutory Provision"/>Verbatim Legal Provision / የደንቡ አንቀጽ ዝርዝር
+                            </h6>
+                            <field name="full_clause_text" readonly="1" class="text-dark fs-6" style="white-space: pre-wrap; line-height: 1.6;"/>
+                        </div>
 
                         <!-- Mode 2: Custom Penalty Overrides Group -->
                         <group string="Statutory Direct Penalty Settings (Override Mode)" invisible="penalty_mode != 'article_override'">
@@ -146,9 +170,9 @@
                             </group>
                         </group>
 
-                        <notebook>
-                            <page string="Repetition Penalty Matrix (Ladder / Multi-Tier)" name="repetition_lines"
-                                  invisible="penalty_mode not in ('repetition_escalation', 'level_default')">
+                        <!-- Repetition Ladder (Only visible if penalty determination mode requires it) -->
+                        <notebook invisible="penalty_mode != 'repetition_escalation'">
+                            <page string="Repetition Penalty Matrix (Ladder / Multi-Tier)" name="repetition_lines">
                                 <button name="action_populate_default_severity_lines" string="Auto-Populate Standard 5-Level Escalation"
                                         type="object" class="btn-outline-primary mb-2"/>
                                 <field name="line_ids">
@@ -165,15 +189,67 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Full Statutory Text / Legal Clause Provision" name="clause_text">
-                                <field name="full_clause_text" placeholder="Enter verbatim text as written in the Collective Agreement or Policy document..."/>
-                            </page>
-                            <page string="Policy Guidelines &amp; Rationale" name="guidelines">
-                                <field name="description" placeholder="Enter policy guidelines, evidence requirements, and punishment rationale..."/>
-                            </page>
                         </notebook>
                     </sheet>
                     <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Offense Definition Dialog / Modal View for Quick Full Text Inspection -->
+        <record id="view_discipline_offense_dialog_form" model="ir.ui.view">
+            <field name="name">discipline.offense.dialog.form</field>
+            <field name="model">discipline.offense</field>
+            <field name="priority">100</field>
+            <field name="arch" type="xml">
+                <form string="Statutory Legal Provision &amp; Misconduct Definition">
+                    <div class="alert alert-info py-2 mb-3" role="status">
+                        <div class="d-flex align-items-center">
+                            <i class="fa fa-balance-scale fa-2x me-3 text-primary" title="Legal Provision"/>
+                            <div>
+                                <h4 class="mb-1 text-primary fw-bold">
+                                    <field name="sub_article_code" readonly="1" class="oe_inline me-2"/>
+                                    <field name="title" readonly="1" class="oe_inline" invisible="not title"/>
+                                </h4>
+                                <div class="text-muted small">
+                                    <span>Governing Article: </span>
+                                    <field name="article_number" readonly="1" class="oe_inline fw-semibold me-3"/>
+                                    <span>Regulation: </span>
+                                    <field name="policy_version_id" readonly="1" class="oe_inline fw-semibold me-3"/>
+                                    <span>Staff Scope: </span>
+                                    <field name="staff_category" readonly="1" class="oe_inline fw-semibold"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <group>
+                        <group string="Classification">
+                            <field name="severity_level_id" readonly="1" string="Severity Classification"/>
+                            <field name="sanction_summary" readonly="1" string="Prescribed Sanction"/>
+                        </group>
+                        <group string="Rule Architecture">
+                            <field name="category_id" readonly="1" string="Offense Category"/>
+                            <field name="penalty_mode" readonly="1" string="Penalty Mode"/>
+                        </group>
+                    </group>
+
+                    <div class="card my-3 border-primary shadow-sm">
+                        <div class="card-header bg-primary text-white fw-bold py-2">
+                            <i class="fa fa-book me-2" title="Statutory Clause Text"/>Verbatim Statutory Clause Definition (ሕጋዊ የጥፋት ዝርዝር መግለጫ)
+                        </div>
+                        <div class="card-body bg-light" style="font-size: 1.05rem; line-height: 1.7; white-space: pre-wrap; font-family: inherit;">
+                            <field name="full_clause_text" readonly="1" nolabel="1"/>
+                        </div>
+                    </div>
+
+                    <group string="Operational Guidelines &amp; Scope" invisible="not description">
+                        <field name="description" readonly="1" nolabel="1" class="text-muted"/>
+                    </group>
+
+                    <footer>
+                        <button string="Close" class="btn btn-secondary px-4" special="cancel"/>
+                    </footer>
                 </form>
             </field>
         </record>
@@ -215,6 +291,14 @@
                         <field name="state" widget="statusbar" statusbar_visible="draft,active,archived"/>
                     </header>
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_articles" type="object" class="oe_stat_button" icon="fa-book">
+                                <field name="article_count" string="Articles" widget="statinfo"/>
+                            </button>
+                            <button name="action_view_offenses" type="object" class="oe_stat_button" icon="fa-list-ol">
+                                <field name="offense_count" string="Sub-Clauses" widget="statinfo"/>
+                            </button>
+                        </div>
                         <div class="oe_title">
                             <span class="o_form_label">Document Code / Version</span>
                             <h1>
@@ -225,17 +309,15 @@
                             </h2>
                         </div>
                         <group>
-                            <group string="Scope &amp; Reference">
+                            <group string="Scope &amp; Applicability">
                                 <field name="staff_category" widget="radio" options="{'horizontal': true}"/>
                                 <field name="chapter_reference" placeholder="e.g. ምዕራፍ ስምንት or Chapter X"/>
                                 <field name="effective_date"/>
-                                <field name="approved_by_id"/>
                             </group>
-                            <group string="Attachment &amp; Metrics">
+                            <group string="Official Policy Document &amp; File">
                                 <field name="document_file" filename="document_filename"/>
                                 <field name="document_filename" invisible="1"/>
-                                <field name="article_count" readonly="1"/>
-                                <field name="offense_count" readonly="1"/>
+                                <field name="approved_by_id" invisible="not approved_by_id"/>
                             </group>
                         </group>
                         <notebook>
@@ -246,6 +328,7 @@
                                         <field name="name"/>
                                         <field name="severity_level_id"/>
                                         <field name="offense_count" string="Sub-Clauses"/>
+                                        <field name="active" widget="boolean_toggle"/>
                                     </list>
                                 </field>
                             </page>

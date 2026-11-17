@@ -193,6 +193,11 @@
                     <field name="national_id"/>
                     <field name="secondary_id_number"/>
                     <field name="highest_education"/>
+                    <field name="city" string="City / Location"/>
+                    <field name="region" string="Region"/>
+                    <field name="skill_ids" string="Skills"/>
+                    <field name="experience_ids" string="Experience"/>
+                    <field name="education_ids" string="Education"/>
                     <separator/>
                     <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
                 </search>

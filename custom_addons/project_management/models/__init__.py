@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from . import lead_office
 from . import strategic_source
+from . import strategic_issue
 from . import strategic_objective
 from . import initiative
 from . import project
@@ -12,5 +13,9 @@ from . import task
 from . import subtask
 from . import progress_log
 from . import progress_update
+from . import project_document
 from . import stage
 from . import tag
+from . import project_sponsor
+from . import process_owner
+from . import test_sheet

@@ -7,8 +7,8 @@
             <list string="Separation Types">
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
-                <field name="code"/>
                 <field name="is_company_terminated"/>
+                <field name="bypass_handover"/>
                 <field name="pays_severance"/>
                 <field name="pays_provident_fund"/>
             </list>
@@ -36,14 +36,16 @@
                                        widget="boolean_toggle"
                                        string="Company-Initiated Termination"
                                        help="Flag for Provident Fund eligibility logic (FR-15). Company-terminated employees are excluded from PF regardless of tenure."/>
+                                <field name="bypass_handover"
+                                       widget="boolean_toggle"
+                                       string="Bypass Manager Handover &amp; Release Date"
+                                       help="If enabled, HR/POMD must enter the Release Date during creation, and direct manager handover is bypassed."/>
                                 <field name="default_notice_period"/>
                             </group>
                             
-                            <group string="Pre-Separation Validations (Enforced before POMD Approval)">
+                            <group string="Pre-Separation Validations (Displayed before POMD Approval)">
                                 <field name="check_disciplinary" widget="boolean_toggle"/>
-                                <field name="check_investigations" widget="boolean_toggle"/>
                                 <field name="check_commitments" widget="boolean_toggle"/>
-                                <field name="check_probation" widget="boolean_toggle"/>
                             </group>
                         </div>
 

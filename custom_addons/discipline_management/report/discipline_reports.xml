@@ -14,6 +14,18 @@
             <field name="binding_type">report</field>
         </record>
 
+        <!-- Attendance Disciplinary Notice / Warning Letter PDF Report Action -->
+        <record id="action_report_attendance_warning_letter" model="ir.actions.report">
+            <field name="name">Attendance Disciplinary Notice / Warning Letter</field>
+            <field name="model">discipline.attendance.case</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">discipline_management.report_attendance_warning_letter_template</field>
+            <field name="report_file">Attendance_Notice</field>
+            <field name="print_report_name">'Attendance_Notice_%s' % (object.name)</field>
+            <field name="binding_model_id" ref="model_discipline_attendance_case"/>
+            <field name="binding_type">report</field>
+        </record>
+
         <!-- Official Exoneration & Clearance Certificate PDF Report Action -->
         <record id="action_report_exoneration_certificate" model="ir.actions.report">
             <field name="name">Official Exoneration &amp; Clearance Certificate</field>

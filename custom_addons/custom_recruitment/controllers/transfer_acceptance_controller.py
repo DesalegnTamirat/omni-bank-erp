@@ -114,21 +114,23 @@ class TransferAcceptanceController(http.Controller):
 
     @http.route('/recruitment/transfer_acceptance/<int:candidate_id>/accept', type='http', auth='user', methods=['POST'], website=False)
     def accept_transfer(self, candidate_id, **kw):
-        candidate = request.env['new.internal.recruitment.selected.candidates'].sudo().browse(candidate_id)
+        candidate = request.env['new.internal.recruitment.selected.candidates'].browse(candidate_id)
         if not candidate.exists():
             return request.not_found()
 
+        candidate._check_current_user_is_candidate()
         if candidate.acceptance_status != 'accepted':
-            candidate.action_accept_promotion()
+            candidate.sudo().with_context(skip_candidate_check=True).action_accept_promotion()
 
         return request.redirect(f'/recruitment/transfer_acceptance/{candidate_id}')
 
     @http.route('/recruitment/transfer_acceptance/<int:candidate_id>/decline', type='http', auth='user', methods=['POST'], website=False)
     def decline_transfer(self, candidate_id, **kw):
-        candidate = request.env['new.internal.recruitment.selected.candidates'].sudo().browse(candidate_id)
+        candidate = request.env['new.internal.recruitment.selected.candidates'].browse(candidate_id)
         if not candidate.exists():
             return request.not_found()
 
+        candidate._check_current_user_is_candidate()
         reason = kw.get('rejection_reason', '').strip()
         if not reason:
             return request.make_response(
@@ -146,7 +148,7 @@ class TransferAcceptanceController(http.Controller):
                 headers=[('Content-Type', 'text/html;charset=utf-8')]
             )
 
-        candidate.confirm_decline_promotion(reason)
+        candidate.sudo().with_context(skip_candidate_check=True).confirm_decline_promotion(reason)
         return request.redirect(f'/recruitment/transfer_acceptance/{candidate_id}')
 
     def _render_portal_html(self, candidate_id, movement_title, is_lateral, emp_name, current_pos, current_loc, target_pos, target_loc, vac_ref, status, resp_date, reason, csrf_token):

@@ -6,6 +6,11 @@
         <field name="arch" type="xml">
             <form string="Internal Job Position" create="false">
                 <sheet>
+                    <field name="is_expired" invisible="1"/>
+                    <div class="alert alert-warning d-flex align-items-center py-2 px-3 mb-3" role="alert" invisible="not is_expired or application_status in ('Applied','Replied','Selected for Promotion')">
+                        <i class="fa fa-clock-o fa-lg me-2"/>
+                        <span><b>Application Deadline Expired:</b> The last date to apply for this vacancy has passed (<field name="last_date_to_apply" readonly="1"/>). No further applications can be submitted.</span>
+                    </div>
                     <group colspan="2">
                         <group>
                             <field name="vacancy_reference"/>
@@ -26,7 +31,8 @@
                         </group>
                         <group>
                             <field name="vacancy_announced_on"/>
-                            <button name="apply" invisible="application_status in ('Applied','Replied','Selected for Promotion')" string="Apply Now" type="object" class="oe_highlight"/>
+                            <button name="apply" invisible="is_expired or application_status in ('Applied','Replied','Selected for Promotion')" string="Apply Now" type="object" class="oe_highlight"/>
+                            <button name="action_expired" invisible="not is_expired or application_status in ('Applied','Replied','Selected for Promotion')" string="Expired" type="object" class="btn btn-secondary disabled" disabled="1"/>
                         </group>
                     </group>
                     <group colspan="2">
@@ -58,14 +64,15 @@
         <field name="name">employee.recruitment.available.list</field>
         <field name="model">employee.recruitment.available</field>
         <field name="arch" type="xml">
-            <list string="Internal Job Position" create="false">
+            <list string="Internal Job Position" create="false" decoration-muted="is_expired">
+                <field name="is_expired" invisible="1"/>
                 <field name="job_location"/>
                 <field name="job_position"/>
                 <field name="employee_grade"/>
                 <field name="employee_category"/>
                 <field name="number_of_vacancies"/>
                 <field name="vacancy_announced_on"/>
-                <field name="last_date_to_apply"/>
+                <field name="last_date_to_apply" decoration-danger="is_expired"/>
                 <field name="job_description"/>
                 <field name="application_reason"/>
                 <field name="application_status"/>

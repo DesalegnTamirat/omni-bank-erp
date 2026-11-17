@@ -105,19 +105,26 @@ def get_sms_access_token(username, password, base_url, force_refresh=False):
     return None
 
 
+_SMS_CONFIG_CACHE = {}
+
 class CbsIntegrationConfig(models.AbstractModel):
     _name = "cbs.integration.config"
     _description = "CBS Integration Configuration Reader (cbs_integration table)"
 
     @api.model
     def _table_columns(self):
-        self.env.cr.execute(
-            """
-            SELECT column_name FROM information_schema.columns
-            WHERE table_schema = current_schema() AND table_name = 'cbs_integration'
-            """
-        )
-        return {row[0] for row in self.env.cr.fetchall()}
+        try:
+            with self.env.registry.cursor() as fresh_cr:
+                fresh_cr.execute(
+                    """
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_schema = current_schema() AND table_name = 'cbs_integration'
+                    """
+                )
+                return {row[0] for row in fresh_cr.fetchall()}
+        except Exception as e:
+            _logger.warning("Could not check cbs_integration columns: %s", e)
+            return set()
 
     @api.model
     def get_config(self, environment=None):
@@ -131,15 +138,21 @@ class CbsIntegrationConfig(models.AbstractModel):
         The password is returned to the caller in memory only; it is never
         logged nor stored anywhere else.
         """
+        global _SMS_CONFIG_CACHE
         if not environment:
             environment = (
                 self.env["ir.config_parameter"].sudo().get_param(SMS_ENVIRONMENT_PARAM)
                 or DEFAULT_SMS_ENVIRONMENT
             )
         environment = str(environment).strip()
+        now = time.time()
+        cached = _SMS_CONFIG_CACHE.get(environment)
+        if cached and cached.get("expires_at", 0) > now:
+            return dict(cached["config"])
+
+        row = None
         try:
-            # Savepoint: a missing table must not poison the caller's transaction.
-            with self.env.cr.savepoint():
+            with self.env.registry.cursor() as fresh_cr:
                 columns = self._table_columns()
                 required = {"username", "password", "endpoint", "environment"}
                 if not columns:
@@ -161,26 +174,24 @@ class CbsIntegrationConfig(models.AbstractModel):
                     query += " AND (status IS NULL OR LOWER(TRIM(status::text)) IN %s)"
                     params.append(_ACTIVE_VALUES)
                 query += " LIMIT 1"
-                row = None
                 try:
-                    with self.env.cr.savepoint():
-                        self.env.cr.execute(query, params)
-                        row = self.env.cr.fetchone()
+                    fresh_cr.execute(query, params)
+                    row = fresh_cr.fetchone()
                 except Exception:
+                    fresh_cr.rollback()
                     # Fallback query if cbs_decode is missing
                     try:
-                        with self.env.cr.savepoint():
-                            fallback_query = (
-                                "SELECT username, password, endpoint, environment "
-                                "FROM cbs_integration WHERE UPPER(TRIM(environment)) = UPPER(%s)"
-                            )
-                            if "status" in columns:
-                                fallback_query += " AND (status IS NULL OR LOWER(TRIM(status::text)) IN %s)"
-                            fallback_query += " LIMIT 1"
-                            self.env.cr.execute(fallback_query, params)
-                            row = self.env.cr.fetchone()
+                        fallback_query = (
+                            "SELECT username, password, endpoint, environment "
+                            "FROM cbs_integration WHERE UPPER(TRIM(environment)) = UPPER(%s)"
+                        )
+                        if "status" in columns:
+                            fallback_query += " AND (status IS NULL OR LOWER(TRIM(status::text)) IN %s)"
+                        fallback_query += " LIMIT 1"
+                        fresh_cr.execute(fallback_query, params)
+                        row = fresh_cr.fetchone()
                     except Exception:
-                        pass
+                        fresh_cr.rollback()
         except Exception as exc:
             _logger.error("Could not read cbs_integration: %s", exc.__class__.__name__)
             return None
@@ -189,6 +200,17 @@ class CbsIntegrationConfig(models.AbstractModel):
         endpoint_setting = (
             self.env["ir.config_parameter"].sudo().get_param(SMS_ENDPOINT_PARAM) or ""
         ).strip()
+        cfg = {
+            "username": str(row[0] or "").strip(),
+            "password": str(row[1] or "").strip(),
+            "endpoint": endpoint_setting or str(row[2] or "").strip(),
+            "environment": str(row[3] or environment).strip(),
+        }
+        _SMS_CONFIG_CACHE[environment] = {
+            "config": dict(cfg),
+            "expires_at": now + 300,
+        }
+        return cfg
         return {
             "username": str(row[0] or "").strip(),
             "password": str(row[1] or "").strip(),

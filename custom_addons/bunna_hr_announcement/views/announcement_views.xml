@@ -5,21 +5,28 @@
         <field name="name">bunna.announcement.list</field>
         <field name="model">bunna.announcement</field>
         <field name="arch" type="xml">
-            <list delete="false" decoration-muted="live_status in ('revoked', 'expired')"
-                  decoration-success="live_status == 'live'">
+            <list delete="false" class="bunna_ann_status_list"
+                  decoration-success="live_status == 'live'"
+                  decoration-info="live_status == 'scheduled'"
+                  decoration-warning="live_status == 'expired'"
+                  decoration-danger="live_status == 'revoked'"
+                  decoration-muted="live_status == 'draft'">
                 <field name="name"/>
+                <field name="live_status" string="Status" widget="badge"
+                       decoration-success="live_status == 'live'"
+                       decoration-info="live_status == 'scheduled'"
+                       decoration-warning="live_status == 'expired'"
+                       decoration-danger="live_status == 'revoked'"
+                       decoration-muted="live_status == 'draft'"/>
+
                 <field name="category_id"/>
                 <field name="priority_id" widget="badge" decoration-danger="is_highlighted"/>
                 <field name="is_highlighted" column_invisible="1"/>
                 <field name="date_published"/>
                 <field name="date_expire"/>
                 <field name="author_id"/>
-                <field name="live_status" widget="badge"
-                       decoration-success="live_status == 'live'"
-                       decoration-info="live_status == 'scheduled'"
-                       decoration-warning="live_status == 'expired'"
-                       decoration-danger="live_status == 'revoked'"
-                       decoration-muted="live_status == 'draft'"/>
+                <field name="view_count" groups="bunna_hr_announcement.group_announcement_publisher"/>
+                <field name="unique_visitor_count" groups="bunna_hr_announcement.group_announcement_publisher"/>
             </list>
         </field>
     </record>
@@ -40,6 +47,10 @@
                     <button name="action_expire_now" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Expire Now"
                             invisible="live_status != 'live'"
                             confirm="This announcement will be taken off the website now (the record is kept). Continue?"/>
+                    <button name="action_open_comments" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Open Comments"
+                            invisible="state != 'published' or allow_comments"/>
+                    <button name="action_close_comments" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Close Comments"
+                            invisible="state != 'published' or not allow_comments"/>
                     <button name="action_set_draft" type="object" groups="bunna_hr_announcement.group_announcement_publisher" string="Set to Draft"
                             invisible="state != 'revoked'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,published,revoked"/>
@@ -73,6 +84,7 @@
                         <group string="Publishing">
                             <field name="date_published" readonly="not can_edit"/>
                             <field name="date_expire" readonly="not can_edit"/>
+                            <field name="allow_comments" readonly="not can_edit"/>
                             <field name="live_status" widget="badge"
                                    decoration-success="live_status == 'live'"
                                    decoration-info="live_status == 'scheduled'"
@@ -106,10 +118,42 @@
                             <field name="size_display"/>
                         </list>
                     </field>
+                    <separator string="Photo Gallery"/>
+                    <field name="photo_ids" nolabel="1" readonly="not can_edit">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="thumb" column_invisible="1"/>
+                            <field name="image" widget="image"
+                                   options="{'size': [0, 60], 'preview_image': 'thumb'}"/>
+                            <field name="caption" placeholder="Optional caption"/>
+                        </list>
+                    </field>
                     <group string="Optional Link">
                         <group>
                             <field name="link_url" widget="url" placeholder="https://... or /jobs" readonly="not can_edit"/>
                             <field name="link_label" placeholder="Open link" invisible="not link_url" readonly="not can_edit"/>
+                        </group>
+                    </group>
+                    <group string="Readership" groups="bunna_hr_announcement.group_announcement_publisher" invisible="state == 'draft'">
+                        <group>
+                            <field name="view_count"/>
+                            <field name="unique_visitor_count"/>
+                        </group>
+                        <group>
+                            <field name="file_open_count"/>
+                            <field name="download_count"/>
+                            <button name="action_open_view_stats" type="object"
+                                    string="Daily breakdown" class="btn-link"/>
+                        </group>
+                    </group>
+                    <group string="Comments" groups="bunna_hr_announcement.group_announcement_publisher" invisible="state == 'draft'">
+                        <group>
+                            <field name="comment_count"/>
+                            <field name="comment_pending_count"/>
+                        </group>
+                        <group>
+                            <button name="action_view_comments" type="object"
+                                    string="Review comments" class="btn-link"/>
                         </group>
                     </group>
                     <group string="Footer">
@@ -227,6 +271,7 @@
                             <field name="page_size"/>
                             <field name="new_duration"/>
                             <field name="new_unit"/>
+                            <field name="show_archive"/>
                         </group>
                         <group string="New Announcements">
                             <field name="default_signed_by"/>
@@ -254,6 +299,29 @@
                             <field name="max_file_mb"/>
                             <field name="max_total_mb"/>
                         </group>
+                        <group string="View Tracking">
+                            <field name="track_views"/>
+                            <field name="visit_retention_days"/>
+                        </group>
+                        <group string="Photo Gallery">
+                            <field name="gallery_max_photos"/>
+                            <field name="gallery_max_photo_mb"/>
+                            <field name="gallery_max_px"/>
+                            <field name="gallery_thumb_px"/>
+                            <field name="gallery_quality"/>
+                            <field name="gallery_caption_max"/>
+                            <field name="gallery_cache_hours"/>
+                        </group>
+                        <group string="Anonymous Comments">
+                            <field name="comments_site_enabled"/>
+                            <field name="comments_default_allow"/>
+                            <field name="comment_max_length"/>
+                            <field name="comment_rate_per_hour"/>
+                            <field name="comment_max_pending"/>
+                            <field name="comment_report_hide_at"/>
+                            <field name="comment_block_links"/>
+                            <field name="comment_notify_emails"/>
+                        </group>
                     </group>
                 </sheet>
             </form>
@@ -272,7 +340,12 @@
         <field name="name">bunna.announcement.report.list</field>
         <field name="model">bunna.announcement</field>
         <field name="arch" type="xml">
-            <list create="false" edit="false" delete="false" default_order="date_published desc, id desc">
+            <list class="bunna_ann_status_list" create="false" edit="false" delete="false" default_order="date_published desc, id desc"
+                  decoration-success="live_status == 'live'"
+                  decoration-info="live_status == 'scheduled'"
+                  decoration-warning="live_status == 'expired'"
+                  decoration-danger="live_status == 'revoked'"
+                  decoration-muted="live_status == 'draft'">
                 <field name="name"/>
                 <field name="category_id"/>
                 <field name="author_id"/>
@@ -281,6 +354,9 @@
                 <field name="date_published"/>
                 <field name="date_expire"/>
                 <field name="revoked_by" optional="hide"/>
+                <field name="view_count"/>
+                <field name="unique_visitor_count"/>
+                <field name="download_count" optional="hide"/>
                 <field name="live_status" widget="badge"
                        decoration-success="live_status == 'live'"
                        decoration-info="live_status == 'scheduled'"
@@ -349,6 +425,14 @@
                     <group>
                         <field name="details"/>
                     </group>
+                    <separator string="What Changed (old value and new value)"/>
+                    <field name="line_ids" nolabel="1">
+                        <list>
+                            <field name="field_label"/>
+                            <field name="old_value"/>
+                            <field name="new_value"/>
+                        </list>
+                    </field>
                 </sheet>
             </form>
         </field>
@@ -399,17 +483,253 @@
         </field>
     </record>
 
+    <!-- ===================== Readership (anonymous view counts) ===================== -->
+    <record id="view_bunna_announcement_readership_list" model="ir.ui.view">
+        <field name="name">bunna.announcement.view.daily.list</field>
+        <field name="model">bunna.announcement.view.daily</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false" default_order="date desc, id desc">
+                <field name="date"/>
+                <field name="announcement_id"/>
+                <field name="views" sum="Total"/>
+                <field name="unique_visitors" sum="Total"/>
+                <field name="file_opens" sum="Total"/>
+                <field name="downloads" sum="Total"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_readership_pivot" model="ir.ui.view">
+        <field name="name">bunna.announcement.view.daily.pivot</field>
+        <field name="model">bunna.announcement.view.daily</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="announcement_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <field name="views" type="measure"/>
+                <field name="unique_visitors" type="measure"/>
+                <field name="file_opens" type="measure"/>
+                <field name="downloads" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_readership_graph" model="ir.ui.view">
+        <field name="name">bunna.announcement.view.daily.graph</field>
+        <field name="model">bunna.announcement.view.daily</field>
+        <field name="arch" type="xml">
+            <graph type="line">
+                <field name="date" interval="day"/>
+                <field name="views" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_readership_search" model="ir.ui.view">
+        <field name="name">bunna.announcement.view.daily.search</field>
+        <field name="model">bunna.announcement.view.daily</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="announcement_id"/>
+                <filter name="readership_date" string="Date" date="date"/>
+                <group>
+                    <filter name="readership_group_announcement" string="Announcement"
+                            context="{'group_by': 'announcement_id'}"/>
+                    <filter name="readership_group_month" string="Month"
+                            context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_bunna_announcement_readership" model="ir.actions.act_window">
+        <field name="name">Readership</field>
+        <field name="res_model">bunna.announcement.view.daily</field>
+        <field name="view_mode">list,pivot,graph</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No views recorded yet</p>
+            <p>Each time an employee or visitor opens an announcement page, it is counted here
+                (anonymously: no names and no IP addresses).</p>
+        </field>
+    </record>
+
+    <!-- ===================== Comments (moderation) ===================== -->
+    <record id="view_bunna_announcement_comment_list" model="ir.ui.view">
+        <field name="name">bunna.announcement.comment.list</field>
+        <field name="model">bunna.announcement.comment</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false" default_order="id desc"
+                  decoration-warning="state == 'pending'" decoration-muted="state == 'hidden'">
+                <field name="announcement_id"/>
+                <field name="body"/>
+                <field name="submitted_on"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'pending'"
+                       decoration-success="state == 'approved'"
+                       decoration-muted="state == 'hidden'"/>
+                <field name="report_count"/>
+                <field name="moderated_by" optional="hide"/>
+                <button name="action_approve" type="object" string="Approve" icon="fa-check"
+                        invisible="state != 'pending'"/>
+                <button name="action_hide_wizard" type="object" string="Hide" icon="fa-eye-slash"
+                        invisible="state == 'hidden'"/>
+                <button name="action_approve" type="object" string="Restore" icon="fa-undo"
+                        invisible="state != 'hidden'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_comment_form" model="ir.ui.view">
+        <field name="name">bunna.announcement.comment.form</field>
+        <field name="model">bunna.announcement.comment</field>
+        <field name="arch" type="xml">
+            <form create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_approve" type="object" string="Approve" class="btn-primary"
+                            invisible="state != 'pending'"/>
+                    <button name="action_hide_wizard" type="object" string="Hide"
+                            invisible="state == 'hidden'"/>
+                    <button name="action_approve" type="object" string="Restore"
+                            invisible="state != 'hidden'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,approved,hidden"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="announcement_id"/>
+                            <field name="submitted_on"/>
+                            <field name="report_count"/>
+                        </group>
+                        <group>
+                            <field name="moderated_by"/>
+                            <field name="moderated_on"/>
+                            <field name="hide_reason"/>
+                        </group>
+                    </group>
+                    <separator string="Comment (the author is anonymous)"/>
+                    <field name="body" nolabel="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_comment_search" model="ir.ui.view">
+        <field name="name">bunna.announcement.comment.search</field>
+        <field name="model">bunna.announcement.comment</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="body"/>
+                <field name="announcement_id"/>
+                <filter name="pending" string="Waiting for Review" domain="[('state', '=', 'pending')]"/>
+                <filter name="approved" string="Approved" domain="[('state', '=', 'approved')]"/>
+                <filter name="hidden" string="Hidden" domain="[('state', '=', 'hidden')]"/>
+                <separator/>
+                <filter name="reported" string="Reported by Readers" domain="[('report_count', '&gt;', 0)]"/>
+                <group>
+                    <filter name="group_announcement" string="Announcement" context="{'group_by': 'announcement_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_bunna_announcement_comment" model="ir.actions.act_window">
+        <field name="name">Comments</field>
+        <field name="res_model">bunna.announcement.comment</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_pending': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No comments waiting</p>
+            <p>Anonymous comments sent from the website appear here. A comment is shown on the website
+                only after you approve it. Comments are never deleted: hide one to remove it from the website.</p>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_comment_hide_form" model="ir.ui.view">
+        <field name="name">bunna.announcement.comment.hide.form</field>
+        <field name="model">bunna.announcement.comment.hide</field>
+        <field name="arch" type="xml">
+            <form>
+                <field name="comment_ids" invisible="1"/>
+                <p class="text-muted">
+                    The comment will be hidden from the website. It stays on record, and your reason is
+                    kept with it and in the audit log. Readers never see the reason.
+                </p>
+                <group>
+                    <field name="reason" placeholder="e.g. Contains personal accusations"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" string="Hide Comment" class="btn-primary"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ===================== Audit changes (old and new values) ===================== -->
+    <record id="view_bunna_announcement_log_line_list" model="ir.ui.view">
+        <field name="name">bunna.announcement.log.line.list</field>
+        <field name="model">bunna.announcement.log.line</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false" default_order="date desc, id desc">
+                <field name="date"/>
+                <field name="user_id"/>
+                <field name="announcement_title"/>
+                <field name="field_label"/>
+                <field name="old_value"/>
+                <field name="new_value"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bunna_announcement_log_line_search" model="ir.ui.view">
+        <field name="name">bunna.announcement.log.line.search</field>
+        <field name="model">bunna.announcement.log.line</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="announcement_title"/>
+                <field name="field_label"/>
+                <field name="user_id"/>
+                <field name="old_value"/>
+                <field name="new_value"/>
+                <filter name="change_date" string="Date" date="date"/>
+                <group>
+                    <filter name="change_group_user" string="Person" context="{'group_by': 'user_id'}"/>
+                    <filter name="change_group_field" string="Field" context="{'group_by': 'field_label'}"/>
+                    <filter name="change_group_title" string="Announcement" context="{'group_by': 'announcement_title'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_bunna_announcement_log_line" model="ir.actions.act_window">
+        <field name="name">Audit Changes</field>
+        <field name="res_model">bunna.announcement.log.line</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No changes recorded yet</p>
+            <p>Each change to a published announcement is listed here with its old value and its new value.</p>
+        </field>
+    </record>
+
     <!-- ===================== Menus ===================== -->
     <menuitem id="menu_bunna_announcement_root" name="Announcements" sequence="90"
               web_icon="bunna_hr_announcement,static/description/icon.png"
               groups="bunna_hr_announcement.group_announcement_drafter,bunna_hr_announcement.group_announcement_publisher,bunna_hr_announcement.group_announcement_manager"/>
     <menuitem id="menu_bunna_announcement_all" name="Announcements"
               parent="menu_bunna_announcement_root" action="action_bunna_announcement" sequence="10"/>
+    <menuitem id="menu_bunna_announcement_comments" name="Comments"
+              parent="menu_bunna_announcement_root" action="action_bunna_announcement_comment" sequence="20"
+              groups="bunna_hr_announcement.group_announcement_publisher,bunna_hr_announcement.group_announcement_manager"/>
     <menuitem id="menu_bunna_announcement_reports" name="Reports"
               parent="menu_bunna_announcement_root" sequence="50"
               groups="bunna_hr_announcement.group_announcement_publisher,bunna_hr_announcement.group_announcement_manager"/>
     <menuitem id="menu_bunna_announcement_report" name="Publishing Report"
               parent="menu_bunna_announcement_reports" action="action_bunna_announcement_report" sequence="10"/>
+    <menuitem id="menu_bunna_announcement_readership" name="Readership"
+              parent="menu_bunna_announcement_reports" action="action_bunna_announcement_readership" sequence="15"/>
+    <menuitem id="menu_bunna_announcement_log_line" name="Audit Changes"
+              parent="menu_bunna_announcement_reports" action="action_bunna_announcement_log_line" sequence="25"/>
     <menuitem id="menu_bunna_announcement_log" name="Audit Log"
               parent="menu_bunna_announcement_reports" action="action_bunna_announcement_log" sequence="20"/>
     <menuitem id="menu_bunna_announcement_config" name="Configuration"

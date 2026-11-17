@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+        <!-- Hide Reset Password Link on Login Form -->
+        <template id="hide_reset_password_link" inherit_id="web.login" priority="999" name="Hide Reset Password Link">
+            <xpath expr="//form" position="inside">
+                <style>
+                    a[href*='/web/reset_password'], a[href*='reset_password'] {
+                        display: none !important;
+                    }
+                </style>
+            </xpath>
+        </template>
 
 
         <!--        <record id="menu_courses" model="website.menu">-->
@@ -541,7 +551,14 @@
                 </style>
 
 
-                <div class="mb-4">
+                <t t-if="error">
+                        <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4" role="alert" style="border-left: 5px solid #dc3545; background-color: #fff5f5;">
+                            <i class="fa fa-exclamation-triangle text-danger me-2" style="font-size: 1.1rem;"/>
+                            <strong class="text-danger">Application Notice:</strong> <t t-esc="error"/>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                        </div>
+                    </t>
+                    <div class="mb-4">
                     <h3 class="fw-bold" style="color: #1D2B32;">Career Opportunities</h3>
                     <p class="text-muted">Explore open positions at Bunna Bank Share Company.</p>
                 </div>
@@ -602,7 +619,13 @@
                                             <span class="btn btn-sm btn-secondary disabled px-3 rounded"><i class="fa fa-lock me-1"/> Closed</span>
                                         </t>
                                         <t t-else="">
-                                            <a t-attf-href="/jobs/apply/#{vacancy.id}" class="btn btn-sm btn-apply px-3 rounded">Apply Now</a>
+                                            <t t-set="user_has_bunna" t-value="bool(candidate and candidate.has_bunna_account)"/>
+                                            <t t-if="user_has_bunna">
+                                                <a t-attf-href="/jobs/apply/#{vacancy.id}" class="btn btn-sm btn-apply px-3 rounded">Apply Now</a>
+                                            </t>
+                                            <t t-else="">
+                                                <button type="button" class="btn btn-sm btn-apply px-3 rounded btn-trigger-bunna-check" t-att-data-job-id="vacancy.id" t-att-data-job-title="vacancy.job_position.name">Apply Now</button>
+                                            </t>
                                         </t>
                                     </div>
                                     <t t-if="request.env.user.has_group('custom_recruitment.group_recruitment_administrator') or request.env.user.has_group('custom_recruitment.group_recruitment_manager') or request.env.user.has_group('hr_recruitment.group_hr_recruitment_manager') or request.env.user.has_group('base.group_system')">
@@ -621,6 +644,209 @@
                         </div>
                     </t>
                 </div>
+
+                <!-- BUNNA BANK ACCOUNT VERIFICATION MODAL -->
+                <div class="modal fade" id="bunnaAccountModal" tabindex="-1" aria-labelledby="bunnaAccountModalLabel" aria-hidden="true" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content shadow-lg border-0" style="border-radius: 14px; overflow: hidden;">
+                            <div class="modal-header text-white" style="background-color: #1D2B32;">
+                                <h5 class="modal-title fw-bold" id="bunnaAccountModalLabel">
+                                    <i class="fa fa-university me-2" style="color: #C17540;"/> Bunna Bank Account Verification
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                <div id="modalStepChoice">
+                                    <div class="text-center py-2 mb-3">
+                                        <h5 class="fw-bold text-dark mb-1">Do you have a Bunna Bank account?</h5>
+                                        <p class="text-muted small">To apply for career vacancies at Bunna Bank, an active Bunna Bank account is required.</p>
+                                    </div>
+                                    <div class="row g-3 mb-2">
+                                        <div class="col-md-6">
+                                            <div class="card p-3 text-center border-success h-100 shadow-xs" style="cursor: pointer; transition: all 0.2s;" onclick="selectModalOption('yes')">
+                                                <i class="fa fa-check-circle fa-3x text-success mb-2"/>
+                                                <h6 class="fw-bold text-success mb-1">Yes, I have an account</h6>
+                                                <small class="text-muted">I already have an opened Bunna Bank account</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card p-3 text-center border-danger h-100 shadow-xs" style="cursor: pointer; transition: all 0.2s;" onclick="selectModalOption('no')">
+                                                <i class="fa fa-times-circle fa-3x text-danger mb-2"/>
+                                                <h6 class="fw-bold text-danger mb-1">No, I don't have an account</h6>
+                                                <small class="text-muted">I need to open an account before applying</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Modal Option Yes: Phone input -->
+                                <div id="modalYesPanel" style="display: none;" class="mt-3">
+                                    <div class="card border p-3 bg-light shadow-xs mb-3">
+                                        <h6 class="fw-bold text-dark mb-2"><i class="fa fa-university me-1 text-primary"/> Please enter your Bunna Bank Account Number:</h6>
+                                        <div class="input-group mb-2">
+                                            <span class="input-group-text bg-white"><i class="fa fa-university"/></span>
+                                            <input type="text" id="modalPhoneInput" class="form-control font-monospace" placeholder="e.g. 1019501012030" t-att-value="candidate.bunna_account_number if candidate and candidate.bunna_account_number else ''"/>
+                                            <button type="button" class="btn btn-bunna text-white" style="background-color: #541718;" onclick="performModalAccountCheck('yes')">
+                                                <span id="modalYesSpinner" class="spinner-border spinner-border-sm me-1" style="display: none;" role="status"></span>
+                                                Check Status
+                                            </button>
+                                        </div>
+                                        <div id="modalYesAlert"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Modal Option No: Open account message + link -->
+                                <div id="modalNoPanel" style="display: none;" class="mt-3">
+                                    <div class="alert alert-warning border-0 shadow-xs mb-3">
+                                        <i class="fa fa-exclamation-circle me-2 text-warning"/>
+                                        <strong>Please Open account first reapply again.</strong>
+                                        <div class="mt-2">
+                                            To open account please <a href="https://onboardingportal.bunnabanksc.com/" target="_blank" class="fw-bold text-decoration-underline" style="color: #541718;">click here: https://onboardingportal.bunnabanksc.com/</a>
+                                        </div>
+                                    </div>
+                                    <div class="card border p-3 bg-light shadow-xs mb-3">
+                                        <h6 class="fw-bold text-dark mb-2"><i class="fa fa-university me-1 text-primary"/> Enter your opened Bunna Bank Account Number:</h6>
+                                        <div class="input-group mb-2">
+                                            <span class="input-group-text bg-white"><i class="fa fa-university"/></span>
+                                            <input type="text" id="modalNoPhoneInput" class="form-control font-monospace" placeholder="e.g. 1019501012030"/>
+                                            <button type="button" class="btn btn-bunna text-white" style="background-color: #541718;" onclick="performModalAccountCheck('no')">
+                                                <span id="modalNoSpinner" class="spinner-border spinner-border-sm me-1" style="display: none;" role="status"></span>
+                                                Check Status
+                                            </button>
+                                        </div>
+                                        <div id="modalNoAlert"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Modal Verification Success Card -->
+                                <div id="modalResultCard" style="display: none;" class="card border-success border-2 shadow-sm p-3 mt-3 bg-white">
+                                    <div class="d-flex align-items-center mb-2 text-success">
+                                        <i class="fa fa-check-circle fa-2x me-2"/>
+                                        <h6 class="fw-bold mb-0">Bunna Bank Account Verified Successfully!</h6>
+                                    </div>
+                                    <div class="row g-2 small mb-3">
+                                        <div class="col-6">
+                                            <span class="text-muted d-block">Account Number:</span>
+                                            <strong class="font-monospace text-dark" id="modalResAcctNo"></strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <span class="text-muted d-block">Name:</span>
+                                            <strong class="text-dark" id="modalResName"></strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <span class="text-muted d-block">Account Type:</span>
+                                            <strong class="text-dark" id="modalResType"></strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <span class="text-muted d-block">Account Status:</span>
+                                            <span class="badge bg-success" id="modalResStatus">Active</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <span class="text-muted d-block">Branch Name:</span>
+                                            <strong class="text-dark" id="modalResBranch"></strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <span class="text-muted d-block">Phone:</span>
+                                            <strong class="text-dark" id="modalResPhone"></strong>
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <a id="btnModalProceedApply" href="#" class="btn btn-success px-4 py-2 fw-bold">
+                                            Proceed to Apply &#8594;
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script type="text/javascript">
+                    var selectedApplyJobId = null;
+
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var triggers = document.querySelectorAll('.btn-trigger-bunna-check');
+                        triggers.forEach(function(btn) {
+                            btn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                selectedApplyJobId = this.getAttribute('data-job-id');
+                                var modalEl = document.getElementById('bunnaAccountModal');
+                                if (modalEl &amp;&amp; window.bootstrap) {
+                                    var modal = new bootstrap.Modal(modalEl);
+                                    modal.show();
+                                }
+                            });
+                        });
+                    });
+
+                    function selectModalOption(opt) {
+                        var yesPanel = document.getElementById('modalYesPanel');
+                        var noPanel = document.getElementById('modalNoPanel');
+                        if (opt === 'yes') {
+                            yesPanel.style.display = 'block';
+                            noPanel.style.display = 'none';
+                        } else {
+                            yesPanel.style.display = 'none';
+                            noPanel.style.display = 'block';
+                        }
+                    }
+
+                    function performModalAccountCheck(type) {
+                        var phoneInput = (type === 'yes') ? document.getElementById('modalPhoneInput') : document.getElementById('modalNoPhoneInput');
+                        var spinner = (type === 'yes') ? document.getElementById('modalYesSpinner') : document.getElementById('modalNoSpinner');
+                        var alertArea = (type === 'yes') ? document.getElementById('modalYesAlert') : document.getElementById('modalNoAlert');
+                        var phone = phoneInput ? phoneInput.value.trim() : '';
+
+                        if (!phone) {
+                            alertArea.innerHTML = '<div class="alert alert-danger small mt-2">Please enter your Bunna Bank account number.</div>';
+                            return;
+                        }
+
+                        spinner.style.display = 'inline-block';
+                        alertArea.innerHTML = '';
+
+                        fetch('/my/candidate/check_cbs_account', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                method: 'call',
+                                params: { account_number: phone }
+                            })
+                        })
+                        .then(function(res) { return res.json(); })
+                        .then(function(result) {
+                            spinner.style.display = 'none';
+                            var resData = result.result || result;
+                            if (resData.success &amp;&amp; resData.data) {
+                                var d = resData.data;
+                                document.getElementById('modalResAcctNo').innerText = d.account_number || '';
+                                document.getElementById('modalResName').innerText = d.name || '';
+                                document.getElementById('modalResType').innerText = d.account_type || 'Saving Account';
+                                document.getElementById('modalResStatus').innerText = d.account_status || 'Active';
+                                document.getElementById('modalResBranch').innerText = d.branch_name || 'BIB Main Branch';
+                                document.getElementById('modalResPhone').innerText = d.phone || phone;
+                                document.getElementById('modalResultCard').style.display = 'block';
+
+                                var applyBtn = document.getElementById('btnModalProceedApply');
+                                if (applyBtn &amp;&amp; selectedApplyJobId) {
+                                    applyBtn.setAttribute('href', '/jobs/apply/' + selectedApplyJobId);
+                                }
+                                alertArea.innerHTML = '<div class="alert alert-success small mt-2"><i class="fa fa-check me-1"/> ' + (resData.message || 'Account verified successfully.') + '</div>';
+                            } else {
+                                alertArea.innerHTML = '<div class="alert alert-danger small mt-2"><i class="fa fa-exclamation-circle me-1"/> ' + (resData.message || 'No account found matching this phone number.') + '</div>';
+                            }
+                        })
+                        .catch(function(err) {
+                            spinner.style.display = 'none';
+                            alertArea.innerHTML = '<div class="alert alert-danger small mt-2">Error checking account. Please try again.</div>';
+                        });
+                    }
+                </script>
+
             </t>
         </template>
 
@@ -694,11 +920,11 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label-custom">Current Monthly Salary (ETB)</label>
-                                <input type="number" name="current_salary" class="form-control form-control-custom" placeholder="e.g. 25000" min="0" step="100" t-att-value="candidate.current_salary or ''"/>
+                                <input type="number" name="current_salary" class="form-control form-control-custom" placeholder="e.g. 25000" min="0" step="any" t-att-value="candidate.current_salary or ''"/>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label-custom">Expected Monthly Salary (ETB)</label>
-                                <input type="number" name="expected_salary" class="form-control form-control-custom" placeholder="e.g. 30000" min="0" step="100"/>
+                                <input type="number" name="expected_salary" class="form-control form-control-custom" placeholder="e.g. 30000" min="0" step="any"/>
                             </div>
                             <div class="col-md-4 d-flex align-items-center pt-3">
                                 <div class="form-check">
@@ -1914,6 +2140,25 @@
                         </div>
                     </t>
 
+                    <t t-if="activation_sent == 1">
+                        <div class="alert alert-info mb-4 p-3 rounded-3 small border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa fa-paper-plane me-2 fs-5"/> A new activation email has been sent. Please check your inbox.
+                        </div>
+                    </t>
+
+                    <t t-if="show_resend_activation and email">
+                        <div class="mb-4 p-3 rounded-3 text-center" style="background-color: #fff9e6; border: 1px dashed #ffc107;">
+                            <p class="small text-muted mb-2">Didn't receive the email or the link expired?</p>
+                            <form action="/jobs/resend_activation" method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <input type="hidden" name="email" t-att-value="email"/>
+                                <button type="submit" class="btn btn-sm btn-outline-dark fw-bold">
+                                    <i class="fa fa-envelope me-1"/> Resend Activation Email
+                                </button>
+                            </form>
+                        </div>
+                    </t>
+
                     <form action="/jobs/login/submit" method="POST">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                         
@@ -2028,14 +2273,37 @@
 
 
 
-                        <div class="row g-3 mb-4">
+                        <div class="row g-3 mb-3">
                             <div class="col-md-6">
-                                <label class="form-label-custom">Password</label>
-                                <input type="password" name="password" class="form-control form-control-custom" placeholder="••••••••" required="1"/>
+                                <label class="form-label-custom">Password <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="password" id="reg_password" name="password" class="form-control form-control-custom" minlength="12" placeholder="Min 12 characters" required="1" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                    <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="reg_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label-custom">Confirm Password</label>
-                                <input type="password" name="confirm_password" class="form-control form-control-custom" placeholder="••••••••" required="1"/>
+                                <label class="form-label-custom">Confirm Password <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="password" id="reg_confirm_password" name="confirm_password" class="form-control form-control-custom" minlength="12" placeholder="Confirm password" required="1" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                    <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="reg_confirm_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Password Security Policy Checklist -->
+                        <div class="p-3 mb-3 rounded-3" style="background-color: #fdf8f8; border: 1px solid #ebd4d5; font-size: 0.8rem;">
+                            <div class="fw-bold mb-2" style="color: #541718;"><i class="fa fa-shield me-1"></i> Bunna Bank Password Security Policy:</div>
+                            <div class="row g-1">
+                                <div class="col-sm-6">
+                                    <div id="rule-length" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 12 characters</div>
+                                    <div id="rule-upper" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 uppercase (A-Z)</div>
+                                    <div id="rule-lower" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 lowercase (a-z)</div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div id="rule-number" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 number (0-9)</div>
+                                    <div id="rule-special" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 special symbol (@$!%*?&amp;)</div>
+                                    <div id="rule-match" class="text-muted"><i class="fa fa-circle-o me-1"></i> Passwords match</div>
+                                </div>
                             </div>
                         </div>
 
@@ -2103,7 +2371,8 @@
                     <h3 class="success-title">Registration Successful!</h3>
                     <p class="success-text">
                         Your account has been created successfully.<br/>
-                        A verification link has been sent to your email address. Please check your inbox and click the verification link to activate your account.
+                        A verification link has been sent to your email address <strong t-if="email"><t t-esc="email"/></strong>.<br/>
+                        Please check your inbox and click the verification link to activate your account.
                     </p>
                     <a href="/jobs/login" class="btn-proceed">Proceed to Login</a>
                 </div>
@@ -2340,6 +2609,12 @@
                             <span class="ats-nav-text">My Profile</span> 
                         </a>
 
+                        <!-- 4b. Account Information Menu -->
+                        <a href="/my/candidate/account_info" t-attf-class="ats-nav-item #{'active' if active_tab == 'account_info' else ''}" title="Account Information">
+                            <i class="fa fa-university nav-icon"/>
+                            <span class="ats-nav-text">Account Information</span>
+                        </a>
+
                         <!-- 5. Settings Menu (ALWAYS VISIBLE) -->
                         <a href="#" id="settingsToggle" t-attf-class="ats-nav-item #{'active' if active_tab == 'settings' or active_tab == 'password' else ''}" title="Settings">
                             <i class="fa fa-cog nav-icon"/>
@@ -2366,8 +2641,83 @@
                                 <span class="ats-navbar-title">Application Tracking System</span>
                             </div>
                             <div class="d-flex align-items-center">
-                                <span class="ats-navbar-user me-3"><i class="fa fa-user-circle me-1"/> <t t-esc="cand.email if cand else request.env.user.email"/></span>
-                                <a href="/web/session/logout?redirect=/jobs" class="btn btn-sm btn-outline-danger" style="font-size: 0.8rem; font-weight: 600;"><i class="fa fa-sign-out me-1"/> Logout</a>
+                                <t t-set="nav_cand" t-value="cand if cand else (candidate if candidate else (request.env['candidate.profile'].sudo().search([('user_id', '=', request.env.user.id)], limit=1) if request.env.user else False))"/>
+                                <div class="dropdown me-3">
+                                    <button class="btn btn-link dropdown-toggle text-decoration-none d-flex align-items-center p-0 border-0 ats-navbar-user" type="button" id="userProfileDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="color: #726732; font-weight: 600; font-size: 0.9rem; cursor: pointer;">
+                                        <i class="fa fa-user-circle me-1" style="font-size: 1.25rem;"/>
+                                        <t t-esc="(nav_cand.name if nav_cand and nav_cand.name else (nav_cand.email if nav_cand else request.env.user.email))"/>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end shadow-lg p-3" aria-labelledby="userProfileDropdown" style="width: 320px; border-radius: 12px; border: 1px solid #e2e8f0; z-index: 1050;">
+                                        <div class="text-center mb-3">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm mx-auto mb-2" style="width: 70px; height: 70px; background-color: #1D2B32; font-size: 1.8rem;">
+                                                <t t-if="nav_cand and nav_cand.name">
+                                                    <t t-esc="nav_cand.name[0].upper()"/>
+                                                </t>
+                                                <t t-elif="request.env.user.name">
+                                                    <t t-esc="request.env.user.name[0].upper()"/>
+                                                </t>
+                                                <t t-else="">
+                                                    <i class="fa fa-user"/>
+                                                </t>
+                                            </div>
+                                            <h6 class="fw-bold mb-0 text-dark"><t t-esc="(nav_cand.name if nav_cand and nav_cand.name else request.env.user.name)"/></h6>
+                                            <div class="text-muted small"><t t-esc="(nav_cand.email if nav_cand and nav_cand.email else request.env.user.email)"/></div>
+                                            <t t-if="nav_cand and nav_cand.phone">
+                                                <span class="badge bg-light text-dark border px-2 py-1 mt-1 small"><i class="fa fa-phone me-1"/> <t t-esc="nav_cand.phone"/></span>
+                                            </t>
+                                        </div>
+
+                                        <hr class="my-2"/>
+
+                                        <t t-if="nav_cand">
+                                            <div class="small">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">National ID:</span>
+                                                    <span class="fw-bold text-dark"><t t-esc="nav_cand.national_id or 'Not Set'"/></span>
+                                                </div>
+                                                <t t-if="nav_cand.secondary_id_type or nav_cand.secondary_id_number">
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span class="text-muted"><t t-esc="dict([('passport', 'Passport'), ('kebele_id', 'Kebele ID'), ('driver_id', 'Driver ID')]).get(nav_cand.secondary_id_type, 'Secondary ID')"/>:</span>
+                                                        <span class="fw-bold text-dark"><t t-esc="nav_cand.secondary_id_number or 'Not Set'"/></span>
+                                                    </div>
+                                                </t>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Gender:</span>
+                                                    <span class="fw-bold text-dark"><t t-esc="dict([('male', 'Male'), ('female', 'Female')]).get(nav_cand.gender, 'Not Set')"/></span>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Location:</span>
+                                                    <span class="fw-bold text-dark"><t t-esc="nav_cand.city or 'Not Set'"/></span>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1 align-items-center">
+                                                    <span class="text-muted">Master CV:</span>
+                                                    <t t-if="nav_cand.cv_file">
+                                                        <a href="/my/candidate/cv/download" class="badge bg-success text-white text-decoration-none"><i class="fa fa-download me-1"/> Download</a>
+                                                    </t>
+                                                    <t t-if="not nav_cand.cv_file">
+                                                        <span class="badge bg-danger">Missing</span>
+                                                    </t>
+                                                </div>
+                                            </div>
+
+                                            <hr class="my-2"/>
+                                        </t>
+
+                                        <div class="d-flex gap-2">
+                                            <t t-if="nav_cand">
+                                                <form action="/my/candidate/profile/delete" method="POST" class="flex-grow-1 mb-0" onsubmit="return confirm('WARNING: Are you sure you want to request deletion of your account and profile data? This action cannot be undone.');">
+                                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger w-100 fw-bold d-flex align-items-center justify-content-center text-nowrap" style="font-size: 0.78rem; padding: 0.35rem 0.5rem;">
+                                                        <i class="fa fa-trash me-1"/> Delete Your Profile
+                                                    </button>
+                                                </form>
+                                            </t>
+                                            <a href="/web/session/logout?redirect=/jobs" class="btn btn-sm btn-outline-danger fw-bold d-flex align-items-center justify-content-center text-nowrap px-3" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;">
+                                                <i class="fa fa-sign-out me-1"/> Logout
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -2520,12 +2870,35 @@
                         <input type="hidden" name="token" t-att-value="token"/>
                         
                         <div class="mb-3">
-                            <label class="form-label-custom">New Password</label>
-                            <input type="password" name="password" class="form-control form-control-custom" placeholder="••••••••" required="1"/>
+                            <label class="form-label-custom">New Password <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="password" id="reset_password" name="password" class="form-control form-control-custom" minlength="12" placeholder="Min 12 characters" required="1" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="reset_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                            </div>
                         </div>
-                        <div class="mb-4">
-                            <label class="form-label-custom">Confirm Password</label>
-                            <input type="password" name="confirm_password" class="form-control form-control-custom" placeholder="••••••••" required="1"/>
+                        <div class="mb-3">
+                            <label class="form-label-custom">Confirm Password <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="password" id="reset_confirm_password" name="confirm_password" class="form-control form-control-custom" minlength="12" placeholder="Confirm password" required="1" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="reset_confirm_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Password Security Policy Checklist -->
+                        <div class="p-3 mb-3 rounded-3" style="background-color: #fdf8f8; border: 1px solid #ebd4d5; font-size: 0.8rem;">
+                            <div class="fw-bold mb-2" style="color: #541718;"><i class="fa fa-shield me-1"></i> Bunna Bank Password Security Policy:</div>
+                            <div class="row g-1">
+                                <div class="col-sm-6">
+                                    <div id="reset-rule-length" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 12 characters</div>
+                                    <div id="reset-rule-upper" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 uppercase (A-Z)</div>
+                                    <div id="reset-rule-lower" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 lowercase (a-z)</div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div id="reset-rule-number" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 number (0-9)</div>
+                                    <div id="reset-rule-special" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 special symbol (@$!%*?&amp;)</div>
+                                    <div id="reset-rule-match" class="text-muted"><i class="fa fa-circle-o me-1"></i> Passwords match</div>
+                                </div>
+                            </div>
                         </div>
                         <button type="submit" class="btn-reset">Reset Password</button>
                     </form>
@@ -2561,15 +2934,41 @@
                                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                         <div class="mb-3">
                                             <label class="form-label fw-bold small">Current Password <span class="text-danger">*</span></label>
-                                            <input type="password" name="old_password" class="form-control" required="required" placeholder="Enter current password"/>
+                                            <div class="input-group">
+                                                <input type="password" id="chg_old_password" name="old_password" class="form-control" required="required" placeholder="Enter current password" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                                <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="chg_old_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                                            </div>
                                         </div>
                                         <div class="mb-3">
                                             <label class="form-label fw-bold small">New Password <span class="text-danger">*</span></label>
-                                            <input type="password" name="new_password" class="form-control" minlength="6" required="required" placeholder="Enter new password (min 6 chars)"/>
+                                            <div class="input-group">
+                                                <input type="password" id="chg_new_password" name="new_password" class="form-control" minlength="12" required="required" placeholder="Enter new password (min 12 chars)" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                                <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="chg_new_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                                            </div>
                                         </div>
-                                        <div class="mb-4">
+                                        <div class="mb-3">
                                             <label class="form-label fw-bold small">Confirm New Password <span class="text-danger">*</span></label>
-                                            <input type="password" name="confirm_password" class="form-control" minlength="6" required="required" placeholder="Confirm new password"/>
+                                            <div class="input-group">
+                                                <input type="password" id="chg_confirm_password" name="confirm_password" class="form-control" minlength="12" required="required" placeholder="Confirm new password" onpaste="return false;" oncopy="return false;" oncut="return false;" ondrop="return false;" autocomplete="off"/>
+                                                <button class="btn btn-outline-secondary toggle-pwd-btn" type="button" data-target="chg_confirm_password" tabindex="-1"><i class="fa fa-eye"></i></button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Password Security Policy Checklist -->
+                                        <div class="p-3 mb-3 rounded-3" style="background-color: #fdf8f8; border: 1px solid #ebd4d5; font-size: 0.8rem;">
+                                            <div class="fw-bold mb-2" style="color: #541718;"><i class="fa fa-shield me-1"></i> Bunna Bank Password Security Policy:</div>
+                                            <div class="row g-1">
+                                                <div class="col-sm-6">
+                                                    <div id="chg-rule-length" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 12 characters</div>
+                                                    <div id="chg-rule-upper" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 uppercase (A-Z)</div>
+                                                    <div id="chg-rule-lower" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 lowercase (a-z)</div>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <div id="chg-rule-number" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 number (0-9)</div>
+                                                    <div id="chg-rule-special" class="text-muted"><i class="fa fa-circle-o me-1"></i> At least 1 special symbol (@$!%*?&amp;)</div>
+                                                    <div id="chg-rule-match" class="text-muted"><i class="fa fa-circle-o me-1"></i> Passwords match</div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="d-grid">
                                             <button type="submit" class="btn btn-bunna py-2" style="background-color: #541718; color: #fff; border: none; font-weight: 600;"><i class="fa fa-save me-1"/> Update Password</button>
@@ -2582,5 +2981,380 @@
                 </div>
             </t>
         </template>
+
+        <!-- CANDIDATE ACCOUNT INFORMATION TEMPLATE -->
+        <template id="ats_account_info_template" name="ATS Account Information">
+            <t t-call="bunna_custom_web_page.dashboard_layout">
+                <t t-set="active_tab" t-value="'account_info'"/>
+                <div class="container py-3">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-9">
+                            <t t-if="error">
+                                <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+                                    <i class="fa fa-exclamation-triangle me-2"/> <t t-esc="error"/>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            </t>
+                            <t t-if="apply_job_id and vacancy">
+                                <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center mb-4" style="border-left: 4px solid #C17540 !important;">
+                                    <i class="fa fa-info-circle fa-2x me-3 text-warning"/>
+                                    <div>
+                                        <strong>Bunna Account Verification Required for Application</strong>
+                                        <div class="small">You are applying for position: <strong><t t-esc="vacancy.job_position.name"/></strong>. Please verify your Bunna Bank account below to continue.</div>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px; overflow: hidden;">
+                                <div class="card-header text-white py-3" style="background-color: #1D2B32;">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5 class="fw-bold mb-0 text-white"><i class="fa fa-university me-2" style="color: #C17540;"/> Bunna Bank Account Information</h5>
+                                        <t t-if="candidate and candidate.has_bunna_account">
+                                            <span class="badge bg-success px-3 py-2"><i class="fa fa-check-circle me-1"/> Verified</span>
+                                        </t>
+                                        <t t-else="">
+                                            <span class="badge bg-warning text-dark px-3 py-2"><i class="fa fa-exclamation-circle me-1"/> Unverified</span>
+                                        </t>
+                                    </div>
+                                </div>
+                                <div class="card-body p-4">
+                                    <!-- Verified Account Display -->
+                                    <t t-if="candidate and candidate.has_bunna_account">
+                                        <div class="alert alert-success border-0 shadow-xs mb-4 d-flex align-items-center">
+                                            <i class="fa fa-check-circle fa-2x me-3 text-success"/>
+                                            <div>
+                                                <h6 class="fw-bold mb-1 text-success">Verified Bunna Bank Customer</h6>
+                                                <small class="text-muted">Your Bunna Bank account details are verified and automatically attached to your vacancy applications.</small>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <div class="p-3 bg-light rounded-3 border">
+                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Account Number</small>
+                                                    <h5 class="fw-bold text-dark font-monospace mb-0"><t t-esc="candidate.bunna_account_number"/></h5>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="p-3 bg-light rounded-3 border">
+                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Account Holder Name</small>
+                                                    <h5 class="fw-bold text-dark mb-0"><t t-esc="candidate.bunna_account_name"/></h5>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="p-3 bg-light rounded-3 border">
+                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Account Type</small>
+                                                    <h6 class="fw-bold text-dark mb-0"><t t-esc="candidate.bunna_account_type or 'Saving Account'"/></h6>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="p-3 bg-light rounded-3 border">
+                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Account Status</small>
+                                                    <div><span class="badge bg-success px-2 py-1"><t t-esc="candidate.bunna_account_status or 'Active'"/></span></div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="p-3 bg-light rounded-3 border">
+                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Branch Name</small>
+                                                    <h6 class="fw-bold text-dark mb-0"><t t-esc="candidate.bunna_branch_name or 'Main Branch'"/></h6>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="p-3 bg-light rounded-3 border">
+                                                    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Registered Phone Number</small>
+                                                    <h6 class="fw-bold text-dark mb-0"><i class="fa fa-phone me-1 text-muted"/> <t t-esc="candidate.bunna_account_phone or candidate.phone"/></h6>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <t t-if="apply_job_id">
+                                            <div class="mt-4 pt-3 border-top text-end">
+                                                <a t-attf-href="/jobs/apply/#{apply_job_id}" class="btn btn-bunna px-4 py-2" style="background-color: #541718; color: #fff; font-weight: 600;">
+                                                    Continue Application &#8594;
+                                                </a>
+                                            </div>
+                                        </t>
+
+                                        <div class="mt-4 pt-3 border-top">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('recheckSection').style.display = 'block'; this.style.display = 'none';">
+                                                <i class="fa fa-refresh me-1"/> Re-verify / Update Account Number
+                                            </button>
+                                        </div>
+                                    </t>
+
+                                    <!-- Verification Wizard Section -->
+                                    <div id="recheckSection" t-att-style="'display: none;' if (candidate and candidate.has_bunna_account) else 'display: block;'">
+                                        <div class="text-center py-2 mb-4">
+                                            <h5 class="fw-bold" style="color: #1D2B32;">Do you have a Bunna Bank account?</h5>
+                                            <p class="text-muted small">All applicants are required to have an active Bunna Bank account.</p>
+                                            <div class="d-flex justify-content-center gap-3 mt-3">
+                                                <button type="button" class="btn btn-outline-success px-4 py-2 fw-bold" id="btnPageYes" onclick="selectPageOption('yes')">
+                                                    <i class="fa fa-check-circle me-1"/> Yes, I have an account
+                                                </button>
+                                                <button type="button" class="btn btn-outline-danger px-4 py-2 fw-bold" id="btnPageNo" onclick="selectPageOption('no')">
+                                                    <i class="fa fa-times-circle me-1"/> No, I need to open an account
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Panel A: Yes, I have an account -->
+                                        <div id="pageYesPanel" style="display: none;" class="card border p-4 bg-light shadow-xs mb-3">
+                                            <h6 class="fw-bold mb-2 text-dark"><i class="fa fa-university me-1 text-primary"/> Enter Your Bunna Bank Account Number</h6>
+                                            <p class="text-muted small mb-3">Please enter your 13-digit Bunna Bank account number to verify your profile:</p>
+                                            <div class="input-group mb-3" style="max-width: 450px;">
+                                                <span class="input-group-text bg-white"><i class="fa fa-university"/></span>
+                                                <input type="text" id="pagePhoneInput" class="form-control font-monospace" placeholder="e.g. 1019501012030" t-att-value="candidate.bunna_account_number if candidate and candidate.bunna_account_number else ''"/>
+                                                <button type="button" class="btn btn-bunna text-white" style="background-color: #541718;" onclick="performAccountCheck('page')">
+                                                    <span id="pageSpinner" class="spinner-border spinner-border-sm me-1" style="display: none;" role="status"></span>
+                                                    Check Status
+                                                </button>
+                                            </div>
+                                            <div id="pageAlertArea"></div>
+                                        </div>
+
+                                        <!-- Panel B: No, I need to open an account -->
+                                        <div id="pageNoPanel" style="display: none;" class="card border p-4 bg-light shadow-xs mb-3">
+                                            <div class="alert alert-warning border-0 shadow-xs mb-3">
+                                                <i class="fa fa-exclamation-circle me-2 text-warning"/>
+                                                <strong>Please Open account first reapply again.</strong>
+                                                <div class="mt-2">
+                                                    To open account please <a href="https://onboardingportal.bunnabanksc.com/" target="_blank" class="fw-bold text-decoration-underline" style="color: #541718;">click here: https://onboardingportal.bunnabanksc.com/</a>
+                                                </div>
+                                            </div>
+                                            <p class="text-muted small mb-2">Once you have opened your account, please enter your opened Bunna Bank Account Number below to check status:</p>
+                                            <div class="input-group mb-3" style="max-width: 450px;">
+                                                <span class="input-group-text bg-white"><i class="fa fa-university"/></span>
+                                                <input type="text" id="pageNoPhoneInput" class="form-control font-monospace" placeholder="e.g. 1019501012030"/>
+                                                <button type="button" class="btn btn-bunna text-white" style="background-color: #541718;" onclick="performAccountCheck('pageNo')">
+                                                    <span id="pageNoSpinner" class="spinner-border spinner-border-sm me-1" style="display: none;" role="status"></span>
+                                                    Check Status
+                                                </button>
+                                            </div>
+                                            <div id="pageNoAlertArea"></div>
+                                        </div>
+
+                                        <!-- Live Verification Result Card -->
+                                        <div id="pageResultCard" style="display: none;" class="card border-success border-2 shadow-sm p-4 mt-3 bg-white">
+                                            <div class="d-flex align-items-center mb-3 text-success">
+                                                <i class="fa fa-check-circle fa-2x me-2"/>
+                                                <h5 class="fw-bold mb-0">Account Information Verified Successfully!</h5>
+                                            </div>
+                                            <div class="row g-3 mb-3">
+                                                <div class="col-md-6">
+                                                    <span class="text-muted small d-block">Account Number:</span>
+                                                    <strong class="font-monospace text-dark fs-6" id="resAcctNo"></strong>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <span class="text-muted small d-block">Name:</span>
+                                                    <strong class="text-dark fs-6" id="resName"></strong>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <span class="text-muted small d-block">Account Type:</span>
+                                                    <strong class="text-dark" id="resType"></strong>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <span class="text-muted small d-block">Account Status:</span>
+                                                    <span class="badge bg-success" id="resStatus"></span>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <span class="text-muted small d-block">Branch Name:</span>
+                                                    <strong class="text-dark" id="resBranch"></strong>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <span class="text-muted small d-block">Phone:</span>
+                                                    <strong class="text-dark" id="resPhone"></strong>
+                                                </div>
+                                            </div>
+                                            <t t-if="apply_job_id">
+                                                <div class="text-end border-top pt-3">
+                                                    <a t-attf-href="/jobs/apply/#{apply_job_id}" class="btn btn-success px-4 py-2 fw-bold">
+                                                        Proceed to Apply &#8594;
+                                                    </a>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script type="text/javascript">
+                    function selectPageOption(opt) {
+                        var yesPanel = document.getElementById('pageYesPanel');
+                        var noPanel = document.getElementById('pageNoPanel');
+                        var btnYes = document.getElementById('btnPageYes');
+                        var btnNo = document.getElementById('btnPageNo');
+                        if (opt === 'yes') {
+                            yesPanel.style.display = 'block';
+                            noPanel.style.display = 'none';
+                            btnYes.classList.add('active');
+                            btnNo.classList.remove('active');
+                        } else {
+                            yesPanel.style.display = 'none';
+                            noPanel.style.display = 'block';
+                            btnNo.classList.add('active');
+                            btnYes.classList.remove('active');
+                        }
+                    }
+
+                    function performAccountCheck(type) {
+                        var phoneInput = (type === 'page') ? document.getElementById('pagePhoneInput') : document.getElementById('pageNoPhoneInput');
+                        var spinner = (type === 'page') ? document.getElementById('pageSpinner') : document.getElementById('pageNoSpinner');
+                        var alertArea = (type === 'page') ? document.getElementById('pageAlertArea') : document.getElementById('pageNoAlertArea');
+                        var phone = phoneInput ? phoneInput.value.trim() : '';
+
+                        if (!phone) {
+                            alertArea.innerHTML = '<div class="alert alert-danger small mt-2">Please enter your Bunna Bank account number.</div>';
+                            return;
+                        }
+
+                        spinner.style.display = 'inline-block';
+                        alertArea.innerHTML = '';
+
+                        fetch('/my/candidate/check_cbs_account', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                method: 'call',
+                                params: { account_number: phone }
+                            })
+                        })
+                        .then(function(res) { return res.json(); })
+                        .then(function(result) {
+                            spinner.style.display = 'none';
+                            var resData = result.result || result;
+                            if (resData.success &amp;&amp; resData.data) {
+                                var d = resData.data;
+                                document.getElementById('resAcctNo').innerText = d.account_number || '';
+                                document.getElementById('resName').innerText = d.name || '';
+                                document.getElementById('resType').innerText = d.account_type || 'Saving Account';
+                                document.getElementById('resStatus').innerText = d.account_status || 'Active';
+                                document.getElementById('resBranch').innerText = d.branch_name || 'BIB Main Branch';
+                                document.getElementById('resPhone').innerText = d.phone || phone;
+                                document.getElementById('pageResultCard').style.display = 'block';
+                                alertArea.innerHTML = '<div class="alert alert-success small mt-2"><i class="fa fa-check me-1"/> ' + (resData.message || 'Account verified successfully.') + '</div>';
+                            } else {
+                                alertArea.innerHTML = '<div class="alert alert-danger small mt-2"><i class="fa fa-exclamation-circle me-1"/> ' + (resData.message || 'No account found matching this phone number.') + '</div>';
+                            }
+                        })
+                        .catch(function(err) {
+                            spinner.style.display = 'none';
+                            alertArea.innerHTML = '<div class="alert alert-danger small mt-2">Error checking account. Please try again.</div>';
+                        });
+                    }
+                </script>
+            </t>
+        </template>
+
     </data>
+    <!-- Interactive Password Policy Checker & Visibility Toggle Script -->
+    <template id="ats_password_policy_script" inherit_id="bunna_custom_web_page.minimal_layout" name="ATS Password Policy Script">
+        <xpath expr="//body" position="inside">
+            <script type="text/javascript"><![CDATA[
+                (function() {
+                    function initPasswordPolicy() {
+                        function setupPolicy(pwdId, confId, prefix) {
+                            var pwd = document.getElementById(pwdId);
+                            var conf = document.getElementById(confId);
+                            if (!pwd) return;
+
+                            var rLen = document.getElementById(prefix + 'rule-length');
+                            var rUp = document.getElementById(prefix + 'rule-upper');
+                            var rLow = document.getElementById(prefix + 'rule-lower');
+                            var rNum = document.getElementById(prefix + 'rule-number');
+                            var rSpec = document.getElementById(prefix + 'rule-special');
+                            var rMatch = document.getElementById(prefix + 'rule-match');
+
+                            function setRuleState(el, label, ok) {
+                                if (!el) return;
+                                if (ok) {
+                                    el.className = 'text-success fw-bold';
+                                    el.innerHTML = '<i class="fa fa-check-circle me-1 text-success"></i> ' + label;
+                                } else {
+                                    el.className = 'text-muted';
+                                    el.innerHTML = '<i class="fa fa-circle-o me-1"></i> ' + label;
+                                }
+                            }
+
+                            function validate() {
+                                var v = pwd.value || '';
+                                var cv = conf ? (conf.value || '') : '';
+                                setRuleState(rLen, 'At least 12 characters', v.length >= 12);
+                                setRuleState(rUp, 'At least 1 uppercase (A-Z)', /[A-Z]/.test(v));
+                                setRuleState(rLow, 'At least 1 lowercase (a-z)', /[a-z]/.test(v));
+                                setRuleState(rNum, 'At least 1 number (0-9)', /[0-9]/.test(v));
+                                setRuleState(rSpec, 'At least 1 special symbol (@$!%*?&)', /[^a-zA-Z0-9\s]/.test(v));
+                                if (rMatch && conf) {
+                                    setRuleState(rMatch, 'Passwords match', v.length >= 12 && v === cv);
+                                }
+                            }
+
+                            pwd.addEventListener('input', validate);
+                            if (conf) conf.addEventListener('input', validate);
+                            validate();
+                        }
+
+                        // Block paste, copy, cut, drop on any password input (even when visible as text)
+                        function isPasswordInput(el) {
+                            if (!el) return false;
+                            var name = (el.getAttribute('name') || '').toLowerCase();
+                            var id = (el.getAttribute('id') || '').toLowerCase();
+                            var type = (el.getAttribute('type') || '').toLowerCase();
+                            return type === 'password' || name.indexOf('password') !== -1 || id.indexOf('password') !== -1;
+                        }
+
+                        ['paste', 'copy', 'cut', 'drop'].forEach(function(evt) {
+                            document.addEventListener(evt, function(e) {
+                                if (isPasswordInput(e.target)) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    return false;
+                                }
+                            }, true);
+                        });
+
+                        // Eye toggle event delegation
+                        document.addEventListener('click', function(e) {
+                            var btn = e.target ? e.target.closest('.toggle-pwd-btn') : null;
+                            if (!btn) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var tid = btn.getAttribute('data-target');
+                            var inp = document.getElementById(tid);
+                            if (!inp) return;
+                            var icon = btn.querySelector('i');
+                            if (inp.type === 'password') {
+                                inp.type = 'text';
+                                if (icon) {
+                                    icon.className = 'fa fa-eye-slash';
+                                }
+                            } else {
+                                inp.type = 'password';
+                                if (icon) {
+                                    icon.className = 'fa fa-eye';
+                                }
+                            }
+                        });
+
+                        setupPolicy('reg_password', 'reg_confirm_password', '');
+                        setupPolicy('reset_password', 'reset_confirm_password', 'reset-');
+                        setupPolicy('chg_new_password', 'chg_confirm_password', 'chg-');
+                    }
+
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', initPasswordPolicy);
+                    } else {
+                        initPasswordPolicy();
+                    }
+                })();
+            ]]></script>
+        </xpath>
+    </template>
+    <!-- End ATS Password Policy Script -->
 </odoo>

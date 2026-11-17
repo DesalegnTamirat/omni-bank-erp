@@ -44,6 +44,12 @@
                             groups="hr.group_hr_user"
                             invisible="shortlisting_done"
                             help="Define shortlisting criteria and auto-populate the External Selected Candidates record"/>
+                    <button name="action_reset_to_draft"
+                            string="↩ Reset to Draft"
+                            type="object"
+                            class="btn-outline-danger"
+                            invisible="not shortlisting_done"
+                            confirm="Are you sure you want to reset this recruitment process to Draft? All candidate states and shortlist records will be released back to draft."/>
                     <button name="notify" invisible="status in ['notify']" string="Notify Applicant" type="object" class="oe_highlight"/>
                 </header>
                 <sheet>

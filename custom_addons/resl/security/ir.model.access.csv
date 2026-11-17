@@ -24,3 +24,9 @@ access_resl_loan_reject_wizard_employee,resl.loan.reject.wizard employee,model_r
 access_resl_pdf_config_user,resl.pdf.config user,model_resl_pdf_config,base.group_user,1,0,0,0
 access_resl_pdf_config_admin,resl.pdf.config admin,model_resl_pdf_config,base.group_system,1,1,1,1
 access_resl_pdf_config_resl_admin,resl.pdf.config resl_admin,model_resl_pdf_config,resl.group_resl_admin,1,1,1,1
+access_resl_routing_rule_system,resl.routing.rule system,model_resl_routing_rule,base.group_system,1,1,1,1
+access_resl_routing_rule_resl_admin,resl.routing.rule resl_admin,model_resl_routing_rule,resl.group_resl_admin,1,1,1,1
+access_resl_routing_rule_job_system,resl.routing.rule.job system,model_resl_routing_rule_job,base.group_system,1,1,1,1
+access_resl_routing_rule_job_resl_admin,resl.routing.rule.job resl_admin,model_resl_routing_rule_job,resl.group_resl_admin,1,1,1,1
+access_resl_routing_unit_system,resl.routing.unit system,model_resl_routing_unit,base.group_system,1,1,1,1
+access_resl_routing_unit_resl_admin,resl.routing.unit resl_admin,model_resl_routing_unit,resl.group_resl_admin,1,1,1,1

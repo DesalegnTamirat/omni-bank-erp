@@ -42,13 +42,13 @@
 
                             <!-- Position / Job Title -->
                             <div class="fw-bold fs-5 text-dark mb-1">
-                                <i class="fa fa-briefcase text-muted me-1"/>
+                                <i class="fa fa-briefcase text-muted me-1" title="Job Position"/>
                                 <field name="job_id"/>
                             </div>
 
                             <!-- Operating Unit & Department -->
                             <div class="text-muted small mb-2">
-                                <i class="fa fa-building-o me-1"/>
+                                <i class="fa fa-building-o me-1" title="Operating Unit"/>
                                 <field name="operating_unit_id"/>
                                 <t t-if="record.department_id.raw_value">
                                     <span> &amp;bull; </span>
@@ -59,12 +59,12 @@
                             <!-- Chips: Headcount, Grade, Type, Sourcing -->
                             <div class="d-flex flex-wrap gap-1 mb-2">
                                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
-                                    <i class="fa fa-users me-1"/>
+                                    <i class="fa fa-users me-1" title="Headcount"/>
                                     <field name="headcount"/> Position<t t-if="record.headcount.raw_value &gt; 1">s</t>
                                 </span>
                                 <t t-if="record.job_grade_id.raw_value">
                                     <span class="badge bg-light text-secondary border px-2 py-1">
-                                        <i class="fa fa-id-badge me-1"/>
+                                        <i class="fa fa-id-badge me-1" title="Job Grade"/>
                                         <field name="job_grade_id"/>
                                     </span>
                                 </t>
@@ -124,6 +124,8 @@
                 <field name="job_grade_id" optional="show"/>
                 <field name="headcount" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" sum="Total Headcount"/>
                 <field name="employment_type"/>
+                <field name="workforce_document" filename="workforce_document_filename" widget="binary" string="Attach Document" readonly="state not in ('draft', 'returned')" options="{'accepted_file_extensions': '.pdf,.doc,.docx'}"/>
+                <field name="workforce_document_filename" column_invisible="1"/>
                 <field name="sourcing_type" optional="show"
                        groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager,base.group_system"/>
                 <field name="recruitment_request_reference" optional="hide"/>
@@ -173,7 +175,7 @@
         <field name="name">pbms.exceptional.workforce.request.form</field>
         <field name="model">pbms.exceptional.workforce.request</field>
         <field name="arch" type="xml">
-            <form string="Exceptional Workforce Request">
+            <form string="Exceptional Workforce Request" class="o_pbms_form">
                 <header>
                     <!-- Explicit Save Action Button -->
                     <button name="action_save_request"
@@ -349,10 +351,12 @@
                                string="Justification"
                                readonly="not can_edit"
                                placeholder="detail justification ..."/>
-                        <field name="supporting_doc_ids" widget="many2many_binary" readonly="not can_edit"/>
+                        <field name="supporting_doc_ids" widget="many2many_binary" readonly="not can_edit" options="{'accepted_file_extensions': '.pdf,.doc,.docx'}"/>
+                        <field name="workforce_document" filename="workforce_document_filename" widget="binary" string="Attach Document" readonly="not can_edit" options="{'accepted_file_extensions': '.pdf,.doc,.docx'}"/>
+                        <field name="workforce_document_filename" invisible="1"/>
                     </group>
 
-                    <notebook>
+                    <notebook class="o_pbms_notebook">
                         <page string="People Solutions Assessment" name="page_people_solutions" invisible="state == 'draft' and not is_people_solutions_request">
                             <group>
                                 <group>

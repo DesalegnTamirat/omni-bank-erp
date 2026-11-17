@@ -1,121 +1,251 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <!-- Report Action -->
-    <record id="action_report_recruitment_offer_letter" model="ir.actions.report">
-        <field name="name">Employment Offer Letter</field>
-        <field name="model">recruitment.offer.letter</field>
-        <field name="report_type">qweb-pdf</field>
-        <field name="report_name">custom_recruitment.report_recruitment_offer_letter_document</field>
-        <field name="report_file">custom_recruitment.report_recruitment_offer_letter_document</field>
-        <field name="print_report_name">'Offer_Letter_' + (object.candidate_name or object.reference or 'Bunna_Bank').replace(' ', '_')</field>
-        <field name="binding_model_id" ref="model_recruitment_offer_letter"/>
-        <field name="binding_type">report</field>
-    </record>
-
-    <!-- Main Report Template Document -->
-    <template id="report_recruitment_offer_letter_document">
-        <t t-call="web.html_container">
-            <t t-foreach="docs" t-as="o">
-                <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Times New Roman', Times, serif; color: #1D2B32; font-size: 14px; line-height: 1.6; padding: 20px 30px;">
-                    
-                    <!-- Official Header -->
-                    <div class="row mb-3" style="border-bottom: 3px solid #541718; padding-bottom: 12px;">
-                        <div class="col-7">
-                            <t t-if="o.get_official_bunna_logo_base64()">
-                                <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 85px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
-                            </t>
-                            <t t-else="">
-                                <img src="/custom_recruitment/static/src/img/bunna_bank_official_logo.png" style="max-height: 85px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
-                            </t>
-                        </div>
-                        <div class="col-5 text-end my-auto" style="font-size: 13px;">
-                            <div><strong>Date: </strong> <span t-esc="o.offer_date.strftime('%d/%m/%Y') if o.offer_date else ''"/></div>
-                            <div><strong>Ref. No: </strong> <span t-esc="o.ref_no or o.reference or ''"/></div>
-                        </div>
-                    </div>
-
-                    <!-- Recipient Info -->
-                    <div class="mb-4" style="font-size: 14px;">
-                        <div>
-                            <strong><span t-esc="dict(o._fields['candidate_title'].selection).get(o.candidate_title, 'Ato/W/ro/W/t')"/>: </strong>
-                            <span t-esc="o.candidate_name or (o.ext_candidate_id.emp_name if o.ext_candidate_id else 'Candidate')"/>
-                        </div>
-                        <div>
-                            <strong>Address: </strong>
-                            <span t-esc="o.candidate_address or 'Addis Ababa, Ethiopia'"/>
-                        </div>
-                        <div class="mt-2">
-                            <strong>Dear <span t-esc="dict(o._fields['candidate_title'].selection).get(o.candidate_title, 'Ato/W/ro/W/t')"/> <span t-esc="o.candidate_name or (o.ext_candidate_id.emp_name if o.ext_candidate_id else 'Candidate')"/>,</strong>
-                        </div>
-                    </div>
-
-                    <!-- Subject Header -->
-                    <div class="text-center my-3">
-                        <h4 style="font-weight: bold; text-decoration: underline; color: #541718; font-size: 16px; margin-bottom: 0;">
-                            Subject: Employment Offer
-                        </h4>
-                    </div>
-
-                    <!-- Body Paragraphs -->
-                    <div style="text-align: justify; font-size: 13.5px; line-height: 1.7;">
-                        <p>
-                            We are pleased to inform you that following your application and successful assessment, we hereby extend this offer of employment for the position of 
-                            <strong><span t-esc="o.job_position_name or 'Position'"/></strong> 
-                            <t t-if="o.job_grade_name"> (<strong><span t-esc="o.job_grade_name"/></strong>)</t> 
-                            at <strong><span t-esc="o.work_unit or 'Head Office'"/></strong>.
-                        </p>
-
-                        <p>
-                            As a result of the employment you will be entitled for a salary of Birr 
-                            <strong><span t-esc="'{:,.2f}'.format(o.salary_figure or 0.0)"/></strong> 
-                            <t t-if="o.salary_words"> (<strong><span t-esc="o.salary_words"/></strong>)</t>, 
-                            <t t-if="o.is_managerial and o.representation_allowance &gt; 0">
-                                representation allowance of <strong>10%</strong> of the base salary (Birr <strong><span t-esc="'{:,.2f}'.format(o.representation_allowance)"/></strong>), 
-                            </t>
-                            housing allowance of Birr <strong><span t-esc="'{:,.2f}'.format(o.housing_allowance or 0.0)"/></strong>, 
-                            fuel allowance of <strong><span t-esc="'{:,.0f}'.format(o.fuel_allowance_liters or 0.0)"/></strong> liters of benzene and other benefits associated to the post.
-                        </p>
-
-                        <p>
-                            This offer is contingent upon the successful completion of all pre-employment requirements, and to confirm your acceptance, please sign and return a copy of this letter by 
-                            <strong><span t-esc="(o.deadline_date or o.expiry_date).strftime('%B %d, %Y') if (o.deadline_date or o.expiry_date) else 'the deadline date'"/></strong>.
-                        </p>
-
-                        <p>
-                            We look forward to welcome you to Bunna Bank.
-                        </p>
-                    </div>
-
-                    <!-- Sign-off Block -->
-                    <div class="mt-4 mb-4" style="font-size: 13.5px;">
-                        <div>With Regards,</div>
-                        <div style="height: 45px;"></div>
-                        <div><strong><span t-esc="o.signatory_name or 'Human Resources Management Department'"/></strong></div>
-                        <div><strong>Bunna Bank S.C.</strong></div>
-                    </div>
-
-                    <!-- CC Block -->
-                    <div class="mt-4" style="font-size: 12px; color: #444; border-top: 1px dotted #ccc; padding-top: 10px;">
-                        <div><strong>CC:</strong></div>
-                        <div style="padding-left: 15px;">
-                            <div>&#x27A4; <span t-esc="o.cc_chief_office or 'Respective Chief Offices'"/></div>
-                            <div>&#x27A4; <span t-esc="o.cc_work_unit or 'Respective work units'"/></div>
-                            <div>&#x27A4; Bunna Bank S.C.</div>
-                        </div>
-                    </div>
-
-                    <!-- Official Footer -->
-                    <div class="footer text-center" style="font-size: 11px; color: #666; border-top: 1px solid #541718; padding-top: 6px; margin-top: 30px;">
-                        <div>
-                            Tel: +251 11 158 08 61/62 | Fax: +251 11 158 08 76 | Email: info@bunnabanksc.com | Website: www.bunnabanksc.com
-                        </div>
-                        <div>
-                            P.O. Box 1743 code 1110 | Addis Ababa, Ethiopia
-                        </div>
-                    </div>
-
-                </div>
-            </t>
-        </t>
-    </template>
-</odoo>
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Report Action -->
+    <record id="action_report_recruitment_offer_letter" model="ir.actions.report">
+        <field name="name">Employment Offer Letter</field>
+        <field name="model">recruitment.offer.letter</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_recruitment.report_recruitment_offer_letter_document</field>
+        <field name="report_file">custom_recruitment.report_recruitment_offer_letter_document</field>
+        <field name="print_report_name">'Offer_Letter_' + (object.candidate_name or object.reference or 'Bunna_Bank').replace(' ', '_')</field>
+        <field name="binding_model_id" ref="model_recruitment_offer_letter"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_bunna_recruitment_letterhead"/>
+    </record>
+
+    <!-- Main Report Template Document -->
+    <template id="report_recruitment_offer_letter_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.basic_layout">
+                    <style type="text/css">
+                        @page {
+                            size: A4 portrait;
+                            margin: 0;
+                        }
+                        html, body, body.container, body.o_body_pdf, .container, .container-fluid, .article {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            min-width: 100% !important;
+                            height: 100% !important;
+                        }
+                        .page {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            width: 100% !important;
+                        }
+                        .header-table, .header-table tr, .header-table td,
+                        .footer-layout-table, .footer-layout-table tr, .footer-layout-table td,
+                        .footer-contact-table, .footer-contact-table tr, .footer-contact-table td {
+                            border: none !important;
+                            border-top: none !important;
+                            border-bottom: none !important;
+                            border-left: none !important;
+                            border-right: none !important;
+                            outline: none !important;
+                            box-shadow: none !important;
+                        }
+                        .footer-fixed {
+                            position: fixed;
+                            bottom: 27pt;
+                            left: 0px;
+                            right: 0px;
+                            width: 100%;
+                            margin: 0;
+                            padding: 0;
+                            border: none !important;
+                        }
+                        <t t-out="o.get_barlow_font_faces()"/>
+                    </style>
+
+                    <div class="page" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Barlow Medium', 'Barlow', Arial, sans-serif !important; color: #000000; font-size: 11pt; line-height: 1.4; width: 100%;">
+
+                        <!-- Official Bunna Bank Letterhead Header Banner (Unstretched logo, full-bleed coffee brown bar #6d382d, zero borders) -->
+                        <div style="padding-top: 26pt; margin-bottom: 20pt; width: 100%; border: 0 !important;">
+                            <table class="header-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0; padding: 0;">
+                                <tr style="border: 0 !important;">
+                                    <td style="width: 155px; vertical-align: middle; text-align: left; padding: 0 0 0 24px; margin: 0; border: 0 !important;">
+                                        <t t-if="o.get_official_bunna_logo_base64()">
+                                            <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="width: 130px; height: auto; display: block; object-fit: contain;" alt="Bunna Bank S.C."/>
+                                        </t>
+                                        <t t-else="">
+                                            <img src="/custom_recruitment/static/src/img/bunna_bank_official_logo.png" style="width: 130px; height: auto; display: block; object-fit: contain;" alt="Bunna Bank S.C."/>
+                                        </t>
+                                    </td>
+                                    <td style="vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                                        <!-- Official Bunna Bank Coffee Brown Header Bar (#6d382d) -->
+                                        <div style="background-color: #6d382d; height: 28px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Body Content Container (25.4mm = 1 inch left & right margins) -->
+                        <div style="padding-left: 25.4mm; padding-right: 25.4mm;">
+
+                            <!-- Date & Reference Numbers Header Table (Right Positioned, Left-Aligned Content, Clean borderless div) -->
+                            <div style="text-align: right; margin-top: 0; margin-bottom: 12pt;">
+                                <div style="display: inline-block; text-align: left; font-size: 11pt; line-height: 1.35; color: #000000;">
+                                    <div><strong>Date: </strong><span t-esc="o.offer_date.strftime('%B %d, %Y') if o.offer_date else ''"/></div>
+                                    <div><strong>Ref. No: </strong><span t-esc="o.ref_no or o.reference or ''"/></div>
+                                </div>
+                            </div>
+
+                            <!-- Recipient Info -->
+                            <div style="margin-bottom: 10pt; font-size: 11.5pt; line-height: 1.35;">
+                                <div><strong><span t-esc="dict(o._fields['candidate_title'].selection).get(o.candidate_title, 'Ato/W/ro/W/t')"/>: </strong><span t-esc="o.candidate_name or (o.ext_candidate_id.emp_name if o.ext_candidate_id else 'Candidate')"/></div>
+                                <div><strong>Address: </strong><span t-esc="o.candidate_address or 'Addis Ababa, Ethiopia'"/></div>
+                            </div>
+
+                            <!-- Salutation -->
+                            <div style="margin-bottom: 10pt; font-size: 11.5pt;">
+                                <strong>Dear <span t-esc="dict(o._fields['candidate_title'].selection).get(o.candidate_title, 'Ato/W/ro/W/t')"/> <span t-esc="o.candidate_name or (o.ext_candidate_id.emp_name if o.ext_candidate_id else 'Candidate')"/>,</strong>
+                            </div>
+
+                            <!-- Subject: Employment Offer -->
+                            <div style="text-align: center; margin-top: 8pt; margin-bottom: 14pt;">
+                                <span style="font-size: 12pt; font-weight: bold; text-decoration: underline; color: #000000;">
+                                    Subject: Employment Offer
+                                </span>
+                            </div>
+
+                            <!-- Body Paragraphs -->
+                            <div style="text-align: justify; font-size: 11pt; line-height: 1.45;">
+                                <p style="margin-bottom: 8pt; text-align: justify;">
+                                    We are pleased to inform you that following your application and successful assessment, we hereby extend this offer of employment for the position of 
+                                    <strong><span t-esc="o.job_position_name or 'Position'"/></strong> 
+                                    <t t-if="o.job_grade_name"> (<strong><span t-esc="o.job_grade_name"/></strong>)</t> 
+                                    at <strong><span t-esc="o.work_unit or 'Head Office'"/></strong>.
+                                </p>
+
+                                <p style="margin-bottom: 8pt; text-align: justify;">
+                                    As a result of the employment you will be entitled for a salary of Birr 
+                                    <strong><span t-esc="'{:,.2f}'.format(o.salary_figure or 0.0)"/></strong> 
+                                    <t t-if="o.salary_words"> (<strong><span t-esc="o.salary_words"/></strong>)</t>, 
+                                    <t t-if="o.is_managerial and o.representation_allowance &gt; 0">
+                                        representation allowance of <strong>10%</strong> of the base salary (Birr <strong><span t-esc="'{:,.2f}'.format(o.representation_allowance)"/></strong>), 
+                                    </t>
+                                    housing allowance of Birr <strong><span t-esc="'{:,.2f}'.format(o.housing_allowance or 0.0)"/></strong>, 
+                                    fuel allowance of <strong><span t-esc="'{:,.0f}'.format(o.fuel_allowance_liters or 0.0)"/></strong> liters of benzene and other benefits associated to the post.
+                                </p>
+
+                                <p style="margin-bottom: 8pt; text-align: justify;">
+                                    This offer is contingent upon the successful completion of all pre-employment requirements, and to confirm your acceptance, please sign and return a copy of this letter by 
+                                    <strong><span t-esc="(o.deadline_date or o.expiry_date).strftime('%B %d, %Y') if (o.deadline_date or o.expiry_date) else 'the deadline date'"/></strong>.
+                                </p>
+
+                                <p style="margin-bottom: 8pt; text-align: justify;">
+                                    We look forward to welcome you to Bunna Bank family.
+                                </p>
+                            </div>
+
+                            <!-- Sign-off Block with Authorized Signature & Official Stamp -->
+                            <div style="font-size: 11pt; line-height: 1.35; margin-top: 10pt; margin-bottom: 8pt; page-break-inside: avoid;">
+                                <div style="margin-bottom: 3px;">With Regards,</div>
+                                <t t-set="sig_data" t-value="o.get_letter_signature_data()"/>
+                                <t t-if="sig_data.get('has_split')">
+                                    <div style="margin-bottom: 6px;">
+                                        <table style="border: none; border-collapse: collapse; margin-top: 4px; margin-bottom: 6px; padding: 0;">
+                                            <tr style="border: none; background: transparent;">
+                                                <t t-if="sig_data.get('stamp_position') == 'left'">
+                                                    <td style="border: none; padding: 0 16px 0 0; vertical-align: middle;">
+                                                        <img t-if="sig_data.get('stamp_b64')" t-att-src="sig_data.get('stamp_b64')" alt="Official Rubber Stamp" style="width: 105px; height: 105px; object-fit: contain; display: block;"/>
+                                                    </td>
+                                                    <td style="border: none; padding: 0; vertical-align: middle;">
+                                                        <img t-if="sig_data.get('signature_b64')" t-att-src="sig_data.get('signature_b64')" alt="Handwritten Signature" style="max-height: 75px; max-width: 220px; object-fit: contain; display: block;"/>
+                                                    </td>
+                                                </t>
+                                                <t t-else="">
+                                                    <td style="border: none; padding: 0 16px 0 0; vertical-align: middle;">
+                                                        <img t-if="sig_data.get('signature_b64')" t-att-src="sig_data.get('signature_b64')" alt="Handwritten Signature" style="max-height: 75px; max-width: 220px; object-fit: contain; display: block;"/>
+                                                    </td>
+                                                    <td style="border: none; padding: 0; vertical-align: middle;">
+                                                        <img t-if="sig_data.get('stamp_b64')" t-att-src="sig_data.get('stamp_b64')" alt="Official Rubber Stamp" style="width: 105px; height: 105px; object-fit: contain; display: block;"/>
+                                                    </td>
+                                                </t>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </t>
+                                <t t-elif="sig_data.get('legacy_b64')">
+                                    <div style="margin-bottom: 6px;">
+                                        <img t-att-src="sig_data.get('legacy_b64')" alt="Authorized Signature &amp; Stamp" style="width: 250px; height: auto; max-height: 155px; object-fit: contain; display: block; margin-top: 4px; margin-bottom: 6px;"/>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div style="height: 30px;"></div>
+                                </t>
+                                <t t-if="sig_data.get('signatory_name')">
+                                    <div><strong><span t-esc="sig_data.get('signatory_name')"/></strong></div>
+                                </t>
+                                <div><strong><span t-esc="sig_data.get('signatory_title') or 'People Operation Management Directorate'"/></strong></div>
+                                <div><strong><span t-esc="sig_data.get('signatory_company') or 'Bunna Bank S.C.'"/></strong></div>
+                            </div>
+
+                            <!-- CC Block -->
+                            <t t-set="cc_lines" t-value="o.get_offer_letter_cc_lines()"/>
+                            <t t-if="cc_lines">
+                                <div style="font-size: 9.5pt; line-height: 1.28; margin-top: 6pt; page-break-inside: avoid;">
+                                    <div><strong>CC:</strong></div>
+                                    <div style="padding-left: 15px;">
+                                        <t t-foreach="cc_lines" t-as="cc_item">
+                                            <div><span t-esc="cc_item"/></div>
+                                        </t>
+                                        <div style="font-weight: bold; text-decoration: underline; margin-top: 1px;">Bunna Bank S.C</div>
+                                    </div>
+                                </div>
+                            </t>
+
+                        </div>
+
+                        <!-- Official Bunna Bank Letterhead Footer (Exact parity with Experience Letter, zero borders, pinned to bottom) -->
+                        <div class="footer-fixed">
+                            <table class="footer-layout-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0; padding: 0;">
+                                <tr style="border: 0 !important;">
+                                    <!-- Left Olive Green Accent Bar (Bleeds to 0px left edge) -->
+                                    <td style="width: 15%; vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                                        <div style="background-color: #253315; height: 26px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
+                                    </td>
+                                    <!-- Center Contact Info Table (Centered between the two bars) -->
+                                    <td style="width: 70%; vertical-align: middle; padding: 0 18px; margin: 0; text-align: center; border: 0 !important;">
+                                        <table class="footer-contact-table" border="0" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: separate !important; border-spacing: 0 !important; border: 0 !important; margin: 0 auto; font-size: 8pt; color: #6d382d; line-height: 1.4;">
+                                            <tr style="border: 0 !important;">
+                                                <td style="width: 34%; text-align: left; padding: 1px 0; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">Tel</strong> +251 111 580 861 | 62
+                                                </td>
+                                                <td style="width: 36%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">Email</strong> info@bunnabanksc.com
+                                                </td>
+                                                <td style="width: 30%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">P.O.Box</strong> 1743 code 1110
+                                                </td>
+                                            </tr>
+                                            <tr style="border: 0 !important;">
+                                                <td style="width: 34%; text-align: left; padding: 1px 0; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">Fax</strong> +251 111 580 832 | 76
+                                                </td>
+                                                <td style="width: 36%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    <strong style="font-weight: bold;">Website</strong> www.bunnabanksc.com
+                                                </td>
+                                                <td style="width: 30%; text-align: left; padding: 1px 0 1px 12px; border: 0 !important; font-size: 8pt; color: #6d382d; white-space: nowrap;">
+                                                    Addis Ababa | Ethiopia
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <!-- Right Olive Green Accent Bar (Bleeds to 100% right edge) -->
+                                    <td style="width: 15%; vertical-align: middle; padding: 0; margin: 0; border: 0 !important;">
+                                        <div style="background-color: #253315; height: 26px; width: 100%; margin: 0; padding: 0; border: 0 !important;"></div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

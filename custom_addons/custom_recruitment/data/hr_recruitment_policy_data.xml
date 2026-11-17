@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="default_hr_recruitment_policy" model="hr.recruitment.policy">
+            <field name="name">Bank Central HR Policy</field>
+            <field name="minimum_number_years_in_company">1</field>
+            <field name="current_location_exp">1.0</field>
+            <field name="no_of_months_since_last_written_notice">12</field>
+            <field name="no_of_months_since_last_promotion">12</field>
+            <field name="minimum_pms_score">75.0</field>
+            <field name="demoted_employee" eval="False"/>
+            <field name="promotion_revoked" eval="False"/>
+            <field name="weightage_written_exam">0.0</field>
+            <field name="weightage_interview">0.0</field>
+            <field name="weightage_pms">0.0</field>
+            <field name="non_experienced_applicant" eval="False"/>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>
+

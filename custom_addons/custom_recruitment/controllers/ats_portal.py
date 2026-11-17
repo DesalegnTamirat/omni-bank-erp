@@ -46,9 +46,45 @@ def _clean_date(d_str):
 
 # -*- coding: utf-8 -*-
 import base64
+import urllib.parse
 from odoo import http, fields, _
 from odoo.http import request, content_disposition
 
+
+
+def validate_ats_password(password, confirm_password=None, old_password=None, user_info=None):
+    """
+    Enforces Bunna Bank ATS Password Security Policy:
+    - Minimum length: At least 12 characters
+    - At least 1 uppercase letter (A-Z)
+    - At least 1 lowercase letter (a-z)
+    - At least 1 numerical digit (0-9)
+    - At least 1 special character / symbol (@$!%*?&#^()_+=-~ etc.)
+    - Must match confirm_password (if provided)
+    - Must not match old_password (when changing password)
+    - Must not contain parts of user name or email (if provided)
+    """
+    if not password:
+        return "Password is required."
+    if confirm_password is not None and password != confirm_password:
+        return "New Password and Confirm Password do not match."
+    if len(password) < 12:
+        return "Password must be at least 12 characters long."
+    if not re.search(r'[A-Z]', password):
+        return "Password must include at least one uppercase letter (A-Z)."
+    if not re.search(r'[a-z]', password):
+        return "Password must include at least one lowercase letter (a-z)."
+    if not re.search(r'[0-9]', password):
+        return "Password must include at least one number (0-9)."
+    if not re.search(r'[@$!%*?&#^()_+=\-\[\]{}|~:;<>,./?\\]', password):
+        return "Password must include at least one special character (@$!%*?&#^()_+=- etc.)."
+    if old_password and password == old_password:
+        return "New password cannot be the same as your current password."
+    if user_info:
+        for val in user_info:
+            if val and len(str(val)) >= 3 and str(val).lower() in password.lower():
+                return "Password must not contain parts of your name or email address."
+    return None
 
 class ATSPortalController(http.Controller):
 
@@ -72,15 +108,35 @@ class ATSPortalController(http.Controller):
         if user._is_public():
             return False
         
-        profile = request.env['candidate.profile'].sudo().search([('partner_id', '=', user.partner_id.id)], limit=1)
+        profile = request.env['candidate.profile'].sudo().search([
+            '|',
+            ('partner_id', '=', user.partner_id.id),
+            ('user_id', '=', user.id),
+        ], limit=1)
+        if not profile and user.email:
+            profile = request.env['candidate.profile'].sudo().search([('email', '=ilike', user.email.strip())], limit=1)
+            if profile and not profile.user_id:
+                try:
+                    profile.sudo().write({'user_id': user.id, 'partner_id': user.partner_id.id})
+                except Exception:
+                    pass
+
         if not profile:
-            profile = request.env['candidate.profile'].sudo().create({
-                'partner_id': user.partner_id.id,
-                'user_id': user.id,
-                'name': user.name or user.partner_id.name,
-                'email': user.email or user.login,
-                'phone': user.phone or user.partner_id.phone or '',
-            })
+            user_phone = (user.phone or user.partner_id.phone or '').strip()
+            cleaned_phone = re.sub(r'[\s\-\(\)]', '', user_phone)
+            if not re.match(r'^(\+251|00251|251|0)(9|7)\d{8}$', cleaned_phone):
+                user_phone = '0900000000'
+            try:
+                profile = request.env['candidate.profile'].sudo().create({
+                    'partner_id': user.partner_id.id,
+                    'user_id': user.id,
+                    'name': user.name or user.partner_id.name or 'New Candidate',
+                    'email': user.email or user.login or f'candidate_{user.id}@example.com',
+                    'phone': user_phone,
+                })
+            except Exception as e:
+                _logger.exception("Failed to auto-create candidate profile for user %s: %s", user.id, e)
+                return False
         return profile
 
     def _is_recruitment_admin(self):
@@ -141,6 +197,31 @@ class ATSPortalController(http.Controller):
         """Returns True if candidate profile belongs to an employee registered in hr.employee / hr.version or has signed contract."""
         if not candidate:
             return False
+        # Direct check on candidate profile method if available
+        if hasattr(candidate, 'is_internal_employee') and candidate.is_internal_employee():
+            return True
+
+        user = request.env.user
+        emp_model = request.env['hr.employee'].sudo()
+        if user and not user._is_public():
+            if hasattr(user, 'employee_id') and user.employee_id:
+                return True
+            if hasattr(user, 'employee_ids') and user.employee_ids:
+                return True
+            if emp_model.search([('user_id', '=', user.id)], limit=1):
+                return True
+            if user.partner_id:
+                partner_domain = []
+                if 'work_contact_id' in emp_model._fields:
+                    partner_domain.append(('work_contact_id', '=', user.partner_id.id))
+                if 'user_partner_id' in emp_model._fields:
+                    partner_domain.append(('user_partner_id', '=', user.partner_id.id))
+                if partner_domain:
+                    if len(partner_domain) > 1:
+                        partner_domain = ['|'] * (len(partner_domain) - 1) + partner_domain
+                    if emp_model.search(partner_domain, limit=1):
+                        return True
+
         # Check if candidate user has an employee record
         if candidate.user_id and hasattr(candidate.user_id, 'employee_ids') and candidate.user_id.employee_ids:
             return True
@@ -270,12 +351,16 @@ class ATSPortalController(http.Controller):
                 has_applied = True
                 applied_stage_name = existing_app.stage_id.name if existing_app.stage_id else 'Applied'
 
+        is_internal_employee = bool(candidate_profile and self._is_hired_or_employee_candidate(candidate_profile))
+
         values = {
             'vacancy': vacancy,
             'candidate_profile': candidate_profile,
             'has_applied': has_applied,
             'applied_stage_name': applied_stage_name,
+            'is_internal_employee': is_internal_employee,
             'is_recruitment_admin': is_admin,
+            'error': kwargs.get('error'),
         }
         return request.render('custom_recruitment.ats_job_detail_template', values)
 
@@ -289,6 +374,32 @@ class ATSPortalController(http.Controller):
         candidate = self._get_candidate_profile()
         if not candidate:
             return request.redirect('/jobs/login')
+
+        # Check if candidate is an internal employee created from employee master
+        if self._is_hired_or_employee_candidate(candidate):
+            err = _("You are an internal employee and cannot apply for external vacancies. You are only eligible for internal vacancies.")
+            return request.redirect(f'/jobs/{vacancy.id}?error=' + urllib.parse.quote(err))
+
+        if not self._is_profile_complete(candidate):
+            return request.redirect('/my/candidate/profile?error=' + urllib.parse.quote(_("Please complete all required profile fields (Personal Info, Education, and Master CV) before applying for vacancies.")))
+
+        # Check if vacancy requires work experience and candidate has none
+        min_exp = vacancy.minimum_experience_years or 0.0
+        bank_exp = vacancy.banking_experience_required or 0.0
+        cand_exp = candidate.total_experience or candidate.total_experience_years or 0.0
+        has_exp = bool(candidate.experience_ids and cand_exp > 0)
+        if (min_exp > 0 or bank_exp > 0) and not has_exp:
+            exp_needed = f"{min_exp:g} year(s)" if min_exp > 0 else f"{bank_exp:g} year(s) banking"
+            err = _("You are not allowed to apply for this vacancy without work experience. This position requires a minimum of %s of experience. You can only apply for fresh graduate vacancies or vacancies requiring 0 years of experience.") % exp_needed
+            return request.redirect(f'/jobs/{vacancy.id}?error=' + urllib.parse.quote(err))
+
+        if candidate.dob or candidate.birth_date:
+            d = candidate.dob or candidate.birth_date
+            today = fields.Date.today()
+            age = today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+            if age < 18:
+                err = _("Age Validation Error: Candidates must be at least 18 years old to apply for career opportunities (Calculated age: %d years).") % age
+                return request.redirect('/my/candidate/profile?step=2&error=' + urllib.parse.quote(err))
 
         existing_app = request.env['hr.applicant'].sudo().search([
             ('app_reference', '=', vacancy.id),
@@ -320,6 +431,7 @@ class ATSPortalController(http.Controller):
         values = {
             'vacancy': vacancy,
             'candidate': candidate,
+            'is_internal_employee': self._is_hired_or_employee_candidate(candidate),
         }
         return request.render('custom_recruitment.ats_job_apply_template', values)
 
@@ -333,6 +445,9 @@ class ATSPortalController(http.Controller):
         if not candidate:
             return request.redirect('/jobs/login')
 
+        if not self._is_profile_complete(candidate):
+            return request.redirect('/my/candidate/profile?error=' + urllib.parse.quote(_("Please complete all required profile fields (Personal Info, Education, and Master CV) to access the candidate dashboard.")))
+
         domain = [
             '|',
             ('candidate_profile_id', '=', candidate.id),
@@ -341,7 +456,7 @@ class ATSPortalController(http.Controller):
             ('contract_created_new', '!=', True),
         ]
         raw_applications = request.env['hr.applicant'].sudo().search(domain, order='create_date desc')
-        applications = raw_applications.filtered(lambda a: not self._is_hired_or_employee_applicant(a))
+        applications = raw_applications
 
         # Auto-link candidate_profile_id on any apps matched by email but missing the link
         for app in applications:
@@ -522,11 +637,16 @@ class ATSPortalController(http.Controller):
             domain.append(('app_reference', 'in', external_vacancy_ids))
 
         if search:
-            domain.extend(['|', '|', '|',
+            domain.extend(['|', '|', '|', '|', '|', '|', '|', '|',
                 ('partner_name', 'ilike', search),
                 ('email_from', 'ilike', search),
                 ('partner_phone', 'ilike', search),
-                ('cover_letter', 'ilike', search)
+                ('cover_letter', 'ilike', search),
+                ('preferred_location', 'ilike', search),
+                ('candidate_profile_id.city', 'ilike', search),
+                ('candidate_profile_id.skill_ids.name', 'ilike', search),
+                ('candidate_profile_id.experience_ids.position', 'ilike', search),
+                ('candidate_profile_id.education_ids.field_of_study', 'ilike', search)
             ])
 
         applicants = request.env['hr.applicant'].sudo().search(domain, order='create_date desc')
@@ -633,6 +753,9 @@ class ATSPortalController(http.Controller):
         if not candidate:
             return request.redirect('/jobs/login')
 
+        if not self._is_profile_complete(candidate):
+            return request.redirect('/my/candidate/profile?error=' + urllib.parse.quote(_("Please complete all required profile fields (Personal Info, Education, and Master CV) to view announcements.")))
+
         domain = [('state', '=', 'published')]
         if search:
             domain.extend(['|', '|', ('name', 'ilike', search), ('summary', 'ilike', search), ('content', 'ilike', search)])
@@ -641,7 +764,6 @@ class ATSPortalController(http.Controller):
 
         all_news = request.env['ats.news'].sudo().search(domain, order="is_featured desc, publish_date desc, id desc")
 
-        import re
         news_items = []
         for n in all_news:
             if n.summary:
@@ -678,6 +800,9 @@ class ATSPortalController(http.Controller):
         if not candidate:
             return request.redirect('/jobs/login')
 
+        if not self._is_profile_complete(candidate):
+            return request.redirect('/my/candidate/profile?error=' + urllib.parse.quote(_("Please complete all required profile fields (Personal Info, Education, and Master CV) to access your applications.")))
+
         domain = [
             '|',
             ('candidate_profile_id', '=', candidate.id),
@@ -686,7 +811,7 @@ class ATSPortalController(http.Controller):
             ('contract_created_new', '!=', True),
         ]
         raw_applications = request.env['hr.applicant'].sudo().search(domain, order='create_date desc')
-        applications = raw_applications.filtered(lambda a: not self._is_hired_or_employee_applicant(a))
+        applications = raw_applications
 
         # Auto-link candidate_profile_id on any apps matched by email but missing the link
         for app in applications:
@@ -757,6 +882,9 @@ class ATSPortalController(http.Controller):
         candidate = self._get_candidate_profile()
         if not candidate:
             return request.redirect('/jobs/login')
+
+        if not self._is_profile_complete(candidate):
+            return request.redirect('/my/candidate/profile?error=' + urllib.parse.quote(_("Please complete all required profile fields (Personal Info, Education, and Master CV) to access job offers.")))
 
         cand_email = candidate.email or request.env.user.email or ''
         user_partner_id = request.env.user.partner_id.id
@@ -952,18 +1080,42 @@ class ATSPortalController(http.Controller):
 
                 full_name = f"{first_name} {middle_name} {last_name}".strip()
 
-                candidate.sudo().write({
+                dob_input = _clean_date(kwargs.get('dob')) or _clean_date(kwargs.get('birth_date'))
+                if dob_input:
+                    dob_dt = datetime.strptime(dob_input, '%Y-%m-%d').date()
+                    today = fields.Date.today()
+                    if dob_dt > today:
+                        err = "Date of Birth cannot be in the future!"
+                        return request.redirect('/my/candidate/profile?step=2&error=' + urllib.parse.quote(err))
+                    age = today.year - dob_dt.year - ((today.month, today.day) < (dob_dt.month, dob_dt.day))
+                    if age < 18:
+                        err = f"Age Validation Error: Candidates must be at least 18 years old to register and apply. The specified Date of Birth corresponds to {age} years old."
+                        return request.redirect('/my/candidate/profile?step=2&error=' + urllib.parse.quote(err))
+
+                write_vals = {
                     'name': full_name or candidate.name,
                     'gender': gender or candidate.gender,
-                    'phone': phone or candidate.phone,
-                    'national_id': kwargs.get('national_id', candidate.national_id),
-                    'secondary_id_type': kwargs.get('secondary_id_type', candidate.secondary_id_type),
-                    'secondary_id_number': kwargs.get('secondary_id_number', candidate.secondary_id_number),
-                    'dob': _clean_date(kwargs.get('dob')) or _clean_date(kwargs.get('birth_date')) or candidate.dob,
-                    'place_of_birth': kwargs.get('place_of_birth', candidate.place_of_birth),
-                    'city': kwargs.get('city', candidate.city),
-                    'address': kwargs.get('address', candidate.address),
-                })
+                    'phone': phone_cleaned or phone or candidate.phone,
+                    'national_id': (kwargs.get('national_id') or '').strip() or False,
+                    'secondary_id_type': kwargs.get('secondary_id_type') or False,
+                    'secondary_id_number': (kwargs.get('secondary_id_number') or '').strip() or False,
+                    'dob': dob_input or candidate.dob or False,
+                    'birth_date': dob_input or candidate.birth_date or False,
+                    'place_of_birth': (kwargs.get('place_of_birth') or '').strip() or False,
+                    'city': (kwargs.get('city') or '').strip() or False,
+                    'address': (kwargs.get('address') or '').strip() or False,
+                }
+                if hasattr(candidate, 'father_name') and middle_name:
+                    write_vals['father_name'] = middle_name
+                if hasattr(candidate, 'grand_father_name') and last_name:
+                    write_vals['grand_father_name'] = last_name
+
+                try:
+                    candidate.sudo().write(write_vals)
+                except Exception as e:
+                    _logger.exception("Error saving candidate profile personal info: %s", e)
+                    return request.redirect('/my/candidate/profile?step=2&error=' + urllib.parse.quote(str(e)))
+
                 return request.redirect('/my/candidate/profile?step=3')
 
             elif step == 3:
@@ -1105,6 +1257,24 @@ class ATSPortalController(http.Controller):
                 return request.redirect('/my/candidate/profile?step=4')
 
             elif step == 4:
+                # Fresh graduate / No experience declaration
+                if kwargs.get('no_experience_declaration') == '1':
+                    candidate.sudo().write({'has_work_experience': False})
+                    return request.redirect('/my/candidate/profile?step=5')
+
+                # Helper: Graduation date check
+                edus = candidate.education_ids.filtered(lambda e: e.active and (e.graduation_year or e.end_date))
+                earliest_grad = None
+                earliest_grad_year = None
+                max_exp_years = 0
+                if edus:
+                    grad_dates = [e.graduation_year if e.graduation_year else e.end_date for e in edus if (e.graduation_year or e.end_date)]
+                    if grad_dates:
+                        earliest_grad = min(grad_dates)
+                        earliest_grad_year = earliest_grad.year
+                        today_d = fields.Date.today()
+                        max_exp_years = max(0, today_d.year - earliest_grad_year)
+
                 # Handle single edit or multiple new experience entries
                 edit_id = kwargs.get('edit_id')
                 if edit_id:
@@ -1115,13 +1285,19 @@ class ATSPortalController(http.Controller):
                     is_curr = kwargs.get('is_current') == '1'
                     e_date = False if is_curr else _clean_date(kwargs.get('end_date'))
 
-                    missing = []
-                    if not pos: missing.append("Job Title / Position")
-                    if not org: missing.append("Company / Organization")
-                    if not s_date: missing.append("Start Date")
-                    if missing:
-                        err = "Please fill in required experience fields: " + ", ".join(missing)
-                        return request.redirect('/my/candidate/profile?step=4&edit_exp_id=' + str(edit_id) + '&error=' + urllib.parse.quote(err))
+                    if earliest_grad_year and s_date:
+                        s_date_obj = fields.Date.to_date(s_date)
+                        if s_date_obj and s_date_obj.year < earliest_grad_year:
+                            err = f"Work experience start date ({s_date}) cannot precede your graduation year ({earliest_grad_year}). Professional experience must be acquired after graduation."
+                            return request.redirect('/my/candidate/profile?step=4&edit_exp_id=' + str(edit_id) + '&error=' + urllib.parse.quote(err))
+
+                    if earliest_grad_year and s_date:
+                        other_exp = sum(exp.duration_years for exp in candidate.experience_ids if exp.active and exp.id != int(edit_id))
+                        stop = fields.Date.today() if is_curr or not e_date else fields.Date.to_date(e_date)
+                        entry_dur = max(0.0, round(((stop - fields.Date.to_date(s_date)).days) / 365.25, 2))
+                        if (other_exp + entry_dur) > (max_exp_years + 1.0):
+                            err = f"Total experience ({round(other_exp + entry_dur, 1)} years) cannot exceed the maximum years elapsed since graduation ({max_exp_years} years based on {earliest_grad_year} graduation)."
+                            return request.redirect('/my/candidate/profile?step=4&edit_exp_id=' + str(edit_id) + '&error=' + urllib.parse.quote(err))
 
                     exp_file = kwargs.get('exp_file')
                     exp_data, exp_filename, exp_err = _validate_uploaded_file(exp_file, max_mb=5, allowed_exts=['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'], label='Experience / Service Certificate')
@@ -1143,6 +1319,7 @@ class ATSPortalController(http.Controller):
                         vals['exp_filename'] = exp_filename
 
                     request.env['candidate.experience'].sudo().browse(int(edit_id)).write(vals)
+                    candidate.sudo().write({'has_work_experience': True})
                     return request.redirect('/my/candidate/profile?step=4')
                 else:
                     # Multi-entry creation mode
@@ -1157,6 +1334,18 @@ class ATSPortalController(http.Controller):
                     exp_files = request.httprequest.files.getlist('exp_file')
 
                     num_entries = max(len(pos_list), len(org_list), 1)
+
+                    # Validate start dates against graduation before saving
+                    if earliest_grad_year:
+                        for i in range(num_entries):
+                            s_date_raw = start_list[i] if i < len(start_list) else kwargs.get('start_date')
+                            s_date = _clean_date(s_date_raw)
+                            if s_date:
+                                s_date_obj = fields.Date.to_date(s_date)
+                                if s_date_obj and s_date_obj.year < earliest_grad_year:
+                                    err = f"Work experience start date ({s_date}) cannot precede your graduation year ({earliest_grad_year}). Professional experience must be acquired after graduation."
+                                    return request.redirect('/my/candidate/profile?step=4&error=' + urllib.parse.quote(err))
+
                     created_any = False
                     for i in range(num_entries):
                         pos = pos_list[i].strip() if i < len(pos_list) else (kwargs.get('position', '').strip() if i == 0 else '')
@@ -1164,17 +1353,7 @@ class ATSPortalController(http.Controller):
                         s_date_raw = start_list[i] if i < len(start_list) else kwargs.get('start_date')
                         s_date = _clean_date(s_date_raw)
 
-                        if pos or org or s_date:
-                            missing = []
-                            if not pos: missing.append("Job Title / Position")
-                            if not org: missing.append("Company / Organization")
-                            if not s_date: missing.append("Start Date")
-                            if missing:
-                                entry_label = f"Experience #{i+1}: " if num_entries > 1 else ""
-                                err = entry_label + "Please fill in required fields: " + ", ".join(missing)
-                                return request.redirect('/my/candidate/profile?step=4&error=' + urllib.parse.quote(err))
-
-                        if not pos and not org:
+                        if not pos and not org and not s_date:
                             continue
 
                         sec = sector_list[i] if i < len(sector_list) else kwargs.get('sector_type', 'banking')
@@ -1204,6 +1383,16 @@ class ATSPortalController(http.Controller):
 
                         request.env['candidate.experience'].sudo().create(vals)
                         created_any = True
+
+                    if created_any or candidate.experience_ids:
+                        candidate.sudo().write({'has_work_experience': True})
+
+                    # Check candidate total experience duration after adding
+                    if earliest_grad_year:
+                        total_exp = sum(exp.duration_years for exp in candidate.experience_ids if exp.active)
+                        if total_exp > (max_exp_years + 1.0):
+                            err = f"Total experience ({round(total_exp, 1)} years) cannot exceed the maximum years elapsed since graduation ({max_exp_years} years based on {earliest_grad_year} graduation)."
+                            return request.redirect('/my/candidate/profile?step=4&error=' + urllib.parse.quote(err))
 
                 return request.redirect('/my/candidate/profile?step=5')
 
@@ -1277,7 +1466,17 @@ class ATSPortalController(http.Controller):
                 # Handle single edit or multiple new language entries
                 edit_id = kwargs.get('edit_id')
                 if edit_id:
-                    lang_name = kwargs.get('lang_name')
+                    lang_name = (kwargs.get('lang_name') or '').strip()
+                    if lang_name:
+                        existing = request.env['candidate.language'].sudo().search([
+                            ('id', '!=', int(edit_id)),
+                            ('candidate_id', '=', candidate.id),
+                            ('name', '=ilike', lang_name),
+                            ('active', '=', True)
+                        ], limit=1)
+                        if existing:
+                            err = f"The language '{lang_name}' already exists in your profile. Each language must be distinct."
+                            return request.redirect('/my/candidate/profile?step=6&edit_lang_id=' + str(edit_id) + '&error=' + urllib.parse.quote(err))
                     request.env['candidate.language'].sudo().browse(int(edit_id)).write({
                         'name': lang_name,
                         'proficiency': kwargs.get('proficiency', 'fluent'),
@@ -1287,11 +1486,19 @@ class ATSPortalController(http.Controller):
                     lang_list = request.httprequest.form.getlist('lang_name')
                     prof_list = request.httprequest.form.getlist('proficiency')
 
+                    existing_langs = {l.name.strip().lower() for l in candidate.language_ids if l.active and l.name}
+                    seen_in_batch = set()
+
                     num_entries = max(len(lang_list), 1)
                     for i in range(num_entries):
                         l_name = lang_list[i].strip() if i < len(lang_list) else (kwargs.get('lang_name', '').strip() if i == 0 else '')
                         if not l_name:
                             continue
+                        l_lower = l_name.lower()
+                        if l_lower in existing_langs or l_lower in seen_in_batch:
+                            err = f"The language '{l_name}' has already been added to your profile. Duplicate languages are not allowed."
+                            return request.redirect('/my/candidate/profile?step=6&error=' + urllib.parse.quote(err))
+                        seen_in_batch.add(l_lower)
                         prof = prof_list[i] if i < len(prof_list) else kwargs.get('proficiency', 'fluent')
                         request.env['candidate.language'].sudo().create({
                             'candidate_id': candidate.id,
@@ -1303,14 +1510,33 @@ class ATSPortalController(http.Controller):
 
             elif step == 7:
                 # Documents & Links
+                linkedin_val = (kwargs.get('linkedin_url') or '').strip()
+                portfolio_val = (kwargs.get('portfolio_url') or '').strip()
+                github_val = (kwargs.get('github_url') or '').strip()
+
+                if linkedin_val:
+                    if not re.match(r'^https?://([a-zA-Z0-9-]+\.)*linkedin\.com(/.*)?$', linkedin_val, re.IGNORECASE):
+                        err = "LinkedIn Profile URL must be a valid LinkedIn link (e.g., https://www.linkedin.com/in/yourprofile)."
+                        return request.redirect('/my/candidate/profile?step=7&error=' + urllib.parse.quote(err))
+
+                if github_val:
+                    if not re.match(r'^https?://([a-zA-Z0-9-]+\.)*(github\.com|gitlab\.com)(/.*)?$', github_val, re.IGNORECASE):
+                        err = "GitHub / GitLab URL must be a valid GitHub or GitLab link (e.g., https://github.com/yourusername)."
+                        return request.redirect('/my/candidate/profile?step=7&error=' + urllib.parse.quote(err))
+
+                if portfolio_val:
+                    if not re.match(r'^https?://[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+(:\d+)?(/.*)?$', portfolio_val, re.IGNORECASE) or any(bad in portfolio_val.lower() for bad in ['javascript:', 'data:', '<script']):
+                        err = "Portfolio Website URL must be a valid web URL starting with http:// or https:// (e.g., https://myportfolio.com)."
+                        return request.redirect('/my/candidate/profile?step=7&error=' + urllib.parse.quote(err))
+
                 write_vals = {
-                    'linkedin_url': kwargs.get('linkedin_url', candidate.linkedin_url),
-                    'portfolio_url': kwargs.get('portfolio_url', candidate.portfolio_url),
-                    'github_url': kwargs.get('github_url', candidate.github_url),
+                    'linkedin_url': linkedin_val,
+                    'portfolio_url': portfolio_val,
+                    'github_url': github_val,
                 }
 
                 cv_file = kwargs.get('cv_file')
-                cv_data, cv_filename, cv_err = _validate_uploaded_file(cv_file, max_mb=5, allowed_exts=['pdf', 'docx', 'doc'], label='Curriculum Vitae (CV / Resume)')
+                cv_data, cv_filename, cv_err = _validate_uploaded_file(cv_file, max_mb=5, allowed_exts=['pdf'], label='Curriculum Vitae (CV / Resume)')
                 if cv_err:
                     return request.redirect('/my/candidate/profile?step=7&upload_error=' + urllib.parse.quote(cv_err))
                 if cv_data:
@@ -1520,11 +1746,11 @@ class ATSPortalController(http.Controller):
 
             user = request.env.user
             try:
-                user._check_credentials(old_pwd, {'interactive': True})
-                if not new_pwd or new_pwd != confirm_pwd:
-                    error = "New Password and Confirm Password do not match."
-                elif len(new_pwd) < 6:
-                    error = "New Password must be at least 6 characters long."
+                user._check_credentials({'type': 'password', 'password': old_pwd}, {'interactive': True})
+                cand_info = [candidate.name if candidate else '', user.name or '', (user.email or user.login or '').split('@')[0]]
+                pwd_error = validate_ats_password(new_pwd, confirm_password=confirm_pwd, old_password=old_pwd, user_info=cand_info)
+                if pwd_error:
+                    error = pwd_error
                 else:
                     user.sudo().write({'password': new_pwd})
                     success = "Your password has been changed successfully!"

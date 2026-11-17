@@ -9,7 +9,7 @@
 
     <record id="assessment_privilege" model="res.groups.privilege">
         <field name="name">Assessment Management</field>
-        <field name="placeholder"></field>
+        <field name="placeholder" eval="False"/>
         <field name="sequence">25</field>
         <field name="category_id" ref="module_category_assessment_management"/>
     </record>

@@ -30,7 +30,38 @@ class PmTask(models.Model):
                     if m.project_id:
                         vals['project_id'] = m.project_id.id
                         vals['is_project_task'] = True
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        records._sync_task_users_to_project_team()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'user_ids' in vals or 'project_id' in vals:
+            self._sync_task_users_to_project_team()
+        return res
+
+    def _sync_task_users_to_project_team(self):
+        """Automatically enroll task assignees into the project team roster if not already present."""
+        role_model = self.env['pm.project.role']
+        team_model = self.env['pm.project.team']
+        default_role = False
+        for task in self:
+            if not task.project_id or not task.user_ids:
+                continue
+            existing_user_ids = set(task.project_id.team_ids.mapped('user_id.id'))
+            for user in task.user_ids:
+                if user.id not in existing_user_ids:
+                    if not default_role:
+                        default_role = role_model.search([('name', '=ilike', 'Team Member')], limit=1)
+                        if not default_role:
+                            default_role = role_model.create({'name': 'Team Member', 'sequence': 50})
+                    team_model.create({
+                        'project_id': task.project_id.id,
+                        'user_id': user.id,
+                        'role_id': default_role.id,
+                        'status': 'active'
+                    })
+                    existing_user_ids.add(user.id)
     
     # Task Category: Project Task vs Non-Project Task
     is_project_task = fields.Boolean(
@@ -53,12 +84,36 @@ class PmTask(models.Model):
     manager_id = fields.Many2one('res.users', string='Project Manager', related='project_id.manager_id', store=True, readonly=True)
     coordinator_id = fields.Many2one('res.users', string='Project Coordinator', related='project_id.coordinator_id', store=True, readonly=True)
     user_ids = fields.Many2many('res.users', 'pm_task_user_rel', 'task_id', 'user_id', string='Assignees', tracking=True)
+    project_member_ids = fields.Many2many(
+        'res.users',
+        compute='_compute_project_member_ids',
+        string='Available Project Team Members'
+    )
+
+    @api.depends('project_id', 'project_id.member_ids', 'project_id.manager_id', 'project_id.coordinator_id')
+    def _compute_project_member_ids(self):
+        internal_users = self.env['res.users'].search([('active', '=', True), ('share', '=', False)])
+        for task in self:
+            if task.project_id:
+                pool = task.project_id.member_ids | task.project_id.manager_id | task.project_id.coordinator_id
+                pool = pool.filtered(lambda u: u.id)
+                task.project_member_ids = pool if pool else internal_users
+            else:
+                task.project_member_ids = internal_users
+
     customer_id = fields.Many2one('res.partner', string='Sponsor')
+    owner_id = fields.Many2one(
+        'res.users',
+        string='Task Owner',
+        default=lambda self: self.env.user,
+        tracking=True,
+        index=True
+    )
     tag_type = fields.Selection([
         ('internal', 'Internal'),
         ('external', 'External'),
         ('both', 'Both')
-    ], string='Type', default='internal')
+    ], string='Task Type', default='internal', tracking=True)
 
     # Timelines
     date_start = fields.Date(string='Start Date', tracking=True)
@@ -67,12 +122,12 @@ class PmTask(models.Model):
     
     # Stage & Completion
     state = fields.Selection([
-        ('pending', 'Pending'),
+        ('pending', 'To Do'),
         ('in_progress', 'In Progress'),
         ('blocked', 'Blocked'),
-        ('done', 'Done'),
-        ('canceled', 'Canceled')
-    ], string='Status State', compute='_compute_task_state', store=True, readonly=False, default='pending', tracking=True)
+        ('done', 'Completed'),
+        ('canceled', 'Cancelled')
+    ], string='State', compute='_compute_task_state', store=True, readonly=False, default='pending', tracking=True)
     stage_id = fields.Many2one('pm.task.stage', string='Stage', default=lambda self: self._default_stage_id(),
                               group_expand='_read_group_stage_ids', tracking=True, index=True)
     is_closed = fields.Boolean(string='Completed', related='stage_id.is_closed', store=True)
@@ -83,7 +138,8 @@ class PmTask(models.Model):
         ('3', 'Urgent')
     ], string='Priority', default='1', tracking=True)
     
-    color = fields.Integer(string='Color Index', default=0)
+    color = fields.Integer(default=0)
+    active = fields.Boolean(string='Active', default=True)
     tag_ids = fields.Many2many('pm.task.tag', string='Tags')
     description = fields.Html(string='Task Description')
 
@@ -95,7 +151,13 @@ class PmTask(models.Model):
         readonly=False,
         default=0.0
     )
-    effective_hours = fields.Float(string='Time Spent (Hours)', compute='_compute_effective_hours', store=True)
+    effective_hours = fields.Float(
+        string='Time Spent (Hours)',
+        compute='_compute_effective_hours',
+        store=True,
+        readonly=False,
+        default=0.0
+    )
     effort_variance = fields.Float(
         string='Effort Variance (%)',
         compute='_compute_effort_variance',
@@ -213,25 +275,62 @@ class PmTask(models.Model):
             elif not rec.is_project_task:
                 rec.is_project_task = False
 
+    @api.onchange('deliverable_id')
+    def _onchange_deliverable_id(self):
+        if self.deliverable_id:
+            self.is_project_task = True
+            if self.deliverable_id.project_id:
+                self.project_id = self.deliverable_id.project_id
+            if self.deliverable_id.milestone_id:
+                self.milestone_id = self.deliverable_id.milestone_id
+
+    @api.onchange('milestone_id')
+    def _onchange_milestone_id(self):
+        if self.milestone_id:
+            self.is_project_task = True
+            if self.milestone_id.project_id:
+                self.project_id = self.milestone_id.project_id
+            if self.deliverable_id and self.deliverable_id.milestone_id != self.milestone_id:
+                self.deliverable_id = False
+            return {'domain': {'deliverable_id': [('milestone_id', '=', self.milestone_id.id)]}}
+        elif self.project_id:
+            return {'domain': {'deliverable_id': [('project_id', '=', self.project_id.id)]}}
+        else:
+            return {'domain': {'deliverable_id': []}}
+
     @api.onchange('project_id')
     def _onchange_project_id(self):
+        domain = {
+            'milestone_id': [],
+            'deliverable_id': [],
+            'user_ids': [],
+        }
         if self.project_id:
             self.is_project_task = True
             if self.project_id.customer_id:
                 self.customer_id = self.project_id.customer_id
             if self.project_id.tag_type:
                 self.tag_type = self.project_id.tag_type
+            if self.milestone_id and self.milestone_id.project_id != self.project_id:
+                self.milestone_id = False
+            if self.deliverable_id and self.deliverable_id.project_id != self.project_id:
+                self.deliverable_id = False
+
+            domain['milestone_id'] = [('project_id', '=', self.project_id.id)]
+            if self.milestone_id:
+                domain['deliverable_id'] = [('milestone_id', '=', self.milestone_id.id)]
+            else:
+                domain['deliverable_id'] = [('project_id', '=', self.project_id.id)]
+
+            pool = self.project_id.member_ids | self.project_id.manager_id | self.project_id.coordinator_id
+            pool = pool.filtered(lambda u: u.id)
+            if pool:
+                domain['user_ids'] = [('id', 'in', pool.ids)]
         else:
             self.milestone_id = False
             self.deliverable_id = False
 
-    @api.onchange('deliverable_id')
-    def _onchange_deliverable_id(self):
-        if self.deliverable_id:
-            if self.deliverable_id.project_id:
-                self.project_id = self.deliverable_id.project_id
-            if self.deliverable_id.milestone_id:
-                self.milestone_id = self.deliverable_id.milestone_id
+        return {'domain': domain}
 
     @api.onchange('subtask_ids')
     def _onchange_subtask_ids_assignees(self):
@@ -243,8 +342,11 @@ class PmTask(models.Model):
     @api.depends('subtask_ids.allocated_hours')
     def _compute_allocated_hours(self):
         for rec in self:
-            if rec.subtask_ids:
-                rec.allocated_hours = sum(s.allocated_hours for s in rec.subtask_ids)
+            subtask_hours = sum(s.allocated_hours for s in rec.subtask_ids)
+            if subtask_hours > 0:
+                rec.allocated_hours = subtask_hours
+            elif not rec.allocated_hours:
+                rec.allocated_hours = 0.0
 
     @api.depends('date_deadline', 'is_closed')
     def _compute_deadline_status(self):
@@ -268,7 +370,17 @@ class PmTask(models.Model):
     @api.depends('progress_log_ids.hours_spent')
     def _compute_effective_hours(self):
         for rec in self:
-            rec.effective_hours = sum(log.hours_spent for log in rec.progress_log_ids)
+            log_hours = sum(log.hours_spent for log in rec.progress_log_ids)
+            if log_hours > 0:
+                rec.effective_hours = log_hours
+            elif not rec.effective_hours:
+                rec.effective_hours = 0.0
+
+    @api.onchange('effective_hours', 'allocated_hours')
+    def _onchange_hours_progress(self):
+        for rec in self:
+            if not rec.subtask_ids and rec.allocated_hours > 0 and not rec.is_closed:
+                rec.progress_rate = min(100.0, max(0.0, round((rec.effective_hours / rec.allocated_hours) * 100.0, 2)))
 
     @api.depends('effective_hours', 'allocated_hours')
     def _compute_effort_variance(self):
@@ -289,9 +401,11 @@ class PmTask(models.Model):
                 rec.state = 'done'
             elif rec.stage_id and (rec.stage_id.name or '').strip().lower() in ('in progress', 'progress'):
                 rec.state = 'in_progress'
+            elif rec.stage_id and (rec.stage_id.name or '').strip().lower() in ('blocked',):
+                rec.state = 'blocked'
             elif rec.stage_id and (rec.stage_id.name or '').strip().lower() in ('canceled', 'cancelled'):
                 rec.state = 'canceled'
-            elif not rec.state:
+            else:
                 rec.state = 'pending'
 
     @api.depends('subtask_ids', 'subtask_ids.is_done', 'subtask_ids.weight')
@@ -373,3 +487,7 @@ class PmTask(models.Model):
         stage_in_progress = self.env['pm.task.stage'].search([('name', '=ilike', 'In Progress')], limit=1)
         if stage_in_progress:
             self.write({'stage_id': stage_in_progress.id, 'progress_rate': 50.0})
+
+    def unlink(self):
+        """Soft delete: archive task instead of permanent deletion."""
+        return self.write({'active': False})

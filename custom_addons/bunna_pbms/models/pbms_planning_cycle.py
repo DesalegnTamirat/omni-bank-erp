@@ -35,6 +35,7 @@ class PbmsPlanningCycle(models.Model):
             ("consolidation", "Consolidation & Hearing"),
             ("board_approval", "Board Approval"),
             ("approved", "Approved / Cascaded"),
+            ("running", "Running"),
             ("closed", "Closed"),
         ],
         default="draft", required=True, tracking=True, index=True,
@@ -117,7 +118,7 @@ class PbmsPlanningCycle(models.Model):
             send_pbms_inbox_notification(self.env, cycle, users_or_partners, subject, body)
 
     company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, required=True,
+        "res.company", string="Company", default=False, required=False,
     )
     active = fields.Boolean(default=True)
 
@@ -134,7 +135,32 @@ class PbmsPlanningCycle(models.Model):
     def _check_dates(self):
         for cycle in self:
             if cycle.date_start >= cycle.date_end:
-                raise ValidationError("Cycle end date must be after the start date.")
+                raise ValidationError(_("Cycle end date must be after the start date."))
+
+    @api.constrains("date_start", "date_end", "company_id")
+    def _check_cycle_date_overlap(self):
+        """Validate that a new or edited planning cycle cannot overlap or fall between an existing cycle's start and end date."""
+        for cycle in self:
+            if not cycle.date_start or not cycle.date_end:
+                continue
+            overlapping = self.search([
+                ("id", "!=", cycle.id),
+                ("company_id", "=", cycle.company_id.id),
+                ("date_start", "<=", cycle.date_end),
+                ("date_end", ">=", cycle.date_start),
+            ], limit=1)
+            if overlapping:
+                raise ValidationError(_(
+                    "Planning Cycle date range (%(start)s to %(end)s) overlaps with existing cycle '%(name)s' "
+                    "(%(exist_start)s to %(exist_end)s).\n"
+                    "A new planning cycle cannot be created with dates falling within or overlapping an existing cycle's start date and end date. "
+                    "Please choose a different start date and end date.",
+                    start=cycle.date_start,
+                    end=cycle.date_end,
+                    name=overlapping.name,
+                    exist_start=overlapping.date_start,
+                    exist_end=overlapping.date_end,
+                ))
 
     @api.constrains("name", "date_start", "date_end", "company_id")
     def _check_unique_cycle(self):
@@ -293,6 +319,104 @@ class PbmsPlanningCycle(models.Model):
                         "end": fields.Date.to_string(end),
                     })
 
+    def _compute_default_deadlines_from_start(self, start_date):
+        """Helper to compute standard sequential deadlines from cycle start date."""
+        from datetime import datetime, timedelta
+        if not start_date:
+            return {}
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        return {
+            "branch_deadline": start_dt + timedelta(days=6, hours=9),
+            "district_deadline": start_dt + timedelta(days=20, hours=9),
+            "head_office_deadline": start_dt + timedelta(days=25, hours=9),
+            "board_deadline": start_dt + timedelta(days=140, hours=10),
+            "workforce_window_start": start_date,
+            "workforce_window_end": (start_dt + timedelta(days=6)).date(),
+        }
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        # Keep planning cycle fields completely empty on new record creation
+        for f in [
+            "name", "date_start", "date_end", "company_id",
+            "branch_deadline", "district_deadline", "head_office_deadline",
+            "board_deadline", "workforce_window_start", "workforce_window_end"
+        ]:
+            if f in res:
+                res[f] = False
+        return res
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get("company_id"):
+                vals["company_id"] = self.env.company.id
+        return super().create(vals_list)
+
+    @api.onchange("name")
+    def _onchange_name_suggest_dates(self):
+        """Keep dates and deadlines user-controlled without auto-overwriting."""
+        pass
+
+    @api.onchange("date_start", "date_end")
+    def _onchange_dates_validate_overlap_and_suggest_name(self):
+        """When user changes date_start or date_end:
+        1. Validates that end date is after start date.
+        2. Validates that the date range does not fall inside or overlap with an existing planning cycle.
+        """
+        if self.date_start and self.date_end:
+            if self.date_start >= self.date_end:
+                return {
+                    "warning": {
+                        "title": _("Invalid Date Range"),
+                        "message": _("Cycle end date must be after the start date."),
+                    }
+                }
+
+            # Check overlap dynamically on change
+            domain = [
+                ("company_id", "=", self.company_id.id or self.env.company.id),
+                ("date_start", "<=", self.date_end),
+                ("date_end", ">=", self.date_start),
+            ]
+            if self._origin and self._origin.id:
+                domain.append(("id", "!=", self._origin.id))
+            overlapping = self.search(domain, limit=1)
+            if overlapping:
+                return {
+                    "warning": {
+                        "title": _("Planning Cycle Date Overlap"),
+                        "message": _(
+                            "The selected date range (%(start)s to %(end)s) overlaps with an existing planning cycle '%(name)s' "
+                            "(%(exist_start)s to %(exist_end)s).\n"
+                            "A planning cycle cannot be created between or overlapping an existing cycle's dates. "
+                            "Please adjust the Start Date and End Date.",
+                            start=self.date_start,
+                            end=self.date_end,
+                            name=overlapping.name,
+                            exist_start=overlapping.date_start,
+                            exist_end=overlapping.date_end,
+                        )
+                    }
+                }
+                return {
+                    "warning": {
+                        "title": _("Planning Cycle Date Overlap"),
+                        "message": _(
+                            "The selected date range (%(start)s to %(end)s) overlaps with an existing planning cycle '%(name)s' "
+                            "(%(exist_start)s to %(exist_end)s).\n"
+                            "A planning cycle cannot be created between or overlapping an existing cycle's dates. "
+                            "Please adjust the Start Date and End Date.",
+                            start=self.date_start,
+                            end=self.date_end,
+                            name=overlapping.name,
+                            exist_start=overlapping.date_start,
+                            exist_end=overlapping.date_end,
+                        )
+                    }
+                }
+
     @api.onchange("date_start", "date_end", "branch_deadline", "district_deadline", "head_office_deadline", "board_deadline")
     def _onchange_submission_deadlines(self):
         try:
@@ -365,7 +489,7 @@ class PbmsPlanningCycle(models.Model):
         root_user = self.env.ref("base.user_root", raise_if_not_found=False)
         if root_user:
             users -= root_user
-        return users.filtered(lambda u: u.active)
+        return users.filtered(lambda u: u.active and u._pbms_has_access())
 
     def _get_all_planning_partners(self):
         """Find all users involved in plan & budget preparation and review across all branches, districts, and head offices."""
@@ -614,6 +738,14 @@ class PbmsPlanningCycle(models.Model):
             _("Official Board approval granted. Approved targets and budgets are now cascaded to all operating units."),
         )
 
+    def action_set_running(self):
+        self.write({"state": "running"})
+        for cycle in self:
+            cycle._notify_cycle_status_change(
+                _("Annual Business Plan Running"),
+                _("Annual Business Plan for '%s' is now officially Running (plan execution and KPI monitoring active).") % cycle.name,
+            )
+
     def action_close(self):
         self.write({"state": "closed"})
         self._notify_cycle_status_change(
@@ -624,6 +756,30 @@ class PbmsPlanningCycle(models.Model):
     def is_editable(self):
         self.ensure_one()
         return self.state == "open"
+
+
+    @api.model
+    def _fix_existing_cycle_deadlines(self):
+        """Backfill deadlines for any existing planning cycle that has empty deadlines."""
+        cycles = self.search([])
+        for cycle in cycles:
+            if not cycle.date_start:
+                continue
+            deadlines = cycle._compute_default_deadlines_from_start(cycle.date_start)
+            vals = {}
+            for f_name, f_val in deadlines.items():
+                if not getattr(cycle, f_name, False):
+                    vals[f_name] = f_val
+            if vals:
+                cycle.with_context(skip_cycle_edit_notification=True).write(vals)
+
+    @api.model
+    def _register_hook(self):
+        super()._register_hook()
+        try:
+            self._fix_existing_cycle_deadlines()
+        except Exception as e:
+            _logger.warning("Error running _fix_existing_cycle_deadlines: %s", e)
 
     # ---------------------------------------------------------------
     # Notifications (BRD 8.2 "Notifications and Alerts")
@@ -693,7 +849,9 @@ class PbmsPlanningCycle(models.Model):
             elif hasattr(unit, "user_ids") and unit.user_ids:
                 candidate = unit.user_ids[0]
 
-        if candidate and candidate.active:
+        if candidate and candidate.active and candidate._pbms_has_access():
+            return candidate
+        if False and candidate and candidate.active:
             pbms_groups = (
                 "bunna_pbms.group_pbms_branch_user",
                 "bunna_pbms.group_pbms_district_reviewer",

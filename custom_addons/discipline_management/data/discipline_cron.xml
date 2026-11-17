@@ -63,5 +63,53 @@
             <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=40, second=0)"/>
             <field name="active" eval="True"/>
         </record>
+
+        <!-- Cron: Nightly Attendance & Absence Violation Scanner (Off-peak at 01:30 AM) -->
+        <record id="ir_cron_discipline_attendance_nightly_scan" model="ir.cron">
+            <field name="name">Discipline Management: Nightly Attendance &amp; Absence Violation Scan</field>
+            <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_escalate_attendance_violations()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=1, minute=30, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Cron: Appeal Acceptance Window Expiry & Held Payroll Refund Processing -->
+        <record id="ir_cron_discipline_appeal_acceptance_window_check" model="ir.cron">
+            <field name="name">Discipline Management: Appeal Acceptance Window Check &amp; Refund Processing</field>
+            <field name="model_id" ref="discipline_management.model_discipline_appeal"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_process_appeal_acceptance_window()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=50, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Cron: Appeal Authority SLA Overdue Auto-Escalation -->
+        <record id="ir_cron_discipline_appeal_sla_escalation_check" model="ir.cron">
+            <field name="name">Discipline Management: Appeal Reviewer SLA Auto-Escalation</field>
+            <field name="model_id" ref="discipline_management.model_discipline_appeal"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_auto_escalate_overdue_appeals()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=55, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Cron: Daily Stage SLA and Prescription Deadline Follow-up Check -->
+        <record id="ir_cron_discipline_case_sla_deadlines" model="ir.cron">
+            <field name="name">Discipline Management: Daily Stage SLA &amp; Prescription Follow-up</field>
+            <field name="model_id" ref="discipline_management.model_discipline_case"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_check_case_sla_deadlines()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=10, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>

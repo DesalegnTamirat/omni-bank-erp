@@ -8,7 +8,7 @@ class HrSeparationType(models.Model):
     _description = 'Separation Type'
     _order = 'sequence asc, name asc'
 
-    name     = fields.Char(required=True, translate=True)
+    name     = fields.Char(required=True)
     code     = fields.Char(
         required=True,
         help='Stable technical key used internally by business logic '
@@ -24,6 +24,12 @@ class HrSeparationType(models.Model):
              'Used by the Provident Fund eligibility rule (FR-15) to '
              'exclude company-terminated employees regardless of tenure.')
 
+    bypass_handover = fields.Boolean(
+        string='Bypass Manager Handover & Release Date',
+        default=False,
+        help='If checked, HR/POMD must enter the Release Date when creating the request, '
+             'and direct manager handover is bypassed.')
+
     allow_salary_payment = fields.Boolean(string="Remaining salary", default=True)
     allow_leave_encashment = fields.Boolean(string="Accrued leave pay", default=True)
 
@@ -34,17 +40,13 @@ class HrSeparationType(models.Model):
     check_disciplinary = fields.Boolean(
         string='Validate Disciplinary Cases',
         default=False,
-        help='If checked, displays a warning if the employee has any active disciplinary cases.'
+        help='If checked, displays a red warning before POMD approval if the employee has any active disciplinary cases.'
     )
-    check_investigations = fields.Boolean(
-        string='Validate Ongoing Investigations', default=True,
-        help='If checked, blocks resignation approval if the employee has active investigations.')
     check_commitments = fields.Boolean(
-        string='Validate Contractual Commitments', default=True,
-        help='If checked, blocks resignation approval if the employee has active training commitments or sponsorships.')
-    check_probation = fields.Boolean(
-        string='Validate Probation Status', default=True,
-        help='If checked, blocks resignation approval if the employee is still on probation.')
+        string='Validate Contractual Commitments',
+        default=True,
+        help='If checked, displays a red warning before POMD approval if the employee has active training/educational commitments or sponsorships.'
+    )
 
     pays_provident_fund = fields.Boolean(
         string='Pays Provident Fund (PF)', default=True,
@@ -112,6 +114,7 @@ class HrSeparationSeveranceRule(models.Model):
         help="Maximum total months of salary that can be paid as severance."
     )
 
-    _sql_constraints = [
-        ('category_uniq', 'unique(separation_type_id, employee_category)', 'A job category can only have one rule per separation type.')
-    ]
+    _category_uniq = models.Constraint(
+        'unique(separation_type_id, employee_category)',
+        'A job category can only have one rule per separation type.',
+    )

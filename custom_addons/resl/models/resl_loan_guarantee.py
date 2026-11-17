@@ -249,11 +249,10 @@ class ReslLoanGuarantee(models.Model):
                         )
                 except Exception:
                     _logger.exception("Failed to schedule borrower activity after all guarantors accepted")
-        try:
-            action = self.env.ref('resl.action_resl_my_guarantees').read()[0]
-            return action
-        except Exception:
-            return {'type': 'ir.actions.act_window_close'}
+        # Stay on the request: reload the loan form the guarantor is looking
+        # at (new status, Agreement button / banner) instead of opening the
+        # "My Pending Guarantees" list, which is empty once the line is answered.
+        return {'type': 'ir.actions.client', 'tag': 'soft_reload'}
 
     def action_reject(self):
         for g in self:
@@ -304,11 +303,10 @@ class ReslLoanGuarantee(models.Model):
                         )
             except Exception:
                 _logger.exception('Failed to notify the requestor about the guarantor rejection')
-        try:
-            action = self.env.ref('resl.action_resl_my_guarantees').read()[0]
-            return action
-        except Exception:
-            return {'type': 'ir.actions.act_window_close'}
+        # Stay on the request: reload the loan form the guarantor is looking
+        # at (new status, Agreement button / banner) instead of opening the
+        # "My Pending Guarantees" list, which is empty once the line is answered.
+        return {'type': 'ir.actions.client', 'tag': 'soft_reload'}
 
     def unlink(self):
         for rec in self:

@@ -1,6 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <record id="paperformat_payroll_summary_landscape" model="report.paperformat">
+        <field name="name">Payroll Summary Landscape</field>
+        <field name="default" eval="True"/>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">10</field>
+        <field name="margin_bottom">10</field>
+        <field name="margin_left">5</field>
+        <field name="margin_right">5</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">5</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_payroll_summary_pdf" model="ir.actions.report">
+        <field name="name">Payroll Summary Report</field>
+        <field name="model">bunna.payroll.summary.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">bunna_hr_payroll.report_payroll_summary_document</field>
+        <field name="report_file">bunna_hr_payroll.report_payroll_summary_document</field>
+        <field name="print_report_name">('Payroll_Summary_%s' % (object.period_id.name))</field>
+        <field name="paperformat_id" ref="bunna_hr_payroll.paperformat_payroll_summary_landscape"/>
+    </record>
+
     <record id="action_contribution_register" model="ir.actions.report">
         <field name="name">PaySlip Lines By Contribution Register</field>
         <field name="model">hr.contribution.register</field>

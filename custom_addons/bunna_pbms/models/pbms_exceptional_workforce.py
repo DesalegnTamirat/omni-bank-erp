@@ -1,10 +1,36 @@
-# -*- coding: utf-8 -*-
+import base64
 import logging
 from markupsafe import Markup
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
+
+
+def _process_workforce_document_vals(vals):
+    """Ensure workforce document is converted to Base64 and stored in database."""
+    if not isinstance(vals, dict):
+        return
+    if "workforce_document" in vals:
+        doc = vals.get("workforce_document")
+        if doc:
+            if isinstance(doc, bytes):
+                base64_str = base64.b64encode(doc).decode("ascii")
+            elif isinstance(doc, str):
+                if "," in doc and doc.startswith("data:"):
+                    base64_str = doc.split(",", 1)[1]
+                else:
+                    base64_str = doc
+            else:
+                base64_str = str(doc)
+            vals["workforce_document_base64"] = base64_str
+            vals["workforce_document"] = base64_str
+        else:
+            vals["workforce_document_base64"] = False
+    elif "workforce_document_base64" in vals and not vals.get("workforce_document"):
+        b64 = vals.get("workforce_document_base64")
+        if b64:
+            vals["workforce_document"] = b64
 
 
 class PbmsExceptionalWorkforceRequest(models.Model):
@@ -178,6 +204,43 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         string="Supporting Documents",
         help="Upload supporting justification memos, committee notes, or business cases.",
     )
+    workforce_document = fields.Binary(
+        string="Attach Document",
+        attachment=False,
+        copy=False,
+        help="Upload supporting workforce document (converted to Base64 and stored directly in database).",
+    )
+    workforce_document_filename = fields.Char(
+        string="Document Filename",
+        copy=False,
+    )
+    workforce_document_base64 = fields.Text(
+        string="Document Base64",
+        copy=False,
+        help="Base64 encoded string of the attached workforce document stored directly in database.",
+    )
+
+    @api.constrains("workforce_document_filename", "workforce_document", "supporting_doc_ids")
+    def _check_exceptional_attachments(self):
+        import os
+        allowed = (".pdf", ".doc", ".docx")
+        for rec in self:
+            if rec.workforce_document_filename:
+                _b, ext = os.path.splitext(rec.workforce_document_filename.lower())
+                if ext not in allowed:
+                    raise ValidationError(_(
+                        "Invalid file format for '%(filename)s'. Only PDF (.pdf) and Word documents (.doc, .docx) are allowed as attachments in PBMS.",
+                        filename=rec.workforce_document_filename,
+                    ))
+            for att in rec.supporting_doc_ids:
+                if att.name:
+                    _b, ext = os.path.splitext(att.name.lower())
+                    if ext not in allowed:
+                        raise ValidationError(_(
+                            "Invalid file format for '%(filename)s'. Only PDF (.pdf) and Word documents (.doc, .docx) are allowed as attachments in PBMS.",
+                            filename=att.name,
+                        ))
+
     company_id = fields.Many2one(
         "res.company",
         string="Company",
@@ -520,6 +583,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            _process_workforce_document_vals(vals)
             if not vals.get("name") or vals["name"] == _("New"):
                 seq = self.env["ir.sequence"].next_by_code("pbms.exceptional.workforce.request")
                 vals["name"] = seq or _("New")
@@ -532,6 +596,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         return records
 
     def write(self, vals):
+        _process_workforce_document_vals(vals)
         if (
             self.env.su
             or self.env.is_admin()
@@ -1032,8 +1097,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                     "recipient_ids": [(6, 0, list(partner_ids))],
                     "auto_delete": False,
                 }
-                mail = self.env["mail.mail"].sudo().create(mail_vals)
-                mail.send()
+                self.env["mail.mail"].sudo().create(mail_vals)
             except Exception as e:
                 _logger.warning("Error sending exceptional workforce email for %s: %s", self.name, str(e))
 

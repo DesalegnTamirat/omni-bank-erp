@@ -12,10 +12,10 @@ class SuccessionCandidateAssessmentWizard(models.TransientModel):
     _name = 'succession.candidate.assessment.wizard'
     _description = 'Record Candidate Assessment Scores'
 
-    candidate_id = fields.Many2one('succession.candidate', required=True, readonly=True)
-    employee_id = fields.Many2one(related='candidate_id.employee_id', string='Candidate', readonly=True)
+    candidate_id = fields.Many2one('succession.candidate', string='Succession Candidate', required=True, readonly=True, index=True)
+    employee_id = fields.Many2one(related='candidate_id.employee_id', string='Candidate (Employee)', readonly=True, index=True)
     critical_position_id = fields.Many2one(
-        related='candidate_id.critical_position_id', string='Target Critical Position', readonly=True)
+        related='candidate_id.critical_position_id', string='Target Critical Position', readonly=True, index=True)
 
     assessment_scope = fields.Selection(
         related='candidate_id.assessment_scope',
@@ -29,9 +29,7 @@ class SuccessionCandidateAssessmentWizard(models.TransientModel):
     competency_score = fields.Float(string='Manager Rating Score (%)', readonly=True)
     competency_eval_status = fields.Char(string='Manager Evaluation Status', readonly=True)
 
-    # Candidate Self-Assessment (Read-only summary of line ratings)
-    has_self_eval = fields.Boolean(string='Self-Assessment Active', default=False)
-    self_eval_score = fields.Float(string='Self-Assessment Score (%)', readonly=True)
+
 
     # SPMC Committee Evaluation (Read-only summary of committee ratings)
     has_spmc_eval = fields.Boolean(string='SPMC Evaluation Active', default=False)
@@ -65,6 +63,11 @@ class SuccessionCandidateAssessmentWizard(models.TransientModel):
         cand_id = self.env.context.get('default_candidate_id') or self.env.context.get('active_id')
         if cand_id:
             cand = self.env['succession.candidate'].browse(cand_id)
+            if not cand.assessment_criteria_synced:
+                raise UserError(_(
+                    "Assessment Plan has not been synchronized with this employee. "
+                    "Please synchronize the Assessment Plan from the Critical Position before recording scores."
+                ))
             cand._ensure_assessment_results()
             cand._compute_pms_score()
             res['candidate_id'] = cand.id
@@ -72,7 +75,6 @@ class SuccessionCandidateAssessmentWizard(models.TransientModel):
 
             # Active evaluators from candidate's plan
             res['has_competency_eval'] = bool(cand.plan_include_manager)
-            res['has_self_eval'] = bool(cand.plan_include_self)
             res['has_spmc_eval'] = bool(cand.plan_include_spmc)
 
             # Manager Competency Rating
@@ -86,8 +88,7 @@ class SuccessionCandidateAssessmentWizard(models.TransientModel):
             else:
                 res['competency_eval_status'] = "No competencies loaded for role"
 
-            # Self-Assessment & SPMC summaries
-            res['self_eval_score'] = cand.self_assessment_score or 0.0
+            # SPMC summaries
             res['spmc_score'] = cand.spmc_score or 0.0
             res['spmc_recommendation'] = cand.spmc_recommendation or False
             res['avg_competency_score'] = cand.succession_competency_score or 0.0
@@ -132,6 +133,11 @@ class SuccessionCandidateAssessmentWizard(models.TransientModel):
         cand = self.candidate_id
         if cand.assessment_done:
             raise UserError(_('Assessment results are locked because this candidate is already assessed.'))
+        if not cand.assessment_criteria_synced:
+            raise UserError(_(
+                "Assessment Plan has not been synchronized with this employee. "
+                "Please synchronize the Assessment Plan from the Critical Position before saving scores."
+            ))
 
         cand._ensure_assessment_results()
         cand.invalidate_recordset(['assessment_result_ids'])
@@ -180,7 +186,18 @@ class SuccessionCandidateAssessmentWizard(models.TransientModel):
         # Recompute candidate scores
         cand._compute_succession_competency_score()
         cand._refresh_assessment_scores()
-        return {'type': 'ir.actions.act_window_close'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'bunna_close_eval_modals',
+            'params': {
+                'notification': {
+                    'title': _('Assessment Scores Saved'),
+                    'message': _('Assessment scores and remarks successfully saved for %s.') % (cand.employee_id.name or cand.display_name),
+                    'type': 'success',
+                    'sticky': False,
+                },
+            },
+        }
 
     action_apply_scores = action_save
 
@@ -189,9 +206,9 @@ class SuccessionCandidateAssessmentWizardLine(models.TransientModel):
     _name = 'succession.candidate.assessment.wizard.line'
     _description = 'Assessment Wizard Component Score Line'
 
-    wizard_id = fields.Many2one('succession.candidate.assessment.wizard', required=True, ondelete='cascade')
-    result_id = fields.Many2one('succession.candidate.assessment.result', string='Candidate Result')
-    component_id = fields.Many2one('succession.assessment.component', string='Component')
+    wizard_id = fields.Many2one('succession.candidate.assessment.wizard', required=True, ondelete='cascade', index=True)
+    result_id = fields.Many2one('succession.candidate.assessment.result', string='Candidate Result', index=True)
+    component_id = fields.Many2one('succession.assessment.component', string='Component', index=True)
     component_name = fields.Char(
         string='Assessment Component',
         compute='_compute_component_info', store=True, readonly=True)

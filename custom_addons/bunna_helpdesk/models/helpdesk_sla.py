@@ -86,8 +86,9 @@ class HelpdeskSlaStatus(models.Model):
         string="SLA Policy",
         required=True,
         ondelete="cascade",
+        index=True,
     )
-    deadline = fields.Datetime(string="Deadline", readonly=True)
+    deadline = fields.Datetime(string="Deadline", readonly=True, index=True)
     reached_datetime = fields.Datetime(string="Reached On", readonly=True)
     status = fields.Selection(
         selection=[
@@ -98,6 +99,7 @@ class HelpdeskSlaStatus(models.Model):
         string="Status",
         compute="_compute_status",
         store=True,
+        index=True,
     )
 
     @api.depends("deadline", "reached_datetime")

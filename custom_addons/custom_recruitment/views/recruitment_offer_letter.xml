@@ -59,8 +59,9 @@
                     <group>
                         <!-- Group 1: Candidate & Vacancy -->
                         <group string="Candidate &amp; Vacancy Selection">
+                            <field name="eligible_vacancy_ids" invisible="1"/>
                             <field name="vacancy_id"
-                                   domain="[('reference', 'ilike', 'EXT')]"
+                                   domain="[('id', 'in', eligible_vacancy_ids)]"
                                    options="{'no_create': True}"
                                    readonly="state != 'draft'"/>
                             <field name="vacancy_reference" invisible="1"/>
@@ -127,17 +128,6 @@
                         <group>
                             <field name="expiry_date" invisible="1"/>
                             <field name="response_date" invisible="state not in ('accepted', 'declined', 'expired')"/>
-                        </group>
-                    </group>
-
-                    <!-- Group 5: Letter Signatory & CC Details -->
-                    <group string="Official Letter Signatory &amp; CC Details">
-                        <group>
-                            <field name="signatory_name" readonly="state != 'draft'"/>
-                        </group>
-                        <group>
-                            <field name="cc_chief_office" readonly="state != 'draft'"/>
-                            <field name="cc_work_unit" readonly="state != 'draft'"/>
                         </group>
                     </group>
 

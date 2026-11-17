@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Configuration > Approvers & Disbursors.
+             One line per (borrower tier, role). See models/resl_routing_rule.py. -->
+
+        <record id="view_resl_routing_rule_list" model="ir.ui.view">
+            <field name="name">resl.routing.rule.list</field>
+            <field name="model">resl.routing.rule</field>
+            <field name="arch" type="xml">
+                <list string="Approvers &amp; Disbursors">
+                    <field name="sequence" widget="handle"/>
+                    <field name="tier"/>
+                    <field name="unit_id" optional="show"/>
+                    <field name="role"/>
+                    <field name="source" optional="hide"/>
+                    <field name="mode" optional="hide"/>
+                    <field name="job_summary" string="Job positions (in order)"/>
+                    <field name="employee_ids" widget="many2many_tags" string="Employees" context="{'resl_show_ou': True, 'resl_employee_picker': True}"/>
+                    <field name="max_count" string="Number"/>
+                    <field name="active" column_invisible="1"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_resl_routing_rule_form" model="ir.ui.view">
+            <field name="name">resl.routing.rule.form</field>
+            <field name="model">resl.routing.rule</field>
+            <field name="arch" type="xml">
+                <form string="Approver / Disbursor Assignment">
+                    <header>
+                        <button name="action_apply_now" type="object" class="btn-primary"
+                                string="Apply to open requests" icon="fa-refresh"/>
+                        <button name="action_set_default" type="object"
+                                string="Set to default" icon="fa-undo"
+                                confirm="Replace the job positions and employees of this line with the default?"
+                                invisible="not id"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <div class="oe_title">
+                            <h1><field name="name" readonly="1"/></h1>
+                        </div>
+                        <field name="active" invisible="1"/>
+                        <div class="alert alert-info" role="alert" invisible="not note">
+                            <field name="note" nolabel="1" class="d-inline"/>
+                        </div>
+                        <group string="Who is it for?">
+                            <group>
+                                <field name="setup_id" invisible="1"/>
+                                <field name="tier" readonly="id"/>
+                                <field name="unit_id" invisible="not setup_id" readonly="1"
+                                       options="{'no_create': True}"/>
+                                <field name="role" readonly="id"/>
+                            </group>
+                            <group>
+                                <field name="source"/>
+                                <field name="mode"/>
+                            </group>
+                        </group>
+                        <div class="alert alert-warning" role="alert" invisible="not scope_warning">
+                            <field name="scope_warning" readonly="1" nolabel="1"/>
+                        </div>
+                        <group string="Who is chosen?">
+                            <group invisible="not linked_text" colspan="2">
+                                <field name="linked_text" readonly="1" colspan="2"
+                                       string="Selected person(s) this line stands behind"/>
+                            </group>
+                            <group invisible="mode != 'job'" colspan="2">
+                                <field name="job_line_ids" nolabel="1" colspan="2">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="job_id" options="{'no_create': True}"
+                                               context="{'resl_job_family': True}"
+                                               domain="[('id', 'in', parent.scope_job_ids)]"/>
+                                        <field name="employee_count"/>
+                                    </list>
+                                </field>
+                                <div class="text-muted" colspan="2">
+                                    Order matters: for each borrower the first job position that has somebody
+                                    in the selected place is used. E.g. line 1 Branch Manager - I, line 2
+                                    Branch Manager - II, line 3 Branch Manager - III: a branch without a
+                                    Manager - I falls to Manager - II, and without that to Manager - III.
+                                    Only job positions that have active employees there are listed (the
+                                    number beside each is how many). People of the same job position are
+                                    taken in alphabetical order.
+                                </div>
+                            </group>
+                            <group invisible="mode != 'employee'" colspan="2">
+                                <field name="employee_ids" widget="many2many_tags" colspan="2"
+                                       options="{'no_create': True}"
+                                       context="{'resl_show_ou': True, 'resl_employee_picker': True}"
+                                       domain="[('user_id', '!=', False), ('default_operating_unit_id', 'in', scope_ou_ids)]"/>
+                                <field name="scope_ou_ids" invisible="1"/>
+                                <field name="scope_dept_ids" invisible="1"/>
+                                <field name="scope_job_ids" invisible="1"/>
+                            </group>
+                            <group invisible="not people_text" colspan="2">
+                                <field name="people_text" readonly="1" colspan="2"
+                                       string="Employees found (job positions + added)"/>
+                            </group>
+                            <group invisible="role not in ('disbursor', 'disbursor_backup', 'hr_accountant', 'hr_accountant_backup')" colspan="2">
+                                <field name="max_count"/>
+                                <field name="fill_from_next_jobs" invisible="mode == 'employee'"/>
+                                <field name="allow_self_disburse" invisible="role not in ('disbursor', 'hr_accountant')"
+                                       string="Disburser disburses own loan (untick to use the Disburser's Disburser)"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_resl_routing_rule_search" model="ir.ui.view">
+            <field name="name">resl.routing.rule.search</field>
+            <field name="model">resl.routing.rule</field>
+            <field name="arch" type="xml">
+                <search string="Approvers &amp; Disbursors">
+                    <field name="unit_id"/>
+                    <filter string="General lines (all districts / branches)" name="f_general" domain="[('unit_id','=',False)]"/>
+                    <filter string="District / Branch lines" name="f_unit" domain="[('unit_id','!=',False)]"/>
+                    <separator/>
+                    <filter string="Branch" name="f_branch" domain="[('tier','=','branch')]"/>
+                    <filter string="District" name="f_district" domain="[('tier','=','district')]"/>
+                    <filter string="Head Office" name="f_ho" domain="[('tier','=','head_office')]"/>
+                    <separator/>
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
+                    <group>
+                        <filter string="Borrower work unit" name="g_tier" context="{'group_by':'tier'}"/>
+                        <filter string="Role" name="g_role" context="{'group_by':'role'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- list: select lines, Action > Set to default -->
+        <record id="action_resl_routing_rule_set_default" model="ir.actions.server">
+            <field name="name">Set to default</field>
+            <field name="model_id" ref="model_resl_routing_rule"/>
+            <field name="binding_model_id" ref="model_resl_routing_rule"/>
+            <field name="binding_view_types">list</field>
+            <field name="state">code</field>
+            <field name="code">action = records.action_set_default()</field>
+        </record>
+
+        <!-- Branch Setup / HO Setup: the general lines, edited here -->
+        <record id="view_resl_routing_rule_simple_list" model="ir.ui.view">
+            <field name="name">resl.routing.rule.simple.list</field>
+            <field name="model">resl.routing.rule</field>
+            <field name="arch" type="xml">
+                <list string="Approvers &amp; Disbursors" create="0" delete="0">
+                    <field name="role"/>
+                    <field name="job_summary" string="Job positions (in order)"/>
+                    <field name="employee_ids" widget="many2many_tags" string="Employees" context="{'resl_show_ou': True, 'resl_employee_picker': True}"/>
+                    <field name="allow_self_disburse" string="Disburses own loan"
+                           invisible="role not in ('disbursor', 'hr_accountant')"/>
+                    <field name="people_text" string="Who it will be"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_resl_routing_rule_branch" model="ir.actions.act_window">
+            <field name="name">Branch Setup</field>
+            <field name="res_model">resl.routing.rule</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('tier','=','branch'),('unit_id','=',False)]</field>
+            <field name="context">{'default_tier': 'branch'}</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_resl_routing_rule_simple_list')}),
+                (0, 0, {'view_mode': 'form'})]"/>
+            <field name="help" type="html">
+                <p>One set of lines for ALL branches: Branch Approver, Approver's Approver,
+                   Disburser and Disburser's Disburser. Open a line to choose job positions
+                   and / or employees.</p>
+            </field>
+        </record>
+
+        <record id="action_resl_routing_rule_ho" model="ir.actions.act_window">
+            <field name="name">HO Setup</field>
+            <field name="res_model">resl.routing.rule</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('tier','=','head_office')]</field>
+            <field name="context">{'default_tier': 'head_office'}</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_resl_routing_rule_simple_list')}),
+                (0, 0, {'view_mode': 'form'})]"/>
+            <field name="help" type="html">
+                <p>Head Office: HO Approver, HO Approver's Approver, HR Auditor, HR Disburser
+                   and HR Disburser's Disburser. Open a line to choose job positions and / or
+                   employees.</p>
+            </field>
+        </record>
+
+        <!-- ===== District Setup / Branch Setup ===== -->
+        <record id="view_resl_routing_unit_list" model="ir.ui.view">
+            <field name="name">resl.routing.unit.list</field>
+            <field name="model">resl.routing.unit</field>
+            <field name="arch" type="xml">
+                <list string="District Setup">
+                    <field name="operating_unit_id"/>
+                    <field name="department_id"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_resl_routing_unit_form" model="ir.ui.view">
+            <field name="name">resl.routing.unit.form</field>
+            <field name="model">resl.routing.unit</field>
+            <field name="arch" type="xml">
+                <form string="District / Branch Setup">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="operating_unit_id" options="{'no_create': True}"
+                                       readonly="id"/></h1>
+                        </div>
+                        <field name="active" invisible="1"/>
+                        <group>
+                            <field name="department_id" options="{'no_create': True}"/>
+                        </group>
+                        <group string="Approvers &amp; Disbursors (open a line to choose job positions and / or employees)">
+                            <field name="rule_ids" nolabel="1" colspan="2">
+                                <list create="0" delete="0">
+                                    <field name="role"/>
+                                    <field name="job_summary" string="Job positions"/>
+                                    <field name="employee_ids" widget="many2many_tags" string="Employees" context="{'resl_show_ou': True, 'resl_employee_picker': True}"/>
+                                    <field name="allow_self_disburse" string="Disburses own loan"
+                                           invisible="role not in ('disbursor', 'hr_accountant')"/>
+                                    <field name="people_text" string="Who it will be"/>
+                                </list>
+                            </field>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_resl_routing_unit_search" model="ir.ui.view">
+            <field name="name">resl.routing.unit.search</field>
+            <field name="model">resl.routing.unit</field>
+            <field name="arch" type="xml">
+                <search string="District / Branch Setup">
+                    <field name="operating_unit_id"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_resl_routing_unit_district" model="ir.actions.act_window">
+            <field name="name">District Setup</field>
+            <field name="res_model">resl.routing.unit</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('tier','=','district')]</field>
+            <field name="search_view_id" ref="view_resl_routing_unit_search"/>
+        </record>
+
+        <record id="action_resl_routing_unit_generate" model="ir.actions.server">
+            <field name="name">Restore default lines &amp; add missing districts</field>
+            <field name="model_id" ref="model_resl_routing_unit"/>
+            <field name="state">code</field>
+            <field name="code">action = model.action_generate_missing()</field>
+        </record>
+
+        <menuitem id="menu_resl_routing_unit_district" name="District Setup"
+            parent="resl.menu_resl_config_root"
+            action="action_resl_routing_unit_district" sequence="21"/>
+        <menuitem id="menu_resl_routing_unit_branch" name="Branch Setup"
+            parent="resl.menu_resl_config_root"
+            action="action_resl_routing_rule_branch" sequence="22"/>
+        <menuitem id="menu_resl_routing_rule_ho" name="HO Setup"
+            parent="resl.menu_resl_config_root"
+            action="action_resl_routing_rule_ho" sequence="23"/>
+        <menuitem id="menu_resl_routing_unit_generate" name="Restore defaults / add districts"
+            parent="resl.menu_resl_config_root"
+            action="action_resl_routing_unit_generate" sequence="24"/>
+    </data>
+</odoo>

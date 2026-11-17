@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 DISCIPLINE_SELECTION = [
     ("none", "No Active Warning"),
@@ -37,48 +37,6 @@ class EmployeeTransferRequest(models.Model):
         return True
 
     _order = "request_date desc"
-    def _auto_init(self):
-        res = super()._auto_init()
-        try:
-            with self.env.cr.savepoint():
-                self.env.cr.execute("""
-                    UPDATE employee_transfer_request 
-                    SET state = CASE 
-                            WHEN state ILIKE 'draft' THEN 'draft'
-                            WHEN state ILIKE 'submitted' THEN 'submitted'
-                            WHEN state ILIKE '%under%' THEN 'under_review'
-                            WHEN state ILIKE 'approved' THEN 'approved'
-                            WHEN state ILIKE 'transferred' THEN 'transferred'
-                            WHEN state ILIKE 'rejected' THEN 'rejected'
-                            WHEN state ILIKE 'withdrawn' THEN 'withdrawn'
-                            WHEN state ILIKE 'refused' THEN 'refused'
-                            ELSE 'draft'
-                        END,
-                        acceptance_status = CASE 
-                            WHEN acceptance_status ILIKE 'accepted' THEN 'accepted'
-                            WHEN acceptance_status ILIKE 'rejected' OR acceptance_status ILIKE 'refused' OR acceptance_status ILIKE 'declined' THEN 'rejected'
-                            ELSE 'pending'
-                        END,
-                        eligibility_status = CASE 
-                            WHEN eligibility_status ILIKE 'ineligible' THEN 'ineligible'
-                            ELSE 'eligible'
-                        END,
-                        current_job_category = CASE 
-                            WHEN current_job_category ILIKE '%non%' THEN 'Non Managerial'
-                            WHEN current_job_category ILIKE '%manag%' THEN 'Managerial'
-                            ELSE 'Non Managerial'
-                        END,
-                        disciplinary_status = CASE 
-                            WHEN disciplinary_status ILIKE '%last%' THEN 'last_written_warning'
-                            WHEN disciplinary_status ILIKE '%second%' THEN 'second_warning'
-                            WHEN disciplinary_status ILIKE '%first%' THEN 'first_warning'
-                            ELSE 'none'
-                        END;
-                """)
-        except Exception as e:
-            pass
-        return res
-
 
     name = fields.Char(string="Reference", copy=False, readonly=True, default=lambda self: _("New"))
 
@@ -86,7 +44,7 @@ class EmployeeTransferRequest(models.Model):
         "hr.employee", string="Requesting Employee", required=True, tracking=True,
         default=lambda self: self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1),
     )
-    request_date = fields.Date(string="Request Date", default=fields.Date.context_today, required=True)
+    request_date = fields.Date(string="Request Date", default=fields.Date.context_today, required=True, readonly=True)
 
     current_job_position_id = fields.Many2one(
         "hr.job", string="Current Job Position", compute="_compute_current_info",
@@ -116,11 +74,11 @@ class EmployeeTransferRequest(models.Model):
     )
     date_in_current_position = fields.Date(
         string="Date Joined Current Position",
-        compute="_compute_current_info", store=True, readonly=False,
+        compute="_compute_current_info", store=True, readonly=True,
     )
     date_in_current_location = fields.Date(
         string="Date Joined Current Location",
-        compute="_compute_current_info", store=True, readonly=False,
+        compute="_compute_current_info", store=True, readonly=True,
     )
 
     target_vacancy_id = fields.Many2one(
@@ -131,7 +89,13 @@ class EmployeeTransferRequest(models.Model):
         "employee.grade", string="Target Grade", compute="_compute_target_info", store=True,
     )
     target_job_position_id = fields.Many2one(
-        "hr.job", string="Target Position", compute="_compute_target_info", store=True,
+        "hr.job", string="Target Position", compute="_compute_target_info",
+        inverse="_inverse_target_job_position", store=True, readonly=False,
+    )
+    allowed_target_job_position_ids = fields.Many2many(
+        "hr.job",
+        compute="_compute_allowed_target_job_positions",
+        string="Allowed Target Job Positions",
     )
 
     target_operating_unit_id = fields.Many2one(
@@ -147,9 +111,6 @@ class EmployeeTransferRequest(models.Model):
     )
     reason_for_transfer = fields.Text(string="Reason for Transfer")
     additional_remarks = fields.Text(string="Additional Remarks (Optional)")
-    transfer_letter_id = fields.Many2one(
-        "transfer.letter", string="Lateral Transfer Letter", readonly=True, copy=False,
-    )
 
     employee_name = fields.Char(related="employee_id.name", string="Employee Name", store=True, readonly=True)
     department_id = fields.Many2one(
@@ -231,14 +192,14 @@ class EmployeeTransferRequest(models.Model):
     )
 
     total_experience_years = fields.Float(
-        string="Total Experience (Years)", compute="_compute_total_experience", store=True, readonly=False
+        string="Total Experience (Years)", compute="_compute_total_experience", store=True, readonly=True
     )
     pms_score = fields.Float(
-        string="PMS Score", compute="_compute_pms_score", store=True, readonly=False,
+        string="PMS Score", compute="_compute_pms_score", store=True, readonly=True,
     )
     supervisor_recommendation_score = fields.Float(
         string="Supervisor Recommendation Score (0-100)",
-        default=100.0,
+        default=0,
     )
     transfer_suitability_score = fields.Float(
         string="Transfer Suitability Score", readonly=True, copy=False,
@@ -261,6 +222,7 @@ class EmployeeTransferRequest(models.Model):
             ("submitted", "Submitted"),
             ("under_review", "Under Review"),
             ("approved", "Approved"),
+            ("pending_release", "Pending Manager Release"),
             ("transferred", "Transfer Completed"),
             ("rejected", "Rejected"),
             ("withdrawn", "Withdrawn"),
@@ -270,69 +232,33 @@ class EmployeeTransferRequest(models.Model):
     )
 
     is_flagged_for_hr = fields.Boolean(string="Flagged for HR", default=False, readonly=True, copy=False)
+    releasing_manager_id = fields.Many2one("hr.employee", string="Releasing Manager")
+    release_date = fields.Date(string="Release Date")
+    handover_status = fields.Selection([
+        ("completed", "Handover Completed"),
+        ("pending", "Pending Handover"),
+    ], string="Handover Clearance Status", default="completed")
+    release_remarks = fields.Text(string="Release Remarks")
+    status_group = fields.Selection(
+        [("active", "Active"), ("inactive", "Inactive")],
+        string="Status Group",
+        default="active",
+        index=True,
+    )
+    is_committee_selected = fields.Boolean(
+        string="Is Committee Selected",
+        default=False,
+        index=True,
+    )
+    acceptance_status = fields.Selection(
+        [("pending", "Pending"), ("accepted", "Accepted"), ("rejected", "Rejected")],
+        string="Acceptance Status",
+        default="pending",
+    )
+    acceptance_date = fields.Date(string="Acceptance Date")
+    transfer_letter_id = fields.Many2one("transfer.letter", string="Transfer Letter", copy=False)
     refusal_reason = fields.Text(string="Refusal Reason")
     hr_notified_on_refusal = fields.Datetime(string="HR Notified On", readonly=True, copy=False)
-
-    acceptance_status = fields.Selection([
-        ('pending', 'Pending Acceptance'),
-        ('accepted', 'Accepted'),
-        ('rejected', 'Refused / Declined'),
-    ], string="Transfer Acceptance Status", default='pending')
-    acceptance_date = fields.Datetime(string="Acceptance / Response Date", readonly=True)
-
-    def action_accept_transfer(self):
-        """Requesting employee or HR accepts the transfer offer."""
-        for rec in self:
-            now = fields.Datetime.now()
-            rec.write({
-                'acceptance_status': 'accepted',
-                'acceptance_date': now,
-            })
-            rec.message_post(
-                body=_("Employee transfer offer ACCEPTED on %s.") % fields.Date.today()
-            )
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Transfer Accepted'),
-                'message': _('Transfer offer has been marked as ACCEPTED.'),
-                'type': 'success',
-                'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
-            }
-        }
-
-    def action_decline_transfer(self):
-        """Opens the decline wizard to capture refusal reason for transfer."""
-        self.ensure_one()
-        return {
-            'name': _('Decline / Refuse Transfer Offer'),
-            'type': 'ir.actions.act_window',
-            'res_model': 'internal.selection.decline.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'default_transfer_request_id': self.id,
-            }
-        }
-
-    def confirm_decline_transfer(self, reason):
-        """Executed by decline wizard to refuse transfer."""
-        for rec in self:
-            now = fields.Datetime.now()
-            rec.write({
-                'acceptance_status': 'rejected',
-                'acceptance_date': now,
-                'state': 'refused',
-                'refusal_reason': reason,
-                'is_flagged_for_hr': True,
-                'hr_notified_on_refusal': now,
-            })
-            rec.message_post(
-                body=_("Employee DECLINED / REFUSED transfer offer.<br/><b>Reason:</b> %s") % reason
-            )
-        return True
 
     submitted_by_user_id = fields.Many2one("res.users", string="Submitted By User", readonly=True, copy=False)
     reviewed_by_user_id = fields.Many2one("res.users", string="Reviewer User (Started Review)", readonly=True, copy=False, tracking=True)
@@ -473,6 +399,81 @@ class EmployeeTransferRequest(models.Model):
                 raise UserError(_("Transfer request fields cannot be modified once submitted."))
         return super().write(vals)
 
+    def _get_employee_movement_dates(self, emp):
+        """Retrieve the date joined current position and current location from hr.job.history
+        considering movements of type: Promotion, Lateral Transfer, Transfer, Assignment, Placement.
+        Falls back to joining_date or first_contract_date if no specific movement record exists."""
+        if not emp:
+            return False, False
+        CONSIDERED_MOVEMENTS = ['promotion', 'lateral_transfer', 'transfer', 'assignment', 'placement']
+
+        # 1. Position Start Date
+        pos_id = emp.job_position.id if emp.job_position else (emp.job_id.id if getattr(emp, 'job_id', False) else False)
+        pos_date = False
+        if pos_id and 'hr.job.history' in self.env:
+            pos_hist = self.env['hr.job.history'].sudo().search([
+                ('employee_id', '=', emp.id),
+                '|', ('to_job_id', '=', pos_id), ('job_id', '=', pos_id),
+                '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+            ], order='job_history_start_date desc, id desc', limit=1)
+            if pos_hist and pos_hist.job_history_start_date:
+                pos_date = pos_hist.job_history_start_date
+
+        if not pos_date and 'hr.job.history' in self.env:
+            curr_hist = self.env['hr.job.history'].sudo().search([
+                ('employee_id', '=', emp.id),
+                ('is_current', '=', True),
+                '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+            ], order='job_history_start_date desc, id desc', limit=1)
+            if curr_hist and curr_hist.job_history_start_date:
+                pos_date = curr_hist.job_history_start_date
+
+        if not pos_date:
+            pos_date = (
+                getattr(emp, 'joining_date', False)
+                or getattr(emp, 'first_contract_date', False)
+                or (emp._get_first_contract_date() if hasattr(emp, '_get_first_contract_date') and callable(getattr(emp, '_get_first_contract_date')) else False)
+            )
+
+        # 2. Location Start Date
+        ou_id = emp.default_operating_unit_id.id if getattr(emp, 'default_operating_unit_id', False) else False
+        loc_date = False
+        if ou_id and 'hr.job.history' in self.env:
+            loc_hist = self.env['hr.job.history'].sudo().search([
+                ('employee_id', '=', emp.id),
+                '|', ('to_operating_unit_id', '=', ou_id), ('operating_unit_id', '=', ou_id),
+                '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+            ], order='job_history_start_date desc, id desc', limit=1)
+            if loc_hist and loc_hist.job_history_start_date:
+                loc_date = loc_hist.job_history_start_date
+
+        if not loc_date and 'hr.job.history' in self.env:
+            curr_loc_hist = self.env['hr.job.history'].sudo().search([
+                ('employee_id', '=', emp.id),
+                ('is_current', '=', True),
+                '|', ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS), ('reason_for_change', 'in', CONSIDERED_MOVEMENTS),
+            ], order='job_history_start_date desc, id desc', limit=1)
+            if curr_loc_hist and curr_loc_hist.job_history_start_date:
+                loc_date = curr_loc_hist.job_history_start_date
+
+        if not loc_date and ou_id and 'hr.employee.transfer.history' in self.env:
+            trans_hist = self.env['hr.employee.transfer.history'].sudo().search([
+                ('employee_id', '=', emp.id),
+                ('to_operating_unit_id', '=', ou_id),
+                ('reason_for_movement', 'in', CONSIDERED_MOVEMENTS),
+            ], order='is_current desc, start_date desc, date desc, id desc', limit=1)
+            if trans_hist and (trans_hist.start_date or trans_hist.date):
+                loc_date = trans_hist.start_date or trans_hist.date
+
+        if not loc_date:
+            loc_date = (
+                getattr(emp, 'joining_date', False)
+                or getattr(emp, 'first_contract_date', False)
+                or (emp._get_first_contract_date() if hasattr(emp, '_get_first_contract_date') and callable(getattr(emp, '_get_first_contract_date')) else False)
+            )
+
+        return pos_date or False, loc_date or False
+
     @api.depends(
         "employee_id",
         "employee_id.job_position",
@@ -506,22 +507,13 @@ class EmployeeTransferRequest(models.Model):
 
             rec.current_job_category = cat or False
 
-            if emp and not rec.date_in_current_position:
-                joining = (
-                        getattr(emp, 'joining_date', False)
-                        or getattr(emp, 'first_contract_date', False)
-                        or (emp._get_first_contract_date() if hasattr(emp, '_get_first_contract_date') and callable(
-                    getattr(emp, '_get_first_contract_date')) else False)
-                )
-                rec.date_in_current_position = joining or False
-            if emp and not rec.date_in_current_location:
-                joining = (
-                        getattr(emp, 'joining_date', False)
-                        or getattr(emp, 'first_contract_date', False)
-                        or (emp._get_first_contract_date() if hasattr(emp, '_get_first_contract_date') and callable(
-                    getattr(emp, '_get_first_contract_date')) else False)
-                )
-                rec.date_in_current_location = joining or False
+            if emp:
+                pos_d, loc_d = rec._get_employee_movement_dates(emp)
+                rec.date_in_current_position = pos_d or False
+                rec.date_in_current_location = loc_d or False
+            else:
+                rec.date_in_current_position = False
+                rec.date_in_current_location = False
 
             contract = getattr(emp, 'contract_id', False) if emp else False
             rec.contract_start_date = getattr(contract, 'date_start', False) if contract else False
@@ -727,9 +719,92 @@ class EmployeeTransferRequest(models.Model):
                 rec.target_job_position_id = rec.target_vacancy_id.job_position
                 rec.target_operating_unit_id = rec.target_vacancy_id.operating_unit_id
             else:
-                rec.target_job_grade_id = rec.current_job_grade_id
-                rec.target_job_position_id = rec.current_job_position_id
+                if not rec.target_job_position_id:
+                    rec.target_job_position_id = rec.current_job_position_id
+                job_grade = getattr(rec.target_job_position_id, "grade", False) or getattr(rec.target_job_position_id, "job_grade_id", False)
+                if job_grade:
+                    rec.target_job_grade_id = job_grade
+                elif not rec.target_job_grade_id:
+                    rec.target_job_grade_id = rec.current_job_grade_id
                 rec.target_operating_unit_id = rec.requested_operating_unit_id
+
+    def _inverse_target_job_position(self):
+        for rec in self:
+            if rec.target_job_position_id:
+                job_grade = getattr(rec.target_job_position_id, "grade", False) or getattr(rec.target_job_position_id, "job_grade_id", False)
+                if job_grade:
+                    rec.target_job_grade_id = job_grade
+
+    @api.depends("requested_operating_unit_id", "current_job_grade_id", "employee_id")
+    def _compute_allowed_target_job_positions(self):
+        OUJobPos = self.env["operating.unit.job.position"]
+        HrEmployee = self.env["hr.employee"]
+        JobVacancy = self.env["job.vacancy"]
+        HrJob = self.env["hr.job"]
+
+        for rec in self:
+            grade = rec.current_job_grade_id
+            ou = rec.requested_operating_unit_id or rec.target_operating_unit_id
+
+            if not grade:
+                rec.allowed_target_job_position_ids = HrJob.browse()
+                continue
+
+            if ou:
+                # 1. Positions established in this OU with matching grade
+                ou_lines = OUJobPos.search([
+                    ("operating_unit_id", "=", ou.id),
+                    "|", ("job_grade_id", "=", grade.id), ("job_position_id.grade", "=", grade.id),
+                ])
+                p1 = ou_lines.mapped("job_position_id")
+
+                # 2. Positions held by active employees in this OU with matching grade
+                ou_emps = HrEmployee.search([
+                    ("default_operating_unit_id", "=", ou.id),
+                    ("job_grade", "=", grade.id),
+                    ("active", "=", True),
+                ])
+                p2 = ou_emps.mapped("job_position")
+
+                # 3. Positions from published/active vacancies in this OU with matching grade
+                ou_vacs = JobVacancy.search([
+                    ("operating_unit_id", "=", ou.id),
+                    "|", ("job_grade", "=", grade.id), ("job_position.grade", "=", grade.id),
+                ])
+                p3 = ou_vacs.mapped("job_position")
+
+                allowed = (p1 | p2 | p3).filtered(lambda j: j.active)
+                rec.allowed_target_job_position_ids = allowed
+            else:
+                # No OU selected yet: filter all active jobs holding this grade
+                all_grade_jobs = HrJob.search([
+                    ("active", "=", True),
+                    ("grade", "=", grade.id),
+                ])
+                ou_pos_with_grade = OUJobPos.search([("job_grade_id", "=", grade.id)]).mapped("job_position_id")
+                rec.allowed_target_job_position_ids = (all_grade_jobs | ou_pos_with_grade).filtered(lambda j: j.active)
+
+    @api.onchange("requested_operating_unit_id", "current_job_grade_id")
+    def _onchange_requested_ou_filter_positions(self):
+        self._compute_allowed_target_job_positions()
+        if self.target_job_position_id and self.allowed_target_job_position_ids:
+            if self.target_job_position_id not in self.allowed_target_job_position_ids:
+                self.target_job_position_id = False
+        return {
+            "domain": {
+                "target_job_position_id": [("id", "in", self.allowed_target_job_position_ids.ids)]
+            }
+        }
+
+    @api.onchange("target_job_position_id")
+    def _onchange_target_job_position_id(self):
+        for rec in self:
+            if rec.target_job_position_id:
+                job_grade = getattr(rec.target_job_position_id, "grade", False) or getattr(rec.target_job_position_id, "job_grade_id", False)
+                if job_grade:
+                    rec.target_job_grade_id = job_grade
+            elif rec.current_job_grade_id:
+                rec.target_job_grade_id = rec.current_job_grade_id
 
     def _compute_final_assessment_score(self):
         ICPSudo = self.env["ir.config_parameter"].sudo()
@@ -817,20 +892,10 @@ class EmployeeTransferRequest(models.Model):
     @api.onchange("employee_id")
     def _onchange_employee_auto_dates(self):
         for rec in self:
-            if rec.employee_id and not rec.date_in_current_position:
-                joining = (
-                        getattr(rec.employee_id, 'joining_date', False)
-                        or getattr(rec.employee_id, 'first_contract_date', False)
-                )
-                if joining:
-                    rec.date_in_current_position = joining
-            if rec.employee_id and not rec.date_in_current_location:
-                joining = (
-                        getattr(rec.employee_id, 'joining_date', False)
-                        or getattr(rec.employee_id, 'first_contract_date', False)
-                )
-                if joining:
-                    rec.date_in_current_location = joining
+            if rec.employee_id:
+                pos_d, loc_d = rec._get_employee_movement_dates(rec.employee_id)
+                rec.date_in_current_position = pos_d or False
+                rec.date_in_current_location = loc_d or False
 
     def action_submit(self):
         for rec in self:
@@ -903,14 +968,17 @@ class EmployeeTransferRequest(models.Model):
         if not manager:
             return
 
-        body = _(
-            "Transfer request %(name)s for employee %(employee)s is now Under Review. "
-            "As the direct manager/supervisor (coach), please open the request and provide the "
-            "Supervisor Recommendation Score (0-100%%)."
-        ) % {
-            "name": rec.name,
-            "employee": rec.employee_id.name,
-        }
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        req_url = f"{base_url.rstrip('/')}/web#id={rec.id}&model=employee.transfer&view_type=form" if base_url else f"/web#id={rec.id}&model=employee.transfer&view_type=form"
+        body = Markup(
+            f"<p>Transfer request <b>{escape(rec.name or '')}</b> for employee <b>{escape(rec.employee_id.name or '')}</b> is now <b>Under Review</b>.</p>"
+            f"<p>As the direct manager/supervisor (coach), please open the request and provide the <b>Supervisor Recommendation Score (0-100%)</b>.</p>"
+            f"<div style='margin-top: 10px; margin-bottom: 12px;'>"
+            f"<a href='{req_url}' target='_blank' style='display: inline-block; padding: 8px 16px; background-color: #541718; color: #ffffff !important; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 13px;'>"
+            f"👉 Open Transfer Request ({escape(rec.name or '')})"
+            f"</a>"
+            f"</div>"
+        )
 
         # 1. Post to Chatter & In-App Discuss / Inbox Notification
         if manager.user_id and manager.user_id.partner_id:
@@ -1115,92 +1183,6 @@ class EmployeeTransferRequest(models.Model):
             'target': 'current',
         }
 
-    # ── Lateral Transfer Letter Actions ──────────────────────────────
-    def _ensure_transfer_letter(self):
-        """Ensures a lateral transfer letter exists for this transfer request, creating it if needed."""
-        self.ensure_one()
-        if self.transfer_letter_id:
-            return self.transfer_letter_id
-
-        emp = self.employee_id
-        title = 'Ato'
-        gender = (emp.gender or '').lower() if emp else ''
-        if gender in ['female', 'f']:
-            title = 'W/ro'
-
-        cur_unit = self.current_operating_unit_id.name if self.current_operating_unit_id else (emp.operating_unit.name if emp and emp.operating_unit else _('Current Branch'))
-        cur_pos = self.current_job_position_id.name if self.current_job_position_id else (emp.job_title or (emp.job_id.name if emp and emp.job_id else _('Current Position')))
-        new_unit = self.target_operating_unit_id.name if self.target_operating_unit_id else (self.requested_operating_unit_id.name if self.requested_operating_unit_id else _('Target Branch'))
-        new_pos = self.target_job_position_id.name if self.target_job_position_id else cur_pos
-        grade_name = self.current_job_grade_id.grade_name if self.current_job_grade_id else (getattr(emp, 'emp_grade', False) and emp.emp_grade.grade_name or 'Grade')
-        salary = emp.contract_id.wage if (emp and emp.contract_id and emp.contract_id.wage) else (getattr(emp, 'monthly_salary', 0.0) or 0.0)
-
-        eff_date = getattr(self, 'effective_transfer_date', False) or getattr(self, 'reporting_date', False) or fields.Date.today()
-        id_num = getattr(emp, 'identification_id', False) or getattr(emp, 'employee_id_number', False) or getattr(emp, 'barcode', '') or ''
-
-        letter_vals = {
-            'transfer_request_id': self.id,
-            'employee_id': emp.id,
-            'employee_name': emp.name,
-            'employee_title': title,
-            'employee_email': (emp.work_email or emp.private_email or '').strip(),
-            'employee_id_number': id_num,
-            'employee_address': cur_unit or _('Addis Ababa'),
-            'letter_date': fields.Date.today(),
-            'effective_date': eff_date,
-            'current_work_unit_name': cur_unit,
-            'current_position_name': cur_pos,
-            'new_work_unit_name': new_unit,
-            'new_position_name': new_pos,
-            'job_grade_name': grade_name,
-            'monthly_salary': salary,
-            'signatory_title': 'Talent Management Directorate',
-            'signatory_company': 'Bunna Bank S.C.',
-            'state': 'draft',
-        }
-        letter = self.env['transfer.letter'].create(letter_vals)
-        self.transfer_letter_id = letter.id
-        return letter
-
-    def action_generate_transfer_letter(self):
-        """Generates or opens the Lateral Transfer Letter."""
-        self.ensure_one()
-        letter = self._ensure_transfer_letter()
-        return {
-            'name': _('Lateral Transfer Letter'),
-            'type': 'ir.actions.act_window',
-            'res_model': 'transfer.letter',
-            'res_id': letter.id,
-            'view_mode': 'form',
-            'target': 'current',
-        }
-
-    def action_print_transfer_letter(self):
-        """Prints the Lateral Transfer Letter directly from the transfer request."""
-        self.ensure_one()
-        letter = self._ensure_transfer_letter()
-        return letter.action_print_transfer_letter()
-
-    def action_send_transfer_letter(self):
-        """Sends the Lateral Transfer Letter by email with PDF attached directly from the transfer request."""
-        self.ensure_one()
-        letter = self._ensure_transfer_letter()
-        return letter.action_send_transfer_letter()
-
-    def action_view_transfer_letter(self):
-        """Opens the linked Lateral Transfer Letter."""
-        self.ensure_one()
-        if not self.transfer_letter_id:
-            raise UserError(_("No Lateral Transfer Letter has been generated yet."))
-        return {
-            'name': _('Lateral Transfer Letter'),
-            'type': 'ir.actions.act_window',
-            'res_model': 'transfer.letter',
-            'res_id': self.transfer_letter_id.id,
-            'view_mode': 'form',
-            'target': 'current',
-        }
-
     def _get_selection_notification_html(self):
         self.ensure_one()
         emp = self.employee_id
@@ -1330,7 +1312,7 @@ class EmployeeTransferRequest(models.Model):
         marked 'Selected' in the ranking — never from the request form
         directly."""
         for rec in self:
-            if rec.state != "approved":
+            if rec.state not in ("approved", "pending_release"):
                 raise UserError(_(
                     "Only requests already Approved by HR can be "
                     "completed. Current status: %s"
@@ -1453,7 +1435,7 @@ class EmployeeTransferRequest(models.Model):
         except ValueError:
             penalty_months = 12
         for rec in self:
-            if rec.state != "approved":
+            if rec.state not in ("approved", "pending_release"):
                 raise UserError(_("Only an Approved transfer can be refused."))
             rec.write({
                 "state": "refused",
@@ -1685,3 +1667,55 @@ class EmployeeTransferRequest(models.Model):
                     )
                 except Exception:
                     pass
+
+    def _ensure_transfer_letter(self):
+        self.ensure_one()
+        if self.transfer_letter_id:
+            return self.transfer_letter_id
+        domain = [('transfer_request_id', '=', self.id)]
+        letter = self.env['transfer.letter'].sudo().search(domain, limit=1)
+        if not letter:
+            emp = self.employee_id
+            target_unit = self.requested_operating_unit_id or self.target_operating_unit_id
+            curr_unit = self.current_operating_unit_id
+            target_pos = self.target_job_position_id or self.current_job_position_id
+            curr_pos = self.current_job_position_id
+            target_grade = self.target_job_grade_id or self.current_job_grade_id
+
+            letter_vals = {
+                'employee_id': emp.id if emp else False,
+                'transfer_request_id': self.id,
+                'current_operating_unit_id': curr_unit.id if curr_unit else False,
+                'current_job_position_id': curr_pos.id if curr_pos else False,
+                'target_operating_unit_id': target_unit.id if target_unit else False,
+                'target_job_position_id': target_pos.id if target_pos else False,
+                'target_job_grade_id': target_grade.id if target_grade else False,
+                'state': 'draft',
+            }
+            letter = self.env['transfer.letter'].sudo().create(letter_vals)
+        self.sudo().write({'transfer_letter_id': letter.id})
+        return letter
+
+    def action_accept_transfer(self):
+        for rec in self:
+            rec.write({
+                'acceptance_status': 'accepted',
+                'acceptance_date': fields.Date.context_today(rec),
+            })
+
+    def confirm_decline_transfer(self, reason=''):
+        for rec in self:
+            rec.write({
+                'acceptance_status': 'rejected',
+                'refusal_reason': reason,
+            })
+
+    def _check_current_user_is_releasing_manager(self):
+        user = self.env.user
+        if user.has_group('custom_recruitment.group_recruitment_administrator') or user.has_group('base.group_system'):
+            return True
+        for rec in self:
+            rel_mgr = rec.releasing_manager_id or (rec.employee_id.coach_id if rec.employee_id else False) or (rec.employee_id.parent_id if rec.employee_id else False)
+            if rel_mgr and rel_mgr.user_id and rel_mgr.user_id.id == user.id:
+                return True
+        return True

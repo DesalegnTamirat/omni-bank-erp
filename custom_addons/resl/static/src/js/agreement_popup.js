@@ -14,7 +14,7 @@ import { Component, onMounted, onWillUnmount } from "@odoo/owl";
  * Whenever the popup closes after something was saved, the page is reloaded so
  * the loan form shows the new state (buttons, banners, status).
  */
-class ReslAgreementDialog extends Component {
+export class ReslAgreementDialog extends Component {
     static template = "resl.AgreementDialog";
     static components = { Dialog };
     static props = ["*"];
@@ -25,10 +25,17 @@ class ReslAgreementDialog extends Component {
                 return;
             }
             const type = ev.data && ev.data.type;
-            if (type === "resl_agreement_saved") {
+            if (type === "resl_agreement_preagreed") {
+                // Part A agreed on a New request that is not in the database yet
+                if (this.props.onPreAgreed) {
+                    this.props.onPreAgreed();
+                }
+            } else if (type === "resl_agreement_saved") {
                 this.props.onSaved();
             } else if (type === "resl_agreement_done") {
-                this.props.onSaved();
+                if (this.props.onSaved) {
+                    this.props.onSaved();
+                }
                 this.props.close();
             }
         };

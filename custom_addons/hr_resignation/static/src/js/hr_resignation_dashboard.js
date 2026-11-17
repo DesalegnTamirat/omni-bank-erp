@@ -11,7 +11,9 @@ export class HrResignationDashboard extends Component {
         this.action = useService("action");
         this.state = useState({
             stats: {},
-            charts: {}
+            charts: {},
+            recent_resignations: [],
+            clearance_bottlenecks: [],
         });
         
         this.pieChartCanvas = useRef("pieChartCanvas");
@@ -23,6 +25,8 @@ export class HrResignationDashboard extends Component {
                 if (data) {
                     this.state.stats = data.stats || {};
                     this.state.charts = data.charts || {};
+                    this.state.recent_resignations = data.recent_resignations || [];
+                    this.state.clearance_bottlenecks = data.clearance_bottlenecks || [];
                 }
             } catch (e) {
                 console.error("Failed to load resignation dashboard data:", e);
@@ -60,7 +64,14 @@ export class HrResignationDashboard extends Component {
                     cutout: '60%',
                     plugins: {
                         legend: {
-                            position: 'right'
+                            position: 'right',
+                            labels: {
+                                boxWidth: 12,
+                                padding: 8,
+                                font: {
+                                    size: 12
+                                }
+                            }
                         }
                     }
                 }
@@ -106,13 +117,21 @@ export class HrResignationDashboard extends Component {
                         x: {
                             grid: {
                                 display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 10
+                                }
                             }
                         },
                         y: {
                             beginAtZero: true,
                             suggestedMax: 5,
                             ticks: {
-                                stepSize: 1
+                                stepSize: 1,
+                                font: {
+                                    size: 10
+                                }
                             }
                         }
                     }
@@ -133,19 +152,26 @@ export class HrResignationDashboard extends Component {
         } else if (type === 'manager_approved') {
             domain = [['state', '=', 'manager_approved']];
             name = "Manager Approved Requests";
-        } else if (type === 'hr_approved') {
-            domain = [['state', 'in', ['hr_approved', 'release_date_set', 'handover_completed']]];
+        } else if (type === 'approved') {
+            domain = [['state', 'in', ['approved', 'release_date_set', 'handover_completed']]];
             name = "HR Approved Requests";
-        } else if (type === 'clearing') {
-            res_model = "hr.resignation";
-            domain = [['state', '=', 'clearance']];
-            name = "Clearances In Progress";
+        } else if (type === 'clearance_in_progress') {
+            domain = [['state', '=', 'clearance_in_progress']];
+            name = "Clearance In Progress";
         } else if (type === 'cleared_awaiting_settlement') {
             domain = [['state', '=', 'cleared']];
             name = "Cleared (Awaiting Settlement)";
+        } else if (type === 'settlement_in_progress') {
+            res_model = "hr.resignation.settlement";
+            domain = [['state', 'in', ['draft', 'waiting_audit']]];
+            name = "Settlement In Progress";
         } else if (type === 'completed') {
-            domain = [['state', 'in', ['settled', 'done']]];
+            domain = [['state', '=', 'completed']];
             name = "Completed Requests";
+        } else if (type === 'waiting_payment') {
+            res_model = "hr.resignation.settlement";
+            domain = [['state', '=', 'waiting_payment']];
+            name = "Waiting Payment";
         } else if (type === 'overdue') {
             res_model = "hr.resignation.clearance";
             domain = [['state', '=', 'pending'], ['is_overdue', '=', true]];
@@ -161,6 +187,7 @@ export class HrResignationDashboard extends Component {
             res_model: res_model,
             views: [[false, "list"], [false, "form"]],
             domain: domain,
+            context: { create: false },
             target: "current",
         });
     }
@@ -168,6 +195,18 @@ export class HrResignationDashboard extends Component {
     onKpiClick(ev) {
         const domain = ev.currentTarget.dataset.domain;
         this.openResignations(domain);
+    }
+
+    openResignationRecord(id) {
+        if (!id) return;
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "hr.resignation",
+            res_id: id,
+            views: [[false, "form"]],
+            context: { create: false },
+            target: "current",
+        });
     }
 }
 HrResignationDashboard.template = "hr_resignation.Dashboard";

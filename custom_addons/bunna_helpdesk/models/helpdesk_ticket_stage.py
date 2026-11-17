@@ -38,8 +38,29 @@ class HelpdeskTicketStage(models.Model):
     team_ids = fields.Many2many(
         comodel_name="helpdesk.ticket.team",
         string="Helpdesk Teams",
-        help="Specific team that uses this stage. If it is empty all teams could uses",
-        domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]",
+        help="Specific Operating Unit teams that use this stage. If empty, all teams can use this stage.",
+    )
+    enable_sms = fields.Boolean(
+        string="Customer Notification Active",
+        default=False,
+        help="Button ON/OFF: Enable automatic SMS or Email notification to the customer when a ticket enters this stage.",
+    )
+    notification_channel = fields.Selection(
+        selection=[
+            ("sms", "SMS"),
+            ("email", "Email"),
+        ],
+        string="Notification Channel",
+        default="sms",
+        help="Drop-down SMS and email: Select whether to dispatch notification via SMS or Email.",
+    )
+    sms_template_type = fields.Selection(
+        selection=[
+            ("escalated", "Escalated Stage (Registered & In Progress)"),
+            ("resolved", "Resolved Stage (Successfully Resolved)"),
+        ],
+        string="Notification Template Type",
+        help="Select which notification message template to send when tickets reach this stage.",
     )
 
     @api.onchange("closed")

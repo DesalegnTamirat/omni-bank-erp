@@ -7,21 +7,19 @@
             <field name="name">succession.development.plan.list</field>
             <field name="model">succession.development.plan</field>
             <field name="arch" type="xml">
-                <list>
-                    <field name="name"/>
-                    <field name="employee_id"/>
-                    <field name="department_id" optional="show"/>
-                    <field name="critical_position_id"/>
-                    <field name="plan_year"/>
-                    <field name="business_impact_score" optional="hide"/>
-                    <field name="urgency_level" optional="hide"/>
-                    <field name="target_readiness" widget="badge"/>
-                    <field name="overall_progress" widget="progressbar"/>
-                    <field name="activity_count"/>
-                    <field name="state" widget="badge"
-                           decoration-success="state == 'completed'"
+                <list default_order="create_date desc, id desc">
+                    <field name="name" string="Plan Reference"/>
+                    <field name="employee_id" string="Employee" class="fw-bold"/>
+                    <field name="critical_position_id" string="Target Critical Position" class="text-primary"/>
+                    <field name="department_id" string="Department" optional="show"/>
+                    <field name="start_date" string="Start Date"/>
+                    <field name="end_date" string="End Date"/>
+                    <field name="target_readiness" widget="badge" string="Target Readiness"/>
+                    <field name="state" widget="badge" string="Status"
+                           decoration-success="state in ('completed', 'completed_ahead')"
                            decoration-info="state == 'active'"
-                           decoration-warning="state == 'draft'"
+                           decoration-warning="state in ('draft', 'extension_pending')"
+                           decoration-primary="state == 'extended'"
                            decoration-muted="state == 'cancelled'"/>
                 </list>
             </field>
@@ -34,66 +32,143 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_activate" string="Activate Plan"
+                        <button name="action_submit" string="Submit for PPDD Approval"
                                 type="object" class="oe_highlight"
-                                invisible="state != 'draft'"
-                                groups="bunna_succession_management.group_succession_ppdd"/>
+                                invisible="state != 'draft'"/>
+                        <button name="action_activate" string="Approve &amp; Activate Plan"
+                                type="object" class="oe_highlight btn-success"
+                                invisible="state != 'submitted'"
+                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+                        <button name="action_return_to_draft" string="Return for Revision"
+                                type="object" class="btn-secondary"
+                                invisible="state != 'submitted'"
+                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+
                         <button name="action_complete" string="Mark Completed"
+                                type="object" class="oe_highlight btn-success"
+                                invisible="state not in ('active', 'extended')"
+                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_line_manager"/>
+                        <button name="action_open_early_completion_wizard" string="Complete Ahead of Schedule"
+                                type="object" class="btn-primary"
+                                invisible="state not in ('active', 'extended')"
+                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_line_manager"/>
+                        <button name="action_open_extension_wizard" string="Extend Plan Duration"
+                                type="object" class="btn-warning"
+                                invisible="state not in ('active', 'extended')"
+                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_line_manager"/>
+                        <button name="action_approve_extension" string="Approve Extension"
                                 type="object" class="btn-success"
-                                invisible="state != 'active'"
+                                invisible="state != 'extension_pending'"
+                                groups="bunna_succession_management.group_succession_ppdd"/>
+                        <button name="action_reject_extension" string="Reject Extension"
+                                type="object" class="btn-danger"
+                                invisible="state != 'extension_pending'"
                                 groups="bunna_succession_management.group_succession_ppdd"/>
                         <button name="action_cancel" string="Cancel"
                                 type="object"
-                                invisible="state in ('completed','cancelled')"
+                                invisible="state in ('completed', 'completed_ahead', 'cancelled')"
                                 groups="bunna_succession_management.group_succession_ppdd"/>
+                        <span class="badge bg-info-subtle text-info border border-info px-3 py-2 fw-bold"
+                              invisible="state != 'submitted'">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Submitted for PPDD Approval
+                        </span>
+                        <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fw-bold"
+                              invisible="state not in ('active', 'extended')">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Approved &amp; Active
+                        </span>
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning px-3 py-2 fw-bold"
+                              invisible="state != 'extension_pending'">
+                            <i class="fa fa-clock-o me-1" title="Pending"/>Extension Submitted
+                        </span>
+                        <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fw-bold"
+                              invisible="state not in ('completed', 'completed_ahead')">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Completed
+                        </span>
                         <field name="state" widget="statusbar"
-                               statusbar_visible="draft,active,completed"/>
+                                statusbar_visible="draft,submitted,active,extended,completed"/>
                     </header>
                     <sheet>
+                        <field name="active" invisible="1"/>
+                        <field name="has_succession_assessment" invisible="1"/>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+
+
+
+
                         <div class="oe_button_box" name="button_box">
-                            <button class="oe_stat_button" icon="fa-tasks" type="object" name="">
+                            <button class="oe_stat_button" icon="fa-tasks" type="object" name="action_view_activities">
                                 <div class="o_stat_info">
                                     <span class="o_stat_value"><field name="activity_count"/></span>
                                     <span class="o_stat_text">Activities</span>
                                 </div>
                             </button>
+
                         </div>
                         <div class="oe_title">
                             <h1><field name="name" readonly="1"/></h1>
                         </div>
+
+                        <field name="is_eligible_for_completion" invisible="1"/>
+                        <div class="alert alert-info mb-2" role="alert" invisible="state != 'active'">
+                            <i class="fa fa-clock-o me-2" title="In Progress"/> <strong>Plan In Progress:</strong> This plan is scheduled until <strong><field name="end_date" readonly="1"/></strong>. To complete the plan, record the <strong>Manager Completion Evaluation</strong> below and click <strong>Mark Completed</strong> (or click <strong>Extend Plan Duration</strong> if more time is required).
+                        </div>
+                        <div class="alert alert-warning mb-2" role="alert" invisible="state != 'extension_pending'">
+                            <i class="fa fa-hourglass-half me-2" title="Extension Pending"/> <strong>Extension Requested:</strong> A duration extension until <strong><field name="proposed_end_date" readonly="1"/></strong> was requested by <strong><field name="extension_requested_by_id" readonly="1"/></strong>. Awaiting PPDD review and approval.
+                        </div>
+                        <div class="alert alert-secondary mb-2" role="alert" invisible="state != 'extended'">
+                            <i class="fa fa-calendar-plus-o me-2" title="Extended"/> <strong>Plan Extended:</strong> This plan has been granted <strong><field name="extension_count" readonly="1"/></strong> extension(s). Current revised target date: <strong><field name="end_date" readonly="1"/></strong> (Baseline: <strong><field name="original_end_date" readonly="1"/></strong>).
+                        </div>
+                        <div class="alert alert-primary mb-2" role="alert" invisible="state != 'completed_ahead'">
+                            <i class="fa fa-bolt me-2" title="Ahead of Schedule"/> <strong>Completed Ahead of Schedule:</strong> This plan was successfully completed on <strong><field name="actual_completion_date" readonly="1"/></strong> (<strong><field name="days_ahead" readonly="1"/></strong> days early).
+                        </div>
+
                         <group>
                             <group string="Candidate Info">
-                                <field name="candidate_id" readonly="state != 'draft'"/>
+                                <field name="candidate_id" readonly="state != 'draft'"
+                                       options="{'no_create': True, 'no_open': True}"
+                                       domain="[('state', 'in', ('approved', 'placed'))]"/>
                                 <field name="employee_id" readonly="1"/>
+                                <field name="evaluating_manager_id" readonly="state != 'draft'"/>
                                 <field name="department_id" readonly="1"/>
                                 <field name="critical_position_id" readonly="1"/>
                             </group>
                             <group string="Plan Details">
-                                <field name="plan_year"/>
-                                <field name="target_readiness"/>
-                                <field name="start_date"/>
-                                <field name="end_date"/>
-                                <field name="overall_progress" widget="progressbar"/>
+                                <field name="urgency_level_id" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft'"/>
+                                <field name="target_readiness_level_id" readonly="1" options="{'no_open': True}"/>
+                                <field name="start_date" required="1" readonly="state != 'draft'"/>
+                                <field name="end_date" required="1" readonly="state != 'draft'"/>
                             </group>
                         </group>
-                        <group string="Global Prioritization (FR-SDP-004)">
-                            <group>
-                                <field name="business_impact_score"/>
-                                <field name="urgency_level"/>
-                            </group>
+
+                        <group string="Manager Completion Evaluation (Mandatory before completion)"
+                               invisible="state in ('draft', 'submitted', 'completed_ahead')">
+                            <field name="completion_notes"
+                                   nolabel="1"
+                                   placeholder="Detail candidate development outcomes, competencies acquired, and manager's final evaluation before clicking Mark Completed..."
+                                   readonly="state in ('completed', 'cancelled')"
+                                   style="min-height: 100px; width: 100%;"/>
                         </group>
+
                         <notebook>
-                            <page string="Development Activities">
-                                <field name="development_activity_ids">
+                            <page string="Development Activities" name="dev_activities">
+                                <field name="development_activity_ids" readonly="state != 'draft'">
                                     <list editable="bottom"
                                           decoration-success="status == 'completed'"
                                           decoration-muted="status == 'cancelled'">
-                                        <field name="activity_description"/>
-                                        <field name="activity_type"/>
+                                        <field name="category_id"
+                                               string="Major Activity"
+                                               options="{'no_create': True, 'no_open': True}"
+                                               required="1"/>
+                                        <field name="activity_type_id"
+                                               string="Sub-Activity"
+                                               domain="[('category_id', '=', category_id)]"
+                                               options="{'no_create': True, 'no_open': True}"
+                                               required="1"/>
+                                        <field name="activity_description" string="Specific Assignment / Task Details" required="1"/>
                                         <field name="competency_id" optional="show"/>
-                                        <field name="start_date"/>
-                                        <field name="target_date"/>
-                                        <field name="progress_percent" widget="progressbar"/>
+                                        <field name="mentor_id" optional="show"/>
+                                        <field name="start_date" required="1"/>
+                                        <field name="target_date" required="1"/>
                                         <field name="status" widget="badge"
                                                decoration-success="status == 'completed'"
                                                decoration-info="status == 'in_progress'"
@@ -102,9 +177,82 @@
                                     </list>
                                 </field>
                             </page>
+
+                            <!-- TAB 2: COMPETENCY GAP ANALYSIS (MATCHING CAREER IDP FORMAT) -->
+                            <page string="Competency Gap Analysis" name="competency_gap_analysis">
+                                <div class="text-muted mb-2">
+                                    <i class="fa fa-info-circle me-1" title="Info"/>
+                                    Comparison of evaluated competency assessment scores against benchmark requirements for <field name="critical_position_id" class="fw-bold d-inline" readonly="1"/>.
+                                </div>
+                                <group>
+                                    <field name="competency_gap_html" nolabel="1"/>
+                                </group>
+                                <button name="action_generate_activities_from_gaps"
+                                        string="Suggest Activities to Close Gaps"
+                                        type="object"
+                                        class="btn-secondary mt-2"
+                                        invisible="state != 'draft'"/>
+                            </page>
+                            <page string="Completion Details" name="completion_details"
+                                  invisible="state not in ('completed', 'completed_ahead')">
+                                <group>
+                                    <group string="Completion Overview">
+                                        <field name="completion_type" widget="badge"/>
+                                        <field name="actual_completion_date"/>
+                                        <field name="achievement_level" widget="badge"
+                                               decoration-success="achievement_level in ('exceeded', 'met')"
+                                               decoration-warning="achievement_level == 'partially_met'"/>
+                                        <field name="days_ahead" invisible="state != 'completed_ahead'"/>
+                                        <field name="acceleration_category" invisible="state != 'completed_ahead'"/>
+                                    </group>
+                                    <group string="Governance Sign-Off">
+                                        <field name="activated_by_id"/>
+                                        <field name="activation_date"/>
+                                        <field name="completed_by_id"/>
+                                        <field name="evaluating_manager_id" string="Evaluator / Mentor"/>
+                                    </group>
+                                </group>
+                                <group string="Outcome &amp; Activity Verification Justification">
+                                    <field name="early_completion_reason" invisible="state != 'completed_ahead'"/>
+                                    <field name="completion_notes" string="Final Evaluation Notes"/>
+                                </group>
+                            </page>
+                            <page string="Extension Governance" name="extension_governance"
+                                  invisible="extension_count == 0 and state != 'extension_pending'">
+                                <group>
+                                    <group string="Extension Summary">
+                                        <field name="original_end_date"/>
+                                        <field name="extension_count"/>
+                                        <field name="proposed_end_date" invisible="state != 'extension_pending'"/>
+                                    </group>
+                                    <group string="Latest Extension Reason">
+                                        <field name="extension_root_cause"/>
+                                        <field name="extension_reason"/>
+                                        <field name="extension_remedial_plan"/>
+                                    </group>
+                                </group>
+                                <field name="extension_history_ids" readonly="1">
+                                    <list>
+                                        <field name="extension_number" string="#"/>
+                                        <field name="old_end_date"/>
+                                        <field name="new_end_date"/>
+                                        <field name="days_extended" string="Days +"/>
+                                        <field name="root_cause"/>
+                                        <field name="justification"/>
+                                        <field name="requested_by_id"/>
+                                        <field name="approved_by_id"/>
+                                        <field name="approval_date"/>
+                                        <field name="status" widget="badge"
+                                               decoration-success="status == 'approved'"
+                                               decoration-danger="status == 'rejected'"/>
+                                    </list>
+                                </field>
+                            </page>
+
                             <page string="Notes">
                                 <field name="notes"
-                                       placeholder="Development focus, key milestones, and expected outcomes..."/>
+                                       placeholder="Development focus, key milestones, and expected outcomes..."
+                                       readonly="state != 'draft'"/>
                             </page>
                         </notebook>
                     </sheet>
@@ -121,7 +269,6 @@
                 <pivot string="Annual Development Consolidation">
                     <field name="plan_year" type="row"/>
                     <field name="department_id" type="row"/>
-                    <field name="business_impact_score" type="measure"/>
                     <field name="activity_count" type="measure"/>
                 </pivot>
             </field>
@@ -139,10 +286,36 @@
             </field>
         </record>
 
+        <!-- SEARCH VIEW -->
+        <record id="view_succession_dev_plan_search" model="ir.ui.view">
+            <field name="name">succession.development.plan.search</field>
+            <field name="model">succession.development.plan</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="candidate_id"/>
+                    <field name="critical_position_id"/>
+                    <field name="department_id"/>
+                    <filter string="In Progress" name="active_plans" domain="[('state', 'in', ('active', 'extended'))]"/>
+                    <filter string="Completed" name="completed" domain="[('state', 'in', ('completed', 'completed_ahead'))]"/>
+                    <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                    <separator/>
+                    <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                    <group name="group_by">
+                        <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                        <filter string="Critical Position" name="group_pos" context="{'group_by': 'critical_position_id'}"/>
+                        <filter string="Department" name="group_dept" context="{'group_by': 'department_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
         <record id="action_succession_dev_plan" model="ir.actions.act_window">
             <field name="name">Successor Development Plans</field>
             <field name="res_model">succession.development.plan</field>
             <field name="view_mode">list,form,pivot,graph</field>
+            <field name="search_view_id" ref="view_succession_dev_plan_search"/>
         </record>
 
     </data>

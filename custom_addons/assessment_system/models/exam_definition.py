@@ -150,6 +150,33 @@ class ExamDefinition(models.Model):
                 rec.total_questions = len(rec.manual_question_ids)
                 rec.total_marks = sum(q.marks for q in rec.manual_question_ids)
 
+    @api.constrains("distribution_line_ids")
+    def _check_unique_distribution_lines(self):
+        for exam in self:
+            seen = set()
+            for line in exam.distribution_line_ids:
+                if not line.competency_id:
+                    continue
+                key = (line.competency_id.id, line.difficulty, line.question_type)
+                if key in seen:
+                    comp_name = line.competency_id.display_name or line.competency_id.name
+                    diff_dict = dict(line._fields["difficulty"].selection) if "difficulty" in line._fields and line._fields["difficulty"].selection else {}
+                    type_dict = dict(line._fields["question_type"].selection) if "question_type" in line._fields and line._fields["question_type"].selection else {}
+                    diff_label = diff_dict.get(line.difficulty, line.difficulty or _("Any / Unspecified"))
+                    type_label = type_dict.get(line.question_type, line.question_type or _("Any / Unspecified"))
+                    raise ValidationError(_(
+                        "Duplicate Question Distribution Rule Detected!\n\n"
+                        "Competency Area: %(comp)s\n"
+                        "Difficulty Level: %(diff)s\n"
+                        "Question Type: %(type)s\n\n"
+                        "You cannot configure multiple distribution rules with the same Competency Area, Difficulty Level, and Question Type on the same exam definition. Please adjust the existing rule or remove the duplicate line."
+                    ) % {
+                        "comp": comp_name,
+                        "diff": diff_label,
+                        "type": type_label,
+                    })
+                seen.add(key)
+
     def _compute_session_count(self):
         for rec in self:
             rec.session_count = len(rec.session_ids)
@@ -157,6 +184,42 @@ class ExamDefinition(models.Model):
     def _compute_version_count(self):
         for rec in self:
             rec.child_version_count = len(rec.child_version_ids)
+
+    def write(self, vals):
+        if not self.env.context.get("bypass_exam_lock"):
+            locked_fields = {
+                "name", "job_id", "vacancy_id", "recruitment_request_id", "assessment_type",
+                "duration_minutes", "passing_score_percentage", "late_arrival_lockout_minutes",
+                "tab_switch_violation_limit", "randomize_questions", "randomize_options",
+                "block_copy_paste", "block_screenshot", "exclude_previously_used_questions",
+                "question_cooldown_days", "selection_mode", "distribution_line_ids",
+                "manual_question_ids", "number_of_versions_to_generate",
+            }
+            for rec in self:
+                if rec.state in ("confirmed", "in_progress", "closed"):
+                    modified_locked = set(vals.keys()) & locked_fields
+                    if modified_locked:
+                        raise UserError(_(
+                            "Exam Definition '%(name)s' is confirmed and locked in '%(state)s' status.\n\n"
+                            "You cannot modify exam parameters, questions, or distribution rules once the exam is confirmed and validated.\n"
+                            "To make changes, please click 'Reset to Draft' first."
+                        ) % {
+                            "name": rec.name,
+                            "state": dict(self._fields["state"].selection).get(rec.state, rec.state),
+                        })
+        return super().write(vals)
+
+    def unlink(self):
+        for rec in self:
+            if rec.state in ("confirmed", "in_progress", "closed"):
+                raise UserError(_(
+                    "You cannot delete an Exam Definition in '%(state)s' status ('%(name)s'). "
+                    "Please reset it to draft first if deletion is required."
+                ) % {
+                    "state": dict(self._fields["state"].selection).get(rec.state, rec.state),
+                    "name": rec.name,
+                })
+        return super().unlink()
 
     def action_view_versions(self):
         self.ensure_one()
@@ -189,9 +252,15 @@ class ExamDefinition(models.Model):
 
     def action_reset_draft(self):
         for rec in self:
-            rec.state = "draft"
+            active_sessions = rec.session_ids.filtered(lambda s: s.state in ("active", "evaluating", "completed"))
+            if active_sessions:
+                raise UserError(_(
+                    "Cannot reset Exam Definition '%(name)s' to draft because active or completed sessions already exist for it."
+                ) % {"name": rec.name})
+            vals_to_write = {"state": "draft"}
             if rec.selection_mode == "auto_distribution" and not rec.is_version_paper:
-                rec.manual_question_ids = [(5, 0, 0)]
+                vals_to_write["manual_question_ids"] = [(5, 0, 0)]
+            rec.with_context(bypass_exam_lock=True).write(vals_to_write)
 
     def action_view_sessions(self):
         self.ensure_one()
@@ -280,7 +349,7 @@ class ExamDefinition(models.Model):
                         exclude_question_ids=list(used_question_ids)
                     )
                 if base_questions and self.selection_mode == "auto_distribution" and not self.manual_question_ids:
-                    self.write({"manual_question_ids": [(6, 0, [q.id for q in base_questions])]})
+                    self.with_context(bypass_exam_lock=True).write({"manual_question_ids": [(6, 0, [q.id for q in base_questions])]})
 
             # Take the master question set and shuffle the question order specifically for this version
             v_questions = list(base_questions)
@@ -342,7 +411,7 @@ class ExamDefinition(models.Model):
                 # Auto-heal empty version paper from parent exam
                 questions = self.parent_exam_id.generate_question_pool_for_candidate(seed=seed, exclude_question_ids=exclude_question_ids)
                 if questions:
-                    self.write({"manual_question_ids": [(6, 0, [q.id for q in questions])]})
+                    self.with_context(bypass_exam_lock=True).write({"manual_question_ids": [(6, 0, [q.id for q in questions])]})
             else:
                 questions = []
         else:
@@ -413,7 +482,7 @@ class ExamDefinition(models.Model):
                     questions.extend(sampled)
                 
                 if questions and self.state == "confirmed":
-                    self.write({"manual_question_ids": [(6, 0, [q.id for q in questions])]})
+                    self.with_context(bypass_exam_lock=True).write({"manual_question_ids": [(6, 0, [q.id for q in questions])]})
 
         if self.randomize_questions and questions:
             rand_gen = random.Random(seed) if seed else random
@@ -447,44 +516,45 @@ class ExamDefinitionDistribution(models.Model):
             target_job = rec.job_id or (rec.exam_id and rec.exam_id.job_id)
             all_comps = self.env["competency.competency"]
             if target_job:
-                # 1. Primary table: hr_competencies_info_job
+                # 1. Competency Role Mapping (Competency Management master)
+                mappings = self.env["competency.role.mapping"].search([
+                    ("job_position_id", "=", target_job.id)
+                ])
+                all_comps |= mappings.mapped("line_ids.competency_id").filtered(
+                    lambda c: getattr(c, "active", True) and getattr(c, "status", "active") in ("active", False)
+                )
+
+                # 2. Job Vacancy Competencies (Recruitment module lines)
+                vac_comps = self.env["job.vacancy.competency"].search([
+                    ("vacancy_id.job_position", "=", target_job.id)
+                ]).mapped("competency_id").filtered(
+                    lambda c: getattr(c, "active", True) and getattr(c, "status", "active") in ("active", False)
+                )
+                all_comps |= vac_comps
+
+                # 3. Primary table: hr_competencies_info_job
                 info_job_lines = self.env["hr_competencies_info_job"].search([
                     ("job_id", "=", target_job.id)
                 ])
                 if info_job_lines:
                     comps = info_job_lines.mapped("competencies")
-                    if comps and comps._name == "competency.competency":
+                    if comps:
                         all_comps |= comps.filtered(
                             lambda c: getattr(c, "status", None) == "active"
                         )
-                    elif comps and comps._name == "recruitment.competency":
-                        comp_names = [c.competency for c in comps if getattr(c, "competency", False)]
-                        if comp_names:
-                            all_comps |= self.env["competency.competency"].search([
-                                ("name", "in", comp_names),
-                                ("status", "=", "active")
-                            ])
 
-                # 2. Applicable jobs on competency.competency
+                # 4. Applicable jobs on competency.competency
                 comp1 = self.env["competency.competency"].search([
                     ("applicable_job_ids", "in", target_job.id),
                     ("status", "=", "active")
                 ])
                 all_comps |= comp1
 
-                # 3. Job Competency Profiles (assessment.competency.job.rel)
+                # 5. Job Competency Profiles (assessment.competency.job.rel)
                 rel_lines = self.env["assessment.competency.job.rel"].search([
                     ("job_id", "=", target_job.id)
                 ])
                 all_comps |= rel_lines.mapped("competency_id").filtered(
-                    lambda c: c.status == "active"
-                )
-
-                # 4. Role Mappings (competency.role.mapping)
-                mappings = self.env["competency.role.mapping"].search([
-                    ("job_position_id", "=", target_job.id)
-                ])
-                all_comps |= mappings.mapped("line_ids.competency_id").filtered(
                     lambda c: c.status == "active"
                 )
 
@@ -501,22 +571,34 @@ class ExamDefinitionDistribution(models.Model):
         target_job = self.job_id or (self.exam_id and self.exam_id.job_id)
         all_comps = self.env["competency.competency"]
         if target_job:
+            # 1. Competency Role Mapping
+            mappings = self.env["competency.role.mapping"].search([
+                ("job_position_id", "=", target_job.id)
+            ])
+            all_comps |= mappings.mapped("line_ids.competency_id").filtered(
+                lambda c: getattr(c, "active", True) and getattr(c, "status", "active") in ("active", False)
+            )
+
+            # 2. Job Vacancy Competencies
+            vac_comps = self.env["job.vacancy.competency"].search([
+                ("vacancy_id.job_position", "=", target_job.id)
+            ]).mapped("competency_id").filtered(
+                lambda c: getattr(c, "active", True) and getattr(c, "status", "active") in ("active", False)
+            )
+            all_comps |= vac_comps
+
+            # 3. Direct table
             info_job_lines = self.env["hr_competencies_info_job"].search([
                 ("job_id", "=", target_job.id)
             ])
             if info_job_lines:
                 comps = info_job_lines.mapped("competencies")
-                if comps and comps._name == "competency.competency":
+                if comps:
                     all_comps |= comps.filtered(
                         lambda c: getattr(c, "status", None) == "active"
                     )
-                elif comps and comps._name == "recruitment.competency":
-                    comp_names = [c.competency for c in comps if getattr(c, "competency", False)]
-                    if comp_names:
-                        all_comps |= self.env["competency.competency"].search([
-                            ("name", "in", comp_names),
-                            ("status", "=", "active")
-                        ])
+
+            # 4. Applicable jobs
             comp1 = self.env["competency.competency"].search([
                 ("applicable_job_ids", "in", target_job.id),
                 ("status", "=", "active")
@@ -532,6 +614,7 @@ class ExamDefinitionDistribution(models.Model):
         if self.competency_id and self.competency_id.id not in all_comps.ids:
             self.competency_id = False
         return {"domain": {"competency_id": [("id", "in", all_comps.ids)]}}
+
 
     difficulty = fields.Selection([
         ("basic", "Basic"),
@@ -551,3 +634,94 @@ class ExamDefinitionDistribution(models.Model):
 
     number_of_questions = fields.Integer(string="No. of Questions", required=True, default=5)
     marks_per_question = fields.Float(string="Marks Per Question", required=True, default=2.0)
+
+    @api.constrains("exam_id", "competency_id", "difficulty", "question_type")
+    def _check_unique_distribution_rule(self):
+        for line in self:
+            if not line.exam_id or not line.competency_id:
+                continue
+            duplicate = self.search([
+                ("id", "!=", line.id),
+                ("exam_id", "=", line.exam_id.id),
+                ("competency_id", "=", line.competency_id.id),
+                ("difficulty", "=", line.difficulty),
+                ("question_type", "=", line.question_type),
+            ], limit=1)
+            if duplicate:
+                comp_name = line.competency_id.display_name or line.competency_id.name
+                diff_dict = dict(line._fields["difficulty"].selection) if "difficulty" in line._fields and line._fields["difficulty"].selection else {}
+                type_dict = dict(line._fields["question_type"].selection) if "question_type" in line._fields and line._fields["question_type"].selection else {}
+                diff_label = diff_dict.get(line.difficulty, line.difficulty or _("Any / Unspecified"))
+                type_label = type_dict.get(line.question_type, line.question_type or _("Any / Unspecified"))
+                raise ValidationError(_(
+                    "Duplicate Question Distribution Rule Detected!\n\n"
+                    "Competency Area: %(comp)s\n"
+                    "Difficulty Level: %(diff)s\n"
+                    "Question Type: %(type)s\n\n"
+                    "A rule with this Competency Area, Difficulty Level, and Question Type already exists for this exam definition. Duplicate rules are not permitted."
+                ) % {
+                    "comp": comp_name,
+                    "diff": diff_label,
+                    "type": type_label,
+                })
+
+    @api.onchange("competency_id", "difficulty", "question_type")
+    def _onchange_check_duplicate_rule(self):
+        if self.exam_id and self.competency_id:
+            for other in self.exam_id.distribution_line_ids:
+                if other == self:
+                    continue
+                if (other.competency_id == self.competency_id and
+                    other.difficulty == self.difficulty and
+                    other.question_type == self.question_type):
+                    comp_name = self.competency_id.display_name or self.competency_id.name
+                    diff_dict = dict(self._fields["difficulty"].selection) if "difficulty" in self._fields and self._fields["difficulty"].selection else {}
+                    type_dict = dict(self._fields["question_type"].selection) if "question_type" in self._fields and self._fields["question_type"].selection else {}
+                    diff_label = diff_dict.get(self.difficulty, self.difficulty or _("Any / Unspecified"))
+                    type_label = type_dict.get(self.question_type, self.question_type or _("Any / Unspecified"))
+                    return {
+                        "warning": {
+                            "title": _("Duplicate Rule Warning"),
+                            "message": _(
+                                "A rule for '%(comp)s' with Difficulty '%(diff)s' and Question Type '%(type)s' already exists in this exam. Duplicate rules are not permitted."
+                            ) % {
+                                "comp": comp_name,
+                                "diff": diff_label,
+                                "type": type_label,
+                            }
+                        }
+                    }
+
+    def write(self, vals):
+        if not self.env.context.get("bypass_exam_lock"):
+            for line in self:
+                if line.exam_id and line.exam_id.state in ("confirmed", "in_progress", "closed"):
+                    raise UserError(_(
+                        "Cannot modify Question Distribution Rules on confirmed/locked exam '%(name)s'. "
+                        "Please reset the exam to Draft first."
+                    ) % {"name": line.exam_id.name})
+        return super().write(vals)
+
+    def unlink(self):
+        if not self.env.context.get("bypass_exam_lock"):
+            for line in self:
+                if line.exam_id and line.exam_id.state in ("confirmed", "in_progress", "closed"):
+                    raise UserError(_(
+                        "Cannot delete Question Distribution Rules from confirmed/locked exam '%(name)s'. "
+                        "Please reset the exam to Draft first."
+                    ) % {"name": line.exam_id.name})
+        return super().unlink()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.context.get("bypass_exam_lock"):
+            for vals in vals_list:
+                exam_id = vals.get("exam_id")
+                if exam_id:
+                    exam = self.env["exam.definition"].browse(exam_id)
+                    if exam.state in ("confirmed", "in_progress", "closed"):
+                        raise UserError(_(
+                            "Cannot add Question Distribution Rules to confirmed/locked exam '%(name)s'. "
+                            "Please reset the exam to Draft first."
+                        ) % {"name": exam.name})
+        return super().create(vals_list)

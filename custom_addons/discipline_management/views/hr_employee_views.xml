@@ -5,6 +5,7 @@
             <field name="name">hr.employee.form.discipline.inherit</field>
             <field name="model">hr.employee</field>
             <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="priority">120</field>
             <field name="arch" type="xml">
 
                 <!-- Smart Button -->
@@ -20,9 +21,13 @@
                     <widget name="web_ribbon" title="Suspended" bg_color="bg-danger" invisible="not is_suspended"/>
                 </xpath>
 
-                <!-- Disciplinary History Tab -->
-                <xpath expr="//notebook" position="inside">
-                    <page string="Disciplinary Record" groups="discipline_management.group_discipline_user">
+                <xpath expr="//field[@name='work_email']" position="before">
+                    <field name="name_amharic" placeholder="ሙሉ ስም በአማርኛ (ምሳሌ፡ ስዩም ጣሰው መንግሥቴ)"/>
+                </xpath>
+
+                <!-- Disciplinary History Tab (Positioned before the '☰ ▾' More dropdown menu) -->
+                <xpath expr="//notebook/page[@name='more_nested_lists']" position="before">
+                    <page string="Disciplinary Record" name="disciplinary_record_tab" groups="discipline_management.group_discipline_user">
                         <group>
                             <group string="Disciplinary Summary Status">
                                 <field name="active_disciplinary_action" readonly="1"/>

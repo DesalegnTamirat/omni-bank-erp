@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
 import base64
+import hashlib
+import logging
 import re
 from datetime import timedelta
+
+import pytz
+from markupsafe import Markup
 
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import html2plaintext
 from odoo.tools.mimetypes import guess_mimetype
 
+from .. import helpers
 from .announcement_settings import LIMITS
 
 DEFAULT_FOOTER = "For any questions, please contact the Human Resources Department."
@@ -17,13 +23,15 @@ ALLOWED_IMAGE_MIMETYPES = {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
 PUBLISH_DATE_GRACE = timedelta(minutes=5)
 COMPLETENESS_FIELDS = {
     'name', 'summary', 'body', 'category_id', 'priority_id', 'date_published', 'date_expire',
-    'link_url', 'link_label', 'footer_note', 'signed_by', 'attachment_ids',
+    'link_url', 'link_label', 'footer_note', 'signed_by', 'attachment_ids', 'photo_ids',
 }
 # Changing any of these on a published announcement is written to the audit log
 AUDITED_FIELDS = {
     'name', 'summary', 'body', 'category_id', 'priority_id', 'date_published', 'date_expire',
-    'link_url', 'link_label', 'footer_note', 'signed_by', 'image', 'attachment_ids', 'allow_download',
+    'link_url', 'link_label', 'footer_note', 'signed_by', 'image', 'attachment_ids', 'photo_ids',
+    'allow_download', 'allow_comments',
 }
+_logger = logging.getLogger(__name__)
 GROUP_DRAFTER = 'bunna_hr_announcement.group_announcement_drafter'
 GROUP_PUBLISHER = 'bunna_hr_announcement.group_announcement_publisher'
 GROUP_ADMIN = 'bunna_hr_announcement.group_announcement_manager'
@@ -43,6 +51,10 @@ class BunnaAnnouncement(models.Model):
     @api.model
     def _default_priority(self):
         return self.env['bunna.announcement.priority'].search([], limit=1).id
+
+    @api.model
+    def _default_allow_comments(self):
+        return bool(self.env['bunna.announcement.settings'].get_value('comments_default_allow'))
 
     @api.model
     def _default_signed_by(self):
@@ -83,6 +95,8 @@ class BunnaAnnouncement(models.Model):
     attachment_ids = fields.One2many(
         'bunna.announcement.attachment', 'announcement_id', string='Attachments')
     attachment_count = fields.Integer(compute='_compute_attachment_count')
+    photo_ids = fields.One2many('bunna.announcement.photo', 'announcement_id', string='Photos')
+    photo_count = fields.Integer(compute='_compute_photo_count')
     allow_download = fields.Boolean(
         string='Allow Download', default=True, tracking=True,
         help="On: employees can view and download the attachments.\n"
@@ -121,6 +135,20 @@ class BunnaAnnouncement(models.Model):
                             help="Archive an announcement to hide it everywhere without deleting it.")
     can_edit = fields.Boolean(compute='_compute_can_edit')
     is_new = fields.Boolean(compute='_compute_is_new')
+    allow_comments = fields.Boolean(
+        string='Allow Comments', default=_default_allow_comments, tracking=True,
+        help="Readers can send anonymous comments, which appear only after a moderator approves them. "
+             "The starting value comes from Website Settings. A Publisher can open or close comments "
+             "at any time, also after publishing.")
+    comment_ids = fields.One2many('bunna.announcement.comment', 'announcement_id', string='Comments')
+    comment_count = fields.Integer(string='Visible Comments', compute='_compute_comment_counts')
+    comment_pending_count = fields.Integer(string='Waiting for Review', compute='_compute_comment_counts')
+    comment_last_alert = fields.Datetime(copy=False, readonly=True)
+    search_text = fields.Text(compute='_compute_search_text', store=True)
+    view_count = fields.Integer(string='Views', compute='_compute_view_stats')
+    unique_visitor_count = fields.Integer(string='Visitors', compute='_compute_view_stats')
+    file_open_count = fields.Integer(string='File Opens', compute='_compute_view_stats')
+    download_count = fields.Integer(string='Downloads', compute='_compute_view_stats')
 
     def _check_complete(self, check_publish_date=False, check_duplicates=False, intro=None):
         """One message listing EVERY field that is empty or wrong (not just the first one).
@@ -226,6 +254,17 @@ class BunnaAnnouncement(models.Model):
                 problems.append(_("Attachments: total size %(now).1f MB is more than the %(max)s MB allowed per announcement.",
                                   now=total_size / (1024 * 1024), max=limit('max_total_mb')))
 
+            # ---- Photo gallery ----
+            photos = rec.photo_ids
+            if len(photos) > limit('gallery_max_photos'):
+                problems.append(_("Photos: at most %s photos per announcement.", limit('gallery_max_photos')))
+            for index, photo in enumerate(photos, start=1):
+                if not photo.has_image:
+                    problems.append(_("Photos: row %s has no picture. Choose a photo or remove the row.", index))
+                elif len(photo.caption or '') > limit('gallery_caption_max'):
+                    problems.append(_("Photos: the caption of photo %(index)s is longer than %(max)s characters.",
+                                      index=index, max=limit('gallery_caption_max')))
+
             if problems:
                 raise ValidationError(
                     (intro or _("Please correct the following before saving:")) + "\n"
@@ -272,6 +311,63 @@ class BunnaAnnouncement(models.Model):
                 and (not rec.date_expire or rec.date_expire > now)
             )
 
+    @api.depends('photo_ids.has_image')
+    def _compute_photo_count(self):
+        for rec in self:
+            rec.photo_count = len(rec.photo_ids.filtered('has_image'))
+
+    def _compute_comment_counts(self):
+        counts = {}
+        ids = [rec_id for rec_id in self.ids if isinstance(rec_id, int)]
+        if ids:
+            self.env['bunna.announcement.comment'].flush_model(['announcement_id', 'state'])
+            self.env.cr.execute("""
+                SELECT announcement_id, state, COUNT(*) FROM bunna_announcement_comment
+                WHERE announcement_id IN %s GROUP BY announcement_id, state
+            """, (tuple(ids),))
+            for announcement_id, state, count in self.env.cr.fetchall():
+                counts.setdefault(announcement_id, {})[state] = count
+        for rec in self:
+            per_state = counts.get(rec.id, {})
+            rec.comment_count = per_state.get('approved', 0)
+            rec.comment_pending_count = per_state.get('pending', 0)
+
+    def _compute_view_stats(self):
+        """Totals from the small daily counter table (one grouped query for all rows shown)."""
+        stats = {}
+        ids = [rec_id for rec_id in self.ids if isinstance(rec_id, int)]
+        if ids:
+            self.env.cr.execute("""
+                SELECT announcement_id, SUM(views), SUM(unique_visitors), SUM(file_opens), SUM(downloads)
+                FROM bunna_announcement_view_daily
+                WHERE announcement_id IN %s
+                GROUP BY announcement_id
+            """, (tuple(ids),))
+            stats = {row[0]: row[1:] for row in self.env.cr.fetchall()}
+        for rec in self:
+            views, visitors, opens, downloads = (int(v or 0) for v in stats.get(rec.id, (0, 0, 0, 0)))
+            rec.view_count = views
+            rec.unique_visitor_count = visitors
+            rec.file_open_count = opens
+            rec.download_count = downloads
+
+    def action_open_view_stats(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Readership: %s", self.name),
+            'res_model': 'bunna.announcement.view.daily',
+            'view_mode': 'list,pivot,graph',
+            'domain': [('announcement_id', '=', self.id)],
+        }
+
+    @api.depends('name', 'summary', 'body')
+    def _compute_search_text(self):
+        """Plain text of title + summary + content, so website search never matches hidden HTML."""
+        for rec in self:
+            content = ' '.join(html2plaintext(rec.body or '').split())
+            rec.search_text = ' '.join(part for part in (rec.name, rec.summary, content) if part)
+
     @api.depends('state', 'date_published')
     def _compute_is_new(self):
         """Recently published: the website shows the card in green (duration set in Website Settings)."""
@@ -315,7 +411,11 @@ class BunnaAnnouncement(models.Model):
     @api.model
     def _search_live_status(self, operator, value):
         all_values = ['draft', 'scheduled', 'live', 'expired', 'revoked']
-        values = list(value) if isinstance(value, (list, tuple, set)) else [value]
+        # Odoo 19 passes a set-like value (OrderedSet) for '=' / 'in': accept any iterable but a string
+        if isinstance(value, str) or not hasattr(value, '__iter__'):
+            values = [value]
+        else:
+            values = list(value)
         if operator in ('=', 'in'):
             wanted = values
         elif operator in ('!=', 'not in'):
@@ -346,17 +446,19 @@ class BunnaAnnouncement(models.Model):
                 rec.excerpt = rec.summary
                 continue
             text = ' '.join(html2plaintext(rec.body or '').split())
-            rec.excerpt = text[:220] + ('…' if len(text) > 220 else '')
+            rec.excerpt = text[:220] + ('â€¦' if len(text) > 220 else '')
 
     @api.model
-    def _website_domain(self):
-        """Single source of truth for what employees may see on the website."""
+    def _website_domain(self, include_expired=False):
+        """What visitors may see: published, already started and (unless include_expired) not expired.
+
+        Draft and revoked announcements are never included.
+        """
         now = fields.Datetime.now()
-        return [
-            ('state', '=', 'published'),
-            ('date_published', '<=', now),
-            '|', ('date_expire', '=', False), ('date_expire', '>', now),
-        ]
+        domain = [('state', '=', 'published'), ('date_published', '<=', now)]
+        if not include_expired:
+            domain += ['|', ('date_expire', '=', False), ('date_expire', '>', now)]
+        return domain
 
     # ---- Roles: enforced on the server, not only by hidden buttons ----------
     def _is_privileged(self):
@@ -384,25 +486,38 @@ class BunnaAnnouncement(models.Model):
             changes_state = 'state' in vals and any(rec.state != vals['state'] for rec in self)
             if changes_state or {'published_by', 'revoked_by'} & set(vals):
                 raise AccessError(_("Only Announcement Publishers can publish, revoke or expire announcements."))
-        # a person changing a PUBLISHED announcement is recorded in the audit log
-        live_before = self.browse()
-        if not self.env.su and AUDITED_FIELDS & set(vals):
-            live_before = self.filtered(lambda rec: rec.state == 'published')
+        # a person changing a PUBLISHED announcement is recorded in the audit log, with old and new values
+        audited = AUDITED_FIELDS & set(vals)
+        before = {}
+        if audited and not self.env.su:
+            for rec in self.filtered(lambda r: r.state == 'published'):
+                before[rec.id] = rec._audit_snapshot(audited)
         res = super().write(vals)
         if not self.env.su and COMPLETENESS_FIELDS & set(vals):
             self._check_complete(check_publish_date='date_published' in vals,
                                  check_duplicates='name' in vals)
-        if live_before:
-            changed = ', '.join(sorted(self._fields[name].string for name in AUDITED_FIELDS & set(vals)))
-            live_before._log_event('edited', _("Changed while published: %s", changed))
+        for rec_id, old in before.items():
+            rec = self.browse(rec_id)
+            new = rec._audit_snapshot(audited)
+            changes = [(rec._fields[name].string, old[name][0], new[name][0])
+                       for name in sorted(audited) if old[name][1] != new[name][1]]
+            if changes:
+                rec._log_event('edited', _("Changed: %s", ', '.join(label for label, _old, _new in changes)),
+                               changes=changes)
         if 'active' in vals:
             self._log_event('unarchived' if vals['active'] else 'archived')
         return res
 
-    def _log_event(self, action, details=''):
-        """Append one audit-log line per announcement (who = the logged-in user, when = now)."""
+    # ---- Audit log --------------------------------------------------------
+    def _log_event(self, action, details='', changes=None):
+        """Append one audit-log entry per announcement (who = the logged-in user, when = now).
+
+        changes: list of (field label, old value, new value) shown as separate lines.
+        """
         if not self:
             return
+        lines = [(0, 0, {'field_label': label, 'old_value': old, 'new_value': new})
+                 for label, old, new in (changes or [])]
         self.env['bunna.announcement.log'].sudo().create([{
             'announcement_id': rec.id,
             'announcement_title': rec.name,
@@ -410,63 +525,259 @@ class BunnaAnnouncement(models.Model):
             'user_id': self.env.uid,
             'state_after': rec.state,
             'details': details,
+            'line_ids': lines,
         } for rec in self])
+
+    def _local_str(self, value):
+        """A date and time in the company time zone (Addis Ababa by default)."""
+        if not value:
+            return _("none")
+        tz = self.env['bunna.announcement.settings'].get_tz()
+        return pytz.utc.localize(fields.Datetime.to_datetime(value)).astimezone(tz).strftime('%d %b %Y, %H:%M')
+
+    def _audit_child_name(self, child):
+        if child._name == 'bunna.announcement.attachment':
+            return child.file_name or _("(unnamed file)")
+        if child._name == 'bunna.announcement.photo':
+            return child.caption or _("Photo #%s", child.id)
+        return child.display_name or str(child.id)
+
+    def _audit_value(self, name):
+        """(text shown in the log, key that tells whether the value really changed)."""
+        self.ensure_one()
+        field = self._fields[name]
+        empty = _("(empty)")
+        if name == 'image':
+            raw = self.image
+            if not raw:
+                return empty, ''
+            return _("a cover image"), hashlib.md5(raw if isinstance(raw, bytes) else raw.encode()).hexdigest()
+        value = self[name]
+        if field.type == 'many2one':
+            text = value.display_name or empty
+        elif field.type == 'datetime':
+            text = self._local_str(value) if value else empty
+        elif field.type == 'boolean':
+            text = _("Yes") if value else _("No")
+        elif field.type == 'html':
+            plain = ' '.join(html2plaintext(value or '').split())
+            return (helpers.shorten(plain) or empty), plain
+        elif field.type == 'one2many':
+            text = ', '.join(sorted(self._audit_child_name(child) for child in value)) or empty
+        else:
+            plain = str(value or '')
+            return (helpers.shorten(plain) or empty), plain
+        return text, text
+
+    def _audit_snapshot(self, names):
+        return {name: self._audit_value(name) for name in names}
+
+    # ---- Messages shown after an action ---------------------------------------
+    def _notify(self, message, level='success', sticky=False):
+        """A pop-up message; the screen behind it refreshes afterwards."""
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Done") if level == 'success' else _("Please note"),
+                'message': message,
+                'type': level,
+                'sticky': sticky,
+                'next': {'type': 'ir.actions.act_window_close'},
+            },
+        }
+
+    def _partition(self, problem_of):
+        """Split the selection into announcements that can go ahead and reasons why others cannot."""
+        valid, skipped = self.browse(), []
+        for rec in self:
+            problem = problem_of(rec)
+            if problem:
+                skipped.append(_("'%(title)s': %(why)s", title=rec.name, why=problem))
+            else:
+                valid |= rec
+        return valid, skipped
+
+    def _finish(self, valid, skipped, message):
+        """Nothing could be done: an error the user must read. Otherwise a success (or warning) pop-up."""
+        if not valid:
+            raise UserError("\n".join(skipped))
+        if skipped:
+            return self._notify(message + " " + _("Not done:") + " " + " ".join(skipped), 'warning', True)
+        return self._notify(message)
 
     def _state_label(self, rec):
         return dict(self._fields['state'].selection).get(rec.state, rec.state)
 
+    # ---- Workflow actions ----------------------------------------------------------
     def action_publish(self):
         self._check_publisher()
         now = fields.Datetime.now()
-        for rec in self:
+
+        def problem(rec):
             if rec.state == 'published':
-                raise UserError(_("'%s' is already published.", rec.name))
+                return _("it is already published.")
             if rec.date_expire and rec.date_expire <= now:
-                raise UserError(_(
-                    "'%s' cannot be published: its Expiry Date has already passed. "
-                    "An Administrator must change the Expiry Date first.", rec.name))
-            rec._check_complete(
-                check_duplicates=True,
-                intro=_("'%s' cannot be published yet. Please correct the following:", rec.name))
-        for rec in self.sudo():
-            rec.write({
-                'state': 'published',
-                'published_by': self.env.uid,
-                'revoked_by': False,
-                # keep a future (scheduled) date, otherwise publish now
-                'date_published': (rec.date_published if rec.date_published
-                                   and rec.date_published > fields.Datetime.now()
-                                   else fields.Datetime.now()),
-            })
-        for rec in self:
-            rec._log_event('published', _("Live from %s (UTC)", fields.Datetime.to_string(rec.date_published)))
+                return _("its Expiry Date has already passed. An Administrator must change it before it can be published.")
+            try:
+                rec._check_complete(
+                    check_duplicates=True,
+                    intro=_("it cannot be published yet. Please correct the following:"))
+            except ValidationError as error:
+                return error.args[0]
+            return False
+
+        valid, skipped = self._partition(problem)
+        if valid:
+            for rec in valid.sudo():
+                rec.write({
+                    'state': 'published',
+                    'published_by': self.env.uid,
+                    'revoked_by': False,
+                    # keep a future (scheduled) date, otherwise publish now
+                    'date_published': (rec.date_published if rec.date_published
+                                       and rec.date_published > fields.Datetime.now()
+                                       else fields.Datetime.now()),
+                })
+            for rec in valid:
+                rec._log_event('published', _("Live from %s (UTC)", fields.Datetime.to_string(rec.date_published)))
+        if len(valid) == 1:
+            tz_name = self.env['bunna.announcement.settings'].get_tz().zone
+            when = self._local_str(valid.date_published)
+            if valid.date_published > fields.Datetime.now():
+                message = _("'%(title)s' is scheduled and will go live on %(when)s (%(tz)s).",
+                            title=valid.name, when=when, tz=tz_name)
+            else:
+                message = _("'%(title)s' is now live on the website. Published %(when)s (%(tz)s).",
+                            title=valid.name, when=when, tz=tz_name)
+            if valid.date_expire:
+                message += " " + _("It expires on %s.", self._local_str(valid.date_expire))
+        else:
+            message = _("%s announcements were published.", len(valid))
+        return self._finish(valid, skipped, message)
 
     def action_revoke(self):
         self._check_publisher()
-        for rec in self:
-            if rec.state != 'published':
-                raise UserError(_("Only a published announcement can be revoked ('%(name)s' is %(state)s).",
-                                  name=rec.name, state=self._state_label(rec)))
-        self.sudo().write({'state': 'revoked', 'revoked_by': self.env.uid})
-        self._log_event('revoked')
+        valid, skipped = self._partition(
+            lambda rec: _("only a published announcement can be revoked (it is %s).", self._state_label(rec))
+            if rec.state != 'published' else False)
+        if valid:
+            valid.sudo().write({'state': 'revoked', 'revoked_by': self.env.uid})
+            valid._log_event('revoked')
+        message = (_("'%s' was revoked. It is no longer shown on the website; the record is kept.", valid.name)
+                   if len(valid) == 1 else _("%s announcements were revoked.", len(valid)))
+        return self._finish(valid, skipped, message)
 
     def action_set_draft(self):
         self._check_publisher()
-        for rec in self:
-            if rec.state != 'revoked':
-                raise UserError(_("Only a revoked announcement can be set back to draft ('%(name)s' is %(state)s).",
-                                  name=rec.name, state=self._state_label(rec)))
-        self.sudo().write({'state': 'draft'})
-        self._log_event('set_draft')
+        valid, skipped = self._partition(
+            lambda rec: _("only a revoked announcement can be set back to draft (it is %s).", self._state_label(rec))
+            if rec.state != 'revoked' else False)
+        if valid:
+            valid.sudo().write({'state': 'draft'})
+            valid._log_event('set_draft')
+        message = (_("'%s' was set back to draft. It is not visible on the website.", valid.name)
+                   if len(valid) == 1 else _("%s announcements were set back to draft.", len(valid)))
+        return self._finish(valid, skipped, message)
 
     def action_expire_now(self):
         """Take a live announcement off the website now, keeping the record."""
         self._check_publisher()
-        for rec in self:
-            if rec.live_status != 'live':
-                raise UserError(_("Only a live announcement can be expired now ('%s' is not live).", rec.name))
-        self.sudo().write({'date_expire': fields.Datetime.now()})
-        self._log_event('expired_now')
+        valid, skipped = self._partition(
+            lambda rec: _("only a live announcement can be expired now.") if rec.live_status != 'live' else False)
+        if valid:
+            valid.sudo().write({'date_expire': fields.Datetime.now()})
+            valid._log_event('expired_now')
+        message = (_("'%(title)s' was taken off the website at %(when)s. The record is kept.",
+                     title=valid.name, when=self._local_str(valid.date_expire))
+                   if len(valid) == 1 else _("%s announcements were taken off the website.", len(valid)))
+        return self._finish(valid, skipped, message)
+
+    def action_open_comments(self):
+        self._check_publisher()
+
+        def problem(rec):
+            if rec.state != 'published' or rec.live_status == 'expired':
+                return _("comments can only be opened on a published announcement that has not expired.")
+            return _("comments are already open.") if rec.allow_comments else False
+
+        valid, skipped = self._partition(problem)
+        if valid:
+            valid.sudo().write({'allow_comments': True})
+            for rec in valid:
+                rec._log_event('comments_opened', _("Comments opened"),
+                               changes=[(_("Allow Comments"), _("No"), _("Yes"))])
+        message = (_("Comments are now open on '%s'. New comments appear only after a moderator approves them.", valid.name)
+                   if len(valid) == 1 else _("Comments were opened on %s announcements.", len(valid)))
+        if valid and not self.env['bunna.announcement.settings'].get_value('comments_site_enabled'):
+            message += " " + _("Note: comments are switched off for the whole website in Website Settings, "
+                               "so visitors will not see the form yet.")
+        return self._finish(valid, skipped, message)
+
+    def action_close_comments(self):
+        self._check_publisher()
+
+        def problem(rec):
+            if rec.state != 'published':
+                return _("it is not published.")
+            return _("comments are already closed.") if not rec.allow_comments else False
+
+        valid, skipped = self._partition(problem)
+        if valid:
+            valid.sudo().write({'allow_comments': False})
+            for rec in valid:
+                rec._log_event('comments_closed', _("Comments closed"),
+                               changes=[(_("Allow Comments"), _("Yes"), _("No"))])
+        message = (_("Comments are now closed on '%s'. Comments already approved stay visible.", valid.name)
+                   if len(valid) == 1 else _("Comments were closed on %s announcements.", len(valid)))
+        return self._finish(valid, skipped, message)
+
+    def action_view_comments(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Comments: %s", self.name),
+            'res_model': 'bunna.announcement.comment',
+            'view_mode': 'list,form',
+            'domain': [('announcement_id', '=', self.id)],
+        }
+
+    def action_archive(self):
+        result = super().action_archive()
+        if isinstance(result, dict) and result:
+            return result
+        return self._notify(_("%s announcement(s) archived. They are hidden from the website and from the "
+                              "default list; use the Archived filter to find them.", len(self)))
+
+    def action_unarchive(self):
+        result = super().action_unarchive()
+        if isinstance(result, dict) and result:
+            return result
+        return self._notify(_("%s announcement(s) restored. They show again according to their status.", len(self)))
+
+    def _alert_new_comment(self):
+        """Tell the configured addresses a comment is waiting (at most one email per announcement per 15 minutes)."""
+        self.ensure_one()
+        emails = (self.env['bunna.announcement.settings'].get_value('comment_notify_emails') or '').strip()
+        if not emails:
+            return
+        now = fields.Datetime.now()
+        if self.comment_last_alert and now - self.comment_last_alert < timedelta(minutes=15):
+            return
+        try:
+            body = Markup("<p>%s</p><p>%s</p>") % (
+                _("A comment is waiting for review on the announcement: %s", self.name),
+                _("Open Odoo: Announcements, Comments."))
+            mail = self.env['mail.mail'].sudo().create({
+                'subject': _("Announcement comment waiting for review"),
+                'email_to': emails,
+                'body_html': body,
+                'auto_delete': True,
+            })
+            mail.send()
+            self.sudo().write({'comment_last_alert': now})
+        except Exception:
+            _logger.warning("bunna announcement: could not send the comment alert email", exc_info=True)
 
     def unlink(self):
         if not self.env.context.get('module_uninstall'):

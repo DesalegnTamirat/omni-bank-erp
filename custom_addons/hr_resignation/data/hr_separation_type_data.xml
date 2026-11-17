@@ -35,6 +35,7 @@
         <field name="code">termination</field>
         <field name="sequence">50</field>
         <field name="is_company_terminated">True</field>
+        <field name="bypass_handover">True</field>
     </record>
 
     <record id="separation_type_contract_end" model="hr.separation.type">

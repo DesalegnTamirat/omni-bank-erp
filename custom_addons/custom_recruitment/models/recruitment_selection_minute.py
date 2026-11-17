@@ -1,11 +1,105 @@
 import os
+import re
 import base64
 import logging
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError, ValidationError, AccessError
 
 _logger = logging.getLogger(__name__)
 
+def gregorian_to_ethiopian(g_date):
+    """Converts a Gregorian date/datetime or date string to Ethiopian Calendar string."""
+    if not g_date:
+        return ""
+    import datetime
+    if isinstance(g_date, str):
+        try:
+            g_date = datetime.datetime.strptime(g_date[:10], "%Y-%m-%d").date()
+        except Exception:
+            return str(g_date)
+    elif isinstance(g_date, datetime.datetime):
+        g_date = g_date.date()
+
+    eth_months = [
+        "", "መስከረም", "ጥቅምት", "ህዳር", "ታህሳስ", "ጥር", "የካቲት",
+        "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜ"
+    ]
+
+    year = g_date.year
+    month = g_date.month
+    day = g_date.day
+
+    a = (14 - month) // 12
+    y = year + 4800 - a
+    m = month + 12 * a - 3
+    jdn = day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
+
+    r = (jdn - 1723856) % 1461
+    n = (r % 365) + 365 * (r // 1460)
+    eth_year = 4 * ((jdn - 1723856) // 1461) + (r // 365) - (r // 1460)
+    eth_month = (n // 30) + 1
+    eth_day = (n % 30) + 1
+
+    if 1 <= eth_month <= 13:
+        return f"{eth_months[eth_month]} {eth_day:02d} ቀን {eth_year} ዓ.ም"
+    return str(g_date)
+
+
+def amount_to_words_amharic(amount):
+    if not amount or amount <= 0:
+        return ""
+
+    units = ["", "አንድ", "ሁለት", "ሦስት", "አራት", "አምስት", "ስድስት", "ሰባት", "ስምንት", "ዘጠኝ"]
+    teens = [
+        "አስር", "አስራ አንድ", "አስራ ሁለት", "አስራ ሦስት", "አስራ አራት",
+        "አስራ አምስት", "አስራ ስድስት", "አስራ ሰባት", "አስራ ስምንት", "አስራ ዘጠኝ"
+    ]
+    tens = ["", "አስር", "ሃያ", "ሰላሳ", "አርባ", "ሃምሳ", "ስድሳ", "ሰባ", "ሰማንያ", "ዘጠና"]
+
+    def _convert_hundreds(n):
+        res = []
+        if n >= 100:
+            h = n // 100
+            if h == 1:
+                res.append("አንድ መቶ")
+            else:
+                res.append(units[h] + " መቶ")
+            n %= 100
+        if 10 <= n <= 19:
+            res.append(teens[n - 10])
+        elif n >= 20:
+            t = n // 10
+            u = n % 10
+            if u > 0:
+                res.append(tens[t] + " " + units[u])
+            else:
+                res.append(tens[t])
+        elif n > 0:
+            res.append(units[n])
+        return " ".join(res)
+
+    int_part = int(round(amount))
+    if int_part == 0:
+        return "ዜሮ"
+
+    billions = int_part // 1000000000
+    int_part %= 1000000000
+    millions = int_part // 1000000
+    int_part %= 1000000
+    thousands = int_part // 1000
+    hundreds = int_part % 1000
+
+    parts = []
+    if billions > 0:
+        parts.append(_convert_hundreds(billions) + " ቢሊዮን")
+    if millions > 0:
+        parts.append(_convert_hundreds(millions) + " ሚሊዮን")
+    if thousands > 0:
+        parts.append(_convert_hundreds(thousands) + " ሺህ")
+    if hundreds > 0:
+        parts.append(_convert_hundreds(hundreds))
+
+    return " ".join(parts).strip()
 
 class RecruitmentSelectionMinute(models.Model):
     """
@@ -54,14 +148,18 @@ class RecruitmentSelectionMinute(models.Model):
         required=True,
     )
 
-    @api.depends("vacancy_id", "vacancy_id.recruitment_type")
+    @api.depends("vacancy_id", "vacancy_id.recruitment_type", "vacancy_id.sourcing_type", "vacancy_id.reference")
     def _compute_recruitment_type(self):
         for rec in self:
-            if rec.vacancy_id and rec.vacancy_id.recruitment_type:
-                raw_val = str(rec.vacancy_id.recruitment_type).strip().lower()
-                rec.recruitment_type = "external" if "ext" in raw_val else "internal"
-            else:
-                rec.recruitment_type = "internal"
+            vac = rec.vacancy_id
+            if vac:
+                r_type = str(vac.recruitment_type or '').lower()
+                s_type = str(vac.sourcing_type or '').lower()
+                ref = str(vac.reference or '').upper()
+                if 'ext' in r_type or 'ext' in s_type or 'EXT' in ref:
+                    rec.recruitment_type = 'external'
+                    continue
+            rec.recruitment_type = 'internal' 
 
     approval_hierarchy_type = fields.Selection(
         [
@@ -82,6 +180,26 @@ class RecruitmentSelectionMinute(models.Model):
     observer_id = fields.Many2one(
         "res.users", string="Labor Representative (Observer)", tracking=True,
         help="Observer role (optional to sign)"
+    )
+    allowed_chairperson_user_ids = fields.Many2many(
+        "res.users",
+        compute="_compute_allowed_committee_users",
+        string="Allowed Chairperson Users",
+    )
+    allowed_panel_member_user_ids = fields.Many2many(
+        "res.users",
+        compute="_compute_allowed_committee_users",
+        string="Allowed Panel Member Users",
+    )
+    allowed_secretary_user_ids = fields.Many2many(
+        "res.users",
+        compute="_compute_allowed_committee_users",
+        string="Allowed Secretary Users",
+    )
+    allowed_observer_user_ids = fields.Many2many(
+        "res.users",
+        compute="_compute_allowed_committee_users",
+        string="Allowed Observer Users",
     )
 
     @api.depends("vacancy_id", "vacancy_id.operating_unit_id", "vacancy_id.employee_category", "vacancy_id.job_grade", "vacancy_id.job_position")
@@ -141,6 +259,19 @@ class RecruitmentSelectionMinute(models.Model):
         default=fields.Date.context_today,
         required=True,
     )
+
+    meeting_place = fields.Char(
+        string="Meeting Place",
+        default="ፒፕል ኦፕሬሽን ማኔጅመንት ዳይሬክቶሬት ቢሮ",
+    )
+    meeting_time = fields.Char(
+        string="Meeting Time",
+        default="ከጠዋቱ በ3፡00 ሰዓት",
+    )
+    meeting_end_time = fields.Char(
+        string="Meeting End Time",
+        default="ከቀኑ በ 6፡00 ሰዓት",
+    )
     state = fields.Selection(
         [
             ("draft", "Draft"),
@@ -189,7 +320,29 @@ class RecruitmentSelectionMinute(models.Model):
     panel_notified = fields.Boolean(
         string="Panel Notified", default=False
     )
+    current_user_can_sign = fields.Boolean(
+        string="Current User Can Sign", compute="_compute_current_user_can_sign", store=False
+    )
     active = fields.Boolean(default=True)
+
+    def _compute_current_user_can_sign(self):
+        for rec in self:
+            can_sign = False
+            if rec.state in ('draft', 'pending_approval') and rec.committee_signature_ids:
+                my_line = rec.committee_signature_ids.filtered(
+                    lambda s: s.user_id == self.env.user and s.state == 'pending'
+                )
+                can_sign = bool(my_line)
+            rec.current_user_can_sign = can_sign
+
+    def action_sign_my_minute_line(self):
+        self.ensure_one()
+        my_line = self.committee_signature_ids.filtered(
+            lambda s: s.user_id == self.env.user and s.state == 'pending'
+        )
+        if not my_line:
+            raise UserError(_("You do not have any pending signature assignments on this Committee Minute."))
+        return my_line[0].action_sign_digitally()
 
     def _auto_init(self):
         # 1. Invalidate stable cache so ir_model_fields lookups are never stale
@@ -202,7 +355,10 @@ class RecruitmentSelectionMinute(models.Model):
                     ADD COLUMN IF NOT EXISTS chairperson_id int4,
                     ADD COLUMN IF NOT EXISTS panel_member_id int4,
                     ADD COLUMN IF NOT EXISTS secretary_id int4,
-                    ADD COLUMN IF NOT EXISTS observer_id int4;
+                    ADD COLUMN IF NOT EXISTS observer_id int4,
+                    ADD COLUMN IF NOT EXISTS meeting_place varchar,
+                    ADD COLUMN IF NOT EXISTS meeting_time varchar,
+                    ADD COLUMN IF NOT EXISTS meeting_end_time varchar;
 
                     -- Pre-ensure ir_model_fields has approval_hierarchy_type registered
                     DO $$
@@ -241,6 +397,23 @@ class RecruitmentSelectionMinute(models.Model):
                         ELSE 'internal'
                     END
                     WHERE recruitment_type IS NULL OR recruitment_type = '' OR LOWER(recruitment_type) NOT IN ('internal', 'external');
+
+                    -- Sanitize corrupted or unreadable meeting time strings in the database
+                    UPDATE recruitment_selection_minute
+                    SET meeting_time = 'ከጠዋቱ በ3፡00 ሰዓት'
+                    WHERE meeting_time IS NULL
+                       OR meeting_time LIKE '%CE%'
+                       OR meeting_time LIKE '%ዕለት%'
+                       OR meeting_time LIKE '%`%'
+                       OR meeting_time ~ '[a-zA-Z]';
+
+                    UPDATE recruitment_selection_minute
+                    SET meeting_end_time = 'ከቀኑ በ 6፡00 ሰዓት'
+                    WHERE meeting_end_time IS NULL
+                       OR meeting_end_time LIKE '%CE%'
+                       OR meeting_end_time LIKE '%ዕለት%'
+                       OR meeting_end_time LIKE '%`%'
+                       OR meeting_end_time ~ '[a-zA-Z]';
 
                     UPDATE recruitment_selection_minute_line 
                     SET selection_status = CASE
@@ -367,11 +540,37 @@ class RecruitmentSelectionMinute(models.Model):
                         sig.state == "signed" for sig in rec.committee_signature_ids
                     )
 
+    @api.model
+    def check_access_rights(self, operation, raise_exception=True):
+        if operation == 'create':
+            user = self.env.user
+            is_admin_recruitment = (
+                user.has_group('custom_recruitment.group_recruitment_administrator')
+                or user.has_group('custom_recruitment.group_recruitment_manager')
+                or user.has_group('base.group_system')
+                or self.env.is_superuser()
+            )
+            if not is_admin_recruitment:
+                if raise_exception:
+                    raise AccessError(_("Only recruitment administrators are authorized to create Digital Selection Minutes."))
+                return False
+        return super().check_access_rights(operation, raise_exception=raise_exception)
+
     @api.model_create_multi
     def create(self, vals_list):
+        if not (self.env.user.has_group('custom_recruitment.group_recruitment_administrator')
+                or self.env.user.has_group('custom_recruitment.group_recruitment_manager')
+                or self.env.is_admin() or self.env.su):
+            raise AccessError(_("Only recruitment administrators are authorized to create Digital Selection Minutes."))
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") in (_("New"), "New") or str(vals.get("name")).startswith("MIN/"):
                 vals["name"] = self._get_next_minute_reference()
+            if not self._is_clean_amharic_time(vals.get("meeting_time")):
+                vals["meeting_time"] = "ከጠዋቱ በ3፡00 ሰዓት"
+            if not self._is_clean_amharic_time(vals.get("meeting_end_time")):
+                vals["meeting_end_time"] = "ከቀኑ በ 6፡00 ሰዓት"
+            if not self._is_clean_amharic(vals.get("meeting_place")):
+                vals["meeting_place"] = "ፒፕል ኦፕሬሽን ማኔጅመንት ዳይሬክቶሬት ቢሮ"
         records = super().create(vals_list)
         for rec in records:
             if rec.vacancy_id:
@@ -421,7 +620,7 @@ class RecruitmentSelectionMinute(models.Model):
             sig_cmds = [(5, 0, 0)]
             added_user_ids = set()
 
-            int_sel = self.env["new.internal.recruitment.selected"].search([
+            int_sel = self.env["new.internal.recruitment.selected"].sudo().search([
                 '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
             ], limit=1)
 
@@ -441,7 +640,7 @@ class RecruitmentSelectionMinute(models.Model):
                         }))
 
             if len(sig_cmds) == 1:
-                ext_sel = self.env["external.recruitment.selected"].search([
+                ext_sel = self.env["external.recruitment.selected"].sudo().search([
                     '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
                 ], limit=1)
                 if ext_sel:
@@ -491,34 +690,44 @@ class RecruitmentSelectionMinute(models.Model):
         lines = []
 
         # 1. Search Internal Recruitment Process Selected records
-        int_sel = self.env["new.internal.recruitment.selected"].search([
+        int_sel = self.env["new.internal.recruitment.selected"].sudo().search([
             '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
         ], limit=1)
 
         if int_sel and int_sel.new_int_rec_sel:
             for cand in int_sel.new_int_rec_sel:
-                if cand.emp_name:
-                    status_val = 'selected' if cand.selection_type in ('selected', 'Selected') else ('reserve' if cand.selection_type in ('reserve', 'Reserved') else 'failed')
-                    lines.append((0, 0, {
-                        'employee_id': cand.emp_name.id,
-                        'candidate_name': cand.emp_name.name,
-                        'pms_score': cand.pms_score or 0.0,
-                        'written_score': cand.written_exam_score or 0.0,
-                        'interview_score': cand.interview_score or 0.0,
-                        'final_score': cand.weighted_score or 0.0,
-                        'rank': cand.rank or 0,
-                        'selection_status': status_val,
-                    }))
+                if not cand.emp_name:
+                    continue
+                # Exclude disqualified or rejected candidates
+                if cand.selection_type == 'rejected' or getattr(cand, 'is_disqualified', False) or not cand.rank:
+                    continue
+                status_val = 'selected' if cand.selection_type in ('selected', 'Selected') else 'reserve'
+                lines.append((0, 0, {
+                    'employee_id': cand.emp_name.id,
+                    'candidate_name': cand.emp_name.name,
+                    'pms_score': cand.pms_score or 0.0,
+                    'experience_score': getattr(cand, 'experience_score', 0.0) or 0.0,
+                    'service_location_score': getattr(cand, 'location_score', 0.0) or 0.0,
+                    'application_date_score': getattr(cand, 'app_date_score', 0.0) or 0.0,
+                    'recommendation_score': getattr(cand, 'supervisor_recommendation_score', 0.0) or 0.0,
+                    'written_score': cand.written_exam_score or 0.0,
+                    'interview_score': cand.interview_score or 0.0,
+                    'final_score': cand.weighted_score or 0.0,
+                    'rank': cand.rank or 0,
+                    'selection_status': status_val,
+                }))
 
         # 2. Search External Recruitment Process Selected records
         if not lines:
-            ext_sel = self.env["external.recruitment.selected"].search([
+            ext_sel = self.env["external.recruitment.selected"].sudo().search([
                 '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
             ], limit=1)
             if ext_sel and ext_sel.ext_rec_sel:
                 for cand in ext_sel.ext_rec_sel:
+                    if cand.selection_type == 'rejected' or getattr(cand, 'disqualified', False) or not getattr(cand, 'rank', 0):
+                        continue
                     cand_name = cand.applicant_name.partner_name if (cand.applicant_name and getattr(cand.applicant_name, 'partner_name', False)) else (cand.applicant_name.name if cand.applicant_name else cand.emp_name or 'Applicant')
-                    status_val = 'selected' if cand.selection_type in ('selected', 'Selected') else ('reserve' if cand.selection_type in ('reserved', 'Reserve') else 'failed')
+                    status_val = 'selected' if cand.selection_type in ('selected', 'Selected') else 'reserve'
                     lines.append((0, 0, {
                         'applicant_id': cand.applicant_name.id if cand.applicant_name else False,
                         'candidate_name': cand_name,
@@ -563,6 +772,104 @@ class RecruitmentSelectionMinute(models.Model):
 
         if lines:
             self.write({"ranking_line_ids": lines})
+
+    @api.depends("approval_hierarchy_type", "vacancy_id", "recruitment_type")
+    def _compute_allowed_committee_users(self):
+        ConfigModel = self.env["committee.role.config"]
+        all_active_users = self.env["res.users"].search([("active", "=", True)])
+        for rec in self:
+            htype = rec.approval_hierarchy_type or "ho_district_grade2_plus"
+            scope = rec.recruitment_type or "all"
+            cfg = ConfigModel.get_config_for_hierarchy(htype, scope=scope)
+            vac = rec.vacancy_id if rec.vacancy_id else False
+            ou = getattr(vac, "operating_unit_id", False) or None
+            dept = (getattr(ou, "department", False) or (vac.job_position.department_id if vac and vac.job_position else False)) if vac else None
+            if cfg:
+                c_users = cfg.get_allowed_users_for_role("chairperson", operating_unit=ou, department=dept)
+                p_users = cfg.get_allowed_users_for_role("panel_member", operating_unit=ou, department=dept)
+                s_users = cfg.get_allowed_users_for_role("secretary", operating_unit=ou, department=dept)
+                o_users = cfg.get_allowed_users_for_role("observer", operating_unit=ou, department=dept)
+
+                rec.allowed_chairperson_user_ids = c_users
+                rec.allowed_panel_member_user_ids = p_users
+                rec.allowed_secretary_user_ids = s_users
+                rec.allowed_observer_user_ids = o_users
+            else:
+                rec.allowed_chairperson_user_ids = False
+                rec.allowed_panel_member_user_ids = False
+                rec.allowed_secretary_user_ids = False
+                rec.allowed_observer_user_ids = False
+
+    @api.onchange("approval_hierarchy_type", "vacancy_id")
+    def _onchange_committee_hierarchy_roles(self):
+        ConfigModel = self.env["committee.role.config"]
+        htype = self.approval_hierarchy_type or "ho_district_grade2_plus"
+        scope = self.recruitment_type or "all"
+        cfg = ConfigModel.get_config_for_hierarchy(htype, scope=scope)
+        vac = self.vacancy_id if self.vacancy_id else False
+        ou = getattr(vac, "operating_unit_id", False) or None
+        dept = (getattr(ou, "department", False) or (vac.job_position.department_id if vac and vac.job_position else False)) if vac else None
+
+        if cfg:
+            c_users = cfg.get_allowed_users_for_role("chairperson", operating_unit=ou, department=dept)
+            p_users = cfg.get_allowed_users_for_role("panel_member", operating_unit=ou, department=dept)
+            s_users = cfg.get_allowed_users_for_role("secretary", operating_unit=ou, department=dept)
+            o_users = cfg.get_allowed_users_for_role("observer", operating_unit=ou, department=dept)
+
+            self.allowed_chairperson_user_ids = c_users
+            self.allowed_panel_member_user_ids = p_users
+            self.allowed_secretary_user_ids = s_users
+            self.allowed_observer_user_ids = o_users
+
+            if c_users:
+                if self.chairperson_id and self.chairperson_id.id not in c_users.ids:
+                    self.chairperson_id = c_users[0] if len(c_users) == 1 else False
+                elif not self.chairperson_id and len(c_users) == 1:
+                    self.chairperson_id = c_users[0]
+
+            if p_users:
+                if self.panel_member_id and self.panel_member_id.id not in p_users.ids:
+                    self.panel_member_id = p_users[0] if len(p_users) == 1 else False
+                elif not self.panel_member_id and len(p_users) == 1:
+                    self.panel_member_id = p_users[0]
+
+            if s_users:
+                if self.secretary_id and self.secretary_id.id not in s_users.ids:
+                    self.secretary_id = s_users[0] if len(s_users) == 1 else False
+                elif not self.secretary_id and len(s_users) == 1:
+                    self.secretary_id = s_users[0]
+
+            if o_users:
+                if self.observer_id and self.observer_id.id not in o_users.ids:
+                    self.observer_id = o_users[0] if len(o_users) == 1 else False
+                elif not self.observer_id and len(o_users) == 1:
+                    self.observer_id = o_users[0]
+
+            return {
+                "domain": {
+                    "chairperson_id": [("id", "in", c_users.ids)] if c_users else [("id", "=", False)],
+                    "panel_member_id": [("id", "in", p_users.ids)] if p_users else [("id", "=", False)],
+                    "secretary_id": [("id", "in", s_users.ids)] if s_users else [("id", "=", False)],
+                    "observer_id": [("id", "in", o_users.ids)] if o_users else [("id", "=", False)],
+                }
+            }
+        else:
+            self.allowed_chairperson_user_ids = False
+            self.allowed_panel_member_user_ids = False
+            self.allowed_secretary_user_ids = False
+            self.allowed_observer_user_ids = False
+            self.chairperson_id = False
+            self.panel_member_id = False
+            self.secretary_id = False
+            self.observer_id = False
+            return {
+                "domain": {
+                    "chairperson_id": [("id", "=", False)],
+                    "panel_member_id": [("id", "=", False)],
+                    "secretary_id": [("id", "=", False)],
+                    "observer_id": [("id", "=", False)],
+                }
+            }
 
     def _get_hierarchy_role_labels(self, htype=None):
         htype = htype or self.approval_hierarchy_type or "ho_district_grade2_plus"
@@ -631,45 +938,85 @@ class RecruitmentSelectionMinute(models.Model):
     def action_generate_signature_lines(self):
         """Persist digital signature lines based on assigned committee roles and hierarchy category."""
         for rec in self:
+            existing_by_user = {}
+            for s in rec.committee_signature_ids:
+                if s.user_id:
+                    existing_by_user[s.user_id.id] = {
+                        'state': s.state,
+                        'digital_signature': s.digital_signature,
+                        'signature_img': s.signature_img,
+                        'signed_date': s.signed_date,
+                        'signed_on': s.signed_on if hasattr(s, 'signed_on') else False,
+                        'comments': s.comments,
+                        'remarks': s.remarks if hasattr(s, 'remarks') else False,
+                    }
             rec.committee_signature_ids.unlink()
             labels = rec._get_hierarchy_role_labels()
             lines_to_create = []
 
             if rec.chairperson_id:
+                prev = existing_by_user.get(rec.chairperson_id.id, {})
                 lines_to_create.append({
                     "minute_id": rec.id,
                     "user_id": rec.chairperson_id.id,
                     "role": "Chairperson",
                     "role_label": labels["chairperson"],
                     "is_mandatory": True,
-                    "state": "pending",
+                    "state": prev.get("state", "pending"),
+                    "digital_signature": prev.get("digital_signature", False),
+                    "signature_img": prev.get("signature_img", False),
+                    "signed_date": prev.get("signed_date", False),
+                    "signed_on": prev.get("signed_on", False),
+                    "comments": prev.get("comments", False),
+                    "remarks": prev.get("remarks", False),
                 })
             if rec.panel_member_id:
+                prev = existing_by_user.get(rec.panel_member_id.id, {})
                 lines_to_create.append({
                     "minute_id": rec.id,
                     "user_id": rec.panel_member_id.id,
                     "role": "Panel Member",
                     "role_label": labels["panel_member"],
                     "is_mandatory": True,
-                    "state": "pending",
+                    "state": prev.get("state", "pending"),
+                    "digital_signature": prev.get("digital_signature", False),
+                    "signature_img": prev.get("signature_img", False),
+                    "signed_date": prev.get("signed_date", False),
+                    "signed_on": prev.get("signed_on", False),
+                    "comments": prev.get("comments", False),
+                    "remarks": prev.get("remarks", False),
                 })
             if rec.secretary_id:
+                prev = existing_by_user.get(rec.secretary_id.id, {})
                 lines_to_create.append({
                     "minute_id": rec.id,
                     "user_id": rec.secretary_id.id,
                     "role": "Panel Member & Secretary",
                     "role_label": labels["secretary"],
                     "is_mandatory": True,
-                    "state": "pending",
+                    "state": prev.get("state", "pending"),
+                    "digital_signature": prev.get("digital_signature", False),
+                    "signature_img": prev.get("signature_img", False),
+                    "signed_date": prev.get("signed_date", False),
+                    "signed_on": prev.get("signed_on", False),
+                    "comments": prev.get("comments", False),
+                    "remarks": prev.get("remarks", False),
                 })
             if rec.observer_id and rec.approval_hierarchy_type != "ho_district_grade2_plus":
+                prev = existing_by_user.get(rec.observer_id.id, {})
                 lines_to_create.append({
                     "minute_id": rec.id,
                     "user_id": rec.observer_id.id,
                     "role": "Observer",
                     "role_label": labels["observer"],
                     "is_mandatory": False,
-                    "state": "pending",
+                    "state": prev.get("state", "pending"),
+                    "digital_signature": prev.get("digital_signature", False),
+                    "signature_img": prev.get("signature_img", False),
+                    "signed_date": prev.get("signed_date", False),
+                    "signed_on": prev.get("signed_on", False),
+                    "comments": prev.get("comments", False),
+                    "remarks": prev.get("remarks", False),
                 })
 
             if lines_to_create:
@@ -683,10 +1030,10 @@ class RecruitmentSelectionMinute(models.Model):
 
         # Synchronize hierarchy and committee roles from Vacancy or Selection record if set
         vac = self.vacancy_id
-        int_sel = self.env["new.internal.recruitment.selected"].search([
+        int_sel = self.env["new.internal.recruitment.selected"].sudo().search([
             '|', ('vacancy_id', '=', vac.id), ('vacancy_reference', '=', vac.reference)
         ], limit=1)
-        ext_sel = self.env["external.recruitment.selected"].search([
+        ext_sel = self.env["external.recruitment.selected"].sudo().search([
             '|', ('vacancy_id', '=', vac.id), ('vacancy_reference', '=', vac.reference)
         ], limit=1)
         sel = int_sel or ext_sel
@@ -743,7 +1090,7 @@ class RecruitmentSelectionMinute(models.Model):
 
         # 2. Search External Process Record Committee Members (recr_exter_selected_team_id / recr_selected_team_id)
         if not sig_lines:
-            ext_sel = self.env["external.recruitment.selected"].search([
+            ext_sel = self.env["external.recruitment.selected"].sudo().search([
                 '|', ('vacancy_id', '=', self.vacancy_id.id), ('vacancy_reference', '=', self.vacancy_id.reference)
             ], limit=1)
             if ext_sel:
@@ -842,6 +1189,15 @@ class RecruitmentSelectionMinute(models.Model):
 
         committee_group = self.env.ref('custom_recruitment.group_recruitment_approval_committee', raise_if_not_found=False)
         for rec in self:
+            if not rec.ranking_line_ids:
+                raise UserError(_("Cannot notify panel members without candidate rankings in the minute."))
+            passed_candidates = rec.ranking_line_ids.filtered(
+                lambda l: l.selection_status in ('selected', 'Selected', 'pass', 'Pass')
+            )
+            if not passed_candidates:
+                raise UserError(
+                    _("Cannot notify approval committee! No candidates in the minute are marked as passed or selected. Please ensure candidates have passed and are added to the minute before notifying the committee.")
+                )
             if not rec.committee_signature_ids:
                 raise UserError(_("No panel/committee members found to notify."))
 
@@ -870,7 +1226,7 @@ class RecruitmentSelectionMinute(models.Model):
                     if not existing_act and todo_act_type and model_id:
                         self.env['mail.activity'].create({
                             'activity_type_id': todo_act_type.id,
-                            'note': _("<p>Selection Minute <b>%s</b> for vacancy <b>%s</b> requires your digital signature.</p>") % (
+                            'note': _("Selection Minute %s for vacancy %s requires your digital signature.") % (
                                 rec.name, rec.vacancy_id.display_name or rec.vacancy_id.name or ''
                             ),
                             'summary': _("Digitally Sign Selection Minute %s") % rec.name,
@@ -880,27 +1236,89 @@ class RecruitmentSelectionMinute(models.Model):
                             'date_deadline': fields.Date.context_today(self),
                         })
 
-            # Send targeted Odoo Discuss message notification ONLY to panel members' partners
+            # Subscribe partners as followers
             if notified_partners:
-                rec.message_notify(
-                    partner_ids=notified_partners,
-                    subject=_("Pending Digital Signature: Selection Minute %s") % rec.name,
-                    body=_(
-                        "<p>Dear Committee Member,</p>"
-                        "<p>Selection Minute <b>%s</b> for vacancy <b>%s</b> is ready for your digital signature.</p>"
-                        "<p>Please review the candidate matrix and provide your digital signature under <b>Employees → Digital Selection Minutes</b>.</p>"
-                    ) % (rec.name, rec.vacancy_id.display_name or rec.vacancy_id.name or ''),
-                    email_layout_xmlid="mail.mail_notification_light",
-                )
+                try:
+                    rec.message_subscribe(partner_ids=notified_partners)
+                except Exception:
+                    pass
 
-            rec.message_post(
+            # Send targeted Odoo Discuss message notification ONLY to panel members' partners
+            notif_msg = None
+            if notified_partners:
+                try:
+                    notif_msg = rec.message_notify(
+                        partner_ids=notified_partners,
+                        subject=_("Pending Digital Signature: Selection Minute %s") % rec.name,
+                        body=_(
+                            "Dear Committee Member,\n\n"
+                            "Selection Minute %s for vacancy %s is ready for your digital signature.\n\n"
+                            "Please review the candidate matrix and provide your digital signature under Employees â†’ Digital Selection Minutes."
+                        ) % (rec.name, rec.vacancy_id.display_name or rec.vacancy_id.name or ''),
+                        email_layout_xmlid="mail.mail_notification_light",
+                    )
+                except Exception:
+                    pass
+
+            mentions_html = ' '.join([
+                f'<a href="#" data-oe-model="res.partner" data-oe-id="{p.id}">@{p.name}</a>'
+                for p in rec.committee_signature_ids.mapped('user_id.partner_id')
+            ])
+            posted_msg = rec.message_post(
                 body=_(
-                    "Digital Signature notification and activity tasks dispatched to %s panel/committee member(s)."
-                ) % len(notified_partners or rec.committee_signature_ids),
+                    "<p>Digital Signature notification dispatched to committee members: %s</p>"
+                    "<p>Please review and sign under the Committee Signatures tab.</p>"
+                ) % mentions_html,
                 partner_ids=notified_partners,
+                message_type='comment',
                 subtype_xmlid="mail.mt_comment",
             )
             rec.write({'panel_notified': True})
+
+            # Enforce Discuss Inbox delivery
+            all_msg_ids = [m.id for m in (notif_msg, posted_msg) if m]
+            if all_msg_ids and notified_partners:
+                notifs = self.env['mail.notification'].search([
+                    ('mail_message_id', 'in', all_msg_ids),
+                    ('res_partner_id', 'in', notified_partners),
+                ])
+                if notifs:
+                    notifs.write({
+                        'notification_type': 'inbox',
+                        'notification_status': 'sent',
+                        'is_read': False,
+                    })
+
+            # Send 1-on-1 Discuss DM
+            if 'discuss.channel' in self.env:
+                for sig in rec.committee_signature_ids.filtered(lambda l: l.state == 'pending' and l.user_id):
+                    user = sig.user_id
+                    if user.partner_id and user.id != self.env.user.id:
+                        try:
+                            chat_channel = self.env['discuss.channel']._get_or_create_chat(
+                                partners_to=[self.env.user.partner_id.id, user.partner_id.id]
+                            )
+                            if chat_channel:
+                                dm_msg = chat_channel.message_post(
+                                    body=_(
+                                        "Hello %s, Selection Minute %s for vacancy %s is ready for your digital signature. "
+                                        "Please review and sign under Employees â†’ Digital Selection Minutes."
+                                    ) % (user.name, rec.name, rec.vacancy_id.display_name or rec.vacancy_id.name or ''),
+                                    message_type='comment',
+                                    subtype_xmlid='mail.mt_comment',
+                                )
+                                dm_notifs = self.env['mail.notification'].search([
+                                    ('mail_message_id', '=', dm_msg.id),
+                                    ('res_partner_id', '=', user.partner_id.id),
+                                ])
+                                if dm_notifs:
+                                    dm_notifs.write({
+                                        'notification_type': 'inbox',
+                                        'notification_status': 'sent',
+                                        'is_read': False,
+                                    })
+                        except Exception:
+                            pass
 
         return {
             'type': 'ir.actions.client',
@@ -921,6 +1339,14 @@ class RecruitmentSelectionMinute(models.Model):
                 _("Cannot submit minute without candidate rankings.")
             )
 
+        passed_candidates = self.ranking_line_ids.filtered(
+            lambda l: l.selection_status in ('selected', 'Selected', 'pass', 'Pass')
+        )
+        if not passed_candidates:
+            raise ValidationError(
+                _("Cannot notify approval committee! No candidates in the minute are marked as passed or selected. Please ensure candidates have passed and are added to the minute before submitting.")
+            )
+
         if not self.committee_signature_ids:
             if self.chairperson_id or self.panel_member_id or self.secretary_id:
                 self.action_generate_signature_lines()
@@ -935,13 +1361,25 @@ class RecruitmentSelectionMinute(models.Model):
         self.write({"state": "pending_approval", "panel_notified": True})
         self.action_notify_panel_members()
 
+    def write(self, vals):
+        if "meeting_time" in vals and not self._is_clean_amharic_time(vals.get("meeting_time")):
+            vals["meeting_time"] = "ከጠዋቱ በ3፡00 ሰዓት"
+        if "meeting_end_time" in vals and not self._is_clean_amharic_time(vals.get("meeting_end_time")):
+            vals["meeting_end_time"] = "ከቀኑ በ 6፡00 ሰዓት"
+        if "meeting_place" in vals and not self._is_clean_amharic(vals.get("meeting_place")):
+            vals["meeting_place"] = "ፒፕል ኦፕሬሽን ማኔጅመንት ዳይሬክቶሬት ቢሮ"
+        res = super(RecruitmentSelectionMinute, self.sudo() if not self.env.is_admin() else self).write(vals)
+        for rec in self:
+            rec._check_auto_approval()
+        return res
+
     def _check_auto_approval(self):
         """Auto-triggers approval once all committee members sign and updates the selection process state to Approved."""
         for rec in self:
             if (rec.state == "pending_approval" and rec.is_fully_signed) or rec.state == "approved":
                 if rec.state == "pending_approval":
-                    rec.write({"state": "approved"})
-                    rec.message_post(
+                    rec.sudo().write({"state": "approved"})
+                    rec.sudo().message_post(
                         body=_(
                             "All committee members have digitally signed. Selection Minute is officially APPROVED."
                         )
@@ -952,25 +1390,25 @@ class RecruitmentSelectionMinute(models.Model):
                 if rec.vacancy_id:
                     vac_ref = rec.vacancy_id.reference
                     vac_id = rec.vacancy_id.id
-                    rec.vacancy_id.write({'minute_signed': True})
+                    rec.vacancy_id.sudo().write({'minute_signed': True})
 
                     # 1. Internal Recruitment Process Selected
-                    int_sel = self.env["new.internal.recruitment.selected"].search([
+                    int_sel = self.env["new.internal.recruitment.selected"].sudo().search([
                         '|', ('vacancy_id', '=', vac_id), ('vacancy_reference', '=', vac_ref)
                     ])
                     for s in int_sel:
-                        s.write({'state': 'approved', 'status': 'approved'})
-                        s.message_post(body=_(
+                        s.sudo().write({'state': 'approved', 'status': 'approved'})
+                        s.sudo().message_post(body=_(
                             "Selection Process officially APPROVED: All committee members have digitally signed Selection Minute <b>%s</b>."
                         ) % rec.name)
 
                     # 2. External Recruitment Process Selected
-                    ext_sel = self.env["external.recruitment.selected"].search([
+                    ext_sel = self.env["external.recruitment.selected"].sudo().search([
                         '|', ('vacancy_id', '=', vac_id), ('vacancy_reference', '=', vac_ref)
                     ])
                     for s in ext_sel:
-                        s.write({'state': 'approved', 'status': 'approved'})
-                        s.message_post(body=_(
+                        s.sudo().write({'state': 'approved', 'status': 'approved'})
+                        s.sudo().message_post(body=_(
                             "Selection Process officially APPROVED: All committee members have digitally signed Selection Minute <b>%s</b>."
                         ) % rec.name)
 
@@ -995,17 +1433,143 @@ class RecruitmentSelectionMinute(models.Model):
                         if pbms_lines:
                             for pl in pbms_lines:
                                 curr_fulfilled = pl.fulfilled_quantity or 0
-                                pl.write({"fulfilled_quantity": curr_fulfilled + selected_count})
-                                pl._compute_remaining_approved_annual_total()
+                                pl.sudo().write({"fulfilled_quantity": curr_fulfilled + selected_count})
+                                pl.sudo()._compute_remaining_approved_annual_total()
+
+    @api.model
+    def verify_selection_minute_fully_approved(self, vacancy_id=None, vacancy_ref=None):
+        """
+        Validates that a recruitment selection minute exists for the vacancy (internal or external),
+        that committee members are assigned, and that ALL committee members have approved and digitally signed.
+        If any committee member has not signed or if the minute is not approved,
+        raises a detailed UserError listing remaining members.
+        """
+        if vacancy_id and hasattr(vacancy_id, 'id'):
+            vacancy_id = vacancy_id.id
+
+        if vacancy_id and not vacancy_ref:
+            vac = self.env["job.vacancy"].browse(vacancy_id)
+            if vac.exists():
+                vacancy_ref = vac.reference
+
+        if not vacancy_id and vacancy_ref:
+            vac = self.env["job.vacancy"].search([("reference", "=", vacancy_ref)], limit=1)
+            if vac:
+                vacancy_id = vac.id
+
+        ref_str = vacancy_ref or str(vacancy_id or "")
+
+        minute_rec = False
+        if self and self._name == "recruitment.selection.minute" and len(self) == 1 and self.id:
+            minute_rec = self
+        else:
+            domain = []
+            if vacancy_id and vacancy_ref:
+                domain = ["|", ("vacancy_id", "=", vacancy_id), ("vacancy_id.reference", "=", vacancy_ref)]
+            elif vacancy_id:
+                domain = [("vacancy_id", "=", vacancy_id)]
+            elif vacancy_ref:
+                domain = [("vacancy_id.reference", "=", vacancy_ref)]
+            else:
+                raise UserError(_("No vacancy reference found to check Selection Committee Minute."))
+
+            minute_rec = self.search(domain, order="id desc", limit=1)
+
+        # Fallback for lateral transfer vacancies: check transfer.committee.minutes
+        if not minute_rec:
+            tcm_domain = []
+            if vacancy_id and vacancy_ref:
+                tcm_domain = ["|", ("target_vacancy_id", "=", vacancy_id), ("target_vacancy_id.reference", "=", vacancy_ref)]
+            elif vacancy_id:
+                tcm_domain = [("target_vacancy_id", "=", vacancy_id)]
+            elif vacancy_ref:
+                tcm_domain = [("target_vacancy_id.reference", "=", vacancy_ref)]
+            if tcm_domain:
+                tcm = self.env["transfer.committee.minutes"].search(tcm_domain, order="id desc", limit=1)
+                if tcm:
+                    if not tcm.signature_line_ids:
+                        raise UserError(_(
+                            "Cannot notify selected candidates! No committee members are assigned to sign Committee Minute '%s' for vacancy '%s'.\n"
+                            "Please ensure committee members are assigned and complete their digital signatures before notifying candidates."
+                        ) % (tcm.name or "N/A", ref_str))
+                    unsigned_tcm = tcm.signature_line_ids.filtered(
+                        lambda s: s.is_mandatory and (s.state != 'signed' or not s.digital_signature)
+                    )
+                    if unsigned_tcm:
+                        remaining = [
+                            f"• {s.user_id.name or 'Unknown User'} ({s.role_label or s.role_type}) — Status: Pending Signature"
+                            for s in unsigned_tcm
+                        ]
+                        raise UserError(_(
+                            "Cannot notify selected candidates! All committee members must digitally sign the Committee Minute before candidates can be notified.\n\n"
+                            "Transfer Committee Minute: %s (Vacancy: %s)\n\n"
+                            "The following committee member(s) have not signed yet:\n%s"
+                        ) % (tcm.name, ref_str, "\n".join(remaining)))
+                    if tcm.state != 'approved':
+                        raise UserError(_(
+                            "Cannot notify selected candidates! Transfer Committee Minute '%s' is in status '%s'.\n"
+                            "All committee members must sign and the minute must be approved before notifying candidates."
+                        ) % (tcm.name, tcm.state))
+                    return tcm
+
+        if not minute_rec:
+            raise UserError(_(
+                "Cannot notify selected candidates! No Selection Committee Minute found for vacancy '%s'.\n"
+                "Please first generate and complete the Selection Committee Minute and ensure all committee members digitally sign before notifying candidates."
+            ) % ref_str)
+
+        # Ensure committee signature slots are populated
+        if not minute_rec.committee_signature_ids:
+            minute_rec.action_load_panel_members_from_vacancy()
+
+        if not minute_rec.committee_signature_ids:
+            raise UserError(_(
+                "Cannot notify selected candidates! No approval committee members are configured on Selection Committee Minute '%s' (Vacancy: %s).\n"
+                "Please ensure committee members are assigned and complete their digital signatures."
+            ) % (minute_rec.name or ref_str, ref_str))
+
+        # Check for unsigned committee members
+        unsigned_sigs = minute_rec.committee_signature_ids.filtered(
+            lambda s: (s.is_mandatory or not s.is_mandatory) and (s.state != "signed" or not (s.digital_signature or s.signature_img))
+        )
+        if unsigned_sigs:
+            remaining_members = []
+            for sig in unsigned_sigs:
+                member_name = sig.user_id.name or sig.user_id.login or _("Unknown User")
+                role_title = sig.role_label or sig.role or _("Committee Member")
+                state_val = sig.state or "pending"
+                state_desc = dict(sig._fields['state'].selection).get(state_val, state_val.capitalize())
+                if not (sig.digital_signature or sig.signature_img):
+                    state_desc = _("Signature Pending")
+                remaining_members.append(f"• {member_name} ({role_title}) — Status: {state_desc}")
+
+            remaining_str = "\n".join(remaining_members)
+            raise UserError(_(
+                "Cannot notify selected candidates! All committee members must digitally sign the Selection Committee Minute before candidates can be notified.\n\n"
+                "Selection Committee Minute: %s (Vacancy: %s)\n\n"
+                "The following committee member(s) have not approved / signed yet:\n%s"
+            ) % (minute_rec.name or ref_str, ref_str, remaining_str))
+
+        if minute_rec.state != "approved":
+            minute_rec._check_auto_approval()
+
+        if minute_rec.state != "approved" or not minute_rec.is_fully_signed:
+            state_label = dict(minute_rec._fields['state'].selection).get(minute_rec.state, minute_rec.state)
+            raise UserError(_(
+                "Cannot notify selected candidates! Selection Committee Minute '%s' is in status '%s'.\n"
+                "All committee members must digitally sign and the minute must be approved before notifying candidates."
+            ) % (minute_rec.name or ref_str, state_label))
+
+        return minute_rec
 
     def _generate_and_attach_pdf(self):
         try:
-            pdf_content, _ = self.env["ir.actions.report"]._render_qweb_pdf(
+            pdf_content, report_format = self.env["ir.actions.report"].sudo()._render_qweb_pdf(
                 "custom_recruitment.action_report_selection_minute", [self.id]
             )
             rec_track = self.recruitment_type or "recruitment"
             filename = f"Selection_Minute_{rec_track}_{self.name.replace('/', '_')}.pdf"
-            attachment = self.env["ir.attachment"].create(
+            attachment = self.env["ir.attachment"].sudo().create(
                 {
                     "name": filename,
                     "type": "binary",
@@ -1015,12 +1579,495 @@ class RecruitmentSelectionMinute(models.Model):
                     "mimetype": "application/pdf",
                 }
             )
-            self.message_post(
+            self.sudo().message_post(
                 body=_("Signed PDF Selection Minute has been generated and attached."),
                 attachment_ids=[attachment.id],
             )
         except Exception as e:
             _logger.warning("PDF Minute Generation Warning: %s", e)
+
+    def get_ethiopic_meeting_date(self):
+        self.ensure_one()
+        return gregorian_to_ethiopian(self.meeting_date or fields.Date.context_today(self))
+
+    def get_meeting_place(self):
+        self.ensure_one()
+        if self.meeting_place:
+            return self.meeting_place
+        if self.vacancy_id and self.vacancy_id.interview_location:
+            return self.vacancy_id.interview_location
+        return "ፒፕል ኦፕሬሽን ማኔጅመንት ዳይሬክቶሬት ቢሮ"
+
+    def get_meeting_time(self):
+        self.ensure_one()
+        val = self.meeting_time
+        return val if self._is_clean_amharic_time(val) else "ከጠዋቱ በ3፡00 ሰዓት"
+
+    def get_meeting_end_time(self):
+        self.ensure_one()
+        val = self.meeting_end_time
+        return val if self._is_clean_amharic_time(val) else "ከቀኑ በ 6፡00 ሰዓት"
+
+    def get_external_minute_number_display(self):
+        self.ensure_one()
+        name = self.name or "001"
+        if "/" in name:
+            parts = name.split("/")
+            num_part = parts[-1]
+            return f"{num_part}/ ({self._get_minute_fiscal_year_label()})"
+        return f"{name}/ ({self._get_minute_fiscal_year_label()})"
+
+    def _get_minute_fiscal_year_label(self):
+        today = self.meeting_date or fields.Date.context_today(self)
+        year = today.year
+        start_year = year if today.month >= 7 else year - 1
+        return f"{start_year}/{str(start_year + 1)[-2:]}"
+
+    def get_job_grade_display(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        if not vac:
+            return ""
+        if vac.job_grade:
+            return getattr(vac.job_grade, 'grade_name', False) or getattr(vac.job_grade, 'display_name', '')
+        if vac.job_position and getattr(vac.job_position, 'grade', False):
+            return getattr(vac.job_position.grade, 'grade_name', False) or getattr(vac.job_position.grade, 'display_name', '')
+        return ""
+
+    def get_department_display(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        if not vac:
+            return ""
+        if getattr(vac, 'operating_unit_id', False):
+            return vac.operating_unit_id.name
+        if getattr(vac, 'department_id', False):
+            return vac.department_id.name
+        if getattr(vac, 'job_position', False) and getattr(vac.job_position, 'department_id', False):
+            return vac.job_position.department_id.name
+        if getattr(vac, 'job_location', False):
+            return vac.job_location
+        return ""
+
+    def get_external_weights(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        w_exam = 50
+        w_int = 50
+        if vac:
+            if vac.written_weight and vac.interview_weight:
+                w_exam = int(round(vac.written_weight))
+                w_int = int(round(vac.interview_weight))
+            elif getattr(vac, 'ext_selected_recruitment_id', False):
+                ext = vac.ext_selected_recruitment_id
+                ew, iw = ext._get_external_weights()
+                w_exam = int(round(ew))
+                w_int = int(round(iw))
+        return w_exam, w_int
+
+    def get_written_weight_pct(self):
+        w_exam, _ = self.get_external_weights()
+        return str(w_exam)
+
+    def get_interview_weight_pct(self):
+        _, w_int = self.get_external_weights()
+        return str(w_int)
+
+    def get_amharic_role(self, role_str):
+        r = str(role_str or '').lower()
+        if 'chair' in r or 'ሰብሳቢ' in r:
+            return "ሰብሳቢ"
+        if 'sec' in r or 'ፀሐፊ' in r or 'ፀሀፊ' in r:
+            return "አባል እና ፀሐፊ"
+        if 'obs' in r or 'ታዛቢ' in r:
+            return "ታዛቢ (የሰራተኛ ተወካይ)"
+        return "አባል"
+
+    def get_amharic_status(self, status, rank=0):
+        s = str(status or '').lower()
+        if 'select' in s:
+            return "ተመርጠዋል"
+        if 'reser' in s:
+            return "ተጠባባቂ"
+        return "አልተመረጡም"
+
+    def get_external_table_data(self):
+        self.ensure_one()
+        res = []
+        sorted_lines = self.ranking_line_ids.sorted(key=lambda l: (l.rank or 999, -(l.final_score or 0.0)))
+        for idx, line in enumerate(sorted_lines, start=1):
+            rank_str = f"{line.rank}ኛ" if line.rank else f"{idx}ኛ"
+            status_str = self.get_amharic_status(line.selection_status, line.rank)
+            
+            # Resolve candidate branch/location
+            branch_name = ""
+            if line.applicant_id:
+                branch_name = line.applicant_id.preferred_location or (
+                    line.applicant_id.operating_unit_id.name if hasattr(line.applicant_id, 'operating_unit_id') and line.applicant_id.operating_unit_id else ""
+                ) or (
+                    line.applicant_id.app_reference.operating_unit_id.name if line.applicant_id.app_reference and line.applicant_id.app_reference.operating_unit_id else ""
+                )
+            if not branch_name and self.vacancy_id and self.vacancy_id.operating_unit_id:
+                branch_name = self.vacancy_id.operating_unit_id.name or ""
+
+            res.append({
+                'num': idx,
+                'name': line.candidate_name,
+                'branch': branch_name or "-",
+                'written': f"{line.written_score:.2f}" if line.written_score else "0.00",
+                'interview': f"{line.interview_score:.2f}" if line.interview_score else "0.00",
+                'total': f"{line.final_score:.2f}" if line.final_score else "0.00",
+                'rank': rank_str,
+                'status': status_str,
+                'selection_status': line.selection_status,
+                'remarks': line.remarks or status_str,
+            })
+        return res
+
+    def get_external_decision_resolution(self):
+        self.ensure_one()
+        selected_lines = self.ranking_line_ids.filtered(lambda l: l.selection_status == 'selected').sorted(key=lambda l: (l.rank or 999, -(l.final_score or 0.0)))
+        reserve_lines = self.ranking_line_ids.filtered(lambda l: l.selection_status in ('reserve', 'reserved')).sorted(key=lambda l: (l.rank or 999, -(l.final_score or 0.0)))
+        
+        if not selected_lines and self.decision_summary:
+            return self.decision_summary
+        
+        dept = self.get_department_display() or "ባንኩ"
+        pos = (self.vacancy_id.job_position.name if self.vacancy_id and self.vacancy_id.job_position else False) or (self.vacancy_id.name if self.vacancy_id else "የሥራ መደብ")
+        grade = self.get_job_grade_display()
+        grade_str = f"በሥራ ደረጃ {grade} " if grade else ""
+        
+        grade_rec = self.vacancy_id.job_grade or (self.vacancy_id.job_position.grade if self.vacancy_id and self.vacancy_id.job_position else False)
+        salary = 0.0
+        if grade_rec:
+            salary = getattr(grade_rec, 'base_salary', 0.0) or getattr(grade_rec, 'basic_salary', 0.0) or 0.0
+        if not salary and self.vacancy_id:
+            salary = getattr(self.vacancy_id, 'starting_salary', 0.0) or getattr(self.vacancy_id, 'base_salary', 0.0) or getattr(self.vacancy_id, 'basic_salary', 0.0) or 0.0
+        
+        salary_str = f"{salary:,.2f}" if salary > 0 else ""
+        salary_words = amount_to_words_amharic(salary) if salary > 0 else ""
+        salary_part = f"መነሻ ደመወዝ ብር {salary_str} ({salary_words}) እየተከፈላቸው" if salary_str else "በተወሰነው መነሻ ደመወዝ"
+
+        sel_parts = []
+        for l in selected_lines:
+            br = l.applicant_id.preferred_location if l.applicant_id and l.applicant_id.preferred_location else ""
+            if br:
+                sel_parts.append(f"ለ{br} {l.candidate_name}")
+            else:
+                sel_parts.append(l.candidate_name)
+        selected_text = "፣ ".join(sel_parts) if sel_parts else "የተመረጡት ተወዳዳሪዎች"
+
+        res_text = f"በዚሁ መሠረት {selected_text} በ{pos} የሥራ መደብ ላይ {grade_str}{salary_part} እንዲቀጠሩ ኮሚቴው ስምምነት ላይ ደርሷል፡፡"
+
+        if reserve_lines:
+            res_names = "፣ ".join([l.candidate_name for l in reserve_lines])
+            res_text += f" በተጠባባቂነት የተቀመጡት ተወዳዳሪዎች {res_names} በአካባቢው ቢሮ ባሉት ቅርንጫፎች በ6 ወራት ውስጥ ክፍተት ሲኖር እንዲመደቡ ተወስኗል፡፡"
+
+        return res_text
+
+    def get_external_narrative_p1(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        dept = self.get_department_display() or "ባንኩ"
+        pos = (vac.job_position.name if vac and vac.job_position else False) or (vac.name if vac else "የሥራ መደብ")
+        ref = vac.reference if vac else ""
+        ann_date = getattr(vac, 'vacancy_announced_on', False) or getattr(vac, 'opening_date', False) or getattr(vac, 'date_announced', False)
+        date_str = ann_date.strftime('%d/%m/%Y') if ann_date else (self.meeting_date.strftime('%d/%m/%Y') if self.meeting_date else "")
+
+        total_applicants = 0
+        shortlisted_count = 0
+        exam_count = len(self.ranking_line_ids)
+
+        ext_sel = self.env["external.recruitment.selected"].sudo().search([
+            '|', ('vacancy_id', '=', vac.id), ('vacancy_reference', '=', vac.reference)
+        ], limit=1) if vac else False
+
+        if ext_sel:
+            if hasattr(ext_sel, 'applicant_count') and ext_sel.applicant_count:
+                total_applicants = ext_sel.applicant_count
+            if hasattr(ext_sel, 'shortlisted_count') and ext_sel.shortlisted_count:
+                shortlisted_count = ext_sel.shortlisted_count
+        if not total_applicants and vac:
+            total_applicants = self.env['hr.applicant'].search_count([
+                '|', ('app_reference', '=', vac.id), ('vacancy_reference', '=', vac.reference)
+            ]) or (self.env['hr.applicant'].search_count([('job_id', '=', vac.job_position.id)]) if vac.job_position else exam_count)
+        if not shortlisted_count:
+            shortlisted_count = max(exam_count, total_applicants)
+        if not total_applicants:
+            total_applicants = exam_count or 1
+        if not shortlisted_count:
+            shortlisted_count = exam_count or 1
+
+        interview_count = len(self.ranking_line_ids.filtered(lambda l: (l.interview_score or 0.0) > 0 or l.selection_status in ('selected', 'reserve', 'reserved', 'pass')))
+        if not interview_count:
+            interview_count = exam_count
+
+        return (
+            f"በ {dept} ስር ለሚገኙት ቅርንጫፎች በእድገት፣ በዝውውር እንዲሁም ከሥራ በለቀቁ ሠራተኞች ምትክ የሰው ኃይል ለመመደብ "
+            f"ለውስጥ ሠራተኞች በዝውውር ማስታወቂያ ቢወጣም በቂ የሰው ኃይል አልተገኘም፡፡ በመሆኑም ከውጭ ቅጥር ለመፈፀም እንዲፈቀድልን "
+            f"በተፈቀደው መሠረት የውጭ ማስታወቂያ በማውጣት {total_applicants} አመልካቾች የተመዘገቡ ሲሆን {shortlisted_count} አመልካቾች "
+            f"ለጽሁፍ ፈተና ተጠርተው {exam_count} ተወዳዳሪዎች ተፈትነዋል፡፡ በመሆኑም የፅሁፍ ፈተና ያለፉ {interview_count} ተወዳዳሪዎች ለቃለ መጠይቅ ተጠርተዋል፡፡"
+        )
+
+    def get_external_narrative_p2(self):
+        self.ensure_one()
+        return (
+            "ከላይ በተጠቀሰው የሥራ መደብ ቅጥር ለመፈፀም ስብሰባው ስለመጠራቱ በሰብሳቢው በኩል ተገልጿል፡፡ "
+            "በዚሁ መሠረት አመልካቾች በግንባር ቀርበው ስለራሳቸው ገለጻ በማድረግ ያላቸውን አጠቃላይ የሥራ ልምድ፣ "
+            "የትምህርት ዝግጅት እንዲሁም በተያያዥ ጉዳዮች ዙሪያ ከኮሚቴው ባቀረበላቸው ጥያቄ መነሻነት አስፈላጊው የመረጃ ልውውጥ ተደርጓል፡፡ "
+            "ስለሆነም ኮሚቴው ለቃለ መጠይቅ የቀረቡትን ተወዳዳሪዎች ሁኔታ በመገምገም በሰንጠረዡ ውስጥ በተቀመጠው መሠረት የቅጥር ሂደታቸው እንዲከናወን ወስኗል፡፡"
+        )
+
+    # ==============================================================
+    # TRANSFER / LATERAL VACANCY MINUTE HELPER METHODS (ዝውውር Min.docx)
+    # ==============================================================
+    def is_transfer_or_lateral(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        if not vac:
+            return False
+        if getattr(vac, 'is_lateral_transfer', False):
+            return True
+        if getattr(vac, 'internal_movement_type', False) in ('lateral', 'transfer'):
+            return True
+        ref = (vac.reference or '').upper()
+        if 'LAT' in ref or 'TRANS' in ref:
+            return True
+        return False
+
+    def get_transfer_minute_number_display(self):
+        self.ensure_one()
+        ref = self.name or ""
+        if "/" in ref:
+            return ref.split("/")[-1]
+        return ref or "001"
+
+    def get_transfer_fiscal_year_display(self):
+        self.ensure_one()
+        d = self.meeting_date or fields.Date.context_today(self)
+        year = d.year
+        if d.month >= 7:
+            return f"{year}/{str(year + 1)[-2:]}"
+        else:
+            return f"{year - 1}/{str(year)[-2:]}"
+
+    def get_transfer_ethiopic_meeting_date(self):
+        self.ensure_one()
+        d = self.meeting_date or fields.Date.context_today(self)
+        eth_m = ["", "መስከረም", "ጥቅምት", "ህዳር", "ታህሳስ", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜ"]
+        try:
+            year, month, day = d.year, d.month, d.day
+            a = (14 - month) // 12
+            y = year + 4800 - a
+            m = month + 12 * a - 3
+            jdn = day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
+            r = (jdn - 1723856) % 1461
+            n = (r % 365) + 365 * (r // 1460)
+            eth_year = 4 * ((jdn - 1723856) // 1461) + (r // 365) - (r // 1460)
+            eth_month = (n // 30) + 1
+            eth_day = (n % 30) + 1
+            if 1 <= eth_month <= 13:
+                return f"{eth_m[eth_month]} {eth_day} ቀን {eth_year} ዓ.ም"
+        except Exception:
+            pass
+        return str(d)
+
+    @staticmethod
+    def _is_clean_amharic(val):
+        if not val or not isinstance(val, str):
+            return False
+        s = val.strip()
+        if any(bad in s for bad in ('á', 'Ã', 'Â', 'â', '€', '™', '?', '`', '\x8d', '\x9d', '\xa0', '\xad')):
+            return False
+        if any(bad in s for bad in ('CE', 'ዕለትከእኩለ', 'ዕ`ለት')):
+            return False
+        return True
+
+    @staticmethod
+    def _is_clean_amharic_time(val):
+        if not val or not isinstance(val, str):
+            return False
+        s = val.strip()
+        if any(bad in s for bad in ('á', 'Ã', 'Â', 'â', '€', '™', '?', '`', '\x8d', '\x9d', '\xa0', '\xad')):
+            return False
+        if any(bad in s for bad in ('CE', 'ዕለት', 'እኩለ', '`')):
+            return False
+        if re.search(r'[a-zA-Z]', s):
+            return False
+        if not any(pref in s for pref in ('ከጠዋቱ', 'ከቀኑ', 'ከሰዓት', 'ከምሽቱ', 'ጠዋት', 'ቀን', 'ከሰአት')):
+            return False
+        return True
+
+    def get_transfer_meeting_time_display(self):
+        val = getattr(self, 'meeting_time', False)
+        return val.strip() if self._is_clean_amharic_time(val) else "ከጠዋቱ በ3፡00 ሰዓት"
+
+    def get_transfer_meeting_end_time_display(self):
+        val = getattr(self, 'meeting_end_time', False)
+        return val.strip() if self._is_clean_amharic_time(val) else "ከቀኑ በ 6፡00 ሰዓት"
+
+    def get_transfer_job_position_name(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        if vac and vac.job_position:
+            return vac.job_position.name
+        return vac.name if vac else ""
+
+    def get_transfer_job_grade_name(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        if vac:
+            grade = getattr(vac, 'job_grade', False) or (getattr(vac.job_position, 'grade', False) if vac.job_position else False)
+            if grade:
+                return getattr(grade, 'grade_name', False) or getattr(grade, 'name', False) or str(grade)
+        return self.get_job_grade_display() or "VIII"
+
+    def get_transfer_work_unit_name(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        if vac and vac.operating_unit_id:
+            return vac.operating_unit_id.name
+        return self.get_department_display() or ""
+
+    @staticmethod
+    def _format_name_with_gender_am(emp_or_user):
+        if not emp_or_user:
+            return ""
+        emp = False
+        if emp_or_user._name == 'hr.employee':
+            emp = emp_or_user
+        elif emp_or_user._name == 'res.users':
+            emp = getattr(emp_or_user, 'employee_id', False) or (emp_or_user.employee_ids[0] if getattr(emp_or_user, 'employee_ids', False) else False)
+            if not emp:
+                emp = emp_or_user.env['hr.employee'].sudo().search([('user_id', '=', emp_or_user.id)], limit=1)
+        gender = (getattr(emp, 'gender', '') or '').lower() if emp else ''
+        sal = "ወ/ት" if gender in ('female', 'f') else "አቶ"
+        name = (emp_or_user.name or "").strip()
+        for p in ("አቶ", "ወ/ት", "ወ/ሮ", "ወ/ሪት", "Ato", "W/t", "W/ro", "W/rit", "Mr.", "Mrs.", "Ms."):
+            if name.startswith(p + " ") or name.startswith(p + "."):
+                name = name[len(p):].lstrip(". ")
+                break
+        return f"{sal} {name}"
+
+    def get_transfer_committee_members_list(self):
+        self.ensure_one()
+        parts = []
+        if self.chairperson_id:
+            parts.append(f"{self._format_name_with_gender_am(self.chairperson_id)} --------------------- ሰብሳቢ ----------------------------")
+        if self.panel_member_id:
+            parts.append(f"{self._format_name_with_gender_am(self.panel_member_id)} ------------------------------ አባል -------------------------------")
+        if self.secretary_id:
+            parts.append(f"{self._format_name_with_gender_am(self.secretary_id)} ------------------------------- አባል እና ፀሐፊ ------------------------")
+        if self.observer_id and self.approval_hierarchy_type != 'ho_district_grade2_plus':
+            parts.append(f"{self._format_name_with_gender_am(self.observer_id)} ------------------------------- የሰራተኛ ተወካይ (ታዛቢ) -------------------")
+        if not parts and self.committee_signature_ids:
+            for sig in self.committee_signature_ids:
+                u_name = self._format_name_with_gender_am(sig.user_id) if sig.user_id else ""
+                r_am = self.get_amharic_role(sig.role_label or sig.role)
+                parts.append(f"{u_name} --------------------- {r_am} ----------------------------")
+        return parts
+
+    def get_transfer_predecessor_narrative(self):
+        return "ሲሰሩ የነበሩት ሰራተኛ በደረጃ እድገት / ዝውውር በማግኘታቸው ምክንያት"
+
+    def get_transfer_vacancy_announcement_date_display(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        if vac:
+            d = getattr(vac, 'announcement_date', False) or getattr(vac, 'vacancy_announced_on', False) or getattr(vac, 'opening_date', False)
+            if d:
+                return d.strftime('%d/%m/%Y')
+        d = self.meeting_date or fields.Date.context_today(self)
+        return d.strftime('%d/%m/%Y')
+
+    def get_transfer_vacancy_reference_display(self):
+        self.ensure_one()
+        vac = self.vacancy_id
+        if vac and vac.reference:
+            return vac.reference
+        fy = self.get_transfer_fiscal_year_display().replace('/', '-')
+        num = self.get_transfer_minute_number_display()
+        return f"BB/LAT/{fy}/{num}"
+
+    def get_transfer_candidate_count_amharic(self):
+        self.ensure_one()
+        return str(len(self.ranking_line_ids) or 1)
+
+    def get_transfer_selection_adjective(self):
+        self.ensure_one()
+        if len(self.ranking_line_ids) <= 1:
+            return "ብቸኛ ተወዳዳሪ የሆኑትን"
+        return "ከፍተኛ ውጤት ያስመዘገቡት ተወዳዳሪ የሆኑትን"
+
+    def get_transfer_selected_candidate_names(self):
+        self.ensure_one()
+        names = []
+        selected_lines = self.ranking_line_ids.filtered(lambda l: l.selection_status in ('selected', 'Selected'))
+        if not selected_lines:
+            selected_lines = self.ranking_line_ids.sorted(key=lambda l: (l.rank or 999, -(l.final_score or 0.0)))[:1]
+        for l in selected_lines:
+            emp = l.employee_id
+            if emp:
+                names.append(self._format_name_with_gender_am(emp))
+            elif l.candidate_name:
+                names.append(l.candidate_name)
+        return ", ".join(names) if names else "ተወዳዳሪውን"
+
+    def get_transfer_table_data(self):
+        self.ensure_one()
+        res = []
+        vac = self.vacancy_id
+        int_sel = self.env["new.internal.recruitment.selected"].sudo().search([
+            '|', ('vacancy_id', '=', vac.id), ('vacancy_reference', '=', vac.reference)
+        ], limit=1) if vac else False
+
+        int_cands_by_emp = {}
+        if int_sel and int_sel.new_int_rec_sel:
+            for c in int_sel.new_int_rec_sel:
+                if c.emp_name:
+                    int_cands_by_emp[c.emp_name.id] = c
+
+        sorted_lines = self.ranking_line_ids.sorted(key=lambda l: (l.rank or 999, -(l.final_score or 0.0)))
+        for idx, line in enumerate(sorted_lines, start=1):
+            emp = line.employee_id
+            name_str = self._format_name_with_gender_am(emp) if emp else line.candidate_name
+            int_cand = int_cands_by_emp.get(emp.id if emp else None, False)
+
+            # Scores:
+            pms_raw = line.pms_score or (int_cand.pms_score if int_cand else 0.0) or 0.0
+            pms_val = pms_raw * 0.30 if pms_raw > 30.0 else pms_raw
+
+            exp_raw = getattr(line, 'experience_score', 0.0) or (int_cand.experience_score if int_cand else 0.0) or 0.0
+            exp_val = exp_raw * 0.20 if exp_raw > 20.0 else exp_raw
+
+            loc_raw = getattr(line, 'service_location_score', 0.0) or (int_cand.location_score if int_cand else 0.0) or 0.0
+            loc_val = loc_raw * 0.20 if loc_raw > 20.0 else loc_raw
+
+            app_raw = getattr(line, 'application_date_score', 0.0) or (int_cand.app_date_score if int_cand else 0.0) or 0.0
+            app_val = app_raw * 0.20 if app_raw > 20.0 else app_raw
+
+            rec_raw = getattr(line, 'recommendation_score', 0.0) or (int_cand.supervisor_recommendation_score if int_cand else 0.0) or 0.0
+            rec_val = rec_raw * 0.10 if rec_raw > 10.0 else rec_raw
+
+            total_val = line.final_score or (pms_val + exp_val + loc_val + app_val + rec_val)
+            if total_val == 0.0:
+                total_val = pms_val + exp_val + loc_val + app_val + rec_val
+
+            is_selected = line.selection_status in ('selected', 'Selected') or (line.rank and line.rank <= (vac.no_of_vacancies or 1))
+            decision_str = "ተመርጠዋል" if is_selected else "ተጠባባቂ"
+
+            res.append({
+                'rank': line.rank or idx,
+                'name': name_str,
+                'pms': f"{pms_val:.2f}",
+                'exp': f"{exp_val:.2f}",
+                'loc': f"{loc_val:.2f}",
+                'app': f"{app_val:.2f}",
+                'rec': f"{rec_val:.2f}",
+                'total': f"{total_val:.2f}",
+                'decision': decision_str,
+            })
+        return res
 
 
 class RecruitmentSelectionMinuteLine(models.Model):
@@ -1044,10 +2091,15 @@ class RecruitmentSelectionMinuteLine(models.Model):
     candidate_name = fields.Char(string="Candidate Name", required=True)
 
     pms_score = fields.Float(string="PMS Score", digits=(5, 2))
+    experience_score = fields.Float(string="Total Experience (20%)", digits=(5, 2))
+    service_location_score = fields.Float(string="Service in Location (20%)", digits=(5, 2))
+    application_date_score = fields.Float(string="Application Date (20%)", digits=(5, 2))
+    recommendation_score = fields.Float(string="Recommendation (10%)", digits=(5, 2))
     written_score = fields.Float(string="Written Exam", digits=(5, 2))
     interview_score = fields.Float(string="Interview Exam", digits=(5, 2))
     final_score = fields.Float(string="Final Total Score", digits=(5, 2))
     rank = fields.Integer(string="Rank")
+    remarks = fields.Char(string="Remarks")
 
     selection_status = fields.Selection(
         [
@@ -1114,7 +2166,6 @@ class RecruitmentCommitteeSignature(models.Model):
         ],
         default="pending",
         required=True,
-        tracking=True,
     )
     remarks = fields.Text(string="Remarks / Comments")
     comments = fields.Text(string="Comments")
@@ -1137,7 +2188,7 @@ class RecruitmentCommitteeSignature(models.Model):
             <line x1="15" y1="42" x2="285" y2="42" stroke="#003366" stroke-width="1.5" stroke-dasharray="4"/>
             <text x="15" y="60" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" fill="#4A2E1A">Digitally Signed &amp; Authenticated</text>
             <text x="15" y="76" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#444444">Role: {role} | Date: {date_str}</text>
-            <text x="15" y="90" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="bold" fill="#28a745">✔ Verified ERP Digital Signature</text>
+            <text x="15" y="90" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="bold" fill="#28a745">âœ” Verified ERP Digital Signature</text>
         </svg>'''
         return base64.b64encode(svg.encode('utf-8'))
 
@@ -1202,10 +2253,10 @@ class RecruitmentCommitteeSignature(models.Model):
             elif self.signature_img and not self.digital_signature:
                 self.digital_signature = self.signature_img
 
-    def action_sign_digitally(self):
-        """Record digital signature strictly for the assigned user and sync to recruitment committee delegation."""
+    def _apply_signature(self, signature_data=None):
+        """Record digital signature and sync to recruitment committee delegation."""
         for line in self:
-            if line.user_id != self.env.user:
+            if line.user_id and line.user_id != self.env.user and not self.env.su:
                 raise UserError(_(
                     "Unauthorized Signature Error: The signature line for '%s' is strictly assigned to '%s'. "
                     "You are logged in as '%s'. Only '%s' is authorized to sign their name on this line."
@@ -1217,7 +2268,10 @@ class RecruitmentCommitteeSignature(models.Model):
                 "signed_on": now_dt,
                 "signed_date": now_dt,
             }
-            if not line.digital_signature and not line.signature_img:
+            if signature_data:
+                vals["digital_signature"] = signature_data
+                vals["signature_img"] = signature_data
+            elif not line.digital_signature and not line.signature_img:
                 sig_badge = line._generate_digital_signature_badge()
                 vals["digital_signature"] = sig_badge
                 vals["signature_img"] = sig_badge
@@ -1226,17 +2280,38 @@ class RecruitmentCommitteeSignature(models.Model):
             elif line.signature_img and not line.digital_signature:
                 vals["digital_signature"] = line.signature_img
 
-            line.write(vals)
+            line.sudo().write(vals)
 
             # Sync signature to Job Vacancy / Selection Delegation Team
             line._sync_signature_to_recruitment_delegation()
 
             if line.minute_id:
-                line.minute_id.message_post(
+                line.minute_id.sudo().message_post(
                     body=_("Digital signature recorded for %s (%s).") % (line.role_label or line.role or 'Committee Member', line.user_id.name)
                 )
                 line.minute_id._check_auto_approval()
         return True
+
+    def action_sign_digitally(self):
+        """Open the Digital Signature Modal Wizard strictly for the designated signatory user."""
+        self.ensure_one()
+        if self.user_id and self.user_id != self.env.user and not self.env.is_superuser():
+            raise UserError(_(
+                "Unauthorized Signature Access: The signature line for '%s' is strictly designated for '%s'. "
+                "You are currently logged in as '%s'. Only '%s' can digitally sign this line."
+            ) % (self.role_label or self.role or 'Committee Member', self.user_id.name, self.env.user.name, self.user_id.name))
+
+        return {
+            'name': _('Committee Digital Signature - %s') % (self.role_label or self.role or 'Sign'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'committee.minute.sign.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'active_model': self._name,
+                'active_id': self.id,
+            }
+        }
 
     def action_sign_minute(self):
         return self.action_sign_digitally()
@@ -1245,13 +2320,13 @@ class RecruitmentCommitteeSignature(models.Model):
         for sig in self:
             if not sig.minute_id or not sig.minute_id.vacancy_id or not sig.user_id:
                 continue
-            vac = sig.minute_id.vacancy_id
+            vac = sig.minute_id.vacancy_id.sudo()
             sig_data = sig.digital_signature or sig.signature_img
             dt = sig.signed_on or sig.signed_date or fields.Datetime.now()
 
             # 1. Sync to Vacancy Delegation Team
             if vac.vac_del_team_id:
-                vac_lines = vac.vac_del_team_id.filtered(
+                vac_lines = vac.vac_del_team_id.sudo().filtered(
                     lambda m: (m.employee_name.id == sig.user_id.id) or (m.alternate_committee_member.id == sig.user_id.id)
                 )
                 for vl in vac_lines:
@@ -1260,34 +2335,34 @@ class RecruitmentCommitteeSignature(models.Model):
                         vl_vals['digital_signature'] = sig_data
                     if hasattr(vl, 'signed_on'):
                         vl_vals['signed_on'] = dt
-                    vl.write(vl_vals)
+                    vl.sudo().write(vl_vals)
 
             # 2. Sync to Internal Selection Process Delegation Team
-            int_sel = self.env["new.internal.recruitment.selected"].search([
+            int_sel = self.env["new.internal.recruitment.selected"].sudo().search([
                 '|', ('vacancy_id', '=', vac.id), ('vacancy_reference', '=', vac.reference)
             ])
             for s in int_sel:
-                for dl in s.recr_selected_team_id:
+                for dl in s.recr_selected_team_id.sudo():
                     if dl.employee_name.id == sig.user_id.id or dl.alternate_committee_member.id == sig.user_id.id:
                         dl_vals = {'approve': True}
                         if hasattr(dl, 'digital_signature'):
                             dl_vals['digital_signature'] = sig_data
                         if hasattr(dl, 'signed_on'):
                             dl_vals['signed_on'] = dt
-                        dl.write(dl_vals)
+                        dl.sudo().write(dl_vals)
 
             # 3. Sync to External Selection Process Delegation Team
-            ext_sel = self.env["external.recruitment.selected"].search([
+            ext_sel = self.env["external.recruitment.selected"].sudo().search([
                 '|', ('vacancy_id', '=', vac.id), ('vacancy_reference', '=', vac.reference)
             ])
             for s in ext_sel:
                 ext_team = getattr(s, 'recr_exter_selected_team_id', False) or getattr(s, 'recr_selected_team_id', False)
                 if ext_team:
-                    for dl in ext_team:
+                    for dl in ext_team.sudo():
                         if dl.employee_name.id == sig.user_id.id or dl.alternate_committee_member.id == sig.user_id.id:
                             dl_vals = {'approve': True}
                             if hasattr(dl, 'digital_signature'):
                                 dl_vals['digital_signature'] = sig_data
                             if hasattr(dl, 'signed_on'):
                                 dl_vals['signed_on'] = dt
-                            dl.write(dl_vals)
+                            dl.sudo().write(dl_vals)

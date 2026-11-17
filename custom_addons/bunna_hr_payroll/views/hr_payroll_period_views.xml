@@ -96,8 +96,29 @@
                             </field>
                         </page>
                         <page string="CBS Journal Entries" name="journal_entries">
+                            <div class="alert alert-danger" role="alert"
+                                 invisible="journal_is_balanced or not journal_entry_ids">
+                                <strong>&#9888; Unbalanced CBS Groups Detected!</strong>
+                                <p>The following group codes have mismatched Debit / Credit totals. Please review and re-generate if needed:</p>
+                                <field name="unbalanced_group_summary" readonly="1" nolabel="1"/>
+                            </div>
+                            <div class="alert alert-success" role="alert"
+                                 invisible="not journal_is_balanced">
+                                <strong>&#10004; All CBS Group Codes are Balanced.</strong> Total Debit equals Total Credit for every group.
+                            </div>
+                            <group>
+                                <group string="CBS Totals">
+                                    <field name="total_journal_debit" string="Total Debit"/>
+                                    <field name="total_journal_credit" string="Total Credit"/>
+                                    <field name="journal_is_balanced" string="Fully Balanced?"
+                                           decoration-success="journal_is_balanced"
+                                           decoration-danger="not journal_is_balanced"/>
+                                </group>
+                            </group>
                             <field name="journal_entry_ids" readonly="1">
-                                <list string="CBS Journal Entries" decoration-info="flag == 'D'" decoration-success="flag == 'C'">
+                                <list string="CBS Journal Entries"
+                                      decoration-danger="is_group_unbalanced">
+                                    <field name="is_group_unbalanced" column_invisible="1"/>
                                     <field name="group_code" widget="badge"/>
                                     <field name="sol_id"/>
                                     <field name="ou_name"/>
@@ -107,6 +128,9 @@
                                     <field name="flag" widget="badge" decoration-info="flag == 'D'" decoration-success="flag == 'C'"/>
                                     <field name="amount" sum="Total"/>
                                     <field name="currency"/>
+                                    <field name="group_balance_diff" string="Group Diff (D-C)" optional="show"
+                                           decoration-danger="is_group_unbalanced"
+                                           decoration-success="not is_group_unbalanced"/>
                                     <field name="report_code" optional="show"/>
                                 </list>
                             </field>
@@ -165,7 +189,7 @@
         <field name="res_model">hr.payroll.period</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_hr_payroll_period_search"/>
-        <field name="context">{'search_default_open': 1}</field>
+        <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create a new Payroll Period

@@ -32,23 +32,33 @@ class PopulateT3ScorecardWizard(models.TransientModel):
         if all_active_templates:
             all_active_templates.with_context(skip_percent_constrain=True)._sync_to_job_measures()
 
-        # 2. Filter only ACTIVE templates that have EXACTLY 100% total weight
+        # 2. Filter ACTIVE templates that have EXACTLY 100% total weight
         valid_templates = all_active_templates.filtered(lambda t: round(t.total_weight, 2) == 100.0)
+        incomplete_templates = all_active_templates.filtered(lambda t: round(t.total_weight, 2) != 100.0)
 
         if not valid_templates:
-            incomplete_templates = all_active_templates.filtered(lambda t: round(t.total_weight, 2) != 100.0)
-            if incomplete_templates:
-                names = ', '.join(incomplete_templates.mapped('name')[:3])
-                raise UserError(
-                    f"No active Job Position Scorecards with 100% weight found. "
-                    f"The following template(s) are incomplete: {names}. "
-                    f"Please ensure the Total Weight is exactly 100% before populating."
-                )
-            raise UserError('No active Job Position Scorecards found. Configure them under Configuration first.')
+            incomplete_names = ', '.join([f"{t.name} ({round(t.total_weight, 2)}%)" for t in incomplete_templates[:5]])
+            raise UserError(
+                f"No active Job Position Scorecards with exactly 100% weight found. "
+                f"The following template(s) are incomplete: {incomplete_names}. "
+                f"Please ensure the Total Weight is exactly 100% before populating."
+            )
+
+        # Track incomplete custom template keys so we don't accidentally fall back to generic branch templates
+        incomplete_direct_keys = set(
+            (t.operating_unit_id.id, t.job_id.id) for t in incomplete_templates if t.operating_unit_id
+        )
+        incomplete_branch_job_ids = set(
+            t.job_id.id for t in incomplete_templates if t.is_branch_unit
+        )
+        incomplete_district_job_ids = set(
+            t.job_id.id for t in incomplete_templates if getattr(t, 'is_district_area_unit', False)
+        )
 
         # 3. Pre-cache template measures in fast in-memory lookups
         direct_template_measures = {}
         branch_template_measures = {}
+        district_area_template_measures = {}
         all_relevant_job_ids = set()
 
         for t in valid_templates:
@@ -63,16 +73,27 @@ class PopulateT3ScorecardWizard(models.TransientModel):
                 direct_template_measures[(t.operating_unit_id.id, t.job_id.id)] = m_ids
             if t.is_branch_unit:
                 branch_template_measures[t.job_id.id] = m_ids
+            if getattr(t, 'is_district_area_unit', False):
+                district_area_template_measures[t.job_id.id] = m_ids
 
         if not all_relevant_job_ids:
             raise UserError('Active Job Position templates have no active measurements assigned.')
 
-        # 4. Fetch Branch Operating Units in 1 query
+        # 4. Fetch Branch and District/Area Operating Units in 1 query
         branch_types = ('branch', 'sub_branch', 'service_center')
         branch_units = self.env['operating.unit'].sudo().search([
             ('work_unit_type', 'in', branch_types)
         ])
         branch_unit_ids = set(branch_units.ids)
+
+        district_area_types = ('district_office', 'area_office', 'district', 'area')
+        all_ous = self.env['operating.unit'].sudo().search([])
+        district_area_unit_ids = {
+            u.id for u in all_ous
+            if (getattr(u, 'work_unit_type', '') in district_area_types or
+                'district' in (u.name or '').lower() or
+                'area' in (u.name or '').lower())
+        }
 
         # 5. Bulk fetch all relevant employees in 1 single search_read query
         Employee = self.env['hr.employee'].sudo()
@@ -151,8 +172,19 @@ class PopulateT3ScorecardWizard(models.TransientModel):
             assigned_measure_ids = []
             if ou_id and (ou_id, job_id) in direct_template_measures:
                 assigned_measure_ids = direct_template_measures[(ou_id, job_id)]
-            elif ou_id in branch_unit_ids and job_id in branch_template_measures:
-                assigned_measure_ids = branch_template_measures[job_id]
+            elif ou_id and (ou_id, job_id) in incomplete_direct_keys:
+                # Specific template for this unit & job is incomplete (< 100%) -> skip
+                continue
+            elif ou_id in branch_unit_ids:
+                if job_id in incomplete_branch_job_ids:
+                    continue
+                if job_id in branch_template_measures:
+                    assigned_measure_ids = branch_template_measures[job_id]
+            elif ou_id in district_area_unit_ids:
+                if job_id in incomplete_district_job_ids:
+                    continue
+                if job_id in district_area_template_measures:
+                    assigned_measure_ids = district_area_template_measures[job_id]
 
             if not assigned_measure_ids:
                 continue
@@ -239,6 +271,7 @@ class PopulateT3ScorecardWizard(models.TransientModel):
 
         # 11. Single-pass ORM batch creation (< 2 seconds for 3,000+ employees)
         new_scorecards = self.env['t3.scorecard'].create(vals_list)
+        new_scorecards._compute_total_weight()
 
         # 12. Strict validation: Ensure every created scorecard has exactly 100% total weight
         incomplete_scs = new_scorecards.filtered(lambda sc: round(sc.total_weight, 2) != 100.0)
@@ -251,7 +284,7 @@ class PopulateT3ScorecardWizard(models.TransientModel):
             valid_new_scs = new_scorecards - incomplete_scs
             if not valid_new_scs:
                 raise UserError(
-                    "Scorecard generation restricted: The generated scorecard(s) did not reach exactly 100% total weight:\n- "
+                    "Tier 3 Scorecard generation restricted: None of the generated scorecard(s) reached exactly 100% total weight:\n- "
                     + "\n- ".join(error_details)
                     + "\n\nPlease check the corresponding Position Scorecard Template to ensure all KPIs sum to exactly 100%."
                 )

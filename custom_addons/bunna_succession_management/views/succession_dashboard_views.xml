@@ -40,5 +40,27 @@
             <field name="context">{'search_default_approved': 1}</field>
         </record>
 
+        <!-- Readonly View Action for Career Aspirations (Dashboard KPI Link) -->
+        <record id="action_view_career_aspiration_readonly" model="ir.actions.act_window">
+            <field name="name">Career Aspirations</field>
+            <field name="res_model">hr.career.aspiration</field>
+            <field name="view_mode">list,form</field>
+            <field name="context">{'create': False}</field>
+        </record>
+
+        <record id="action_view_career_aspiration_readonly_list" model="ir.actions.act_window.view">
+            <field name="sequence" eval="1"/>
+            <field name="view_mode">list</field>
+            <field name="view_id" ref="hr_employee_custom.view_career_aspiration_list_readonly"/>
+            <field name="act_window_id" ref="action_view_career_aspiration_readonly"/>
+        </record>
+
+        <record id="action_view_career_aspiration_readonly_form" model="ir.actions.act_window.view">
+            <field name="sequence" eval="2"/>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="hr_employee_custom.view_career_aspiration_form"/>
+            <field name="act_window_id" ref="action_view_career_aspiration_readonly"/>
+        </record>
+
     </data>
 </odoo>

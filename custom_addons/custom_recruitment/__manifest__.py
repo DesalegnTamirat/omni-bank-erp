@@ -80,15 +80,19 @@ dependency, so they were intentionally left in place.
         'data/recruitment_scoring_data.xml',
         'data/promotion_letter_sequence.xml',
         'data/recruitment_employment_letter_sequence.xml',
+        'data/probation_permanent_letter_sequence.xml',
         'data/transfer_letter_sequence.xml',
+        'data/hr_recruitment_policy_data.xml',
 
         # -- Reports (must load before views referencing their actions) --
+        'reports/paperformat.xml',
         'reports/minute_template.xml',
         'reports/transfer_minute_template.xml',
         'reports/internal_recruitment_minute.xml',
         'reports/recruitment_selection_minute_report.xml',
         'reports/promotion_letter_report.xml',
         'reports/recruitment_employment_letter_report.xml',
+        'reports/probation_permanent_letter_report.xml',
         'reports/transfer_letter_report.xml',
 
         # -- Menus Root (must load first so parent menus exist early) --
@@ -113,12 +117,12 @@ dependency, so they were intentionally left in place.
         'views/eligible_employees_external.xml',
         'views/eligible_employees_internal.xml',
 
+        'views/selected_internal.xml',
         'views/job_vacancy.xml',
         'views/recruitment_process_external.xml',
         'views/external_default_criteria_views.xml',
         'views/recruitment_process_internal.xml',
         'views/selected_external.xml',
-        'views/selected_internal.xml',
         'views/recruitment_selection_minute_views.xml',
         'views/hr_applicant_views.xml',
         'views/employee_probation.xml',
@@ -126,8 +130,13 @@ dependency, so they were intentionally left in place.
         'views/transfer_ranking.xml',
         'views/transfer_letter_views.xml',
         'views/recruitment_signatory_config_views.xml',
+        'views/committee_role_config_views.xml',
+        'views/panel_member_config_views.xml',
+        'views/vacancy_approver_config_views.xml',
+        'views/hr_recruitment_policy_views.xml',
         'views/job_vacancy_competency_views.xml',
         'views/employee_education_views.xml',
+        'views/hr_employee_views.xml',
         # -- Recruitment Request Management  --
         'views/recruitment_request.xml',
         'views/hr_job.xml',
@@ -136,9 +145,11 @@ dependency, so they were intentionally left in place.
         'reports/recruitment_offer_letter_report.xml',
         'views/recruitment_offer_letter.xml',
         'views/recruitment_employment_letter_views.xml',
+        'views/recruitment_permanent_letter_views.xml',
         'views/recruitment_scoring_views.xml',
         'views/talent_roster_views.xml',
         'data/talent_roster_cron.xml',
+        'data/job_vacancy_cron.xml',
 
         'views/ats_news_views.xml',
         'wizards/external_candidates.xml',
@@ -152,6 +163,10 @@ dependency, so they were intentionally left in place.
         'wizards/reschedule_interview_wizard.xml',
         'wizards/internal_selection_decline_wizard_views.xml',
         'wizards/supervisor_recommendation_wizard_views.xml',
+        'wizards/transfer_recommendation_wizard_views.xml',
+        'wizards/transfer_release_wizard_views.xml',
+        'wizards/committee_minute_sign_wizard_views.xml',
+        'wizards/hr_employee_signature_wizard_views.xml',
 
         # -- Menus (must load AFTER wizards so action refs resolve) --
         'views/menu_recruitment.xml',
@@ -167,6 +182,7 @@ dependency, so they were intentionally left in place.
             'custom_recruitment/static/src/manpower_dashboard/manpower_dashboard.scss',
             'custom_recruitment/static/src/manpower_dashboard/manpower_dashboard.xml',
             'custom_recruitment/static/src/manpower_dashboard/manpower_dashboard.js',
+            'custom_recruitment/static/src/views/transfer_list_controller_patch.js',
         ],
     },
 }

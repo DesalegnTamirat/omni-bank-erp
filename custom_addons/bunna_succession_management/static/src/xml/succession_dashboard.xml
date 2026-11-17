@@ -68,11 +68,11 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="o_succ_kpi_card" style="border-left-color: #e3604f; cursor: pointer;" t-on-click="openTalentPools">
-                            <div class="o_kpi_icon text-danger"><i class="fa fa-users"></i></div>
+                        <div class="o_succ_kpi_card" style="border-left-color: #dc3545; cursor: pointer;" t-on-click="openHighRisk">
+                            <div class="o_kpi_icon text-danger"><i class="fa fa-exclamation-triangle"></i></div>
                             <div class="o_kpi_info">
-                                <h3><t t-esc="state.dashboardData.talent_pools_count"/></h3>
-                                <span>Active Talent Pools</span>
+                                <h3><t t-esc="state.dashboardData.high_risk_count"/></h3>
+                                <span>Priority Positions</span>
                             </div>
                         </div>
                     </div>
@@ -110,37 +110,75 @@
                     </div>
                     
                     <div class="col-md-6 mb-4">
-                        <div class="o_succ_panel">
-                            <h4><i class="fa fa-shield"></i> Critical Positions at Risk</h4>
-                            <table class="table table-borderless table-hover o_succ_table">
-                                <thead>
-                                    <tr>
-                                        <th>Position</th>
-                                        <th>Succession Risk</th>
-                                        <th>Bench Strength</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="state.dashboardData.critical_list" t-as="pos" t-key="pos.id">
-                                        <tr>
-                                            <td class="fw-bold text_succ_slate"><t t-esc="pos.name"/></td>
-                                            <td>
-                                                <span t-attf-class="badge {{ pos.risk == 'high' ? 'bg_succ_maroon' : (pos.risk == 'medium' ? 'bg_succ_orange' : 'bg_succ_green') }}">
-                                                    <t t-esc="pos.risk.toUpperCase()"/>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="o_bench_pill">
-                                                    <t t-esc="pos.bench_strength"/> Candidates
+                        <div class="o_succ_panel d-flex flex-column" style="min-height: 400px;">
+                            <!-- Header with Title, Count & Filter Pills -->
+                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <h4 class="mb-0 border-0 pb-0"><i class="fa fa-briefcase text-primary me-1"></i> Critical Positions Watchlist</h4>
+                                    <span class="badge bg-secondary rounded-pill fw-bold"><t t-esc="filteredCriticalList.length"/></span>
+                                </div>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" t-attf-class="btn btn-sm {{ state.riskFilter === 'all' ? 'btn-primary' : 'btn-outline-secondary' }}" t-on-click="() => this.setRiskFilter('all')">All</button>
+                                    <button type="button" t-attf-class="btn btn-sm {{ state.riskFilter === 'critical' ? 'btn-danger' : 'btn-outline-danger' }}" t-on-click="() => this.setRiskFilter('critical')">Critical</button>
+                                    <button type="button" t-attf-class="btn btn-sm {{ state.riskFilter === 'high' ? 'btn-warning' : 'btn-outline-warning' }}" t-on-click="() => this.setRiskFilter('high')">High</button>
+                                    <button type="button" t-attf-class="btn btn-sm {{ state.riskFilter === 'medium' ? 'btn-info' : 'btn-outline-info' }}" t-on-click="() => this.setRiskFilter('medium')">Medium</button>
+                                </div>
+                            </div>
+
+                            <!-- Live Filter Input -->
+                            <div class="input-group input-group-sm mb-2 shadow-sm">
+                                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa fa-search"></i></span>
+                                <input type="text" class="form-control form-control-sm border-start-0 ps-0" placeholder="Quick filter positions by title or department..." t-model="state.searchQuery"/>
+                                <t t-if="state.searchQuery">
+                                    <button class="btn btn-outline-secondary border-start-0" type="button" t-on-click="() => this.state.searchQuery = ''"><i class="fa fa-times"></i></button>
+                                </t>
+                            </div>
+
+                            <!-- Scrollable Compact List Container (Never expands indefinitely) -->
+                            <div class="flex-grow-1 overflow-auto pe-1" style="max-height: 275px;">
+                                <t t-if="filteredCriticalList.length">
+                                    <div class="list-group list-group-flush gap-1">
+                                        <t t-foreach="filteredCriticalList" t-as="pos" t-key="pos.id">
+                                            <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-2 rounded border mb-1 bg-light shadow-sm"
+                                                 style="cursor: pointer; transition: all 0.15s ease;"
+                                                 t-on-click="() => this.openPosition(pos.id)"
+                                                 title="Click to open this Critical Position">
+                                                <div class="me-2 text-truncate">
+                                                    <div class="fw-bold text-dark text-truncate" style="font-size: 0.95rem;">
+                                                        <t t-esc="pos.name"/>
+                                                    </div>
+                                                    <div class="small text-muted text-truncate">
+                                                        <i class="fa fa-building-o me-1"></i><t t-esc="pos.department"/>
+                                                    </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    </t>
-                                    <t t-if="!state.dashboardData.critical_list.length">
-                                        <tr><td colspan="3" class="text-center text-muted">No high risk positions found.</td></tr>
-                                    </t>
-                                </tbody>
-                            </table>
+                                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                                    <span t-attf-class="badge {{ pos.risk === 'critical' ? 'bg-danger text-white' : (pos.risk === 'high' ? 'bg-warning text-dark' : 'bg-info text-white') }} text-uppercase px-2 py-1" style="font-size: 0.75rem;">
+                                                        <t t-esc="pos.risk"/>
+                                                    </span>
+                                                    <span t-attf-class="badge rounded-pill {{ pos.bench_strength === 0 ? 'bg-danger-subtle text-danger border border-danger' : 'bg-success-subtle text-success border border-success' }}" style="font-size: 0.8rem;">
+                                                        <i t-attf-class="fa {{ pos.bench_strength === 0 ? 'fa-exclamation-circle' : 'fa-users' }} me-1"></i>
+                                                        <t t-esc="pos.bench_strength"/> / <t t-esc="pos.target"/> Successors
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div class="text-center text-muted p-4 my-auto">
+                                        <i class="fa fa-check-circle fa-2x text-success mb-2"></i>
+                                        <p class="mb-0 small">No positions found matching selected filter.</p>
+                                    </div>
+                                </t>
+                            </div>
+
+                            <!-- Footer Navigation Link -->
+                            <div class="pt-2 border-top mt-auto d-flex justify-content-between align-items-center">
+                                <span class="small text-muted">Showing priority positions requiring successors</span>
+                                <button type="button" class="btn btn-link btn-sm text-primary fw-bold p-0 text-decoration-none" t-on-click="openHighRisk">
+                                    View Full Positions Register <i class="fa fa-arrow-right ms-1"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

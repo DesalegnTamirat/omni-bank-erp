@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_inprogress_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.inprogress.wizard.form</field>
+        <field name="model">helpdesk.ticket.inprogress.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Accept Ticket — In Progress" class="o_helpdesk_wizard">
+                <sheet>
+                    <div class="alert alert-info py-2 mb-3" role="alert">
+                        <i class="fa fa-tasks me-1" title="Acceptance Notice" aria-label="Acceptance Notice" />
+                        <strong>Acceptance Notice:</strong> You are accepting this ticket and moving it to
+                        <strong>In Progress</strong>. Document the initial steps you are taking to
+                        investigate or resolve this ticket. The customer will be notified (if checked below).
+                    </div>
+                    <group>
+                        <group string="Ticket Information">
+                            <field name="ticket_id" invisible="1" />
+                            <field name="target_stage_id" invisible="1" />
+                            <field name="ticket_number" string="Ticket #" />
+                            <field name="ticket_name" string="Sub Service" />
+                            <field name="current_stage_id" string="Current Stage" />
+                        </group>
+                        <group string="Customer Inquiry" invisible="not customer_request_details">
+                            <field name="customer_request_details" string="Customer Inquiry" readonly="1" />
+                        </group>
+                    </group>
+                    <group string="Acceptance Notes">
+                        <field
+                            name="action_notes"
+                            string="Initial Action / Notes"
+                            required="1"
+                            placeholder="Mandatory: Describe the initial steps being taken — e.g. contacted branch, checked CBS, escalating to team lead..."
+                        />
+                        <field
+                            name="send_acceptance_notification"
+                            string="Send Customer Acceptance Notification (SMS)"
+                            widget="boolean_toggle"
+                        />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        name="action_confirm_inprogress"
+                        type="object"
+                        string="Accept &amp; Move to In Progress"
+                        class="btn-primary"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_inprogress_wizard" model="ir.actions.act_window">
+        <field name="name">Accept Ticket — In Progress</field>
+        <field name="res_model">helpdesk.ticket.inprogress.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

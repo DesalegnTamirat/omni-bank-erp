@@ -72,4 +72,22 @@ class PbmsExceptionalWorkforceWizard(models.TransientModel):
             else:
                 req.action_reject(reason)
 
-        return {"type": "ir.actions.act_window_close"}
+        action_titles = {
+            "return": _("Returned Successfully"),
+            "reject": _("Rejected Successfully"),
+        }
+        action_messages = {
+            "return": _("Exceptional request returned for revision."),
+            "reject": _("Exceptional request rejected."),
+        }
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": action_titles.get(self.action_type, _("Action Completed")),
+                "message": action_messages.get(self.action_type, _("Action completed successfully.")),
+                "type": "warning",
+                "sticky": False,
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }

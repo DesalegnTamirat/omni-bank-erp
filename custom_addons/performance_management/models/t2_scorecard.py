@@ -80,6 +80,7 @@ class T2Scorecard(models.Model):
 
     accept_by = fields.Date(
         string='Accept By',
+        default=fields.Date.context_today,
         help='Date before which the employee should review and accept or reject the scorecard.',
     )
     accepted_by = fields.Many2one("hr.employee", string="Accepted By")
@@ -110,11 +111,12 @@ class T2Scorecard(models.Model):
         ("draft", "Draft"),
         ("notified", "Notified"),
         ("accepted", "Accepted"),
+        ("auto_accepted", "Auto Accepted"),
         ("rejected", "Rejected"),
-        ("confirmed", "Confirmed"),
         ("appraisal_started", "Appraisal Started"),
     ], default="draft", tracking=True)
     rejection_reason = fields.Text(string="Rejection Reason", copy=False)
+    manager_rejection_reply = fields.Text(string="Manager Rejection Response", copy=False, tracking=True)
 
     @api.constrains('employee_id', 'fiscal_year_id', 'appraisal_period_id')
     def _check_unique_scorecard(self):
@@ -242,13 +244,40 @@ class T2Scorecard(models.Model):
 
     @api.onchange('fiscal_year_id', 'appraisal_period_id')
     def _onchange_fiscal_year_period(self):
-        if self.fiscal_year_id and self.appraisal_period_id:
             line = self.fiscal_year_id.line_ids.filtered(
                 lambda l: l.appraisal_period == self.appraisal_period_id
             )[:1]
             if line:
                 self.start_date = line.date_start
                 self.end_date = line.date_end
+
+    @api.constrains('accept_by')
+    def _check_accept_by(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.accept_by and rec.accept_by < today:
+                raise ValidationError("Acceptance deadline ('Accept By') cannot be earlier than the current date.")
+
+    @api.constrains('total_weight', 'state')
+    def _check_total_weight_on_state(self):
+        for rec in self:
+            if rec.state not in ('draft', 'rejected'):
+                if round(rec.total_weight, 2) != 100.0:
+                    state_lbl = dict(rec._fields['state'].selection).get(rec.state, rec.state)
+                    raise ValidationError(
+                        f"Tier 2 Scorecard '{rec.planning_name or rec.name or rec.display_name}' must have a Total Weight of exactly 100% "
+                        f"(currently {round(rec.total_weight, 2)}%) when in '{state_lbl}' status."
+                    )
+
+    @api.onchange('accept_by')
+    def _onchange_accept_by(self):
+        if self.accept_by and self.accept_by < fields.Date.context_today(self):
+            return {
+                'warning': {
+                    'title': 'Invalid Acceptance Deadline',
+                    'message': "Acceptance deadline ('Accept By') cannot be earlier than the current date.",
+                }
+            }
 
     @api.depends('operating_unit_id', 'employee_id', 'fiscal_year_id', 'appraisal_period_id')
     def _compute_planning_name(self):
@@ -359,6 +388,9 @@ class T2Scorecard(models.Model):
                 if target_val <= 0.0:
                     measure_name = line.measure_id.name if line.measure_id else 'KPI Measure'
                     invalid_measures.append(f"{measure_name} (Current {target_label}: {target_val})")
+                elif line.target_type == 'percent' and target_val > 100.0:
+                    measure_name = line.measure_id.name if line.measure_id else 'KPI Measure'
+                    invalid_measures.append(f"{measure_name} (Percentage target cannot exceed 100%: {target_val}%)")
 
             if invalid_measures:
                 period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else code
@@ -366,15 +398,39 @@ class T2Scorecard(models.Model):
                 raise UserError(
                     f"Scorecard for '{emp_name}' cannot be notified for appraisal period '{period_name}'. "
                     f"All scorecard lines must have a valid non-zero {target_label} set.\n\n"
-                    f"Missing or zero targets found for:\n- " + "\n- ".join(invalid_measures)
+                    f"Missing, zero, or invalid targets found for:\n- " + "\n- ".join(invalid_measures)
                 )
 
     def action_notify(self):
+        today = fields.Date.context_today(self)
         for rec in self:
-            if not (rec.is_current_manager or rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
-                raise UserError('Only the Manager or Planning administrator can notify the employee.')
+            if round(rec.total_weight, 2) != 100.0:
+                raise UserError(
+                    f"Tier 2 Scorecard '{rec.planning_name or rec.name or rec.display_name}' cannot be notified "
+                    f"because its Total Weight is {round(rec.total_weight, 2)}% (must be exactly 100%)."
+                )
+            if rec.state == 'rejected':
+                if not rec.manager_rejection_reply or not rec.manager_rejection_reply.strip():
+                    return {
+                        'name': 'Reply to Employee Rejection Reason',
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'performance.rejection.reply.wizard',
+                        'view_mode': 'form',
+                        'target': 'new',
+                        'context': {
+                            'default_res_model': rec._name,
+                            'default_res_id': rec.id,
+                            'default_action_type': 'notify',
+                            'default_rejection_reason': rec.rejection_reason,
+                        },
+                    }
+        for rec in self:
+            if not (rec.is_current_manager or rec.is_planning_role or rec.is_hr_role or rec.is_admin_role or self.env.is_admin()):
+                raise UserError('Only the Manager, Planning administrator, or HR administrator can notify the employee.')
             if not rec.accept_by:
                 raise UserError(f"Please provide an 'Accept By' deadline before notifying the employee for scorecard '{rec.planning_name or rec.name or rec.display_name}'.")
+            if rec.accept_by < today:
+                raise UserError(f"The 'Accept By' deadline cannot be earlier than the current date ({today}) for scorecard '{rec.planning_name or rec.name or rec.display_name}'.")
         self._validate_period_targets_for_notify()
         for rec in self:
             rec.write({'state': 'notified'})
@@ -398,6 +454,7 @@ class T2Scorecard(models.Model):
                 ("Appraisal Period", f"{period_name} ({fy_name})"),
                 ("Accept By Deadline", f'<span style="color: #c53030; font-weight: bold;">{accept_by_str}</span>'),
                 ("Total Weight", f"{rec.total_weight:.2f}%"),
+                ("Manager Response to Rejection", f'<span style="color: #2b6cb0; font-weight: bold;">{rec.manager_rejection_reply}</span>'),
                 ("Current Status", '<span style="background-color: #feebc8; color: #7b341e; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">NOTIFIED</span>'),
             ]
 
@@ -422,6 +479,11 @@ class T2Scorecard(models.Model):
         for rec in self:
             if not (rec.is_current_employee or self.env.is_admin()):
                 raise UserError('Only the assigned employee can accept this Tier 2 Scorecard.')
+            if round(rec.total_weight, 2) != 100.0:
+                raise UserError(
+                    f"Tier 2 Scorecard '{rec.planning_name or rec.name or rec.display_name}' cannot be accepted "
+                    f"because its Total Weight is {round(rec.total_weight, 2)}% (must be exactly 100%)."
+                )
             user_emp_id = self.env.user.sudo().employee_id.id or rec.sudo().employee_id.id
             rec.sudo().write({
                 'state': 'accepted',
@@ -470,6 +532,49 @@ class T2Scorecard(models.Model):
                 activity_summary=f"Tier 2 Scorecard Accepted by {emp_name} - Action: Confirm",
             )
 
+    def action_auto_accept(self):
+        """Automatically accept scorecards whose deadline has passed without employee response."""
+        for rec in self:
+            if rec.state != 'notified':
+                continue
+            rec.sudo().write({
+                'state': 'auto_accepted',
+                'accepted_by': False,
+            })
+            try:
+                rec.activity_feedback(['mail.mail_activity_data_todo'], feedback="Tier 2 Scorecard automatically accepted by system.")
+            except Exception:
+                pass
+
+            period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else ''
+            fy_name = rec.fiscal_year_id.name if rec.fiscal_year_id else ''
+            emp_name = rec.employee_id.name if rec.employee_id else (rec.operating_unit_id.name or 'Work Unit Manager')
+            doc_name = rec.planning_name or rec.name or f"Tier 2 Scorecard - {emp_name}"
+            deadline_str = str(rec.accept_by) if rec.accept_by else 'N/A'
+
+            details = [
+                ("Document Name", f"<strong>{doc_name}</strong>"),
+                ("Work Unit / Employee", f"<strong>{emp_name}</strong>"),
+                ("Operating Unit", rec.operating_unit_id.name if rec.operating_unit_id else "N/A"),
+                ("Appraisal Period", f"{period_name} ({fy_name})"),
+                ("Total Weight", f"{rec.total_weight:.2f}%"),
+                ("Acceptance Deadline", deadline_str),
+                ("Current Status", '<span style="background-color: #ede9fe; color: #5b21b6; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">AUTO-ACCEPTED</span>'),
+            ]
+
+            send_performance_notification(
+                record=rec,
+                title="⚡ Tier 2 Scorecard Automatically Accepted",
+                badge_text="AUTO-ACCEPTED",
+                badge_bg="#6d28d9",
+                border_color="#6d28d9",
+                intro_text=f"The Tier 2 Scorecard for <strong>{emp_name}</strong> ({period_name} {fy_name}) has been <strong>AUTOMATICALLY ACCEPTED</strong> by the system because the deadline (<strong>{deadline_str}</strong>) passed without employee review.",
+                details=details,
+                action_btn_text="🎯 View Auto-Accepted Scorecard",
+                action_btn_color="#5b21b6",
+                footer_note="Scorecard accepted automatically by system policy.",
+            )
+
     def action_reject(self):
         for rec in self:
             if not (rec.is_current_employee or self.env.is_admin()):
@@ -487,58 +592,31 @@ class T2Scorecard(models.Model):
         }
 
     def action_confirm(self):
-        for rec in self:
-            if not (rec.is_current_manager or rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
-                raise UserError('Only the Manager or Planning administrator can confirm this Tier 2 Scorecard.')
-            rec.write({'state': 'confirmed'})
-            
-            emp = rec.employee_id
-            emp_user = emp.user_id if emp else False
-            emp_partner = emp_user.partner_id if emp_user else False
-            partner_ids = [emp_partner.id] if emp_partner else []
-
-            period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else ''
-            fy_name = rec.fiscal_year_id.name if rec.fiscal_year_id else ''
-            emp_name = emp.name if emp else (rec.operating_unit_id.name or 'Work Unit Manager')
-            manager_name = self.env.user.name or 'Manager / Planning'
-            doc_name = rec.planning_name or rec.name or f"Tier 2 Scorecard - {emp_name}"
-
-            try:
-                rec.activity_feedback(['mail.mail_activity_data_todo'], feedback="Tier 2 Scorecard confirmed.")
-            except Exception:
-                pass
-
-            details = [
-                ("Document Name", f"<strong>{doc_name}</strong>"),
-                ("Work Unit / Employee", f"<strong>{emp_name}</strong>"),
-                ("Operating Unit", rec.operating_unit_id.name if rec.operating_unit_id else "N/A"),
-                ("Manager / Planning", manager_name),
-                ("Appraisal Period", f"{period_name} ({fy_name})"),
-                ("Total Weight", f"{rec.total_weight:.2f}%"),
-                ("Current Status", '<span style="background-color: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">CONFIRMED</span>'),
-            ]
-
-            send_performance_notification(
-                record=rec,
-                title="🔒 Tier 2 Scorecard Confirmed & Finalized",
-                badge_text="CONFIRMED",
-                badge_bg="#425727",
-                border_color="#425727",
-                intro_text=f"Manager / Planning <strong>{manager_name}</strong> has <strong>CONFIRMED</strong> the Tier 2 Scorecard for <strong>{emp_name}</strong> for period <strong>{period_name}</strong> ({fy_name}).",
-                details=details,
-                action_btn_text="🎯 View Confirmed Tier 2 Scorecard",
-                action_btn_color="#425727",
-                footer_note="Tier 2 Scorecard targets are confirmed and active for departmental appraisal evaluation.",
-                recipient_partner_ids=partner_ids,
-            )
+        raise UserError('Confirm action is no longer required on scorecards. Once accepted by the employee, the scorecard targets are finalized and active for appraisal.')
 
     def action_reset_draft(self):
         for rec in self:
+            if rec.state == 'rejected':
+                if not rec.manager_rejection_reply or not rec.manager_rejection_reply.strip():
+                    return {
+                        'name': 'Reply to Employee Rejection Reason',
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'performance.rejection.reply.wizard',
+                        'view_mode': 'form',
+                        'target': 'new',
+                        'context': {
+                            'default_res_model': rec._name,
+                            'default_res_id': rec.id,
+                            'default_action_type': 'reset_draft',
+                            'default_rejection_reason': rec.rejection_reason,
+                        },
+                    }
+        for rec in self:
             if rec.is_current_employee and not (rec.is_current_manager or rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Employees are not permitted to reset scorecards to draft.')
-            if rec.state == 'confirmed':
+            if rec.state in ('accepted', 'auto_accepted'):
                 if not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
-                    raise UserError('Once confirmed by the manager, only the Planning administrator can reset this Tier 2 Scorecard to draft.')
+                    raise UserError('Once accepted, only the Planning administrator can reset this Tier 2 Scorecard to draft.')
             elif not (rec.is_current_manager or rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Only the Manager or Planning administrator can reset this Tier 2 Scorecard to draft.')
             rec.write({'state': 'draft'})
@@ -546,12 +624,16 @@ class T2Scorecard(models.Model):
 
     def write(self, vals):
         for rec in self:
+            if rec.state == 'rejected' and vals.get('state') in ('notified', 'draft'):
+                reply = vals.get('manager_rejection_reply') or rec.manager_rejection_reply
+                if not reply or not str(reply).strip():
+                    raise UserError("You must provide a reply/response to the employee's rejection reason before re-notifying or resetting to draft.")
             if rec.is_current_employee and not (rec.is_current_manager or rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
-                allowed_fields = {'state', 'accepted_by', 'rejection_reason'}
+                allowed_fields = {'state', 'accepted_by', 'rejection_reason', 'manager_rejection_reply'}
                 if not set(vals.keys()).issubset(allowed_fields):
                     raise UserError('Employees are not permitted to edit scorecards.')
-            if rec.state in ('accepted', 'confirmed', 'appraisal_started'):
-                allowed_fields = {'state', 'accepted_by', 'rejection_reason'}
+            if rec.state in ('accepted', 'auto_accepted', 'appraisal_started'):
+                allowed_fields = {'state', 'accepted_by', 'rejection_reason', 'manager_rejection_reply'}
                 if rec.is_planning_role or rec.is_admin_role or self.env.is_admin():
                     allowed_fields |= {'employee_id', 'manager_id', 'job_id', 'operating_unit_id', 'fiscal_year_id', 'appraisal_period_id'}
                 if not set(vals.keys()).issubset(allowed_fields):
@@ -567,7 +649,7 @@ class T2Scorecard(models.Model):
 
     def unlink(self):
         for rec in self:
-            if rec.state in ('accepted', 'confirmed', 'appraisal_started'):
+            if rec.state in ('accepted', 'auto_accepted', 'appraisal_started'):
                 raise UserError(
                     'This Tier 2 Scorecard is %s and cannot be deleted.'
                     % dict(rec._fields['state'].selection).get(rec.state, rec.state)
@@ -602,7 +684,7 @@ class T2Scorecard(models.Model):
                     ('active', '=', True),
                 ])
 
-            # 3. If no direct measures and this is a branch unit/manager, cascade from 100% branch template objectives
+            # 3. If no direct measures and this is a branch or district/area unit/manager, cascade from 100% template objectives
             if not measures:
                 unit = scorecard.operating_unit_id
                 is_branch = unit and hasattr(unit, 'work_unit_type') and unit.work_unit_type in branch_types
@@ -611,19 +693,45 @@ class T2Scorecard(models.Model):
                     if emp_ou and hasattr(emp_ou, 'work_unit_type') and emp_ou.work_unit_type in branch_types:
                         is_branch = True
 
+                district_area_types = ('district_office', 'area_office', 'district', 'area')
+                def _is_dist_area(u):
+                    if not u:
+                        return False
+                    w = getattr(u, 'work_unit_type', '') or ''
+                    if w in district_area_types:
+                        return True
+                    nm = (u.name or '').lower()
+                    return 'district' in nm or 'area' in nm
+
+                is_dist_area = _is_dist_area(unit)
+                if not is_dist_area and scorecard.employee_id:
+                    is_dist_area = _is_dist_area(scorecard.employee_id.default_operating_unit_id)
+
                 if is_branch:
                     branch_ous = OperatingUnit.search([('work_unit_type', 'in', branch_types)])
                     branch_objs = Objective.search([
                         ('active', '=', True),
                         ('employee_operating_unit_id', 'in', branch_ous.ids),
                     ])
-                    # Find a branch unit whose active measures total 100%
                     unit_map = defaultdict(lambda: self.env['performance.measure'])
                     for b_obj in branch_objs:
                         unit_map[b_obj.employee_operating_unit_id.id] |= b_obj.measure_ids.filtered(lambda m: m.active)
                     for b_ou_id, b_measures in unit_map.items():
                         if round(sum(b_measures.mapped('weight')), 2) == 100.0:
                             measures = b_measures
+                            break
+                elif is_dist_area:
+                    dist_area_ous = OperatingUnit.search([]).filtered(lambda u: _is_dist_area(u))
+                    dist_objs = Objective.search([
+                        ('active', '=', True),
+                        ('employee_operating_unit_id', 'in', dist_area_ous.ids),
+                    ])
+                    unit_map = defaultdict(lambda: self.env['performance.measure'])
+                    for d_obj in dist_objs:
+                        unit_map[d_obj.employee_operating_unit_id.id] |= d_obj.measure_ids.filtered(lambda m: m.active)
+                    for d_ou_id, d_measures in unit_map.items():
+                        if round(sum(d_measures.mapped('weight')), 2) == 100.0:
+                            measures = d_measures
                             break
 
             existing_measure_ids = set(scorecard.line_ids.mapped('measure_id').ids)
@@ -641,6 +749,13 @@ class T2Scorecard(models.Model):
 
         new_lines = Line.create(vals_list)
         self._compute_total_weight()
+        for scorecard in self:
+            if round(scorecard.total_weight, 2) != 100.0:
+                raise UserError(
+                    f"Populated Tier 2 Scorecard lines for '{scorecard.planning_name or scorecard.employee_id.name}' "
+                    f"total {round(scorecard.total_weight, 2)}% (must be exactly 100%). "
+                    "Please adjust the Strategic Objectives and measures."
+                )
         return new_lines
 
 
@@ -704,7 +819,7 @@ class T2ScorecardLine(models.Model):
         string='Performance Measure',
         required=True,
         ondelete='cascade',
-        domain="['|', ('objective_id.employee_id', '=', scorecard_employee_id), ('objective_id.employee_operating_unit_id.work_unit_type', 'in', ('branch', 'sub_branch', 'service_center'))]",
+        domain="['|', '|', ('objective_id.employee_id', '=', scorecard_employee_id), ('objective_id.employee_operating_unit_id.work_unit_type', 'in', ('branch', 'sub_branch', 'service_center')), ('objective_id.employee_operating_unit_id.work_unit_type', 'in', ('district_office', 'area_office'))]",
     )
     objective_id = fields.Many2one(
         related='measure_id.objective_id', store=True, readonly=True,

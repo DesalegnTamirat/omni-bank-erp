@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Centralized Dynamic Workflows & Access Configuration Menus -->
+    <!-- Centralized Dynamic Workflows and Access Configuration Menus -->
     <menuitem id="menu_pbms_dynamic_workflow_config_parent"
-              name="Workflows &amp; Access Controls"
-              parent="bunna_pbms.menu_pbms_config"
-              sequence="1"
+              name="Workflows and Access Controls"
+              parent="bunna_pbms.menu_pbms_root"
+              sequence="80"
               groups="bunna_pbms.group_pbms_manager"/>
 
     <menuitem id="menu_pbms_config_categories"

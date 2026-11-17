@@ -120,6 +120,17 @@ class TalentRoster(models.Model):
         for rec in expired_records:
             rec.message_post(body=_("Talent Roster entry automatically expired after 6 months."))
 
+        # Expire candidate reserve pool entries older than 180 days (6 months)
+        six_months_ago = today - timedelta(days=180)
+        eligible_reserved = self.env['external.recruitment.eligible.employees'].sudo().search([
+            ('selection_type', '=', 'reserved'),
+            '|',
+            ('reserve_date', '=', False),
+            ('reserve_date', '<', six_months_ago),
+        ])
+        if eligible_reserved:
+            eligible_reserved.write({'selection_type': 'expired'})
+
     @api.model
     def action_sync_external_candidates(self):
         """Sync / import eligible external applicants into Talent Roster."""

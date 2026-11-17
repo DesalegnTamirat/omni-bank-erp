@@ -70,5 +70,46 @@
             <field name="approval_authority">direct_manager</field>
             <field name="description">Minor offense resulting in recorded formal verbal warning without financial penalty.</field>
         </record>
+
+        <!-- Official Attendance & Timekeeping Misconduct Seeds -->
+        <record id="offense_repeated_lateness" model="discipline.offense">
+            <field name="name">Repeated Lateness Violation (ተደጋጋሚ የማርፈድ ጥፋት)</field>
+            <field name="category_id" ref="offense_cat_attendance"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="penalty_percentage">5.0</field>
+            <field name="approval_authority">direct_manager</field>
+            <field name="description">Unexcused late arrival exceeding the monthly cumulative lateness threshold. Results in First Written Warning and 5% monthly salary deduction.</field>
+        </record>
+
+        <record id="offense_repeated_absence" model="discipline.offense">
+            <field name="name">Prolonged Unexcused Absence (3+ Consecutive Days) (ያለፈቃድ ከስራ መቅረት)</field>
+            <field name="category_id" ref="offense_cat_attendance"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="penalty_percentage">20.0</field>
+            <field name="approval_authority">hr_manager</field>
+            <field name="description">Unexcused absence for 3 or more consecutive working days. Results in Final Written Warning and 20% monthly salary deduction upon HR / POMD review.</field>
+        </record>
+
+        <record id="offense_job_abandonment" model="discipline.offense">
+            <field name="name">Unexcused Absence Exceeding 5 Consecutive Days (Job Abandonment / የስራ መልቀቅ)</field>
+            <field name="category_id" ref="offense_cat_attendance"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="punishment_type">dismissal</field>
+            <field name="penalty_percentage">0.0</field>
+            <field name="approval_authority">committee</field>
+            <field name="description">Critical unexcused absence exceeding 5 consecutive working days deemed abandonment of post. Results in formal referral to Disciplinary Committee for dismissal.</field>
+        </record>
+
+        <record id="offense_repeated_force_checkout" model="discipline.offense">
+            <field name="name">Repeated Force Checkout / Attendance Irregularity</field>
+            <field name="category_id" ref="offense_cat_attendance"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="penalty_percentage">10.0</field>
+            <field name="approval_authority">hr_manager</field>
+            <field name="description">Repeated failure to check out properly leading to automatic system-forced checkouts. Results in Second Written Warning and 10% monthly salary deduction.</field>
+        </record>
     </data>
 </odoo>

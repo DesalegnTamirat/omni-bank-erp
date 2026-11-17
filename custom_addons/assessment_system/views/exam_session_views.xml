@@ -10,50 +10,55 @@
                 <header>
                     <button name="action_fetch_recruitment_candidates" string="Fetch Candidates from Recruitment" type="object" invisible="state != 'draft'" class="btn-primary" icon="fa-users"/>
                     <button name="action_schedule" string="Confirm Schedule" type="object" invisible="state != 'draft'" class="btn-primary"/>
-                    <button name="action_send_invitations" string="Dispatch Candidate Invitations" type="object" invisible="state not in ['scheduled', 'active']" class="btn-success"/>
+                    <button name="action_send_invitations" string="Dispatch Candidate Invitations" type="object" invisible="invitation_dispatched or state not in ['scheduled', 'active']" class="btn-success"/>
                     <button name="action_start_session" string="Open / Start Session" type="object" invisible="state != 'scheduled'" class="btn-warning"/>
-                    <button name="action_submit_all_essay_evaluations" string="Compute &amp; Finalize All Essay Evaluations" type="object" class="btn-success" invisible="state not in ['active', 'evaluating']" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                    <button name="action_submit_all_essay_evaluations" string="Compute &amp; Finalize All Essay Evaluations" type="object" class="btn-success" invisible="evaluations_finalized or state not in ['active', 'evaluating']" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
                     <button name="action_close_session" string="Close Session &amp; Evaluate" type="object" invisible="state != 'active'" class="btn-danger"/>
                     <button name="action_finalize_results" string="Finalize Results" type="object" invisible="state != 'evaluating'" class="btn-primary"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,active,evaluating,completed"/>
                 </header>
                 <sheet>
+                    <field name="invitation_dispatched" invisible="1"/>
+                    <field name="evaluations_finalized" invisible="1"/>
                     <div class="oe_title">
                         <label for="name" string="Session Reference"/>
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
                     <group>
                         <group>
-                            <field name="exam_id" domain="[('is_version_paper', '=', False)]"/>
-                            <field name="job_id"/>
-                            <field name="vacancy_id"/>
-                            <field name="venue_type"/>
+                            <field name="exam_id" domain="[('is_version_paper', '=', False)]" readonly="state != 'draft'"/>
+                            <field name="job_id" readonly="state != 'draft'"/>
+                            <field name="vacancy_id" readonly="state != 'draft'"/>
+                            <field name="vacancy_reference" invisible="not vacancy_reference" readonly="1"/>
+                            <field name="is_external" invisible="1"/>
+                            <field name="venue_type" readonly="state != 'draft'"/>
                         </group>
                         <group>
-                            <field name="start_datetime"/>
-                            <field name="end_datetime"/>
-                            <field name="duration_minutes"/>
-                            <field name="location_notes"/>
+                            <field name="start_datetime" readonly="state != 'draft'"/>
+                            <field name="end_datetime" readonly="state != 'draft'"/>
+                            <field name="duration_minutes" readonly="state != 'draft'"/>
+                            <field name="location_notes" readonly="state != 'draft'"/>
                         </group>
                     </group>
                     <group string="Proctors &amp; Invigilators">
-                        <field name="invigilator_user_ids" widget="many2many_tags"/>
+                        <field name="invigilator_user_ids" widget="many2many_tags" readonly="state != 'draft'"/>
                     </group>
                     <notebook>
                         <page string="Candidate Exam Attempts">
-                            <field name="attempt_ids">
-                                <list decoration-danger="state == 'disqualified'" decoration-success="is_passed and state == 'completed'" decoration-warning="state == 'in_progress'">
-                                    <field name="candidate_code"/>
-                                    <field name="candidate_name"/>
-                                    <field name="candidate_type"/>
-                                    <field name="version_code" string="Version" widget="badge"/>
-                                    <field name="version_exam_id" string="Assigned Paper" optional="show"/>
-                                    <field name="tab_switch_count"/>
-                                    <field name="total_score"/>
-                                    <field name="score_percentage"/>
-                                    <field name="is_passed"/>
-                                    <field name="state" widget="badge"/>
-                                    <button name="action_open_exam_portal" string="Open Exam" type="object" icon="fa-external-link" class="btn-link"/>
+                            <field name="attempt_ids" readonly="state != 'draft'">
+                                <list editable="bottom" decoration-danger="state == 'disqualified'" decoration-success="is_passed and state == 'completed'" decoration-warning="state == 'in_progress'">
+                                    <field name="is_external" column_invisible="1"/>
+                                    <field name="candidate_code" readonly="1"/>
+                                    <field name="candidate_name" readonly="1"/>
+                                    <field name="candidate_type" readonly="1"/>
+                                    <field name="version_code" string="Version" widget="badge" readonly="1"/>
+                                    <field name="version_exam_id" string="Assigned Paper" optional="show" readonly="1"/>
+                                    <field name="tab_switch_count" readonly="1"/>
+                                    <field name="total_score" readonly="not is_external"/>
+                                    <field name="score_percentage" readonly="not is_external"/>
+                                    <field name="is_passed" readonly="1"/>
+                                    <field name="state" widget="badge" readonly="1"/>
+                                    <button name="action_open_exam_portal" string="Open Exam" type="object" icon="fa-external-link" class="btn-link" invisible="is_external"/>
                                 </list>
                             </field>
                         </page>
@@ -178,7 +183,8 @@
                                     <field name="sequence"/>
                                     <field name="question_text"/>
                                     <field name="question_type"/>
-                                    <field name="text_answer" string="Candidate Response"/>
+                                    <field name="candidate_response_display" string="Candidate Response"/>
+                                    <field name="correct_answer_display" string="Correct Answer"/>
                                     <field name="marks_available"/>
                                     <field name="marks_awarded"/>
                                     <field name="is_correct"/>

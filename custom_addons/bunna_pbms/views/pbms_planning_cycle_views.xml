@@ -9,7 +9,7 @@
                 <field name="date_start"/>
                 <field name="date_end"/>
                 <field name="state" widget="badge"
-                       decoration-success="state == 'approved'"
+                       decoration-success="state in ('approved', 'running')"
                        decoration-warning="state in ('open', 'budget_call', 'consolidation', 'board_approval')"
                        decoration-muted="state == 'closed'"/>
                 <button name="action_start_budget_call" type="object" string="Start Budget Call" icon="fa-bullhorn"
@@ -22,8 +22,10 @@
                         class="btn-primary btn-sm" invisible="state != 'consolidation'" groups="bunna_pbms.group_pbms_manager"/>
                 <button name="action_approve" type="object" string="Mark Approved" icon="fa-check-square-o"
                         class="btn-primary btn-sm" invisible="state != 'board_approval'" groups="bunna_pbms.group_pbms_manager"/>
+                <button name="action_set_running" type="object" string="Start Running" icon="fa-play"
+                        class="btn-primary btn-sm" invisible="state != 'approved'" groups="bunna_pbms.group_pbms_manager"/>
                 <button name="action_close" type="object" string="Close Cycle" icon="fa-lock"
-                        class="btn-secondary btn-sm" invisible="state != 'approved'" groups="bunna_pbms.group_pbms_manager"/>
+                        class="btn-secondary btn-sm" invisible="state not in ('approved', 'running')" groups="bunna_pbms.group_pbms_manager"/>
             </list>
         </field>
     </record>
@@ -43,7 +45,7 @@
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="fs-5 fw-bold"><field name="name"/></span>
                                 <field name="state" widget="badge"
-                                       decoration-success="state == 'approved'"
+                                       decoration-success="state in ('approved', 'running')"
                                        decoration-warning="state in ('open', 'budget_call', 'consolidation', 'board_approval')"
                                        decoration-muted="state == 'closed'"/>
                             </div>
@@ -62,7 +64,7 @@
         <field name="name">pbms.planning.cycle.form</field>
         <field name="model">pbms.planning.cycle</field>
         <field name="arch" type="xml">
-            <form>
+            <form class="o_pbms_form">
                 <header>
                     <!-- NEW: Start Budget Call button -->
                     <button name="action_start_budget_call" type="object" string="Start Budget Call"
@@ -75,17 +77,19 @@
                             invisible="state != 'consolidation'" class="btn-primary"/>
                     <button name="action_approve" type="object" string="Mark Approved"
                             invisible="state != 'board_approval'" class="btn-primary"/>
+                    <button name="action_set_running" type="object" string="Start Running"
+                            invisible="state != 'approved'" class="btn-primary"/>
                     <button name="action_close" type="object" string="Close Cycle"
-                            invisible="state != 'approved'"/>
+                            invisible="state not in ('approved', 'running')"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,budget_call,open,consolidation,board_approval,approved"/>
+                           statusbar_visible="draft,budget_call,open,consolidation,board_approval,approved,running,closed"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" placeholder="e.g. FY 2026/27"/></h1>
                     </div>
-                    <notebook>
+                    <notebook class="o_pbms_notebook">
                         <page string="Schedule" name="page_schedule">
                             <group>
                                 <field name="date_start"/>
@@ -95,17 +99,17 @@
                         </page>
                         <page string="Deadlines" name="page_deadlines">
                             <group>
-                                <field name="branch_deadline"/>
-                                <field name="district_deadline"/>
-                                <field name="head_office_deadline"/>
-                                <field name="board_deadline"/>
+                                <field name="branch_deadline" options="{'min_date': 'date_start', 'max_date': 'date_end'}"/>
+                                <field name="district_deadline" options="{'min_date': 'date_start', 'max_date': 'date_end'}"/>
+                                <field name="head_office_deadline" options="{'min_date': 'date_start', 'max_date': 'date_end'}"/>
+                                <field name="board_deadline" options="{'min_date': 'date_start', 'max_date': 'date_end'}"/>
                             </group>
                         </page>
                         <page string="Workforce Submission Window" name="page_workforce_window">
                             <group>
                                 <group string="Window Period">
-                                    <field name="workforce_window_start"/>
-                                    <field name="workforce_window_end"/>
+                                    <field name="workforce_window_start" options="{'min_date': 'date_start', 'max_date': 'date_end'}"/>
+                                    <field name="workforce_window_end" options="{'min_date': 'date_start', 'max_date': 'date_end'}"/>
                                     <field name="is_workforce_window_open" widget="boolean_toggle" readonly="1"/>
                                 </group>
                                 <group string="Notification Status">
@@ -134,8 +138,9 @@
         <field name="arch" type="xml">
             <search>
                 <field name="name"/>
-                <filter string="Active Cycles" name="filter_active" domain="[('state', 'in', ('budget_call', 'open', 'consolidation', 'board_approval'))]"/>
-                <filter string="Official Approved ABP" name="filter_approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Active Cycles" name="filter_active" domain="[('state', 'in', ('budget_call', 'open', 'consolidation', 'board_approval', 'approved', 'running'))]"/>
+                <filter string="Official Approved ABP" name="filter_approved" domain="[('state', 'in', ('approved', 'running'))]"/>
+                <filter string="Running" name="filter_running" domain="[('state', '=', 'running')]"/>
                 <separator/>
                 <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
             </search>

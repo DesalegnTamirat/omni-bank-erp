@@ -7,6 +7,12 @@ _logger = logging.getLogger(__name__)
 
 
 class PbmsPlanningCategoryDefinition(models.Model):
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_cat_def_code_active_idx
+                ON pbms_planning_category_definition (code, active);
+        """)
     """Centralized, dynamic configuration of PBMS Planning Categories.
     Allows administrators to configure, activate, deactivate, and extend planning categories
     without source code changes."""
@@ -257,6 +263,14 @@ class PbmsWorkUnitType(models.Model):
 
 
 class PbmsPrivilege(models.Model):
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_privilege_action_active_idx
+                ON pbms_privilege (action_type, active);
+            CREATE INDEX IF NOT EXISTS pbms_privilege_code_active_idx
+                ON pbms_privilege (code, active);
+        """)
     """Granular PBMS Privileges controlling planning actions and permissions."""
     _name = "pbms.privilege"
     _description = "PBMS Privilege"
@@ -315,6 +329,14 @@ class PbmsPrivilege(models.Model):
 
 
 class PbmsRoleDefinition(models.Model):
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_role_def_code_active_idx
+                ON pbms_role_definition (code, active);
+            CREATE INDEX IF NOT EXISTS pbms_role_def_active_level_idx
+                ON pbms_role_definition (active, org_level);
+        """)
     """Configurable Organizational Planning Roles consolidating privileges."""
     _name = "pbms.role.definition"
     _description = "Planning Role & Responsibilities"
@@ -383,13 +405,37 @@ class PbmsRoleDefinition(models.Model):
 
 
 class PbmsPrivilegeAssignment(models.Model):
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_priv_assign_active_grant_priv_idx
+                ON pbms_privilege_assignment (active, grant_type, privilege_id);
+            CREATE INDEX IF NOT EXISTS pbms_priv_assign_active_user_idx
+                ON pbms_privilege_assignment (active, user_id);
+            CREATE INDEX IF NOT EXISTS pbms_priv_assign_active_group_idx
+                ON pbms_privilege_assignment (active, group_id);
+            CREATE INDEX IF NOT EXISTS pbms_priv_assign_active_job_idx
+                ON pbms_privilege_assignment (active, job_id);
+            CREATE INDEX IF NOT EXISTS pbms_priv_assign_active_role_idx
+                ON pbms_privilege_assignment (active, role_id);
+            CREATE INDEX IF NOT EXISTS pbms_priv_assign_active_ou_idx
+                ON pbms_privilege_assignment (active, org_unit_id);
+        """)
     """Direct Privilege Assignment to Users, Security Groups, HR Job Positions, or Units."""
     _name = "pbms.privilege.assignment"
     _description = "Privilege Assignment"
     _order = "id desc"
 
     name = fields.Char(string="Assignment Name", compute="_compute_name", store=True)
-    privilege_id = fields.Many2one("pbms.privilege", string="Privilege", required=True, index=True, ondelete="cascade")
+    privilege_id = fields.Many2one("pbms.privilege", string="Privilege", required=False, index=True, ondelete="cascade")
+    privilege_ids = fields.Many2many(
+        "pbms.privilege",
+        "pbms_priv_assign_multi_priv_rel",
+        "assignment_id",
+        "privilege_id",
+        string="Additional Privileges",
+        help="Optional: grant or deny multiple specific privileges at once.",
+    )
     role_id = fields.Many2one("pbms.role.definition", string="Role Reference", index=True, ondelete="set null")
     
     # Target actors
@@ -430,10 +476,30 @@ class PbmsPrivilegeAssignment(models.Model):
     )
     active = fields.Boolean(string="Active", default=True, index=True)
 
-    @api.depends("privilege_id", "user_id", "group_id", "job_id", "role_id", "grant_type")
+    @api.constrains("privilege_id", "privilege_ids", "role_id")
+    def _check_privilege_or_role(self):
+        for rec in self:
+            if not rec.privilege_id and not rec.privilege_ids and not rec.role_id:
+                raise ValidationError(_("Please specify at least a Privilege, Additional Privileges, or a Role Reference."))
+
+    @api.depends("privilege_id", "privilege_ids", "user_id", "group_id", "job_id", "role_id", "grant_type")
     def _compute_name(self):
         for rec in self:
-            priv_name = rec.privilege_id.name if rec.privilege_id else _("Unknown Privilege")
+            priv_names = []
+            if rec.privilege_id:
+                priv_names.append(rec.privilege_id.name)
+            if hasattr(rec, "privilege_ids") and rec.privilege_ids:
+                for p in rec.privilege_ids:
+                    if p.name not in priv_names:
+                        priv_names.append(p.name)
+            if priv_names:
+                priv_name = ", ".join(priv_names[:3])
+                if len(priv_names) > 3:
+                    priv_name += f" (+{len(priv_names) - 3})"
+            elif rec.role_id:
+                priv_name = rec.role_id.name
+            else:
+                priv_name = _("Unknown Privilege")
             target = ""
             if rec.user_id:
                 target = f"User: {rec.user_id.name}"
@@ -453,36 +519,72 @@ class PbmsPrivilegeAssignment(models.Model):
     def _sync_user_security_groups(self):
         """Automatically synchronize Odoo security groups and operating units when a privilege or role is assigned to a user."""
         action_group_map = {
-            "chief_review": "bunna_pbms.group_pbms_respective_chief",
-            "chief_approve": "bunna_pbms.group_pbms_respective_chief",
-            "committee_review": "bunna_pbms.group_pbms_budget_hiring_committee",
-            "committee_approve": "bunna_pbms.group_pbms_budget_hiring_committee",
-            "ceo_approval": "bunna_pbms.group_pbms_ceo",
-            "ceo_approve": "bunna_pbms.group_pbms_ceo",
+            "view": "bunna_pbms.group_pbms_branch_user",
+            "create": "bunna_pbms.group_pbms_branch_user",
+            "edit": "bunna_pbms.group_pbms_branch_user",
+            "delete": "bunna_pbms.group_pbms_branch_user",
+            "submit": "bunna_pbms.group_pbms_branch_user",
+            "export_excel": "bunna_pbms.group_pbms_branch_user",
+            "import_excel": "bunna_pbms.group_pbms_branch_user",
+            "district_edit": "bunna_pbms.group_pbms_district_reviewer",
             "district_review": "bunna_pbms.group_pbms_district_reviewer",
             "district_approve": "bunna_pbms.group_pbms_district_reviewer",
             "district_endorse": "bunna_pbms.group_pbms_district_reviewer",
+            "district_return": "bunna_pbms.group_pbms_district_reviewer",
+            "ho_edit": "bunna_pbms.group_pbms_ho_reviewer",
             "ho_review": "bunna_pbms.group_pbms_ho_reviewer",
             "ho_approve": "bunna_pbms.group_pbms_ho_reviewer",
             "ho_endorse": "bunna_pbms.group_pbms_ho_reviewer",
+            "ho_return": "bunna_pbms.group_pbms_ho_reviewer",
+            "chief_review": "bunna_pbms.group_pbms_respective_chief",
+            "chief_approve": "bunna_pbms.group_pbms_respective_chief",
             "people_solutions_review": "bunna_pbms.group_pbms_people_solutions",
             "ps_approve": "bunna_pbms.group_pbms_people_solutions",
             "cpco_review": "bunna_pbms.group_pbms_cpco",
             "cpco_approve": "bunna_pbms.group_pbms_cpco",
+            "committee_review": "bunna_pbms.group_pbms_budget_hiring_committee",
+            "committee_approve": "bunna_pbms.group_pbms_budget_hiring_committee",
+            "ceo_approval": "bunna_pbms.group_pbms_ceo",
+            "ceo_approve": "bunna_pbms.group_pbms_ceo",
             "final_approve": "bunna_pbms.group_pbms_approver",
+            "cascade": "bunna_pbms.group_pbms_approver",
+            "cascade_target": "bunna_pbms.group_pbms_approver",
         }
+        branch_group = self.env.ref("bunna_pbms.group_pbms_branch_user", raise_if_not_found=False)
         for rec in self:
             if not rec.user_id:
                 continue
             groups_to_add = self.env["res.groups"]
-            if rec.role_id and rec.role_id.group_ids:
-                groups_to_add |= rec.role_id.group_ids
+            if rec.grant_type == "allow" and rec.active and branch_group:
+                groups_to_add |= branch_group
+
+            if rec.role_id:
+                if rec.role_id.group_ids:
+                    groups_to_add |= rec.role_id.group_ids
+                for p in rec.role_id.privilege_ids:
+                    if p.action_type:
+                        xml_id = action_group_map.get(p.action_type)
+                        if xml_id:
+                            grp = self.env.ref(xml_id, raise_if_not_found=False)
+                            if grp:
+                                groups_to_add |= grp
+
             if rec.privilege_id and rec.privilege_id.action_type:
                 xml_id = action_group_map.get(rec.privilege_id.action_type)
                 if xml_id:
                     grp = self.env.ref(xml_id, raise_if_not_found=False)
                     if grp:
                         groups_to_add |= grp
+
+            if hasattr(rec, "privilege_ids") and rec.privilege_ids:
+                for p in rec.privilege_ids:
+                    if p.action_type:
+                        xml_id = action_group_map.get(p.action_type)
+                        if xml_id:
+                            grp = self.env.ref(xml_id, raise_if_not_found=False)
+                            if grp:
+                                groups_to_add |= grp
+
             if groups_to_add and rec.grant_type == "allow" and rec.active:
                 rec.user_id.sudo().write({"group_ids": [(4, g.id) for g in groups_to_add]})
             if rec.org_unit_id and rec.grant_type == "allow" and rec.active:
@@ -535,6 +637,14 @@ class PbmsWorkflowDefinition(models.Model):
 
 
 class PbmsWorkflowStep(models.Model):
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_wf_step_wf_state_idx
+                ON pbms_workflow_step (workflow_id, state);
+            CREATE INDEX IF NOT EXISTS pbms_wf_step_wf_seq_idx
+                ON pbms_workflow_step (workflow_id, sequence);
+        """)
     """Single Stage / Step within an Approval Workflow."""
     _name = "pbms.workflow.step"
     _description = "Approval Workflow Step"
@@ -583,6 +693,14 @@ class PbmsWorkflowStep(models.Model):
 
 
 class PbmsWorkflowTransition(models.Model):
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_wf_trans_step_action_idx
+                ON pbms_workflow_transition (step_id, action_type, active);
+            CREATE INDEX IF NOT EXISTS pbms_wf_trans_step_method_idx
+                ON pbms_workflow_transition (step_id, action_method, active);
+        """)
     """Outgoing Action and State Transition from a Workflow Step."""
     _name = "pbms.workflow.transition"
     _description = "Workflow Action Transition"

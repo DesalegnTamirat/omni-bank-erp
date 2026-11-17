@@ -745,11 +745,13 @@ class ReslValidations(models.AbstractModel):
         # borrower has 2 already (they must pick one of those two).
         if loan.employee_id:
             known = self.borrower_guarantor_employees(loan, exclude_loan_id)
-            if g_emp.id not in known.ids and len(known) >= 2:
+            if g_emp.id not in known.ids and len(known) >= self.guarantor_max():
                 names = ", ".join(known.mapped('name'))
-                yield (_("Borrower already has 2 guarantors (%s)") % names,
-                       _("This employee already has 2 guarantors (%s) on previous requests. "
-                         "Please choose one of them for this request.") % names)
+                yield (_("Borrower already has %(n)s guarantors (%(names)s)") % {
+                           'n': self.guarantor_max(), 'names': names},
+                       _("This employee already has %(n)s guarantors (%(names)s) on previous "
+                         "requests. Please choose one of them for this request.") % {
+                           'n': self.guarantor_max(), 'names': names})
                 return
 
     # ── Two-guarantor (combined salary) support ───────────────────────────
@@ -795,6 +797,17 @@ class ReslValidations(models.AbstractModel):
         }
 
     @api.model
+    def guarantor_max(self):
+        """Most guarantors one request can have (Configuration > Number of
+        guarantors). Default 2; never below 1."""
+        try:
+            n = int(self.env['ir.config_parameter'].sudo().get_param(
+                'resl.max_guarantors', '2') or 2)
+        except (TypeError, ValueError):
+            n = 2
+        return max(n, 1)
+
+    @api.model
     def guarantor_slot_state(self, loan):
         """'open'         - no guarantor yet,
         'needs_second' - one guarantor whose salary alone does not cover the
@@ -803,7 +816,7 @@ class ReslValidations(models.AbstractModel):
         cov = self.guarantor_coverage(loan)
         if cov['count'] == 0:
             return 'open'
-        if cov['count'] >= 2 or cov['covered']:
+        if cov['count'] >= self.guarantor_max() or cov['covered']:
             return 'full'
         return 'needs_second'
 
@@ -814,8 +827,8 @@ class ReslValidations(models.AbstractModel):
         cover the borrower's salary on their own."""
         cov = self.guarantor_coverage(loan)
         n = cov['count'] + pending_count
-        if n >= 2:
-            raise ValidationError(_("A request can have at most two guarantors."))
+        if n >= self.guarantor_max():
+            raise ValidationError(_("A request can have at most %s guarantors.") % self.guarantor_max())
         if cov['count'] == 1 and pending_count == 0 and cov['covered']:
             raise ValidationError(_(
                 "This request already has a guarantor who covers it, so a second "
@@ -838,8 +851,8 @@ class ReslValidations(models.AbstractModel):
         """
         v = self.with_context(resl_replacing_line_ids=old_line.ids)
         cov = v.guarantor_coverage(loan)
-        if cov['count'] >= 2:
-            raise ValidationError(_("A request can have at most two guarantors."))
+        if cov['count'] >= self.guarantor_max():
+            raise ValidationError(_("A request can have at most %s guarantors.") % self.guarantor_max())
         has_replacement = bool(old_line.sudo().replacement_line_ids.filtered(
             lambda l: l.state in ('draft', 'pending', 'accepted')
         ))

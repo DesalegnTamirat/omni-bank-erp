@@ -22,6 +22,8 @@ class DisciplineRevocationWizard(models.TransientModel):
             raise UserError(_('Revocation Authority Violation: Only authorized HR Administrators or Senior Management can revoke disciplinary cases.'))
 
         case = self.case_id
+        if case.is_exonerated_case or case.punishment_type == 'exonerate' or case.appeal_outcome_type == 'exonerated':
+            raise UserError(_('Invalid Action: Case "%s" has already been fully exonerated on appeal. An exonerated case has no active penalties and cannot be revoked.') % case.name)
         if not self.revocation_reason:
             raise UserError(_('Formal revocation justification is mandatory.'))
 
@@ -37,13 +39,15 @@ class DisciplineRevocationWizard(models.TransientModel):
         })
 
         # Revert employee disciplinary status
-        emp = case.employee_id
-        emp.active_disciplinary_action = False
-        if emp.disciplinary_warning_count > 0:
-            emp.disciplinary_warning_count -= 1
+        emp = case.sudo().employee_id
+        if emp:
+            emp.with_context(no_leave_resource_calendar_update=True).write({
+                'active_disciplinary_action': False,
+                'disciplinary_warning_count': max(0, emp.disciplinary_warning_count - 1),
+            })
 
         # Cancel any active/pending payroll penalties associated with this case
-        case.payroll_penalty_ids.write({'state': 'cancelled'})
+        case.sudo().payroll_penalty_ids.write({'state': 'cancelled'})
 
         # Post immutable audit log in chatter
         case.message_post(

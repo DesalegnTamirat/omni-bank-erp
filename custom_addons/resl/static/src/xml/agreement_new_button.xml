@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="resl.AgreementNewButton">
+        <button t-if="isVisible" type="button"
+                t-attf-class="btn #{agreed ? 'btn-secondary' : 'btn-primary'}" t-on-click="onClick">
+            <i t-attf-class="fa #{agreed ? 'fa-check' : 'fa-pencil-square-o'} me-1"/>
+            <t t-if="agreed">Agreement (Borrower) – agreed</t>
+            <t t-else="">Agreement (Borrower)</t>
+        </button>
+    </t>
+</templates>

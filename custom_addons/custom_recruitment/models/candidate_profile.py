@@ -61,6 +61,16 @@ class CandidateProfile(models.Model):
     linkedin_url = fields.Char(string='LinkedIn Profile URL')
     portfolio_url = fields.Char(string='Portfolio Website URL')
     github_url = fields.Char(string='GitHub / GitLab URL')
+    # ── Bunna Bank Account Information (CBS Integration) ───────────────────
+    has_bunna_account = fields.Boolean(string='Has Bunna Bank Account', default=False)
+    bunna_account_number = fields.Char(string='Bunna Account Number')
+    bunna_account_name = fields.Char(string='Bunna Account Holder Name')
+    bunna_account_type = fields.Char(string='Bunna Account Type', default='Saving Account')
+    bunna_account_status = fields.Char(string='Bunna Account Status', default='Active')
+    bunna_branch_name = fields.Char(string='Bunna Branch Name')
+    bunna_account_phone = fields.Char(string='Bunna Account Phone')
+    bunna_account_verified_at = fields.Datetime(string='Bunna Account Verified At')
+
     active = fields.Boolean(
         string='Active',
         default=True,
@@ -69,10 +79,120 @@ class CandidateProfile(models.Model):
         string='Activation Token',
         index=True,
     )
+    activation_token_expiry = fields.Datetime(
+        string='Activation Token Expiration',
+        index=True,
+    )
+
+    def generate_activation_token(self, validity_minutes=None):
+        """Generates a fresh unique activation token with an expiration datetime (default: 5 minutes).
+        Any previous token is superseded and invalidated immediately.
+        """
+        self.ensure_one()
+        import uuid
+        from datetime import timedelta
+        if validity_minutes is None:
+            config_val = self.env['ir.config_parameter'].sudo().get_param('ats.activation_token_expiry_minutes', '5')
+            try:
+                validity_minutes = int(config_val)
+            except (ValueError, TypeError):
+                validity_minutes = 5
+        token = str(uuid.uuid4())
+        expiry = fields.Datetime.now() + timedelta(minutes=validity_minutes)
+        self.sudo().write({
+            'activation_token': token,
+            'activation_token_expiry': expiry,
+        })
+        return token
     reset_token = fields.Char(
         string='Reset Token',
         index=True,
     )
+
+    def is_internal_employee(self):
+        """Check if candidate profile belongs to an employee registered in hr.employee master or hired."""
+        self.ensure_one()
+        emp_model = self.env['hr.employee'].sudo()
+
+        # 1. User Account check
+        if self.user_id:
+            u = self.user_id
+            if hasattr(u, 'employee_id') and u.employee_id:
+                return True
+            if hasattr(u, 'employee_ids') and u.employee_ids:
+                return True
+            if emp_model.search([('user_id', '=', u.id)], limit=1):
+                return True
+
+        # 2. Partner Link check
+        if self.partner_id:
+            partner_domain = []
+            if 'work_contact_id' in emp_model._fields:
+                partner_domain.append(('work_contact_id', '=', self.partner_id.id))
+            if 'user_partner_id' in emp_model._fields:
+                partner_domain.append(('user_partner_id', '=', self.partner_id.id))
+            if 'user_id' in emp_model._fields:
+                partner_domain.append(('user_id.partner_id', '=', self.partner_id.id))
+            if partner_domain:
+                if len(partner_domain) > 1:
+                    partner_domain = ['|'] * (len(partner_domain) - 1) + partner_domain
+                if emp_model.search(partner_domain, limit=1):
+                    return True
+
+        # 3. Email check (case-insensitive)
+        emails = {e.strip().lower() for e in [self.email, self.user_id.email if self.user_id else False, self.user_id.login if self.user_id else False] if e and '@' in e}
+        for em in emails:
+            email_domain = []
+            if 'work_email' in emp_model._fields:
+                email_domain.append(('work_email', '=ilike', em))
+            if 'private_email' in emp_model._fields:
+                email_domain.append(('private_email', '=ilike', em))
+            if email_domain:
+                if len(email_domain) > 1:
+                    email_domain = ['|'] * (len(email_domain) - 1) + email_domain
+                if emp_model.search(email_domain, limit=1):
+                    return True
+
+        # 4. Phone number check (last 9 digits)
+        clean_phone = re.sub(r'[\s\-\(\)\+]', '', str(self.phone or '')).strip()
+        if clean_phone and len(clean_phone) >= 9:
+            last9 = clean_phone[-9:]
+            phone_domain = []
+            if 'mobile_phone' in emp_model._fields:
+                phone_domain.append(('mobile_phone', 'ilike', last9))
+            if 'work_phone' in emp_model._fields:
+                phone_domain.append(('work_phone', 'ilike', last9))
+            if phone_domain:
+                if len(phone_domain) > 1:
+                    phone_domain = ['|'] * (len(phone_domain) - 1) + phone_domain
+                if emp_model.search(phone_domain, limit=1):
+                    return True
+
+        # 5. National ID check
+        nid = (self.national_id or '').strip()
+        if nid:
+            nid_domain = []
+            if 'identification_id' in emp_model._fields:
+                nid_domain.append(('identification_id', '=ilike', nid))
+            if 'national_id' in emp_model._fields:
+                nid_domain.append(('national_id', '=ilike', nid))
+            if 'employee_id_number' in emp_model._fields:
+                nid_domain.append(('employee_id_number', '=ilike', nid))
+            if nid_domain:
+                if len(nid_domain) > 1:
+                    nid_domain = ['|'] * (len(nid_domain) - 1) + nid_domain
+                if emp_model.search(nid_domain, limit=1):
+                    return True
+
+        # 6. Check existing applications
+        for app in self.application_ids:
+            if app.employee_id or app.contract_created_new or app.bunna_app_status == 'hired':
+                return True
+            stage_name = (app.stage_id.name or '').strip().lower() if app.stage_id else ''
+            if any(k in stage_name for k in ['contract signed', 'contract proposal', 'hired', 'signed']):
+                return True
+
+        return False
 
     # ---------------------------------------------------------------
     # Personal & Contact Information
@@ -117,6 +237,7 @@ class CandidateProfile(models.Model):
     alternative_mobile = fields.Char(string='Alternate Mobile')
 
     # ── User Requested Bunna Bank Experience Fields ─────────────────────────
+    has_work_experience = fields.Boolean(string='I Have Professional Work Experience', default=False)
     worked_in_bunna_earlier = fields.Selection([('yes', 'Yes'), ('no', 'No')], string='Previously Worked in Bunna Bank?', default='no')
     last_position_held = fields.Char(string='Last Position Held')
     last_department = fields.Char(string='Last Department')
@@ -150,6 +271,19 @@ class CandidateProfile(models.Model):
             else:
                 rec.age = 0
 
+    @api.constrains('dob', 'birth_date')
+    def _check_candidate_minimum_age(self):
+        today = date.today()
+        for rec in self:
+            d = rec.dob or rec.birth_date
+            if d:
+                if d > today:
+                    raise ValidationError(_("Date of Birth cannot be in the future."))
+                age = today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+                if age < 18:
+                    raise ValidationError(_("Candidates must be at least 18 years old to register and apply. The specified Date of Birth (%s) corresponds to an age of %d years.") % (d.strftime('%Y-%m-%d'), age))
+
+
     @api.depends('experience_ids.duration_years', 'experience_ids.sector_type', 'experience_ids.experience_type')
     def _compute_experience_totals(self):
         for rec in self:
@@ -170,7 +304,7 @@ class CandidateProfile(models.Model):
         ('female', 'Female'),
     ], string='Gender')
     birth_date = fields.Date(
-        string='Date of Birth',
+        string='Birth Date',
     )
     city = fields.Char(
         string='City / Town',
@@ -187,6 +321,31 @@ class CandidateProfile(models.Model):
         string='State / Region',
         domain="[('country_id', '=', country_id)]",
     )
+
+    @api.constrains('cv_filename')
+    def _check_cv_format(self):
+        for rec in self:
+            if rec.cv_filename:
+                ext = rec.cv_filename.split('.')[-1].lower() if '.' in rec.cv_filename else ''
+                if ext != 'pdf':
+                    raise ValidationError(_("Curriculum Vitae (CV) must strictly be a PDF file (.pdf)."))
+
+    @api.constrains('linkedin_url', 'github_url', 'portfolio_url')
+    def _check_professional_urls(self):
+        import re
+        for rec in self:
+            if rec.linkedin_url:
+                url = rec.linkedin_url.strip()
+                if not re.match(r'^https?://([a-zA-Z0-9-]+\.)*linkedin\.com(/.*)?$', url, re.IGNORECASE):
+                    raise ValidationError(_("LinkedIn Profile URL must be a valid LinkedIn link (e.g., https://www.linkedin.com/in/yourprofile)."))
+            if rec.github_url:
+                url = rec.github_url.strip()
+                if not re.match(r'^https?://([a-zA-Z0-9-]+\.)*(github\.com|gitlab\.com)(/.*)?$', url, re.IGNORECASE):
+                    raise ValidationError(_("GitHub / GitLab URL must be a valid GitHub or GitLab link (e.g., https://github.com/yourusername)."))
+            if rec.portfolio_url:
+                url = rec.portfolio_url.strip()
+                if not re.match(r'^https?://[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+(:\d+)?(/.*)?$', url, re.IGNORECASE) or any(bad in url.lower() for bad in ['javascript:', 'data:', '<script']):
+                    raise ValidationError(_("Portfolio Website URL must be a valid web URL starting with http:// or https://."))
 
     @api.constrains('name', 'email', 'phone')
     def _check_required_candidate_fields(self):
@@ -260,7 +419,7 @@ class CandidateProfile(models.Model):
         store=True,
     )
     total_experience_years = fields.Float(
-        string='Total Experience (Years)',
+        string='Total Experience In Years',
         compute='_compute_profile_summaries',
         store=True,
     )
@@ -465,6 +624,15 @@ class CandidateProfile(models.Model):
             'email_from': self.email,
             'partner_phone': self.phone,
         })
+        if self.has_bunna_account:
+            applicant.write({
+                'bunna_account_number': self.bunna_account_number,
+                'bunna_account_name': self.bunna_account_name,
+                'bunna_account_type': self.bunna_account_type,
+                'bunna_account_status': self.bunna_account_status,
+                'bunna_branch_name': self.bunna_branch_name,
+                'bunna_account_phone': self.bunna_account_phone,
+            })
         applicant._sync_from_candidate_profile()
 
     def sync_from_application(self, applicant):
@@ -567,16 +735,17 @@ class CandidateProfile(models.Model):
         _logger.info("Master Candidate Profiles auto-synced %s unlinked applicant records.", count)
         return True
 
-    @api.constrains('phone')
+    @api.constrains('phone', 'alternative_mobile')
     def _check_phone_number(self):
         for record in self:
-            if record.phone:
-                cleaned = re.sub(r'[\s\-\(\)]', '', str(record.phone).strip())
-                if not re.match(r'^(\+251|00251|251|0)(9|7)\d{8}$', cleaned):
-                    raise ValidationError(_(
-                        "Invalid Ethiopian phone number '%s'. "
-                        "Please enter a valid Ethiopian mobile phone number starting with 09, 07, or +251 (e.g. 0911223344, 0711223344, or +251911223344)."
-                    ) % record.phone)
+            for phone_val, label in [(record.phone, _("Mobile Phone Number")), (record.alternative_mobile, _("Alternate Mobile"))]:
+                if phone_val:
+                    cleaned = re.sub(r'[\s\-\(\)]', '', str(phone_val).strip())
+                    if not re.match(r'^(\+251|00251|251|0)(9|7|1|2|3|4|5)\d{7,8}$', cleaned):
+                        raise ValidationError(_(
+                            "Invalid Ethiopian phone number '%s' for %s. "
+                            "Please enter a valid Ethiopian mobile phone number starting with 09, 07, 011, or +251 (e.g. 0911223344, 0711223344, or +251911223344)."
+                        ) % (phone_val, label))
 
 
 
@@ -700,8 +869,8 @@ class CandidateExperience(models.Model):
         ondelete='cascade',
         index=True,
     )
-    position = fields.Char(string='Job Title / Position', required=True)
-    organization = fields.Char(string='Company / Organization', required=True)
+    position = fields.Char(string='Job Title / Position')
+    organization = fields.Char(string='Company / Organization')
     employment_type = fields.Selection([
         ('full_time', 'Full Time'),
         ('permanent', 'Permanent'),
@@ -709,7 +878,7 @@ class CandidateExperience(models.Model):
         ('internship', 'Internship'),
         ('part_time', 'Part Time'),
         ('freelance', 'Freelance / Temporary'),
-    ], string='Employment Type', default='full_time', required=True)
+    ], string='Employment Type', default='full_time')
 
     experience_type = fields.Selection([
         ('banking', 'Banking Sector'),
@@ -719,7 +888,7 @@ class CandidateExperience(models.Model):
         ('other', 'Other'),
     ], string='Experience Type', default='banking')
 
-    start_date = fields.Date(string='Start Date', required=True)
+    start_date = fields.Date(string='Start Date')
     end_date = fields.Date(string='End Date')
     is_current = fields.Boolean(string='Currently Working Here', default=False)
     exp_file = fields.Binary(string='Experience Attachment', attachment=True)
@@ -743,18 +912,41 @@ class CandidateExperience(models.Model):
             else:
                 rec.duration_years = 0.0
 
-    @api.constrains('position', 'organization', 'start_date')
-    def _check_required_experience_fields(self):
+    @api.constrains('candidate_id', 'start_date', 'end_date', 'is_current')
+    def _check_experience_vs_graduation(self):
+        today = fields.Date.today()
         for rec in self:
-            missing = []
-            if not rec.position or not str(rec.position).strip():
-                missing.append(_("Job Title / Position"))
-            if not rec.organization or not str(rec.organization).strip():
-                missing.append(_("Company / Organization"))
-            if not rec.start_date:
-                missing.append(_("Start Date"))
-            if missing:
-                raise ValidationError(_("Missing required information for Experience Entry:\n• %s\n\nPlease specify all required experience details.") % "\n• ".join(missing))
+            if not rec.candidate_id or not rec.active:
+                continue
+            edus = rec.candidate_id.education_ids.filtered(lambda e: e.active and (e.graduation_year or e.end_date))
+            if not edus:
+                continue
+            grad_dates = [e.graduation_year if e.graduation_year else e.end_date for e in edus if (e.graduation_year or e.end_date)]
+            if not grad_dates:
+                continue
+            earliest_grad = min(grad_dates)
+            earliest_year = earliest_grad.year
+            max_years = max(0, today.year - earliest_year)
+
+            if rec.start_date and rec.start_date.year < earliest_year:
+                raise ValidationError(_(
+                    "Work experience start date (%(start)s) cannot precede your graduation year (%(yr)d). "
+                    "Professional experience must be acquired after graduation.",
+                    start=rec.start_date,
+                    yr=earliest_year,
+                ))
+
+            total_exp = sum(
+                exp.duration_years for exp in rec.candidate_id.experience_ids
+                if exp.active and exp.id != rec.id
+            ) + (rec.duration_years or 0.0)
+            if total_exp > (max_years + 1.0):
+                raise ValidationError(_(
+                    "Total experience (%(exp).1f years) cannot exceed the maximum years elapsed since graduation (%(max)d years based on graduation year %(yr)d).",
+                    exp=total_exp,
+                    max=max_years,
+                    yr=earliest_year,
+                ))
 
     def unlink(self):
         for rec in self:
@@ -807,12 +999,38 @@ class CandidateSkill(models.Model):
         index=True,
     )
     name = fields.Char(string='Skill Name', required=True)
+    skill_name = fields.Char(string='Skill', compute='_compute_skill_name', inverse='_inverse_skill_name')
     level = fields.Selection([
         ('beginner', 'Beginner'),
         ('intermediate', 'Intermediate'),
         ('advanced', 'Advanced'),
         ('expert', 'Expert'),
     ], string='Proficiency Level', default='intermediate')
+    proficiency = fields.Char(string='Proficiency', compute='_compute_proficiency', inverse='_inverse_proficiency')
+
+    @api.depends('name')
+    def _compute_skill_name(self):
+        for rec in self:
+            rec.skill_name = rec.name
+
+    def _inverse_skill_name(self):
+        for rec in self:
+            rec.name = rec.skill_name
+
+    @api.depends('level')
+    def _compute_proficiency(self):
+        level_labels = dict(self._fields['level'].selection)
+        for rec in self:
+            rec.proficiency = level_labels.get(rec.level, rec.level or 'Intermediate')
+
+    def _inverse_proficiency(self):
+        for rec in self:
+            if rec.proficiency:
+                val = rec.proficiency.lower()
+                for k, v in self._fields['level'].selection:
+                    if val in (k.lower(), v.lower()):
+                        rec.level = k
+                        break
     active = fields.Boolean(default=True)
 
     def unlink(self):
@@ -842,6 +1060,20 @@ class CandidateLanguage(models.Model):
         ('native', 'Native / Mother Tongue'),
     ], string='Proficiency', default='fluent')
     active = fields.Boolean(default=True)
+
+    @api.constrains('candidate_id', 'name', 'active')
+    def _check_unique_language(self):
+        for rec in self:
+            if not rec.active or not rec.name:
+                continue
+            duplicate = self.search([
+                ('id', '!=', rec.id),
+                ('candidate_id', '=', rec.candidate_id.id),
+                ('name', '=ilike', rec.name.strip()),
+                ('active', '=', True)
+            ], limit=1)
+            if duplicate:
+                raise ValidationError(_("The language '%s' has already been added to your profile. Each language must be distinct.") % rec.name)
 
     def unlink(self):
         for rec in self:

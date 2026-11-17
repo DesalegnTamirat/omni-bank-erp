@@ -28,7 +28,42 @@ class HrInductionTaskTemplate(models.Model):
         default=1,
         help="Number of calendar days after the employee's Expected Start Date to set the target due date.",
     )
+    employee_category = fields.Selection(
+        [
+            ("all", "All Job Categories"),
+            ("Managerial", "Managerial Only"),
+            ("Non Managerial", "Non Managerial Only"),
+        ],
+        string="Applicable Category",
+        default="all",
+        required=True,
+        help="Specifies whether this induction module applies to managerial or non-managerial recruits.",
+    )
+    department_ids = fields.Many2many(
+        "hr.department",
+        "induction_task_tmpl_dept_rel",
+        "tmpl_id",
+        "dept_id",
+        string="Target Departments",
+        help="Leave empty if this orientation training applies across all departments in Bunna Bank.",
+    )
     active = fields.Boolean(string="Active", default=True)
+
+    @api.constrains("name")
+    def _check_unique_name(self):
+        for rec in self:
+            if rec.name:
+                clean_name = rec.name.strip()
+                duplicate = self.search([
+                    ("id", "!=", rec.id),
+                    ("name", "=ilike", clean_name),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_(
+                        "Duplicate Induction Task Title Error!\n\n"
+                        "An Induction Task Template with the title '%s' already exists.\n\n"
+                        "Each orientation training title must be unique to avoid redundant tasks."
+                    ) % clean_name)
 
 
 class HrOnboardingScoreConfig(models.Model):
@@ -123,4 +158,39 @@ class HrOnboardingTaskTemplate(models.Model):
         default=1,
         help="Number of calendar days after the employee's Expected Start Date to set the target due date.",
     )
+    employee_category = fields.Selection(
+        [
+            ("all", "All Job Categories"),
+            ("Managerial", "Managerial Only"),
+            ("Non Managerial", "Non Managerial Only"),
+        ],
+        string="Applicable Category",
+        default="all",
+        required=True,
+        help="Specifies whether this induction module applies to managerial or non-managerial recruits.",
+    )
+    department_ids = fields.Many2many(
+        "hr.department",
+        "onboarding_task_tmpl_dept_rel",
+        "tmpl_id",
+        "dept_id",
+        string="Target Departments",
+        help="Leave empty if this task applies across all departments in Bunna Bank.",
+    )
     active = fields.Boolean(string="Active", default=True)
+
+    @api.constrains("name")
+    def _check_unique_name(self):
+        for rec in self:
+            if rec.name:
+                clean_name = rec.name.strip()
+                duplicate = self.search([
+                    ("id", "!=", rec.id),
+                    ("name", "=ilike", clean_name),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_(
+                        "Duplicate Onboarding Task Description Error!\n\n"
+                        "An Onboarding Task Template with the description '%s' already exists.\n\n"
+                        "Each workplace onboarding task description must be unique to avoid redundant tasks."
+                    ) % clean_name)

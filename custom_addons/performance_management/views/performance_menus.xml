@@ -71,7 +71,7 @@
     <!-- ===================== Tier 2 ===================== -->
 
     <menuitem id="menu_tier2"
-              name="Tier 2 (Division)"
+              name="Tier 2 (Work Units)"
               parent="menu_performance"
               groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="20"/>
@@ -147,7 +147,7 @@
     <!-- ===================== Tier 2 ===================== -->
 
     <menuitem id="menu_tier2_appraisal"
-              name="Tier 2 (Division)"
+              name="Tier 2 (Work Units)"
               parent="menu_appraisals"
               groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
               sequence="20"/>
@@ -201,6 +201,45 @@
               name="Automatic Scorecard Notify"
               parent="menu_automation"
               action="action_automatic_scorecard_notify_wizard"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
+              sequence="10"/>
+
+    <menuitem id="menu_automatic_appraisal_notify_wizard"
+              name="Automatic Appraisal Notify"
+              parent="menu_automation"
+              action="action_automatic_appraisal_notify_wizard"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
+              sequence="20"/>
+
+    <menuitem id="menu_automatic_scorecard_accept_wizard"
+              name="Automatic Scorecard Acceptance"
+              parent="menu_automation"
+              action="action_automatic_scorecard_accept_wizard"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
+              sequence="30"/>
+
+    <menuitem id="menu_automatic_appraisal_accept_wizard"
+              name="Automatic Appraisal Acceptance"
+              parent="menu_automation"
+              action="action_automatic_appraisal_accept_wizard"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
+              sequence="40"/>
+
+
+    <!-- ====================================================== -->
+    <!-- Reporting -->
+    <!-- ====================================================== -->
+
+    <menuitem id="menu_reporting"
+              name="Reporting"
+              parent="menu_performance_management_root"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
+              sequence="35"/>
+
+    <menuitem id="menu_comprehensive_performance_report"
+              name="Comprehensive Performance Report"
+              parent="menu_reporting"
+              action="action_performance_comprehensive_report_wizard"
               groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="10"/>
 

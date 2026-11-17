@@ -7,7 +7,7 @@ class PmTaskTag(models.Model):
     _description = 'Project Type / Tag'
 
     name = fields.Char(string='Project Type / Tag Name', required=True, translate=True)
-    color = fields.Integer(string='Color Index', default=0)
+    color = fields.Integer(default=0)
 
     @api.constrains('name')
     def _check_name_uniq(self):

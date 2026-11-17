@@ -4,8 +4,8 @@
         <record id="seq_succession_dev_plan" model="ir.sequence">
             <field name="name">Succession Development Plan Reference</field>
             <field name="code">succession.development.plan</field>
-            <field name="prefix">SDP-%(year)s-</field>
-            <field name="padding">4</field>
+            <field name="prefix">BB-IDP-</field>
+            <field name="padding">5</field>
             <field name="company_id" eval="False"/>
         </record>
     </data>

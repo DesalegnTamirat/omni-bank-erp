@@ -16,47 +16,97 @@ _TOKEN_CACHE = {
 }
 
 
+_CONFIG_CACHE = {
+    "config": None,
+    "expires_at": 0,
+}
+
 def get_cbs_credentials(env):
-    """Retrieve CBS API credentials securely from the cbs_integration table or system parameters.
-    No credentials or network endpoints are hardcoded.
+    """Retrieve CBS API credentials securely from cbs_integration or parameters.
+    Uses an isolated database cursor so that any SQL/pgcrypto failure never triggers
+    an env.cr savepoint rollback and never invalidates in-memory record cache.
     """
+    global _CONFIG_CACHE
+    now = time.time()
+    if _CONFIG_CACHE.get("config") and _CONFIG_CACHE.get("expires_at", 0) > now:
+        return dict(_CONFIG_CACHE["config"])
+
     config = {
         "username": "",
         "password": "",
         "endpoint": "",
-        "environment": "UAT",
+        "environment": "CBS",
         "status": "true",
     }
+    # Query using an isolated cursor to protect caller's transaction/cache
     try:
-        env.cr.execute(
-            """
-            SELECT username, password, endpoint, environment, status
-            FROM cbs_integration
-            WHERE status = 'true'
-            LIMIT 1
-            """
-        )
-        row = env.cr.fetchone()
-        if row:
-            config["username"] = str(row[0] or "").strip()
-            config["password"] = str(row[1] or "").strip()
-            raw_endpoint = str(row[2] or "").strip()
-            if raw_endpoint:
-                config["endpoint"] = raw_endpoint.rstrip("/")
-            config["environment"] = str(row[3] or "UAT").strip()
-            config["status"] = str(row[4] or "true").strip()
-    except Exception as e:
-        _logger.warning("Could not query cbs_integration table: %s", e)
+        with env.registry.cursor() as fresh_cr:
+            # 1. Try querying cbs_integration with cbs_decode()
+            try:
+                fresh_cr.execute(
+                    """
+                    SELECT username, cbs_decode(password), endpoint, environment, status
+                    FROM cbs_integration
+                    WHERE (status IS NULL OR status = 'true' OR status = 'active')
+                      AND UPPER(TRIM(environment)) IN ('CBS', 'UAT')
+                    LIMIT 1
+                    """
+                )
+                row = fresh_cr.fetchone()
+                if row:
+                    config["username"] = str(row[0] or "").strip()
+                    config["password"] = str(row[1] or "").strip()
+                    raw_endpoint = str(row[2] or "").strip()
+                    if raw_endpoint:
+                        config["endpoint"] = raw_endpoint.rstrip("/")
+                    config["environment"] = str(row[3] or "CBS").strip()
+                    config["status"] = str(row[4] or "true").strip()
+            except Exception as e:
+                fresh_cr.rollback()
+                _logger.warning("Querying cbs_integration with cbs_decode failed, falling back: %s", e)
 
-    # Fallback to system parameters (configured by Administrator in Settings)
-    params = env["ir.config_parameter"].sudo()
-    if not config["username"]:
-        config["username"] = params.get_param("bunna_helpdesk.cbs_username", "").strip()
-    if not config["password"]:
-        config["password"] = params.get_param("bunna_helpdesk.cbs_password", "").strip()
-    if not config["endpoint"]:
-        config["endpoint"] = params.get_param("bunna_helpdesk.cbs_endpoint", "").strip().rstrip("/")
+            # 2. If not found or failed, try querying cbs_integration without cbs_decode()
+            if not config["username"]:
+                try:
+                    fresh_cr.execute(
+                        """
+                        SELECT username, password, endpoint, environment, status
+                        FROM cbs_integration
+                        WHERE (status IS NULL OR status = 'true' OR status = 'active')
+                          AND UPPER(TRIM(environment)) IN ('CBS', 'UAT')
+                        LIMIT 1
+                        """
+                    )
+                    row = fresh_cr.fetchone()
+                    if row:
+                        config["username"] = str(row[0] or "").strip()
+                        config["password"] = str(row[1] or "").strip()
+                        raw_endpoint = str(row[2] or "").strip()
+                        if raw_endpoint:
+                            config["endpoint"] = raw_endpoint.rstrip("/")
+                        config["environment"] = str(row[3] or "CBS").strip()
+                        config["status"] = str(row[4] or "true").strip()
+                except Exception as exc:
+                    fresh_cr.rollback()
+                    _logger.warning("Could not query cbs_integration table: %s", exc)
+    except Exception as exc:
+        _logger.warning("Could not open isolated cursor for CBS credentials: %s", exc)
 
+    # 3. Fallback to system parameters (configured by Administrator in Settings)
+    try:
+        params = env["ir.config_parameter"].sudo()
+        if not config["username"]:
+            config["username"] = params.get_param("bunna_helpdesk.cbs_username", "").strip()
+        if not config["password"]:
+            config["password"] = params.get_param("bunna_helpdesk.cbs_password", "").strip()
+        if not config["endpoint"]:
+            config["endpoint"] = params.get_param("bunna_helpdesk.cbs_endpoint", "").strip().rstrip("/")
+    except Exception as exc:
+        _logger.warning("Could not query ir.config_parameter: %s", exc)
+
+    if config.get("endpoint"):
+        _CONFIG_CACHE["config"] = dict(config)
+        _CONFIG_CACHE["expires_at"] = now + 300
     return config
 
 
@@ -264,7 +314,28 @@ def parse_cbs_response_customer(raw_data, query_identifier=None, id_type="accoun
     else:
         preferred_language = "amharic"
 
-    # 14. Customer Type Description
+    # 14. Account Ownership
+    account_ownership = str(get_val(["ACCOUNT_OWNERSHIP", "account_ownership", "accountOwnership", "ownership", "ownershipType"], "")).strip() or False
+
+    # 15. Mode of Operation Code
+    mode_of_oper_code = str(get_val(["MODE_OF_OPER_CODE", "mode_of_oper_code", "modeOfOperCode", "modeOfOperation"], "")).strip() or False
+
+    # 16. Account Opening Date
+    raw_opn_date = get_val(["ACCT_OPN_DATE", "acct_opn_date", "acctOpnDate", "accountOpenDate", "openDate"])
+    acct_opn_date = False
+    if raw_opn_date:
+        raw_str = str(raw_opn_date).strip()
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%Y"):
+            try:
+                dt = datetime.datetime.strptime(raw_str[:19], fmt)
+                acct_opn_date = dt.date().isoformat()
+                break
+            except (ValueError, TypeError):
+                continue
+        if not acct_opn_date and len(raw_str) >= 10:
+            acct_opn_date = raw_str[:10]
+
+    # 17. Customer Type Description
     customer_type = str(get_val(["CUSTOMER_SEGMENT", "customer_segment", "customerType", "custType", "CUSTOMER_TYPE"], "Retail")).strip()
 
     return {
@@ -275,16 +346,17 @@ def parse_cbs_response_customer(raw_data, query_identifier=None, id_type="accoun
         "phone": str(phone).strip() if phone else False,
         "email": email_str or False,
         "age": age,
-        "district_name": str(district_name).strip(),
-        "branch_name": str(branch_name).strip(),
+        "district_name": str(district_name).strip() if district_name else False,
+        "branch_name": str(branch_name).strip() if branch_name else False,
         "sol_id": str(sol_id).strip() if sol_id else False,
         "customer_type": customer_type,
-        "account_type": str(account_type).strip(),
+        "account_type": str(account_type).strip() if account_type else "Saving Account",
         "account_status": account_status,
         "customer_segment": customer_segment,
         "preferred_language": preferred_language,
-        "acct_opn_date": get_val(["ACCT_OPN_DATE", "acct_opn_date", "acctOpnDate"]),
-        "mode_of_oper_code": get_val(["MODE_OF_OPER_CODE", "mode_of_oper_code", "modeOfOperCode"]),
+        "acct_opn_date": acct_opn_date,
+        "mode_of_oper_code": mode_of_oper_code,
+        "account_ownership": account_ownership,
     }
 
 
@@ -320,8 +392,8 @@ def query_cbs_api(env, identifier, id_type="account"):
     # Step 1: Obtain JWT Token (with cached token support)
     token = get_cbs_access_token(env, username, password, base_url)
     if not token:
-        # Fallback: try basic auth directly if token login is not supported
-        _logger.info("No JWT token obtained, attempting direct request.")
+        _logger.warning("CBS authentication login failed for user '%s' at '%s'", username, base_url)
+        return False, None, _("Authentication failed while connecting to Core Banking System. Please verify credentials (user: %s).") % username
 
     def do_request(jwt_token=None):
         headers = {
@@ -332,23 +404,9 @@ def query_cbs_api(env, identifier, id_type="account"):
         if jwt_token:
             headers["Authorization"] = f"Bearer {jwt_token}"
 
-        auth = (username, password) if (username and password and not jwt_token) else None
-
         # Build URL for primary customer details endpoint: /api/cbs/customer-details/{foracid}
         req_url = f"{base_url}/api/cbs/customer-details/{q}"
-
-        # If query identifier contains digits (Account or CIF)
-        resp = requests.get(req_url, headers=headers, auth=auth, timeout=(3.0, 5.0))
-        if resp.status_code == 404 or resp.status_code == 400:
-            # Fallback to query parameter endpoint: /api/cbs/customer-details or /customer
-            fallback_url = f"{base_url}/customer"
-            resp = requests.get(
-                fallback_url,
-                params={"accountNumber": q, "cif": q, "phone": q, "faydaNumber": q},
-                headers=headers,
-                auth=auth,
-                timeout=(3.0, 5.0),
-            )
+        resp = requests.get(req_url, headers=headers, timeout=(3.0, 5.0))
         return resp
 
     raw_response = None
@@ -368,6 +426,14 @@ def query_cbs_api(env, identifier, id_type="account"):
             return False, None, _("Authentication failed while connecting to Core Banking System. Please verify credentials.")
         elif resp.status_code == 404:
             return False, None, _("Customer %s not found in Finacle Core Banking.") % q
+        elif resp.status_code == 400:
+            err_msg = ""
+            try:
+                err_data = resp.json()
+                err_msg = err_data.get("message", "")
+            except Exception:
+                pass
+            return False, None, err_msg or (_("Invalid CBS request for identifier: %s") % q)
         else:
             return False, None, _("CBS returned HTTP %s") % resp.status_code
 

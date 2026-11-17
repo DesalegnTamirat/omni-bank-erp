@@ -36,6 +36,8 @@
                     <button name="action_trigger_provisioning_alert" string="Send 7-Day Pre-Arrival IT Alert" type="object" class="btn-secondary" invisible="state not in ('pre_boarding', 'induction_gate') or provisioning_status != 'pending'"/>
                     <button name="action_start_work_unit_onboarding" string="Initiate Work Unit Onboarding" type="object" class="oe_highlight" invisible="state != 'induction_gate'"/>
                     <button name="action_dispatch_midterm_eval" string="Dispatch 4-Week Mid-Term Form" type="object" invisible="state != 'work_unit_onboarding'"/>
+                    <button name="action_resolve_escalation" string="Resolve Escalation" type="object" class="btn-success" invisible="not is_escalated or state == 'completed'"/>
+                    <button name="action_load_default_tasks" string="Auto-Load Workplace Tasks" type="object" class="btn-secondary" invisible="state == 'completed'"/>
                     <button name="action_close_onboarding" string="Digital Sign-off &amp; Close File" type="object" class="oe_highlight" invisible="state not in ('midterm_review', 'work_unit_onboarding')"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,pre_boarding,induction_gate,work_unit_onboarding,midterm_review,completed"/>
                 </header>
@@ -55,14 +57,21 @@
                     <div class="card p-3 mb-4 bg-light">
                         <group>
                             <group>
-                                <field name="employee_id" string="NEW HIRE EMPLOYEE" readonly="state != 'draft'"/>
+                                <field name="eligible_employee_ids" invisible="1"/>
+                                <field name="eligible_buddy_ids" invisible="1"/>
+                                <field name="operating_unit_id" invisible="1"/>
+                                <field name="is_officer_or_admin" invisible="1"/>
+                                <field name="is_supervisor" invisible="1"/>
+                                <field name="is_new_hire" invisible="1"/>
+                                <field name="is_buddy" invisible="1"/>
+                                <field name="employee_id" string="NEW HIRE EMPLOYEE" domain="[('id', 'in', eligible_employee_ids)]" readonly="state != 'draft' or not is_officer_or_admin"/>
                                 <field name="job_position_id" string="POSITION TITLE" readonly="1"/>
                                 <field name="department_id" string="DEPARTMENT" readonly="1"/>
                             </group>
                             <group>
-                                <field name="supervisor_id" string="IMMEDIATE SUPERVISOR" readonly="state in ('completed',)"/>
+                                <field name="supervisor_id" string="IMMEDIATE SUPERVISOR" readonly="1" force_save="1"/>
                                 <field name="start_date" string="EXPECTED START DATE" readonly="state != 'draft'"/>
-                                <field name="employee_category" string="JOB CATEGORY" readonly="state != 'draft'"/>
+                                <field name="employee_category" string="JOB CATEGORY" readonly="1" force_save="1"/>
                                 <field name="progress_percentage" widget="progressbar" string="WORK UNIT PROGRESS"/>
                             </group>
                         </group>
@@ -75,18 +84,18 @@
                                 <strong>Pre-Boarding Gatekeeper Rule (POMD):</strong> Formal onboarding cannot initiate until POMD verifies all critical pre-employment documentation.
                             </div>
                             <group>
-                                <group string="Mandatory Document Checklists">
-                                    <field name="doc_offer_letter" string="Signed Offer / Acceptance Letter" readonly="state == 'completed'"/>
-                                    <field name="doc_medical_certificate" string="Medical Certificate Verified" readonly="state == 'completed'"/>
-                                    <field name="doc_police_clearance" string="Police Clearance / Forensic Cert." readonly="state == 'completed'"/>
-                                    <field name="doc_guarantor_contract" string="Guarantor Contract &amp; Letter" readonly="state == 'completed'"/>
-                                    <field name="doc_code_of_conduct" string="Signed Code of Conduct" readonly="state == 'completed'"/>
-                                    <field name="doc_job_description" string="Signed Job Description (JD)" readonly="state == 'completed'"/>
-                                    <field name="doc_asset_registration" string="Asset Requisition / Handover Form" readonly="state == 'completed'"/>
+                                <group string="Mandatory Document Checklists (Auto-Populated from Recruitment)">
+                                    <field name="doc_offer_letter" string="Signed Offer / Acceptance Letter" readonly="1" force_save="1"/>
+                                    <field name="doc_medical_certificate" string="Medical Certificate Verified" readonly="1" force_save="1"/>
+                                    <field name="doc_police_clearance" string="Police Clearance / Forensic Cert." readonly="1" force_save="1"/>
+                                    <field name="doc_guarantor_contract" string="Guarantor Contract &amp; Letter" readonly="1" force_save="1"/>
+                                    <field name="doc_code_of_conduct" string="Signed Code of Conduct" readonly="1" force_save="1"/>
+                                    <field name="doc_job_description" string="Signed Job Description (JD)" readonly="1" force_save="1"/>
+                                    <field name="doc_asset_registration" string="Asset Requisition / Handover Form" readonly="1" force_save="1"/>
                                 </group>
-                                <group string="Formalities Verification &amp; Gate">
-                                    <field name="doc_tin_number" string="TIN Number" placeholder="e.g. 0045981234" readonly="state == 'completed'"/>
-                                    <field name="doc_pension_number" string="Pension Reference No." placeholder="e.g. PEN-88741" readonly="state == 'completed'"/>
+                                <group string="Formalities Verification &amp; Gate (From Employee Master)">
+                                    <field name="doc_tin_number" string="TIN Number" readonly="1" force_save="1"/>
+                                    <field name="doc_pension_number" string="Pension Reference No." readonly="1" force_save="1"/>
                                     <field name="pre_boarding_verified" string="Pre-Boarding Gate Passed" widget="boolean_toggle" readonly="1"/>
                                     <field name="pre_boarding_verified_by_user_id" string="Verified By POMD User" readonly="1"/>
                                 </group>
@@ -114,35 +123,44 @@
                         <page string="Buddy &amp; Work Unit Tasks">
                             <group string="Onboarding Buddy Mentorship Handoff">
                                 <group>
-                                    <field name="buddy_id" string="Assigned Onboarding Buddy" readonly="state == 'completed'"/>
+                                    <field name="buddy_id" string="Assigned Onboarding Buddy" 
+                                           domain="[('id', 'in', eligible_buddy_ids)]"
+                                           options="{'no_create': True, 'no_create_edit': True}" 
+                                           readonly="state == 'completed' or not is_officer_or_admin"/>
                                     <field name="buddy_user_id" string="Buddy User Account" readonly="1"/>
                                     <field name="buddy_assigned_date" string="Assigned On" readonly="1"/>
                                     <field name="buddy_assigned_by_user_id" string="Assigned By" readonly="1"/>
-                                    <button name="action_assign_buddy" string="Confirm Buddy Assignment" type="object" class="btn btn-secondary"/>
+                                    <button name="action_assign_buddy" string="Confirm Buddy Assignment" type="object" class="btn btn-secondary" invisible="not is_officer_or_admin"/>
                                 </group>
                                 <group>
-                                    <field name="buddy_notes" string="Buddy Guidance Notes &amp; Check-ins" placeholder="Log mentorship advice, weekly check-in notes..." readonly="state == 'completed'"/>
+                                    <field name="buddy_notes" string="Buddy Guidance Notes &amp; Check-ins" placeholder="Log mentorship advice, weekly check-in notes..." readonly="state == 'completed' or (not is_buddy and not is_officer_or_admin)"/>
                                 </group>
                             </group>
-                            <separator string="Work Unit Daily &amp; Weekly Task Progress Tracker"/>
+                            <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+                                <h5 class="fw-bold m-0" style="color: #4A261A;">Work Unit Daily &amp; Weekly Task Progress Tracker</h5>
+                                <button name="action_load_default_tasks" string="Auto-Load Workplace Tasks" type="object" class="btn btn-sm btn-outline-primary" invisible="state == 'completed'"/>
+                            </div>
                             <field name="task_ids" readonly="state == 'completed'">
-                                <list editable="bottom"
+                                <list create="false" delete="false" edit="false"
                                       decoration-danger="is_overdue"
                                       decoration-success="state == 'done'">
-                                    <field name="period" string="Period" widget="badge"/>
-                                    <field name="name" string="Task Description"/>
-                                    <field name="assigned_to_role" string="Assigned Role" widget="badge"/>
-                                    <field name="due_date" string="Due Date"/>
+                                    <field name="period" string="Period" widget="badge" readonly="1"/>
+                                    <field name="template_id" string="Task Description" options="{'no_create': True, 'no_create_edit': True, 'no_open': True}" readonly="1"/>
+                                    <field name="name" column_invisible="1"/>
+                                    <field name="assigned_to_role" string="Assigned Role" widget="badge" readonly="1"/>
+                                    <field name="is_first_task" column_invisible="1"/>
+                                    <field name="can_mark_done" column_invisible="1"/>
+                                    <field name="due_date" string="Due Date" readonly="1"/>
                                     <field name="is_overdue" column_invisible="1"/>
                                     <field name="state" string="Status" widget="badge"
                                            decoration-success="state == 'done'"
                                            decoration-warning="state == 'todo'"/>
-                                    <field name="comments" string="Progress Notes" optional="hide"/>
+                                    <field name="comments" string="Progress Notes" optional="hide" readonly="1"/>
                                     <field name="completed_date" string="Completed On" readonly="1" optional="show"/>
                                     <field name="completed_by_user_id" string="Completed By" readonly="1" optional="show"/>
                                     <button name="action_mark_done" string="Mark Done" type="object"
                                             icon="fa-check-circle" class="btn-success"
-                                            invisible="state == 'done'"/>
+                                            invisible="state == 'done' or not can_mark_done"/>
                                 </list>
                             </field>
                         </page>
@@ -153,23 +171,24 @@
                                 <group>
                                     <field name="midterm_eval_sent" string="Form Dispatched" readonly="1"/>
                                     <field name="midterm_eval_date" string="Dispatched Date" readonly="1"/>
-                                    <field name="midterm_score" string="Mid-Term Rating (/100)" readonly="state == 'completed'"/>
                                 </group>
                                 <group>
-                                    <field name="midterm_employee_feedback" string="New Hire Mid-Term Feedback" placeholder="New hire comments on integration..." readonly="state == 'completed'"/>
-                                    <field name="midterm_supervisor_feedback" string="Supervisor Mid-Term Feedback" placeholder="Supervisor performance feedback..." readonly="state == 'completed'"/>
+                                    <field name="midterm_employee_feedback" string="New Hire Mid-Term Feedback" placeholder="New hire comments on integration..." readonly="state == 'completed' or (not is_new_hire and not is_officer_or_admin)"/>
+                                    <field name="midterm_supervisor_feedback" string="Supervisor Mid-Term Feedback" placeholder="Supervisor performance feedback..." readonly="state == 'completed' or (not is_supervisor and not is_officer_or_admin)"/>
                                 </group>
                             </group>
                             <group string="2-Month Program Closure &amp; Digital Sign-off">
                                 <group>
-                                    <field name="final_eval_sent" string="Final Form Sent" readonly="1"/>
+                                    <field name="final_eval_sent" string="Final Form Sent" readonly="state == 'completed' or (not is_supervisor and not is_officer_or_admin)"/>
                                     <field name="final_eval_date" string="Closure Date" readonly="1"/>
-                                    <field name="final_onboarding_score" string="Overall Onboarding Score (/100)" readonly="state == 'completed'"/>
+                                    <field name="final_onboarding_score" string="Overall Onboarding Score (/100)" readonly="state == 'completed' or (not is_supervisor and not is_officer_or_admin)"/>
                                 </group>
                                 <group string="Probation Counter Linkage">
-                                    <field name="probation_id" string="Linked Probation Record" readonly="1"/>
-                                    <field name="is_escalated" string="Milestone Escalated" readonly="1"/>
-                                    <field name="escalation_reason" string="Escalation Reason" readonly="1"/>
+                                    <field name="probation_duration_days" string="Probation Period (Days)" readonly="1"/>
+                                    <field name="probation_deadline" string="Probation End Date" readonly="1"/>
+                                    <field name="days_remaining_probation" string="Days Remaining" readonly="1"/>
+                                    <field name="is_escalated" string="Milestone Escalated" widget="boolean_toggle" readonly="1"/>
+                                    <field name="escalation_reason" string="Escalation Notes" readonly="state == 'completed' or (not is_supervisor and not is_officer_or_admin)"/>
                                 </group>
                             </group>
 
@@ -191,7 +210,7 @@
                                         <button name="action_employee_signoff" string="I Confirm &amp; Sign Off"
                                                 type="object" class="btn mt-2 w-100 fw-bold"
                                                 style="background-color: #4A261A; color: #F0C27B; border: none;"
-                                                invisible="final_employee_signoff or state == 'completed'"/>
+                                                invisible="final_employee_signoff or state == 'completed' or (not is_new_hire and not is_officer_or_admin)"/>
                                     </div>
                                 </div>
                                 <!-- Supervisor Sign-off Panel -->
@@ -210,7 +229,7 @@
                                         <button name="action_supervisor_signoff" string="Supervisor Sign-off &amp; Approve"
                                                 type="object" class="btn mt-2 w-100 fw-bold"
                                                 style="background-color: #4A261A; color: #F0C27B; border: none;"
-                                                invisible="final_supervisor_signoff or state == 'completed'"/>
+                                                invisible="final_supervisor_signoff or state == 'completed' or (not is_supervisor and not is_officer_or_admin)"/>
                                     </div>
                                 </div>
                             </div>
@@ -275,5 +294,83 @@
                 Manage pre-boarding formalities, workstation setup alerts, buddy mentorship, work unit tasks, and 2-month evaluations.
             </p>
         </field>
+    </record>
+
+    <!-- ═══ ONBOARDING TASK VIEWS & ACTION ═══ -->
+    <record id="hr_onboarding_task_view_tree" model="ir.ui.view">
+        <field name="name">hr.onboarding.task.list</field>
+        <field name="model">hr.onboarding.task</field>
+        <field name="arch" type="xml">
+            <list string="Onboarding Tasks" create="false" delete="false"
+                  decoration-danger="is_overdue"
+                  decoration-success="state == 'done'">
+                <field name="period" string="Period" widget="badge"/>
+                <field name="name" string="Task Description"/>
+                <field name="onboarding_plan_id" string="Onboarding Plan"/>
+                <field name="assigned_to_role" string="Assigned Role" widget="badge"/>
+                <field name="due_date" string="Due Date"/>
+                <field name="state" string="Status" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-warning="state == 'todo'"/>
+                <field name="completed_date" string="Completed On" optional="show"/>
+                <field name="completed_by_user_id" string="Completed By" optional="show"/>
+                <field name="is_overdue" column_invisible="1"/>
+                <field name="can_mark_done" column_invisible="1"/>
+                <button name="action_mark_done" string="Mark Done" type="object"
+                        icon="fa-check-circle" class="btn-success"
+                        invisible="state == 'done' or not can_mark_done"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="hr_onboarding_task_view_form" model="ir.ui.view">
+        <field name="name">hr.onboarding.task.form</field>
+        <field name="model">hr.onboarding.task</field>
+        <field name="arch" type="xml">
+            <form string="Onboarding Task" create="false" delete="false" edit="is_officer_or_admin">
+                <header>
+                    <button name="action_mark_done" string="Mark Done" type="object"
+                            icon="fa-check-circle" class="btn-success"
+                            invisible="state == 'done' or not can_mark_done"/>
+                    <field name="state" widget="statusbar" statusbar_visible="todo,done"/>
+                </header>
+                <sheet>
+                    <field name="is_officer_or_admin" invisible="1"/>
+                    <field name="can_mark_done" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="name" string="Task Description"/>
+                        <h1>
+                            <field name="name" readonly="not is_officer_or_admin"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Task Assignment &amp; Schedule">
+                            <field name="onboarding_plan_id" readonly="1" options="{'no_open': False}"/>
+                            <field name="template_id" readonly="not is_officer_or_admin" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="period" readonly="not is_officer_or_admin"/>
+                            <field name="assigned_to_role" readonly="not is_officer_or_admin"/>
+                            <field name="due_date" readonly="not is_officer_or_admin"/>
+                        </group>
+                        <group string="Status &amp; Verification">
+                            <field name="completed_date" readonly="1"/>
+                            <field name="completed_by_user_id" readonly="1"/>
+                            <field name="is_overdue" readonly="1" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Progress Notes &amp; Comments">
+                        <field name="comments" placeholder="Progress notes or comments..." readonly="not is_officer_or_admin and not can_mark_done"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="hr_onboarding_task_action" model="ir.actions.act_window">
+        <field name="name">Onboarding Tasks</field>
+        <field name="res_model">hr.onboarding.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('hr_onboarding_task_view_tree')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('hr_onboarding_task_view_form')})]"/>
     </record>
 </odoo>

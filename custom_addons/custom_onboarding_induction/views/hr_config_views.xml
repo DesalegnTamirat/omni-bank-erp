@@ -12,6 +12,7 @@
                 <field name="sequence" widget="handle"/>
                 <field name="name" string="Task / Training Title"/>
                 <field name="training_type" string="Training Type"/>
+                <field name="employee_category" string="Category" widget="badge"/>
                 <field name="is_mandatory" string="Mandatory?" widget="boolean_toggle"/>
                 <field name="days_offset" string="Due Date Offset (Days from Start)"/>
                 <field name="active" string="Active" widget="boolean_toggle"/>
@@ -32,6 +33,8 @@
                     <group>
                         <group>
                             <field name="training_type" string="Training Type"/>
+                            <field name="employee_category" string="Applicable Category"/>
+                            <field name="department_ids" widget="many2many_tags" string="Target Departments"/>
                             <field name="is_mandatory" string="Mandatory?" widget="boolean_toggle"/>
                         </group>
                         <group>
@@ -71,6 +74,7 @@
                 <field name="name" string="Task Description"/>
                 <field name="period" string="Period"/>
                 <field name="assigned_to_role" string="Assigned Role"/>
+                <field name="employee_category" string="Category" widget="badge"/>
                 <field name="days_offset" string="Due Date Offset (Days from Start)"/>
                 <field name="active" string="Active" widget="boolean_toggle"/>
             </list>
@@ -91,6 +95,8 @@
                         <group>
                             <field name="period" string="Onboarding Period"/>
                             <field name="assigned_to_role" string="Assigned Role"/>
+                            <field name="employee_category" string="Applicable Category"/>
+                            <field name="department_ids" widget="many2many_tags" string="Target Departments"/>
                         </group>
                         <group>
                             <field name="days_offset" string="Due Date Offset (Days from Start Date)"/>

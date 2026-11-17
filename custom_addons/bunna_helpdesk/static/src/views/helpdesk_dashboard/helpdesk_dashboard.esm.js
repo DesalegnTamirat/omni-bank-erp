@@ -1,6 +1,10 @@
-import {Component, onWillStart, onWillUnmount, useEffect, useRef, useState} from "@odoo/owl";
+import {Component, onMounted, onWillStart, onWillUnmount, useEffect, useRef, useState} from "@odoo/owl";
 import {useService} from "@web/core/utils/hooks";
 import {loadBundle} from "@web/core/assets";
+import {session} from "@web/session";
+
+// Auto-refresh interval in milliseconds (60 seconds)
+const AUTO_REFRESH_MS = 60_000;
 
 export class HelpdeskDashboard extends Component {
     static template = "bunna_helpdesk.HelpdeskDashboard";
@@ -11,67 +15,74 @@ export class HelpdeskDashboard extends Component {
         this.action = useService("action");
         this.notification = useService("notification");
 
+        this.topCasesChartCanvas = useRef("topCasesChartCanvas");
+        this.caseStatusChartCanvas = useRef("caseStatusChartCanvas");
+        this.caseResolutionChartCanvas = useRef("caseResolutionChartCanvas");
+        this.workUnitChartCanvas = useRef("workUnitChartCanvas");
+        this.csatChartCanvas = useRef("csatChartCanvas");
         this.trendChartCanvas = useRef("trendChartCanvas");
-        this.barChartCanvas = useRef("barChartCanvas");
-        this.pieChartCanvas = useRef("pieChartCanvas");
+        this.teamAgentActivitiesChartCanvas = useRef("teamAgentActivitiesChartCanvas");
 
+        this.topCasesChart = null;
+        this.caseStatusChart = null;
+        this.caseResolutionChart = null;
+        this.workUnitChart = null;
+        this.csatChart = null;
         this.trendChart = null;
-        this.barChart = null;
-        this.pieChart = null;
+        this.teamAgentActivitiesChart = null;
+
+        // Auto-refresh interval handle
+        this._autoRefreshTimer = null;
 
         this.state = useState({
             period: "all",
+            dateFrom: "",
+            dateTo: "",
             groupingMode: "teams", // "teams" or "individual"
             teamId: 0,
             userId: 0,
+            roleView: "auto",      // "auto", "manager", "back_line", "front_line"
             loading: false,
             collapsed: false,
             trendMetric: "all",    // "all", "created", "closed"
-            barMode: "teams",      // "teams", "channels", "stages"
-            pieMode: "case_types", // "case_types", "priorities", "customer_types", "channels"
-            activeDropdown: null,  // "grouping", "team", "user", "barMode", "pieMode"
+            activeDropdown: null,  // "grouping", "team", "user"
+            lastUpdated: "",       // HH:MM:SS timestamp of last successful data load
+            autoRefreshEnabled: true, // toggle for auto-refresh
             data: {
-                kpi: {
+                user_role: "manager",
+                active_role: "manager",
+                can_switch_role: false,
+                can_view_frontline: true,
+                can_view_backline: true,
+                is_front_line: false,
+                base_domain: [],
+                team_agent_activities: false,
+                case_status_kpi: {
                     total: 0,
-                    open: 0,
+                    reopen: 0,
                     unassigned: 0,
-                    unattended: 0,
-                    urgent: 0,
-                    sla_failed: 0,
-                    nbe_complaints: 0,
                     escalated: 0,
-                    internal: 0,
-                    external: 0,
-                    rating_avg: 5.0,
-                    rating_count: 0,
-                    total_hours: 0,
+                    in_progress: 0,
+                    new: 0,
+                    resolved: 0,
+                    closed: 0,
+                    rejected: 0,
                 },
-                stages: [],
-                priorities: [],
+                front_back_channels: [],
+                manager_channels: [],
+                critical_urgent: { count: 0, very_high: 0, high: 0, unassigned: 0, tickets: [] },
+                top_cases: { labels: [], series_total: [], series_solved: [], series_in_progress: [], series_escalated: [], cases_list: [] },
+                case_resolution: { labels: [], series_total: [], series_resolved: [], series_pending: [], l1_resolved: 0, l1_total: 0, l2_resolved: 0, l2_total: 0, pending_count: 0 },
+                work_unit: { labels: [], series_total: [], series_open: [], series_solved: [], units_list: [] },
+                sla_breached: { total_breached: 0, open_breached: 0, critical_breached: 0, unassigned_breached: 0, by_work_unit: [], by_service_type: [] },
+                agent_performance: [],
+                avg_response_time: [],
+                csat: { rating_avg: 0.0, rating_count: 0, breakdown: [] },
+                kpi: { total: 0, open: 0, unassigned: 0, unattended: 0, urgent: 0, sla_failed: 0, nbe_complaints: 0, escalated: 0, internal: 0, external: 0, rating_avg: 0.0, rating_count: 0, total_hours: 0 },
                 teams: [{id: 0, name: "All Teams"}],
                 users: [],
-                recent_tickets: [],
-                company_name: "Bunna Bank",
-                trend: {
-                    labels: [],
-                    created: [],
-                    closed: [],
-                    breached: [],
-                    total_created: 0,
-                    total_closed: 0,
-                    total_breached: 0,
-                },
-                bar_charts: {
-                    teams: {labels: [], series_open: [], series_closed: [], ids: []},
-                    channels: {labels: [], data: [], codes: []},
-                    stages: {labels: [], data: [], ids: []},
-                },
-                pie_charts: {
-                    case_types: {labels: [], data: [], codes: []},
-                    priorities: {labels: [], data: [], codes: []},
-                    customer_types: {labels: [], data: [], codes: []},
-                    channels: {labels: [], data: [], codes: []},
-                },
+                case_status: { labels: [], data: [], colors: [] },
+                trend: { labels: [], created: [], closed: [], breached: [], total_created: 0, total_closed: 0, total_breached: 0 },
             },
         });
 
@@ -87,6 +98,10 @@ export class HelpdeskDashboard extends Component {
             await this.loadData();
         });
 
+        onMounted(() => {
+            this._startAutoRefresh();
+        });
+
         useEffect(
             () => {
                 if (!this.state.collapsed && !this.state.loading) {
@@ -95,9 +110,8 @@ export class HelpdeskDashboard extends Component {
             },
             () => [
                 this.state.data,
+                this.state.roleView,
                 this.state.trendMetric,
-                this.state.barMode,
-                this.state.pieMode,
                 this.state.collapsed,
                 this.state.loading,
             ]
@@ -105,8 +119,37 @@ export class HelpdeskDashboard extends Component {
 
         onWillUnmount(() => {
             this.destroyCharts();
+            this._stopAutoRefresh();
             document.removeEventListener("click", this.onDocumentClick);
         });
+    }
+
+    /* ── Auto-refresh helpers ────────────────────────────────────────────── */
+    _startAutoRefresh() {
+        this._stopAutoRefresh();
+        this._autoRefreshTimer = setInterval(async () => {
+            if (!this.state.loading && this.state.autoRefreshEnabled && !this.state.collapsed) {
+                await this.loadData();
+            }
+        }, AUTO_REFRESH_MS);
+    }
+
+    _stopAutoRefresh() {
+        if (this._autoRefreshTimer) {
+            clearInterval(this._autoRefreshTimer);
+            this._autoRefreshTimer = null;
+        }
+    }
+
+    toggleAutoRefresh() {
+        this.state.autoRefreshEnabled = !this.state.autoRefreshEnabled;
+        if (this.state.autoRefreshEnabled) {
+            this._startAutoRefresh();
+            this.notification.add("Auto-refresh enabled (every 60 s)", { type: "info" });
+        } else {
+            this._stopAutoRefresh();
+            this.notification.add("Auto-refresh paused", { type: "warning" });
+        }
     }
 
     async loadData() {
@@ -122,10 +165,22 @@ export class HelpdeskDashboard extends Component {
                     period: this.state.period,
                     team_id: teamIdParam,
                     user_id: userIdParam,
+                    grouping_mode: this.state.groupingMode,
+                    role_view: this.state.roleView,
+                    date_from: this.state.period === "custom" ? (this.state.dateFrom || false) : false,
+                    date_to: this.state.period === "custom" ? (this.state.dateTo || false) : false,
                 }
             );
             if (res) {
                 this.state.data = res;
+                if (res.is_front_line) {
+                    this.state.groupingMode = "individual";
+                    this.state.userId = 0;
+                    this.state.teamId = 0;
+                }
+                // Stamp the last-updated time
+                const now = new Date();
+                this.state.lastUpdated = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
             }
         } catch (err) {
             console.error("Error loading Bunna Helpdesk dashboard:", err);
@@ -135,17 +190,33 @@ export class HelpdeskDashboard extends Component {
     }
 
     destroyCharts() {
+        if (this.topCasesChart) {
+            this.topCasesChart.destroy();
+            this.topCasesChart = null;
+        }
+        if (this.caseStatusChart) {
+            this.caseStatusChart.destroy();
+            this.caseStatusChart = null;
+        }
+        if (this.caseResolutionChart) {
+            this.caseResolutionChart.destroy();
+            this.caseResolutionChart = null;
+        }
+        if (this.workUnitChart) {
+            this.workUnitChart.destroy();
+            this.workUnitChart = null;
+        }
+        if (this.csatChart) {
+            this.csatChart.destroy();
+            this.csatChart = null;
+        }
         if (this.trendChart) {
             this.trendChart.destroy();
             this.trendChart = null;
         }
-        if (this.barChart) {
-            this.barChart.destroy();
-            this.barChart = null;
-        }
-        if (this.pieChart) {
-            this.pieChart.destroy();
-            this.pieChart = null;
+        if (this.teamAgentActivitiesChart) {
+            this.teamAgentActivitiesChart.destroy();
+            this.teamAgentActivitiesChart = null;
         }
     }
 
@@ -153,14 +224,471 @@ export class HelpdeskDashboard extends Component {
         if (typeof window.Chart === "undefined") {
             return;
         }
-        this.renderTrendChart();
-        this.renderBarChart();
-        this.renderPieChart();
+        const role = this.state.data.active_role || this.state.data.user_role || "manager";
+
+        // Team Agent Activities Horizontal Bar Chart (when a team is selected)
+        this.renderTeamAgentActivitiesChart();
+
+        // Case status chart is available for all tiers
+        this.renderCaseStatusChart();
+
+        // Top 4 Cases & Case Resolution are available for Back Office and Manager
+        if (role === "manager" || role === "back_line") {
+            this.renderTopCasesChart();
+            this.renderCaseResolutionChart();
+            this.renderWorkUnitChart();
+            this.renderTrendChart();
+        }
+
+        // CSAT Chart is available for Manager
+        if (role === "manager") {
+            this.renderCsatChart();
+        }
     }
 
-    /* ── 1. Line Chart: Trends & Changes Over Time ───────────────────────── */
+    /* ── Team Agent Activities (Horizontal Bar Chart) ────────────────────── */
+    renderTeamAgentActivitiesChart() {
+        if (!this.teamAgentActivitiesChartCanvas || !this.teamAgentActivitiesChartCanvas.el) return;
+        if (this.teamAgentActivitiesChart) {
+            this.teamAgentActivitiesChart.destroy();
+            this.teamAgentActivitiesChart = null;
+        }
+
+        const actData = this.state.data.team_agent_activities;
+        if (!actData || !actData.chart_labels || !actData.chart_labels.length) return;
+
+        const ctx = this.teamAgentActivitiesChartCanvas.el.getContext("2d");
+        this.teamAgentActivitiesChart = new window.Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: actData.chart_labels,
+                datasets: [
+                    {
+                        label: "Total Case Handling",
+                        data: actData.chart_series_total,
+                        backgroundColor: "#541718", // Bunna Maroon
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.85,
+                    },
+                    {
+                        label: "Solved",
+                        data: actData.chart_series_solved,
+                        backgroundColor: "#425727", // Forest Green
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.85,
+                    },
+                    {
+                        label: "In Progress",
+                        data: actData.chart_series_in_progress,
+                        backgroundColor: "#C17540", // Terracotta
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.85,
+                    },
+                    {
+                        label: "Escalated",
+                        data: actData.chart_series_escalated,
+                        backgroundColor: "#1D2B32", // Slate Navy
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.85,
+                    },
+                ],
+            },
+            options: {
+                indexAxis: "y",
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: {
+                            boxWidth: 12,
+                            font: { size: 11, family: "Segoe UI, sans-serif" },
+                            padding: 10,
+                        },
+                    },
+                    tooltip: {
+                        backgroundColor: "#1D2B32",
+                        titleFont: { size: 12, weight: "bold" },
+                        bodyFont: { size: 11 },
+                        padding: 10,
+                        cornerRadius: 6,
+                    },
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: "#f1f5f9" },
+                        ticks: { precision: 0, font: { size: 10, family: "Segoe UI, sans-serif" } },
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11, weight: "500", family: "Segoe UI, sans-serif" } },
+                    },
+                },
+            },
+        });
+    }
+
+    /* ── 1. Top 4 Case Handling (Horizontal Bar Chart) ───────────────────── */
+    renderTopCasesChart() {
+        if (!this.topCasesChartCanvas || !this.topCasesChartCanvas.el) return;
+        if (this.topCasesChart) {
+            this.topCasesChart.destroy();
+            this.topCasesChart = null;
+        }
+
+        const topData = this.state.data.top_cases;
+        if (!topData || !topData.labels || !topData.labels.length) return;
+
+        const ctx = this.topCasesChartCanvas.el.getContext("2d");
+        this.topCasesChart = new window.Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: topData.labels,
+                datasets: [
+                    {
+                        label: "Total Case Handling",
+                        data: topData.series_total,
+                        backgroundColor: "#541718", // Bunna Maroon
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.85,
+                    },
+                    {
+                        label: "Solved",
+                        data: topData.series_solved,
+                        backgroundColor: "#425727", // Forest Green
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.85,
+                    },
+                    {
+                        label: "In Progress",
+                        data: topData.series_in_progress,
+                        backgroundColor: "#C17540", // Terracotta
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.85,
+                    },
+                    {
+                        label: "Escalated",
+                        data: topData.series_escalated,
+                        backgroundColor: "#1D2B32", // Slate Navy
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.85,
+                    },
+                ],
+            },
+            options: {
+                indexAxis: "y",
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: {
+                            boxWidth: 12,
+                            font: { size: 11, family: "Segoe UI, sans-serif" },
+                            padding: 10,
+                        },
+                    },
+                    tooltip: {
+                        backgroundColor: "#1D2B32",
+                        titleFont: { size: 12, weight: "bold" },
+                        bodyFont: { size: 11 },
+                        padding: 10,
+                        cornerRadius: 6,
+                    },
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: "#f1f5f9" },
+                        ticks: { precision: 0, font: { size: 10, family: "Segoe UI, sans-serif" } },
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11, weight: "500", family: "Segoe UI, sans-serif" } },
+                    },
+                },
+            },
+        });
+    }
+
+    /* ── 2. Case Status (Pie / Donut Chart) ──────────────────────────────── */
+    renderCaseStatusChart() {
+        if (!this.caseStatusChartCanvas || !this.caseStatusChartCanvas.el) return;
+        if (this.caseStatusChart) {
+            this.caseStatusChart.destroy();
+            this.caseStatusChart = null;
+        }
+
+        const statusData = this.state.data.case_status;
+        if (!statusData || !statusData.labels || !statusData.labels.length) return;
+
+        const ctx = this.caseStatusChartCanvas.el.getContext("2d");
+        this.caseStatusChart = new window.Chart(ctx, {
+            type: "doughnut",
+            data: {
+                labels: statusData.labels,
+                datasets: [
+                    {
+                        data: statusData.data,
+                        backgroundColor: statusData.colors || ["#1877F2", "#C17540", "#DC3545", "#425727", "#541718", "#726732", "#6C757D"],
+                        borderColor: "#ffffff",
+                        borderWidth: 2,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: "60%",
+                plugins: {
+                    legend: {
+                        position: "right",
+                        labels: {
+                            boxWidth: 12,
+                            font: { size: 11, family: "Segoe UI, sans-serif" },
+                            padding: 8,
+                            generateLabels: function (chart) {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    const dataset = data.datasets[0];
+                                    const total = dataset.data.reduce((acc, val) => acc + val, 0);
+                                    return data.labels.map((label, i) => {
+                                        const value = dataset.data[i];
+                                        const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+                                        return {
+                                            text: `${label} (${value} - ${pct}%)`,
+                                            fillStyle: dataset.backgroundColor[i],
+                                            hidden: isNaN(dataset.data[i]) || chart.getDatasetMeta(0).data[i].hidden,
+                                            index: i,
+                                        };
+                                    });
+                                }
+                                return [];
+                            },
+                        },
+                    },
+                    tooltip: {
+                        backgroundColor: "#1D2B32",
+                        titleFont: { size: 12, weight: "bold" },
+                        bodyFont: { size: 11 },
+                        padding: 10,
+                        cornerRadius: 6,
+                    },
+                },
+            },
+        });
+    }
+
+    /* ── 3. Case Resolution (Horizontal Bar Chart) ───────────────────────── */
+    renderCaseResolutionChart() {
+        if (!this.caseResolutionChartCanvas || !this.caseResolutionChartCanvas.el) return;
+        if (this.caseResolutionChart) {
+            this.caseResolutionChart.destroy();
+            this.caseResolutionChart = null;
+        }
+
+        const resData = this.state.data.case_resolution;
+        if (!resData || !resData.labels || !resData.labels.length) return;
+
+        const ctx = this.caseResolutionChartCanvas.el.getContext("2d");
+        this.caseResolutionChart = new window.Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: resData.labels,
+                datasets: [
+                    {
+                        label: "Total Handled",
+                        data: resData.series_total,
+                        backgroundColor: "#541718", // Maroon
+                        borderRadius: 3,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8,
+                    },
+                    {
+                        label: "Resolved",
+                        data: resData.series_resolved,
+                        backgroundColor: "#425727", // Green
+                        borderRadius: 3,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8,
+                    },
+                    {
+                        label: "Pending",
+                        data: resData.series_pending,
+                        backgroundColor: "#1D2B32", // Slate
+                        borderRadius: 3,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8,
+                    },
+                ],
+            },
+            options: {
+                indexAxis: "y",
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: {
+                            boxWidth: 12,
+                            font: { size: 11, family: "Segoe UI, sans-serif" },
+                            padding: 10,
+                        },
+                    },
+                    tooltip: {
+                        backgroundColor: "#1D2B32",
+                        titleFont: { size: 12, weight: "bold" },
+                        bodyFont: { size: 11 },
+                        padding: 10,
+                        cornerRadius: 6,
+                    },
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: "#f1f5f9" },
+                        ticks: { precision: 0, font: { size: 10, family: "Segoe UI, sans-serif" } },
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11, weight: "500", family: "Segoe UI, sans-serif" } },
+                    },
+                },
+            },
+        });
+    }
+
+    /* ── 4. Case Handling by Work Unit (Bar Chart) ───────────────────────── */
+    renderWorkUnitChart() {
+        if (!this.workUnitChartCanvas || !this.workUnitChartCanvas.el) return;
+        if (this.workUnitChart) {
+            this.workUnitChart.destroy();
+            this.workUnitChart = null;
+        }
+
+        const wuData = this.state.data.work_unit;
+        if (!wuData || !wuData.labels || !wuData.labels.length) return;
+
+        const ctx = this.workUnitChartCanvas.el.getContext("2d");
+        this.workUnitChart = new window.Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: wuData.labels,
+                datasets: [
+                    {
+                        label: "Total Tickets",
+                        data: wuData.series_total,
+                        backgroundColor: "#541718",
+                        borderRadius: 4,
+                        barPercentage: 0.75,
+                    },
+                    {
+                        label: "Solved",
+                        data: wuData.series_solved,
+                        backgroundColor: "#425727",
+                        borderRadius: 4,
+                        barPercentage: 0.75,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "top",
+                        labels: { boxWidth: 12, font: { size: 11 } },
+                    },
+                    tooltip: {
+                        backgroundColor: "#1D2B32",
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 10 } },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 },
+                        grid: { color: "#f1f5f9" },
+                    },
+                },
+            },
+        });
+    }
+
+    /* ── 5. CSAT Rating Distribution Chart (Bar) ─────────────────────────── */
+    renderCsatChart() {
+        if (!this.csatChartCanvas || !this.csatChartCanvas.el) return;
+        if (this.csatChart) {
+            this.csatChart.destroy();
+            this.csatChart = null;
+        }
+
+        const csat = this.state.data.csat;
+        if (!csat || !csat.breakdown || !csat.breakdown.length) return;
+
+        const labels = csat.breakdown.map((b) => b.rating);
+        const data = csat.breakdown.map((b) => b.count);
+        const colors = ["#425727", "#726732", "#c17540", "#d44638", "#541718", "#6c757d"];
+
+        const ctx = this.csatChartCanvas.el.getContext("2d");
+        this.csatChart = new window.Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: "Ratings Received",
+                        data: data,
+                        backgroundColor: colors,
+                        borderRadius: 4,
+                        barPercentage: 0.65,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "#1D2B32",
+                        callbacks: {
+                            label: function (context) {
+                                return ` ${context.parsed.y} ratings`;
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11, weight: "600" } },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 },
+                        grid: { color: "#f1f5f9" },
+                    },
+                },
+            },
+        });
+    }
+
+    /* ── 6. Line Chart: Trends & Inflow vs Resolution ───────────────────── */
     renderTrendChart() {
-        if (!this.trendChartCanvas.el) return;
+        if (!this.trendChartCanvas || !this.trendChartCanvas.el) return;
         if (this.trendChart) {
             this.trendChart.destroy();
             this.trendChart = null;
@@ -202,22 +730,6 @@ export class HelpdeskDashboard extends Component {
             });
         }
 
-        if (this.state.trendMetric === "all") {
-            datasets.push({
-                label: "SLA Breaches",
-                data: trend.breached,
-                borderColor: "#c17540",
-                backgroundColor: "transparent",
-                borderWidth: 2,
-                borderDash: [5, 4],
-                fill: false,
-                tension: 0.35,
-                pointRadius: 3,
-                pointHoverRadius: 5,
-                pointBackgroundColor: "#c17540",
-            });
-        }
-
         this.trendChart = new window.Chart(ctx, {
             type: "line",
             data: {
@@ -234,245 +746,35 @@ export class HelpdeskDashboard extends Component {
                 plugins: {
                     legend: {
                         position: "top",
-                        labels: {
-                            boxWidth: 12,
-                            font: { size: 11, family: "Segoe UI, sans-serif" },
-                            padding: 12,
-                        },
+                        labels: { boxWidth: 12, font: { size: 11, family: "Segoe UI, sans-serif" } },
                     },
                     tooltip: {
                         backgroundColor: "#1D2B32",
-                        titleFont: { size: 12, weight: "bold" },
-                        bodyFont: { size: 11 },
-                        padding: 10,
-                        cornerRadius: 6,
                     },
                 },
                 scales: {
                     x: {
                         grid: { display: false },
-                        ticks: { font: { size: 10, family: "Segoe UI, sans-serif" } },
+                        ticks: { font: { size: 10 } },
                     },
                     y: {
                         beginAtZero: true,
-                        ticks: {
-                            precision: 0,
-                            font: { size: 10, family: "Segoe UI, sans-serif" },
-                        },
-                        grid: {
-                            color: "#f1f5f9",
-                        },
+                        ticks: { precision: 0 },
+                        grid: { color: "#f1f5f9" },
                     },
                 },
             },
         });
     }
 
-    /* ── 2. Bar & Column Chart: Compare Values Across Categories ─────────── */
-    renderBarChart() {
-        if (!this.barChartCanvas.el) return;
-        if (this.barChart) {
-            this.barChart.destroy();
-            this.barChart = null;
-        }
-
-        const barData = this.state.data.bar_charts?.[this.state.barMode];
-        if (!barData || !barData.labels || !barData.labels.length) return;
-
-        const ctx = this.barChartCanvas.el.getContext("2d");
-        let datasets = [];
-
-        if (this.state.barMode === "teams") {
-            datasets = [
-                {
-                    label: "Active Open Tickets",
-                    data: barData.series_open || [],
-                    backgroundColor: "#541718",
-                    borderRadius: 4,
-                },
-                {
-                    label: "Resolved / Closed",
-                    data: barData.series_closed || [],
-                    backgroundColor: "#425727",
-                    borderRadius: 4,
-                },
-            ];
-        } else if (this.state.barMode === "channels") {
-            const colors = [
-                "#541718", "#C17540", "#425727", "#726732", "#1D2B32", "#1E2917",
-            ];
-            datasets = [
-                {
-                    label: "Tickets Received",
-                    data: barData.data || [],
-                    backgroundColor: barData.labels.map((_, i) => colors[i % colors.length]),
-                    borderRadius: 4,
-                },
-            ];
-        } else if (this.state.barMode === "stages") {
-            const stageColors = [
-                "#541718", "#C17540", "#726732", "#425727", "#1D2B32", "#1E2917",
-            ];
-            datasets = [
-                {
-                    label: "Tickets in Stage",
-                    data: barData.data || [],
-                    backgroundColor: barData.labels.map((_, i) => stageColors[i % stageColors.length]),
-                    borderRadius: 4,
-                },
-            ];
-        }
-
-        this.barChart = new window.Chart(ctx, {
-            type: "bar",
-            data: {
-                labels: barData.labels,
-                datasets: datasets,
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: "top",
-                        labels: {
-                            boxWidth: 12,
-                            font: { size: 11, family: "Segoe UI, sans-serif" },
-                            padding: 10,
-                        },
-                    },
-                    tooltip: {
-                        backgroundColor: "#1D2B32",
-                        titleFont: { size: 12, weight: "bold" },
-                        bodyFont: { size: 11 },
-                        padding: 10,
-                        cornerRadius: 6,
-                    },
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: { font: { size: 10, family: "Segoe UI, sans-serif" } },
-                    },
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0,
-                            font: { size: 10, family: "Segoe UI, sans-serif" },
-                        },
-                        grid: {
-                            color: "#f1f5f9",
-                        },
-                    },
-                },
-                onClick: (evt, elements) => {
-                    if (!elements || !elements.length) return;
-                    const index = elements[0].index;
-
-                    if (this.state.barMode === "teams" && barData.ids) {
-                        const teamId = barData.ids[index];
-                        this.openTickets("team", teamId);
-                    } else if (this.state.barMode === "channels" && barData.codes) {
-                        const channelCode = barData.codes[index];
-                        this.openTickets("channel", channelCode);
-                    } else if (this.state.barMode === "stages" && barData.ids) {
-                        const stageId = barData.ids[index];
-                        this.openTickets("stage", stageId);
-                    }
-                },
-            },
-        });
+    /* ── Role Switching Controls (Manager / Admin privilege) ─────────────── */
+    async selectRoleView(role) {
+        if (this.state.roleView === role) return;
+        this.state.roleView = role;
+        await this.loadData();
     }
 
-    /* ── 3. Pie & Donut Chart: Parts of a Whole / Proportions ────────────── */
-    renderPieChart() {
-        if (!this.pieChartCanvas.el) return;
-        if (this.pieChart) {
-            this.pieChart.destroy();
-            this.pieChart = null;
-        }
-
-        const pieData = this.state.data.pie_charts?.[this.state.pieMode];
-        if (!pieData || !pieData.labels || !pieData.labels.length) return;
-
-        const ctx = this.pieChartCanvas.el.getContext("2d");
-        const palette = [
-            "#541718", // Bunna Maroon (Primary)
-            "#C17540", // Bunna Terracotta (Secondary)
-            "#425727", // Bunna Forest (Secondary)
-            "#726732", // Bunna Bronze (Secondary)
-            "#1D2B32", // Bunna Slate (Primary)
-            "#1E2917", // Bunna Pine (Secondary)
-        ];
-
-        const chartColors = pieData.labels.map((_, i) => palette[i % palette.length]);
-
-        this.pieChart = new window.Chart(ctx, {
-            type: "doughnut",
-            data: {
-                labels: pieData.labels,
-                datasets: [
-                    {
-                        data: pieData.data,
-                        backgroundColor: chartColors,
-                        borderColor: "#ffffff",
-                        borderWidth: 2,
-                        hoverOffset: 6,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: "58%",
-                plugins: {
-                    legend: {
-                        position: "right",
-                        labels: {
-                            boxWidth: 12,
-                            font: { size: 11, family: "Segoe UI, sans-serif" },
-                            padding: 8,
-                        },
-                    },
-                    tooltip: {
-                        backgroundColor: "#1D2B32",
-                        titleFont: { size: 12, weight: "bold" },
-                        bodyFont: { size: 11 },
-                        padding: 10,
-                        cornerRadius: 6,
-                        callbacks: {
-                            label: function (context) {
-                                const label = context.label || "";
-                                const value = context.parsed || 0;
-                                const dataset = context.dataset;
-                                const total = dataset.data.reduce((acc, curr) => acc + curr, 0);
-                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-                                return ` ${label}: ${value} (${percentage}%)`;
-                            },
-                        },
-                    },
-                },
-                onClick: (evt, elements) => {
-                    if (!elements || !elements.length) return;
-                    const index = elements[0].index;
-                    const selectedCode = pieData.codes ? pieData.codes[index] : false;
-                    if (selectedCode === undefined || selectedCode === false || selectedCode === "") return;
-
-                    if (this.state.pieMode === "case_types") {
-                        this.openTickets("case_type", selectedCode);
-                    } else if (this.state.pieMode === "priorities") {
-                        this.openTickets("priority", selectedCode);
-                    } else if (this.state.pieMode === "customer_types") {
-                        this.openTickets(selectedCode === "internal" ? "internal" : "external");
-                    } else if (this.state.pieMode === "channels") {
-                        this.openTickets("channel", selectedCode);
-                    }
-                },
-            },
-        });
-    }
-
-    /* ── Dropdown Controls (Official Bunna Maroon Hover) ─────────────────── */
+    /* ── Dropdown Controls ───────────────────────────────────────────────── */
     toggleDropdown(name, ev) {
         if (ev) {
             ev.preventDefault();
@@ -505,57 +807,38 @@ export class HelpdeskDashboard extends Component {
         await this.loadData();
     }
 
-    selectBarMode(mode) {
-        this.state.activeDropdown = null;
-        this.state.barMode = mode;
-    }
-
-    selectPieMode(mode) {
-        this.state.activeDropdown = null;
-        this.state.pieMode = mode;
-    }
-
     get currentGroupingModeLabel() {
+        if (this.state.data.is_front_line) {
+            return "My Tickets";
+        }
+        if (this.state.data.active_role === "back_line") {
+            return this.state.groupingMode === "individual" ? "My Tickets" : "My Team";
+        }
         return this.state.groupingMode === "individual" ? "Individual" : "All Teams";
     }
 
     get currentTeamOrUserLabel() {
+        if (this.state.data.is_front_line) {
+            return "My Tickets";
+        }
         if (this.state.groupingMode === "teams") {
             const team = (this.state.data.teams || []).find((t) => t.id === this.state.teamId);
+            if (this.state.data.active_role === "back_line") {
+                return team ? team.name : (this.state.data.teams?.[0]?.name || "My Team");
+            }
             return team ? team.name : "All Teams";
         } else {
+            if (this.state.data.active_role === "back_line") {
+                if (this.state.userId === 0) return "My Tickets";
+                if (this.state.userId === -1) return "Unassigned Tickets";
+                const user = (this.state.data.users || []).find((u) => u.id === this.state.userId);
+                return user ? user.name : "My Tickets";
+            }
             if (this.state.userId === 0) return "All Users";
             if (this.state.userId === -1) return "Unassigned Tickets";
             const user = (this.state.data.users || []).find((u) => u.id === this.state.userId);
             return user ? user.name : "Select User";
         }
-    }
-
-    get currentBarModeLabel() {
-        switch (this.state.barMode) {
-            case "teams": return "By Support Teams (Open vs Closed)";
-            case "channels": return "By Omnichannel Source";
-            case "stages": return "By Pipeline Stage";
-            default: return "Select View";
-        }
-    }
-
-    get currentPieModeLabel() {
-        switch (this.state.pieMode) {
-            case "case_types": return "By Case Type";
-            case "channels": return "By Omnichannel Source";
-            case "priorities": return "By Priority";
-            case "customer_types": return "By Customer Type (Branch vs External)";
-            default: return "Select View";
-        }
-    }
-
-    onBarModeChange(ev) {
-        this.state.barMode = ev.target.value;
-    }
-
-    onPieModeChange(ev) {
-        this.state.pieMode = ev.target.value;
     }
 
     setTrendMetric(metric) {
@@ -565,27 +848,89 @@ export class HelpdeskDashboard extends Component {
     async setPeriod(period) {
         if (this.state.period === period) return;
         this.state.period = period;
-        await this.loadData();
+        if (period === "custom") {
+            if (!this.state.dateFrom || !this.state.dateTo) {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, "0");
+                const d = String(now.getDate()).padStart(2, "0");
+                if (!this.state.dateFrom) this.state.dateFrom = `${y}-${m}-01`;
+                if (!this.state.dateTo) this.state.dateTo = `${y}-${m}-${d}`;
+            }
+            await this.loadData();
+        } else {
+            await this.loadData();
+        }
     }
 
-    async onGroupingModeChange(ev) {
-        this.state.groupingMode = ev.target.value;
-        if (this.state.groupingMode === "teams") {
-            this.state.userId = 0;
-        } else {
-            this.state.teamId = 0;
+    onDateFromChange(ev) {
+        this.state.dateFrom = ev.target.value;
+    }
+
+    onDateToChange(ev) {
+        this.state.dateTo = ev.target.value;
+    }
+
+    async applyCustomDateRange() {
+        if (this.state.dateFrom && this.state.dateTo && this.state.dateFrom > this.state.dateTo) {
+            this.notification.add("Start date cannot be greater than end date.", { type: "warning" });
+            return;
         }
         await this.loadData();
     }
 
-    async onTeamChange(ev) {
-        this.state.teamId = Number(ev.target.value) || 0;
+    async clearCustomDateRange() {
+        this.state.dateFrom = "";
+        this.state.dateTo = "";
+        this.state.period = "all";
         await this.loadData();
     }
 
-    async onUserChange(ev) {
-        this.state.userId = Number(ev.target.value) || 0;
-        await this.loadData();
+    openAgentTodayTickets(agentId, agentName, filterType = "all") {
+        let domain = [];
+        const today = new Date().toISOString().slice(0, 10);
+
+        if (filterType === "created") {
+            domain = [
+                ["create_uid", "=", agentId],
+                ["create_date", ">=", `${today} 00:00:00`],
+                ["create_date", "<=", `${today} 23:59:59`],
+            ];
+        } else if (filterType === "resolved") {
+            domain = [
+                ["user_id", "=", agentId],
+                ["stage_id.closed", "=", true],
+                "|",
+                ["closed_date", ">=", `${today} 00:00:00`],
+                ["last_stage_update", ">=", `${today} 00:00:00`],
+            ];
+        } else if (filterType === "open") {
+            domain = [
+                ["user_id", "=", agentId],
+                ["stage_id.closed", "=", false],
+            ];
+        } else {
+            domain = [
+                "|",
+                ["user_id", "=", agentId],
+                ["create_uid", "=", agentId],
+            ];
+        }
+
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: `Today's Activities - ${agentName}`,
+            res_model: "helpdesk.ticket",
+            views: [
+                [false, "list"],
+                [false, "kanban"],
+                [false, "form"],
+            ],
+            domain: domain,
+            context: {
+                default_user_id: agentId,
+            },
+        });
     }
 
     toggleCollapse() {
@@ -593,21 +938,58 @@ export class HelpdeskDashboard extends Component {
     }
 
     _getBaseDomain() {
+        if (this.state.data && this.state.data.base_domain && this.state.data.base_domain.length) {
+            return [...this.state.data.base_domain];
+        }
         const domain = [];
-        if (this.state.groupingMode === "teams") {
-            if (this.state.teamId) {
-                domain.push(["team_id", "=", this.state.teamId]);
+        if (this.state.data.active_role === "front_line" || this.state.data.active_role === "back_line") {
+            const teamIds = (this.state.data.teams || []).map((t) => t.id).filter((id) => id > 0);
+            if (this.state.groupingMode === "teams") {
+                if (this.state.teamId) {
+                    domain.push(["team_id", "=", this.state.teamId]);
+                } else if (teamIds.length) {
+                    domain.push(["team_id", "in", teamIds]);
+                }
+            } else if (this.state.groupingMode === "individual") {
+                if (this.state.userId === -1) {
+                    domain.push(["user_id", "=", false]);
+                    if (teamIds.length) domain.push(["team_id", "in", teamIds]);
+                } else if (this.state.userId > 0) {
+                    domain.push("|");
+                    domain.push("|");
+                    domain.push("|");
+                    domain.push(["user_id", "=", this.state.userId]);
+                    domain.push(["create_uid", "=", this.state.userId]);
+                    domain.push(["escalated_to_user_id", "=", this.state.userId]);
+                    domain.push(["escalated_to_level_3_user_id", "=", this.state.userId]);
+                } else {
+                    const myUid = session.uid;
+                    if (myUid) {
+                        domain.push("|");
+                        domain.push("|");
+                        domain.push(["user_id", "=", myUid]);
+                        domain.push(["escalated_to_user_id", "=", myUid]);
+                        domain.push(["escalated_to_level_3_user_id", "=", myUid]);
+                    }
+                }
             }
-        } else if (this.state.groupingMode === "individual") {
-            if (this.state.userId === -1) {
-                domain.push(["user_id", "=", false]);
-            } else if (this.state.userId > 0) {
-                domain.push(["user_id", "=", this.state.userId]);
+        } else {
+            if (this.state.groupingMode === "teams") {
+                if (this.state.teamId) {
+                    domain.push(["team_id", "=", this.state.teamId]);
+                }
+            } else if (this.state.groupingMode === "individual") {
+                if (this.state.userId === -1) {
+                    domain.push(["user_id", "=", false]);
+                } else if (this.state.userId > 0) {
+                    domain.push(["user_id", "=", this.state.userId]);
+                }
             }
         }
         return domain;
     }
 
+    /* ── Drill-Down Ticket Actions ───────────────────────────────────────── */
     openTickets(filterType, param) {
         let domain = this._getBaseDomain();
         let title = "Helpdesk Tickets";
@@ -616,74 +998,98 @@ export class HelpdeskDashboard extends Component {
             case "total":
                 title = "All Tickets";
                 break;
-            case "open":
-                domain.push(["stage_id.closed", "=", false]);
-                title = "Active Open Tickets";
+            case "reopen":
+                domain.push(["is_reopened", "=", true]);
+                title = "Reopened Tickets";
                 break;
             case "unassigned":
                 domain.push(["user_id", "=", false]);
                 domain.push(["stage_id.closed", "=", false]);
                 title = "Unassigned Tickets";
                 break;
-            case "unattended":
-                domain.push(["unattended", "=", true]);
+            case "escalated":
+                domain.push(["is_escalated", "=", true]);
                 domain.push(["stage_id.closed", "=", false]);
-                title = "Unattended Tickets";
+                title = "Escalated Cases (2nd Level)";
+                break;
+            case "in_progress":
+                domain.push(["stage_id.name", "ilike", "Progress"]);
+                domain.push(["stage_id.closed", "=", false]);
+                title = "In Progress Tickets";
+                break;
+            case "new":
+                domain.push(["stage_id.name", "=", "New"]);
+                domain.push(["stage_id.closed", "=", false]);
+                title = "New Tickets";
+                break;
+            case "review":
+                domain.push(["stage_id.name", "in", ["Review", "Under Review"]]);
+                title = "Tickets Under Review";
+                break;
+            case "resolved":
+                domain.push(["stage_id.name", "in", ["Done", "Resolved", "Solved", "Resolve"]]);
+                title = "Resolved Tickets";
+                break;
+            case "closed":
+                domain.push(["stage_id.name", "in", ["Closed", "Close"]]);
+                title = "Closed Tickets";
+                break;
+            case "rejected":
+                domain.push(["stage_id.name", "in", ["Rejected", "Cancelled"]]);
+                title = "Rejected Tickets";
                 break;
             case "urgent":
                 domain.push(["priority", "in", ["2", "3"]]);
                 domain.push(["stage_id.closed", "=", false]);
-                title = "Urgent / High Priority Tickets";
+                title = "Critical / Urgent Tickets";
+                break;
+            case "very_high":
+                domain.push(["priority", "=", "3"]);
+                domain.push(["stage_id.closed", "=", false]);
+                title = "Very High Priority Tickets";
+                break;
+            case "high":
+                domain.push(["priority", "=", "2"]);
+                domain.push(["stage_id.closed", "=", false]);
+                title = "High Priority Tickets";
+                break;
+            case "urgent_unassigned":
+                domain.push(["priority", "in", ["2", "3"]]);
+                domain.push(["stage_id.closed", "=", false]);
+                domain.push(["user_id", "=", false]);
+                title = "Unassigned Critical / Urgent Tickets";
                 break;
             case "sla_failed":
+                domain.push("|");
                 domain.push(["sla_status", "=", "failed"]);
-                title = "SLA Breached Tickets";
+                domain.push(["ola_status", "=", "failed"]);
+                title = "SLA & OLA Breached Tickets";
                 break;
-            case "nbe_complaints":
-                domain.push(["is_nbe_complaint", "=", true]);
-                title = "NBE Regulatory Complaints";
+            case "sla_open_breached":
+                domain.push("|");
+                domain.push(["sla_status", "=", "failed"]);
+                domain.push(["ola_status", "=", "failed"]);
+                domain.push(["stage_id.closed", "=", false]);
+                title = "Open Breached Tickets";
                 break;
-            case "escalated":
-                domain.push(["is_escalated", "=", true]);
-                title = "Escalated Cases (2nd Level)";
+            case "sla_critical_breached":
+                domain.push("|");
+                domain.push(["sla_status", "=", "failed"]);
+                domain.push(["ola_status", "=", "failed"]);
+                domain.push(["priority", "in", ["2", "3"]]);
+                title = "Critical / Urgent Breached Tickets";
                 break;
-            case "internal":
-                domain.push(["customer_type", "=", "internal"]);
-                title = "Internal Branch / Staff Cases";
+            case "sla_unassigned_breached":
+                domain.push("|");
+                domain.push(["sla_status", "=", "failed"]);
+                domain.push(["ola_status", "=", "failed"]);
+                domain.push(["user_id", "=", false]);
+                title = "Unassigned Breached Tickets";
                 break;
-            case "external":
-                domain.push(["customer_type", "!=", "internal"]);
-                title = "External Customer Cases";
-                break;
-            case "team":
+            case "work_unit":
                 if (param) {
-                    domain.push(["team_id", "=", param]);
-                    title = "Team Tickets";
-                }
-                break;
-            case "case_type":
-                if (param) {
-                    domain.push(["case_type", "=", param]);
-                    title = `${param.replace('_', ' ').toUpperCase()} Tickets`;
-                }
-                break;
-            case "channel":
-                if (param) {
-                    domain.push(["channel_type", "=", param]);
-                    title = `${param.replace('_', ' ').toUpperCase()} Channel Tickets`;
-                }
-                break;
-            case "stage":
-                if (param) {
-                    domain.push(["stage_id", "=", param]);
-                    title = "Tickets in Stage";
-                }
-                break;
-            case "priority":
-                if (param !== undefined) {
-                    domain.push(["priority", "=", String(param)]);
-                    domain.push(["stage_id.closed", "=", false]);
-                    title = `Priority ${param} Tickets`;
+                    domain.push(["operating_unit_id.name", "=", param]);
+                    title = `Tickets - ${param}`;
                 }
                 break;
         }
@@ -703,6 +1109,123 @@ export class HelpdeskDashboard extends Component {
                 default_team_id: (this.state.groupingMode === "teams" && this.state.teamId) || false,
                 default_user_id: (this.state.groupingMode === "individual" && this.state.userId > 0 && this.state.userId) || false,
             },
+        });
+    }
+
+    openTicketsByChannel(channelCode) {
+        let domain = this._getBaseDomain();
+        if (channelCode === "chatbot") {
+            domain.push(["channel_type", "in", ["chatbot", "tidio_chat"]]);
+        } else if (channelCode === "other") {
+            domain.push(["channel_type", "in", ["other", "api", "mobile_banking", "branch_walkin", "instagram"]]);
+        } else {
+            domain.push(["channel_type", "=", channelCode]);
+        }
+        const titles = {
+            phone: "Phone / IVR Tickets",
+            telegram: "Telegram Tickets",
+            whatsapp: "WhatsApp Tickets",
+            facebook: "Facebook Messenger Tickets",
+            email: "Email Helpdesk Tickets",
+            web_portal: "Customer Web Portal Tickets",
+            webportal: "Customer Web Portal Tickets",
+            chatbot: "Chatbot & Live Chat Tickets",
+            sms: "SMS / USSD Tickets",
+            other: "Other Inflow Tickets",
+        };
+        const title = titles[channelCode] || `Tickets via ${channelCode}`;
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: title,
+            res_model: "helpdesk.ticket",
+            views: [
+                [false, "list"],
+                [false, "kanban"],
+                [false, "form"],
+                [false, "pivot"],
+            ],
+            domain: domain,
+            context: {
+                default_channel_type: channelCode === "chatbot" ? "chatbot" : (channelCode === "webportal" ? "web_portal" : channelCode),
+            },
+        });
+    }
+
+    openTicketsByWorkUnit(unitName) {
+        let domain = this._getBaseDomain();
+        domain.push("|");
+        domain.push(["sla_status", "=", "failed"]);
+        domain.push(["ola_status", "=", "failed"]);
+        if (unitName) {
+            domain.push(["operating_unit_id.name", "=", unitName]);
+        }
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: `SLA & OLA Breached Tickets - ${unitName || 'All Units'}`,
+            res_model: "helpdesk.ticket",
+            views: [
+                [false, "list"],
+                [false, "kanban"],
+                [false, "form"],
+                [false, "pivot"],
+            ],
+            domain: domain,
+        });
+    }
+
+    openTicketsByService(serviceName) {
+        let domain = this._getBaseDomain();
+        domain.push("|");
+        domain.push(["sla_status", "=", "failed"]);
+        domain.push(["ola_status", "=", "failed"]);
+        if (serviceName) {
+            domain.push(["service_id.name", "=", serviceName]);
+        }
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: `SLA & OLA Breached Tickets - ${serviceName || 'All Services'}`,
+            res_model: "helpdesk.ticket",
+            views: [
+                [false, "list"],
+                [false, "kanban"],
+                [false, "form"],
+                [false, "pivot"],
+            ],
+            domain: domain,
+        });
+    }
+
+    openTicketsByAgent(userId, userName) {
+        let domain = [
+            "|",
+            ["create_uid", "=", userId],
+            ["user_id", "=", userId],
+        ];
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: `Tickets Handled by ${userName}`,
+            res_model: "helpdesk.ticket",
+            views: [
+                [false, "list"],
+                [false, "kanban"],
+                [false, "form"],
+                [false, "pivot"],
+            ],
+            domain: domain,
+            context: {
+                default_user_id: userId,
+            },
+        });
+    }
+
+    openTicketRecord(ticketId) {
+        if (!ticketId) return;
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "helpdesk.ticket",
+            res_id: ticketId,
+            views: [[false, "form"]],
+            target: "current",
         });
     }
 
@@ -739,6 +1262,9 @@ export class HelpdeskDashboard extends Component {
                     period: this.state.period,
                     team_id: teamIdParam,
                     user_id: userIdParam,
+                    grouping_mode: this.state.groupingMode,
+                    date_from: this.state.period === "custom" ? (this.state.dateFrom || false) : false,
+                    date_to: this.state.period === "custom" ? (this.state.dateTo || false) : false,
                 }
             );
             if (action && action.url) {

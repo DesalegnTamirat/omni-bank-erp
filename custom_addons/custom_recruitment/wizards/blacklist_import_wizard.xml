@@ -7,8 +7,18 @@
             <form string="Import Blacklist Pool Excel/CSV">
                 <sheet>
                     <div class="oe_title">
-                        <h2>Import Blacklist Pool Records</h2>
-                        <span class="text-muted">Upload an Excel/CSV template containing blacklisted candidate records</span>
+                        <h2>Import Inter-Bank Termination Records</h2>
+                        <span class="text-muted">Upload an Excel (.xlsx / .xls) or CSV file containing inter-bank blacklist records</span>
+                    </div>
+
+                    <div class="alert alert-info mt-2 mb-3" role="alert">
+                        <strong>Expected Columns:</strong>
+                        <ol class="mb-0 mt-1">
+                            <li><strong>Name</strong>: Full Name of the employee</li>
+                            <li><strong>Name of the Bank</strong>: Disclosing bank (e.g. Wegagen Bank, Oromia Bank, Abay Bank)</li>
+                            <li><strong>Reasons For Termination</strong>: Reason for disciplinary termination (e.g. Fraud, Forged Work Experience)</li>
+                            <li><strong>Date of Termination</strong>: Date of termination (e.g. September 09/2021, February 21,2023)</li>
+                        </ol>
                     </div>
 
                     <group>

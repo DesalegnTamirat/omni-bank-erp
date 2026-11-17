@@ -83,7 +83,7 @@
                                 <field name="code" />
                             </span>
                             <span class="badge text-bg-warning" t-if="record.is_nbe_complaint.raw_value">
-                                <i class="fa fa-shield me-1" />NBE Regulated
+                                <i class="fa fa-shield me-1" title="NBE Regulated" />NBE Regulated
                             </span>
                         </div>
                         <field class="fw-bold fs-5" name="name" />

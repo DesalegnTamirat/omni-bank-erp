@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name':     'HR Resignation',
-    'version':  '19.0.6.0.8',
+    'version':  '19.0.6.0.9',
     'category': 'Human Resources',
     'summary':  (
         'End-to-end separation workflow: request -> manager -> POMD/HR -> '
@@ -9,14 +9,17 @@
         'Supports voluntary resignation, retirement, medical, probation '
         'termination, and employer-initiated separation.'
     ),
-    'author':   'Bunna Bank',
+    'author':   'Taresa',
     'license':  'LGPL-3',
     'depends': [
         'hr',
         'hr_employee_custom',
         'hr_leave_request_custom',
+        'bunna_hr_payroll',
         'mail',
         'resl',
+        'discipline_management',
+        'employee_development_system',
     ],
     'data': [
         # -- 1. Security groups -------------------------------------------
@@ -36,9 +39,11 @@
         'wizard/hr_resignation_reject_wizard_views.xml',
         'wizard/hr_clearance_reject_wizard_views.xml',
         'wizard/hr_settlement_return_wizard_views.xml',
+        'wizard/hr_resignation_report_wizard_views.xml',
 
         # -- 5. Report ----------------------------------------------------
         'report/certificate_of_release.xml',
+        'report/resignation_acceptance_letter.xml',
         'report/settlement_statement.xml',
         'report/exit_interview_report.xml',
 
@@ -48,6 +53,7 @@
         'views/hr_resignation_dashboard_views.xml',
         'views/hr_separation_type_views.xml',
         'views/hr_clearance_config_views.xml',
+        'views/hr_certificate_config_views.xml',
         'views/hr_resignation_clearance_views.xml',
         'views/hr_exit_interview_views.xml',
         'views/hr_exit_interview_portal_templates.xml',

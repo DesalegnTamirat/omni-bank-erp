@@ -7,10 +7,10 @@
             <list string="Knowledge Base Articles &amp; SOPs">
                 <field name="sequence" widget="handle" />
                 <field name="name" />
-                <field name="service_family_id" />
-                <field name="service_id" />
-                <field name="sub_category_id" />
-                <field name="operating_unit_id" />
+                <field name="service_id" string="Service" />
+                <field name="sub_category_id" string="Sub Service" />
+                <field name="operating_unit_id" string="Service Provider" />
+                <field name="agent_response" string="Agent Response" optional="show" />
                 <field name="author_id" />
                 <field name="state" widget="badge" decoration-success="state == 'published'" decoration-warning="state == 'draft'" decoration-muted="state == 'archived'" />
                 <field name="active" widget="boolean_toggle" />
@@ -22,7 +22,7 @@
         <field name="name">helpdesk.knowledge.article.form</field>
         <field name="model">helpdesk.knowledge.article</field>
         <field name="arch" type="xml">
-            <form string="Knowledge Base Article">
+            <form string="Knowledge Base Article" class="o_helpdesk_form">
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="draft,published,archived" />
                 </header>
@@ -35,17 +35,19 @@
                     </div>
                     <group>
                         <group string="Service Mapping">
-                            <field name="service_family_id" options="{'no_create': True}" />
-                            <field name="service_id" options="{'no_create': True}" />
-                            <field name="sub_category_id" options="{'no_create': True}" />
+                            <field name="service_id" string="Service" options="{'no_create': True}" />
+                            <field name="sub_category_id" string="Sub Service" options="{'no_create': True}" />
                             <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" />
                         </group>
                         <group string="Author &amp; Responsibility">
-                            <field name="operating_unit_id" options="{'no_create': True}" />
+                            <field name="operating_unit_id" string="Service Provider" options="{'no_create': True}" />
                             <field name="author_id" options="{'no_create': True}" />
                             <field name="approver_id" options="{'no_create': True}" />
                             <field name="active" widget="boolean_toggle" />
                         </group>
+                    </group>
+                    <group string="Agent Response">
+                        <field name="agent_response" string="Agent Response" placeholder="Standard verified agent response provided to customer inquiries..." />
                     </group>
                     <notebook>
                         <page string="Article / SOP Content" name="content">
@@ -65,15 +67,16 @@
         <field name="model">helpdesk.knowledge.article</field>
         <field name="arch" type="xml">
             <search>
-                <field name="name" string="Article" filter_domain="['|', ('name', 'ilike', self), ('content', 'ilike', self)]" />
+                <field name="name" string="Article" filter_domain="['|', '|', ('name', 'ilike', self), ('agent_response', 'ilike', self), ('content', 'ilike', self)]" />
+                <field name="agent_response" string="Agent Response" />
                 <field name="service_id" />
                 <field name="sub_category_id" />
                 <field name="tag_ids" />
                 <filter string="Published" name="filter_published" domain="[('state', '=', 'published')]" />
                 <filter string="Draft" name="filter_draft" domain="[('state', '=', 'draft')]" />
                 <group name="group_by">
-                    <filter string="Service Family" name="group_family" domain="[]" context="{'group_by': 'service_family_id'}" />
                     <filter string="Service" name="group_service" domain="[]" context="{'group_by': 'service_id'}" />
+                    <filter string="Sub Service" name="group_sub_category" domain="[]" context="{'group_by': 'sub_category_id'}" />
                 </group>
             </search>
         </field>
@@ -83,10 +86,9 @@
         <field name="name">helpdesk.knowledge.article.kanban</field>
         <field name="model">helpdesk.knowledge.article</field>
         <field name="arch" type="xml">
-            <kanban class="o_kanban_mobile" default_group_by="service_family_id">
+            <kanban class="o_kanban_mobile" default_group_by="service_id">
                 <field name="name" />
                 <field name="state" />
-                <field name="service_family_id" />
                 <field name="service_id" />
                 <field name="sub_category_id" />
                 <field name="author_id" />
@@ -95,14 +97,14 @@
                 <templates>
                     <t t-name="card">
                         <div class="d-flex align-items-center justify-content-between mb-1">
-                            <span class="badge rounded-pill text-bg-primary" t-if="record.service_family_id.value">
-                                <field name="service_family_id" />
+                            <span class="badge rounded-pill text-bg-primary" t-if="record.service_id.value">
+                                <field name="service_id" />
                             </span>
                             <field name="state" widget="badge" decoration-success="state == 'published'" decoration-warning="state == 'draft'" decoration-muted="state == 'archived'" />
                         </div>
                         <field class="fw-bold fs-5 text-truncate" name="name" />
                         <div class="text-muted small mt-1" t-if="record.service_id.value">
-                            <i class="fa fa-cube me-1" />
+                            <i class="fa fa-cube me-1" title="Service" />
                             <field name="service_id" />
                             <t t-if="record.sub_category_id.value">
                                 <span class="mx-1">/</span>
@@ -114,7 +116,7 @@
                         </div>
                         <footer class="pt-2 d-flex justify-content-between align-items-center">
                             <span class="text-muted small">
-                                <i class="fa fa-building-o me-1" />
+                                <i class="fa fa-building-o me-1" title="Operating Unit" />
                                 <field name="operating_unit_id" />
                             </span>
                             <field name="author_id" widget="many2one_avatar_user" />

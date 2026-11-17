@@ -24,6 +24,12 @@ class PerformanceJobTemplate(models.Model):
         store=True,
         help="If True, this template will automatically apply to all other branches with the same Job Position.",
     )
+    is_district_area_unit = fields.Boolean(
+        string='Is District/Area Unit',
+        compute='_compute_is_district_area_unit',
+        store=True,
+        help="If True, this template will automatically apply to all other District and Area Offices with the same Job Position.",
+    )
     job_id = fields.Many2one(
         'hr.job', string='Job Position', required=True, index=True
     )
@@ -67,6 +73,21 @@ class PerformanceJobTemplate(models.Model):
             rec.is_branch_unit = bool(
                 unit and hasattr(unit, 'work_unit_type') and unit.work_unit_type in ('branch', 'sub_branch', 'service_center')
             )
+
+    @api.depends('operating_unit_id.work_unit_type', 'operating_unit_id.name')
+    def _compute_is_district_area_unit(self):
+        district_area_types = ('district_office', 'area_office', 'district', 'area')
+        for rec in self:
+            unit = rec.operating_unit_id
+            if not unit:
+                rec.is_district_area_unit = False
+                continue
+            wut = getattr(unit, 'work_unit_type', '') or ''
+            if wut in district_area_types:
+                rec.is_district_area_unit = True
+            else:
+                uname = (unit.name or '').lower()
+                rec.is_district_area_unit = ('district' in uname or 'area' in uname)
 
     @api.depends('line_ids.weight')
     def _compute_total_weight(self):

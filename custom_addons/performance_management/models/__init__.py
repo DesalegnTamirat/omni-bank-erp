@@ -16,3 +16,5 @@ from . import performance_dashboard
 from . import res_users
 from . import performance_job_template
 from . import performance_notification_helper
+from . import performance_score_allocation
+from . import performance_comprehensive_report

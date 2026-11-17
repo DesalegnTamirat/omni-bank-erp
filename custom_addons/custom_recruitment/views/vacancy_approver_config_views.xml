@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree View: Vacancy Approver Configurations -->
+    <record id="view_vacancy_approver_config_tree" model="ir.ui.view">
+        <field name="name">vacancy.approver.config.list</field>
+        <field name="model">vacancy.approver.config</field>
+        <field name="arch" type="xml">
+            <list string="Vacancy Approver Configurations" decoration-muted="not active">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="scope"/>
+                <field name="employee_count"/>
+                <field name="job_count"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View: Vacancy Approver Configuration -->
+    <record id="view_vacancy_approver_config_form" model="ir.ui.view">
+        <field name="name">vacancy.approver.config.form</field>
+        <field name="model">vacancy.approver.config</field>
+        <field name="arch" type="xml">
+            <form string="Vacancy Approver Configuration">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Configuration Title"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Authorized Vacancy Approvers"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Scope &amp; Operating Units">
+                            <field name="scope"/>
+                            <field name="operating_unit_ids" widget="many2many_tags" placeholder="All Operating Units if empty..."/>
+                        </group>
+                        <group string="Settings">
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-info" role="alert">
+                        <strong>ℹ️ Vacancy Approver Configuration:</strong>
+                        Employees and Job Positions added below will be the <strong>authorized vacancy approvers</strong> selectable in the <em>Vacancy Approval Members</em> tab of Job Vacancies instead of listing all employees from the responsible officer's operating unit.
+                    </div>
+
+                    <notebook>
+                        <page string="Eligible Approver Employees" name="employees">
+                            <field name="employee_ids" widget="many2many">
+                                <list string="Allowed Vacancy Approvers">
+                                    <field name="name" string="Employee Name"/>
+                                    <field name="job_id" string="Job Position"/>
+                                    <field name="department_id" string="Department"/>
+                                    <field name="default_operating_unit_id" string="Work Unit / Branch"/>
+                                    <field name="user_id" string="Linked User Account"/>
+                                    <field name="work_email" string="Email"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Authorized User Accounts" name="users">
+                            <field name="user_ids" widget="many2many">
+                                <list string="Allowed Users">
+                                    <field name="name" string="User Name"/>
+                                    <field name="login" string="Login"/>
+                                    <field name="email" string="Email"/>
+                                </list>
+                            </field>
+                            <p class="text-muted small mt-2">
+                                <i>Note: Automatically synchronized from eligible approver employees, but additional users can also be authorized here directly.</i>
+                            </p>
+                        </page>
+                        <page string="Eligible Job Positions (Optional)" name="job_positions">
+                            <field name="job_ids" widget="many2many">
+                                <list string="Allowed Job Positions">
+                                    <field name="name" string="Job Position"/>
+                                    <field name="department_id" string="Department"/>
+                                    <field name="no_of_employee" string="Current Employees"/>
+                                </list>
+                            </field>
+                            <p class="text-muted small mt-2">
+                                <i>Note: All active employees holding any of the selected job positions above will also be eligible as vacancy approvers.</i>
+                            </p>
+                        </page>
+                        <page string="Description &amp; Notes" name="notes">
+                            <field name="note" placeholder="Internal remarks or policy reference for authorized vacancy approvers..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_vacancy_approver_config_search" model="ir.ui.view">
+        <field name="name">vacancy.approver.config.search</field>
+        <field name="model">vacancy.approver.config</field>
+        <field name="arch" type="xml">
+            <search string="Search Vacancy Approver Configurations">
+                <field name="name"/>
+                <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="filter_archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_by_scope" string="Scope" context="{'group_by': 'scope'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_vacancy_approver_config" model="ir.actions.act_window">
+        <field name="name">Vacancy Approvers</field>
+        <field name="res_model">vacancy.approver.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_vacancy_approver_config_search"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure Authorized Vacancy Approvers
+            </p>
+            <p>
+                Add employees or job positions who are authorized to review and approve job vacancies in the Vacancy Approval Members list.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu items: Under Recruitment Configuration -->
+    <menuitem id="menu_vacancy_approver_config"
+              name="Vacancy Approvers"
+              parent="hr_recruitment.menu_hr_recruitment_configuration"
+              action="action_vacancy_approver_config"
+              sequence="54"
+              groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"/>
+
+    <menuitem id="menu_vacancy_approver_config_direct"
+              name="Vacancy Approvers"
+              parent="menu_recruitment_config_root"
+              action="action_vacancy_approver_config"
+              sequence="14"
+              groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"/>
+
+</odoo>
+

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- These functions run on EVERY upgrade of the module (the block must not
+         be noupdate: Odoo skips <function> tags inside noupdate data when the
+         module is upgraded). They are safe to re-run: they only add what is
+         missing, fill lines that are empty, and the one-time default reset is
+         guarded by a system parameter.
+         1. general Branch / District / Head Office lines (Branch Setup, HO Setup)
+         2. a setup record for every district office (District Setup), each
+            with its 4 lines; branches are set once (Branch Setup). -->
+    <data>
+        <function model="resl.routing.rule" name="_remove_job_picker_view"/>
+        <function model="resl.routing.unit" name="_cleanup_branch_units"/>
+        <function model="resl.routing.unit" name="_generate_defaults_once"/>
+        <function model="resl.routing.rule" name="_create_default_rules"/>
+    </data>
+</odoo>

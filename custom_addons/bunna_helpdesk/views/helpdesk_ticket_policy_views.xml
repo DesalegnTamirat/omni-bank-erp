@@ -6,13 +6,13 @@
         <field name="name">helpdesk.ticket.policy.auto.close.form</field>
         <field name="model">helpdesk.ticket.policy</field>
         <field name="arch" type="xml">
-            <form string="Auto-Close Policy" create="false" delete="false">
+            <form string="Auto-Close Policy" create="false" delete="false" class="o_helpdesk_form">
                 <sheet>
                     <div class="oe_title mb-3">
                         <h2>Auto-Close Policy</h2>
                         <span class="text-muted">Configure automatic ticket resolution and inactivity closure rules.</span>
                     </div>
-                    <group string="Automatic Ticket Closure (Done → Closed)">
+                    <group string="Automatic Ticket Closure (Resolved → Closed)">
                         <group>
                             <field name="auto_close_tickets" string="Enable Automatic Closure" />
                             <label for="auto_close_delay" string="Closure Grace Period" invisible="not auto_close_tickets" />
@@ -40,7 +40,7 @@
         <field name="name">helpdesk.ticket.policy.assignment.form</field>
         <field name="model">helpdesk.ticket.policy</field>
         <field name="arch" type="xml">
-            <form string="Ticket Assignment Policy" create="false" delete="false">
+            <form string="Ticket Assignment Policy" create="false" delete="false" class="o_helpdesk_form">
                 <sheet>
                     <div class="oe_title mb-3">
                         <h2>Ticket Assignment &amp; Responsible Operating Units</h2>
@@ -68,7 +68,7 @@
         <field name="name">helpdesk.ticket.policy.duplicate.form</field>
         <field name="model">helpdesk.ticket.policy</field>
         <field name="arch" type="xml">
-            <form string="Duplicate Tracking Policy" create="false" delete="false">
+            <form string="Duplicate Tracking Policy" create="false" delete="false" class="o_helpdesk_form">
                 <sheet>
                     <div class="oe_title mb-3">
                         <h2>Duplicate Ticket Tracking</h2>

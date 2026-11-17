@@ -1,7 +1,9 @@
 import base64
+import logging
 import mimetypes
 from collections import defaultdict
 from hashlib import sha1
+from markupsafe import Markup
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
@@ -26,6 +28,11 @@ OLE_MAGIC = b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
 THUMBNAIL_MIMETYPES = ('image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp')
 THUMBNAIL_SIZE = (256, 256)
 VIEWABLE_PREFIXES = ('image/', 'video/', 'audio/', 'text/', 'application/pdf', 'application/json')
+WORD_MIMETYPES = (
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+)
+_logger = logging.getLogger(__name__)
 
 
 class DmsDocument(models.Model):
@@ -40,15 +47,15 @@ class DmsDocument(models.Model):
         help="Disabled documents are hidden from Viewers and cannot be previewed or downloaded by them. "
              "Admins can still find them with the Disabled filter and enable them again.")
     folder_id = fields.Many2one(
-        'dms.folder', string='Folder', required=True, index=True, ondelete='restrict', tracking=True,
+        'dms.folder', string='Folder', required=False, index=True, ondelete='restrict', tracking=True,
         default=lambda self: self._default_folder())
     tag_ids = fields.Many2many('dms.tag', 'dms_document_tag_rel', 'document_id', 'tag_id', string='Tags')
     description = fields.Text()
     company_id = fields.Many2one(related='folder_id.company_id', store=True, index=True)
-    file = fields.Binary(string='File', attachment=False, copy=False)
-    file_name = fields.Char(string='File Name')
+    file = fields.Binary(string='File', attachment=False, copy=False, prefetch=False)
+    file_name = fields.Char(string='File Name', index=True)
     thumbnail = fields.Binary(
-        attachment=False, readonly=True, copy=False,
+        attachment=False, readonly=True, copy=False, prefetch=False,
         help="Small copy of an image, so cards and lists never have to load and resize the full file.")
     mimetype = fields.Char(readonly=True, index=True)
     extension = fields.Char(compute='_compute_extension', store=True)
@@ -57,6 +64,7 @@ class DmsDocument(models.Model):
     checksum = fields.Char(readonly=True, index=True)
     is_image = fields.Boolean(compute='_compute_is_image', store=True)
     is_viewable = fields.Boolean(compute='_compute_is_image', store=True)
+    is_word = fields.Boolean(compute='_compute_is_word', store=True)
     has_duplicate = fields.Boolean(compute='_compute_has_duplicate')
     status = fields.Selection(
         [('enabled', 'Enabled'), ('disabled', 'Disabled')], string='Status',
@@ -82,6 +90,23 @@ class DmsDocument(models.Model):
     file_password = fields.Char(
         string='File Password',
         help="If set, users must enter this password before viewing or downloading.")
+
+    # Custom per-document permission fields (when created without folder or with separate permissions)
+    custom_permission = fields.Boolean(
+        string='Custom Permission', default=False,
+        help="If checked, this document uses its own permission rules rather than folder access.")
+    is_restricted = fields.Boolean(
+        string='Restricted', default=False,
+        help="If checked, only authorized users/groups/departments/units can access this document.")
+    read_user_ids = fields.Many2many(
+        'res.users', 'dms_doc_read_user_rel', 'doc_id', 'user_id', string='Allowed Users',
+        domain=[('share', '=', False)])
+    read_group_ids = fields.Many2many(
+        'res.groups', 'dms_doc_read_group_rel', 'doc_id', 'group_id', string='Allowed Groups')
+    read_department_ids = fields.Many2many(
+        'hr.department', 'dms_doc_read_dept_rel', 'doc_id', 'dept_id', string='Allowed Departments')
+    read_operating_unit_ids = fields.Many2many(
+        'operating.unit', 'dms_doc_read_ou_rel', 'doc_id', 'ou_id', string='Allowed Operating Units')
 
     # -------------------------------------------------------------- defaults
     @api.model
@@ -120,6 +145,13 @@ class DmsDocument(models.Model):
             mime = doc.mimetype or ''
             doc.is_image = mime in IMAGE_MIMETYPES
             doc.is_viewable = mime.startswith(VIEWABLE_PREFIXES)
+
+    @api.depends('extension', 'mimetype')
+    def _compute_is_word(self):
+        for doc in self:
+            ext = (doc.extension or '').lower()
+            mime = (doc.mimetype or '').lower()
+            doc.is_word = ext in ('doc', 'docx') or mime in WORD_MIMETYPES
 
     def _compute_has_duplicate(self):
         sums = {c for c in self.mapped('checksum') if c}
@@ -173,40 +205,81 @@ class DmsDocument(models.Model):
              ('index_content', 'ilike', value)], ['res_id'])
         return [('id', 'in' if operator != 'not ilike' else 'not in', attachments.mapped('res_id'))]
 
-    # -------------------------------------------------------------- file meta
+    # -------------------------------------------------------------- file meta & configuration
+    @api.model
+    def _get_dms_settings(self):
+        """Helper to get active DMS settings with safe fallbacks."""
+        if 'dms.config.settings' in self.env:
+            try:
+                return self.env['dms.config.settings'].get_settings()
+            except Exception:
+                pass
+        return None
+
     @api.model
     def _max_file_size(self):
-        """Limit in bytes. Change it with the system parameter documents_lite.max_file_size_mb."""
-        mb = int(self.env['ir.config_parameter'].sudo().get_param('documents_lite.max_file_size_mb', 5))
+        """Limit in bytes. Reads from dedicated DMS configuration."""
+        settings = self._get_dms_settings()
+        if settings and settings.max_file_size_mb:
+            return settings.max_file_size_mb * 1024 * 1024
+        mb = int(self.env['ir.config_parameter'].sudo().get_param('documents_lite.max_file_size_mb', 25))
         return mb * 1024 * 1024
 
     @api.model
+    def _max_files_per_folder(self):
+        """Max documents per folder (0 = unlimited). Reads from dedicated DMS configuration."""
+        settings = self._get_dms_settings()
+        if settings is not None:
+            return settings.max_files_per_folder
+        return int(self.env['ir.config_parameter'].sudo().get_param('documents_lite.max_files_per_folder', 500))
+
+    @api.model
+    def _get_allowed_extensions(self):
+        """Returns set of allowed file extensions (lowercase) configured in DMS settings."""
+        settings = self._get_dms_settings()
+        if settings:
+            if settings.allow_all_extensions:
+                return set()  # Empty set denotes all allowed
+            if settings.allowed_extensions and settings.allowed_extensions.strip():
+                return {ext.strip().lstrip('.').lower() for ext in settings.allowed_extensions.split(',') if ext.strip()}
+        param = self.env['ir.config_parameter'].sudo().get_param('documents_lite.allowed_extensions', '')
+        if param and param.strip():
+            exts = {ext.strip().lstrip('.').lower() for ext in param.split(',') if ext.strip()}
+            if exts:
+                return exts
+        return set(ALLOWED_FILE_KINDS.keys())
+
+    @api.model
     def _check_file_type(self, raw, name):
-        """Only PDF, image and document files are accepted; the content must match the extension."""
+        """Only allowed extensions are accepted; the content must match the extension."""
         name = name or ''
         ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+        allowed_exts = self._get_allowed_extensions()
+        if allowed_exts:
+            if not ext or ext not in allowed_exts:
+                allowed_label = ', '.join(sorted(allowed_exts)).upper()
+                raise ValidationError(_(
+                    '"%(name)s" is not an allowed file type. Only files with extension (%(allowed)s) can be uploaded.',
+                    name=name, allowed=allowed_label))
         kind = ALLOWED_FILE_KINDS.get(ext)
-        if not kind:
-            raise ValidationError(_(
-                '"%(name)s" is not an allowed file type. Only %(allowed)s can be uploaded.',
-                name=name, allowed=ALLOWED_EXTENSIONS_LABEL))
-        head = raw[:16]
-        if kind == 'pdf':
-            ok = b'%PDF-' in raw[:1024]
-        elif kind == 'image':
-            ok = (head.startswith((b'\x89PNG\r\n\x1a\n', b'\xff\xd8\xff', b'GIF87a', b'GIF89a', b'BM'))
-                  or (head[:4] == b'RIFF' and head[8:12] == b'WEBP'))
-        elif kind == 'zip':
-            ok = head.startswith(b'PK\x03\x04')
-        elif kind == 'ole':
-            ok = head.startswith(OLE_MAGIC)
-        elif kind == 'rtf':
-            ok = head.startswith(b'{\\rtf')
-        else:  # txt, csv
-            ok = b'\x00' not in raw[:8192]
-        if not ok:
-            raise ValidationError(_(
-                'The content of "%(name)s" does not match its file type (.%(ext)s).', name=name, ext=ext))
+        if kind:
+            head = raw[:16]
+            if kind == 'pdf':
+                ok = b'%PDF-' in raw[:1024]
+            elif kind == 'image':
+                ok = (head.startswith((b'\x89PNG\r\n\x1a\n', b'\xff\xd8\xff', b'GIF87a', b'GIF89a', b'BM'))
+                      or (head[:4] == b'RIFF' and head[8:12] == b'WEBP'))
+            elif kind == 'zip':
+                ok = head.startswith(b'PK\x03\x04')
+            elif kind == 'ole':
+                ok = head.startswith(OLE_MAGIC)
+            elif kind == 'rtf':
+                ok = head.startswith(b'{\\rtf')
+            else:  # txt, csv
+                ok = b'\x00' not in raw[:8192]
+            if not ok:
+                raise ValidationError(_(
+                    'The content of "%(name)s" does not match its file type (.%(ext)s).', name=name, ext=ext))
 
     @api.model
     def _is_file_allowed(self, raw, name):
@@ -262,17 +335,42 @@ class DmsDocument(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        max_files = self._max_files_per_folder()
+        folder_counts = {}
         for vals in vals_list:
+            fid = vals.get('folder_id')
+            if fid and max_files > 0:
+                if fid not in folder_counts:
+                    folder_counts[fid] = self.search_count([('folder_id', '=', fid), ('active', '=', True)])
+                if folder_counts[fid] >= max_files:
+                    folder = self.env['dms.folder'].browse(fid)
+                    raise ValidationError(_(
+                        'Folder "%(folder)s" has reached its maximum file limit of %(max)d documents.',
+                        folder=folder.name, max=max_files
+                    ))
+                folder_counts[fid] += 1
             if vals.get('file'):
                 vals.setdefault('file_name', vals.get('name'))
                 vals.update(self._file_meta(vals['file'], vals.get('file_name') or vals.get('name')))
             if not vals.get('name') and vals.get('file_name'):
                 vals['name'] = vals['file_name']
-        return super().create(vals_list)
+        docs = super().create(vals_list)
+        return docs
 
     def write(self, vals):
+        if 'folder_id' in vals and vals['folder_id']:
+            fid = vals['folder_id']
+            max_files = self._max_files_per_folder()
+            if max_files > 0:
+                current_count = self.search_count([('folder_id', '=', fid), ('active', '=', True), ('id', 'not in', self.ids)])
+                if current_count + len(self) > max_files:
+                    folder = self.env['dms.folder'].browse(fid)
+                    raise ValidationError(_(
+                        'Cannot move documents to folder "%(folder)s". It exceeds the maximum file limit of %(max)d documents.',
+                        folder=folder.name, max=max_files
+                    ))
         if 'active' in vals and not self.env.context.get('dms_cascade'):
-            if vals['active'] and any(not doc.folder_id.active for doc in self):
+            if vals['active'] and any(doc.folder_id and not doc.folder_id.active for doc in self):
                 raise UserError(_('Enable the folder first: this document is inside a disabled folder.'))
             vals = dict(vals, disabled_by_folder=False)  # a manual choice wins over the folder's
         if 'file' in vals:
@@ -328,13 +426,33 @@ class DmsDocument(models.Model):
         for doc in self:
             doc.message_post(body=_('Document disabled by %s.', self.env.user.name))
         self.write({'active': False})
-        return {'type': 'ir.actions.client', 'tag': 'reload'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Document Disabled'),
+                'message': _('Document "%(name)s" disabled successfully.', name=self.name if len(self) == 1 else _('%d documents', len(self))),
+                'type': 'warning',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
 
     def action_enable(self):
         self.write({'active': True})
         for doc in self:
             doc.message_post(body=_('Document enabled by %s.', self.env.user.name))
-        return {'type': 'ir.actions.client', 'tag': 'reload'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Document Enabled'),
+                'message': _('Document "%(name)s" enabled successfully.', name=self.name if len(self) == 1 else _('%d documents', len(self))),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
 
     def action_open_details(self):
         """Open the full record (form) straight from the card menu, without the preview."""
@@ -392,12 +510,12 @@ class DmsDocumentVersion(models.Model):
     _order = 'document_id, version_no desc'
 
     document_id = fields.Many2one('dms.document', required=True, ondelete='cascade', index=True)
-    version_no = fields.Integer(string='Version', required=True)
-    file = fields.Binary(attachment=False)
+    version_no = fields.Integer(string='Version', required=True, index=True)
+    file = fields.Binary(attachment=False, prefetch=False)
     file_name = fields.Char()
-    mimetype = fields.Char()
+    mimetype = fields.Char(index=True)
     file_size = fields.Integer(string='Size (bytes)')
-    checksum = fields.Char()
+    checksum = fields.Char(index=True)
     replaced_by_id = fields.Many2one('res.users', string='Replaced By', default=lambda self: self.env.user)
     replaced_on = fields.Datetime(default=fields.Datetime.now)
 
@@ -407,8 +525,23 @@ class DmsDocumentVersion(models.Model):
         doc = self.document_id
         doc.with_context(dms_skip_file_check=True).write({'file': self.file, 'file_name': self.file_name})
         doc.message_post(body=_('Restored the file of version %(v)s.', v=self.version_no))
-        return {'type': 'ir.actions.act_window', 'res_model': 'dms.document', 'res_id': doc.id,
-                'view_mode': 'form', 'target': 'current'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Version Restored'),
+                'message': _('Version %(v)s restored successfully for "%(name)s".', v=self.version_no, name=doc.name),
+                'type': 'success',
+                'sticky': False,
+                'next': {
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'dms.document',
+                    'res_id': doc.id,
+                    'view_mode': 'form',
+                    'target': 'current',
+                },
+            },
+        }
 
     def action_download(self):
         self.ensure_one()

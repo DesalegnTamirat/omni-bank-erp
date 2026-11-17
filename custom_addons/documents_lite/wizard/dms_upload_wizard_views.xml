@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="dms_upload_wizard_view_form" model="ir.ui.view">
+        <field name="name">dms.upload.wizard.form</field>
+        <field name="model">dms.upload.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Upload Document">
+                <sheet>
+                    <group>
+                        <group string="File &amp; Details">
+                            <field name="file" filename="file_name"
+                                   options="{'accepted_file_extensions': '.pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.csv'}"/>
+                            <field name="file_name" placeholder="File name"/>
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color', 'no_create_edit': True}"/>
+                        </group>
+                        <group string="Destination">
+                            <field name="folder_mode" widget="radio"/>
+                            <field name="folder_id" invisible="folder_mode != 'folder'" required="folder_mode == 'folder'"/>
+                        </group>
+                    </group>
+
+                    <group string="Custom Document Permissions" invisible="folder_mode != 'no_folder'">
+                        <div class="text-muted mb-2">
+                            Define who can view and access this document. If restricted mode is enabled, only selected users, groups, departments, or operating units can view it.
+                        </div>
+                        <field name="inherit_folder_rules" string="Restrict Document Access"/>
+                        <field name="read_user_ids" widget="many2many_tags" options="{'no_create': True}" invisible="not inherit_folder_rules"/>
+                        <field name="read_group_ids" widget="many2many_tags" options="{'no_create': True}" invisible="not inherit_folder_rules"/>
+                        <field name="read_department_ids" widget="many2many_tags" options="{'no_create': True}" invisible="not inherit_folder_rules"/>
+                        <field name="read_operating_unit_ids" widget="many2many_tags" options="{'no_create': True}" invisible="not inherit_folder_rules"/>
+                    </group>
+
+                    <group string="Description">
+                        <field name="description" placeholder="Optional notes or description about this document..." nolabel="1"/>
+                    </group>
+                    <field name="res_model" invisible="1"/>
+                    <field name="res_id" invisible="1"/>
+                </sheet>
+                <footer>
+                    <button name="action_upload" string="Upload" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_dms_upload_wizard" model="ir.actions.act_window">
+        <field name="name">Upload Document</field>
+        <field name="res_model">dms.upload.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

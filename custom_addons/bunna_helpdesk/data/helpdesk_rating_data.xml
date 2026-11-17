@@ -78,14 +78,54 @@
                                                 <p style="margin-bottom: 20px;">
                                                     Your support ticket <strong style="color: #541718;"><t t-out="object.number" /> — "<t t-out="object.name" />"</strong> has recently been resolved. Your satisfaction is our highest priority, and we would greatly value your brief feedback!
                                                 </p>
-                                                <p style="text-align: center; margin: 28px 0;">
-                                                    <a
-                                                        t-att-href="object.rating_get_access_url()"
-                                                        style="background-color: #541718; color: #ffffff; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block; border: 2px solid #c17540; box-shadow: 0 4px 10px rgba(84, 23, 24, 0.2);"
-                                                    >
-                                                        ⭐ Rate Your Experience
-                                                    </a>
-                                                </p>
+                                                <t t-set="access_token" t-value="object._rating_get_access_token()"/>
+                                                <div style="text-align: center; margin: 28px 0; background-color: #fdfaf7; border: 1px solid #f3d7c5; border-radius: 8px; padding: 20px;">
+                                                    <p style="font-weight: 600; font-size: 14px; margin-top: 0; margin-bottom: 14px; color: #541718;">
+                                                        How was your support experience?
+                                                    </p>
+                                                    <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto; width: 100%; max-width: 460px;">
+                                                        <tr>
+                                                            <td align="center" style="padding: 4px;">
+                                                                <a t-attf-href="{{ object.get_base_url() }}/rate/{{ access_token }}/5" style="text-decoration: none; display: inline-block;">
+                                                                    <div style="font-size: 30px; line-height: 1;">⭐</div>
+                                                                    <div style="font-size: 12px; font-weight: bold; color: #425727; margin-top: 4px;">5 - Excellent</div>
+                                                                </a>
+                                                            </td>
+                                                            <td align="center" style="padding: 4px;">
+                                                                <a t-attf-href="{{ object.get_base_url() }}/rate/{{ access_token }}/4" style="text-decoration: none; display: inline-block;">
+                                                                    <div style="font-size: 30px; line-height: 1;">⭐</div>
+                                                                    <div style="font-size: 12px; font-weight: bold; color: #726732; margin-top: 4px;">4 - Good</div>
+                                                                </a>
+                                                            </td>
+                                                            <td align="center" style="padding: 4px;">
+                                                                <a t-attf-href="{{ object.get_base_url() }}/rate/{{ access_token }}/3" style="text-decoration: none; display: inline-block;">
+                                                                    <div style="font-size: 30px; line-height: 1;">⭐</div>
+                                                                    <div style="font-size: 12px; font-weight: bold; color: #C17540; margin-top: 4px;">3 - Fair</div>
+                                                                </a>
+                                                            </td>
+                                                            <td align="center" style="padding: 4px;">
+                                                                <a t-attf-href="{{ object.get_base_url() }}/rate/{{ access_token }}/2" style="text-decoration: none; display: inline-block;">
+                                                                    <div style="font-size: 30px; line-height: 1;">⭐</div>
+                                                                    <div style="font-size: 12px; font-weight: bold; color: #d44638; margin-top: 4px;">2 - Poor</div>
+                                                                </a>
+                                                            </td>
+                                                            <td align="center" style="padding: 4px;">
+                                                                <a t-attf-href="{{ object.get_base_url() }}/rate/{{ access_token }}/1" style="text-decoration: none; display: inline-block;">
+                                                                    <div style="font-size: 30px; line-height: 1;">⭐</div>
+                                                                    <div style="font-size: 12px; font-weight: bold; color: #541718; margin-top: 4px;">1 - Very Poor</div>
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                    <div style="margin-top: 18px;">
+                                                        <a
+                                                            t-att-href="object.rating_get_access_url()"
+                                                            style="background-color: #541718; color: #ffffff; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block; border: 2px solid #c17540; box-shadow: 0 4px 10px rgba(84, 23, 24, 0.15);"
+                                                        >
+                                                            Rate &amp; Add Comments
+                                                        </a>
+                                                    </div>
+                                                </div>
                                                 <p style="margin-bottom: 0; color: #1D2B32; font-weight: 500;">
                                                     Thank you for banking with Bunna Bank — <em>Bank of the Visionaries!</em>
                                                 </p>
@@ -129,5 +169,8 @@
                 </table>
             </field>
         </record>
+
+        <!-- ── Auto-initialize team ratings on all existing teams ─────────── -->
+        <function model="helpdesk.ticket.team" name="_init_team_ratings" />
     </data>
 </odoo>

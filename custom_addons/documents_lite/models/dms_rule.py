@@ -9,8 +9,8 @@ class DmsRule(models.Model):
     _order = 'sequence, id'
 
     name = fields.Char(required=True)
-    sequence = fields.Integer(default=10)
-    active = fields.Boolean(default=True)
+    sequence = fields.Integer(default=10, index=True)
+    active = fields.Boolean(default=True, index=True)
     model_id = fields.Many2one(
         'ir.model', string='Attached To', required=True, ondelete='cascade',
         domain=[('transient', '=', False)], help="Attachments added to records of this model are filed.")
@@ -18,9 +18,9 @@ class DmsRule(models.Model):
     name_pattern = fields.Char(
         string='File Name Pattern', help="Optional, e.g. invoice*.pdf or *.png (not case sensitive).")
     mimetype_prefix = fields.Char(string='File Type', help="Optional, e.g. application/pdf or image/")
-    folder_id = fields.Many2one('dms.folder', string='File Into', required=True, ondelete='cascade')
+    folder_id = fields.Many2one('dms.folder', string='File Into', required=True, ondelete='cascade', index=True)
     tag_ids = fields.Many2many('dms.tag', 'dms_rule_tag_rel', 'rule_id', 'tag_id', string='Tags')
-    company_id = fields.Many2one('res.company')
+    company_id = fields.Many2one('res.company', index=True)
 
     def _match(self, attachment):
         self.ensure_one()

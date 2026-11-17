@@ -7,12 +7,14 @@ import { kanbanView } from "@web/views/kanban/kanban_view";
 import { KanbanController } from "@web/views/kanban/kanban_controller";
 import { listView } from "@web/views/list/list_view";
 import { ListController } from "@web/views/list/list_controller";
+import { FormController } from "@web/views/form/form_controller";
+import { formView } from "@web/views/form/form_view";
 import { openDmsViewer } from "./dms_viewer";
 
 /**
  * Upload + drag and drop for the Documents kanban / list.
- * Files are posted to /dms/upload with the folder picked in the search panel
- * (or the record the action is linked to).
+ * Files can be uploaded through the upload modal dialog with folder / custom permissions,
+ * or dropped directly to /dms/upload.
  */
 const ALLOWED_FILE_EXTENSIONS = [
     "pdf", "png", "jpg", "jpeg", "gif", "webp", "bmp",
@@ -23,6 +25,8 @@ const ALLOWED_FILE_RE = new RegExp(`\\.(${ALLOWED_FILE_EXTENSIONS.join("|")})$`,
 function useDmsUpload(controller) {
     const fileUpload = useService("file_upload");
     const notification = useService("notification");
+    const actionService = useService("action");
+
     // Only Admins can upload; Viewers get no Upload button and no drop zone.
     const state = useState({ canUpload: false });
     onWillStart(async () => {
@@ -55,20 +59,29 @@ function useDmsUpload(controller) {
             return;
         }
         const ctx = controller.props.context;
-        await fileUpload.upload("/dms/upload", files, {
-            buildFormData: (fd) => {
-                fd.append("folder_id", currentFolderId());
-                if (ctx.default_res_model && ctx.default_res_id) {
-                    fd.append("res_model", ctx.default_res_model);
-                    fd.append("res_id", ctx.default_res_id);
-                }
-            },
-        });
+        try {
+            await fileUpload.upload("/dms/upload", files, {
+                buildFormData: (fd) => {
+                    fd.append("folder_id", currentFolderId());
+                    if (ctx.default_res_model && ctx.default_res_id) {
+                        fd.append("res_model", ctx.default_res_model);
+                        fd.append("res_id", ctx.default_res_id);
+                    }
+                },
+            });
+            notification.add(_t("Upload complete."), { type: "success" });
+            controller.env.searchModel?.search();
+        } catch (err) {
+            notification.add(_t("Upload failed: %s", err.message || err), { type: "danger" });
+        }
     };
 
     useBus(fileUpload.bus, "FILE_UPLOAD_LOADED", () => {
-        notification.add(_t("Upload complete."), { type: "success" });
-        controller.env.searchModel.search();
+        controller.env.searchModel?.search();
+    });
+
+    useBus(fileUpload.bus, "FILE_UPLOAD_ERROR", (ev) => {
+        notification.add(_t("Upload failed: %s", ev.detail?.error || "Error"), { type: "danger" });
     });
 
     // Drop zone: plain DOM so it works whatever the view layout is.
@@ -126,13 +139,24 @@ function useDmsUpload(controller) {
 
     return {
         state,
-        pickFiles() {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.multiple = true;
-            input.accept = ALLOWED_FILE_EXTENSIONS.map((e) => `.${e}`).join(",");
-            input.onchange = () => upload(input.files);
-            input.click();
+        openUploadWizard() {
+            const folderId = currentFolderId();
+            actionService.doAction({
+                type: "ir.actions.act_window",
+                name: _t("Upload Document"),
+                res_model: "dms.upload.wizard",
+                views: [[false, "form"]],
+                target: "new",
+                context: {
+                    default_folder_id: folderId || false,
+                    default_res_model: controller.props.context.default_res_model || false,
+                    default_res_id: controller.props.context.default_res_id || false,
+                },
+            }, {
+                onClose: () => {
+                    controller.env.searchModel?.search();
+                },
+            });
         },
         upload,
     };
@@ -143,13 +167,14 @@ export class DmsKanbanController extends KanbanController {
         super.setup();
         this.dms = useDmsUpload(this);
         this.dmsDialog = useService("dialog");
+        this.notification = useService("notification");
     }
     /** A click on a card shows the document full screen instead of opening the form. */
     async openRecord(record) {
         openDmsViewer(this.dmsDialog, record);
     }
     onUploadClick() {
-        this.dms.pickFiles();
+        this.dms.openUploadWizard();
     }
 }
 
@@ -158,12 +183,49 @@ export class DmsListController extends ListController {
         super.setup();
         this.dms = useDmsUpload(this);
         this.dmsDialog = useService("dialog");
+        this.notification = useService("notification");
     }
     async openRecord(record) {
         openDmsViewer(this.dmsDialog, record);
     }
     onUploadClick() {
-        this.dms.pickFiles();
+        this.dms.openUploadWizard();
+    }
+}
+
+export class DmsFormController extends FormController {
+    setup() {
+        super.setup();
+        this.notification = useService("notification");
+    }
+    async saveButtonClicked(params = {}) {
+        const isNew = !this.model.root.resId;
+        try {
+            const saved = await super.saveButtonClicked(params);
+            if (saved !== false) {
+                this.notification.add(
+                    isNew ? _t("Document created successfully.") : _t("Document updated successfully."),
+                    { type: "success" }
+                );
+            }
+            return saved;
+        } catch (err) {
+            this.notification.add(
+                _t("Failed to save document: %s", err.message || err),
+                { type: "danger" }
+            );
+            throw err;
+        }
+    }
+    async beforeUnlink() {
+        try {
+            const res = await super.beforeUnlink(...arguments);
+            this.notification.add(_t("Document deleted successfully."), { type: "success" });
+            return res;
+        } catch (err) {
+            this.notification.add(_t("Failed to delete document: %s", err.message || err), { type: "danger" });
+            throw err;
+        }
     }
 }
 
@@ -176,4 +238,8 @@ registry.category("views").add("dms_list", {
     ...listView,
     Controller: DmsListController,
     buttonTemplate: "documents_lite.ListButtons",
+});
+registry.category("views").add("dms_form", {
+    ...formView,
+    Controller: DmsFormController,
 });

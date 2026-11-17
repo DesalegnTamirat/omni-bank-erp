@@ -80,10 +80,10 @@
                                 <field name="code" />
                             </span>
                             <span class="badge text-bg-primary" t-if="record.is_internal.raw_value">
-                                <i class="fa fa-building me-1" />Internal Unit
+                                <i class="fa fa-building me-1" title="Internal Unit" />Internal Unit
                             </span>
                             <span class="badge text-bg-success" t-if="!record.is_internal.raw_value">
-                                <i class="fa fa-globe me-1" />External Client
+                                <i class="fa fa-globe me-1" title="External Client" />External Client
                             </span>
                         </div>
                         <field class="fw-bold fs-5" name="name" />

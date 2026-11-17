@@ -31,7 +31,8 @@
                   decoration-muted="state == 'cancelled'">
                 <header>
                     <button name="%(action_succession_nominate_candidates_wizard)d" type="action"
-                            string="Auto-Match &amp; Invite Candidates" class="btn-primary" icon="fa-magic"/>
+                            string="Auto-Match &amp; Invite Candidates" class="btn-primary" icon="fa-magic"
+                            groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
                 </header>
                 <field name="critical_position_id" class="fw-bold text-primary" string="Critical Position"/>
                 <field name="employee_id" class="fw-bold" string="Candidate"/>
@@ -59,7 +60,48 @@
                         invisible="state != 'invited'"/>
                 <button name="action_nominate_to_pipeline" type="object" string="Nominate"
                         class="btn-primary btn-sm" icon="fa-user-plus"
-                        invisible="state != 'accepted'"/>
+                        invisible="state != 'accepted'"
+                        groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- List View: Employee Self-Service ("My Succession Invitations") -->
+    <record id="view_succession_my_invitation_tree" model="ir.ui.view">
+        <field name="name">succession.candidate.invitation.my.list</field>
+        <field name="model">succession.candidate.invitation</field>
+        <field name="arch" type="xml">
+            <list string="My Succession Invitations" sample="1"
+                  create="0"
+                  default_order="create_date desc, id desc"
+                  decoration-success="state == 'accepted'"
+                  decoration-info="state == 'invited'"
+                  decoration-danger="state in ('declined', 'expired')"
+                  decoration-primary="state == 'nominated'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="critical_position_id" class="fw-bold text-primary" string="Critical Position"/>
+                <field name="employee_id" class="fw-bold" string="Candidate"/>
+                <field name="employee_job_id" string="Current Position"/>
+                <field name="department_id" string="Target Department" optional="show"/>
+                <field name="grade_name" string="Current Grade" optional="show"/>
+                <field name="tenure_years" string="Bank Service (Yrs)" optional="show"/>
+                <field name="application_date" string="Application Date" optional="show"/>
+                <field name="deadline_date" string="Acceptance End Date"
+                       decoration-danger="deadline_date and deadline_date &lt; current_date and state == 'invited'"/>
+                <field name="candidate_response_notes" string="Candidate Response Notes" optional="show"/>
+                <field name="state" widget="badge" string="Status"
+                       decoration-info="state == 'invited'"
+                       decoration-success="state == 'accepted'"
+                       decoration-danger="state == 'declined'"
+                       decoration-warning="state == 'expired'"
+                       decoration-primary="state == 'nominated'"
+                       decoration-muted="state == 'cancelled'"/>
+                <button name="action_accept" type="object" string="Accept"
+                        class="btn-success btn-sm" icon="fa-check"
+                        invisible="state != 'invited'"/>
+                <button name="action_decline" type="object" string="Decline"
+                        class="btn-outline-danger btn-sm" icon="fa-times"
+                        invisible="state != 'invited'"/>
             </list>
         </field>
     </record>
@@ -73,7 +115,8 @@
                 <header>
                     <button name="action_nominate_to_pipeline" type="object"
                             string="Nominate Selected to Pipeline" class="btn-primary"
-                            icon="fa-user-plus"/>
+                            icon="fa-user-plus"
+                            groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
                 </header>
                 <field name="critical_position_id" class="fw-bold text-primary"/>
                 <field name="employee_id" class="fw-bold"/>
@@ -88,7 +131,8 @@
                 <field name="state" widget="badge" decoration-success="state == 'accepted'"/>
                 <button name="action_nominate_to_pipeline" type="object" string="Nominate"
                         class="btn-success btn-sm shadow-sm" icon="fa-user-plus"
-                        invisible="state != 'accepted'"/>
+                        invisible="state != 'accepted'"
+                        groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
             </list>
         </field>
     </record>
@@ -102,7 +146,19 @@
                 <header>
                     <button name="action_accept" type="object" string="Accept &amp; Confirm Interest" class="btn-success" icon="fa-check" invisible="state != 'invited'"/>
                     <button name="action_decline" type="object" string="Decline Invitation" class="btn-outline-danger" icon="fa-times" invisible="state != 'invited'"/>
-                    <button name="action_nominate_to_pipeline" type="object" string="Nominate to Succession Pipeline" class="btn-primary" icon="fa-user-plus" invisible="state != 'accepted'" groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+                    <button name="action_nominate_to_pipeline" type="object" string="Nominate to Succession Pipeline" class="btn-primary" icon="fa-user-plus" invisible="state != 'accepted' or context.get('hide_nominate')" groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+                    <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fw-bold"
+                          invisible="state != 'accepted'">
+                        <i class="fa fa-check-circle me-1" title="Accepted"/>Accepted
+                    </span>
+                    <span class="badge bg-danger-subtle text-danger border border-danger px-3 py-2 fw-bold"
+                          invisible="state != 'declined'">
+                        <i class="fa fa-times-circle me-1"/>Declined
+                    </span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-2 fw-bold"
+                          invisible="state != 'nominated'">
+                        <i class="fa fa-check-circle me-1" title="Accepted"/>Nominated to Pipeline
+                    </span>
                     <field name="state" widget="statusbar" statusbar_visible="invited,accepted,nominated"/>
                 </header>
                 <sheet>
@@ -226,6 +282,7 @@
         <field name="model_id" ref="model_succession_candidate_invitation"/>
         <field name="binding_model_id" ref="model_succession_candidate_invitation"/>
         <field name="binding_view_types">list</field>
+        <field name="group_ids" eval="[(4, ref('bunna_succession_management.group_succession_ppdd')), (4, ref('bunna_succession_management.group_succession_admin'))]"/>
         <field name="state">code</field>
         <field name="code">
 if records:
@@ -283,7 +340,9 @@ if records:
         <field name="name">My Succession Invitations</field>
         <field name="res_model">succession.candidate.invitation</field>
         <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_succession_my_invitation_tree"/>
         <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="context">{'hide_nominate': True}</field>
         <field name="search_view_id" ref="view_succession_candidate_invitation_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

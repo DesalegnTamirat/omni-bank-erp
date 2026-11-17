@@ -5,7 +5,7 @@
         <field name="name">helpdesk.ticket.merge.wizard.form</field>
         <field name="model">helpdesk.ticket.merge.wizard</field>
         <field name="arch" type="xml">
-            <form string="Merge Tickets">
+            <form string="Merge Tickets" class="o_helpdesk_wizard">
                 <sheet>
                     <group>
                         <field name="target_ticket_id" />

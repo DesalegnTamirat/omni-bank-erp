@@ -6,3 +6,6 @@ from . import ir_binary
 from . import ir_attachment
 from . import base
 from . import res_groups
+from . import dms_dashboard
+from . import res_config_settings
+from . import dms_config_settings

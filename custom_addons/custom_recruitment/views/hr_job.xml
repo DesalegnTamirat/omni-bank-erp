@@ -33,5 +33,4 @@
         </field>
     </record>
 
-    <!--<menuitem id="menu_new_recruitments" name="Recruitments" parent="hr_recruitment.menu_hr_recruitment_root"/>-->
 </odoo>

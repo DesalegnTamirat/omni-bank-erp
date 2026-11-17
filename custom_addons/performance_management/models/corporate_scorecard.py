@@ -105,11 +105,11 @@ class CorporateScorecard(models.Model):
         ('notified', 'Notified'),
         ('accepted', 'Accepted'),
         ('rejected', 'Rejected'),
-        ('confirmed', 'Confirmed'),
         ('appraisal_started', 'Appraisal Started'),
         ('completed', 'Completed'),
     ], string='Status', default='draft', required=True, tracking=True, copy=False)
     rejection_reason = fields.Text(string='Rejection Reason', copy=False)
+    manager_rejection_reply = fields.Text(string='Manager Rejection Response', copy=False, tracking=True)
 
     @api.constrains('fiscal_year_id', 'appraisal_period_id')
     def _check_unique_scorecard(self):
@@ -249,6 +249,34 @@ class CorporateScorecard(models.Model):
                     'Planning Period Start Date must be before the Planning Period End Date.'
                 )
 
+    @api.constrains('accept_by')
+    def _check_accept_by(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.accept_by and rec.accept_by < today:
+                raise ValidationError("Acceptance deadline ('Accept By') cannot be earlier than the current date.")
+
+    @api.constrains('total_weight', 'state')
+    def _check_total_weight_on_state(self):
+        for rec in self:
+            if rec.state not in ('draft', 'rejected'):
+                if round(rec.total_weight, 2) != 100.0:
+                    state_lbl = dict(rec._fields['state'].selection).get(rec.state, rec.state)
+                    raise ValidationError(
+                        f"Corporate Scorecard '{rec.name or rec.display_name}' must have a Total Weight of exactly 100% "
+                        f"(currently {round(rec.total_weight, 2)}%) when in '{state_lbl}' status."
+                    )
+
+    @api.onchange('accept_by')
+    def _onchange_accept_by(self):
+        if self.accept_by and self.accept_by < fields.Date.context_today(self):
+            return {
+                'warning': {
+                    'title': 'Invalid Acceptance Deadline',
+                    'message': "Acceptance deadline ('Accept By') cannot be earlier than the current date.",
+                }
+            }
+
     @api.onchange('fiscal_year_id')
     def _onchange_fiscal_year_id(self):
         if self.fiscal_year_id:
@@ -308,21 +336,48 @@ class CorporateScorecard(models.Model):
                 if target_val <= 0.0:
                     measure_name = line.measure_id.name if line.measure_id else 'KPI Measure'
                     invalid_measures.append(f"{measure_name} (Current {target_label}: {target_val})")
+                elif line.target_type == 'percent' and target_val > 100.0:
+                    measure_name = line.measure_id.name if line.measure_id else 'KPI Measure'
+                    invalid_measures.append(f"{measure_name} (Percentage target cannot exceed 100%: {target_val}%)")
 
             if invalid_measures:
                 period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else code
                 raise UserError(
                     f"Corporate Scorecard cannot be notified for appraisal period '{period_name}'. "
                     f"All scorecard lines must have a valid non-zero {target_label} set.\n\n"
-                    f"Missing or zero targets found for:\n- " + "\n- ".join(invalid_measures)
+                    f"Missing, zero, or invalid targets found for:\n- " + "\n- ".join(invalid_measures)
                 )
 
     def action_notify(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if round(rec.total_weight, 2) != 100.0:
+                raise UserError(
+                    f"Corporate Scorecard '{rec.name or rec.display_name}' cannot be notified "
+                    f"because its Total Weight is {round(rec.total_weight, 2)}% (must be exactly 100%)."
+                )
+            if rec.state == 'rejected':
+                if not rec.manager_rejection_reply or not rec.manager_rejection_reply.strip():
+                    return {
+                        'name': 'Reply to Employee Rejection Reason',
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'performance.rejection.reply.wizard',
+                        'view_mode': 'form',
+                        'target': 'new',
+                        'context': {
+                            'default_res_model': rec._name,
+                            'default_res_id': rec.id,
+                            'default_action_type': 'notify',
+                            'default_rejection_reason': rec.rejection_reason,
+                        },
+                    }
         for rec in self:
             if not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Only the Planning administrator can notify the employee.')
             if not rec.accept_by:
                 raise UserError(f"Please provide an 'Accept By' deadline before notifying the employee for corporate scorecard '{rec.name or rec.display_name}'.")
+            if rec.accept_by < today:
+                raise UserError(f"The 'Accept By' deadline cannot be earlier than the current date ({today}) for corporate scorecard '{rec.name or rec.display_name}'.")
         self._validate_period_targets_for_notify()
         for rec in self:
             rec.write({'state': 'notified'})
@@ -345,6 +400,7 @@ class CorporateScorecard(models.Model):
                 ("Appraisal Period", f"{period_name} ({fy_name})"),
                 ("Accept By Deadline", f'<span style="color: #c53030; font-weight: bold;">{accept_by_str}</span>'),
                 ("Total Weight", f"{rec.total_weight:.2f}%"),
+                ("Manager Response to Rejection", f'<span style="color: #2b6cb0; font-weight: bold;">{rec.manager_rejection_reply}</span>'),
                 ("Current Status", '<span style="background-color: #feebc8; color: #7b341e; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">NOTIFIED</span>'),
             ]
 
@@ -369,6 +425,11 @@ class CorporateScorecard(models.Model):
         for rec in self:
             if not (rec.is_current_employee or self.env.is_admin()):
                 raise UserError('Only the assigned employee can accept this Corporate Scorecard.')
+            if round(rec.total_weight, 2) != 100.0:
+                raise UserError(
+                    f"Corporate Scorecard '{rec.name or rec.display_name}' cannot be accepted "
+                    f"because its Total Weight is {round(rec.total_weight, 2)}% (must be exactly 100%)."
+                )
             user_emp_id = self.env.user.sudo().employee_id.id or rec.sudo().employee_id.id
             rec.sudo().write({
                 'state': 'accepted',
@@ -402,9 +463,9 @@ class CorporateScorecard(models.Model):
                 border_color="#28a745",
                 intro_text=f"Executive <strong>{emp_name}</strong> has reviewed and <strong>ACCEPTED</strong> the Corporate Scorecard for period <strong>{period_name}</strong> ({fy_name}).",
                 details=details,
-                action_btn_text="🎯 Open & Confirm Corporate Scorecard",
+                action_btn_text="🎯 View Corporate Scorecard",
                 action_btn_color="#166534",
-                footer_note="Planning Administrator, please confirm this corporate scorecard to finalize targets.",
+                footer_note="Corporate Scorecard targets are finalized and active for strategic appraisal evaluation.",
             )
 
     def action_reject(self):
@@ -424,49 +485,7 @@ class CorporateScorecard(models.Model):
         }
 
     def action_confirm(self):
-        for rec in self:
-            if not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
-                raise UserError('Only the Planning administrator can confirm this Corporate Scorecard.')
-            rec.write({'state': 'confirmed'})
-            
-            emp = rec.employee_id
-            emp_user = emp.user_id if emp else False
-            emp_partner = emp_user.partner_id if emp_user else False
-            partner_ids = [emp_partner.id] if emp_partner else []
-
-            period_name = rec.appraisal_period_id.name if rec.appraisal_period_id else ''
-            fy_name = rec.fiscal_year_id.name if rec.fiscal_year_id else ''
-            emp_name = emp.name if emp else 'Assigned Executive'
-            manager_name = self.env.user.name or 'Planning Administrator'
-            doc_name = rec.name or f"Corporate Scorecard - {fy_name}"
-
-            try:
-                rec.activity_feedback(['mail.mail_activity_data_todo'], feedback="Corporate Scorecard confirmed.")
-            except Exception:
-                pass
-
-            details = [
-                ("Document Name", f"<strong>{doc_name}</strong>"),
-                ("Executive / Assignee", f"<strong>{emp_name}</strong>"),
-                ("Planning Admin", manager_name),
-                ("Appraisal Period", f"{period_name} ({fy_name})"),
-                ("Total Weight", f"{rec.total_weight:.2f}%"),
-                ("Current Status", '<span style="background-color: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">CONFIRMED</span>'),
-            ]
-
-            send_performance_notification(
-                record=rec,
-                title="🔒 Corporate Scorecard Confirmed & Finalized",
-                badge_text="CONFIRMED",
-                badge_bg="#425727",
-                border_color="#425727",
-                intro_text=f"Planning Administrator <strong>{manager_name}</strong> has <strong>CONFIRMED</strong> the Corporate Scorecard for <strong>{emp_name}</strong> for period <strong>{period_name}</strong> ({fy_name}).",
-                details=details,
-                action_btn_text="🎯 View Confirmed Corporate Scorecard",
-                action_btn_color="#425727",
-                footer_note="Corporate Scorecard targets are finalized and active for strategic appraisal evaluation.",
-                recipient_partner_ids=partner_ids,
-            )
+        raise UserError('Confirm action is no longer required on scorecards. Once accepted by the executive, the scorecard targets are finalized and active for appraisal.')
 
     def action_complete(self):
         self.write({'state': 'completed'})
@@ -475,6 +494,22 @@ class CorporateScorecard(models.Model):
         self.write({'state': 'appraisal_started'})
 
     def action_reset_draft(self):
+        for rec in self:
+            if rec.state == 'rejected':
+                if not rec.manager_rejection_reply or not rec.manager_rejection_reply.strip():
+                    return {
+                        'name': 'Reply to Employee Rejection Reason',
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'performance.rejection.reply.wizard',
+                        'view_mode': 'form',
+                        'target': 'new',
+                        'context': {
+                            'default_res_model': rec._name,
+                            'default_res_id': rec.id,
+                            'default_action_type': 'reset_draft',
+                            'default_rejection_reason': rec.rejection_reason,
+                        },
+                    }
         for rec in self:
             if rec.is_current_employee and not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
                 raise UserError('Employees are not permitted to reset scorecards to draft.')
@@ -485,12 +520,16 @@ class CorporateScorecard(models.Model):
 
     def write(self, vals):
         for rec in self:
+            if rec.state == 'rejected' and vals.get('state') in ('notified', 'draft'):
+                reply = vals.get('manager_rejection_reply') or rec.manager_rejection_reply
+                if not reply or not str(reply).strip():
+                    raise UserError("You must provide a reply/response to the employee's rejection reason before re-notifying or resetting to draft.")
             if rec.is_current_employee and not (rec.is_planning_role or rec.is_admin_role or self.env.is_admin()):
-                allowed_fields = {'state', 'accepted_by', 'rejection_reason'}
+                allowed_fields = {'state', 'accepted_by', 'rejection_reason', 'manager_rejection_reply'}
                 if not set(vals.keys()).issubset(allowed_fields):
                     raise UserError('Employees are not permitted to edit scorecards.')
-            if rec.state in ('accepted', 'confirmed', 'appraisal_started', 'completed'):
-                allowed_fields = {'state', 'accepted_by', 'rejection_reason'}
+            if rec.state in ('accepted', 'appraisal_started', 'completed'):
+                allowed_fields = {'state', 'accepted_by', 'rejection_reason', 'manager_rejection_reply'}
                 if rec.is_planning_role or rec.is_admin_role or self.env.is_admin():
                     allowed_fields |= {'employee_id', 'manager_id', 'job_id', 'operating_unit_id', 'department_id', 'fiscal_year_id', 'appraisal_period_id', 'date_start', 'date_end'}
                 if not set(vals.keys()).issubset(allowed_fields):
@@ -532,6 +571,11 @@ class CorporateScorecard(models.Model):
 
         new_lines = Line.create(vals_list)
         self._compute_total_weight()
+        if round(self.total_weight, 2) != 100.0:
+            raise UserError(
+                f"Populated Corporate Scorecard lines total {round(self.total_weight, 2)}% (must be exactly 100%). "
+                "Please adjust the Corporate Objectives/Measures so that total weight is exactly 100%."
+            )
         return new_lines
 
 

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Employee Transfer Request Release Wizard Form View (Modal) -->
+    <record id="view_transfer_request_release_wizard_form" model="ir.ui.view">
+        <field name="name">transfer.request.release.wizard.form</field>
+        <field name="model">transfer.request.release.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Employee Transfer Release Form">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>
+                            <field name="employee_id" readonly="1"/>
+                        </h2>
+                        <span class="text-muted">Authorizing lateral transfer release &amp; work unit handover clearance</span>
+                    </div>
+
+                    <group>
+                        <group string="Current Placement Info">
+                            <field name="current_position"/>
+                            <field name="current_work_unit"/>
+                        </group>
+                        <group string="New Placement Requisition">
+                            <field name="target_position"/>
+                            <field name="target_grade"/>
+                            <field name="target_work_unit"/>
+                        </group>
+                    </group>
+
+                    <group string="Coach / Manager Release Authorization">
+                        <group>
+                            <field name="releasing_manager_id" options="{'no_create': True}"/>
+                            <field name="release_date"/>
+                        </group>
+                        <group>
+                            <field name="handover_status"/>
+                        </group>
+                    </group>
+
+                    <group string="Handover &amp; Clearance Remarks">
+                        <field name="release_remarks" placeholder="Enter clearance notes, equipment/document handover details, or comments..."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_release" string="✅ Confirm &amp; Release Employee" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

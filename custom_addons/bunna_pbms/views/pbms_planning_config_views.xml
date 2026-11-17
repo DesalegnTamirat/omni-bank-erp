@@ -30,7 +30,7 @@
         <field name="name">pbms.planning.config.form</field>
         <field name="model">pbms.planning.config</field>
         <field name="arch" type="xml">
-            <form string="Planning Configuration">
+            <form string="Planning Configuration" class="o_pbms_form">
                 <header>
                     <button name="action_save" string="Save" type="object" class="btn-primary" icon="fa-save"/>
                 </header>
@@ -49,7 +49,7 @@
                             <field name="currency_id" groups="base.group_multi_currency"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_pbms_notebook">
                         <page string="Eligible Planning Categories" name="page_categories">
                             <group string="Financial &amp; Core Mobilization">
                                 <group>
@@ -139,7 +139,12 @@
                             <group string="Deposit Mobilization &amp; Customer Base" invisible="not enable_deposit and not enable_customer_base">
                                 <field name="deposit_type_ids" widget="many2many_tags"
                                        string="Available Deposit Types"
+                                       invisible="not enable_deposit"
                                        help="Select which deposit types (Savings, Demand, Time, IFB, etc.) are available for this configuration."/>
+                                <field name="customer_type_ids" widget="many2many_tags"
+                                       string="Available Customer Types"
+                                       invisible="not enable_customer_base"
+                                       help="Select which customer account types (Savings, Demand, Time, IFB, etc.) are available for Customer Base planning."/>
                             </group>
                             <group string="FX Mobilization Sources" invisible="not enable_fx">
                                 <field name="fx_source_type_ids" widget="many2many_tags"
@@ -151,7 +156,7 @@
                                        string="Available Digital Channels"
                                        help="Select which digital channels are available for this configuration."/>
                             </group>
-                            <group string="Loan &amp; Advances Products" invisible="not enable_loan_disbursement_collection and not enable_loan_outstanding">
+                            <group string="Loan &amp; Advances Products" invisible="not enable_loan_outstanding">
                                 <field name="loan_product_ids" widget="many2many_tags"
                                        string="Available Loan Products"
                                        help="Select which loan products (Term Loan, Overdraft, Advances, etc.) are available for this configuration."/>
@@ -176,9 +181,9 @@
                                        string="Available Position Types"
                                        help="Select which request types (New Position, Additional Position, Replacement, Position Transfer, Position Upgrade) are available for this configuration."/>
                             </group>
-                            <group string="Credit Portfolio Items" invisible="not enable_credit_portfolio">
+                            <group string="Income Plan Items" invisible="not enable_credit_portfolio">
                                 <field name="credit_portfolio_item_ids" widget="many2many_tags"
-                                       string="Available Credit Portfolio Items"
+                                       string="Available Income Plan Items"
                                        help="Select which Credit Portfolio items are available for this configuration."/>
                             </group>
                         </page>
@@ -254,6 +259,7 @@
         <field name="view_mode">form,list</field>
         <field name="view_id" ref="bunna_pbms.view_pbms_planning_request_form"/>
         <field name="search_view_id" ref="bunna_pbms.view_pbms_planning_category_search"/>
+        <field name="context">{'is_planning_request': True}</field>
         <field name="target">current</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

@@ -22,7 +22,24 @@ class AtsBulkCommunicationWizard(models.TransientModel):
         'job.vacancy',
         string='Job Vacancy',
         required=True,
+        domain="[('reference', 'ilike', 'EXT')]",
     )
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        if 'vacancy_id' in fields_list and not res.get('vacancy_id'):
+            active_model = self.env.context.get('active_model')
+            active_id = self.env.context.get('active_id')
+            if active_model == 'job.vacancy' and active_id:
+                vac = self.env['job.vacancy'].browse(active_id)
+                if vac.exists() and (
+                    vac.sourcing_type in ('external', 'both')
+                    or vac.recruitment_type == 'External'
+                    or (vac.reference and 'EXT' in vac.reference.upper())
+                ):
+                    res['vacancy_id'] = vac.id
+        return res
     bunna_app_status = fields.Selection([
         ('all', 'All Applicants'),
         ('draft', 'Draft'),
@@ -76,20 +93,35 @@ class AtsBulkCommunicationWizard(models.TransientModel):
         if not self.applicant_ids:
             raise UserError(_("No candidates found matching the selected vacancy and status filter."))
 
+        # Resolve sender: corporate mail server requires authenticated sender address
+        default_from = (
+            self.env['ir.config_parameter'].sudo().get_param('mail.default.from')
+            or self.env['ir.mail_server'].sudo().search([('active', '=', True)], limit=1).smtp_user
+            or 'natnael.negussie@bunnabanksc.com'
+        )
+        sender_email = f'"Bunna Bank Recruitment" <{default_from}>'
+        reply_to_email = default_from
+
         sent_count = 0
         for applicant in self.applicant_ids:
             email_to = applicant.email_from or (applicant.candidate_profile_id and applicant.candidate_profile_id.email)
             if email_to:
                 # Personalize body greeting if possible
-                personalized_body = self.body.replace("Dear Candidate", f"Dear {applicant.partner_name or applicant.name or 'Candidate'}")
+                candidate_name = applicant.partner_name or applicant.name or 'Candidate'
+                personalized_body = self.body.replace("Dear Candidate", f"Dear {candidate_name}")
 
                 mail_values = {
                     'subject': self.subject,
                     'body_html': personalized_body,
                     'email_to': email_to,
-                    'email_from': self.env.user.email or self.env.company.email,
+                    'email_from': sender_email,
+                    'reply_to': reply_to_email,
                 }
-                self.env['mail.mail'].sudo().create(mail_values).send()
+                mail = self.env['mail.mail'].sudo().create(mail_values)
+                try:
+                    mail.send(raise_exception=False)
+                except Exception as e:
+                    _logger.warning("Error dispatching bulk email to %s: %s", email_to, e)
 
                 # Log communication history in applicant chatter (FR-ATS-046)
                 applicant.message_post(
@@ -105,7 +137,9 @@ class AtsBulkCommunicationWizard(models.TransientModel):
             'tag': 'display_notification',
             'params': {
                 'title': _("Bulk Communication Sent"),
-                'message': _("Successfully dispatched bulk emails to %s candidates.") % sent_count,
+                'message': _("Successfully dispatched bulk emails to %s candidate(s).") % sent_count,
+                'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
             }
         }

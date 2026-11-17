@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Document Configuration Settings Dedicated Form View -->
+    <record id="dms_config_settings_view_form" model="ir.ui.view">
+        <field name="name">dms.config.settings.form</field>
+        <field name="model">dms.config.settings</field>
+        <field name="arch" type="xml">
+            <form string="Document Settings" create="0" delete="0">
+                <sheet>
+                    <div class="oe_title mb-4">
+                        <label for="name" string="Configuration Profile"/>
+                        <h1><field name="name" placeholder="Profile name e.g. Bunna Document Policy"/></h1>
+                    </div>
+
+                    <notebook>
+                        <page string="File Sizing &amp; Quotas" name="sizing">
+                            <group>
+                                <group string="Upload Limits">
+                                    <label for="max_file_size_mb"/>
+                                    <div class="o_row">
+                                        <field name="max_file_size_mb" class="oe_inline" style="width: 100px;"/>
+                                        <span class="text-muted ms-2">MB per file</span>
+                                    </div>
+                                    <label for="warning_file_size_mb"/>
+                                    <div class="o_row">
+                                        <field name="warning_file_size_mb" class="oe_inline" style="width: 100px;"/>
+                                        <span class="text-muted ms-2">MB (highlight in filters &amp; dashboard)</span>
+                                    </div>
+                                </group>
+                                <group string="Folder Quotas">
+                                    <label for="max_files_per_folder"/>
+                                    <div class="o_row">
+                                        <field name="max_files_per_folder" class="oe_inline" style="width: 100px;"/>
+                                        <span class="text-muted ms-2">Files per folder (0 = unlimited)</span>
+                                    </div>
+                                    <field name="company_id" groups="base.group_multi_company"/>
+                                </group>
+                            </group>
+                            <div class="alert alert-info mt-3" role="alert">
+                                <i class="fa fa-info-circle me-1"/>
+                                <strong>Upload Size Note:</strong> Limits apply dynamically to all single and batch uploads, drag-and-drop dropzones, and auto-filing rules.
+                            </div>
+                        </page>
+
+                        <page string="Allowed File Types" name="file_types">
+                            <group>
+                                <field name="allow_all_extensions"/>
+                                <field name="allowed_extensions" widget="text" invisible="allow_all_extensions"
+                                       placeholder="pdf, docx, xlsx, pptx, png, jpg, jpeg, csv, txt"/>
+                            </group>
+                            <div class="alert alert-secondary mt-2">
+                                <strong>Default Recommended Formats:</strong>
+                                <ul class="mb-0 mt-1">
+                                    <li><strong>PDF Documents:</strong> <code>pdf</code></li>
+                                    <li><strong>Image Formats:</strong> <code>png, jpg, jpeg, gif, webp, bmp</code></li>
+                                    <li><strong>Office Documents:</strong> <code>doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, rtf</code></li>
+                                    <li><strong>Text &amp; Data:</strong> <code>txt, csv</code></li>
+                                </ul>
+                            </div>
+                        </page>
+
+                        <page string="PostgreSQL Database Optimization" name="db_optimization">
+                            <group>
+                                <group string="PostgreSQL Base64 Storage">
+                                    <field name="enable_base64_optimization"/>
+                                    <field name="auto_generate_thumbnails"/>
+                                    <label for="thumbnail_quality" invisible="not auto_generate_thumbnails"/>
+                                    <div class="o_row" invisible="not auto_generate_thumbnails">
+                                        <field name="thumbnail_quality" class="oe_inline" style="width: 80px;"/>
+                                        <span class="text-muted ms-2">% quality</span>
+                                    </div>
+                                </group>
+                                <group string="Versioning &amp; History">
+                                    <field name="enable_versioning"/>
+                                    <field name="max_versions_per_document" invisible="not enable_versioning"/>
+                                    <field name="allow_public_downloads_default"/>
+                                </group>
+                            </group>
+                            <div class="alert alert-success mt-3" role="alert">
+                                <h5><i class="fa fa-database me-2"/>Active PostgreSQL Storage Architecture</h5>
+                                <p class="mb-1">Document binary data is stored directly inside the PostgreSQL database table in base64 format with:</p>
+                                <ul class="mb-0">
+                                    <li><strong>Lazy Memory Prefetching (<code>prefetch=False</code>):</strong> File binary bytea chunks are never preloaded into web server RAM during search, list, or kanban operations.</li>
+                                    <li><strong>Dedicated Base64 Thumbnails:</strong> Compact compressed preview thumbnails (256x256) are generated on upload to keep document cards lightweight.</li>
+                                    <li><strong>High-Speed Database Indexing:</strong> Composite indexes on checksums, mime types, and foreign keys maintain instant response times under heavy volume.</li>
+                                </ul>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_dms_config_settings_dedicated" model="ir.actions.act_window">
+        <field name="name">Document Settings</field>
+        <field name="res_model">dms.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+    
+    <!-- Server action to guarantee opening the singleton record -->
+    <record id="action_dms_config_settings_open" model="ir.actions.server">
+        <field name="name">Document Settings</field>
+        <field name="model_id" ref="model_dms_config_settings"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_settings()
+        </field>
+    </record>
+</odoo>

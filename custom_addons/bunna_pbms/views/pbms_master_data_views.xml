@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
-                <field name="code"/>
+                <field name="code" readonly="1" force_save="1"/>
                 <field name="name"/>
                 <field name="is_ifb" widget="boolean_toggle"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -20,6 +20,26 @@
         <field name="view_mode">list</field>
     </record>
 
+    <!-- Customer Type (Customer Base) -->
+    <record id="view_pbms_customer_type_list" model="ir.ui.view">
+        <field name="name">pbms.customer.type.list</field>
+        <field name="model">pbms.customer.type</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code" readonly="1" force_save="1"/>
+                <field name="name"/>
+                <field name="is_ifb" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_pbms_customer_type" model="ir.actions.act_window">
+        <field name="name">Customer Types</field>
+        <field name="res_model">pbms.customer.type</field>
+        <field name="view_mode">list</field>
+    </record>
+
     <!-- Expense Account -->
     <record id="view_pbms_expense_account_list" model="ir.ui.view">
         <field name="name">pbms.expense.account.list</field>
@@ -27,7 +47,7 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
-                <field name="code"/>
+                <field name="code" readonly="1" force_save="1"/>
                 <field name="name"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
@@ -46,7 +66,7 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
-                <field name="code"/>
+                <field name="code" readonly="1" force_save="1"/>
                 <field name="name"/>
                 <field name="reference_unit_price" widget="monetary"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -66,7 +86,7 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
-                <field name="code"/>
+                <field name="code" readonly="1" force_save="1"/>
                 <field name="name"/>
                 <field name="unit_of_measure"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -86,7 +106,7 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
-                <field name="code"/>
+                <field name="code" readonly="1" force_save="1"/>
                 <field name="name"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
@@ -105,7 +125,7 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
-                <field name="code"/>
+                <field name="code" readonly="1" force_save="1"/>
                 <field name="name"/>
                 <field name="is_new_position" widget="boolean_toggle"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -125,7 +145,7 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
-                <field name="code"/>
+                <field name="code" readonly="1" force_save="1"/>
                 <field name="name"/>
                 <field name="category_type"/>
                 <field name="applies_to"/>
@@ -146,10 +166,8 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="sequence" widget="handle"/>
-                <field name="code"/>
-                <field name="name"/>
-                <field name="section"/>
-                <field name="totals_basis"/>
+                <field name="code" readonly="1" force_save="1"/>
+                <field name="name" string="Source of Income"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
         </field>
@@ -159,14 +177,12 @@
         <field name="name">pbms.credit.portfolio.item.form</field>
         <field name="model">pbms.credit.portfolio.item</field>
         <field name="arch" type="xml">
-            <form string="Credit Portfolio Item">
+            <form string="Income Plan Item" class="o_pbms_form">
                 <sheet>
                     <group>
                         <group>
-                            <field name="name"/>
-                            <field name="code"/>
-                            <field name="section"/>
-                            <field name="totals_basis"/>
+                            <field name="name" string="Source of Income"/>
+                            <field name="code" readonly="1" force_save="1"/>
                         </group>
                         <group>
                             <field name="sequence"/>
@@ -185,23 +201,15 @@
         <field name="name">pbms.credit.portfolio.item.search</field>
         <field name="model">pbms.credit.portfolio.item</field>
         <field name="arch" type="xml">
-            <search string="Search Credit Portfolio Items">
-                <field name="name"/>
+            <search string="Search Income Plan Items">
+                <field name="name" string="Source of Income"/>
                 <field name="code"/>
-                <field name="section"/>
-                <separator/>
-                <filter string="Balance Sheet" name="filter_balance_sheet" domain="[('section', '=', 'balance_sheet')]"/>
-                <filter string="Income Statement" name="filter_income_statement" domain="[('section', '=', 'income_statement')]"/>
-                <separator/>
-                <separator/>
-                <filter string="Section" name="group_by_section" context="{'group_by': 'section'}"/>
-                <filter string="Totals Basis" name="group_by_totals_basis" context="{'group_by': 'totals_basis'}"/>
             </search>
         </field>
     </record>
 
     <record id="action_pbms_credit_portfolio_item" model="ir.actions.act_window">
-        <field name="name">Credit Portfolio Items</field>
+        <field name="name">Income Plan Items</field>
         <field name="res_model">pbms.credit.portfolio.item</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_pbms_credit_portfolio_item_search"/>

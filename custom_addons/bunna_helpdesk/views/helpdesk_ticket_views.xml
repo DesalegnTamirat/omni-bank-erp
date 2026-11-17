@@ -43,20 +43,22 @@
         <field name="arch" type="xml">
             <search>
                 <field
-                    string="Ticket"
+                    string="Ticket, Account, or Phone"
                     name="number"
-                    filter_domain="['|',('number', 'ilike', self),('name', 'ilike', self)]"
+                    filter_domain="['|', '|', '|', '|', '|', '|', ('number', 'ilike', self), ('name', 'ilike', self), ('account_number', 'ilike', self), ('partner_phone', 'ilike', self), ('phone_number', 'ilike', self), ('partner_phone_secondary', 'ilike', self), ('customer_name', 'ilike', self)]"
                 />
+                <field name="account_number" string="Account Number" filter_domain="[('account_number', 'ilike', self)]" />
+                <field name="phone_number" string="Phone Number" filter_domain="['|', '|', ('phone_number', 'ilike', self), ('partner_phone', 'ilike', self), ('partner_phone_secondary', 'ilike', self)]" />
+                <field name="partner_phone" string="Phone / Mobile" filter_domain="['|', ('partner_phone', 'ilike', self), ('partner_phone_secondary', 'ilike', self)]" />
+                <field name="customer_name" string="Customer Name" filter_domain="['|', ('customer_name', 'ilike', self), ('partner_name', 'ilike', self)]" />
                 <field name="partner_id" />
                 <field name="commercial_partner_id" />
                 <field name="partner_email" />
                 <field name="user_id" />
                 <field name="name" />
                 <field name="category_id" />
-                <field name="account_number" string="Account Number" />
                 <field name="cif_number" string="CIF Number" />
                 <field name="fayda_number" string="Fayda / National ID" />
-                <field name="partner_phone" string="Phone / Mobile" />
                 <field name="service_family_id" />
                 <field name="service_id" />
                 <field name="service_sub_category_id" />
@@ -90,6 +92,11 @@
                     name="sla_failing"
                     domain="[('sla_status', '=', 'failed')]"
                 />
+                <filter
+                    string="Assigned to Agent on Leave"
+                    name="filter_user_on_leave"
+                    domain="[('user_is_on_leave', '=', True)]"
+                />
                 <separator />
                 <filter
                     string="Complaints (NBE)"
@@ -118,14 +125,30 @@
                     domain="[('is_escalated', '=', True)]"
                 />
                 <filter
-                    string="Internal Customer"
+                    string="Pending (Escalated Pending Resolution)"
+                    name="filter_pending"
+                    domain="[('is_pending', '=', True)]"
+                />
+                <separator />
+                <filter
+                    string="Existing Customers"
+                    name="filter_existing_customers"
+                    domain="[('customer_status', '=', 'existing')]"
+                />
+                <filter
+                    string="New Customers / Prospects"
+                    name="filter_new_customers"
+                    domain="[('customer_status', '=', 'new')]"
+                />
+                <filter
+                    string="Internal Staff"
                     name="filter_internal_customer"
                     domain="[('customer_type', '=', 'internal')]"
                 />
                 <filter
                     string="External Customer"
                     name="filter_external_customer"
-                    domain="[('customer_type', '!=', 'internal')]"
+                    domain="[('customer_type', '=', 'external')]"
                 />
                 <separator />
                 <filter
@@ -137,7 +160,7 @@
                 <filter
                     string="My Tickets"
                     name="mytickets"
-                    domain="[('user_id','=',uid)]"
+                    domain="['|', '|', ('user_id', '=', uid), ('escalated_to_user_id', '=', uid), ('escalated_to_level_3_user_id', '=', uid)]"
                 />
                 <filter
                     string="My Followed Tickets"
@@ -187,10 +210,10 @@
                         context="{'group_by':'commercial_partner_id'}"
                     />
                     <filter
-                        string="Team"
-                        name="group_team"
+                        string="Service Provider"
+                        name="group_operating_unit"
                         domain="[]"
-                        context="{'group_by':'team_id'}"
+                        context="{'group_by':'operating_unit_id'}"
                     />
                     <filter
                         string="User"
@@ -211,28 +234,46 @@
                         context="{'group_by':'operation_id'}"
                     />
                     <filter
+                        string="Customer Status"
+                        name="group_customer_status"
+                        domain="[]"
+                        context="{'group_by':'customer_status'}"
+                    />
+                    <filter
                         string="Customer Type"
                         name="group_customer_type"
                         domain="[]"
                         context="{'group_by':'customer_type'}"
                     />
                     <filter
-                        string="Service Family"
+                        string="Service"
                         name="group_service_family"
                         domain="[]"
                         context="{'group_by':'service_family_id'}"
                     />
                     <filter
-                        string="Service"
+                        string="Sub Service"
                         name="group_service"
                         domain="[]"
                         context="{'group_by':'service_id'}"
                     />
                     <filter
-                        string="Subservice Category / Issues"
+                        string="Sub Sub Service"
                         name="group_service_sub_category"
                         domain="[]"
                         context="{'group_by':'service_sub_category_id'}"
+                    />
+                    <filter
+                        string="Service Provider"
+                        name="group_parent_operating_unit"
+                        domain="[]"
+                        context="{'group_by':'parent_operating_unit_id'}"
+                    />
+                    <filter
+                        string="Sub Service Provider"
+                        name="group_operating_unit"
+                        domain="[]"
+                        context="{'group_by':'operating_unit_id'}"
                     />
                     <filter
                         string="Escalation Level"
@@ -282,6 +323,18 @@
                         domain="[]"
                         context="{'group_by':'ola_status'}"
                     />
+                    <filter
+                        string="Acceptance Sent Channel"
+                        name="group_acceptance_sent_channel"
+                        domain="[]"
+                        context="{'group_by':'acceptance_sent_channel'}"
+                    />
+                    <filter
+                        string="Done Sent Channel"
+                        name="group_done_sent_channel"
+                        domain="[]"
+                        context="{'group_by':'done_sent_channel'}"
+                    />
                 </group>
             </search>
         </field>
@@ -292,66 +345,81 @@
         <field name="name">helpdesk.ticket.view.form</field>
         <field name="model">helpdesk.ticket</field>
         <field name="arch" type="xml">
-            <form string="Helpdesk Ticket">
+            <form string="Helpdesk Ticket" class="o_helpdesk_ticket_form">
                 <header>
+                    <field name="can_escalate" invisible="1" />
+                    <field name="is_closed_or_resolved" invisible="1" />
+                    <field name="is_resolved" invisible="1" />
+                    <field name="is_creator_viewing" invisible="1" />
+                    <field name="can_act_on_rejected" invisible="1" />
+                    <field name="is_escalated" invisible="1" />
+                    <field name="escalation_level" invisible="1" />
+                    <field name="is_under_review" invisible="1" />
+                    <field name="is_sla_expired" invisible="1" />
                     <button
-                        string="Escalate to 2nd Level"
-                        name="action_open_escalate_wizard"
+                        string="Audit &amp; Review Ticket"
+                        name="action_open_review_wizard"
                         type="object"
                         class="btn-primary"
-                        invisible="closed or escalation_level &gt;= 2"
-                        groups="bunna_helpdesk.group_helpdesk_user"
-                    />
-                    <button
-                        string="Escalate to 3rd Level"
-                        name="action_open_escalate_level_3_wizard"
-                        type="object"
-                        class="btn-warning"
-                        invisible="closed or escalation_level &gt;= 3"
-                        groups="bunna_helpdesk.group_helpdesk_user"
-                    />
-                    <button
-                        string="Assign to me"
-                        name="assign_to_me"
-                        type="object"
-                        invisible="user_id"
-                    />
-                    <button
-                        string="Mark as Duplicate"
-                        name="action_open_duplicate_wizard"
-                        type="object"
-                        invisible="duplicate_id or duplicate_ids or not duplicate_tracking_enabled"
-                    />
-                    <button
-                        string="Merge"
-                        name="action_open_merge_wizard"
-                        type="object"
-                        groups="bunna_helpdesk.group_helpdesk_user"
-                    />
-                    <button
-                        string="Convert"
-                        name="action_open_convert_wizard"
-                        type="object"
-                        groups="bunna_helpdesk.group_helpdesk_user"
-                    />
-                    <button
-                        string="Acceptance SMS"
-                        name="action_send_acceptance_sms"
-                        type="object"
-                        class="btn-primary"
-                        icon="fa-paper-plane"
-                        invisible="closed"
-                        groups="bunna_helpdesk.group_helpdesk_user"
-                        help="Notify customer of ticket acceptance via SMS and update stage to In Progress"
-                    />
-                    <button
-                        string="Done SMS"
-                        name="action_send_done_sms"
-                        type="object"
-                        class="btn-success"
                         icon="fa-check-circle"
-                        groups="bunna_helpdesk.group_helpdesk_user"
-                        help="Notify customer of ticket resolution via SMS and mark ticket as Done"
+                        invisible="not is_under_review"
+                        groups="bunna_helpdesk.group_helpdesk_back_line,bunna_helpdesk.group_helpdesk_contact_center_back_line,bunna_helpdesk.group_helpdesk_team_leader,bunna_helpdesk.group_helpdesk_contact_center_team_leader,bunna_helpdesk.group_helpdesk_manager,bunna_helpdesk.group_helpdesk_contact_center_director,base.group_erp_manager"
+                        help="Complete Back-line quality audit and provide evaluation/feedback on registration, root cause, and resolution."
+                    />
+                    <button
+                        string="Reopen Ticket"
+                        name="action_open_reopen_wizard"
+                        type="object"
+                        class="btn-secondary"
+                        icon="fa-undo"
+                        invisible="not id or not (is_resolved or is_rejected or closed or is_closed_or_resolved)"
+                        groups="bunna_helpdesk.group_helpdesk_user_own,base.group_user"
+                        help="Reopen this ticket to return it to the active workflow."
+                    />
+                    <button
+                        string="Send Rating Survey"
+                        name="action_send_rating"
+                        type="object"
+                        class="btn-outline-info"
+                        icon="fa-star"
+                        invisible="not id or not closed"
+                        groups="bunna_helpdesk.group_helpdesk_user_own,bunna_helpdesk.group_helpdesk_user,base.group_user"
+                        help="Send or re-send customer satisfaction rating survey email."
+                    />
+                    <!-- ── 2 Header Dropdowns: 1st Accept or Resolve, 2nd SMS or Email ── -->
+                    <field
+                        name="header_action"
+                        widget="selection"
+                        invisible="not id or not display_header_notification or is_resolved or is_rejected or closed or is_closed_or_resolved"
+                        class="oe_inline me-2 bunna-header-action-select"
+                        options="{'no_open': True}"
+                        groups="bunna_helpdesk.group_helpdesk_user_own,base.group_user"
+                    />
+                    <field
+                        name="header_notify_toggle"
+                        widget="boolean_toggle"
+                        string="Notify Customer"
+                        invisible="not id or not display_header_notification or is_resolved or is_rejected or closed or is_closed_or_resolved"
+                        class="oe_inline me-2"
+                        groups="bunna_helpdesk.group_helpdesk_user_own,base.group_user"
+                    />
+                    <field
+                        name="header_channel"
+                        widget="selection"
+                        invisible="not id or not display_header_notification or not header_notify_toggle or is_resolved or is_rejected or closed or is_closed_or_resolved"
+                        class="oe_inline me-2 bunna-header-channel-select"
+                        options="{'no_open': True}"
+                        groups="bunna_helpdesk.group_helpdesk_user_own,base.group_user"
+                    />
+                    <button
+                        string="Apply &amp; Send"
+                        name="action_execute_header_notification"
+                        type="object"
+                        class="btn-primary bunna-header-apply-btn me-2"
+                        icon="fa-paper-plane"
+                        invisible="not id or not display_header_notification or is_resolved or is_rejected or closed or is_closed_or_resolved"
+                        groups="bunna_helpdesk.group_helpdesk_user_own,base.group_user"
+                        help="Execute selected action (Accept or Resolve) and send notification via selected channel (SMS or Email)."
                     />
                     <field
                         name="stage_id"
@@ -360,11 +428,20 @@
                     />
                 </header>
                 <sheet>
+                    <field name="is_assigned_to_me" invisible="1"/>
+                    <field name="is_reopened" invisible="1"/>
+                    <field name="is_pending" invisible="1"/>
                     <widget
                         name="web_ribbon"
                         title="Archived"
                         bg_color="bg-danger"
                         invisible="active"
+                    />
+                    <widget
+                        name="web_ribbon"
+                        title="Pending"
+                        bg_color="bg-warning"
+                        invisible="not is_pending or is_rejected"
                     />
                     <widget
                         name="web_ribbon"
@@ -374,16 +451,55 @@
                     />
                     <widget
                         name="web_ribbon"
-                        title="Escalated (2nd Level)"
-                        bg_color="bg-warning"
-                        invisible="not is_escalated or is_level_3_escalated"
+                        title="Rejected"
+                        bg_color="bg-danger"
+                        invisible="not is_rejected"
                     />
                     <widget
                         name="web_ribbon"
-                        title="Escalated (3rd Level Executive)"
-                        bg_color="bg-danger"
-                        invisible="not is_level_3_escalated"
+                        title="Escalated"
+                        bg_color="bg-warning"
+                        invisible="not is_escalated or is_rejected or is_level_3_escalated or is_ceo_escalated"
                     />
+                    <widget
+                        name="web_ribbon"
+                        title="Escalated (Directorate / Exec)"
+                        bg_color="bg-danger"
+                        invisible="not is_level_3_escalated or is_ceo_escalated or is_rejected"
+                    />
+                    <widget
+                        name="web_ribbon"
+                        title="Escalated (CEO Level)"
+                        bg_color="bg-danger"
+                        invisible="not is_ceo_escalated or is_rejected"
+                    />
+                    <div class="alert alert-warning py-2 mb-3" role="alert" invisible="not is_pending">
+                        <i class="fa fa-pause-circle me-1" title="Pending Notice" aria-label="Pending Notice"/>
+                        <strong>Ticket is Pending: </strong>
+                        <field name="pending_reason" readonly="1" class="d-inline fw-bold me-2"/>
+                        <span invisible="not pending_date">(since <field name="pending_date" widget="datetime" class="d-inline"/>)</span>
+                        <div invisible="not pending_reason_details" class="small mt-1 text-muted">
+                            <field name="pending_reason_details" readonly="1" class="d-inline"/>
+                        </div>
+                    </div>
+                    <div class="alert alert-info py-2 mb-3" role="alert" invisible="not is_under_review">
+                        <i class="fa fa-clipboard me-1" title="Under Review" aria-label="Under Review"/>
+                        <strong>📋 Under Audit Review:</strong> This ticket was resolved by Front-line and is in the <strong>Review Stage</strong> awaiting Back-line Team audit to ensure that it has been properly documented and that the resolution reason is accurate and appropriate.
+                    </div>
+                    <div class="alert alert-danger py-2 mb-3" role="alert" invisible="not is_sla_expired">
+                        <i class="fa fa-clock-o me-1" title="SLA Expired" aria-label="SLA Expired"/>
+                        <strong>⚠️ SLA Escalation Time Expired:</strong> The allowed SLA resolution time ended for this ticket, and it has been automatically escalated to the next higher level.
+                    </div>
+                    <div class="alert alert-danger py-2 mb-3" role="alert" invisible="not is_rejected or can_act_on_rejected">
+                        <i class="fa fa-times-circle me-1" title="Ticket Rejected" aria-label="Ticket Rejected"/>
+                        <strong>Ticket Rejected:</strong> <field name="rejection_reason" readonly="1" class="d-inline"/>
+                    </div>
+                    <div class="alert alert-warning py-2 mb-3" role="alert" invisible="not can_act_on_rejected">
+                        <i class="fa fa-exclamation-circle me-1" title="Action Required" aria-label="Action Required"/>
+                        <strong>&#x26A0; Ticket Rejected - Action Required:</strong>
+                        <span> Reason: </span><field name="rejection_reason" readonly="1" class="d-inline"/>
+                        <br/><small class="text-muted">As the ticket creator, you can: <strong>Re-assign</strong> the Assigned User field below, then use <strong>Re-route Ticket</strong> to escalate to another team, or <strong>Reopen Ticket</strong> to restart the workflow.</small>
+                    </div>
                     <div class="oe_button_box" name="button_box">
                         <!-- Duplicates -->
                         <button
@@ -413,13 +529,14 @@
                                 widget="statinfo"
                             />
                         </button>
-                        <!-- Timesheets -->
+                        <!-- Timesheets (Hidden) -->
                         <button
                             class="oe_stat_button"
                             type="action"
                             name="%(bunna_helpdesk.action_helpdesk_timesheet)d"
                             icon="fa-clock-o"
                             groups="bunna_helpdesk.group_helpdesk_user"
+                            invisible="1"
                         >
                             <field
                                 string="Hours"
@@ -441,13 +558,22 @@
                             readonly="stage_id.closed"
                         />
                         </div>
+                        <!-- Agent on Leave banner -->
+                        <field name="user_is_on_leave" invisible="1" />
+                        <div
+                            class="alert alert-warning"
+                            role="alert"
+                            invisible="not user_is_on_leave"
+                        >
+                            <i class="fa fa-exclamation-triangle" title="Agent on Leave" /> <strong>Assigned Agent Currently on Leave:</strong> <field name="user_id" readonly="1" class="fw-bold" /> is <field name="user_leave_status" readonly="1" class="fw-bold" />. Resolution may be delayed.
+                        </div>
                         <!-- SLA banner -->
                         <div
                             class="alert alert-danger"
                             role="alert"
                             invisible="sla_status != 'failed'"
                         >
-                            <i class="fa fa-exclamation-triangle" /> SLA Breached — Deadline was
+                            <i class="fa fa-exclamation-triangle" title="SLA Breached" /> SLA Breached — Deadline was
                             <field name="sla_deadline" readonly="1" widget="datetime" />
                         </div>
                         <div
@@ -455,7 +581,7 @@
                             role="alert"
                             invisible="sla_status != 'in_progress' or not sla_deadline"
                         >
-                            <i class="fa fa-clock-o" /> SLA Deadline:
+                            <i class="fa fa-clock-o" title="SLA Deadline" /> SLA Deadline:
                             <field name="sla_deadline" readonly="1" widget="remaining_days" />
                         </div>
                         <!-- OLA banner -->
@@ -464,7 +590,7 @@
                             role="alert"
                             invisible="ola_status != 'failed'"
                         >
-                            <i class="fa fa-exclamation-triangle" /> <strong>OLA Breached!</strong> Escalation Service Delivery Time deadline exceeded:
+                            <i class="fa fa-exclamation-triangle" title="OLA Breached" /> <strong>OLA Breached!</strong> Escalation Service Delivery Time deadline exceeded:
                             <field name="ola_deadline" readonly="1" widget="datetime" />
                         </div>
                         <div
@@ -472,7 +598,7 @@
                             role="alert"
                             invisible="ola_status != 'in_progress' or not ola_deadline"
                         >
-                            <i class="fa fa-clock-o" /> <strong>2nd Level OLA Active:</strong> Target Deadline:
+                            <i class="fa fa-clock-o" title="2nd Level OLA Active" /> <strong>2nd Level OLA Active:</strong> Target Deadline:
                             <field name="ola_deadline" readonly="1" widget="remaining_days" />
                         </div>
                         <div
@@ -489,6 +615,7 @@
                             <field name="name" readonly="1" />
                         </h2>
                     </div>
+
                     <group name="main">
                         <group string="Ticket Information">
                             <field name="active" invisible="1" />
@@ -500,18 +627,105 @@
                             <field name="has_crm" invisible="1" />
                             <field name="has_repair" invisible="1" />
                             <field name="has_loyalty" invisible="1" />
-                            <field name="service_family_id" options="{'no_create': True}" placeholder="Select Service Family..." />
-                            <field name="service_id" options="{'no_create': True}" domain="[('family_id', '=', service_family_id)] if service_family_id else []" placeholder="Select Service..." />
-                            <field name="service_sub_category_id" options="{'no_create': True}" domain="[('service_id', '=', service_id)] if service_id else []" placeholder="Select Subservice Category / Issue..." />
+                            <field name="acceptance_sms_sent" invisible="1" />
+                            <field name="acceptance_email_sent" invisible="1" />
+                            <field name="completion_sms_sent" invisible="1" />
+                            <field name="completion_email_sent" invisible="1" />
+                            <field name="is_acceptance_sent" invisible="1" />
+                            <field name="is_done_sent" invisible="1" />
+                            <field name="display_header_notification" invisible="1" />
+                            <!-- ── Notification Delivery Captured Fields ───────────────── -->
+                            <field
+                                name="acceptance_sent_channel"
+                                string="Acceptance Notification Sent By"
+                                readonly="1"
+                                invisible="not acceptance_sent_channel"
+                                widget="badge"
+                                decoration-info="acceptance_sent_channel == 'sms'"
+                                decoration-primary="acceptance_sent_channel == 'email'"
+                            />
+                            <field
+                                name="done_sent_channel"
+                                string="Done Notification Sent By"
+                                readonly="1"
+                                invisible="not done_sent_channel"
+                                widget="badge"
+                                decoration-success="done_sent_channel == 'sms'"
+                                decoration-warning="done_sent_channel == 'email'"
+                            />
+                            <field
+                                name="notification_channel_sent"
+                                string="Notification Delivery Status"
+                                readonly="1"
+                                invisible="not notification_channel_sent or notification_channel_sent == 'Not Dispatched'"
+                            />
+                            <!-- ── 1. Operating Unit Hierarchy (Auto-populated from hr_employee / Catalogue, Readonly) ── -->
+                            <field name="executive_operating_unit_id" readonly="1" force_save="1" invisible="not id" string="Executive / CEO Office" placeholder="Auto-populated from employee / catalogue..." />
+                            <field name="directorate_operating_unit_id" readonly="1" force_save="1" invisible="not id" string="Directorate / Head Office Unit" placeholder="Auto-populated from employee / catalogue..." />
+                            <field name="district_operating_unit_id" invisible="1" />
+                            <field name="branch_operating_unit_id" invisible="1" />
+                            <!-- ── 1. Service Provider (Parent Unit) & Division (Child Unit) ── -->
+                            <field
+                                name="parent_operating_unit_id"
+                                string="Service Provider"
+                                domain="['|', ('child_unit_ids', '!=', False), ('parent_unit', '=', False)]"
+                                options="{'no_create': True}"
+                                placeholder="Select Service Provider (Parent Unit)..."
+                            />
+                            <field
+                                name="operating_unit_id"
+                                string="Sub Service Provider"
+                                domain="['|', ('parent_unit', '=', parent_operating_unit_id), ('id', '=', parent_operating_unit_id)] if parent_operating_unit_id else []"
+                                options="{'no_create': True}"
+                                placeholder="Select Sub Service Provider..."
+                            />
+
+                            <!-- ── 2. Service Catalogue (Under Operating Units) ──────── -->
+                            <field
+                                name="service_id"
+                                string="Service"
+                                domain="['|', ('operating_unit_id', '=', operating_unit_id), ('operating_unit_id', '=', parent_operating_unit_id)] if (operating_unit_id or parent_operating_unit_id) else []"
+                                options="{'no_create': True}"
+                                placeholder="Select Service..."
+                                required="1"
+                            />
+                            <field
+                                name="service_sub_category_id"
+                                string="Sub Service"
+                                domain="[('service_id', '=', service_id)] if service_id else []"
+                                options="{'no_create': True}"
+                                placeholder="Select Sub Service..."
+                            />
+
+                            <!-- ── 3. Assignment & Channel ─────────────────────────────────── -->
                             <field name="channel_type" />
                             <field name="social_chat_id" invisible="channel_type not in ('telegram', 'whatsapp', 'facebook')" readonly="1" string="Channel User / Chat ID" />
-                            <field name="team_id" options='{"always_reload": True}' />
+                            <field name="contact_center_agent_ids" invisible="1" />
+                            <field name="contact_center_agent_id" options="{'no_create': True}" placeholder="Select Contact Center Agent..." domain="[('id', 'in', contact_center_agent_ids)]" />
+                            <field name="team_id" invisible="1" />
+                            <field name="operating_unit_user_ids" invisible="1" />
                             <field name="user_ids" invisible="1" readonly="1" />
                             <field
                                 name="user_id"
+                                readonly="1"
+                                force_save="1"
                                 options='{"always_reload": True}'
+                                domain="[('share', '=', False), ('id', 'in', operating_unit_user_ids)]"
                                 widget="many2one_avatar_user"
+                                placeholder="Select assigned user in Sub Service Provider / Operating Unit..."
+                                invisible="can_act_on_rejected"
                             />
+                            <field
+                                name="user_id"
+                                readonly="1"
+                                force_save="1"
+                                invisible="not can_act_on_rejected"
+                                options='{"always_reload": True}'
+                                domain="[('share', '=', False)]"
+                                widget="many2one_avatar_user"
+                                placeholder="Re-assign to another user..."
+                            />
+                            <field name="user_helpdesk_role" widget="badge" invisible="not user_id" decoration-info="user_helpdesk_role in ('frontend', 'backend', 'fullstack')" decoration-warning="user_helpdesk_role in ('supervisor', 'manager')" decoration-danger="user_helpdesk_role in ('director', 'deputy_cto', 'cido', 'ceo')" />
                             <field name="priority" widget="priority" />
                             <field
                                 name="company_id"
@@ -526,7 +740,9 @@
                                 options="{'no_create_edit': True, 'color_field': 'color',}"
                             />
                         </group>
-                        <group string="Bunna Customer Profile">
+                        <group string="Customer Information">
+                            <field name="customer_status" placeholder="Select Customer Status..." />
+                            <field name="customer_type" placeholder="Select Customer Type..." />
                             <label for="account_number" string="Account Number" />
                             <div class="o_row">
                                 <field name="account_number" placeholder="e.g. 10000235467" class="oe_inline" />
@@ -541,16 +757,23 @@
                             </div>
                             <field name="cif_number" string="CIF Number" placeholder="e.g. CIF1000235" />
                             <field name="fayda_number" string="Fayda / National ID" placeholder="e.g. FAN-2024-102938" />
-                            <field name="partner_phone" string="Phone / Mobile" placeholder="e.g. +251 91 123 4567" />
+                            <field name="partner_phone" string="Phone / Mobile" placeholder="e.g. +251 91 123 4567" required="1" />
+                            <field name="partner_phone_secondary" string="Caller Phone" placeholder="e.g. +251 92 987 6543" required="1" />
+                            <field
+                                name="customer_name"
+                                string="Customer Name"
+                                required="1"
+                                placeholder="Enter customer full name or select below..."
+                            />
                             <field
                                 name="partner_id"
-                                string="Customer Name"
-                                placeholder="Select customer or auto-populated from CBS..."
-                                context="{'default_name': partner_name, 'default_email': partner_email, 'show_vat': True}"
+                                string="Customer Contact"
+                                placeholder="Select contact or auto-populated from CBS..."
+                                context="{'default_name': customer_name, 'default_email': partner_email, 'show_vat': True}"
                             />
-                            <field name="partner_name" invisible="partner_id" />
+                            <field name="partner_name" invisible="1" />
                             <field name="partner_email" string="Customer Email" placeholder="customer@example.com" />
-                            <field name="customer_type_name" string="Customer Type" placeholder="Auto-populated from CBS..." />
+                            <field name="customer_type_name" string="CBS Customer Segment" placeholder="Auto-populated from CBS..." readonly="1" invisible="not customer_type_name" />
                             <field name="customer_age" string="Age" readonly="1" invisible="not customer_age" />
                             <field name="customer_district" string="District Name" readonly="1" invisible="not customer_district" />
                             <field name="account_branch_name" string="Branch Name" readonly="1" invisible="not account_branch_name" />
@@ -570,32 +793,25 @@
                                 decoration-warning="account_status == 'dormant'"
                                 readonly="1"
                             />
+                            <field name="acct_opn_date" readonly="1" invisible="not acct_opn_date" />
+                            <field name="mode_of_oper_code" readonly="1" invisible="not mode_of_oper_code" />
+                            <field name="account_ownership" readonly="1" invisible="not account_ownership" />
                         </group>
                         <group>
                             <field name="account_branch_id" readonly="1" options="{'no_open': False}" />
+                            <field name="sol_id" readonly="1" invisible="not sol_id" />
                             <field name="customer_segment" />
                             <field name="preferred_language" />
                         </group>
                     </group>
-                    <notebook>
-                        <page string="Description" name="description">
-                            <field name="description" widget="html" />
+                    <notebook class="o_helpdesk_ticket_notebook">
+                        <page string="Customer Inquiries" name="description">
+                            <field name="description" placeholder="Customer inquiry and issue description..." required="1" class="o_customer_inquiry_field" />
                         </page>
                         <page string="Contact Center Assistant / Notes" name="inquiry_helper">
                             <group>
-                                <group string="Caller Summary &amp; KB Selection">
-                                    <field name="inquiry_summary" placeholder="Brief one-line customer request or issue..." />
-                                    <field name="customer_request_details" placeholder="Detailed caller inquiry / context / transaction details..." />
-                                    <field name="kb_article_id" options="{'no_create': True}" placeholder="Select Knowledge Base SOP / Article..." />
-                                </group>
-                                <group string="Agent Action &amp; Resolution">
-                                    <field name="agent_action_taken" placeholder="Action taken by agent / advice given / steps completed..." />
-                                    <div class="mt-2 d-flex flex-wrap gap-2">
-                                        <button name="action_format_inquiry_description" string="Format &amp; Append to Ticket Description" type="object" class="btn btn-sm btn-secondary" icon="fa-magic" />
-                                        <button name="action_lookup_cbs_account" string="Lookup CBS (Finacle)" type="object" class="btn btn-sm btn-outline-primary" icon="fa-search" />
-                                        <button name="action_load_kb_sop_to_notes" string="Load KB / SOP to Notes" type="object" class="btn btn-sm btn-outline-info" icon="fa-download" help="Pull Knowledge Base SOP steps into Action Taken notes" />
-                                        <button name="action_publish_notes_to_kb" string="Save to Knowledge Base" type="object" class="btn btn-sm btn-outline-success" icon="fa-book" help="Publish these resolution notes as a reusable Knowledge Base Article" />
-                                    </div>
+                                <group string="Knowledge Base SOP Guidance">
+                                    <field name="kb_article_id" options="{'no_create': True}" string="Knowledge Base Response / Article" placeholder="Select or search Knowledge Base article..." />
                                 </group>
                             </group>
                         </page>
@@ -625,35 +841,20 @@
                                 </group>
                                 <group string="Escalation Details">
                                     <field name="is_escalated" readonly="1" />
-                                    <field name="escalated_to_team_id" readonly="1" />
-                                    <field name="escalated_to_user_id" readonly="1" />
+                                    <field name="is_pending" readonly="1" invisible="not is_pending" />
+                                    <field name="pending_reason" readonly="1" invisible="not is_pending and not pending_reason" />
+                                    <field name="pending_reason_details" readonly="1" invisible="not is_pending and not pending_reason_details" />
+                                    <field name="pending_date" readonly="1" invisible="not is_pending and not pending_date" />
+                                    <field name="escalated_to_team_id" string="Escalated to Operating Unit" readonly="1" />
+                                    <field name="escalated_to_user_id" string="Escalated Assignee" readonly="1" />
                                     <field name="escalation_date" readonly="1" />
                                     <field name="escalation_reason" readonly="1" />
+                                    <field name="is_rejected" readonly="1" invisible="not is_rejected" />
+                                    <field name="rejection_reason" readonly="1" invisible="not is_rejected" />
                                 </group>
                             </group>
                         </page>
-                        <!-- Timesheets tab -->
-                        <page
-                            string="Timesheets"
-                            name="timesheets"
-                            groups="bunna_helpdesk.group_helpdesk_user_own"
-                        >
-                            <field
-                                name="timesheet_ids"
-                                widget="one2many"
-                                context="{'default_helpdesk_ticket_id': id}"
-                            >
-                                <list editable="bottom">
-                                    <field name="date" />
-                                    <field name="user_id" string="User" />
-                                    <field name="name" string="Description" />
-                                    <field name="unit_amount" string="Hours" />
-                                </list>
-                            </field>
-                            <group>
-                                <field name="total_hours_spent" readonly="1" />
-                            </group>
-                        </page>
+
                         <!-- SLA tab -->
                         <page string="SLA" name="sla" invisible="not sla_status_ids">
                             <field
@@ -681,23 +882,60 @@
                         <page string="Escalation History" name="escalation_history" invisible="not escalation_history_ids">
                             <field name="escalation_history_ids" readonly="1">
                                 <list default_order="escalation_datetime desc">
-                                    <field name="escalation_level" string="Level" widget="badge" />
+                                    <field name="escalation_journey" string="Journey" widget="badge" decoration-info="escalation_journey == 'primary_journey'" decoration-warning="escalation_journey == 'other_work_journey'" />
+                                    <field name="escalation_level" string="Level" widget="badge" decoration-info="escalation_level &lt; 3" decoration-warning="escalation_level in (3, 4)" decoration-danger="escalation_level &gt;= 5" />
+                                    <field name="previous_escalation_level" string="Prev Level" optional="hide" />
+                                    <field name="level_name" string="Escalation Stage" />
+                                    <field name="escalation_type" string="Type" optional="hide" />
+                                    <field name="original_operating_unit_id" string="Original OU" optional="hide" />
+                                    <field name="current_operating_unit_id" string="Current OU" optional="hide" />
+                                    <field name="escalated_by_user_id" string="Escalated By" widget="many2one_avatar_user" />
                                     <field name="previous_user_id" string="Previous Assignee" />
-                                    <field name="new_user_id" string="Escalated To (Manager)" widget="many2one_avatar_user" />
+                                    <field name="new_user_id" string="Escalated To" widget="many2one_avatar_user" />
+                                    <field name="manager_relationship" string="Manager Relationship" optional="hide" />
+                                    <field name="escalation_status" string="Status" widget="badge" decoration-info="escalation_status == 'escalated'" decoration-success="escalation_status == 'resolved'" />
                                     <field name="escalation_datetime" string="Escalated On" />
-                                    <field name="sla_deadline" string="Breached Deadline" />
-                                    <field name="new_sla_deadline" string="Target Deadline" />
-                                    <field name="is_ceo_level" string="CEO Level" widget="boolean" />
-                                    <field name="reason" string="Reason" />
+                                    <field name="sla_deadline" string="Breached Deadline" optional="hide" />
+                                    <field name="new_sla_deadline" string="Target Deadline" optional="hide" />
+                                    <field name="is_ceo_level" string="CEO Level" widget="boolean" optional="hide" />
+                                    <field name="reason" string="Reason &amp; Findings" />
                                 </list>
                             </field>
                         </page>
+                        <page string="Back-Line Audit &amp; Review" name="backline_audit" invisible="not is_under_review and not reviewed_by_id">
+                            <group>
+                                <group string="Audit Status &amp; Decision">
+                                    <field name="review_decision" readonly="1" widget="badge" decoration-success="review_decision == 'approved'" decoration-warning="review_decision == 'returned'"/>
+                                    <field name="review_submitted_by_id" readonly="1" widget="many2one_avatar_user"/>
+                                    <field name="review_submitted_at" readonly="1"/>
+                                    <field name="reviewed_by_id" readonly="1" widget="many2one_avatar_user"/>
+                                    <field name="reviewed_at" readonly="1"/>
+                                </group>
+                                <group string="Back-Line Quality Evaluation">
+                                    <field name="review_registration_feedback" readonly="not is_under_review"/>
+                                    <field name="review_root_cause_feedback" readonly="not is_under_review"/>
+                                    <field name="review_resolution_feedback" readonly="not is_under_review"/>
+                                    <field name="review_comments" readonly="not is_under_review"/>
+                                </group>
+                            </group>
+                        </page>
                         <page string="Other Information" name="other_info">
                             <group>
-                                <field name="last_stage_update" readonly="1" />
-                                <field name="assigned_date" readonly="1" />
-                                <field name="closed_date" readonly="1" />
-                                <field name="sla_deadline" readonly="1" invisible="not sla_deadline" />
+                                <group string="Ticket Journey &amp; Origin">
+                                    <field name="original_operating_unit_id" readonly="1" string="Original Operating Unit" invisible="not original_operating_unit_id" />
+                                    <field name="escalation_journey" widget="badge" readonly="1" string="Active Escalation Journey" invisible="not is_escalated" decoration-info="escalation_journey == 'primary_journey'" decoration-warning="escalation_journey == 'other_work_journey'" />
+                                </group>
+                                <group string="Timestamps">
+                                    <field name="last_stage_update" readonly="1" />
+                                    <field name="assigned_date" readonly="1" />
+                                    <field name="closed_date" readonly="1" />
+                                    <field name="sla_deadline" readonly="1" invisible="not sla_deadline" />
+                                </group>
+                            </group>
+                            <group string="Case Resolution &amp; Root Cause" invisible="not agent_action_taken and not inquiry_summary and not resolution">
+                                <field name="inquiry_summary" string="Root Case" readonly="1" invisible="not inquiry_summary" />
+                                <field name="resolution" string="Case Resolution" readonly="1" invisible="not resolution" />
+                                <field name="agent_action_taken" string="Agent Response" readonly="1" invisible="not agent_action_taken" />
                             </group>
                         </page>
                     </notebook>
@@ -712,71 +950,82 @@
         <field name="name">helpdesk.ticket.view.list</field>
         <field name="model">helpdesk.ticket</field>
         <field name="arch" type="xml">
-            <list>
-                <field name="priority" widget="priority" />
-                <field name="sequence" widget="handle" />
-                <field name="number" decoration-bf="1" />
-                <field name="name" />
-                <field name="service_family_id" optional="show" />
-                <field name="service_id" optional="show" />
-                <field name="service_sub_category_id" optional="show" />
-                <field name="case_type_id" optional="hide" />
-                <field name="operation_id" optional="hide" />
-                <field name="partner_id" optional="hide" widget="many2one_avatar" />
-                <field name="partner_name" optional="show" />
-                <field name="account_number" optional="hide" />
-                <field name="customer_type_name" optional="hide" string="Customer Type" />
-                <field name="customer_age" optional="hide" string="Age" />
-                <field name="customer_district" optional="hide" string="District" />
-                <field name="channel_type" optional="hide" />
-                <field name="user_id" optional="show" widget="many2one_avatar_user" />
-                <field name="escalation_level" optional="show" widget="badge" decoration-warning="escalation_level &gt; 0" decoration-danger="is_ceo_escalated" string="Escalation" />
-                <field name="category_id" optional="hide" />
-                <field name="is_escalated" optional="hide" widget="boolean" string="Escalated" />
+            <list export_xlsx="true" default_order="create_date desc, id desc" multi_edit="1">
+                <field name="priority" widget="priority" optional="show" />
+                <field name="number" string="Ticket Number" decoration-bf="1" />
+                <field name="customer_name" string="Customer Name" optional="show" decoration-bf="1" />
+                <field name="customer_status" string="Customer Status" optional="show" />
+                <field name="customer_type" string="Customer Types" optional="show" />
+                <field name="account_number" string="Account Number" optional="show" />
+                <field name="cif_number" string="CIF Number" optional="show" />
+                <field name="fayda_number" string="Fayda / National ID" optional="show" />
+                <field name="partner_phone" string="Phone / Mobile" optional="show" />
+                <field name="partner_phone_secondary" string="Caller Phone Number" optional="show" />
+                <field name="partner_id" string="Customer Contact" optional="show" widget="many2one_avatar" />
+                <field name="partner_email" string="Customer Email" optional="show" />
+                <field name="parent_operating_unit_id" string="Service Provider" optional="show" />
+                <field name="operating_unit_id" string="Sub-Service Provider" optional="show" />
+                <field name="service_id" string="Service" optional="show" />
+                <field name="service_sub_category_id" string="Sub Service" optional="show" />
+                <field name="channel_type" string="Communication Channel" optional="show" />
+                <field name="contact_center_agent_id" string="Contact Center Agent" optional="show" widget="many2one_avatar" />
+                <field name="category_id" string="Category" optional="show" />
+                <field name="tag_ids" string="Tags" widget="many2many_tags" options="{'color_field': 'color'}" optional="hide" />
+                <field name="preferred_language" string="Communication Language" optional="show" />
+                <field name="customer_rating" string="Customer Rating" optional="show" widget="badge" />
+                <field name="user_id" string="Assigned User" optional="show" widget="many2one_avatar_user" />
+                <field name="create_uid" string="Created By" optional="show" widget="many2one_avatar_user" />
+                <field name="create_date" string="Created on" optional="show" />
+                <field name="write_date" string="Last Update" optional="show" />
+                <field name="customer_request_details" string="Customer Inquires" optional="show" />
+                <field name="agent_action_taken" string="Agent Response" optional="show" />
+                <field name="resolution" string="Case Resolution" optional="show" />
+                <field name="closure_reason" string="Rejection / Cancellation Reason" optional="show" />
+                <field name="rejection_reason" string="Rejection Reason" optional="hide" />
+                <field name="cancel_reason" string="Cancellation Reason" optional="hide" />
                 <field
-                    name="ola_status"
-                    optional="hide"
+                    name="stage_id"
+                    string="Stage"
                     widget="badge"
-                    decoration-danger="ola_status == 'failed'"
-                    decoration-warning="ola_status == 'in_progress'"
-                    decoration-success="ola_status == 'reached'"
+                    decoration-success="not unattended and not closed"
+                    decoration-info="unattended == True"
+                    decoration-muted="closed == True"
+                    optional="show"
                 />
-                <field name="sla_deadline" optional="show" widget="remaining_days" />
                 <field
                     name="sla_status"
+                    string="SLA Status"
                     optional="show"
                     widget="badge"
                     decoration-success="sla_status == 'reached'"
                     decoration-warning="sla_status == 'in_progress'"
                     decoration-danger="sla_status == 'failed'"
                 />
+                <field name="sla_deadline" string="SLA Deadline" optional="show" widget="remaining_days" />
+                <field
+                    name="ola_status"
+                    string="OLA Status"
+                    optional="show"
+                    widget="badge"
+                    decoration-danger="ola_status == 'failed'"
+                    decoration-warning="ola_status == 'in_progress'"
+                    decoration-success="ola_status == 'reached'"
+                />
+                <field name="ola_deadline" string="OLA Deadline" optional="show" widget="remaining_days" />
+                <field name="is_escalated" string="Escalated" optional="show" widget="boolean" />
+                <field name="escalation_level" string="Escalation Level" optional="show" widget="badge" decoration-warning="escalation_level &gt; 0" decoration-danger="is_ceo_escalated" />
+                <field name="cbs_lookup_status" string="CBS Verification Status" optional="show" />
+                <field name="account_type" string="Account Type" optional="show" />
+                <field name="account_status" string="Account Status" optional="show" />
+                <field name="account_branch_name" string="Branch Name" optional="show" />
+                <field name="customer_district" string="District Name" optional="show" />
+                <field name="customer_type_name" string="CBS Customer Segment" optional="show" />
+                <field name="customer_age" string="Age" optional="show" />
+                <field name="name" string="Subject" optional="show" />
                 <field name="unattended" column_invisible="1" />
                 <field name="closed" column_invisible="1" />
-                <field
-                    name="tag_ids"
-                    widget="many2many_tags"
-                    options="{'color_field': 'color'}"
-                    optional="show"
-                />
-                <field
-                    name="create_date"
-                    widget="remaining_days"
-                    readonly="1"
-                    optional="show"
-                />
-                <field
-                    name="last_stage_update"
-                    widget="remaining_days"
-                    optional="show"
-                />
-                <field name="activity_ids" widget="list_activity" optional="hide" />
-                <field
-                    name="stage_id"
-                    widget="badge"
-                    decoration-success="not unattended and not closed"
-                    decoration-info="unattended == True"
-                    decoration-muted="closed == True"
-                />
+                <field name="user_is_on_leave" column_invisible="1" />
+                <field name="is_ceo_escalated" column_invisible="1" />
             </list>
         </field>
     </record>
@@ -785,16 +1034,16 @@
     <record id="view_helpdesk_ticket_kanban" model="ir.ui.view">
         <field name="name">helpdesk.ticket.kanban</field>
         <field name="model">helpdesk.ticket</field>
-        <field name="priority" eval="100" />
+        <field name="priority" eval="16" />
         <field name="arch" type="xml">
             <kanban class="o_kanban_mobile" default_group_by="stage_id">
                 <field name="number" />
                 <field name="active" />
                 <field name="name" />
-                <field name="partner_name" />
+                <field name="partner_name" invisible="1" />
                 <field name="user_id" />
                 <field name="user_ids" />
-                <field name="team_id" />
+                <field name="operating_unit_id" />
                 <field name="sequence" />
                 <field name="color" />
                 <field name="stage_id" />
@@ -830,7 +1079,7 @@
                         <field name="number" class="text-truncate" />
                         <!-- SLA indicator -->
                         <span
-                            t-if="record.sla_status.raw_value == 'failed'"
+                            t-if="record.sla_status and record.sla_status.raw_value == 'failed'"
                             class="badge text-bg-danger"
                         >SLA Failed</span>
                         <small class="o_kanban_record_subtitle text-muted">
@@ -871,7 +1120,8 @@
         <field name="model">helpdesk.ticket</field>
         <field name="arch" type="xml">
             <pivot string="Pivot Analysis" disable_linking="True">
-                <field name="team_id" type="row" />
+                <field name="parent_operating_unit_id" type="row" string="Service Provider" />
+                <field name="operating_unit_id" type="row" string="Sub Service Provider" />
                 <field name="stage_id" type="col" />
                 <field name="priority" type="col" />
             </pivot>
@@ -884,7 +1134,8 @@
         <field name="model">helpdesk.ticket</field>
         <field name="arch" type="xml">
             <graph string="Tickets Analysis" type="bar">
-                <field name="team_id" type="row" />
+                <field name="parent_operating_unit_id" type="row" string="Service Provider" />
+                <field name="operating_unit_id" type="row" string="Sub Service Provider" />
                 <field name="stage_id" type="col" />
             </graph>
         </field>

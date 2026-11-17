@@ -16,7 +16,7 @@
                 <group>
                     <group>
                         <field name="plan_id" invisible="not plan_id"/>
-                        <field name="format_type" readonly="plan_id != False"/>
+                        <field name="format_type"/>
                         <field name="import_mode" widget="radio"/>
                     </group>
                     <group>

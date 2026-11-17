@@ -13,15 +13,15 @@ class SuccessionPlanCompletionWizard(models.TransientModel):
     _name = 'succession.plan.completion.wizard'
     _description = 'Successor Development Plan Completion Evaluation'
 
-    plan_id = fields.Many2one('succession.development.plan', required=True, readonly=True)
+    plan_id = fields.Many2one('succession.development.plan', required=True, readonly=True, index=True)
     candidate_id = fields.Many2one(
-        related='plan_id.candidate_id', string='Candidate', readonly=True)
+        related='plan_id.candidate_id', string='Candidate', readonly=True, index=True)
     employee_id = fields.Many2one(
-        related='plan_id.employee_id', string='Employee', readonly=True)
+        related='plan_id.employee_id', string='Employee', readonly=True, index=True)
     evaluating_manager_id = fields.Many2one(
-        related='plan_id.evaluating_manager_id', string='Assigned Mentor / Evaluator', readonly=True)
+        related='plan_id.evaluating_manager_id', string='Assigned Mentor / Evaluator', readonly=True, index=True)
     critical_position_id = fields.Many2one(
-        related='plan_id.critical_position_id', string='Target Critical Position', readonly=True)
+        related='plan_id.critical_position_id', string='Target Critical Position', readonly=True, index=True)
     plan_start_date = fields.Date(
         related='plan_id.start_date', string='Plan Start Date', readonly=True)
     plan_end_date = fields.Date(
@@ -155,4 +155,14 @@ class SuccessionPlanCompletionWizard(models.TransientModel):
                     plan.name, achievement_label, self.completion_evaluation)
             )
 
-        return {'type': 'ir.actions.act_window_close'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Development Plan Completed'),
+                'message': _('Development Plan %s has been successfully marked as Completed.') % plan.name,
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }

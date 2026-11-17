@@ -65,12 +65,30 @@ class ExamPortalController(http.Controller):
         if not attempt.answer_ids:
             attempt._initialize_candidate_questions()
 
+        # Check total allocated duration
+        total_duration_minutes = session.duration_minutes or (attempt.exam_id.duration_minutes if attempt.exam_id else 60)
+        total_duration_seconds = int(total_duration_minutes * 60)
+
         # If candidate state is assigned/invited, activate exam attempt directly
         if attempt.state in ["assigned", "invited"]:
             attempt.write({
                 "state": "in_progress",
                 "start_datetime": now,
                 "login_datetime": attempt.login_datetime or now,
+            })
+            start_time = now
+        else:
+            start_time = attempt.start_datetime or now
+
+        # Calculate accurate remaining time based on start_datetime
+        elapsed_seconds = (now - start_time).total_seconds()
+        remaining_seconds = max(0, int(total_duration_seconds - elapsed_seconds))
+
+        if remaining_seconds <= 0 and attempt.state == "in_progress":
+            attempt.action_submit_exam()
+            return request.render("assessment_system.exam_completed_page", {
+                "attempt": attempt,
+                "message": _("Time has expired. Your examination has been automatically finalized and submitted."),
             })
 
         # Render active exam interface
@@ -79,9 +97,11 @@ class ExamPortalController(http.Controller):
             "session": session,
             "exam": attempt.exam_id,
             "answers": attempt.answer_ids.sorted(key=lambda a: a.sequence),
+            "remaining_seconds": remaining_seconds,
+            "total_duration_seconds": total_duration_seconds,
         })
 
-    @http.route("/exam/session/<string:token>/start", type="json", auth="public", methods=["POST"])
+    @http.route("/exam/session/<string:token>/start", type="jsonrpc", auth="public", methods=["POST"])
     def start_exam(self, token, **kwargs):
         attempt = request.env["exam.candidate.attempt"].sudo().search([("access_token", "=", token)], limit=1)
         if not attempt:
@@ -92,12 +112,14 @@ class ExamPortalController(http.Controller):
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    @http.route("/exam/session/<string:token>/save", type="json", auth="public", methods=["POST"])
+    @http.route("/exam/session/<string:token>/save", type="jsonrpc", auth="public", methods=["POST"])
     def auto_save_answers(self, token, **kwargs):
         """Auto-save endpoint called every 30s and before final submission (FR-EXM-027)"""
         attempt = request.env["exam.candidate.attempt"].sudo().search([("access_token", "=", token)], limit=1)
         if not attempt or attempt.state == "completed":
             return {"status": "error", "message": "Attempt not active or already completed"}
+        if attempt.state == "disqualified":
+            return {"status": "disqualified", "action": "disqualified", "message": attempt.disqualification_reason or _("Candidate is disqualified")}
 
         answers_payload = kwargs.get("answers", [])
         for ans_data in answers_payload:
@@ -110,9 +132,13 @@ class ExamPortalController(http.Controller):
             if "selected_option_id" in ans_data:
                 opt_id = ans_data["selected_option_id"]
                 vals["selected_option_id"] = int(opt_id) if opt_id else False
+                if vals["selected_option_id"]:
+                    opt = request.env["exam.question.option"].sudo().browse(vals["selected_option_id"])
+                    if opt.exists():
+                        vals["text_answer"] = opt.option_text
             if "selected_option_ids" in ans_data:
                 vals["selected_option_ids"] = [(6, 0, ans_data["selected_option_ids"] or [])]
-            if "text_answer" in ans_data:
+            if "text_answer" in ans_data and not vals.get("selected_option_id"):
                 vals["text_answer"] = ans_data["text_answer"] or ""
             if "is_marked_for_review" in ans_data:
                 vals["is_marked_for_review"] = bool(ans_data["is_marked_for_review"])
@@ -121,19 +147,23 @@ class ExamPortalController(http.Controller):
 
         return {"status": "saved", "saved_at": str(fields.Datetime.now())}
 
-    @http.route("/exam/session/<string:token>/event", type="json", auth="public", methods=["POST"])
+    @http.route("/exam/session/<string:token>/event", type="jsonrpc", auth="public", methods=["POST"])
     def record_proctor_event(self, token, **kwargs):
         """Receives anti-cheating violation signals from client agent (FR-EXM-021 - FR-EXM-023)"""
         attempt = request.env["exam.candidate.attempt"].sudo().search([("access_token", "=", token)], limit=1)
-        if not attempt or attempt.state == "completed":
+        if not attempt:
+            return {"status": "error", "message": "Invalid token"}
+        if attempt.state == "completed":
             return {"status": "ignored"}
+        if attempt.state == "disqualified":
+            return {"action": "disqualified", "message": attempt.disqualification_reason or _("You have been disqualified.")}
 
         event_type = kwargs.get("event_type", "tab_switch")
         details = kwargs.get("details", "")
         res = attempt.record_proctor_event(event_type, details)
         return res
 
-    @http.route("/exam/session/<string:token>/submit", type="json", auth="public", methods=["POST"])
+    @http.route("/exam/session/<string:token>/submit", type="jsonrpc", auth="public", methods=["POST"])
     def submit_exam(self, token, **kwargs):
         """Final submission triggered by candidate or timer auto-submit (FR-EXM-024)"""
         attempt = request.env["exam.candidate.attempt"].sudo().search([("access_token", "=", token)], limit=1)

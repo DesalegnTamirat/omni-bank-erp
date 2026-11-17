@@ -28,7 +28,6 @@
                     <div class="oe_button_box" name="button_box"/>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <widget name="web_ribbon" title="Default Active" bg_color="text-bg-success" invisible="not is_default or not active"/>
-                    <field name="signature_stamp_image" widget="image" class="oe_avatar" options="{'preview_image': 'signature_stamp_image', 'size': [180, 100]}"/>
                     <div class="oe_title">
                         <label for="name" string="Configuration Title"/>
                         <h1>
@@ -56,6 +55,25 @@
                             <field name="department_id" string="Head Office Department" invisible="org_level != 'head_office'"/>
                         </group>
                     </group>
+                                        <group string="Digital Handwritten Signature &amp; Official Bank Rubber Stamp">
+                        <group string="1. Signatory Handwritten Signature">
+                            <field name="signature_image" widget="image" options="{'size': [220, 90]}"/>
+                            <div class="text-muted small">Personal handwritten signature of the authorized signatory (PNG format with transparent background recommended).</div>
+                        </group>
+                        <group string="2. Official Bank Rubber Stamp / Seal">
+                            <field name="stamp_image" widget="image" options="{'size': [110, 110]}"/>
+                            <field name="stamp_position" widget="radio"/>
+                            <div class="text-muted small">Official purple circular Bunna Bank rubber stamp. If left empty, automatically inherits from the District or Head Office default stamp.</div>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Legacy Combined Image" invisible="not signature_stamp_image and (signature_image or stamp_image)">
+                            <group>
+                                <field name="signature_stamp_image" widget="image" options="{'size': [240, 110]}"/>
+                                <div class="text-muted small">Single combined image (signature + stamp) preserved for 100% backward compatibility. When separate signature or stamp is uploaded above, they take precedence.</div>
+                            </group>
+                        </page>
+                    </notebook>
                     <div class="alert alert-info mt-3" role="alert">
                         <strong>ℹ️ Dynamic Application:</strong>
                         This signature and official stamp will be automatically applied to matching Bank letters (Lateral Transfers, Promotions, Permanent Confirmation Letters) based on the hiring work unit and department. If no district-specific configuration is set, the system seamlessly falls back to Head Office default.

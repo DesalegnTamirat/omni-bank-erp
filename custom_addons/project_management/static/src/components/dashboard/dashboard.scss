@@ -11,7 +11,7 @@ $bunna-navy:      #1D2B32;  // Bunna Deep Slate Navy (Headers / Dark Accents)
 $bunna-bg:        #F7F9F5;  // Soft Warm Brand Background
 $bunna-card-border: #E8ECE3;
 
-.o_pm_executive_dashboard {
+.o_pm_executive_dashboard, .o_pm_non_project_dashboard {
     background-color: $bunna-bg;
     font-family: inherit;
 
@@ -49,6 +49,62 @@ $bunna-card-border: #E8ECE3;
                 background-color: lighten($bunna-bronze, 8%);
                 transform: rotate(45deg);
             }
+        }
+    }
+
+    // Filter Ribbon Bar (Dedicated Clean Control Strip)
+    .o_bunna_filter_bar {
+        background-color: #ffffff;
+        border: 1px solid #E2E8DF !important;
+        border-radius: 0.85rem;
+
+        .o_filter_label {
+            font-size: 0.70rem;
+            font-weight: 700;
+            color: #5A6A55;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-bottom: 0.35rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-select, .form-control {
+            border: 1px solid #D6DDD2;
+            background-color: #FAFCF9;
+            color: $bunna-navy;
+            font-size: 0.83rem;
+            font-weight: 500;
+            border-radius: 0.5rem;
+            height: 38px;
+            padding: 0.375rem 0.65rem;
+            transition: all 0.2s ease;
+
+            &:focus {
+                border-color: $bunna-green;
+                background-color: #ffffff;
+                box-shadow: 0 0 0 0.2rem rgba(66, 87, 39, 0.15);
+            }
+
+            &:hover {
+                border-color: $bunna-bronze;
+            }
+        }
+    }
+
+    .btn-bunna-reset {
+        background-color: rgba(255, 255, 255, 0.15);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 0.5rem;
+        font-weight: 500;
+        font-size: 0.82rem;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: #ffffff;
+            color: $bunna-maroon;
+            border-color: #ffffff;
         }
     }
 

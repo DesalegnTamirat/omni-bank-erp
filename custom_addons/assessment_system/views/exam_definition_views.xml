@@ -17,6 +17,7 @@
                 <filter string="Confirmed" name="filter_confirmed" domain="[('state', '=', 'confirmed')]"/>
                 <filter string="Draft" name="filter_draft" domain="[('state', '=', 'draft')]"/>
                 <group>
+                    <filter string="Exam Title" name="group_exam_title" context="{'group_by': 'name'}"/>
                     <filter string="Job Position" name="group_job" context="{'group_by': 'job_id'}"/>
                     <filter string="Vacancy" name="group_vacancy" context="{'group_by': 'vacancy_id'}"/>
                     <filter string="Status" name="group_status" context="{'group_by': 'state'}"/>
@@ -49,42 +50,42 @@
                     </div>
                     <div class="oe_title">
                         <label for="name" string="Exam Title"/>
-                        <h1><field name="name" placeholder="e.g. Senior Credit Analyst Written Assessment 2026"/></h1>
+                        <h1><field name="name" placeholder="e.g. Senior Credit Analyst Written Assessment 2026" readonly="state != 'draft'"/></h1>
                         <h3><field name="code" readonly="1"/></h3>
                     </div>
                     <group>
                         <group>
-                             <field name="vacancy_id"/>
-                            <field name="job_id"/>
-                            <field name="recruitment_request_id"/>
-                            <field name="assessment_type"/>
+                             <field name="vacancy_id" readonly="state != 'draft'"/>
+                            <field name="job_id" readonly="state != 'draft'"/>
+                            <field name="recruitment_request_id" readonly="state != 'draft'"/>
+                            <field name="assessment_type" readonly="state != 'draft'"/>
                             <field name="is_version_paper" invisible="1"/>
                             <field name="version_code" invisible="not is_version_paper" readonly="1"/>
                             <field name="parent_exam_id" invisible="not is_version_paper" readonly="1"/>
                         </group>
                         <group>
-                            <field name="duration_minutes"/>
-                            <field name="passing_score_percentage"/>
-                            <field name="number_of_versions_to_generate" invisible="is_version_paper"/>
-                            <field name="late_arrival_lockout_minutes"/>
-                            <field name="tab_switch_violation_limit"/>
+                            <field name="duration_minutes" readonly="state != 'draft'"/>
+                            <field name="passing_score_percentage" readonly="state != 'draft'"/>
+                            <field name="number_of_versions_to_generate" invisible="is_version_paper" readonly="state != 'draft'"/>
+                            <field name="late_arrival_lockout_minutes" readonly="state != 'draft'"/>
+                            <field name="tab_switch_violation_limit" readonly="state != 'draft'"/>
                         </group>
                     </group>
                     <group string="Cheating Prevention, Randomization &amp; Fresh Question Rotation">
                         <group>
-                            <field name="randomize_questions"/>
-                            <field name="randomize_options"/>
-                            <field name="exclude_previously_used_questions"/>
-                            <field name="question_cooldown_days" invisible="not exclude_previously_used_questions"/>
+                            <field name="randomize_questions" readonly="state != 'draft'"/>
+                            <field name="randomize_options" readonly="state != 'draft'"/>
+                            <field name="exclude_previously_used_questions" readonly="state != 'draft'"/>
+                            <field name="question_cooldown_days" invisible="not exclude_previously_used_questions" readonly="state != 'draft'"/>
                         </group>
                         <group>
-                            <field name="block_copy_paste"/>
-                            <field name="block_screenshot"/>
+                            <field name="block_copy_paste" readonly="state != 'draft'"/>
+                            <field name="block_screenshot" readonly="state != 'draft'"/>
                         </group>
                     </group>
                     <notebook>
                         <page string="Automated Question Distribution Rules" invisible="selection_mode != 'auto_distribution'">
-                            <field name="distribution_line_ids">
+                            <field name="distribution_line_ids" readonly="state != 'draft'">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
                                     <field name="eligible_competency_ids" column_invisible="1"/>
@@ -97,7 +98,7 @@
                             </field>
                         </page>
                         <page string="Assigned Version Questions" invisible="selection_mode != 'manual_select'">
-                            <field name="manual_question_ids"/>
+                            <field name="manual_question_ids" readonly="state != 'draft'"/>
                         </page>
                         <page string="Generated Child Versions" invisible="child_version_count == 0">
                             <field name="child_version_ids" readonly="1">
@@ -112,7 +113,7 @@
                         </page>
                         <page string="Summary Totals">
                             <group>
-                                <field name="selection_mode"/>
+                                <field name="selection_mode" readonly="state != 'draft'"/>
                                 <field name="total_questions"/>
                                 <field name="total_marks"/>
                             </group>
@@ -151,7 +152,7 @@
         <field name="res_model">exam.definition</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('is_version_paper', '=', False)]</field>
-        <field name="context">{'default_is_version_paper': False, 'search_default_master_exams': 1}</field>
+        <field name="context">{'default_is_version_paper': False, 'search_default_master_exams': 1, 'search_default_group_exam_title': 1}</field>
         <field name="search_view_id" ref="view_exam_definition_search"/>
     </record>
 

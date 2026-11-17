@@ -1,10 +1,38 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
+    <record id="new_internal_recruit_select_cand_search_view" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.selected.candidates.search</field>
+        <field name="model">new.internal.recruitment.selected.candidates</field>
+        <field name="arch" type="xml">
+            <search string="Search Selected Employees">
+                <field name="emp_name" string="Employee Name"/>
+                <field name="emp_grade" string="Grade"/>
+                <field name="pms_score" string="PMS Score"/>
+                <field name="written_exam_score" string="Written Exam Score"/>
+                <field name="interview_score" string="Interview Score"/>
+                <field name="weighted_score" string="Weighted Score"/>
+                <separator/>
+                <filter string="Selected Flag" name="filter_selected_flag" domain="[('select_flag', '=', True)]"/>
+                <filter string="Unselected Flag" name="filter_unselected_flag" domain="[('select_flag', '=', False)]"/>
+                <separator/>
+                <filter string="Passed (Selected)" name="filter_selected_result" domain="[('selection_type', 'in', ['selected', 'Selected'])]"/>
+                <filter string="Reserved" name="filter_reserved_result" domain="[('selection_type', 'in', ['reserve', 'reserved', 'Reserve', 'Reserved'])]"/>
+                <filter string="Disqualified" name="filter_disqualified_result" domain="[('selection_type', 'in', ['rejected', 'Disqualified'])]"/>
+                <group name="group_by">
+                    <filter string="Selection Flag" name="group_select_flag" context="{'group_by': 'select_flag'}"/>
+                    <filter string="Result" name="group_selection_type" context="{'group_by': 'selection_type'}"/>
+                    <filter string="Grade" name="group_grade" context="{'group_by': 'emp_grade'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_new_internal_recruit_select_cand" model="ir.actions.act_window">
         <field name="name">Internal Recruitment Process Selected Candidates</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">new.internal.recruitment.selected.candidates</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="new_internal_recruit_select_cand_search_view"/>
         <field name="context">{}</field>
         <field name="domain">[]</field>
         <field name="help" type="html">
@@ -16,26 +44,37 @@
         <field name="name">new.internal.recruitment.selected.candidates.tree</field>
         <field name="model">new.internal.recruitment.selected.candidates</field>
         <field name="arch" type="xml">
-            <list string="Internal Recruitment Selected Candidates" editable="top" limit="500" multi_edit="1" delete="0" decoration-danger="active_leave_status not in ('Active', 'N/A')" decoration-success="active_leave_status == 'Active'"> 
+            <list string="Selected Employees" editable="top" limit="500" multi_edit="1" delete="0"
+                  decoration-success="selection_type in ['selected', 'Selected']"
+                  decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']"
+                  decoration-danger="selection_type in ['rejected', 'Disqualified']"
+                  decoration-muted="selection_type in ['pending', 'Pending Evaluation']">
                 <field name="emp_name"/>
                 <field name="select_flag"/>
                 <field name="emp_position"/>
                 <field name="current_work_unit"/>
                 <field name="current_department"/>
                 <field name="preferred_location"/>
-                <field name="written_exam_score"/>
                 <field name="pms_score"/>
-                <field name="application_date" optional="hide"/>
-                <field name="app_date_score" optional="hide"/>
-                <field name="relevant_experience" string="Experience (Yrs)" optional="hide"/>
-                <field name="experience_score" optional="hide"/>
-                <field name="service_in_company" string="Service (Yrs)" optional="hide"/>
-                <field name="location_score" optional="hide"/>
-                <field name="supervisor_recommendation_score" string="Supervisor Rec Score" optional="hide"/>
-                <field name="weighted_score"/>
+                <field name="written_exam_score"/>
+                <field name="interview_score"/>
+                <field name="banking_experience" string="Banking Exp (Yrs)" optional="show"/>
+                <field name="non_banking_experience" string="Non-Banking Exp (Yrs)" optional="show"/>
+                <field name="service_in_company" string="Company Exp (Yrs)" optional="show"/>
+                <field name="previous_experience" string="Prev Exp (Yrs)" optional="show"/>
+                <field name="relevant_experience" string="Total Credited Exp (Yrs)" optional="show"/>
+                <field name="experience_score" string="Exp Score" optional="show"/>
+                <field name="service_in_current_position" string="Pos Service (Yrs)" optional="show"/>
+                <field name="service_in_current_location" string="Loc Service (Yrs)" optional="show"/>
+                <field name="location_score" string="Loc Score" optional="show"/>
+                <field name="supervisor_recommendation_score" string="Supervisor Rec" optional="show"/>
+                <field name="weighted_score" class="fw-bold"/>
                 <field name="rank" readonly="1"/>
-                <field name="selection_type"/>
-                <field name="active_leave_status" string="Leave Status" readonly="1" optional="show" decoration-danger="active_leave_status not in ('Active', 'N/A')" decoration-success="active_leave_status == 'Active'"/>
+                <field name="selection_type" string="Result"/>
+                <field name="acceptance_status" optional="show"/>
+                <field name="active_leave_status" string="Leave Status" readonly="1" optional="show"
+                       decoration-danger="active_leave_status not in ('Active', 'N/A')"
+                       decoration-success="active_leave_status == 'Active'"/>
                 <field name="remarks"/>
             </list>
         </field>
@@ -108,21 +147,22 @@
             <form string="Internal Recruitment Selected Candidates" delete="0">
                 <header>
                     <button name="notify_written_exam" invisible="exam_scheduled == 'Yes'" string="Notify Written Exam" type="object" class="btn-secondary" icon="fa-paper-plane"/>
-                    <button name="fetch_exam_score" string="Fetch Exam Score" type="object" class="btn-secondary" icon="fa-download" invisible="exam_scores_fetched == True"/>
                     <button name="notify_interview_panel" invisible="panel_notified == True" string="Notify Interview Panel" type="object" class="btn-secondary" icon="fa-users"/>
                     <button name="action_open_reschedule_wizard" string="Reschedule Interview" type="object" class="btn-warning" icon="fa-clock-o" invisible="not show_reschedule_button"/>
                     <button name="notify_interview" invisible="interview_scheduled == 'Yes'" string="Notify Interview" type="object" class="btn-secondary" icon="fa-calendar"/>
-                    <button name="fetch_interview_score" string="Fetch Interview Score" type="object" class="btn-secondary" icon="fa-download" invisible="interview_scores_fetched == True"/>
                     <button name="action_request_supervisor_recommendation" string="Request Supervisor Recommendation" type="object" class="btn-secondary" icon="fa-bell" invisible="scores_computed == True or supervisor_rec_requested == True" confirm="This will send notification links to the direct supervisors of all eligible candidates to submit their recommendation marks. Proceed?"/>
                     <button name="action_compute_and_rank" string="Compute &amp; Rank Scores" type="object" class="btn-primary" icon="fa-calculator" confirm="This will compute weighted scores for all candidates using the vacancy weight matrix, then rank and set final status (Selected / Reserved / Disqualified). Continue?"/>
-                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o" invisible="not minute_signed"/>
+                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o" invisible="not scores_computed and not minute_signed"/>
                     <button name="action_open_digital_minute" string="Digital Selection Minute" type="object" class="btn-primary" icon="fa-pencil-square-o" help="Open or create the digital committee selection minute for digital signatures."/>
-                    <button name="action_promote_selected_employees" string="Promote Selected Employees" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-rocket" invisible="not scores_computed"/>
-                    <button name="action_print_all_promotion_letters" string="📄 Promotion Letters" type="object" class="btn-secondary" icon="fa-print" invisible="not employees_promoted"/>
+                    <button name="action_promote_selected_employees" string="Complete Transfer" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-exchange" invisible="not scores_computed or not is_lateral_transfer"/>
+                    <button name="action_promote_selected_employees" string="Promote Selected Employees" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-rocket" invisible="not scores_computed or is_lateral_transfer"/>
+                    <button name="action_print_all_transfer_letters" string="📄 Transfer Letters" type="object" class="btn-secondary" icon="fa-print" invisible="not employees_promoted or not is_lateral_transfer"/>
+                    <button name="action_print_all_promotion_letters" string="📄 Promotion Letters" type="object" class="btn-secondary" icon="fa-print" invisible="not employees_promoted or is_lateral_transfer"/>
                     <button name="notify_selection" invisible="selection_notified == True" string="Notify Selection" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-trophy"/>
                     <field name="state" widget="statusbar" statusbar_visible="notify,evaluate,approved"/>
                 </header>
                 <sheet>
+                    <field name="is_lateral_transfer" invisible="1"/>
                     <field name="supervisor_rec_requested" invisible="1"/>
                     <div class="oe_button_box" name="button_box">
                         <button class="oe_stat_button" icon="fa-users">
@@ -184,13 +224,18 @@
                                     <field name="current_department" readonly="parent.scores_computed == True"/>
                                     <field name="preferred_location" readonly="parent.scores_computed == True"/>
                                     <field name="pms_score" readonly="parent.scores_computed == True"/>
-                                    <field name="written_exam_score" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True" column_invisible="parent.transfer_eval_mode in ['interview_only', 'transfer_matrix_only']"/>
-                                    <field name="interview_score" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True" column_invisible="parent.transfer_eval_mode == 'transfer_matrix_only'"/>
+                                    <field name="written_exam_score" readonly="parent.scores_computed == True" column_invisible="parent.transfer_eval_mode in ['interview_only', 'transfer_matrix_only']"/>
+                                    <field name="interview_score" readonly="parent.scores_computed == True" column_invisible="parent.transfer_eval_mode == 'transfer_matrix_only'"/>
                                     <field name="application_date" string="App Date" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
                                     <field name="app_date_score" string="App Date Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="1"/>
-                                    <field name="relevant_experience" string="Experience (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="banking_experience" string="Banking Exp (Yrs)" optional="show" readonly="parent.scores_computed == True"/>
+                                    <field name="non_banking_experience" string="Non-Banking Exp (Yrs)" optional="show" readonly="parent.scores_computed == True"/>
+                                    <field name="service_in_company" string="Company Experience (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="previous_experience" string="Previous Experience (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="relevant_experience" string="Total Credited Exp (Yrs)" optional="show" readonly="parent.scores_computed == True"/>
                                     <field name="experience_score" string="Experience Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="1"/>
-                                    <field name="service_in_company" string="Service (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="service_in_current_position" string="Service in Current Position (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
+                                    <field name="service_in_current_location" string="Service in Current Location (Yrs)" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="parent.scores_computed == True"/>
                                     <field name="location_score" string="Location Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'" readonly="1"/>
                                     <field name="supervisor_recommendation_score" string="Supervisor Rec Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'"/>
                                     <field name="supervisor_remarks" string="Supervisor Remarks" optional="hide" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'"/>
@@ -205,7 +250,8 @@
                                     <field name="promotion_status" readonly="1" optional="show"/>
                                     <field name="promoted_salary" optional="show" string="Salary (ETB)"/>
                                     <field name="promotion_ref_no" readonly="1" optional="show" string="Ref No"/>
-                                    <button name="action_print_promotion_letter" string="📄 Letter" type="object" class="btn-secondary btn-sm" invisible="selection_type not in ('selected', 'Selected') or promotion_status == 'draft'"/>
+                                    <button name="action_send_promotion_notification" string="Send CC &amp; Letter" type="object" class="btn-primary btn-sm" icon="fa-paper-plane" invisible="selection_type not in ('selected', 'Selected') or promotion_status == 'draft'" help="Dispatch official promotion letter and CC notifications via Discuss and Work Email to all CC Work Unit Managers."/>
+                                     <button name="action_print_promotion_letter" string="📄 Letter" type="object" class="btn-secondary btn-sm" invisible="selection_type not in ('selected', 'Selected') or promotion_status == 'draft'"/>
                                     <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="selection_type != 'selected' or promotion_type != 'diff_unit' or not parent.minute_signed or promotion_status in ('promoted', 'released')"/>
                                     <field name="remarks"/>
                                 </list>
@@ -236,37 +282,41 @@
                             </field>
                         </page>
                         <page string="Recruitment Approval Committee">
+                            <field name="allowed_chairperson_user_ids" invisible="1"/>
+                            <field name="allowed_panel_member_user_ids" invisible="1"/>
+                            <field name="allowed_secretary_user_ids" invisible="1"/>
+                            <field name="allowed_observer_user_ids" invisible="1"/>
                             <group string="Approval Hierarchy &amp; Committee Roles">
                                 <group>
                                     <field name="approval_hierarchy_type" widget="radio"/>
                                 </group>
                                 <group>
                                     <!-- Head Office & District Grade II and above -->
-                                    <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
-                                    <field name="panel_member_id" string="Respective Senior Management (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
-                                    <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="panel_member_id" string="Respective Senior Management (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
 
                                     <!-- For all non-managerial head office -->
-                                    <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="panel_member_id" string="Head Office / District Director (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="panel_member_id" string="Head Office / District Director (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
 
                                     <!-- For all non-managerial district -->
-                                    <field name="chairperson_id" string="District Director (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="panel_member_id" string="District Division Member (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="chairperson_id" string="District Director (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="panel_member_id" string="District Division Member (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
 
                                     <!-- Default fallback if unassigned -->
-                                    <field name="chairperson_id" string="Chairperson" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="panel_member_id" string="Panel Member" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="secretary_id" string="Panel Member &amp; Secretary" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="chairperson_id" string="Chairperson" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="panel_member_id" string="Panel Member" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="secretary_id" string="Panel Member &amp; Secretary" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
                                 </group>
                             </group>
                             <field name="recr_selected_team_id" context="{'parent_workunit_id': workunit_id, 'default_new_rec_del_id': id}">
-                                <list editable="bottom" delete="0" decoration-success="approve == True">
+                                <list editable="bottom" decoration-success="approve == True">
                                     <field name="eligible_user_ids" column_invisible="1"/>
                                     <field name="role"/>
                                     <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]"/>

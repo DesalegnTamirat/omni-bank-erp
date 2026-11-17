@@ -89,7 +89,7 @@
                             <div class="row g-3 mt-2">
                                 <div class="col-md-4">
                                     <div class="border rounded p-2 text-center h-100">
-                                        <h5>Page 4 (Part B Guarantee)</h5>
+                                        <h5>Page 4 (Guarantor – Guarantee)</h5>
                                         <field name="page_4_image" widget="image" class="oe_avatar" style="max-height:220px;width:auto;"/>
                                     </div>
                                 </div>
@@ -109,9 +109,9 @@
                         </page>
 
                         <!-- TAB 2: PART A - EVERY WORD CAN BE EDITED -->
-                        <page string="Part A - Borrower Words &amp; Details">
+                        <page string="Borrower - Words &amp; Details">
                             <div class="alert alert-info" role="alert">
-                                <strong>Word &amp; Clause Editor (Part A - Borrower):</strong> Edit any word, label, or clause format below. Use placeholders like <code>{a_name}</code>, <code>{a_amt}</code>, <code>{a_inst}</code>, <code>{a_start}</code> where dynamic borrower data should appear.
+                                <strong>Word &amp; Clause Editor (Borrower):</strong> Edit any word, label, or clause format below. Use placeholders like <code>{a_name}</code>, <code>{a_amt}</code>, <code>{a_inst}</code>, <code>{a_start}</code> where dynamic borrower data should appear.
                             </div>
                             <group string="Borrower Personal Information Words">
                                 <group>
@@ -136,9 +136,9 @@
                         </page>
 
                         <!-- TAB 3: PART B - GUARANTOR WORDS CAN BE EDITED -->
-                        <page string="Part B - Guarantor Words &amp; Details">
+                        <page string="Guarantor - Words &amp; Details">
                             <div class="alert alert-info" role="alert">
-                                <strong>Word &amp; Clause Editor (Part B - Guarantor):</strong> Edit any word, label, or clause format for the guarantor guarantee page. Use placeholders like <code>{b_name}</code>, <code>{b_amt}</code>, <code>{b_borrower}</code>, <code>{b_branch1}</code>.
+                                <strong>Word &amp; Clause Editor (Guarantor):</strong> Edit any word, label, or clause format for the guarantor guarantee page. Use placeholders like <code>{b_name}</code>, <code>{b_amt}</code>, <code>{b_borrower}</code>, <code>{b_branch1}</code>.
                             </div>
                             <group string="Guarantor Personal Information Words">
                                 <group>

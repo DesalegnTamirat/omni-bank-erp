@@ -111,14 +111,32 @@ class RecruitmentSignatoryConfig(models.Model):
         ('transfer_letter', 'Lateral Transfer Letters'),
         ('promotion_letter', 'Promotion Letters'),
         ('permanent_letter', 'Probation Confirmation / Permanent Letters'),
+        ('experience_letter', 'Work Experience Letters'),
         ('committee_minute', 'Committee Minutes'),
         ('employment_letter', 'External Employment Letters'),
     ], string='Applicable Document Scope', default='all', required=True)
 
-    signature_stamp_image = fields.Binary(
-        string='Signature & Official Stamp Image',
+    signature_image = fields.Binary(
+        string='Signatory Handwritten Signature',
         attachment=True,
-        help='Upload PNG/JPG containing the authorized signature and official purple Bunna Bank rubber stamp'
+        help='Upload PNG/JPG containing the personal handwritten signature of the authorized signatory (transparent/white background)'
+    )
+    stamp_image = fields.Binary(
+        string='Official Rubber Stamp / Seal',
+        attachment=True,
+        help='Upload PNG/JPG containing the official circular purple Bunna Bank rubber stamp (transparent/white background)'
+    )
+    stamp_position = fields.Selection([
+        ('right', 'Stamp to the Right of Signature'),
+        ('left', 'Stamp to the Left of Signature'),
+        ('overlap', 'Stamp Overlapping Signature'),
+    ], string='Stamp Placement', default='right', required=True,
+       help='Positioning of the official stamp relative to the handwritten signature')
+
+    signature_stamp_image = fields.Binary(
+        string='Combined Signature & Stamp (Legacy)',
+        attachment=True,
+        help='Legacy upload PNG/JPG containing both signature and stamp merged into a single image'
     )
     is_default = fields.Boolean(
         string='Default Active Signatory',
@@ -138,11 +156,15 @@ class RecruitmentSignatoryConfig(models.Model):
                     ALTER TABLE recruitment_signatory_config 
                     ADD COLUMN IF NOT EXISTS org_level varchar DEFAULT 'head_office',
                     ADD COLUMN IF NOT EXISTS operating_unit_id integer,
-                    ADD COLUMN IF NOT EXISTS department_id integer;
+                    ADD COLUMN IF NOT EXISTS department_id integer,
+                    ADD COLUMN IF NOT EXISTS stamp_position varchar DEFAULT 'right';
 
                     UPDATE recruitment_signatory_config 
                     SET org_level = 'head_office' 
                     WHERE org_level IS NULL OR org_level = '' OR org_level = 'all';
+                    UPDATE recruitment_signatory_config 
+                    SET stamp_position = 'right' 
+                    WHERE stamp_position IS NULL OR stamp_position = '';
                 """)
         except Exception:
             pass
@@ -164,15 +186,78 @@ class RecruitmentSignatoryConfig(models.Model):
                 if others:
                     others.write({'is_default': False})
 
+    def get_signature_base64(self):
+        """Returns the Base64 data URI of the signatory handwritten signature."""
+        self.ensure_one()
+        if self.signature_image:
+            b64_str = self.signature_image.decode('utf-8') if isinstance(self.signature_image, bytes) else self.signature_image
+            return f"data:image/png;base64,{b64_str}"
+        return ""
+
+    def get_stamp_base64(self):
+        """Returns the Base64 data URI of the official bank rubber stamp."""
+        self.ensure_one()
+        if self.stamp_image:
+            b64_str = self.stamp_image.decode('utf-8') if isinstance(self.stamp_image, bytes) else self.stamp_image
+            return f"data:image/png;base64,{b64_str}"
+
+        # If this signatory has no stamp, search if a default stamp exists for this operating unit
+        if self.operating_unit_id:
+            parent_sig = self.search([
+                ('active', '=', True),
+                ('operating_unit_id', '=', self.operating_unit_id.id),
+                ('stamp_image', '!=', False)
+            ], limit=1)
+            if parent_sig and parent_sig.stamp_image:
+                b64_str = parent_sig.stamp_image.decode('utf-8') if isinstance(parent_sig.stamp_image, bytes) else parent_sig.stamp_image
+                return f"data:image/png;base64,{b64_str}"
+
+        # Search default head office stamp
+        ho_sig = self.search([
+            ('active', '=', True),
+            ('org_level', '=', 'head_office'),
+            ('stamp_image', '!=', False)
+        ], limit=1)
+        if ho_sig and ho_sig.stamp_image:
+            b64_str = ho_sig.stamp_image.decode('utf-8') if isinstance(ho_sig.stamp_image, bytes) else ho_sig.stamp_image
+            return f"data:image/png;base64,{b64_str}"
+
+        return ""
+
+    def has_separate_signature_and_stamp(self):
+        """Returns True if this signatory config has separate signature or stamp images."""
+        self.ensure_one()
+        return bool(self.signature_image or self.stamp_image)
+
+    def get_letter_signature_data(self):
+        """Returns a comprehensive dict with signature, stamp, and layout options for all letter reports."""
+        self.ensure_one()
+        sig_b64 = self.get_signature_base64()
+        stamp_b64 = self.get_stamp_base64()
+        legacy_b64 = self.get_signature_stamp_base64()
+        has_split = bool(sig_b64 or stamp_b64)
+        return {
+            'has_split': has_split,
+            'signature_b64': sig_b64,
+            'stamp_b64': stamp_b64,
+            'legacy_b64': legacy_b64 if not has_split else '',
+            'stamp_position': self.stamp_position or 'right',
+            'signatory_name': self.signatory_name or '',
+            'signatory_title': self.signatory_title or '',
+            'signatory_company': self.signatory_company or 'Bunna Bank S.C.',
+        }
+
     def get_signature_stamp_base64(self):
         """
-        Returns the Base64 data URI of the signature and stamp image.
-        Falls back to bunna_bank_official_logo.png or static default if none uploaded.
+        Returns the Base64 data URI of the legacy combined image or fallback.
         """
         self.ensure_one()
         if self.signature_stamp_image:
             b64_str = self.signature_stamp_image.decode('utf-8') if isinstance(self.signature_stamp_image, bytes) else self.signature_stamp_image
             return f"data:image/png;base64,{b64_str}"
+
+        if self.signature_image and not self.stamp_image:
+            return self.get_signature_base64()
 
         # Fallback to static asset
         static_path = os.path.abspath(
@@ -339,3 +424,22 @@ class RecruitmentSignatoryConfig(models.Model):
             with open(static_path, 'rb') as f:
                 return f"data:image/png;base64,{base64.b64encode(f.read()).decode('utf-8')}"
         return ""
+
+    @api.model
+    def get_active_letter_signature_data(self, doc_type='all', work_unit=None, department=None):
+        """Direct helper to retrieve structured signature and stamp data dictionary for any letter report."""
+        sig = self.get_active_signatory(doc_type=doc_type, work_unit=work_unit, department=department)
+        if sig:
+            return sig.get_letter_signature_data()
+
+        legacy_b64 = self.get_active_signature_stamp_base64(doc_type=doc_type, work_unit=work_unit, department=department)
+        return {
+            'has_split': False,
+            'signature_b64': '',
+            'stamp_b64': '',
+            'legacy_b64': legacy_b64,
+            'stamp_position': 'right',
+            'signatory_name': self.signatory_name if hasattr(self, 'signatory_name') and self.signatory_name else 'Abayneh Markos',
+            'signatory_title': self.signatory_title if hasattr(self, 'signatory_title') and self.signatory_title else 'People Operation Management Directorate',
+            'signatory_company': self.signatory_company if hasattr(self, 'signatory_company') and self.signatory_company else 'Bunna Bank S.C.',
+        }

@@ -1,10 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
-    <!-- Replace Company Name with Logged-in User Name in top navbar pill -->
+    <!-- Show Logged-in User Full Name in top-right navbar inside UserMenu -->
+    <t t-inherit="web.UserMenu" t-inherit-mode="extension">
+        <xpath expr="//button" position="attributes">
+            <attribute name="class">py-1 py-lg-0 d-flex align-items-center text-white border-0 bg-transparent</attribute>
+        </xpath>
+        <xpath expr="//small[hasclass('oe_topbar_name')]" position="replace">
+            <span class="oe_topbar_name d-inline-block text-white fw-bold ms-2 align-middle text-truncate" style="max-width: 250px; font-size: 13.5px;" t-esc="userName"/>
+        </xpath>
+    </t>
+
+    <!-- Hide SwitchCompanyMenu completely so it does not display a disabled company pill -->
     <t t-inherit="web.SwitchCompanyMenu" t-inherit-mode="extension">
-        <xpath expr="//span[hasclass('oe_topbar_name')]" position="replace">
-            <span class="oe_topbar_name d-none d-lg-block text-truncate" t-esc="user.name"/>
+        <xpath expr="//div[hasclass('o_switch_company_menu')]" position="attributes">
+            <attribute name="class">o_switch_company_menu d-none</attribute>
         </xpath>
     </t>
 

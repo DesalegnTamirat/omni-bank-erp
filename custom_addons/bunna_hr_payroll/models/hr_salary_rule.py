@@ -181,33 +181,86 @@ class HrSalaryRule(models.Model):
     # Standalone Payroll Accounting fields (Independent of core Odoo account module)
     account_debit = fields.Many2one(
         'hr.payroll.account',
-        string='Debit Account',
-        domain="[('account_type', 'in', ('debit', 'both'))]",
-        help="Debit / Expense account for this salary rule."
+        string='Debit Account (Conventional)',
+        domain="[('account_type', 'in', ('debit', 'both')), '|', ('banking_type', '=', False), ('banking_type', 'in', ('conventional', 'both'))]",
+        help="Debit / Expense account for Conventional operating units (or both if shared)."
     )
     account_credit = fields.Many2one(
         'hr.payroll.account',
-        string='Credit Account',
-        domain="[('account_type', 'in', ('credit', 'both'))]",
-        help="Credit / Liability account for this salary rule."
+        string='Credit Account (Conventional)',
+        domain="[('account_type', 'in', ('credit', 'both')), '|', ('banking_type', '=', False), ('banking_type', 'in', ('conventional', 'both'))]",
+        help="Credit / Liability account for Conventional operating units (or both if shared)."
+    )
+    account_debit_ifb = fields.Many2one(
+        'hr.payroll.account',
+        string='Debit Account (IFB)',
+        domain="[('account_type', 'in', ('debit', 'both')), '|', ('banking_type', '=', False), ('banking_type', 'in', ('ifb', 'both'))]",
+        help="Debit / Expense account for Interest-Free Banking (IFB) operating units. If not set, falls back to Conventional / shared account."
+    )
+    account_credit_ifb = fields.Many2one(
+        'hr.payroll.account',
+        string='Credit Account (IFB)',
+        domain="[('account_type', 'in', ('credit', 'both')), '|', ('banking_type', '=', False), ('banking_type', 'in', ('ifb', 'both'))]",
+        help="Credit / Liability account for Interest-Free Banking (IFB) operating units. If not set, falls back to Conventional / shared account."
     )
     analytic_account_id = fields.Many2one('hr.payroll.analytic.account', string='Analytic Account')
     account_tax_id = fields.Many2one('hr.payroll.tax', string='Tax')
 
-
-
-
-    @api.constrains('account_debit', 'account_credit')
+    @api.constrains('account_debit', 'account_credit', 'account_debit_ifb', 'account_credit_ifb')
     def _check_account_debit_credit(self):
         for rule in self:
             if rule.account_debit and rule.account_debit.account_type not in ('debit', 'both'):
                 raise ValidationError(_(
-                    "Debit Account '%s' on rule '%s' must have Account Type 'Debit / Expense' or 'Debit & Credit'."
+                    "Conventional Debit Account '%s' on rule '%s' must have Account Type 'Debit / Expense' or 'Debit & Credit'."
                 ) % (rule.account_debit.display_name, rule.name))
             if rule.account_credit and rule.account_credit.account_type not in ('credit', 'both'):
                 raise ValidationError(_(
-                    "Credit Account '%s' on rule '%s' must have Account Type 'Credit / Liability' or 'Debit & Credit'."
+                    "Conventional Credit Account '%s' on rule '%s' must have Account Type 'Credit / Liability' or 'Debit & Credit'."
                 ) % (rule.account_credit.display_name, rule.name))
+            if rule.account_debit_ifb and rule.account_debit_ifb.account_type not in ('debit', 'both'):
+                raise ValidationError(_(
+                    "IFB Debit Account '%s' on rule '%s' must have Account Type 'Debit / Expense' or 'Debit & Credit'."
+                ) % (rule.account_debit_ifb.display_name, rule.name))
+            if rule.account_credit_ifb and rule.account_credit_ifb.account_type not in ('credit', 'both'):
+                raise ValidationError(_(
+                    "IFB Credit Account '%s' on rule '%s' must have Account Type 'Credit / Liability' or 'Debit & Credit'."
+                ) % (rule.account_credit_ifb.display_name, rule.name))
+
+    def get_rule_account_debit(self, is_ifb=False):
+        """Return the appropriate debit account for this salary rule based on operating unit IFB flag."""
+        self.ensure_one()
+        if is_ifb:
+            if self.account_debit_ifb:
+                return self.account_debit_ifb
+            # Fallback to conventional if not strictly restricted to conventional
+            if self.account_debit and (not self.account_debit.banking_type or self.account_debit.banking_type in ('both', 'ifb')):
+                return self.account_debit
+            return self.account_debit
+        else:
+            if self.account_debit:
+                return self.account_debit
+            # Fallback to IFB account if it can be used by both
+            if self.account_debit_ifb and (not self.account_debit_ifb.banking_type or self.account_debit_ifb.banking_type in ('both', 'conventional')):
+                return self.account_debit_ifb
+            return self.account_debit_ifb or self.account_debit
+
+    def get_rule_account_credit(self, is_ifb=False):
+        """Return the appropriate credit account for this salary rule based on operating unit IFB flag."""
+        self.ensure_one()
+        if is_ifb:
+            if self.account_credit_ifb:
+                return self.account_credit_ifb
+            # Fallback to conventional if not strictly restricted to conventional
+            if self.account_credit and (not self.account_credit.banking_type or self.account_credit.banking_type in ('both', 'ifb')):
+                return self.account_credit
+            return self.account_credit
+        else:
+            if self.account_credit:
+                return self.account_credit
+            # Fallback to IFB account if it can be used by both
+            if self.account_credit_ifb and (not self.account_credit_ifb.banking_type or self.account_credit_ifb.banking_type in ('both', 'conventional')):
+                return self.account_credit_ifb
+            return self.account_credit_ifb or self.account_credit
 
     def approve(self):
         return True

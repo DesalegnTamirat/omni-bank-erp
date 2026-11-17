@@ -91,11 +91,33 @@
         </field>
     </record>
 
+    <!-- Search View: Transfer Assessment Records -->
+    <record id="view_transfer_assessment_record_search" model="ir.ui.view">
+        <field name="name">transfer.assessment.record.search</field>
+        <field name="model">transfer.assessment.record</field>
+        <field name="arch" type="xml">
+            <search string="Search Transfer Assessments">
+                <field name="name" string="Assessment Reference"/>
+                <field name="employee_id" string="Applicant Employee"/>
+                <field name="employee_code" string="Employee ID"/>
+                <field name="target_job_id" string="Target Position"/>
+                <field name="state" string="Status"/>
+                <group>
+                    <filter name="group_by_target_job" string="Target Position" context="{'group_by': 'target_job_id'}"/>
+                    <filter name="group_by_employee" string="Employee" context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <!-- Action: Transfer Assessments -->
     <record id="action_transfer_assessment_records" model="ir.actions.act_window">
         <field name="name">Transfer Assessments</field>
         <field name="res_model">transfer.assessment.record</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_transfer_assessment_record_search"/>
+        <field name="context">{'search_default_group_by_target_job': 1}</field>
     </record>
 
 </odoo>

@@ -23,12 +23,12 @@
                         </group>
                         <notebook>
                             <page string="Assessment Components Catalog" name="components">
-                                <div class="alert alert-info py-2 px-3 mb-3">
+                                <div class="alert alert-info py-2 px-3 mb-3" role="alert">
                                     <i class="fa fa-info-circle me-1" role="img" aria-label="Info"/>
                                     <strong>Assessment Components Catalog:</strong> Define the assessment criteria utilized across the bank for succession evaluations (e.g., Written Exam, Interview, Performance Appraisal, Competency Assessment).
                                     Weights (%), maximum scores, and exemptions (N/A) are configured directly in each candidate's <strong>Assessment &amp; Exam Plan</strong> for 100% role flexibility.
                                 </div>
-                                <field name="component_ids">
+                                <field name="component_ids" context="{'active_test': False}">
                                     <list editable="bottom">
                                         <field name="sequence" widget="handle"/>
                                         <field name="name" string="Assessment Component"/>
@@ -58,6 +58,7 @@ action = {
     'res_model': 'succession.assessment.config',
     'res_id': cfg.id,
     'view_mode': 'form',
+    'context': {'active_test': False},
     'views': [(False, 'form')],
     'target': 'current',
 }

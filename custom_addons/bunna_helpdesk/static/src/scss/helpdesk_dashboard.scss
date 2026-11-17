@@ -420,6 +420,161 @@ $bunna-secondary-pine: #1E2917;      /* Swatch 5: C:73 M:56 Y:81 K:73 | R:30 G:4
             &.card-cust-type { --kpi-color: #425727; --kpi-bg: rgba(66, 87, 39, 0.1); }
             &.card-csat { --kpi-color: #425727; --kpi-bg: rgba(66, 87, 39, 0.1); }
             &.card-hours { --kpi-color: #1E2917; --kpi-bg: rgba(30, 41, 23, 0.1); }
+
+            /* Combined Status List Card */
+            &.card-combined-status {
+                grid-column: span 2;
+                padding: 0.85rem 1rem;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                cursor: default;
+
+                &::before {
+                    width: 4px;
+                    background: linear-gradient(180deg, #541718 0%, #C17540 50%, #726732 100%);
+                }
+
+                &:hover {
+                    transform: none;
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+                    border-color: #e5e9e5;
+                }
+
+                .kpi-combined-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding-bottom: 0.45rem;
+                    margin-bottom: 0.5rem;
+                    border-bottom: 1px solid #edf2ed;
+
+                    .header-left {
+                        font-size: 0.85rem;
+                        font-weight: 700;
+                        color: #1D2B32;
+                        display: flex;
+                        align-items: center;
+
+                        i {
+                            color: #541718;
+                        }
+                    }
+
+                    .badge-live {
+                        font-size: 0.65rem;
+                        font-weight: 700;
+                        padding: 0.15rem 0.5rem;
+                        border-radius: 4px;
+                        background: rgba(66, 87, 39, 0.12);
+                        color: #425727;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+                }
+
+                .kpi-list-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.4rem;
+                    max-height: 220px;
+                    overflow-y: auto;
+                    padding-right: 4px;
+
+                    &::-webkit-scrollbar {
+                        width: 4px;
+                    }
+                    &::-webkit-scrollbar-thumb {
+                        background: #d4ded4;
+                        border-radius: 4px;
+                    }
+                }
+
+                .kpi-list-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 0.35rem 0.6rem;
+                    border-radius: 6px;
+                    background: #fbfdfb;
+                    border: 1px solid #f0f4f0;
+                    cursor: pointer;
+                    transition: all 0.18s ease;
+
+                    &:hover {
+                        background: #f4f8f4;
+                        transform: translateX(3px);
+                    }
+
+                    .kpi-item-left {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.6rem;
+                    }
+
+                    .kpi-mini-icon {
+                        width: 28px;
+                        height: 28px;
+                        border-radius: 6px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 0.85rem;
+                    }
+
+                    .kpi-item-text {
+                        display: flex;
+                        flex-direction: column;
+
+                        .kpi-item-title {
+                            font-size: 0.8rem;
+                            font-weight: 600;
+                            color: #2c3e50;
+                            line-height: 1.2;
+                        }
+
+                        .kpi-item-sub {
+                            font-size: 0.68rem;
+                            color: #8c9ba5;
+                            line-height: 1.1;
+                        }
+                    }
+
+                    .kpi-list-badge {
+                        font-size: 0.95rem;
+                        font-weight: 700;
+                        padding: 0.15rem 0.6rem;
+                        border-radius: 12px;
+                        min-width: 32px;
+                        text-align: center;
+                    }
+
+                    &.item-total {
+                        .kpi-mini-icon { background: rgba(29, 43, 50, 0.1); color: #1D2B32; }
+                        .kpi-list-badge { background: rgba(29, 43, 50, 0.08); color: #1D2B32; }
+                        &:hover { border-color: #1D2B32; }
+                    }
+                    &.item-open {
+                        .kpi-mini-icon { background: rgba(84, 23, 24, 0.1); color: #541718; }
+                        .kpi-list-badge { background: rgba(84, 23, 24, 0.1); color: #541718; }
+                        &:hover { border-color: #541718; }
+                    }
+                    &.item-unassigned {
+                        .kpi-mini-icon { background: rgba(193, 117, 64, 0.12); color: #C17540; }
+                        .kpi-list-badge { background: rgba(193, 117, 64, 0.12); color: #C17540; }
+                        &:hover { border-color: #C17540; }
+                    }
+                    &.item-unattended {
+                        .kpi-mini-icon { background: rgba(114, 103, 50, 0.12); color: #726732; }
+                        .kpi-list-badge { background: rgba(114, 103, 50, 0.12); color: #726732; }
+                        &:hover { border-color: #726732; }
+                    }
+                }
+
+                @media (max-width: 768px) {
+                    grid-column: span 1;
+                }
+            }
         }
     }
 
@@ -495,35 +650,502 @@ $bunna-secondary-pine: #1E2917;      /* Swatch 5: C:73 M:56 Y:81 K:73 | R:30 G:4
             }
         }
     }
-}
 
-/* Ensure duplicate team cards are completely removed from the dashboard */
-.o_kanban_renderer.o_helpdesk_dashboard_view,
-.o_kanban_view[class*="helpdesk"],
-.o_helpdesk_dashboard_kanban {
-    .o_kanban_record:not(.bunna-kpi-card):not(.bunna-panel),
-    .o_kanban_group {
-        display: none !important;
+    /* ==========================================================================
+       Role-Tailored Status & Channel Cards for Helpdesk Dashboard Matrix
+       ========================================================================== */
+    /* Role Switcher in Banner */
+    .role-view-switch-group {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 2px 6px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+
+        .role-switch-label {
+            font-size: 0.75rem;
+            color: #f3d7c5;
+            font-weight: 500;
+        }
+
+        .btn-bunna-active {
+            background-color: #c17540 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            border: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
+
+        .btn-bunna-subtle {
+            background-color: transparent;
+            color: #f3d7c5;
+            border: none;
+            font-weight: 500;
+
+            &:hover {
+                color: #ffffff;
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+        }
+    }
+
+    /* Status Cards Grid */
+    .status-cards-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+        gap: 0.65rem;
+
+        .status-stat-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 0.75rem 0.85rem;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+
+            &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            }
+
+            .stat-top {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 0.35rem;
+
+                .stat-icon {
+                    font-size: 1.1rem;
+                    opacity: 0.85;
+                }
+
+                .stat-val {
+                    font-size: 1.45rem;
+                    font-weight: 700;
+                    color: #1D2B32;
+                    line-height: 1;
+                }
+            }
+
+            .stat-label {
+                font-size: 0.72rem;
+                font-weight: 600;
+                color: #64748b;
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+            }
+
+            &.card-status-total {
+                border-top: 3.5px solid #1D2B32;
+                .stat-icon { color: #1D2B32; }
+            }
+            &.card-status-reopen {
+                border-top: 3.5px solid #726732;
+                .stat-icon { color: #726732; }
+            }
+            &.card-status-unassigned {
+                border-top: 3.5px solid #6C757D;
+                .stat-icon { color: #6C757D; }
+            }
+            &.card-status-escalated {
+                border-top: 3.5px solid #DC3545;
+                .stat-icon { color: #DC3545; }
+                .stat-val { color: #DC3545; }
+            }
+            &.card-status-pending {
+                border-top: 3.5px solid #C17540;
+                .stat-icon { color: #C17540; }
+            }
+            &.card-status-new {
+                border-top: 3.5px solid #1877F2;
+                .stat-icon { color: #1877F2; }
+            }
+            &.card-status-resolved {
+                border-top: 3.5px solid #425727;
+                .stat-icon { color: #425727; }
+                .stat-val { color: #425727; }
+            }
+            &.card-status-closed {
+                border-top: 3.5px solid #541718;
+                .stat-icon { color: #541718; }
+            }
+            &.card-status-rejected {
+                border-top: 3.5px solid #842029;
+                .stat-icon { color: #842029; }
+            }
+        }
+    }
+
+    /* Channel Cards Grid */
+    .channels-cards-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+        gap: 0.65rem;
+
+        .channel-card {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #ffffff;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            padding: 0.6rem 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+            &:hover {
+                transform: translateY(-2px);
+                border-color: #cbd5e1;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            }
+
+            .channel-icon-wrap {
+                font-size: 1.35rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 32px;
+                height: 32px;
+                border-radius: 6px;
+                background: #f8fafc;
+            }
+
+            .channel-info {
+                display: flex;
+                flex-direction: column;
+                min-width: 0;
+
+                .channel-name {
+                    font-size: 0.74rem;
+                    font-weight: 500;
+                    color: #64748b;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .channel-count {
+                    font-size: 1.15rem;
+                    font-weight: 700;
+                    color: #1D2B32;
+                    line-height: 1.1;
+                }
+            }
+        }
+    }
+
+    /* --- Side-by-Side Overview Cards (Ticket Overview & Omnichannel Inflow) --- */
+    .bunna-overview-row {
+        padding: 0 1.25rem;
+
+        .bunna-overview-card {
+            background: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #eef2f6;
+            padding: 1rem 1.25rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+
+            /* Left Accent Border matching Screenshot 1 */
+            border-left: 4px solid #541718;
+
+            .overview-card-header {
+                padding-bottom: 0.65rem;
+                margin-bottom: 0.75rem;
+                border-bottom: 1px solid #f1f5f9;
+
+                .header-left {
+                    .overview-title {
+                        font-size: 0.95rem;
+                        font-weight: 700;
+                        color: #1D2B32;
+                    }
+                }
+
+                .badge-live {
+                    font-size: 0.65rem;
+                    font-weight: 700;
+                    padding: 0.2rem 0.55rem;
+                    border-radius: 4px;
+                    background: rgba(66, 87, 39, 0.12);
+                    color: #425727;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    display: inline-block;
+                }
+            }
+
+            .overview-list-group {
+                display: flex;
+                flex-direction: column;
+                gap: 0.45rem;
+                max-height: 295px;
+                overflow-y: auto;
+                padding-right: 4px;
+
+                /* Sleek Custom Scrollbar */
+                &::-webkit-scrollbar {
+                    width: 5px;
+                }
+                &::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 4px;
+                }
+                &::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+
+                .overview-list-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 0.45rem 0.75rem;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    border: 1px solid #eef2f6;
+                    cursor: pointer;
+                    transition: all 0.18s ease-in-out;
+
+                    &:hover {
+                        background: #f8fafc;
+                        border-color: #cbd5e1;
+                        transform: translateX(2px);
+                    }
+
+                    .item-left {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.75rem;
+                        min-width: 0;
+
+                        .item-icon-box {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 6px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 0.9rem;
+                            flex-shrink: 0;
+
+                            &.box-total { background: rgba(29, 43, 50, 0.08); color: #1D2B32; }
+                            &.box-reopen { background: rgba(114, 103, 50, 0.1); color: #726732; }
+                            &.box-unassigned { background: rgba(193, 117, 64, 0.12); color: #C17540; }
+                            &.box-escalated { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
+                            &.box-inprogress { background: rgba(13, 202, 240, 0.12); color: #087990; }
+                            &.box-pending { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+                            &.box-new { background: rgba(13, 110, 253, 0.1); color: #0d6efd; }
+                            &.box-resolved { background: rgba(25, 135, 84, 0.1); color: #198754; }
+                            &.box-closed { background: rgba(84, 23, 24, 0.1); color: #541718; }
+                            &.box-rejected { background: rgba(132, 32, 41, 0.1); color: #842029; }
+                        }
+
+                        .item-text {
+                            display: flex;
+                            flex-direction: column;
+                            min-width: 0;
+
+                            .item-title {
+                                font-size: 0.82rem;
+                                font-weight: 600;
+                                color: #1e293b;
+                                line-height: 1.25;
+                                white-space: nowrap;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                            }
+
+                            .item-subtitle {
+                                font-size: 0.68rem;
+                                color: #64748b;
+                                line-height: 1.15;
+                                white-space: nowrap;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                            }
+                        }
+                    }
+
+                    /* Rounded Pill Badge for Status Items */
+                    .item-badge {
+                        font-size: 0.95rem;
+                        font-weight: 700;
+                        padding: 0.15rem 0.65rem;
+                        border-radius: 12px;
+                        min-width: 36px;
+                        text-align: center;
+                        flex-shrink: 0;
+
+                        &.badge-total { background: #f1f5f9; color: #1e293b; }
+                        &.badge-reopen { background: #fef9c3; color: #854d0e; }
+                        &.badge-unassigned { background: #ffedd5; color: #9a3412; }
+                        &.badge-escalated { background: #fee2e2; color: #991b1b; }
+                        &.badge-inprogress { background: #cff4fc; color: #055160; }
+                        &.badge-pending { background: #fef3c7; color: #b45309; }
+                        &.badge-new { background: #dbeafe; color: #1e40af; }
+                        &.badge-resolved { background: #dcfce7; color: #166534; }
+                        &.badge-closed { background: #f1f5f9; color: #475569; }
+                        &.badge-rejected { background: #fee2e2; color: #991b1b; }
+                    }
+
+                    /* Plain Bold Number for Channel Counts matching Screenshot 1 */
+                    .item-channel-count {
+                        font-size: 0.95rem;
+                        font-weight: 700;
+                        color: #1e293b;
+                        min-width: 28px;
+                        text-align: right;
+                        padding-right: 0.35rem;
+                        flex-shrink: 0;
+                    }
+                }
+            }
+        }
+    }
+
+    /* ==========================================================================
+       Dashboard Alert Cards: Critical / Urgent Tickets & SLA Breached Analysis
+       ========================================================================== */
+    .bunna-panel, .bunna-dashboard-card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        position: relative;
+        overflow: hidden;
+        transition: all 0.2s ease-in-out;
+
+        &:hover {
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+        }
+
+        .panel-header {
+            .critical-icon-box {
+                width: 34px;
+                height: 34px;
+                border-radius: 8px;
+                background: linear-gradient(135deg, #dc3545 0%, #a71d2a 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 6px rgba(220, 53, 69, 0.28);
+                font-size: 0.95rem;
+            }
+
+            .sla-icon-box {
+                width: 34px;
+                height: 34px;
+                border-radius: 8px;
+                background: linear-gradient(135deg, #541718 0%, #3a0d0e 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 6px rgba(84, 23, 24, 0.28);
+                font-size: 0.95rem;
+            }
+        }
+
+        &.bunna-critical-card {
+            border-left: 5px solid #dc3545;
+
+            .table-responsive {
+                border-radius: 8px;
+                overflow: hidden;
+                border: 1px solid #f1f5f9;
+            }
+
+            .table {
+                thead th {
+                    background-color: #f8fafc;
+                    color: #475569;
+                    font-weight: 600;
+                    border-bottom: 2px solid #e2e8f0;
+                    padding: 0.65rem 0.85rem;
+                    font-size: 0.8rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                }
+
+                tbody tr {
+                    transition: background-color 0.15s ease, transform 0.1s ease;
+
+                    &:hover {
+                        background-color: #f8fafc;
+                    }
+
+                    td {
+                        padding: 0.65rem 0.85rem;
+                        vertical-align: middle;
+                        border-bottom: 1px solid #f1f5f9;
+                    }
+                }
+            }
+        }
+
+        &.bunna-sla-breached-card {
+            border-left: 5px solid #541718;
+
+            .sla-subcard {
+                background: #fbfdfb;
+                border: 1px solid #eef2f6;
+                border-radius: 10px;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+                transition: all 0.2s ease;
+
+                &:hover {
+                    background: #ffffff;
+                    border-color: #cbd5e1;
+                    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+                }
+
+                .sla-subcard-header {
+                    font-size: 0.86rem;
+                    font-weight: 700;
+                    padding-bottom: 0.5rem;
+                    margin-bottom: 0.5rem;
+                    border-bottom: 1px solid #edf2ed;
+                }
+
+                .sla-item-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 0.45rem 0.65rem;
+                    border-radius: 6px;
+                    font-size: 0.83rem;
+                    border-bottom: 1px solid #f8fafc;
+                    transition: all 0.15s ease;
+
+                    &:last-child {
+                        border-bottom: none;
+                    }
+
+                    &:hover {
+                        background: rgba(84, 23, 24, 0.05);
+                        transform: translateX(2px);
+                    }
+                }
+            }
+        }
     }
 }
 
-/* Remove the top control panel bar (Dashboard breadcrumb, Search bar, Pager, View switchers) on Dashboard */
-.o_helpdesk_dashboard_kanban,
-.o_kanban_view[class*="helpdesk"]:has(.o_bunna_helpdesk_dashboard),
-.o_action_manager:has(.o_bunna_helpdesk_dashboard) {
-    > .o_control_panel,
-    .o_control_panel {
-        display: none !important;
+// ── Critical/Urgent KPI cards ──────────────────────────────────────────────
+.critical-kpi-box {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    border-radius: 8px !important;
+    user-select: none;
+
+    &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+    }
+
+    &:active {
+        transform: translateY(0);
     }
 }
-
-/* Ensure parents allow position: sticky to stick to .o_content */
-.o_kanban_view.o_helpdesk_dashboard_kanban,
-.o_kanban_view[class*="helpdesk"]:has(.o_bunna_helpdesk_dashboard) {
-    overflow: visible !important;
-
-    .o_kanban_renderer {
-        overflow: visible !important;
-    }
-}
-

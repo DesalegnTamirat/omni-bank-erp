@@ -1,75 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- LIST VIEW -->
-        <record id="view_succession_ninebox_cell_tree" model="ir.ui.view">
-            <field name="name">succession.ninebox.cell.list</field>
-            <field name="model">succession.ninebox.cell</field>
+
+        <!-- UNIFIED 9-BOX MATRIX CONFIGURATION FORM -->
+        <record id="view_succession_ninebox_configuration_form" model="ir.ui.view">
+            <field name="name">succession.ninebox.configuration.form</field>
+            <field name="model">succession.ninebox.configuration</field>
             <field name="arch" type="xml">
-                <list string="9-Box Grid Cell Definitions" editable="bottom">
-                    <field name="potential_rating"/>
-                    <field name="performance_rating"/>
-                    <field name="criteria_display" class="fw-bold text-primary"/>
-                    <field name="name" string="Cell Label"/>
-                    <field name="tier_color" widget="badge"
-                           decoration-success="tier_color == 'gold'"
-                           decoration-info="tier_color == 'teal'"
-                           decoration-danger="tier_color == 'brick'"/>
-                    <field name="priority" widget="badge"
-                           decoration-danger="priority in ('critical','urgent')"
-                           decoration-warning="priority == 'high'"
-                           decoration-muted="priority == 'low'"/>
-                    <field name="is_high_potential"/>
-                    <field name="is_watchlist"/>
-                    <field name="description" string="Recommended HR Action"/>
-                </list>
+                <form string="9-Box Matrix Configuration" create="false" delete="false">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="name" readonly="1"/></h1>
+                        </div>
+
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="status">
+                            <i class="fa fa-info-circle me-2 fs-5" title="Information"/>
+                            <div>
+                                Configure the <strong>PMS Appraisal Score</strong> qualifying boundaries (min/max) and <strong>Competency Match (%)</strong> qualifying boundaries (min/max) for each of the 9 matrix cells. Candidates automatically qualify and appear in their respective grid cells according to these configured thresholds.
+                            </div>
+                        </div>
+
+                        <field name="cell_ids" mode="list">
+                            <list string="9-Box Grid Cells" create="false" delete="false" editable="bottom">
+                                <field name="sequence" widget="handle"/>
+                                <field name="potential_rating" string="Potential Level (Y-Axis)" class="fw-bold"/>
+                                <field name="performance_rating" string="Performance Level (X-Axis)" class="fw-bold"/>
+                                <field name="name" string="Cell Display Label" class="fw-bold text-primary"/>
+                                <field name="min_pms_score" string="Min PMS Score"/>
+                                <field name="max_pms_score" string="Max PMS Score"/>
+                                <field name="min_potential_match" string="Min Competency Match (%)"/>
+                                <field name="max_potential_match" string="Max Competency Match (%)"/>
+                                <field name="tier_color" string="Color Tier"/>
+                                <field name="description" string="Recommended HR Strategy &amp; Guidance"/>
+                            </list>
+                        </field>
+                    </sheet>
+                </form>
             </field>
         </record>
 
-        <!-- FORM VIEW -->
+        <!-- STANDALONE FORM VIEW FOR INDIVIDUAL CELL (FULLY EDITABLE) -->
         <record id="view_succession_ninebox_cell_form" model="ir.ui.view">
             <field name="name">succession.ninebox.cell.form</field>
             <field name="model">succession.ninebox.cell</field>
             <field name="arch" type="xml">
-                <form string="9-Box Cell Definition">
+                <form string="9-Box Matrix Cell Configuration">
                     <sheet>
                         <div class="oe_title">
-                            <label for="name" class="oe_edit_only"/>
+                            <label for="name" string="Cell Display Label (Shown on Grid)"/>
                             <h1><field name="name" placeholder="e.g. Star Performer"/></h1>
                         </div>
+
                         <group>
-                            <group string="Grid Position">
-                                <field name="performance_rating"/>
-                                <field name="potential_rating"/>
+                            <group string="Matrix Positioning (Grid Coordinates)">
+                                <field name="sequence"/>
+                                <field name="potential_rating" string="Potential Level (Y-Axis)"/>
+                                <field name="performance_rating" string="Performance Level (X-Axis)"/>
+                                <field name="tier_color" string="Color Tier"/>
                             </group>
-                            <group string="Classification &amp; Formatting">
-                                <field name="tier_color"/>
-                                <field name="priority"/>
-                                <field name="is_high_potential"/>
-                                <field name="is_watchlist"/>
+                            <group string="Score &amp; Match Qualification Ranges">
+                                <label for="min_pms_score" string="PMS Appraisal Score Range"/>
+                                <div class="o_row">
+                                    <field name="min_pms_score" class="oe_inline"/>
+                                    <span> to </span>
+                                    <field name="max_pms_score" class="oe_inline"/>
+                                </div>
+                                <label for="min_potential_match" string="Competency Match (%) Range"/>
+                                <div class="o_row">
+                                    <field name="min_potential_match" class="oe_inline"/>
+                                    <span>% to </span>
+                                    <field name="max_potential_match" class="oe_inline"/>
+                                    <span>%</span>
+                                </div>
                             </group>
                         </group>
-                        <group string="Recommended HR Intervention / Action">
-                            <field name="description" placeholder="Describe recommended development interventions or HR actions for candidates falling in this box..."/>
+
+                        <group string="Recommended HR Strategy &amp; Guidance">
+                            <field name="description" placeholder="Specify recommended career pathing, development, or retention actions for candidates in this box (shown on grid tooltip)..."/>
                         </group>
                     </sheet>
                 </form>
             </field>
         </record>
 
-        <!-- ACTION -->
-        <record id="action_succession_ninebox_cell" model="ir.actions.act_window">
-            <field name="name">9-Box Grid Cell Definitions</field>
-            <field name="res_model">succession.ninebox.cell</field>
-            <field name="view_mode">list,form</field>
-            <field name="help" type="html">
-                <p class="o_view_nocontent_smiling_face">
-                    Configure the 9-Box Grid Cell Definitions
-                </p>
-                <p>
-                    Define custom labels, color tiers, priority, and recommended HR actions for each of the 9 matrix intersections.
-                </p>
+        <!-- SERVER ACTION TO OPEN UNIFIED 9-BOX CONFIGURATION DIRECTLY -->
+        <record id="action_succession_ninebox_configuration" model="ir.actions.server">
+            <field name="name">9-Box Matrix Configuration</field>
+            <field name="model_id" ref="model_succession_ninebox_configuration"/>
+            <field name="state">code</field>
+            <field name="code">
+config = env['succession.ninebox.configuration'].get_config()
+action = {
+    'type': 'ir.actions.act_window',
+    'name': '9-Box Matrix Configuration',
+    'res_model': 'succession.ninebox.configuration',
+    'res_id': config.id,
+    'view_mode': 'form',
+    'target': 'current',
+}
             </field>
         </record>
+
+        <!-- ACT_WINDOW ACTION FOR CELL RECORDS -->
+        <record id="action_succession_ninebox_designer" model="ir.actions.act_window">
+            <field name="name">9-Box Matrix Cells</field>
+            <field name="res_model">succession.ninebox.cell</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
     </data>
 </odoo>

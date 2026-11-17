@@ -21,20 +21,22 @@ h1{font-size:16px;margin:0;font-weight:600}
 main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;padding:16px;max-width:1280px;margin:0 auto}
 @media(max-width:900px){main{grid-template-columns:1fr;padding:12px 16px}}
 #pages{display:flex;flex-direction:column;gap:14px;align-items:center;min-width:0}
-.page{position:relative;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.25);width:100%;max-width:820px}
+.page{position:relative;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.25);width:100%;max-width:820px;overflow:hidden}
 .page canvas{display:block;width:100%;height:auto}
 .pn{position:absolute;right:6px;top:4px;font-size:11px;color:#777;background:#fffa;padding:0 4px;border-radius:3px}
 .fsig{position:absolute;display:flex;justify-content:flex-end;align-items:flex-end;pointer-events:none}
 .fsig img{max-width:100%;max-height:100%;display:block}
 .slot{position:absolute;color:#000;font-family:"NotoEth","Nyala",sans-serif;white-space:nowrap;overflow:hidden;cursor:pointer;display:flex;align-items:center}
 .slot.miss{background:var(--req)}
-.slot.ok{background:var(--filled)}
+.slot.ok{background:transparent}
+.slot .v{background:transparent}
 .slot.err{outline:2px solid var(--bad);outline-offset:0}
 .slot .sys{color:var(--sys)}
 .slot .ln{display:flex;white-space:nowrap;align-items:center}
 .slot .ln span{white-space:nowrap}
 .sig{position:absolute;border:1.5px dashed #2a7a2a;background:rgba(93,240,93,.35);display:flex;align-items:center;justify-content:center;color:#155;font:600 11px system-ui;cursor:pointer;text-align:center;overflow:hidden;line-height:1.2}
-.sig.ok{background:transparent;border-color:transparent}
+.sig.ok{background:transparent;border-color:transparent;color:#0a1f6b;font:700 12px system-ui,sans-serif}
+.sig.todo{cursor:pointer}
 .sig.err{outline:2px solid var(--bad)}
 .sig img{max-width:100%;max-height:100%;display:block}
 aside{display:flex;flex-direction:column;gap:12px;min-width:0}
@@ -46,24 +48,43 @@ input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--line);border
 input[type=text][readonly]{opacity:.7}
 input.invalid{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--bg))}
 .msg{color:var(--bad);font-size:12px;min-height:0;margin-top:2px}
-button.p{background:var(--brand);color:#fff;border:0;padding:9px 14px;border-radius:8px;font:inherit;cursor:pointer}
+button.p{background:var(--brand);color:#fff;border:0;padding:9px 14px;border-radius:8px;font:inherit;cursor:pointer;transition:filter .12s,transform .08s,box-shadow .12s}
+button.p:hover{filter:brightness(1.12);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+button.p:active{transform:scale(.96);filter:brightness(.88);box-shadow:none}
+button.p:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+button.p.busy,button.p:disabled{opacity:.75;cursor:progress;pointer-events:none}
+button.p.busy::before{content:"";display:inline-block;width:12px;height:12px;margin-right:8px;vertical-align:-2px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;animation:rslspin .6s linear infinite}
+@keyframes rslspin{to{transform:rotate(360deg)}}
+.sig.todo{transition:filter .12s,transform .08s}
+.sig.todo:hover{filter:brightness(.95);box-shadow:0 0 0 2px #2a7a2a inset}
+.sig.todo:active{transform:scale(.97)}
+.sig.busy{opacity:.6;cursor:progress;pointer-events:none}
 button.s{background:transparent;color:var(--ink);border:1px solid var(--line);padding:7px 12px;border-radius:8px;font:inherit;cursor:pointer}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 ul.st{list-style:none;margin:0;padding:0;font-size:13px}
 ul.st li{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)}
 .good{color:var(--ok)}.bad{color:var(--bad)}
-.files{display:grid;gap:8px;margin-top:10px}
-.file{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px;cursor:pointer}
-.file .th{width:44px;height:44px;border-radius:5px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:11px;overflow:hidden;flex:none}
-.file .th img{width:100%;height:100%;object-fit:cover}
-.file small{color:var(--muted);display:block}
-dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:16px;max-width:min(92vw,720px);width:100%}
-dialog::backdrop{background:#0008}
-#pad{width:100%;height:220px;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:none;display:block}
-#view{width:100%;height:70vh;border:0;background:#fff}
-#view img{max-width:100%}
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:50}
 #toast.on{opacity:1}
+/* ---- printing (approvers / admin): only the contract pages, one per sheet ---- */
+@page{size:letter;margin:0}
+@media print{
+  html,body{background:#fff !important}
+  header,aside,#toast,dialog,.pn{display:none !important}
+  main{display:block !important;padding:0 !important;margin:0 !important;max-width:none !important}
+  #pages{display:block !important;gap:0 !important}
+  /* one letter sheet (8.5in = 816px) per page; the overlay is re-drawn at exactly this width
+     in the beforeprint handler, so nothing is zoomed or shifted */
+  .page{box-shadow:none !important;margin:0 !important;width:815px !important;max-width:none !important;overflow:hidden;
+        break-inside:avoid;page-break-after:always;break-after:page}
+  .page:last-child{page-break-after:auto;break-after:auto}
+  /* the white boxes cover the template's own placeholder text: they MUST be printed,
+     even when the browser's "Background graphics" option is off */
+  .page,.page *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  .slot,.slot.ok{background:#fff !important}
+  .slot .v{background:transparent !important}
+  .sig.todo{display:none !important}
+}
 </style>
 </head>
 <body>
@@ -76,108 +97,50 @@ dialog::backdrop{background:#0008}
   <aside>
     <div class="card" id="formCard"></div>
     <div class="card" id="statusCard"></div>
-    <div class="card" id="upCard"></div>
   </aside>
 </main>
-<dialog id="padDlg">
-  <h2 id="padTitle" style="margin:0 0 8px;font-size:15px">Sign</h2>
-  <canvas id="pad"></canvas>
-  <div class="row" style="margin-top:10px;justify-content:flex-end">
-    <button class="s" id="padClear">Clear</button>
-    <button class="s" id="padCancel">Cancel</button>
-    <button class="p" id="padSave">Save signature</button>
-  </div>
-</dialog>
-<dialog id="viewDlg">
-  <div class="row" style="justify-content:space-between;margin-bottom:8px"><strong id="viewName"></strong><button class="s" id="viewClose">Close</button></div>
-  <div id="view"></div>
-</dialog>
 <div id="toast"></div>
 
 <script src="/web/static/lib/pdfjs/build/pdf.js"></script>
 <script>
 const CFG=/*CONFIG*/null;
 const _PDF = (CFG && CFG.pdf) ? CFG.pdf : {};
-const PAGES = (_PDF.pages && _PDF.pages.length) ? _PDF.pages : [1,2,3,4,5,6].map(n=>"/resl/static/agreement/page"+n+".png");
+const PAGES = (_PDF.pages && _PDF.pages.length) ? _PDF.pages : [1,2,3,4,5].map(n=>"/resl/static/agreement/page"+n+".png");
+const NAMES = (CFG && CFG.names) ? CFG.names : {};
 </script>
 <script>
 (()=>{
 "use strict";
 const $=s=>document.querySelector(s);
-const ETH=/[ሀ-፿]/;
-const DATE_RE=/^[ሀ-፿]+\s+\d{1,2}\s*(ቀን|,)?\s*\d{4}\s*ዓ\.ም$/;
-const PHONE_RE=/^[0-9+\-\s()]{7,}$/;
-const ROLES={requester:"Requester (borrower)",approver:"Bank approver",guarantor:"Guarantor"};
+const ROLES={requester:"Borrower",approver:"Approver",guarantor:"Guarantor"};
+/* "Name (Borrower)" / "Name (Guarantor)" / "Name (Approver)" - shown by name and role */
+const whoName=(r,k)=>{const n=(r==="requester"?NAMES.sig_borrower:(r==="approver"?NAMES.sig_bank_a:((PARTS[k==null?ACTIVE:k]||{}).name)))||"";return n?n+" ("+ROLES[r]+")":ROLES[r]};
 
-/* ---- values supplied by the system (replace with your API data) ---- */
+/* ---- values supplied by the system (amounts) ---- */
 const SYSTEM=CFG.system;
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-/* ---- Part B copies: one per guarantor ---- */
+/* ---- guarantor copies: one per guarantor ---- */
 const PARTS=(CFG.parts&&CFG.parts.length)?CFG.parts:[{lineId:0,name:"",state:"",values:{},sig:"",complete:false,editable:false}];
-const ACTIVE=Math.max(0,PARTS.findIndex(p=>p.editable));   // the copy this user may fill (guarantor only)
+const ACTIVE=Math.max(0,PARTS.findIndex(p=>p.mine||p.editable));   // the copy this user may agree to (guarantor only)
 const BASE=id=>id.replace(/@\d+$/,"");                       // "b_date@1" -> "b_date"
 
-/* ---- inputs ---- */
-const tx=(id,role,label,hint,rule,extra)=>Object.assign({id,role,kind:"text",label,hint,rule},extra||{});
-const sy=(id,role,label,val)=>({id,role,kind:"system",label,value:val});
-const sg=(id,role,label)=>({id,role,kind:"sig",label});
-const rAm=v=>ETH.test(v)?"":"Type in Amharic";
-const rAny=v=>v.trim()?"":"Required";
-const rHave=v=>v.trim()?"":"Required – type any value (e.g. -) if you have none";
-const rDate=v=>DATE_RE.test(v.trim())?"":"Use the format ሀምሌ 27, 2018 ዓ.ም";
-const rStart=v=>DATE_RE.test(v.trim())?"":"Use the format ነሀሴ 26 ቀን 2018 ዓ.ም";
-const rTax=v=>/^-{1,3}$/.test(v.trim())||/^[0-9A-Za-z\-]{6,}$/.test(v.trim())?"":"Tax ID, or - / -- / --- if none";
-const rPhone=v=>PHONE_RE.test(v.trim())?"":"Enter a phone number";
-const INPUTS=[
- tx("a_date","requester","Date","ወር ቀን ዓ.ም — e.g. ሐምሌ 1 ቀን 2016 ዓ.ም",rDate),
- tx("a_name","requester","Borrower name (typed in Amharic)","አቶ/ወ/ሮ [የተበዳሪው ሙሉ ስም]",rAm),
- tx("a_city","requester","City (ከተማ)","ከተማ — e.g. አዲስ አበባ",rHave),
- tx("a_subcity","requester","Sub-city (ክፍለ ከተማ)","ክፍለ ከተማ — e.g. ቦሌ",rHave),
- tx("a_woreda","requester","Woreda (ወረዳ)","ወረዳ — e.g. 05",rHave),
- tx("a_house","requester","House number (ቤት.ቁጥር)","ቤት ቁጥር — e.g. አዲስ / ቁ.123",rHave),
- tx("a_phone","requester","Phone (ቁጥር)","09XX-XX-XX-XX",rPhone),
- tx("a_tax","requester","Tax ID (ግብር ከፋይ መለያ ቁጥር)","ግብር ቁጥር — ከሌለ --- ይፃፉ",rHave),
- tx("a_emp","requester","ID number (መታወቂያ ቁጥር)","የሰራተኛ መ/ቁ — e.g. 0001",rHave),
- sy("a_amt","requester","Loan amount",SYSTEM.amount),
- tx("a_amtw","requester","Amount in words (Art. 6)","የብድሩ መጠን በቃላት (በአማርኛ)",rAm),
- tx("a_start","requester","Payment start date (Art. 7)","የክፍያ ጅምር ቀን — e.g. ጥር 1 ቀን 2017 ዓ.ም",rStart),
- sy("a_inst","requester","Monthly installment",SYSTEM.installment),
- tx("a_instw","requester","Installment in words (Art. 7)","ወርሃዊ ክፍያ በቃላት (በአማርኛ)",rAm),
- sg("sig_borrower","requester","Borrower signature"),
- sg("sig_bank_a","approver","Bank approver signature (loan contract)"),
- sg("sig_bank_b","approver","Bank approver signature (guarantee)"),
-];
-/* Part B fields are created once per guarantor; ids carry "@<copy>" */
-PARTS.forEach((pt,k)=>{
- const q=id=>id+"@"+k,c={copy:k};
- INPUTS.push(
-  tx(q("b_date"),"guarantor","Date","ወር ቀን ዓ.ም — e.g. ሐምሌ 1 ቀን 2016 ዓ.ም",rDate,c),
-  tx(q("b_name"),"guarantor","Guarantor name","አቶ/ወ/ሮ [የዋስትና ሰጪ ሙሉ ስም]",rAm,c),
-  tx(q("b_address"),"guarantor","Address (city, sub-city, woreda)","ከተማ ክፍለ ከተማ ወረዳ — e.g. አ.አ ቦሌ ወረዳ 01",rAm,c),
-  tx(q("b_house"),"guarantor","House number","ቤት ቁጥር — e.g. አዲስ / ቁ.123",rAny,c),
-  tx(q("b_tax"),"guarantor","Tax ID (የግብር ከፋይ መለያ ቁጥር)","ግብር ቁጥር — ከሌለ - ይፃፉ",rTax,c),
-  tx(q("b_emp"),"guarantor","Employee ID (የ.መ.ቁ)","የሰራተኛ መ/ቁ — e.g. 0001",rAny,c),
-  tx(q("b_phone"),"guarantor","Phone","09XX-XX-XX-XX",rPhone,c),
-  sy(q("b_borrower"),"guarantor","Borrower name",()=>(S.values.a_name||"").trim()||SYSTEM.borrower),
-  tx(q("b_bdate"),"guarantor","Date of borrower's agreement","ወር ቀን ዓ.ም — e.g. ሐምሌ 1 ቀን 2016 ዓ.ም",rDate,c),
-  sy(q("b_amt"),"guarantor","Loan amount",SYSTEM.amount),
-  tx(q("b_amtw"),"guarantor","Amount in words","የብድሩ መጠን በቃላት (በአማርኛ)",rAm,c),
-  sg(q("sig_guarantor"),"guarantor","Guarantor signature"),
-  tx(q("b_branch1"),"guarantor","Art. 11 – borrower's branch/directorate","የተበዳሪው ቅርንጫፍ/ዳይሬክቶሬት",rAm,c),
-  tx(q("b_branch2"),"guarantor","Art. 11 – guarantor's branch/directorate","የዋስትና ሰጪው ቅርንጫፍ/ዳይሬክቶሬት",rAm,c));
-});
-INPUTS.forEach(i=>{const m=i.id.match(/@(\d+)$/);if(m)i.copy=+m[1]});
-const BY=Object.fromEntries(INPUTS.map(i=>[i.id,i]));
-const mineHere=i=>i.copy==null||i.copy===ACTIVE;            // inputs shown in the side form
+/* Nothing is typed on this page: every value comes from the server (HR records).
+   The only action is "Agree and continue", which puts "Agreed" where a signature used to be. */
+const FIELDS_A=[["a_date","Agreement date"],["a_name","Name"],["a_city","City"],["a_subcity","Sub-city"],["a_woreda","Woreda"],["a_house","House number"],["a_phone","Phone"],["a_tax","Tax ID"],["a_emp","Employee ID"],["a_amt","Loan amount"],["a_amtw","Amount in words"],["a_start","Payment start date"],["a_inst","Monthly installment"],["a_instw","Installment in words"]];
+const FIELDS_BANK=[["a_name","Borrower"],["a_amt","Loan amount"],["a_amtw","Amount in words"],["a_inst","Monthly installment"]];
+const FIELDS_B=[["b_date","Agreement date"],["b_name","Name"],["b_address","Address"],["b_house","House number"],["b_tax","Tax ID"],["b_emp","Employee ID"],["b_phone","Phone"],["b_borrower","Borrower"],["b_bdate","Borrower's agreement date"],["b_amt","Loan amount"],["b_amtw","Amount in words"],["b_branch1","Borrower's branch"],["b_branch2","Guarantor's branch"]];
+/* where "Agreed" is shown, and who it belongs to */
+const SIGROLE=id=>id==="sig_borrower"?"requester":(id.startsWith("sig_bank")?"approver":"guarantor");
+const copyOf=id=>{const m=id.match(/@(\d+)$/);return m?+m[1]:null};
 
 /* ---- slots: green areas on the PDF (PDF points, origin top-left) ----
-   " " glues a label to its value so they never get separated by a line break. */
-const NB=" ";
+   NB (a no-break space, U+00A0) glues a label to its value so they never get separated by a line break. */
+const NB="\u00a0";
 const SLOTS_A = (_PDF.slots_a && _PDF.slots_a.length) ? _PDF.slots_a : [
  {p:"1",r:[[158,140,257,154]],t:"{a_date}"},
  {p:"1",r:[[258,140,383,154]],t:"{a_name}"},
- {p:"1",r:[[446,140,520,154],[72,156,407,168]],t:"ከተማ"+NB+"{a_city} ክፍለ"+NB+"ከተማ፤"+NB+"{a_subcity} ወረዳ"+NB+"{a_woreda} ቤት.ቁጥር-"+NB+"{a_house} ቁጥር"+NB+"{a_phone}"},
+ {p:"1",r:[[446,140,520,154],[72,156,407,168]],t:"{a_city}"+NB+"ከተማ {a_subcity} ክፍለ"+NB+"ከተማ፤ ወረዳ"+NB+"{a_woreda} ቤት.ቁጥር-"+NB+"{a_house} ቁጥር"+NB+"{a_phone}"},
  {p:"1",r:[[528,156,580,168]],t:"{a_tax}"},
  {p:"1",r:[[248,170,352,183]],t:"መታወቂያ"+NB+"ቁጥር-"+NB+"{a_emp}"},
  {p:"2",r:[[221,122,540,134]],t:"{a_amt} ({a_amtw})"},
@@ -186,15 +149,13 @@ const SLOTS_A = (_PDF.slots_a && _PDF.slots_a.length) ? _PDF.slots_a : [
 const SLOTS_B = (_PDF.slots_b && _PDF.slots_b.length) ? _PDF.slots_b : [
  {p:"4",r:[[135,154,236,168]],t:"{b_date}"},
  {p:"4",r:[[237,154,362,168]],t:"{b_name}"},
- {p:"4",r:[[427,154,540,168],[72,168,257,180]],t:"{b_address} የቤት. ቁጥር {b_house}"},
- {p:"4",r:[[498,168,540,180],[72,180,209,192]],t:"{b_tax}፤ የ.መ.ቁ {b_emp} ፤ስ.ቁጥር {b_phone}"},
+ {p:"4",r:[[427,154,540,168],[72,168,257,180]],t:"{b_city}"+NB+"ከተማ {b_subcity} ክፍለ"+NB+"ከተማ፤ ወረዳ"+NB+"{b_woreda} የቤት."+NB+"ቁጥር"+NB+"{b_house}"},
+ {p:"4",r:[[498,168,540,180]],t:"{b_tax}፤"},
+ {p:"4",r:[[72,180,209,192]],t:"የ.መ.ቁ"+NB+"{b_emp} ፤ስ.ቁጥር"+NB+"{b_phone}"},
  {p:"4",r:[[302,221,433,234]],t:"{b_borrower}"},
  {p:"4",r:[[440,221,540,234]],t:"{b_bdate}"},
  {p:"4",r:[[253,241,540,254],[72,260,107,272]],t:"{b_amt} ({b_amtw})"},
  {p:"4",r:[[423,382,540,395],[144,401,350,413]],t:"{b_amt} ({b_amtw})"},
- {p:"5",r:[[529,485,541,497]],t:""},
- {p:"5",r:[[144,503,266,516]],t:"{b_branch1}/ዳይሬክቶሬት)እና("},
- {p:"5",r:[[271,503,376,516]],t:"{b_branch2}/ዳይሬክቶሬት)"},
 ];
 const SIGS_A = (_PDF.sigs_a && _PDF.sigs_a.length) ? _PDF.sigs_a : [
  {id:"sig_bank_a",p:"3",r:[100,440,205,479]},
@@ -210,19 +171,28 @@ PARTS.forEach((pt,k)=>{
  SIGS_B.forEach(g=>SIGS.push({id:g.id==="sig_guarantor"?"sig_guarantor@"+k:g.id,p:g.p+"@"+k,r:g.r}));
 });
 SLOTS.forEach((s,n)=>s.n=n);
-/* pages shown: 1-3, then pages 4-5 once per guarantor, then 6 */
+const role=CFG.role;
+/* All parties see the full agreement (borrower and guarantor pages) so each side
+   can read what the other signed. Who can actually sign a page is controlled
+   separately by SIGROLE. */
 const DISPLAY=[{key:"1",n:1},{key:"2",n:2},{key:"3",n:3}];
 PARTS.forEach((pt,k)=>DISPLAY.push({key:"4@"+k,n:4,k},{key:"5@"+k,n:5,k}));
-DISPLAY.push({key:"6",n:6});
-
 /* ---- state ---- */
 const S={values:Object.assign({},CFG.values),sigs:Object.assign({},CFG.sigs),files:CFG.files.slice(),status:CFG.status};
 PARTS.forEach((pt,k)=>{for(const key in pt.values)S.values[key+"@"+k]=pt.values[key];if(pt.sig)S.sigs["sig_guarantor@"+k]=pt.sig});
-const newSigs={};            // signatures drawn in this session (sent to the server)
-let role=CFG.role,showErr=false,saveTimer=null;
+const agreedAlready=()=>role==="guarantor"?!!PARTS[ACTIVE].complete:!!S.status[role];
 const CAN=CFG.editable&&role!=="viewer";
-const val=id=>{const i=BY[id];return i.kind==="system"?(typeof i.value==="function"?i.value():i.value):(S.values[id]||"")};
-const err=id=>{const i=BY[id];if(i.kind==="text"){const v=val(id);if(!v.trim())return"Required";return i.rule(v)||overErr(id)}if(i.kind==="sig")return S.sigs[id]?"":"Signature required";return""};
+/* every blank of the agreement is filled: a value that is missing, empty or only spaces is written as "-" */
+const clean=v=>{const s=(v==null?"":String(v)).replace(/[\s\u00a0]+/g," ").trim();return(!s||s==="undefined"||s==="null"||s==="false")?"-":s};
+/* several phone numbers may be stored in one field (separated by / \ , ; | & ፣ ፤ or the word "or"): only the first one is written */
+const firstPhone=v=>clean(String(v==null?"":v).split(/[\/\\,;|&፣፤]|\s+(?:or|እና|ወይም)\s+/i)[0]);
+const val=id=>{
+  const b=BASE(id);
+  if(b==="a_amt"||b==="b_amt")return clean(SYSTEM.amount);
+  if(b==="a_inst")return clean(SYSTEM.installment);
+  if(b==="a_phone"||b==="b_phone")return firstPhone(S.values[id]);
+  return clean(S.values[id]);
+};
 const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("on"),2600)};
 async function post(path,fd){
   fd.append("csrf_token",CFG.csrf);
@@ -230,26 +200,50 @@ async function post(path,fd){
   if(!r.ok)throw new Error("HTTP "+r.status);
   return r.json();
 }
-async function persist(){
-  if(!CAN)return{ok:true,errors:{}};
-  const mine={};INPUTS.filter(i=>i.role===role&&i.kind==="text"&&mineHere(i)).forEach(i=>mine[BASE(i.id)]=S.values[i.id]||"");
-  const fd=new FormData();
-  fd.append("payload",JSON.stringify({role,lineId:CFG.lineId,values:mine,sigs:newSigs}));
-  const j=await post("/save",fd);
-  if(j.ok){for(const k in newSigs)delete newSigs[k];S.status[role]=!Object.keys(j.errors).length;if(role==="guarantor")PARTS[ACTIVE].complete=S.status[role]}
-  if(j.ok&&EMBED)window.parent.postMessage({type:"resl_agreement_saved"},location.origin);
-  return j;
+/* "Agree and continue": tell the server this person agreed */
+let AGREEING=false;
+const setBusy=on=>{
+  AGREEING=on;
+  document.querySelectorAll("button.p").forEach(b=>{
+    if(b.dataset.agree==null)return;
+    b.classList.toggle("busy",on);
+    b.textContent=on?"Saving…":"Agree and continue";
+  });
+  document.querySelectorAll(".sig.todo").forEach(d=>d.classList.toggle("busy",on));
+};
+async function agree(){
+  if(AGREEING)return;
+  if(!CAN){toast("This part is locked or view only");return}
+  if(agreedAlready()){finish();return}
+  if(CFG.preview){
+    /* New flow: the borrower cannot agree before the guarantors do.
+       The preview page is view-only for the requester. */
+    toast("You must find a guarantor first. The guarantor(s) agree before the borrower.");
+    return;
+  }
+  setBusy(true);
+  try{
+    const fd=new FormData();
+    fd.append("payload",JSON.stringify({role,lineId:CFG.lineId}));
+    const j=await post("/save",fd);
+    if(!j.ok){setBusy(false);toast(j.message||"Could not save");return}
+    S.status[role]=true;
+    if(role==="requester")S.sigs.sig_borrower="Agreed";
+    else if(role==="approver")S.sigs.sig_bank_a=S.sigs.sig_bank_b="Agreed";
+    else{PARTS[ACTIVE].complete=true;S.sigs["sig_guarantor@"+ACTIVE]="Agreed"}
+    if(EMBED)window.parent.postMessage({type:"resl_agreement_saved"},location.origin);
+    AGREEING=false;renderAll();toast("Agreed");finish();
+  }catch(x){setBusy(false);toast("Could not save: "+x.message)}
 }
-function autosave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist().catch(()=>{}),1500)}
 
 /* ---- PDF ---- */
-let pageEls={},scale=1;
+let pageEls={},scale=1,pending=0;
 const ctx=document.createElement("canvas").getContext("2d");
 const EMBED=window.parent!==window;   // shown as a popup inside the loan form
 /* Done: close the popup (the loan form refreshes itself) or, when opened on its own, the tab */
 function finish(){
   if(EMBED){window.parent.postMessage({type:"resl_agreement_done"},location.origin);return}
-  toast("Saved. You can close this tab and go back to the loan.");
+  toast(CFG.preview?"Agreed. You can close this tab and go back to the request.":"Saved. You can close this tab and go back to the loan.");
   setTimeout(()=>{try{window.close()}catch(e){}},800);
 }
 const FONT='"NotoEth","Nyala",sans-serif';        // same stack as .slot, so measuring == rendering
@@ -281,27 +275,6 @@ const layout=(s,text)=>{
   if(!v){const hs=s.r.map(r=>r[3]-r[1]);v=flow(text,s.r,Math.min(11,Math.min(...hs)*.82));memo.set(key,v);if(memo.size>600)memo.clear()}
   return v;
 };
-const SLOT_OF={};
-SLOTS.forEach(s=>[...s.t.matchAll(/\{([\w@]+)\}/g)].forEach(m=>(SLOT_OF[m[1]]=SLOT_OF[m[1]]||[]).push(s)));
-const typedIds=s=>[...s.t.matchAll(/\{([\w@]+)\}/g)].map(m=>m[1]).filter(i=>BY[i].kind==="text");
-/* text of a slot with only the values typed so far (nothing for empty ones) */
-const filledText=s=>s.t.replace(/\{([\w@]+)\}/g,(m,id)=>val(id).trim()).replace(/ {2,}/g," ").trim();
-const slotOver=s=>s.t&&!layout(s,filledText(s)).fit;
-/* Only the longest entry of an overflowing slot gets the "too long" message */
-function overErr(id){
-  const bad=(SLOT_OF[id]||[]).find(slotOver);
-  if(!bad)return"";
-  const ids=typedIds(bad).filter(i=>val(i).trim());
-  const longest=ids.reduce((a,i)=>val(i).trim().length>val(a).trim().length?i:a,ids[0]);
-  return longest===id?"Too long for its space on the contract – shorten it":"";
-}
-const slotState=s=>{
-  const ids=[...s.t.matchAll(/\{([\w@]+)\}/g)].map(m=>m[1]);
-  const typed=ids.filter(i=>BY[i].kind==="text");
-  const missing=typed.some(i=>!val(i).trim());
-  const bad=typed.some(i=>err(i))||slotOver(s);
-  return{ids,missing,bad};
-};
 /* One line: words spread over the width (justified), so short entries do not leave a gap */
 function fillLine(d,words,W,fs,f){
   const sp=measure(" ",fs),n=words.length;
@@ -315,45 +288,152 @@ function fillLine(d,words,W,fs,f){
   words.forEach(w=>{const sp2=document.createElement("span");sp2.textContent=w;ln.appendChild(sp2)});
   d.appendChild(ln);
 }
-function drawOverlays(){
-  for(const k in pageEls){pageEls[k].ov.innerHTML=""}
-  const f=scale;
-  SLOTS.forEach(s=>{
-    const st=slotState(s);
-    const text=s.t.replace(/\{([\w@]+)\}/g,(m,id)=>val(id).trim()||"……");
-    const heights=s.r.map(r=>r[3]-r[1]);
-    if(!s.t){s.r.forEach(r=>{const d=document.createElement("div");d.className="slot";d.style.cssText=`background:#fff;left:${(r[0]-.5)*f}px;top:${(r[1]-1)*f}px;width:${(r[2]-r[0]+1)*f}px;height:${(r[3]-r[1]+3)*f}px`;pageEls[s.p].ov.appendChild(d)});return}
-    const {fs,lines}=layout(s,text);
-    s.r.forEach((r,i)=>{
-      const d=document.createElement("div");
-      d.className="slot "+(lines[i].length?(st.missing?"miss":"ok")+((showErr&&(st.missing||st.bad))||slotOver(s)?" err":""):"");
-      d.style.cssText=`left:${(r[0]-1)*f}px;top:${(r[1]-1)*f}px;width:${(r[2]-r[0]+2)*f}px;height:${(r[3]-r[1]+3)*f}px;font-size:${fs*f}px;padding-left:${f}px`;
-      if(!lines[i].length)d.style.background="#fff";
-      else{fillLine(d,lines[i],r[2]-r[0]-3,fs,f);d.title=text.replace(/ /g," ")}
-      d.onclick=()=>focusSlot(st);
-      pageEls[s.p].ov.appendChild(d);
+/* The agreement is a picture with blanks. Each value is written in its blank at the
+   normal word spacing; the rest of that text row (the printed words after the blank)
+   is cut out of the page picture and moved up against the value, so a short value
+   leaves no hole. Rows are handled one by one, left to right. */
+const PW=612;                                     // page width in PDF points
+const srcOf=k=>{
+  const e=pageEls[k];if(!e)return null;
+  const el=e.canvas||e.im;if(!el)return null;
+  if(e.im&&!e.im.complete)return null;
+  const w=e.im?e.im.naturalWidth:el.width,h=e.im?e.im.naturalHeight:el.height;   // img.width is the displayed size, not the picture's
+  return(w&&h)?{el,w,h}:null;
+};
+function slotDiv(ov,x,r,w,fs,f,text,lw){
+  const d=document.createElement("div");d.className="slot ok";
+  d.style.cssText=`left:${x*f}px;top:${(r[1]-1)*f}px;width:${(w+1)*f}px;height:${(r[3]-r[1]+3)*f}px;font-size:${fs*f}px;padding-left:${f}px`;
+  const inn=document.createElement("span");inn.style.whiteSpace="nowrap";
+  text.split(" ").forEach((word,wi)=>{
+    if(wi)inn.appendChild(document.createTextNode(" "));
+    word.split(NB).forEach((part,pi)=>{
+      if(pi)inn.appendChild(document.createTextNode(NB));
+      if(lw&&lw.has(part)){inn.appendChild(document.createTextNode(part))}      // printed word of the agreement: normal text, no colour
+      else{const v=document.createElement("span");v.className="v";v.textContent=part;inn.appendChild(v)}   // value taken from the HR records
     });
   });
-  SIGS.forEach(g=>{
-    const i=BY[g.id],d=document.createElement("div"),has=!!S.sigs[g.id];
-    const mine=i.role===role&&CAN&&mineHere(i);
-    d.className="sig "+(has?"ok":"")+(showErr&&!has&&mine?" err":"");
-    const r=g.r;d.style.cssText=`left:${r[0]*f}px;top:${r[1]*f}px;width:${(r[2]-r[0])*f}px;height:${(r[3]-r[1])*f}px;font-size:${10*f}px`;
-    if(has){const im=new Image();im.src=S.sigs[g.id];d.appendChild(im)}
-    else d.textContent=mine?"✍ Click to sign":"Not signed yet";
-    d.onclick=()=>openPad(g.id);
-    pageEls[g.p].ov.appendChild(d);
+  d.appendChild(inn);d.title=text;
+  d.onclick=()=>toast("This value is taken from the HR records");
+  ov.appendChild(d);
+}
+function drawRow(k,row,f){
+  const e=pageEls[k],ov=e.ov,src=srcOf(k);
+  const y1=Math.min(...row.map(i=>i.r[1]))-1,y2=Math.max(...row.map(i=>i.r[3]))+2;
+  const x0=row[0].r[0];
+  if(!src){                                       // picture not ready yet: plain per-blank fill
+    row.forEach(it=>{
+      const cover=document.createElement("div");cover.className="slot";
+      cover.style.cssText=`background:#fff;left:${(it.r[0]-1)*f}px;top:${(it.r[1]-1)*f}px;width:${(it.r[2]-it.r[0]+2)*f}px;height:${(it.r[3]-it.r[1]+3)*f}px`;
+      ov.appendChild(cover);
+      if(it.words.length){const t=it.words.join(" ");slotDiv(ov,it.r[0]-1,it.r,measure(t,it.fs),it.fs,f,t,it.lw)}
+    });
+    return;
+  }
+  const cover=document.createElement("div");cover.className="slot";
+  cover.style.cssText=`background:#fff;left:${(x0-1)*f}px;top:${y1*f}px;width:${(PW-x0)*f}px;height:${(y2-y1)*f}px`;
+  ov.appendChild(cover);
+  /* Keep the whole row (values AND the printed words after them, e.g. ነዋሪነታቸው, ወረዳ)
+     inside the text area: when the values are longer than the blanks were, they are written
+     a little smaller instead of pushing the printed words out of the page. */
+  const segW=(a0,b0)=>{const a=a0>x0?a0+1.5:a0,b=b0<PW?b0-.5:b0;return Math.max(0,b-a)};
+  const rowEnd=row[row.length-1].r[2],LIM=Math.max(541,rowEnd);
+  const endAt=k=>{
+    let c=x0,pe=x0;
+    row.forEach((it,n)=>{
+      if(n)c+=segW(pe,it.r[0]);
+      if(it.words.length)c+=measure(it.words.join(" "),it.fs*k)+measure(" ",it.fs*k);
+      pe=it.r[2];
+    });
+    return c+Math.max(0,Math.min(540,LIM)-pe);
+  };
+  let rk=1;
+  if(endAt(1)>LIM){
+    let lo=.5,hi=1;
+    for(let i=0;i<14;i++){const mid=(lo+hi)/2;if(endAt(mid)>LIM)hi=mid;else lo=mid}
+    rk=lo;
+  }
+  const kx=src.w/PW,ky=src.h/792,dpr=window.devicePixelRatio||1;
+  let cursor=x0;
+  const seg=(a0,b0)=>{                            // printed words between two blanks, moved to the cursor
+    const a=a0>x0?a0+1.5:a0,b=b0<PW?b0-.5:b0;      // skip the edge of the template's own green box
+    const w=b-a;if(w<=.5)return;
+    const c=document.createElement("canvas");
+    c.width=Math.max(1,Math.round(w*f*dpr));c.height=Math.max(1,Math.round((y2-y1)*f*dpr));
+    c.style.cssText=`position:absolute;left:${cursor*f}px;top:${y1*f}px;width:${w*f}px;height:${(y2-y1)*f}px;pointer-events:none`;
+    c.getContext("2d").drawImage(src.el,a*kx,y1*ky,w*kx,(y2-y1)*ky,0,0,c.width,c.height);
+    ov.appendChild(c);cursor+=w;
+  };
+  let prevEnd=x0;
+  row.forEach((it,n)=>{
+    if(n)seg(prevEnd,it.r[0]);
+    if(it.words.length){
+      const t=it.words.join(" "),fs=it.fs*rk,w=measure(t,fs);
+      slotDiv(ov,cursor-1,it.r,w,fs,f,t,it.lw);
+      cursor+=w+measure(" ",fs);                  // one normal word gap after the value
+    }
+    prevEnd=it.r[2];
   });
-  /* Footer signature on EVERY page: the requester's on each Part A page, each
-     guarantor's on each page of his / her own Part B copy (never the bank's). */
-  DISPLAY.forEach(pg=>{
-    const url=pg.k!=null?S.sigs["sig_guarantor@"+pg.k]:(pg.n<=3?S.sigs.sig_borrower:"");
-    const el=pageEls[pg.key];
-    if(!url||!el)return;
-    const d=document.createElement("div");d.className="fsig";
-    d.style.cssText=`right:${72*f}px;bottom:${8*f}px;width:${110*f}px;height:${30*f}px`;
-    const im=new Image();im.src=url;im.alt="signature";d.appendChild(im);
-    el.ov.appendChild(d);
+  seg(prevEnd,PW);
+}
+function drawOverlays(){
+  for(const k in pageEls){pageEls[k].ov.innerHTML=""}
+  const f=scale,items={},blanks=[];
+  SLOTS.forEach(s=>{
+    const text=s.t.replace(/\{([\w@]+)\}/g,(m,id)=>val(id));
+    if(!s.t){blanks.push(s);return}
+    const {fs,lines}=layout(s,text);
+    const lw=new Set(s.t.replace(/\{[\w@]+\}/g," ").split(/\s+/).filter(Boolean));   // the printed words of this blank
+    s.r.forEach((r,i)=>{(items[s.p]=items[s.p]||[]).push({r,fs,words:lines[i]||[],lw})});
+  });
+  for(const k in items){
+    if(!pageEls[k])continue;
+    const list=items[k].slice().sort((a,b)=>a.r[1]-b.r[1]||a.r[0]-b.r[0]),rows=[];
+    list.forEach(it=>{
+      const row=rows.find(r=>Math.abs(r[0].r[1]-it.r[1])<=2.5&&Math.abs(r[0].r[3]-it.r[3])<=3);
+      if(row)row.push(it);else rows.push([it]);
+    });
+    rows.forEach(row=>{row.sort((a,b)=>a.r[0]-b.r[0]);drawRow(k,row,f)});
+  }
+  blanks.forEach(s=>{
+    s.r.forEach(r=>{const d=document.createElement("div");d.className="slot";d.style.cssText=`background:#fff;left:${(r[0]-.5)*f}px;top:${(r[1]-1)*f}px;width:${(r[2]-r[0]+1)*f}px;height:${(r[3]-r[1]+3)*f}px`;pageEls[s.p].ov.appendChild(d)});
+  });
+  /* "Agreed" replaces the signature, only on the signature places (never in a page footer) */
+  SIGS.forEach(g=>{
+    const has=!!S.sigs[g.id],c=copyOf(g.id);
+    const mine=SIGROLE(g.id)===role&&CAN&&(c==null||c===ACTIVE)&&!agreedAlready();
+    if(!has&&!mine)return;
+    const d=document.createElement("div");
+    d.className="sig "+(has?"ok":"todo");
+    const r=g.r;d.style.cssText=`left:${r[0]*f}px;top:${r[1]*f}px;width:${(r[2]-r[0])*f}px;height:${(r[3]-r[1])*f}px;font-size:${12*f}px`;
+    if(has){
+      /* Signer's name first, then "Agreed" */
+      const sigKey=g.id;
+      const signerName=NAMES[sigKey]||"";
+      d.innerHTML="";
+      d.style.flexDirection="column";
+      d.style.alignItems="center";
+      d.style.justifyContent="center";
+      d.style.overflow="visible";
+      /* Name FIRST, "Agreed" under it. The box is solid white so it also hides
+         the printed dashed/solid line that used to sit between them. In the small
+         guarantor boxes it is made a little taller so the line is fully covered. */
+      d.style.background="#fff";
+      if((r[3]-r[1])<30)d.style.height=`${(r[3]-r[1]+6)*f}px`;
+      if(signerName){
+        const nameEl=document.createElement("div");
+        nameEl.style.cssText=`font-size:${9.5*f}px;font-weight:700;color:#1d1d1b;text-align:center;line-height:1.2;white-space:nowrap;font-family:"NotoEth","Nyala",sans-serif`;
+        nameEl.textContent=signerName;
+        d.appendChild(nameEl);
+      }
+      const agreedEl=document.createElement("div");
+      agreedEl.style.cssText=`font-size:${11*f}px;font-weight:700;color:#0a1f6b;text-align:center;line-height:1.2;white-space:nowrap`;
+      agreedEl.textContent="Agreed";
+      d.appendChild(agreedEl);
+    }else{
+      d.textContent="Agree here";
+    }
+    if(!has)d.onclick=()=>agree();
+    pageEls[g.p].ov.appendChild(d);
   });
 }
 let loadedPdfDoc = null;
@@ -370,15 +450,15 @@ async function initPdfDoc() {
   }
 }
 
-/* A trailing page with nothing on it (after Part B) is removed from the view */
+/* A trailing page with nothing on it (after the guarantor pages) is removed from the view */
 function relabel(){
   DISPLAY.forEach((pg,idx)=>{
     const el=pageEls[pg.key];
-    if(el)el.wrap.querySelector(".pn").textContent=(idx+1)+" / "+DISPLAY.length+(pg.k!=null?" · Part B – "+(PARTS[pg.k].name||"Guarantor "+(pg.k+1)):"");
+    if(el)el.wrap.querySelector(".pn").textContent=(idx+1)+" / "+DISPLAY.length+(pg.k!=null?" · "+(PARTS[pg.k].name||"Guarantor "+(pg.k+1))+" (Guarantor)":"");
   });
 }
 function dropIfBlank(pg,src){
-  if(pg.k!=null||pg.n<=3)return;                 // only the page after Part B can be dropped
+  if(pg.k!=null||pg.n<=3)return;                 // only the page after the guarantor pages can be dropped
   try{
     const W=200,H=260,c=document.createElement("canvas");c.width=W;c.height=H;
     const x=c.getContext("2d",{willReadFrequently:true});x.fillStyle="#fff";x.fillRect(0,0,W,H);
@@ -391,6 +471,7 @@ function dropIfBlank(pg,src){
   relabel();
 }
 async function renderPages(){
+  if(window.matchMedia&&matchMedia("print").matches)return;      // never re-layout while printing
   const host=$("#pages");
   scale=Math.min(820,host.clientWidth)/612;
   if(!loadedPdfDoc && _PDF.pdf_url && window.pdfjsLib){
@@ -401,7 +482,7 @@ async function renderPages(){
       const wrap=document.createElement("div");wrap.className="page";
       const ov=document.createElement("div");ov.style.cssText="position:absolute;inset:0";
       const pn=document.createElement("div");pn.className="pn";
-      pn.textContent=(idx+1)+" / "+DISPLAY.length+(pg.k!=null?" · Part B – "+(PARTS[pg.k].name||"Guarantor "+(pg.k+1)):"");
+      pn.textContent=(idx+1)+" / "+DISPLAY.length+(pg.k!=null?" · "+(PARTS[pg.k].name||"Guarantor "+(pg.k+1))+" (Guarantor)":"");
 
       if(loadedPdfDoc){
         const canvas=document.createElement("canvas");
@@ -411,6 +492,7 @@ async function renderPages(){
         pageEls[pg.key]={wrap,ov,canvas};
 
         const pageNum = Math.min(pg.n, loadedPdfDoc.numPages);
+        pending++;
         loadedPdfDoc.getPage(pageNum).then(page => {
           const unscaledViewport = page.getViewport({ scale: 1 });
           const targetW = Math.min(820, host.clientWidth || 820);
@@ -419,13 +501,13 @@ async function renderPages(){
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           const ctx = canvas.getContext('2d');
-          page.render({ canvasContext: ctx, viewport: viewport }).promise.then(()=>dropIfBlank(pg,canvas));
-        });
+          page.render({ canvasContext: ctx, viewport: viewport }).promise.then(()=>{dropIfBlank(pg,canvas);drawOverlays()}).finally(()=>{pending--});
+        }).catch(()=>{pending--});
       } else {
-        const im=new Image();im.src=PAGES[pg.n-1]||PAGES[0];im.alt="Page "+(idx+1);im.style.cssText="display:block;width:100%;height:auto";im.onload=()=>dropIfBlank(pg,im);
+        const im=new Image();im.src=PAGES[pg.n-1]||PAGES[0];im.alt="Page "+(idx+1);im.style.cssText="display:block;width:100%;height:auto";pending++;im.onload=()=>{dropIfBlank(pg,im);drawOverlays();pending--};im.onerror=()=>{pending--};
         wrap.append(im,ov,pn);
         host.appendChild(wrap);
-        pageEls[pg.key]={wrap,ov};
+        pageEls[pg.key]={wrap,ov,im};
       }
     }
   });
@@ -433,150 +515,95 @@ async function renderPages(){
 }
 
 /* ---- sidebar ---- */
-function focusSlot(st){
-  const mine=i=>BY[i].role===role&&BY[i].kind==="text"&&mineHere(BY[i]);
-  const id=st.ids.find(i=>mine(i)&&(!val(i).trim()||err(i)))||st.ids.find(mine);
-  if(!id){const o=st.ids.map(i=>BY[i].role).find(r=>r!==role&&r);toast(o?"This part is filled by the "+ROLES[o]:"System-filled field");return}
-  const el=document.getElementById("f_"+id);if(el){el.scrollIntoView({block:"center",behavior:"smooth"});el.focus()}
-}
 function renderRoles(){
   const r=$("#roles");r.innerHTML="";
   const a=document.createElement("span");a.textContent=CFG.ref;r.appendChild(a);
   const b=document.createElement("span");b.className="me";b.textContent=ROLES[role]||"View only";r.appendChild(b);
+  if(CFG.canPrint){
+    const pb=document.createElement("button");pb.id="printBtn";pb.textContent="🖨 Print";
+    pb.title="Print the agreement";pb.onclick=()=>printAgreement();r.appendChild(pb);
+  }
   if(_PDF.pdf_url){
     const d=document.createElement("a");d.href=_PDF.pdf_url;d.target="_blank";
     d.textContent="📄 Original PDF";d.style.cssText="border:1px solid var(--line);padding:6px 12px;border-radius:999px;font:inherit;color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:4px";
     r.appendChild(d);
   }
 }
-function roleErrors(r){return INPUTS.filter(i=>i.role===r&&i.kind!=="system"&&mineHere(i)&&err(i.id)).map(i=>i.id)}
 function renderForm(){
   const c=$("#formCard");
-  if(role==="viewer"){c.innerHTML="<h2>View only</h2><p style='margin:0;color:var(--muted)'>You can read this agreement and its documents. Only the requester, the guarantor and the bank approver can fill in or sign it.</p>"+(CFG.why?"<p style='margin:10px 0 0;color:var(--bad)'>"+esc(CFG.why)+"</p>":"");return}
-  c.innerHTML=`<h2>${ROLES[role]} – fields</h2>`;
-  if(!CFG.editable){const n=document.createElement("p");n.style.cssText="margin:0 0 8px;color:var(--muted)";n.textContent="This part is locked: it can no longer be changed.";c.appendChild(n)}
-  INPUTS.filter(i=>i.role===role&&i.kind!=="sig"&&mineHere(i)).forEach(i=>{
-    const l=document.createElement("label");l.htmlFor="f_"+i.id;l.innerHTML=i.label+(i.kind==="system"?'<span class="sysTag">filled by system</span>':' <span style="color:var(--bad)">*</span>');
-    const inp=document.createElement("input");inp.type="text";inp.id="f_"+i.id;
-    const m=document.createElement("div");m.className="msg";
-    if(i.kind==="system"){inp.value=val(i.id);inp.readOnly=true}
-    else{
-      inp.value=S.values[i.id]||"";inp.placeholder=i.hint;inp.lang="am";inp.autocomplete="off";inp.readOnly=!CAN;
-      const check=()=>{const e=err(i.id);const show=showErr||inp.value.trim();inp.classList.toggle("invalid",!!(e&&show));m.textContent=(e&&show)?e:""};
-      inp.oninput=()=>{S.values[i.id]=inp.value;check();drawOverlays();renderStatus();autosave()};
-      setTimeout(check,0);
-    }
-    c.append(l,inp,m);
+  if(role==="viewer"){c.innerHTML="<h2>View only</h2><p style='margin:0;color:var(--muted)'>You can read this agreement and its documents. Only the requester, the guarantor and the bank approver can agree to it.</p>"+(CFG.why?"<p style='margin:10px 0 0;color:var(--bad)'>"+esc(CFG.why)+"</p>":"");return}
+  c.innerHTML=`<h2>${esc(whoName(role))} – details</h2>`;
+  const note=document.createElement("p");note.style.cssText="margin:0 0 8px;color:var(--muted);font-size:12px";
+  note.textContent=CFG.editable?"These details are taken from the HR records and are filled in the agreement automatically. Check them, then press Agree and continue.":(role==="requester"?"Your guarantor(s) must agree first. You will be notified when they are done, then you can agree here.":"This part is locked: it can no longer be changed.");
+  c.appendChild(note);
+  const rows=role==="requester"?FIELDS_A:(role==="approver"?FIELDS_BANK:FIELDS_B.map(([k,l])=>[k+"@"+ACTIVE,l]));
+  const ul=document.createElement("ul");ul.className="st";
+  rows.forEach(([id,label])=>{
+    const li=document.createElement("li");li.style.cssText="gap:10px;align-items:flex-start";
+    const a=document.createElement("span");a.textContent=label;a.style.color="var(--muted)";
+    const b=document.createElement("span");b.textContent=val(id);b.style.cssText="text-align:right;word-break:break-word";
+    li.append(a,b);ul.appendChild(li);
   });
-  const sigs=INPUTS.filter(i=>i.role===role&&i.kind==="sig"&&i.id!=="sig_bank_b"&&mineHere(i));
-  if(sigs.length){
-    const h=document.createElement("label");h.textContent="Signature *";c.append(h);
-    sigs.forEach(i=>{const row=document.createElement("div");row.className="row";row.style.margin="4px 0";
-      const b=document.createElement("button");b.className="s";b.disabled=!CAN;b.textContent=(S.sigs[i.id]?"✓ ":"✍ ")+i.label.replace(" (loan contract)","");
-      b.onclick=()=>{const g=SIGS.find(x=>x.id===i.id);pageEls[g.p].wrap.scrollIntoView({behavior:"smooth",block:"center"});openPad(i.id)};row.append(b);c.append(row)});
-  }
+  c.appendChild(ul);
   if(CAN){
     const row=document.createElement("div");row.className="row";row.style.marginTop="14px";
-    const sb=document.createElement("button");sb.className="p";sb.textContent="Save and continue";
-    sb.onclick=async()=>{
-      const e=roleErrors(role);showErr=true;
-      if(e.length){renderAll();toast(e.length+" required item(s) missing or invalid");const el=document.getElementById("f_"+e.find(x=>BY[x].kind==="text"));if(el)el.focus();return}
-      try{
-        const j=await persist();
-        if(!j.ok){toast(j.message||"Could not save");return}
-        if(Object.keys(j.errors).length){toast("Server check: "+Object.keys(j.errors).join(", "));return}
-        showErr=false;renderAll();toast("Saved");finish();
-      }catch(x){toast("Could not save: "+x.message)}
-    };
-    row.append(sb);c.append(row);
+    if(agreedAlready()){
+      const ok=document.createElement("p");ok.style.cssText="margin:0;color:var(--ok);font-weight:600";
+      ok.textContent="✓ You have agreed to this agreement.";
+      c.append(ok);
+    }else{
+      const sb=document.createElement("button");sb.className="p";
+      sb.textContent="Agree and continue";sb.dataset.agree="1";
+      sb.onclick=()=>agree();
+      row.append(sb);c.append(row);
+    }
   }
 }
 function renderStatus(){
   const c=$("#statusCard");
   c.innerHTML="<h2>Agreement status</h2><ul class='st'></ul>";
   const ul=c.querySelector("ul");
-  const rows=[["Part A – Borrower",!!S.status.requester]];
-  PARTS.forEach((p,k)=>rows.push(["Part B – "+(p.name||"Guarantor "+(k+1)),!!p.complete]));
-  rows.push(["Bank approver signature",!!S.status.approver]);
+  const rows=[[whoName("requester"),!!S.status.requester]];
+  PARTS.forEach((p,k)=>rows.push([(p.name||"Guarantor "+(k+1))+" ("+ROLES.guarantor+")",!!p.complete]));
+  rows.push([whoName("approver"),!!S.status.approver]);
   rows.forEach(([label,done])=>{
     ul.innerHTML+=`<li><span></span><span class="${done?"good":"bad"}">${done?"Complete":"Pending"}</span></li>`;
     ul.lastElementChild.firstChild.textContent=label;
   });
 }
-/* ---- signature pad ---- */
-let padId=null,drawing=false,last=null,dirty=false;
-const pad=$("#pad"),pc=pad.getContext("2d");
-function openPad(id){
-  const i=BY[id];
-  if(i.role!==role||!CAN){toast(CAN?"Only the "+ROLES[i.role]+" can sign here":"This part is locked or view only");return}
-  if(!mineHere(i)){toast("This is another guarantor's copy – only that guarantor can sign here");return}
-  padId=id;dirty=false;$("#padTitle").textContent=i.label;
-  $("#padDlg").showModal();
-  const r=pad.getBoundingClientRect(),d=window.devicePixelRatio||1;
-  pad.width=r.width*d;pad.height=r.height*d;pc.setTransform(d,0,0,d,0,0);
-  pc.lineWidth=2.2;pc.lineCap=pc.lineJoin="round";pc.strokeStyle="#0a1f6b";pc.clearRect(0,0,r.width,r.height);
-}
-const pt=e=>{const r=pad.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
-pad.onpointerdown=e=>{drawing=true;last=pt(e);pad.setPointerCapture(e.pointerId);pc.beginPath();pc.moveTo(...last);pc.lineTo(last[0]+.1,last[1]);pc.stroke();dirty=true};
-pad.onpointermove=e=>{if(!drawing)return;const p=pt(e);pc.beginPath();pc.moveTo(...last);pc.lineTo(...p);pc.stroke();last=p};
-pad.onpointerup=pad.onpointercancel=()=>{drawing=false};
-$("#padClear").onclick=()=>{const r=pad.getBoundingClientRect();pc.clearRect(0,0,r.width,r.height);dirty=false};
-$("#padCancel").onclick=()=>$("#padDlg").close();
-$("#padSave").onclick=()=>{
-  if(!dirty){toast("Draw your signature first");return}
-  // trim to ink bounds
-  const w=pad.width,h=pad.height,im=pc.getImageData(0,0,w,h).data;let x0=w,y0=h,x1=0,y1=0;
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(im[(y*w+x)*4+3]>10){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
-  const m=6,t=document.createElement("canvas");t.width=x1-x0+2*m;t.height=y1-y0+2*m;
-  t.getContext("2d").putImageData(pc.getImageData(x0-m,y0-m,t.width,t.height),0,0);
-  const url=t.toDataURL("image/png");
-  if(padId==="sig_bank_a"||padId==="sig_bank_b"){S.sigs.sig_bank_a=S.sigs.sig_bank_b=url;newSigs.sig_bank=url}
-  else{S.sigs[padId]=url;newSigs[BASE(padId)]=url}
-  $("#padDlg").close();renderAll();
-  if(role==="approver"){persist().then(j=>{if(j.ok)toast("Signature saved");else toast(j.message||"Could not save")}).catch(x=>toast("Could not save: "+x.message))}
-  else autosave();
-};
-/* ---- uploads ---- */
-const OKT=["image/png","image/jpeg","application/pdf"];
-function renderUploads(){
-  const c=$("#upCard");
-  c.innerHTML=`<h2>Supporting documents</h2>`+(role!=="viewer"?`<div class="row"><input type="file" id="fi" accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf" hidden><button class="s" id="ub">⬆ Upload PNG, JPEG or PDF</button><small style="color:var(--muted)">max 5 MB · visible to everyone in the request</small></div>`:`<small style="color:var(--muted)">Visible to everyone in the request</small>`)+`<div class="files" id="fl"></div>`;
-  if(role!=="viewer"){
-    $("#ub").onclick=()=>$("#fi").click();
-    $("#fi").onchange=async e=>{
-      for(const f of [...e.target.files]){
-        if(!OKT.includes(f.type)){toast(f.name+": only PNG, JPEG or PDF");continue}
-        if(f.size>5*1024*1024){toast(f.name+": larger than 5 MB");continue}
-        const fd=new FormData();fd.append("file",f);
-        try{const j=await post("/upload",fd);if(j.ok){S.files=j.files;renderUploads();toast("Uploaded")}else toast(j.message||"Upload failed")}catch(x){toast("Upload failed: "+x.message)}
-      }
-    };
-  }
-  const fl=$("#fl");
-  S.files.forEach(f=>{
-    const d=document.createElement("div");d.className="file";
-    d.innerHTML=`<div class="th">${f.type==="application/pdf"?"PDF":""}</div><div><div></div><small></small></div>`;
-    d.querySelector("div div").textContent=f.name;d.querySelector("small").textContent=f.by+" · "+f.at;
-    if(f.type!=="application/pdf"){const im=new Image();im.src=f.url;d.querySelector(".th").appendChild(im)}
-    d.onclick=()=>viewFile(f);fl.appendChild(d);
-  });
-}
-function viewFile(f){
-  $("#viewName").textContent=f.name;const v=$("#view");v.innerHTML="";
-  if(f.type==="application/pdf"){const o=document.createElement("object");o.data=f.url;o.type="application/pdf";o.style.cssText="width:100%;height:70vh";o.textContent="PDF preview not supported in this browser.";v.appendChild(o)}
-  else{const im=new Image();im.src=f.url;v.appendChild(im)}
-  $("#viewDlg").showModal();
-}
-$("#viewClose").onclick=()=>$("#viewDlg").close();
 function renderAll(){renderRoles();renderForm();renderStatus();drawOverlays()}
+
+/* ---- print (approvers / admin only: CFG.canPrint is decided by the server) ---- */
+const LETTER_PX=815;                       // 8.5in at 96 dpi, a hair under so no blank sheet follows
+let screenScale=null;
+function fitForPrint(){
+  if(screenScale!==null)return;
+  screenScale=scale;scale=LETTER_PX/612;drawOverlays();      // re-draw everything at the paper width (synchronous)
+}
+function unfitAfterPrint(){if(screenScale!==null){scale=screenScale;screenScale=null;drawOverlays()}}
+window.addEventListener("beforeprint",fitForPrint);
+window.addEventListener("afterprint",unfitAfterPrint);
+async function printAgreement(){
+  if(!CFG.canPrint)return;
+  for(let i=0;i<150&&pending>0;i++)await new Promise(r=>setTimeout(r,100));   // wait for the pages (max 15 s)
+  window.print();
+}
 
 /* ---- boot ---- */
 (async()=>{
   try{await document.fonts.load("11px NotoEth","ሀ")}catch(e){}
-  renderRoles();renderForm();renderStatus();renderUploads();
+  renderRoles();renderForm();renderStatus();
   await renderPages();
   let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(renderPages,150)});
+  /* the page width can change without a window resize (a scrollbar appears, the popup is
+     resized): keep the filled-in values on the same scale as the page picture */
+  if(window.ResizeObserver)new ResizeObserver(()=>{
+    if(screenScale!==null)return;
+    const sc=Math.min(820,$("#pages").clientWidth)/612;
+    if(sc>0&&Math.abs(sc-scale)>.002){scale=sc;drawOverlays()}
+  }).observe($("#pages"));
   window.__ready=true;
+  if(CFG.autoPrint)printAgreement();
 })();
 })();
 </script>

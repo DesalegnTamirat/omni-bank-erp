@@ -65,4 +65,29 @@ class PbmsReviewActionWizard(models.TransientModel):
         elif self.action_type == "reject":
             plan.action_reject(self.comment.strip())
 
-        return {"type": "ir.actions.act_window_close"}
+        action_titles = {
+            "review_comment": _("Review Comment Added"),
+            "request_info": _("Information Requested"),
+            "return": _("Returned Successfully"),
+            "recommend_rejection": _("Rejection Recommended"),
+            "reject": _("Rejected Successfully"),
+        }
+        action_messages = {
+            "review_comment": _("Review comment recorded successfully."),
+            "request_info": _("Information request submitted successfully."),
+            "return": _("Plan returned for revision successfully."),
+            "recommend_rejection": _("Rejection recommended successfully."),
+            "reject": _("Plan has been rejected successfully."),
+        }
+        notif_type = "warning" if self.action_type in ("return", "reject") else "info"
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": action_titles.get(self.action_type, _("Action Completed")),
+                "message": action_messages.get(self.action_type, _("Action completed successfully.")),
+                "type": notif_type,
+                "sticky": False,
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }

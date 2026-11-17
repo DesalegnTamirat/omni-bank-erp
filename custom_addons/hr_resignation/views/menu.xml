@@ -15,26 +15,28 @@
               sequence="5"/>
 
     <menuitem id="menu_hr_resignation_my"
-              name="My Resignation Request"
+              name="Resignation Request"
               parent="menu_hr_resignation_root"
               action="action_hr_resignation_my"
               groups="base.group_user"
               sequence="10"/>
 
     <!--
-        Shown to users whose privilege is "Manager" OR "HR Manager" OR "POMD Officer" OR "Administrator".
-        - Manager: sees only their own direct reports (via record rule)
-        - HR Manager: also sees their direct reports (via separate record rule)
-        Both record rules use coach_id.user_id = user.id so each user
-        only sees their own team regardless of their privilege level.
-        POMD and Clearance Officers are excluded — they use their own menus.
+        "My Team's Resignations":
+        Accessible to internal users at model level, but dynamically blacklisted
+        and hidden via _load_menus_blacklist in ir_ui_menu.py for any employee
+        who is not an active coach or direct manager of other employees.
     -->
     <menuitem id="menu_hr_resignation_team_restricted"
               name="My Team's Resignations"
               parent="menu_hr_resignation_root"
               action="action_hr_resignation_team"
-              groups="hr_resignation.group_resignation_manager"
+              groups="base.group_user"
               sequence="15"/>
+
+    <record id="menu_hr_resignation_team_restricted" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('base.group_user')])]"/>
+    </record>
 
     <!--
         ONLY shown to users whose privilege is exactly "Clearance Officer".
@@ -85,6 +87,13 @@
               groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_admin"
               sequence="10"/>
 
+    <menuitem id="menu_hr_resignation_excel_report"
+              name="Resignation Report"
+              parent="menu_hr_resignation_reporting"
+              action="action_hr_resignation_report_wizard"
+              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_admin"
+              sequence="20"/>
+
     <!-- ── Configuration ──────────────────────────────────────────────── -->
     <menuitem id="menu_hr_resignation_config"
               name="Configuration"
@@ -115,5 +124,12 @@
               parent="menu_hr_resignation_config"
               action="action_hr_resignation_tax_bracket"
               sequence="50"/>
+
+    <menuitem id="menu_resignation_certificate_config"
+              name="Certificate Settings"
+              parent="menu_hr_resignation_config"
+              action="action_resignation_certificate_config"
+              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_resignation_admin,base.group_system"
+              sequence="60"/>
 
 </odoo>

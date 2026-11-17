@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="web.ListRenderer.GroupRow" t-inherit-mode="extension">
+        <xpath expr="//th[contains(@t-attf-class, 'o_group_name')]" position="before">
+            <th t-if="hasSelectors"
+                class="o_list_record_selector align-middle pe-1 cursor-pointer"
+                tabindex="-1"
+                t-on-click.stop="() => this.toggleGroupSelection(group)">
+                <CheckBox
+                    disabled="props.selectDisabled"
+                    value="isGroupSelected(group)"
+                    indeterminate="isGroupIndeterminate(group)"
+                    className="'d-flex m-0'"
+                    onChange="() => this.toggleGroupSelection(group)"
+                />
+            </th>
+        </xpath>
+    </t>
+</templates>

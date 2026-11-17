@@ -30,7 +30,27 @@
 
                     <group>
                         <group invisible="action_type != 'adjust_leave'">
+                            <field name="is_self_employee" invisible="1"/>
+                            <field name="can_manual_adjust" invisible="1"/>
+                            <field name="requires_allocation" invisible="1"/>
+                            <field name="has_insufficient_allocation" invisible="1"/>
                             <field name="leave_mode" widget="radio"/>
+
+                            <!-- Role Action Notices -->
+                            <div class="alert alert-info mb-2" role="alert" invisible="action_type != 'adjust_leave' or leave_mode != 'create_new' or not is_self_employee">
+                                <i class="fa fa-info-circle me-1" title="Self Submission"/>
+                                <strong>Submission:</strong> This request will be submitted to your Direct Coach for one-click approval.
+                            </div>
+                            <div class="alert alert-primary mb-2" role="alert" invisible="action_type != 'adjust_leave' or leave_mode != 'create_new' or is_self_employee">
+                                <i class="fa fa-bolt me-1" title="Direct Approval"/>
+                                <strong>Direct Approval:</strong> Confirming will immediately approve the leave, deduct from accrued balance, and close this attendance case with zero penalty.
+                            </div>
+
+                            <!-- Manual Adjustment Notice -->
+                            <div class="alert alert-warning mb-2" role="alert" invisible="can_manual_adjust or leave_mode != 'manual_adjust'">
+                                <i class="fa fa-lock me-1" title="Restricted"/> Direct administrative leave adjustment is restricted to POMD Officers and HR Administrators.
+                            </div>
+
                             <field name="leave_id"
                                    invisible="leave_mode != 'existing'"
                                    required="action_type == 'adjust_leave' and leave_mode == 'existing'"
@@ -45,6 +65,27 @@
                             <field name="leave_date_to"
                                    invisible="leave_mode == 'existing'"
                                    required="action_type == 'adjust_leave' and leave_mode != 'existing'"/>
+
+                            <!-- Dynamic Leave Balance Verification -->
+                            <field name="required_leave_days"
+                                   invisible="leave_mode != 'create_new'"
+                                   readonly="1"/>
+                            <field name="available_leave_balance"
+                                   invisible="leave_mode != 'create_new' or not requires_allocation"
+                                   readonly="1"/>
+                            <field name="balance_after_adjustment"
+                                   invisible="leave_mode != 'create_new' or not requires_allocation"
+                                   readonly="1"/>
+
+                            <!-- Allocation Balance Status -->
+                            <div class="alert alert-danger mb-2" role="alert"
+                                 invisible="leave_mode != 'create_new' or not has_insufficient_allocation">
+                                <field name="leave_balance_warning" readonly="1"/>
+                            </div>
+                            <div class="alert alert-success mb-2" role="alert"
+                                 invisible="leave_mode != 'create_new' or has_insufficient_allocation or not leave_balance_warning">
+                                <field name="leave_balance_warning" readonly="1"/>
+                            </div>
                         </group>
                         <group>
                             <field name="attendance_case_ids" widget="many2many_tags" readonly="1"/>
@@ -78,12 +119,17 @@
                       decoration-info="state == 'enforced'"
                       decoration-muted="state == 'hr_refused'">
                     <header>
+                        <button name="action_run_attendance_scan"
+                                string="⚡ Run Attendance Scan Now"
+                                type="object"
+                                class="btn-success"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
                         <button name="action_coach_enforce"
                                 string="Batch Enforce (Coach)"
                                 type="object"
                                 class="btn-primary"/>
-                        <button name="action_open_exonerate_wizard"
-                                string="Batch Exonerate / Acknowledge"
+                        <button name="action_recheck_leave_coverage"
+                                string="Batch Re-Verify Coverage"
                                 type="object"
                                 class="btn-secondary"/>
                         <button name="action_open_hr_refuse_wizard"
@@ -134,6 +180,14 @@
             <field name="arch" type="xml">
                 <form string="Attendance Disciplinary Case">
                     <header>
+                        <!-- Coach Approval of Submitted Leave Adjustment -->
+                        <button name="action_coach_approve_leave_adjustment"
+                                string="Approve Leave Adjustment (Coach)"
+                                type="object"
+                                class="oe_highlight btn-success"
+                                invisible="not can_coach_approve_leave"
+                                confirm="Approve this leave adjustment? This will deduct the unexcused days from the employee's accrued balance and close this attendance case."/>
+
                         <!-- Direct Coach Actions (Minor / Prolonged Track) -->
                         <button name="action_coach_enforce"
                                 string="Enforce Penalty (Coach)"
@@ -141,13 +195,7 @@
                                 class="btn-primary"
                                 invisible="not can_coach_act or violation_type == 'absence_dismissal'"
                                 confirm="Enforce this attendance disciplinary sanction and schedule any applicable salary penalty?"/>
-                        <button name="action_open_exonerate_wizard"
-                                string="Acknowledge / Exonerate"
-                                type="object"
-                                class="btn-info"
-                                invisible="not can_coach_act"/>
-
-                        <!-- Pre-Enforcement Leave Conversion (Available to Employee, Coach, Director, POMD before enforcement) -->
+                        <!-- Pre-Enforcement Leave Conversion & Attendance Re-Verification (Available to Employee, Coach, Director, POMD before enforcement) -->
                         <button name="action_open_leave_adjustment_wizard"
                                 string="Adjust / Convert Absence to Leave"
                                 type="object"
@@ -155,11 +203,11 @@
                                 invisible="not can_adjust_by_leave"
                                 help="Convert absent days into approved/submitted Time Off (Leave) prior to enforcement."/>
                         <button name="action_recheck_leave_coverage"
-                                string="Re-Verify Leave Coverage"
+                                string="Re-Verify Attendance &amp; Leave Coverage"
                                 type="object"
                                 class="btn-secondary"
                                 invisible="not can_adjust_by_leave"
-                                help="Re-scan employee Time Off records to check if absent dates are now covered by approved leave."/>
+                                help="Cross-verify whether absent dates are officially acknowledged by the manager in Attendance Management or covered by approved Time Off."/>
 
                         <!-- Dismissal Absence (>= 5 Consecutive Working Days): Director -> POMD -->
                         <button name="action_director_send_to_pomd"
@@ -182,6 +230,15 @@
                                 class="btn-danger"
                                 invisible="not can_hr_refuse"/>
 
+                        <!-- Official Notice / Warning Letter Print -->
+                        <button name="action_print_notice_letter"
+                                string="Print Notice Letter"
+                                type="object"
+                                class="btn-outline-primary"
+                                icon="fa-print"
+                                invisible="state in ('draft', 'leave_adjusted', 'exonerated', 'hr_refused')"
+                                help="Download and print the official Bunna Bank Disciplinary Notice / Warning Letter PDF."/>
+
                         <field name="state" widget="statusbar"
                                statusbar_visible="coach_review,director_review,pomd_review,enforced,leave_adjusted,exonerated"/>
                     </header>
@@ -198,6 +255,10 @@
                         <field name="can_director_act" invisible="1"/>
                         <field name="can_pomd_enforce" invisible="1"/>
                         <field name="can_hr_refuse" invisible="1"/>
+                        <field name="has_pending_leave_approval" invisible="1"/>
+                        <field name="can_coach_approve_leave" invisible="1"/>
+                        <field name="coach_id" invisible="1"/>
+                        <field name="director_id" invisible="1"/>
                         <field name="payroll_penalty_count" invisible="1"/>
 
                         <widget name="web_ribbon" title="Adjusted by Leave" bg_color="text-bg-success" invisible="state != 'leave_adjusted'"/>
@@ -222,6 +283,18 @@
                         </div>
 
                         <!-- Guidance Banners -->
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="alert"
+                             invisible="not has_pending_leave_approval">
+                            <i class="fa fa-clock-o fa-2x me-3 text-info" title="Pending Approval"/>
+                            <div>
+                                <h5 class="mb-1 font-weight-bold">Leave Adjustment Pending Coach Approval</h5>
+                                <p class="mb-0">
+                                    The subject employee submitted Leave Request <strong><field name="leave_id" readonly="1" class="d-inline fw-bold"/></strong> to cover the unexcused absence.
+                                    The Direct Coach / Line Manager can click <strong>Approve Leave Adjustment (Coach)</strong> above to deduct the leave and close this case.
+                                </p>
+                            </div>
+                        </div>
+
                         <div class="alert alert-danger d-flex align-items-center mb-3" role="alert"
                              invisible="violation_type != 'absence_dismissal' or state not in ('director_review', 'pomd_review')">
                             <i class="fa fa-exclamation-triangle fa-2x me-3 text-danger" title="Dismissal Absence Warning"/>
@@ -236,16 +309,12 @@
                         </div>
 
                         <group>
-                            <group string="Employee &amp; Shift Schedule Profile">
+                            <group string="Employee Profile">
                                 <field name="employee_id" readonly="state != 'draft'"/>
                                 <field name="operating_unit_id" readonly="1" options="{'no_open': True}"/>
                                 <field name="department_id" readonly="1"/>
                                 <field name="job_id" readonly="1"/>
                                 <field name="staff_category_display" string="Employment Category" readonly="1"/>
-                                <field name="is_shift_worker" readonly="1"/>
-                                <field name="shift_schedule_summary" readonly="1"/>
-                                <field name="coach_id" readonly="state in ('enforced', 'leave_adjusted', 'exonerated', 'hr_refused')"/>
-                                <field name="director_id" readonly="state in ('enforced', 'leave_adjusted', 'exonerated', 'hr_refused')"/>
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
 
@@ -254,19 +323,18 @@
                                 <field name="incident_date" readonly="state in ('enforced', 'leave_adjusted', 'exonerated', 'hr_refused')"/>
                                 <field name="date_from" readonly="state != 'draft'"/>
                                 <field name="date_to" readonly="state != 'draft'"/>
-                                <field name="absent_dates_summary" invisible="violation_type in ('late', 'force_checkout')" readonly="1"/>
                                 <field name="absent_days_count" invisible="violation_type in ('late', 'force_checkout')" readonly="1"/>
                                 <field name="max_consecutive_days" invisible="violation_type in ('late', 'force_checkout')" readonly="1"/>
                                 <field name="late_minutes_total" invisible="violation_type != 'late'" readonly="1"/>
                                 <field name="late_occurrences_count" invisible="violation_type != 'late'" readonly="1"/>
                                 <field name="force_checkout_count" invisible="violation_type != 'force_checkout'" readonly="1"/>
-                                <field name="offense_id" readonly="1"/>
-                                <field name="severity_level_id" readonly="1"/>
-                                <field name="occurrence_count" readonly="1"/>
                                 <field name="punishment_type" readonly="state in ('enforced', 'leave_adjusted', 'exonerated', 'hr_refused')"/>
-                                <field name="penalty_percentage" invisible="staff_category == 'managerial' or violation_type == 'absence_dismissal'" readonly="1"/>
-                                <field name="fine_days" invisible="staff_category != 'managerial' or violation_type == 'absence_dismissal'" readonly="1"/>
+                                <field name="penalty_percentage" invisible="staff_category == 'managerial' or violation_type == 'absence_dismissal' or penalty_percentage == 0" readonly="1"/>
+                                <field name="fine_days" invisible="staff_category != 'managerial' or violation_type == 'absence_dismissal' or fine_days == 0" readonly="1"/>
+                                <field name="occurrence_count" readonly="1"/>
                                 <field name="deduction_status" readonly="1"/>
+                                <field name="active_penalty_end_date" invisible="not active_penalty_end_date" readonly="1"/>
+                                <field name="notice_language"/>
                             </group>
                         </group>
 
@@ -289,8 +357,23 @@
                                         <field name="refused_date" invisible="not refused_date"/>
                                     </group>
                                 </group>
-                                <separator string="Detailed System Scan Summary"/>
-                                <field name="description" readonly="state in ('enforced', 'leave_adjusted', 'exonerated', 'hr_refused')"/>
+                                <group string="Unexcused Absent Dates" invisible="violation_type in ('late', 'force_checkout')">
+                                    <field name="absent_dates_summary" readonly="1" nolabel="1"/>
+                                </group>
+                            </page>
+                            <page string="Governance &amp; Notice Regulatory Details" name="governance_details">
+                                <group>
+                                    <group string="Statutory Misconduct Offense">
+                                        <field name="offense_id" readonly="state != 'draft'"/>
+                                        <field name="severity_level_id" readonly="state != 'draft'"/>
+                                        <field name="active_duration_days" readonly="1"/>
+                                        <field name="active_penalty_end_date" readonly="1"/>
+                                    </group>
+                                    <group string="Signatory &amp; Digital Authorization">
+                                        <field name="signatory_id" readonly="1"/>
+                                        <field name="signatory_signature" widget="image" class="oe_avatar" readonly="1" invisible="not signatory_signature"/>
+                                    </group>
+                                </group>
                             </page>
                         </notebook>
                     </sheet>
@@ -338,6 +421,11 @@
             <field name="name">Attendance Disciplinary Cases</field>
             <field name="res_model">discipline.attendance.case</field>
             <field name="view_mode">list,form</field>
+            <field name="domain">[]</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_discipline_attendance_case_list')}),
+                (0, 0, {'view_mode': 'form', 'view_id': ref('view_discipline_attendance_case_form')})
+            ]"/>
             <field name="context">{'discipline_scope': True}</field>
             <field name="search_view_id" ref="view_discipline_attendance_case_search"/>
             <field name="help" type="html">
@@ -361,12 +449,12 @@
         </record>
 
         <record id="action_server_batch_coach_exonerate_attendance_cases" model="ir.actions.server">
-            <field name="name">Batch Acknowledge / Exonerate (Coach)</field>
+            <field name="name">Batch Re-Verify Attendance &amp; Leave Coverage</field>
             <field name="model_id" ref="discipline_management.model_discipline_attendance_case"/>
             <field name="binding_model_id" ref="discipline_management.model_discipline_attendance_case"/>
             <field name="binding_view_types">list</field>
             <field name="state">code</field>
-            <field name="code">action = records.action_open_exonerate_wizard()</field>
+            <field name="code">action = records.action_recheck_leave_coverage()</field>
         </record>
 
     </data>

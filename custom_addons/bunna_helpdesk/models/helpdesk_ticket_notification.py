@@ -24,19 +24,19 @@ EVENTS = {
         "sms_param": "bunna_helpdesk.bunna_sms_acceptance_template",
         "sms_default": (
             "Dear {first_name}\n"
-            "Your Bunna Bank request {number} {name} has been registered and accepted by {team_name}. We are currently processing it. For inquiries, call 8501.\n"
+            "Your Bunna Bank request {number} has been registered and accepted by {team_name}. We are currently processing it. For inquiries, call 8501.\n"
             "Bunna Bank S.C."
         ),
         "label": "Acceptance",
     },
     "completion": {
         "stage_xmlid": "bunna_helpdesk.helpdesk_ticket_stage_done",
-        "stage_name": "Done",
+        "stage_name": "Resolve",
         "template_xmlid": "bunna_helpdesk.email_template_service_request_completed",
         "sms_param": "bunna_helpdesk.bunna_sms_done_template",
         "sms_default": (
             "Dear {first_name}\n"
-            "Your Bunna Bank ticket {number} {name} has been successfully resolved. Thank you for banking with Bunna Bank! Inquiries: 8501.\n"
+            "Your Bunna Bank ticket {number} has been successfully resolved. Thank you for banking with Bunna Bank! Inquiries: 8501.\n"
             "Bunna Bank S.C."
         ),
         "label": "Completion",
@@ -62,7 +62,6 @@ class HelpdeskTicketNotification(models.Model):
         [("sms", "SMS"), ("email", "Email")],
         string="Acceptance Notification Channel",
         default="sms",
-        tracking=True,
         help="Select whether to notify the customer via SMS or Email upon ticket acceptance. Once sent, the alternative channel is deactivated.",
     )
     acceptance_sent_channel = fields.Selection(
@@ -75,7 +74,6 @@ class HelpdeskTicketNotification(models.Model):
         [("sms", "SMS"), ("email", "Email")],
         string="Done Notification Channel",
         default="sms",
-        tracking=True,
         help="Select whether to notify the customer via SMS or Email upon resolution/done. Once sent, the alternative channel is deactivated.",
     )
     done_sent_channel = fields.Selection(
@@ -87,12 +85,17 @@ class HelpdeskTicketNotification(models.Model):
 
     header_action = fields.Selection(
         selection=[
-            ("accept", "Accept Ticket"),
-            ("done", "Resolve & Done"),
+            ("escalated", "Escalated Stage (Register & In Progress)"),
+            ("done", "Resolved Stage (Mark as Resolved)"),
         ],
-        string="Action",
-        default="accept",
-        help="1st Dropdown: Select whether to Accept the ticket or Mark as Done.",
+        string="Stage Action",
+        default="escalated",
+        help="Select case management stage for notification (Escalated or Resolved).",
+    )
+    header_notify_toggle = fields.Boolean(
+        string="Notify Customer",
+        default=False,
+        help="Button ON/OFF: Toggle customer SMS or Email notification on or off.",
     )
     header_channel = fields.Selection(
         selection=[
@@ -101,7 +104,7 @@ class HelpdeskTicketNotification(models.Model):
         ],
         string="Notification Channel",
         default="sms",
-        help="2nd Dropdown: Select delivery channel (SMS or Email).",
+        help="Drop-down SMS and email: Select delivery channel.",
     )
 
     display_header_notification = fields.Boolean(
@@ -115,9 +118,10 @@ class HelpdeskTicketNotification(models.Model):
             if not ticket.id:
                 ticket.display_header_notification = False
                 continue
-            is_done_stage = bool(ticket.stage_id and (ticket.stage_id.name == "Done" or ticket.stage_id.closed))
+            stage_name = (ticket.stage_id.name or "").lower() if ticket.stage_id else ""
+            is_done_stage = bool(ticket.stage_id and (stage_name in ("done", "resolve", "resolved") or ticket.stage_id.closed))
             if is_done_stage:
-                # When ticket status is Done, keep header controls visible until the Done notification is actually sent
+                # When ticket status is Resolved / Done, keep header controls visible until the completion notification is actually sent
                 ticket.display_header_notification = not (ticket.completion_sms_sent or ticket.completion_email_sent)
             else:
                 # In New or In Progress stages, keep header controls visible
@@ -126,14 +130,15 @@ class HelpdeskTicketNotification(models.Model):
     @api.onchange("stage_id", "acceptance_sms_sent", "acceptance_email_sent")
     def _onchange_stage_header_action(self):
         for ticket in self:
-            if ticket.stage_id and (ticket.stage_id.name == "Done" or ticket.stage_id.closed):
+            stage_name = (ticket.stage_id.name or "").lower() if ticket.stage_id else ""
+            if ticket.stage_id and (stage_name in ("done", "resolve", "resolved") or ticket.stage_id.closed):
                 ticket.header_action = "done"
-            elif ticket.stage_id and ticket.stage_id.name == "In Progress":
+            elif ticket.stage_id and stage_name == "in progress":
                 ticket.header_action = "done"
             elif ticket.acceptance_sms_sent or ticket.acceptance_email_sent:
                 ticket.header_action = "done"
             else:
-                ticket.header_action = "accept"
+                ticket.header_action = "escalated"
 
     acceptance_notification_status = fields.Char(
         string="Acceptance Status",
@@ -190,7 +195,6 @@ class HelpdeskTicketNotification(models.Model):
         string="Notification Channel Sent",
         compute="_compute_notification_channel_sent",
         store=True,
-        tracking=True,
         help="Captures whether notification was dispatched by SMS or by Email for acceptance and resolution.",
     )
 
@@ -221,23 +225,47 @@ class HelpdeskTicketNotification(models.Model):
         conf = EVENTS[event]
         stage = self.env.ref(conf["stage_xmlid"], raise_if_not_found=False)
         if not stage:
-            stage = self.env["helpdesk.ticket.stage"].search(
-                [("name", "ilike", conf["stage_name"])], limit=1
-            )
+            if event == "completion":
+                stage = self.env["helpdesk.ticket.stage"].search(
+                    ["|", ("name", "ilike", "resolve"), ("name", "ilike", "resolved")], limit=1
+                )
+            if not stage:
+                stage = self.env["helpdesk.ticket.stage"].search(
+                    [("name", "ilike", conf["stage_name"])], limit=1
+                )
         return stage
 
     def _bunna_stage_event(self, stage):
         """Return 'acceptance' / 'completion' / False for a stage record."""
         if not stage:
             return False
+        if getattr(stage, "sms_template_type", False):
+            if stage.sms_template_type == "escalated":
+                return "acceptance"
+            elif stage.sms_template_type == "resolved":
+                return "completion"
         for event in EVENTS:
             if stage == self._bunna_get_stage(event):
                 return event
+        stage_name = (stage.name or "").lower()
+        if any(w in stage_name for w in ("in progress", "escalat", "escalated")):
+            return "acceptance"
+        if any(w in stage_name for w in ("resolve", "resolved", "done")):
+            return "completion"
         return False
 
     # ── write hook ───────────────────────────────────────────────────────────
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get("header_action") == "accept":
+                vals["header_action"] = "escalated"
+        return super().create(vals_list)
+
     def write(self, vals):
+        if vals.get("header_action") == "accept":
+            vals["header_action"] = "escalated"
         if "stage_id" not in vals:
             return super().write(vals)
         old_stages = {t.id: t.stage_id for t in self}
@@ -260,6 +288,12 @@ class HelpdeskTicketNotification(models.Model):
                 ticket.with_context(mail_notrack=True).sudo().write({
                     "done_notification_date": fields.Datetime.now(),
                 })
+            # Automatic notification if stage has enable_sms configured
+            if new and getattr(new, "enable_sms", False) and not self.env.context.get("bunna_skip_notifications"):
+                evt = ticket._bunna_stage_event(new)
+                if evt:
+                    ch = getattr(new, "notification_channel", "sms") or "sms"
+                    ticket._bunna_send_notifications(evt, channels=(ch,))
         return res
 
     def _track_template(self, tracking):
@@ -271,6 +305,26 @@ class HelpdeskTicketNotification(models.Model):
 
     # ── SMS ──────────────────────────────────────────────────────────────────
 
+    def _bunna_get_notification_operating_unit_name(self):
+        """Resolve the current or escalated operating unit responsible for this ticket."""
+        self.ensure_one()
+        # 1. Check current operating unit on ticket (Sub Service Provider / Escalated OU)
+        if self.operating_unit_id:
+            return self.operating_unit_id.name
+        # 2. If ticket was escalated and OU not set, check latest escalation history destination OU
+        if self.escalation_history_ids:
+            latest_history = self.escalation_history_ids.sorted("id", reverse=True)[:1]
+            if latest_history.current_operating_unit_id:
+                return latest_history.current_operating_unit_id.name
+        # 3. Check escalated assignee's operating unit
+        if self.escalated_to_user_id and self.escalated_to_user_id.default_operating_unit_id:
+            return self.escalated_to_user_id.default_operating_unit_id.name
+        # 4. Check team's operating unit if configured
+        if self.team_id and hasattr(self.team_id, "operating_unit_id") and self.team_id.operating_unit_id:
+            return self.team_id.operating_unit_id.name
+        # 5. Fallback to team name or Support Team
+        return self.team_id.name or "Bunna Bank Support Team"
+
     def _bunna_sms_body(self, event):
         self.ensure_one()
         conf = EVENTS[event]
@@ -279,20 +333,36 @@ class HelpdeskTicketNotification(models.Model):
         )
         full_name = (self.partner_id.name or self.partner_name or _("Customer")).strip()
         first_name = full_name.split()[0] if full_name else _("Customer")
+
+        # Strip any HTML/XML tags or residual angle brackets from title
+        clean_name = self.name or ""
+        if "<" in clean_name and ">" in clean_name:
+            clean_name = tools.html2plaintext(clean_name)
+            clean_name = re.sub(r"<[^>]+>", "", clean_name)
+        clean_name = " ".join(clean_name.split()).strip()
+
+        # Resolve responsible / escalated operating unit name
+        ou_name = self._bunna_get_notification_operating_unit_name()
+
         values = {
             "reference": self.number or "",
             "number": self.number or "",
-            "name": self.name or "",
+            "name": clean_name,
             "partner_name": full_name,
             "first_name": first_name,
             "partner_first_name": first_name,
-            "team_name": self.team_id.name or "Support Team",
+            "team_name": ou_name,
+            "operating_unit_name": ou_name,
+            "escalated_operating_unit": ou_name,
             "bank_hotline": "8501",
         }
         # plain placeholder replacement: no attribute access / format-spec tricks
-        return re.sub(
+        body = re.sub(
             r"\{(\w+)\}", lambda m: str(values.get(m.group(1), m.group(0))), template
         ).strip()
+        # Clean up any leftover double spaces
+        body = re.sub(r" +", " ", body)
+        return body
 
     def _bunna_sms_phone(self):
         """First usable mobile among: ticket phone, partner phone, partner mobile.
@@ -430,14 +500,7 @@ class HelpdeskTicketNotification(models.Model):
             if flags:
                 ticket.with_context(mail_notrack=True, bunna_skip_notifications=True).sudo().write(flags)
             if lines:
-                try:
-                    ticket.message_post(
-                        body="<br/>".join(lines),
-                        message_type="notification",
-                        subtype_xmlid="mail.mt_note",
-                    )
-                except Exception:
-                    _logger.exception("Could not log notification result on ticket %s", ticket.number)
+                _logger.info("Notification dispatch result for ticket %s: %s", ticket.number, " | ".join(lines))
         return summary
 
     # ── buttons & wizards ───────────────────────────────────────────────────
@@ -539,19 +602,37 @@ class HelpdeskTicketNotification(models.Model):
         }
 
     def action_execute_header_notification(self):
-        """Execute selected header action (1st Dropdown: Accept or Done) with selected channel (2nd Dropdown: SMS or Email)."""
+        """Execute selected header action (Escalated or Resolved) with selected channel (SMS or Email) and toggle ON/OFF."""
         self.ensure_one()
-        action = self.header_action or "accept"
+        action = self.header_action or "escalated"
         channel = self.header_channel or "sms"
+        event = "acceptance" if action in ("escalated", "accept") else "completion"
 
-        if action == "accept":
+        if not self.header_notify_toggle:
+            stage = self._bunna_get_stage(event)
+            if stage and self.stage_id != stage:
+                self.with_context(bunna_skip_notifications=True).write({"stage_id": stage.id})
+            return {
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {
+                    "title": _("Stage Updated"),
+                    "message": _("Ticket status updated (Customer notification turned OFF)."),
+                    "type": "info",
+                    "sticky": False,
+                },
+            }
+
+        if event == "acceptance":
             self.acceptance_channel = channel
             self.acceptance_sent_channel = channel
-            return self._bunna_manual_notify("acceptance", channels=(channel,))
-        elif action == "done":
+        else:
             self.done_channel = channel
             self.done_sent_channel = channel
-            return self._bunna_manual_notify("completion", channels=(channel,))
+
+        res = self._bunna_manual_notify(event, channels=(channel,))
+        self.with_context(mail_notrack=True).write({"header_notify_toggle": False})
+        return res
 
     def action_accept_ticket_channel(self):
         """Accept ticket (-> In Progress) and notify customer via selected acceptance_channel (SMS or Email)."""

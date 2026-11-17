@@ -26,92 +26,26 @@ patch(ListRenderer.prototype, {
                 return;
             }
 
-            // Only run if this table has an is_selected column (Auto Match candidate table)
+            // Only run if this table has an is_selected column
             const th = table.querySelector('th[data-name="is_selected"]');
             if (!th) {
                 return;
             }
 
-            const records = this.props.list?.records?.filter((r) => !r.data.already_nominated) || [];
+            const box = th.querySelector("input[type='checkbox']");
+            if (!box) {
+                return;
+            }
+
+            const records = this.props.list?.records || [];
             const isAll = records.length > 0 && records.every((r) => Boolean(r.data.is_selected));
             const isAny = records.some((r) => Boolean(r.data.is_selected));
-
-            let box = th.querySelector("input.o_automatch_select_all_box");
-            if (!box) {
-                th.innerHTML = "";
-                const container = document.createElement("div");
-                container.className = "d-inline-flex align-items-center justify-content-center w-100";
-
-                box = document.createElement("input");
-                box.type = "checkbox";
-                box.className = "form-check-input cursor-pointer o_automatch_select_all_box m-0";
-                box.style.cursor = "pointer";
-                box.title = "Select All / Deselect All";
-
-                container.appendChild(box);
-                th.appendChild(container);
-                th.style.cursor = "pointer";
-                th.onclick = (ev) => {
-                    if (ev.target !== box) {
-                        ev.stopPropagation();
-                        box.click();
-                    }
-                };
-
-                // Master select all / deselect all in 1 click
-                box.onclick = async (ev) => {
-                    ev.stopPropagation();
-                    const currentRecords = this.props.list?.records?.filter((r) => !r.data.already_nominated) || [];
-                    if (!currentRecords.length) {
-                        return;
-                    }
-
-                    const allChecked = currentRecords.every((r) => Boolean(r.data.is_selected));
-                    const targetVal = !allChecked;
-                    box.checked = targetVal;
-                    box.indeterminate = false;
-
-                    // Immediately update row checkboxes in DOM for instant visual feedback
-                    const rowCheckboxes = table.querySelectorAll('tbody td[name="is_selected"] input[type="checkbox"]:not(:disabled)');
-                    for (const cb of rowCheckboxes) {
-                        cb.checked = targetVal;
-                    }
-
-                    const root = this.props.list?.model?.root;
-                    const orm = this.orm || this.env.services?.orm;
-                    const validModels = ["succession.auto.match.wizard", "succession.candidate.nomination.wizard"];
-
-                    // Fast 1-click backend bulk update and reload
-                    if (root && root.resId && validModels.includes(root.resModel) && orm) {
-                        try {
-                            const action = await orm.call(
-                                root.resModel,
-                                targetVal ? "action_select_all" : "action_deselect_all",
-                                [[root.resId]]
-                            );
-                            if (typeof root.load === "function") {
-                                await root.load();
-                            } else if (action && (this.actionService || this.env.services?.action)) {
-                                const actService = this.actionService || this.env.services?.action;
-                                await actService.doAction(action);
-                            }
-                        } catch (e) {
-                            console.error("Auto match select all error:", e);
-                        }
-                    } else {
-                        // In-memory fallback
-                        for (const rec of currentRecords) {
-                            if (Boolean(rec.data.is_selected) !== targetVal) {
-                                await rec.update({ is_selected: targetVal });
-                            }
-                        }
-                    }
-                };
-            }
 
             box.checked = isAll;
             box.indeterminate = !isAll && isAny;
         };
+
+        this.updateSelectAllHeader = updateSelectAllHeader;
 
         const removeTopScrollbar = () => {
             const table = this.tableRef?.el;
@@ -139,19 +73,76 @@ patch(ListRenderer.prototype, {
         if (!this.props.list || !this.props.list.records) {
             return false;
         }
-        const records = this.props.list.records.filter((r) => !r.data.already_nominated);
-        return records.length > 0 && records.every((r) => Boolean(r.data[column.name]));
+        const colName = column?.name || "is_selected";
+        const records = this.props.list.records;
+        return records.length > 0 && records.every((r) => Boolean(r.data[colName]));
+    },
+
+    async toggleAutoMatchRecord(record, column, ev) {
+        if (!record) {
+            return;
+        }
+        if (ev) {
+            ev.stopPropagation();
+        }
+        const colName = column?.name || "is_selected";
+        const currentValue = Boolean(record.data[colName]);
+        const newValue = !currentValue;
+
+        // Immediately update all DOM checkboxes in this row
+        const table = this.tableRef?.el;
+        if (table) {
+            const row = table.querySelector(`tr[data-id="${record.id}"]`);
+            if (row) {
+                const inputs = row.querySelectorAll('input[type="checkbox"]');
+                inputs.forEach((input) => {
+                    input.checked = newValue;
+                });
+            }
+        } else if (ev?.target) {
+            const input = ev.target.tagName === "INPUT" ? ev.target : ev.target.querySelector("input");
+            if (input) {
+                input.checked = newValue;
+            }
+        }
+
+        try {
+            if (this.props.list?.enterEditMode) {
+                await this.props.list.enterEditMode(record);
+            }
+            await record.update({ [colName]: newValue });
+        } catch (e) {
+            console.warn("record.update note:", e);
+            record.data[colName] = newValue;
+            if (record._changes) {
+                record._changes[colName] = newValue;
+            }
+            record.dirty = true;
+        }
+
+        if (typeof this.updateSelectAllHeader === "function") {
+            this.updateSelectAllHeader();
+        }
+    },
+
+    async onCellClicked(record, column, ev, newWindow) {
+        if (column && column.name === "is_selected") {
+            await this.toggleAutoMatchRecord(record, column, ev);
+            return;
+        }
+        return super.onCellClicked(...arguments);
     },
 
     async toggleAutoMatchSelectAll(column, ev) {
         if (!this.props.list || !this.props.list.records) {
             return;
         }
-        const records = this.props.list.records.filter((r) => !r.data.already_nominated);
+        const colName = column?.name || "is_selected";
+        const records = this.props.list.records;
         if (!records.length) {
             return;
         }
-        const isAll = records.every((r) => Boolean(r.data[column.name]));
+        const isAll = records.every((r) => Boolean(r.data[colName]));
         const newValue = !isAll;
         if (ev && ev.target) {
             ev.target.checked = newValue;
@@ -160,38 +151,31 @@ patch(ListRenderer.prototype, {
 
         const table = this.tableRef?.el;
         if (table) {
-            const rowCheckboxes = table.querySelectorAll('tbody td[name="is_selected"] input[type="checkbox"]:not(:disabled)');
+            const rowCheckboxes = table.querySelectorAll('tbody td input[type="checkbox"]');
             for (const cb of rowCheckboxes) {
                 cb.checked = newValue;
             }
         }
 
-        const root = this.props.list?.model?.root;
-        const orm = this.orm || this.env.services?.orm;
-        const validModels = ["succession.auto.match.wizard", "succession.candidate.nomination.wizard"];
-
-        if (root && root.resId && validModels.includes(root.resModel) && orm) {
+        const targetRecords = records.filter((r) => Boolean(r.data[colName]) !== newValue);
+        for (let i = 0; i < targetRecords.length; i++) {
+            const record = targetRecords[i];
+            const isLast = i === targetRecords.length - 1;
             try {
-                const action = await orm.call(
-                    root.resModel,
-                    newValue ? "action_select_all" : "action_deselect_all",
-                    [[root.resId]]
-                );
-                if (typeof root.load === "function") {
-                    await root.load();
-                } else if (action && (this.actionService || this.env.services?.action)) {
-                    const actService = this.actionService || this.env.services?.action;
-                    await actService.doAction(action);
+                if (typeof record._update === "function" && record.model?.mutex) {
+                    await record.model.mutex.exec(() =>
+                        record._update({ [colName]: newValue }, { withoutOnchange: !isLast })
+                    );
+                } else {
+                    await record.update({ [colName]: newValue });
                 }
             } catch (e) {
-                console.error("Auto match select all error:", e);
+                console.warn("batch update note:", e);
             }
-        } else {
-            for (const record of records) {
-                if (Boolean(record.data[column.name]) !== newValue) {
-                    await record.update({ [column.name]: newValue });
-                }
-            }
+        }
+
+        if (typeof this.updateSelectAllHeader === "function") {
+            this.updateSelectAllHeader();
         }
     },
 });

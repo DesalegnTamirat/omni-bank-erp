@@ -27,11 +27,16 @@ class PmDeliverable(models.Model):
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled')
     ], string='Status', compute='_compute_deliverable_state', store=True, readonly=False, default='draft', tracking=True)
+    is_state_manual = fields.Boolean(string='Manual Status Override', default=False)
     
     description = fields.Html(string='Deliverable Description & Notes')
-    color = fields.Integer(string='Color', default=0)
+    color = fields.Integer(default=0)
+    active = fields.Boolean(string='Active', default=True)
 
     task_ids = fields.One2many('pm.task', 'deliverable_id', string='Tasks')
+    subtask_ids = fields.One2many('pm.task.subtask', 'deliverable_id', string='Sub-tasks')
+    test_case_ids = fields.One2many('pm.test.case', 'deliverable_id', string='Test Cases & Results')
+    document_ids = fields.One2many('pm.project.document', 'deliverable_id', string='Requirements & Gap Analysis')
     task_count = fields.Integer(string='Total Tasks', compute='_compute_task_stats', store=True)
     closed_task_count = fields.Integer(string='Completed Tasks', compute='_compute_task_stats', store=True)
     progress_rate = fields.Float(string='Progress (%)', compute='_compute_task_stats', store=True)
@@ -53,6 +58,8 @@ class PmDeliverable(models.Model):
             m = self.env['pm.milestone'].browse(vals['milestone_id'])
             if m.project_id:
                 vals['project_id'] = m.project_id.id
+        if 'state' in vals and 'is_state_manual' not in vals and not self.env.context.get('skip_state_manual'):
+            vals['is_state_manual'] = True
         return super().write(vals)
 
     @api.onchange('milestone_id')
@@ -116,13 +123,16 @@ class PmDeliverable(models.Model):
                         "Deliverable '%s': Allocated weight (%.2f%%) cannot be less than the total weight of its tasks (%.2f%%)!"
                     ) % (rec.name, rec.weight, total_task_weight))
 
-    @api.depends('task_ids', 'task_ids.is_closed', 'task_ids.progress_rate', 'task_ids.weight')
+    @api.depends('task_ids', 'task_ids.is_closed', 'task_ids.progress_rate', 'task_ids.weight', 'state')
     def _compute_task_stats(self):
         for rec in self:
             total = len(rec.task_ids)
             closed = len(rec.task_ids.filtered(lambda t: t.is_closed))
             rec.task_count = total
             rec.closed_task_count = closed
+            if rec.state == 'completed':
+                rec.progress_rate = 100.0
+                continue
             if total > 0:
                 total_weight = sum(t.weight for t in rec.task_ids)
                 if total_weight > 0:
@@ -132,23 +142,35 @@ class PmDeliverable(models.Model):
             else:
                 rec.progress_rate = 0.0
 
-    @api.depends('task_count', 'closed_task_count', 'progress_rate', 'date_deadline')
+    @api.depends('task_count', 'closed_task_count', 'progress_rate', 'date_deadline', 'is_state_manual',
+                 'task_ids.is_blocked', 'task_ids.is_closed')
     def _compute_deliverable_state(self):
         today = date.today()
         for rec in self:
-            if rec.state == 'cancelled':
+            if rec.is_state_manual and rec.state:
                 continue
-            if rec.task_count > 0 and rec.closed_task_count == rec.task_count and rec.progress_rate >= 100.0:
+            if rec.state in ('completed', 'cancelled'):
+                continue
+            if rec.progress_rate >= 100.0 or (rec.task_count > 0 and rec.closed_task_count == rec.task_count):
                 rec.state = 'completed'
-            elif rec.progress_rate > 0.0 or (rec.task_count > 0 and any(not t.is_closed and t.stage_id.name != 'To Do' for t in rec.task_ids)):
+                continue
+            has_blocked = any(t.is_blocked and not t.is_closed for t in rec.task_ids)
+            is_overdue = rec.date_deadline and rec.date_deadline < today and rec.progress_rate < 100.0
+            if has_blocked or is_overdue:
+                rec.state = 'at_risk'
+            elif rec.progress_rate > 0.0 or any(not t.is_closed and (t.stage_id.name or '').strip().lower() != 'to do' for t in rec.task_ids):
                 rec.state = 'in_progress'
-            elif rec.task_count == 0:
-                if rec.date_deadline and rec.date_deadline < today:
-                    rec.state = 'at_risk'
-                elif rec.state != 'in_progress':
-                    rec.state = 'draft'
-            elif rec.closed_task_count == 0:
-                if rec.date_deadline and rec.date_deadline < today:
-                    rec.state = 'at_risk'
-                elif rec.state != 'in_progress':
-                    rec.state = 'draft'
+            else:
+                rec.state = 'draft'
+
+    @api.onchange('state')
+    def _onchange_state(self):
+        if self.state == 'completed':
+            self.progress_rate = 100.0
+            self.is_state_manual = True
+        elif self.state:
+            self.is_state_manual = True
+
+    def unlink(self):
+        """Soft delete: archive deliverable instead of permanent deletion."""
+        return self.write({'active': False})

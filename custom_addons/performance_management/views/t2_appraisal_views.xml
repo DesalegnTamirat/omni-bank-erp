@@ -26,6 +26,7 @@
                        decoration-info="state == 'draft'"
                        decoration-warning="state == 'notified'"
                        decoration-success="state == 'accepted'"
+                       decoration-primary="state == 'auto_accepted'"
                        decoration-danger="state == 'rejected'"/>
                 <field name="company_id" string="Company" optional="hide"/>
             </list>
@@ -84,7 +85,7 @@
                             icon="fa-undo"
                             class="btn-secondary"
                             groups="performance_management.group_performance_manager,performance_management.group_performance_planning,performance_management.group_performance_admin"
-                            invisible="state in ('draft', 'confirmed') or is_current_employee or (not is_current_manager and not is_planning_role and not is_admin_role)"/>
+                            invisible="state in ('draft', 'accepted', 'auto_accepted') or is_current_employee or (not is_current_manager and not is_planning_role and not is_admin_role)"/>
 
                     <!-- Reset to draft for Planning Role / Admin after confirmation -->
                     <button name="action_reset_draft"
@@ -93,11 +94,11 @@
                             icon="fa-undo"
                             class="btn-warning"
                             groups="performance_management.group_performance_planning,performance_management.group_performance_admin"
-                            invisible="state != 'confirmed' or is_current_employee or (not is_planning_role and not is_admin_role)"/>
+                            invisible="state not in ('accepted', 'auto_accepted') or is_current_employee or (not is_planning_role and not is_admin_role)"/>
 
                     <field name="state"
                            widget="statusbar"
-                           statusbar_visible="draft,notified,accepted,confirmed"/>
+                           statusbar_visible="draft,notified,accepted"/>
                 </header>
 
                 <sheet>
@@ -108,18 +109,40 @@
                     <field name="is_admin_role" invisible="1"/>
                     <field name="appraisal_period_code" invisible="1"/>
                     <field name="rejection_reason" invisible="1"/>
+                    <field name="manager_rejection_reply" invisible="1"/>
 
                     <!-- Rejection Alert Banner -->
-                    <div class="alert alert-danger d-flex align-items-center mb-3 shadow-sm"
+                    <div class="alert alert-danger d-flex align-items-start mb-3 shadow-sm"
                          style="border-left: 5px solid #541718; background-color: #fbf0f0; color: #541718; border-radius: 6px;"
                          role="alert"
                          invisible="state != 'rejected' or not rejection_reason">
-                        <i class="fa fa-exclamation-circle fa-2x me-3" style="color: #541718;"/>
-                        <div>
+                        <i class="fa fa-exclamation-circle fa-2x me-3 mt-1" style="color: #541718;"/>
+                        <div class="w-100">
                             <span class="badge" style="background-color: #541718; color: #fff; font-size: 11px;">REJECTED BY EMPLOYEE</span>
                             <div class="mt-1" style="font-size: 13.5px;">
-                                <strong>Reason: </strong>
+                                <strong>Employee Reason: </strong>
                                 <field name="rejection_reason" readonly="1" class="d-inline fw-semibold"/>
+                            </div>
+                            <div class="mt-2 pt-2 border-top border-danger-subtle">
+                                <label for="manager_rejection_reply" class="fw-bold text-dark" style="font-size: 13px;">Manager Reply to Employee Reason:</label>
+                                <field name="manager_rejection_reply" placeholder="Type your response or explanation to the employee before clicking Notify or Reset to Draft..." class="w-100"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Previous Rejection Resolution Info Banner -->
+                    <div class="alert alert-info d-flex align-items-center mb-3 shadow-sm"
+                         style="border-left: 5px solid #2b6cb0; background-color: #ebf8ff; color: #2b6cb0; border-radius: 6px;"
+                         role="alert"
+                         invisible="not manager_rejection_reply or state == 'rejected'">
+                        <i class="fa fa-reply fa-2x me-3" style="color: #2b6cb0;"/>
+                        <div>
+                            <span class="badge" style="background-color: #2b6cb0; color: #fff; font-size: 11px;">PREVIOUS REJECTION RESOLUTION</span>
+                            <div class="mt-1" style="font-size: 13px;" invisible="not rejection_reason">
+                                <strong>Employee Reason: </strong><field name="rejection_reason" readonly="1" class="d-inline text-muted"/>
+                            </div>
+                            <div class="mt-1" style="font-size: 13.5px;">
+                                <strong>Manager Response: </strong><field name="manager_rejection_reply" readonly="1" class="d-inline fw-semibold text-dark"/>
                             </div>
                         </div>
                     </div>
@@ -321,6 +344,7 @@
                                                    decoration-info="state == 'draft'"
                                                    decoration-warning="state == 'notified'"
                                                    decoration-success="state == 'accepted'"
+                                                   decoration-primary="state == 'auto_accepted'"
                                                    decoration-danger="state == 'rejected'"/>
                                         </div>
                                         <div class="text-muted small fw-bold mt-1">

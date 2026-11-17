@@ -2,6 +2,7 @@ from datetime import timedelta
 from markupsafe import Markup
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from odoo.tools.misc import format_date
 
 
 class DisciplineCaseWorkflow(models.Model):
@@ -145,6 +146,7 @@ class DisciplineCaseWorkflow(models.Model):
                     partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
                 )
                 rec._send_employee_discuss_direct_message(message_type='initiate')
+                rec._notify_assigned_secretaries_on_routing(rec.director_id, 'Director Review')
             else:
                 # If no director in line, submit directly to Chief
                 rec.sudo().with_context(force_write=True, force_escalate=True).write({
@@ -185,6 +187,8 @@ class DisciplineCaseWorkflow(models.Model):
                 partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
             )
             rec._send_chief_submission_discuss_notification()
+            if rec.chief_id:
+                rec._notify_assigned_secretaries_on_routing(rec.chief_id, 'Chief Review')
 
     def action_chief_exonerate(self):
         """Chief Officer reviews and officially exonerates the employee, dropping all charges."""
@@ -213,26 +217,82 @@ class DisciplineCaseWorkflow(models.Model):
         """Disallowed per policy governance: Only CEO can refer cases to Internal Audit for investigation."""
         raise UserError(_("Authority Restriction: Executive Chiefs cannot directly refer cases to Internal Audit. Please refer the case to the Chief Executive Officer (CEO) for investigation referral."))
 
-    def action_chief_escalate_to_ceo(self):
-        """Escalate the case directly to the Chief Executive Officer for review."""
+    def action_escalate_case(self):
+        """
+        Dynamically escalate the case step-by-step along the supervisory hierarchy.
+        - If the next supervisor is an intermediate executive (e.g., Deputy Chief -> Chief):
+          Update chief_id, retain state in 'submitted_chief', and notify the next executive.
+        - If the next supervisor is the CEO (or top of the chain):
+          Transition state to 'ceo_review', set escalation_target to 'ceo', and notify the CEO.
+        """
         for rec in self:
-            rec.escalation_target = 'ceo'
-            rec.with_context(force_write=True).write({'state': 'ceo_review'})
-            
-            EmpModel = self.env['hr.employee'].sudo()
-            ceo_user = EmpModel.get_ceo_user()
-            partners_to_notify = []
-            emp_sudo = rec.employee_id.sudo() if rec.employee_id else False
-            if ceo_user and ceo_user.partner_id:
-                partners_to_notify.append(ceo_user.partner_id.id)
-            if emp_sudo and emp_sudo.user_id and emp_sudo.user_id.partner_id:
-                partners_to_notify.append(emp_sudo.user_id.partner_id.id)
+            current_user = self.env.user
+            if not (rec.is_case_chief_user or rec.is_hr_admin or current_user._is_superuser()):
+                raise UserError(_("Authority Restriction: Only the active reviewing executive (%s) or HR Administrator can escalate this case.") % (rec.chief_id.name if rec.chief_id else _("Assigned Executive")))
 
-            rec.message_post(
-                body=Markup(_('Chief escalated case <strong>%s</strong> directly to CEO for executive review.') % rec.name),
-                partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
-            )
-            rec._send_chief_to_ceo_discuss_notification()
+            next_user, is_ceo, target_label = rec._get_next_escalation_supervisor()
+            
+            if is_ceo or not next_user:
+                # Top-level executive escalation to CEO
+                rec.escalation_target = 'ceo'
+                rec.with_context(force_write=True).write({'state': 'ceo_review'})
+                
+                EmpModel = self.env['hr.employee'].sudo()
+                ceo_user = EmpModel.get_ceo_user()
+                target_user = next_user or ceo_user
+                
+                notification_body = _(
+                    '<p>⚖️ <strong>Executive Case Escalation</strong></p>'
+                    '<p>Case <strong>%s</strong> officially escalated by %s to Chief Executive Officer (CEO) %s for executive review.</p>'
+                ) % (rec.name, current_user.name, target_user.name if target_user else "CEO")
+                
+                partners_to_notify = []
+                if target_user and target_user.partner_id:
+                    partners_to_notify.append(target_user.partner_id.id)
+                emp_sudo = rec.employee_id.sudo() if rec.employee_id else False
+                if emp_sudo and emp_sudo.user_id and emp_sudo.user_id.partner_id:
+                    partners_to_notify.append(emp_sudo.user_id.partner_id.id)
+                    
+                rec.message_post(
+                    body=Markup(notification_body),
+                    partner_ids=list(set(partners_to_notify)) if partners_to_notify else False,
+                )
+                if target_user and target_user.partner_id:
+                    rec._send_discuss_direct_message(current_user, target_user.partner_id, notification_body)
+            else:
+                # Step-by-step intermediate executive escalation (e.g. Deputy Chief -> Chief)
+                rec.with_context(force_write=True).write({
+                    'chief_id': next_user.id,
+                    'state': 'submitted_chief',
+                })
+                
+                notification_body = _(
+                    '<p>⚖️ <strong>Executive Case Escalation</strong></p>'
+                    '<p>Case <strong>%s</strong> escalated by %s to %s for executive review.</p>'
+                ) % (rec.name, current_user.name, target_label)
+                
+                rec.message_post(
+                    body=Markup(notification_body),
+                    partner_ids=[next_user.partner_id.id] if next_user.partner_id else False,
+                )
+                if next_user.partner_id:
+                    rec.sudo().message_subscribe(partner_ids=[next_user.partner_id.id])
+                    rec._send_discuss_direct_message(current_user, next_user.partner_id, notification_body)
+                    rec._notify_assigned_secretaries_on_routing(next_user)
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Case Escalated'),
+                'message': _('Disciplinary case has been successfully escalated to the next authority.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    action_chief_escalate_to_ceo = action_escalate_case
 
     def action_ceo_announce_audit_and_suspend(self):
         """CEO action: formally announce case to Audit Directorate for investigation and instruct Committee Secretary (POMD) to suspend the employee."""
@@ -511,6 +571,7 @@ class DisciplineCaseWorkflow(models.Model):
 
         default_vals = {
             'default_case_id': self.id,
+            'default_is_case_readonly': True,
             'default_committee_chair_id': cpco_user.id if cpco_user else False,
             'default_respective_director_id': resp_dir_user.id if resp_dir_user else False,
             'default_legal_director_id': legal_user.id if legal_user else False,
@@ -530,13 +591,25 @@ class DisciplineCaseWorkflow(models.Model):
         }
 
     def action_open_active_committee_meeting(self):
-        """Open the active/in-progress committee meeting linked to this case."""
+        """Open the active/in-progress committee meeting linked to this case, validating the scheduled date."""
         self.ensure_one()
         meeting = self.committee_meeting_ids.filtered(lambda m: m.state not in ('completed', 'cancelled'))[:1]
         if not meeting:
             meeting = self.committee_meeting_ids[:1]
         if not meeting:
             return self.action_schedule_committee_meeting()
+
+        today = fields.Date.context_today(self)
+        if meeting.state == 'scheduled' and meeting.meeting_date and today < meeting.meeting_date:
+            raise UserError(_(
+                "Premature Hearing Access: The Disciplinary Committee meeting is scheduled for %(meeting_date)s. "
+                "Today is %(today)s. The hearing session cannot be opened before the scheduled meeting date. "
+                "If the hearing must be held earlier, the Committee Secretary (POMD) must reschedule the meeting date."
+            ) % {
+                'meeting_date': format_date(self.env, meeting.meeting_date),
+                'today': format_date(self.env, today),
+            })
+
         return {
             'name': _('Committee Meeting — %s') % meeting.name,
             'type': 'ir.actions.act_window',
@@ -604,6 +677,8 @@ class DisciplineCaseWorkflow(models.Model):
             if rec.case_action_track == 'direct_enforce':
                 if not rec.severity_level_id:
                     raise UserError(_('Severity Level is required for Coach Direct Enforcement.'))
+                if not rec.description:
+                    raise UserError(_('Detailed Description of Misconduct is required before enforcing this case.'))
                 cfg_punish, max_rank, allowed_levels = self._get_coach_max_authority()
                 
                 punish_ranks = {
@@ -638,14 +713,55 @@ class DisciplineCaseWorkflow(models.Model):
                             'Please route/escalate this case to the Respective Chief / Executive Disciplinary Committee.'
                         ) % (cfg_display, rec.severity_level_id.name or rec.severity_level, rec.punishment_type or rec.decided_punishment_type))
             else:
-                # Committee-escalated / Pending Approval track: ONLY the CEO (or HR Admin) can approve and enforce
-                if not (rec.is_ceo_user or rec.is_hr_admin or current_user._is_superuser()):
+                # Committee-escalated / Pending Approval track: CPCO (Committee Chairman), CEO, or HR Admin can approve and enforce
+                if not (rec.is_cpco_user or rec.is_ceo_user or rec.is_hr_admin or current_user._is_superuser()):
                     raise UserError(_(
-                        'Authority Restriction: Only the Chief Executive Officer (CEO) is authorized to approve and enforce Disciplinary Committee decisions.'
+                        'Authority Restriction: Only the Disciplinary Committee Chairman (CPCO), Chief Executive Officer (CEO), or HR Admin is authorized to approve and enforce Disciplinary Committee decisions.'
                     ))
                 if not rec.severity_level_id and not rec.decided_punishment_type and not rec.punishment_type:
                     raise UserError(_('Severity Level and Final Decided Punishment must be assigned before enforcing this case.'))
 
+            # Digital Signature Validation & Auto-Population
+            if not rec.is_exonerated_case and (not rec.signatory_signature or len(rec.signatory_signature) < 50):
+                user_saved_sig = getattr(current_user, 'discipline_digital_signature', False) or getattr(current_user, 'digital_signature', False)
+                if not user_saved_sig:
+                    prev_case = self.search([
+                        ('signatory_signature', '!=', False),
+                        '|', ('initiator_id', '=', current_user.id), ('create_uid', '=', current_user.id)
+                    ], order='id desc', limit=1)
+                    if prev_case and prev_case.signatory_signature:
+                        user_saved_sig = prev_case.signatory_signature
+                if user_saved_sig:
+                    rec.with_context(force_write=True).write({'signatory_signature': user_saved_sig})
+                else:
+                    if rec.case_action_track == 'direct_enforce':
+                        raise UserError(_(
+                            "Mandatory Digital Signature Required:\n\n"
+                            "Enforcing without signature is prevented. As the Line Manager / Supervisor enforcing this disciplinary decision, "
+                            "you must draw or load your digital signature under 'Digital Sign-off' before enforcing the official disciplinary notice."
+                        ))
+                    else:
+                        raise UserError(_(
+                            "Mandatory Digital Signature Required:\n\n"
+                            "Enforcing without signature is prevented. As the Executive Authority (CPCO / CEO) approving and enforcing this "
+                            "Disciplinary Committee decision, you must provide your digital signature under 'Digital Sign-off' before enforcing this case."
+                        ))
+
+            # Final validation check
+            if not rec.is_exonerated_case and (not rec.signatory_signature or len(rec.signatory_signature) < 50):
+                raise UserError(_(
+                    "Mandatory Digital Signature Required:\n\n"
+                    "Enforcing without signature is prevented. An authentic digital signature must be provided under 'Digital Sign-off'."
+                ))
+
+            # Auto-persist signature to user profile so future cases never ask again
+            if rec.signatory_signature and not getattr(current_user, 'discipline_digital_signature', False):
+                try:
+                    current_user.sudo().write({'discipline_digital_signature': rec.signatory_signature})
+                except Exception:
+                    pass
+
+            rec.signatory_id = current_user
             rec.approver_id = current_user
             rec._validate_segregation_of_duties()
 
@@ -709,6 +825,27 @@ class DisciplineCaseWorkflow(models.Model):
             # Fast executive notification to chatter and Discuss direct message to employee
             rec._post_enforcement_notification()
             rec._send_employee_discuss_direct_message(message_type='enforce')
+            if hasattr(rec, '_dispatch_cc_stakeholder_notifications'):
+                rec._dispatch_cc_stakeholder_notifications()
+
+            # Only for Disciplinary Committee track cases enforced by CPCO, formally brief CEO
+            is_committee_enforcement = (
+                rec.case_action_track == 'committee' or bool(rec.committee_meeting_ids)
+            ) and rec.case_action_track != 'direct_enforce'
+            if is_committee_enforcement and not rec.is_ceo_user and hasattr(rec, '_send_committee_enforcement_ceo_notification'):
+                rec._send_committee_enforcement_ceo_notification()
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Decision Enforced'),
+                'message': _('Disciplinary Case %s has been successfully enforced.') % self.name,
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     @api.model
     def _compute_target_payroll_month(self, target_date=None):
@@ -981,6 +1118,8 @@ class DisciplineCaseWorkflow(models.Model):
         self.ensure_one()
         if not self.env.user.has_group('discipline_management.group_discipline_admin'):
             raise UserError(_('Revocation Authority Violation: Only HR Administrators can initiate case revocation.'))
+        if self.is_exonerated_case or self.punishment_type == 'exonerate' or self.appeal_outcome_type == 'exonerated':
+            raise UserError(_('Invalid Action: Case "%s" has already been fully exonerated on appeal. An exonerated case has no active penalties and cannot be revoked.') % self.name)
         return {
             'name': _('Revoke Disciplinary Case'),
             'type': 'ir.actions.act_window',

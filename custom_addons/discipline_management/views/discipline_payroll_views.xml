@@ -7,7 +7,11 @@
             <field name="arch" type="xml">
                 <list>
                     <field name="name"/>
-                    <field name="case_id"/>
+                    <field name="transaction_type" widget="badge"
+                           decoration-danger="transaction_type == 'deduction'"
+                           decoration-success="transaction_type == 'refund'"/>
+                    <field name="case_id" optional="show"/>
+                    <field name="attendance_case_id" optional="show"/>
                     <field name="employee_id"/>
                     <field name="penalty_type"/>
                     <field name="penalty_percentage"/>
@@ -16,7 +20,13 @@
                     <field name="calculated_amount"/>
                     <field name="payroll_month"/>
                     <field name="effective_date"/>
-                    <field name="state" widget="badge"/>
+                    <field name="is_appeal_held" widget="boolean_toggle" readonly="1" optional="show"/>
+                    <field name="state" widget="badge"
+                           decoration-warning="state == 'pending'"
+                           decoration-info="state == 'transferred'"
+                           decoration-danger="state == 'deducted'"
+                           decoration-success="state == 'reimbursed'"
+                           decoration-muted="state == 'cancelled'"/>
                 </list>
             </field>
         </record>
@@ -31,26 +41,36 @@
                                 invisible="state != 'pending'"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin,base.group_system"/>
                         <button name="action_mark_deducted" string="Mark as Deducted" type="object" class="btn-success"
-                                invisible="state != 'transferred'"
+                                invisible="state != 'transferred' or transaction_type == 'refund'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin,base.group_system"/>
+                        <button name="action_mark_reimbursed" string="Mark as Reimbursed in Payslip" type="object" class="btn-success"
+                                invisible="state != 'transferred' or transaction_type != 'refund'"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin,base.group_system"/>
                         <!-- Cancel button -->
                         <button name="action_cancel" string="Cancel / Waive" type="object" class="btn-danger"
-                                invisible="state in ('deducted', 'cancelled')"
+                                invisible="state in ('deducted', 'reimbursed', 'cancelled')"
                                 groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin,base.group_system"
-                                confirm="Cancel this penalty deduction?"/>
-                        <field name="state" widget="statusbar" statusbar_visible="pending,transferred,deducted"/>
+                                confirm="Cancel this payroll transaction?"/>
+                        <field name="state" widget="statusbar" statusbar_visible="pending,transferred,deducted,reimbursed"/>
                     </header>
                     <sheet>
+                        <widget name="web_ribbon" title="Appeal Hold" bg_color="text-bg-warning" invisible="not is_appeal_held"/>
+                        <field name="is_appeal_window_active" invisible="1"/>
                         <group>
                             <group string="Penalty &amp; Case">
                                 <field name="name" readonly="1"/>
-                                <field name="case_id"/>
+                                <field name="transaction_type"/>
+                                <field name="case_id" invisible="not case_id and attendance_case_id"/>
+                                <field name="attendance_case_id" invisible="not attendance_case_id and case_id"/>
                                 <field name="employee_id"/>
+                                <field name="parent_penalty_id" invisible="transaction_type != 'refund'"/>
+                                <field name="appeal_id" invisible="transaction_type != 'refund'"/>
                             </group>
                             <!-- Penalty type selector -->
                             <group string="Calculation Type">
                                 <field name="penalty_type"/>
-                                <field name="penalty_percentage" invisible="penalty_type != 'percentage'"/>
+                                <field name="refund_amount" invisible="transaction_type != 'refund'"/>
+                                <field name="penalty_percentage" invisible="penalty_type != 'percentage' or transaction_type == 'refund'"/>
                                 <field name="suspension_id" invisible="penalty_type != 'suspension_without_pay'"/>
                                 <field name="suspension_days" invisible="penalty_type != 'suspension_without_pay'"/>
                                 <field name="managerial_days" invisible="penalty_type != 'managerial'"/>
@@ -59,8 +79,9 @@
                             </group>
                         </group>
                         <group>
-                            <group string="Deduction Amounts &amp; Dates">
+                            <group string="Amounts &amp; Payroll Dates">
                                 <field name="calculated_amount" readonly="1"/>
+                                <field name="is_appeal_held" readonly="1"/>
                                 <field name="payroll_month" string="Target Payroll Month"/>
                                 <field name="effective_date"/>
                                 <field name="payslip_reference"/>
@@ -78,7 +99,7 @@
         </record>
 
         <record id="action_discipline_payroll_penalty" model="ir.actions.act_window">
-            <field name="name">Payroll Penalty Deductions</field>
+            <field name="name">Payroll Penalty Deductions &amp; Reimbursements</field>
             <field name="res_model">discipline.payroll.penalty</field>
             <field name="view_mode">list,form</field>
         </record>

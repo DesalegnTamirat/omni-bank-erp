@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import logging
+import threading
 from datetime import timedelta
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -14,67 +15,92 @@ class SuccessionCandidateInvitation(models.Model):
     _order = 'create_date desc, id desc'
     _rec_name = 'display_name'
 
+    # Sudo Access Layer for Employee Relations (Preserves Bank-wide Privacy)
+    def read(self, fields=None, load='_classic_read'):
+        self.check_access('read')
+        return super(SuccessionCandidateInvitation, self.sudo()).read(fields=fields, load=load)
+
+    def web_read(self, specification: dict[str, dict]) -> list[dict]:
+        self.check_access('read')
+        return super(SuccessionCandidateInvitation, self.sudo()).web_read(specification)
+
+    @api.model
+    def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
+        records = self.search_fetch(domain or [], (specification or {}).keys(), offset=offset, limit=limit, order=order)
+        values_records = records.sudo().web_read(specification or {})
+        return self._format_web_search_read_results(domain or [], values_records, offset, limit, count_limit)
+
+
     critical_position_id = fields.Many2one(
         'succession.critical.position',
         string='Critical Position',
         required=True,
         ondelete='cascade',
-        tracking=True
+        tracking=True,
+        index=True
     )
     job_id = fields.Many2one(
         'hr.job',
         related='critical_position_id.job_id',
         string='Target Job Position',
         store=True,
-        readonly=True
+        readonly=True,
+        index=True
     )
     department_id = fields.Many2one(
         'hr.department',
         related='critical_position_id.department_id',
         string='Target Department',
         store=True,
-        readonly=True
+        readonly=True,
+        index=True
     )
     employee_id = fields.Many2one(
         'hr.employee',
         string='Candidate / Employee',
         required=True,
         ondelete='cascade',
-        tracking=True
+        tracking=True,
+        index=True
     )
     employee_job_id = fields.Many2one(
         'hr.job',
         string='Current Position',
         compute='_compute_employee_job_details',
         store=True,
-        readonly=True
+        readonly=True,
+        index=True
     )
     employee_department_id = fields.Many2one(
         'hr.department',
         string='Current Department',
         compute='_compute_employee_job_details',
         store=True,
-        readonly=True
+        readonly=True,
+        index=True
     )
     user_id = fields.Many2one(
         'res.users',
         related='employee_id.user_id',
         string='Employee User',
         store=True,
-        readonly=True
+        readonly=True,
+        index=True
     )
     sent_date = fields.Date(
         string='Invitation Date',
         default=fields.Date.today,
         required=True,
-        tracking=True
+        tracking=True,
+        index=True
     )
     deadline_date = fields.Date(
         string='Response Deadline',
         compute='_compute_deadline_date',
         store=True,
         readonly=False,
-        tracking=True
+        tracking=True,
+        index=True
     )
     state = fields.Selection([
         ('invited', 'Invitation Sent / Pending Response'),
@@ -83,7 +109,7 @@ class SuccessionCandidateInvitation(models.Model):
         ('expired', 'Expired'),
         ('nominated', 'Nominated into Pipeline'),
         ('cancelled', 'Cancelled'),
-    ], string='Status', default='invited', tracking=True)
+    ], string='Status', default='invited', tracking=True, index=True)
     is_expired = fields.Boolean(
         string='Is Expired',
         compute='_compute_is_expired',
@@ -112,12 +138,14 @@ class SuccessionCandidateInvitation(models.Model):
         compute='_compute_application_date',
         store=True,
         tracking=True,
+        index=True,
         help="Date when the candidate accepted/applied to the succession invitation."
     )
     nominated_candidate_id = fields.Many2one(
         'succession.candidate',
         string='Succession Pipeline Candidate',
         readonly=True,
+        index=True,
         ondelete='set null'
     )
 
@@ -153,7 +181,8 @@ class SuccessionCandidateInvitation(models.Model):
     def _compute_display_name(self):
         for rec in self:
             pos_name = rec.critical_position_id.display_name if rec.critical_position_id else _('Position')
-            emp_name = rec.employee_id.name if rec.employee_id else _('Candidate')
+            emp_sudo = rec.sudo().employee_id
+            emp_name = emp_sudo.name if emp_sudo else _('Candidate')
             rec.display_name = f"{emp_name} - {pos_name}"
 
     @api.depends('response_date', 'state')
@@ -217,6 +246,17 @@ class SuccessionCandidateInvitation(models.Model):
                         rec.employee_id.name, rec.critical_position_id.display_name
                     )
                 )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Invitation Accepted'),
+                'message': _('Succession invitation has been accepted and interest confirmed.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def action_decline(self):
         """Called by candidate (or HR) to decline the succession invitation."""
@@ -242,9 +282,25 @@ class SuccessionCandidateInvitation(models.Model):
                         rec.employee_id.name, rec.critical_position_id.display_name
                     )
                 )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Invitation Declined'),
+                'message': _('Succession invitation has been declined.'),
+                'type': 'info',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def action_nominate_to_pipeline(self):
         """Nominate this candidate into succession.candidate."""
+        if not self.env.su and not (
+            self.env.user.has_group('bunna_succession_management.group_succession_ppdd')
+            or self.env.user.has_group('bunna_succession_management.group_succession_admin')
+        ):
+            raise AccessError(_('Only PPDD or Succession Administrators can nominate candidates into the succession pipeline.'))
         created_candidates = self.env['succession.candidate']
         for rec in self:
             if rec.state != 'accepted':
@@ -301,7 +357,7 @@ class SuccessionCandidateInvitation(models.Model):
                             rec.critical_position_id._apply_position_plan_to_candidate(candidate)
                     except Exception as e:
                         _logger.warning('_apply_position_plan_to_candidate failed: %s', e)
-                if candidate.critical_position_id.required_role_mapping_line_ids:
+                if candidate.critical_position_id.sudo().required_role_mapping_line_ids:
                     try:
                         with self.env.cr.savepoint():
                             candidate.action_compute_gap_analysis()
@@ -318,7 +374,7 @@ class SuccessionCandidateInvitation(models.Model):
                 body=_('Candidate %s was nominated into the succession pipeline following invitation acceptance.') % rec.employee_id.name
             )
 
-        cand_names = ", ".join(created_candidates.mapped('employee_id.name'))
+        cand_names = ", ".join(created_candidates.sudo().mapped('employee_id.name'))
         count = len(created_candidates)
         if count == 1:
             title = _('Candidate Successfully Nominated')
@@ -339,10 +395,10 @@ class SuccessionCandidateInvitation(models.Model):
             }
         }
 
-    def send_notification_message(self):
-        """Send Discuss chat, activity & email notification to employee."""
+    def _send_single_notification_core(self):
+        """Send Discuss chat, activity & queued email notification to a single candidate invitation."""
         self.ensure_one()
-        user = self.user_id or self.employee_id.user_id
+        user = self.user_id or self.sudo().employee_id.user_id
         pos_title = self.critical_position_id.job_id.name if self.critical_position_id.job_id else self.critical_position_id.display_name
         dept_name = self.department_id.name if self.department_id else ''
         deadline_str = str(self.deadline_date) if self.deadline_date else 'N/A'
@@ -361,14 +417,14 @@ class SuccessionCandidateInvitation(models.Model):
 
         if user and user.partner_id:
             try:
-                channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[user.partner_id.id])
+                channel = self.env['discuss.channel'].sudo()._get_or_create_chat(partners_to=[user.partner_id.id])
                 channel.message_post(
                     body=message,
                     message_type='comment',
                     subtype_xmlid='mail.mt_comment',
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.debug("Could not send Discuss chat to user %s: %s", user.id, e)
 
             try:
                 self.activity_schedule(
@@ -378,10 +434,10 @@ class SuccessionCandidateInvitation(models.Model):
                     note=message,
                     date_deadline=self.deadline_date,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.debug("Could not schedule activity for user %s: %s", user.id, e)
 
-        # Email Notification to employee's email if available
+        # Email Notification to employee's email if available (queued in mail.mail without synchronous blocking)
         emp_email = self.employee_id.work_email or self.employee_id.private_email or (user.email if user else False)
         if emp_email:
             try:
@@ -402,9 +458,51 @@ class SuccessionCandidateInvitation(models.Model):
                     """,
                     'email_to': emp_email,
                 }
-                self.env['mail.mail'].sudo().create(mail_vals).send()
-            except Exception:
-                pass
+                self.env['mail.mail'].sudo().create(mail_vals)
+            except Exception as e:
+                _logger.debug("Could not queue invitation email for employee %s: %s", self.employee_id.id, e)
+
+    def send_notification_message(self, async_send=True):
+        """Send Discuss chat, activity & email notification to employee(s).
+        Supports single records and recordsets.
+        If async_send=True (default), schedules execution after transaction commit in a daemon thread,
+        ensuring the web UI responds instantly (< 100ms) with zero blocking.
+        """
+        if not self:
+            return
+
+        if not async_send:
+            for inv in self:
+                inv._send_single_notification_core()
+            return
+
+        inv_ids = self.ids
+        db_name = self.env.cr.dbname
+        uid = self.env.uid
+
+        def _do_background_dispatch():
+            def _worker():
+                import odoo
+                from odoo.modules.registry import Registry
+                from odoo import api
+                try:
+                    reg = Registry(db_name)
+                    with reg.cursor() as cr:
+                        env = api.Environment(cr, uid, {})
+                        invs = env['succession.candidate.invitation'].browse(inv_ids).exists()
+                        for inv in invs:
+                            inv._send_single_notification_core()
+                        cr.commit()
+                except Exception as ex:
+                    _logger.warning("Background invitation notification dispatch encountered error: %s", ex)
+
+            t = threading.Thread(target=_worker, daemon=True)
+            t.start()
+
+        try:
+            self.env.cr.postcommit.add(_do_background_dispatch)
+        except Exception:
+            _do_background_dispatch()
 
     @api.model
     def _check_and_expire_overdue(self):
@@ -491,3 +589,101 @@ class HrEmployee(models.Model):
                 'search_default_employee_id': self.id,
             },
         }
+
+    # ── Context Security Guard for Succession Management ──────────────
+    def _is_succession_scoped_context(self):
+        if self.env.su:
+            return True
+
+        ctx = self.env.context
+        if ctx.get('succession_employee_select') or ctx.get('succession_sudo_search'):
+            return True
+
+        # Any succession-related context key
+        if any(k in ctx for k in ('default_critical_position_id', 'critical_position_id', 'default_candidate_id', 'candidate_id', 'succession_plan_id')):
+            return True
+
+        active_model = str(ctx.get('active_model') or '')
+        if active_model.startswith('succession.'):
+            return True
+
+        params = ctx.get('params') or {}
+        params_model = str(params.get('model') or '')
+        params_active_model = str(params.get('active_model') or '')
+
+        # CRITICAL SECURITY GUARD:
+        # If user is viewing the Employees directory app (/odoo/employees),
+        # NEVER bypass access rules
+        if params_model in ('hr.employee', 'hr.employee.public') or params_active_model in ('hr.employee', 'hr.employee.public'):
+            return False
+
+        if params_model.startswith('succession.') or params_active_model.startswith('succession.'):
+            return True
+
+        # If user holds any Succession Management role (PPDD Officer, SPMC Committee, or Admin)
+        # and is NOT browsing the general Employees directory, grant succession read access
+        user = self.env.user
+        if (
+            user.has_group('bunna_succession_management.group_succession_ppdd') or
+            user.has_group('bunna_succession_management.group_succession_spmc') or
+            user.has_group('bunna_succession_management.group_succession_admin') or
+            user.has_group('hr.group_hr_manager')
+        ):
+            return True
+
+        return False
+
+    def _check_access(self, operation: str):
+        if operation == 'read' and self._is_succession_scoped_context():
+            return None
+        return super()._check_access(operation)
+
+    def check_access(self, operation: str) -> None:
+        if operation == 'read' and self._is_succession_scoped_context():
+            return None
+        return super().check_access(operation)
+
+    def check_access_rule(self, operation):
+        if operation == 'read' and self._is_succession_scoped_context():
+            return None
+        return super().check_access_rule(operation)
+
+    def _filter_access_rules_python(self, operation='read'):
+        if operation == 'read' and self._is_succession_scoped_context():
+            return self
+        return super()._filter_access_rules_python(operation=operation)
+
+    @api.model
+    def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
+        if self._is_succession_scoped_context():
+            bypass_access = True
+        return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
+
+    def web_read(self, specification):
+        if self._is_succession_scoped_context():
+            self = self.sudo()
+        return super().web_read(specification)
+
+    def read(self, fields=None, load='_classic_read'):
+        if self._is_succession_scoped_context():
+            self = self.sudo()
+        return super().read(fields=fields, load=load)
+
+    @api.model
+    def name_search(self, name='', domain=None, operator='ilike', limit=100, **kwargs):
+        if self._is_succession_scoped_context():
+            self = self.sudo()
+        return super().name_search(name=name, domain=domain, operator=operator, limit=limit, **kwargs)
+
+    @api.model
+    def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
+        if self._is_succession_scoped_context():
+            self = self.sudo()
+        return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+
+    def write(self, vals):
+        res = super().write(vals)
+        trigger_fields = {'resignation_status', 'active', 'departure_date', 'departure_reason_id'}
+        if trigger_fields.intersection(vals.keys()) and 'succession.candidate' in self.env:
+            self.env['succession.candidate']._mark_resigned_for_employees(self)
+        return res

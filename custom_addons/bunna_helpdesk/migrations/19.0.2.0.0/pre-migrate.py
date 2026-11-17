@@ -5,6 +5,12 @@ Migration: v19.0.1.0.0 → v19.0.2.0.0
 
 def migrate(cr, version):
     cr.execute("""
+        ALTER TABLE operating_unit ADD COLUMN IF NOT EXISTS helpdesk_team_id INTEGER;
+
+        INSERT INTO ir_config_parameter (key, value, create_date, write_date)
+        VALUES ('ir_attachment.location', 'db', NOW(), NOW())
+        ON CONFLICT (key) DO UPDATE SET value = 'db';
+
         ALTER TABLE helpdesk_ticket_team
         ADD COLUMN IF NOT EXISTS visibility VARCHAR DEFAULT 'company',
         ADD COLUMN IF NOT EXISTS assignment_method VARCHAR DEFAULT 'manual',

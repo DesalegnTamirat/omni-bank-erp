@@ -32,6 +32,7 @@
               name="Corporate Induction Plans"
               parent="menu_onboarding_induction_plans_cat"
               action="hr_induction_plan_action"
+              groups="group_onboarding_induction_officer"
               sequence="20"/>
 
     <!-- Submenu Category: Configuration -->

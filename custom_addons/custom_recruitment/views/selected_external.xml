@@ -27,6 +27,7 @@
                 <field name="weighted_score"/>
                 <field name="selection_type"/>
                 <field name="remarks"/>
+                <button name="action_open_employment_letter" string="Employment Letter" type="object" icon="fa-file-text-o" invisible="selection_type not in ['selected', 'Selected']"/>
             </list>
         </field>
     </record>
@@ -65,19 +66,15 @@
                 <header>
                     <!-- Step 1: Written Exam Phase -->
                     <button name="notify_written_exam" invisible="exam_scheduled == 'Yes'" string="Notify Written Exam" type="object" class="btn-primary" icon="fa-paper-plane"/>
-                    <button name="fetch_exam_score" invisible="exam_scores_fetched == True or exam_scheduled != 'Yes'" string="Fetch Exam Score" type="object" class="btn-secondary" icon="fa-file-text-o"/>
-
-                    <!-- Step 2: Interview Phase -->
+                                        <!-- Step 2: Interview Phase -->
                     <button name="notify_interview_panel" invisible="panel_notified == True" string="Notify Interview Panel" type="object" class="btn-secondary" icon="fa-users"/>
                     <button name="action_open_reschedule_wizard" string="Reschedule Interview" type="object" class="btn-warning" icon="fa-clock-o" invisible="not show_reschedule_button"/>
                     <button name="notify_interview" invisible="interview_scheduled == 'Yes'" string="Notify Interview" type="object" class="btn-secondary" icon="fa-calendar"/>
-                    <button name="fetch_interview_score" invisible="interview_scores_fetched == True or interview_scheduled != 'Yes'" string="Fetch Interview Score" type="object" class="btn-secondary" icon="fa-list-ol"/>
-
-                    <!-- Step 3: Scoring & Ranking Phase -->
+                                        <!-- Step 3: Scoring & Ranking Phase -->
                     <button name="compute_weighted_score" invisible="scores_computed == True" string="Compute &amp; Rank Scores" type="object" class="btn-primary" icon="fa-calculator"/>
 
                     <!-- Step 4: Minute & Approval Phase -->
-                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o" invisible="not minute_signed"/>
+                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o" invisible="not scores_computed and not minute_signed"/>
                     <button name="action_open_digital_minute" string="Digital Selection Minute" type="object" class="btn-primary" icon="fa-pencil-square-o" help="Open or create the digital committee selection minute for digital signatures."/>
 
                     <!-- Step 5: Final Selection Notification -->
@@ -143,15 +140,16 @@
                                       decoration-muted="selection_type in ['shortlisted', 'Shortlisted', 'pending', 'Pending Evaluation']"
                                       decoration-warning="selection_type in ['reserved', 'Reserved', 'reserve']"
                                       decoration-danger="selection_type in ['rejected', 'Disqualified']">
-                                    <field name="applicant_name" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="applicant_name" readonly="parent.scores_computed == True"/>
                                     <field name="select_flag" readonly="parent.scores_computed == True"/>
                                     <field name="applicant_email" readonly="parent.scores_computed == True"/>
                                     <field name="preferred_location" readonly="parent.scores_computed == True"/>
-                                    <field name="written_exam_score" widget="float" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True"/>
-                                    <field name="interview_score" widget="float" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="written_exam_score" widget="float" readonly="parent.scores_computed == True"/>
+                                    <field name="interview_score" widget="float" readonly="parent.scores_computed == True"/>
                                     <field name="weighted_score" widget="float" bold="1" readonly="1"/>
                                     <field name="selection_type" readonly="parent.scores_computed == True"/>
                                     <field name="remarks" readonly="parent.scores_computed == True"/>
+                                    <button name="action_open_employment_letter" string="Employment Letter" type="object" icon="fa-file-text-o" invisible="selection_type not in ['selected', 'Selected']"/>
                                 </list>
                             </field>
                         </page>
@@ -180,37 +178,41 @@
                             </field>
                         </page>
                         <page string="Approval Committee Members">
+                            <field name="allowed_chairperson_user_ids" invisible="1"/>
+                            <field name="allowed_panel_member_user_ids" invisible="1"/>
+                            <field name="allowed_secretary_user_ids" invisible="1"/>
+                            <field name="allowed_observer_user_ids" invisible="1"/>
                             <group string="Approval Hierarchy &amp; Committee Roles">
                                 <group>
                                     <field name="approval_hierarchy_type" widget="radio"/>
                                 </group>
                                 <group>
                                     <!-- Head Office & District Grade II and above -->
-                                    <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
-                                    <field name="panel_member_id" string="Respective Senior Management (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
-                                    <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="panel_member_id" string="Respective Senior Management (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                                    <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
 
                                     <!-- For all non-managerial head office -->
-                                    <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="panel_member_id" string="Head Office / District Director (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="panel_member_id" string="Head Office / District Director (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
 
                                     <!-- For all non-managerial district -->
-                                    <field name="chairperson_id" string="District Director (Chairperson)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="panel_member_id" string="District Division Member (Panel Member)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="chairperson_id" string="District Director (Chairperson)" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="panel_member_id" string="District Division Member (Panel Member)" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
 
                                     <!-- Default fallback if unassigned -->
-                                    <field name="chairperson_id" string="Chairperson" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="panel_member_id" string="Panel Member" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="secretary_id" string="Panel Member &amp; Secretary" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                                    <field name="observer_id" string="Labor Representative (Observer)" options="{'no_create': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="chairperson_id" string="Chairperson" domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="panel_member_id" string="Panel Member" domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="secretary_id" string="Panel Member &amp; Secretary" domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                                    <field name="observer_id" string="Labor Representative (Observer)" domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
                                 </group>
                             </group>
                             <field name="recr_exter_selected_team_id" context="{'parent_workunit_id': workunit_id, 'default_exter_rec_del_id': id}">
-                                <list string="Approval Members" editable="bottom" delete="0" decoration-success="approve == True">
+                                <list string="Approval Members" editable="bottom" decoration-success="approve == True">
                                     <field name="eligible_user_ids" column_invisible="1"/>
                                     <field name="role"/>
                                     <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]"/>

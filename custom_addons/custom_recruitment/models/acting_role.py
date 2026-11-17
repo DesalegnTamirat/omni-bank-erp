@@ -125,6 +125,29 @@ class ActingRoleAssignment(models.Model):
                 base_pay = 0.0
             rec.acting_allowance_amount = round(base_pay * (rec.acting_allowance_percent or 0.0) / 100.0, 2)
 
+    @api.constrains('employee_id', 'target_vacancy_id')
+    def _check_acting_role_grade_sequence(self):
+        for rec in self:
+            if rec.employee_id and rec.target_vacancy_id:
+                emp_grade = rec.employee_id.job_grade
+                tgt_grade = rec.target_vacancy_id.job_grade or (rec.target_job_position_id.grade if rec.target_job_position_id else False)
+                if emp_grade and tgt_grade and hasattr(emp_grade, 'is_eligible_acting_grade'):
+                    if not emp_grade.is_eligible_acting_grade(tgt_grade):
+                        curr_code = emp_grade.grade_name or emp_grade.grade_code
+                        tgt_code = tgt_grade.grade_name or tgt_grade.grade_code
+                        raise ValidationError(_(
+                            "Acting Sequence Policy Violation!\n\n"
+                            "Employee '%(emp)s' holds substantive Grade %(curr)s, "
+                            "which cannot act in vacant post '%(vac)s' of Grade %(tgt)s.\n\n"
+                            "The Acting Sequence Rule permits upward progression only to the immediate next grade(s) "
+                            "(e.g., VI ➔ VII/VIII, VII & VIII ➔ IX, IX ➔ X/XI, X ➔ XI/XII)."
+                        ) % {
+                            'emp': rec.employee_id.name,
+                            'curr': curr_code,
+                            'vac': rec.target_vacancy_id.name or rec.target_vacancy_id.reference,
+                            'tgt': tgt_code,
+                        })
+
     # ---------------------------------------
     # Workflow Actions
     # ---------------------------------------

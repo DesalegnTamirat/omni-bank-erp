@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_employee_form_inherit_signature" model="ir.ui.view">
+        <field name="name">hr.employee.form.inherit.signature</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="priority">120</field>
+        <field name="arch" type="xml">
+            <!-- 1. Smart Button in Button Box for 1-Click Signature Setup -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <field name="can_edit_signature" invisible="1"/>
+                <field name="is_current_user" invisible="1"/>
+                <button name="action_open_signature_dialog" class="oe_stat_button" icon="fa-pencil-square-o" type="object"
+                        help="Draw or update master digital signature.">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text" invisible="not digital_signature">Signature: <strong class="text-success">Saved</strong></span>
+                        <span class="o_stat_text text-warning" invisible="digital_signature">Signature: <strong>Empty</strong></span>
+                        <span class="o_stat_value small text-muted">Click to Edit</span>
+                    </div>
+                </button>
+            </xpath>
+
+            <!-- 2. Add Digital Signature to Extended Sub-menus under the 3 dots (☰ ▾) -->
+            <xpath expr="//page[@name='more_nested_lists']//div[contains(@class, 'dropdown_vertical_menu')]" position="inside">
+                <div class="vertical_menu_item" onclick="switchNestedPane(this, 'pane_digital_signature')">
+                    <i class="fa fa-pencil-square-o" title="Digital Signature" style="width: 20px;"/>
+                    Digital Signature
+                </div>
+            </xpath>
+
+            <!-- 3. Add Digital Signature Content Pane under the 3 dots (☰ ▾) -->
+            <xpath expr="//page[@name='more_nested_lists']//div[contains(@class, 'dropdown_content_pane')]" position="inside">
+                <div id="pane_digital_signature" class="custom_nested_pane d-none">
+
+                    <!-- Banner: Viewing own signature -->
+                    <div class="alert alert-success d-flex align-items-center mb-3" role="alert" invisible="not is_current_user">
+                        <i class="fa fa-check-circle fa-2x me-3 text-success" title="Owner Signature"/>
+                        <div>
+                            <strong>My Master Digital Signature</strong>
+                            <div class="small text-muted">
+                                This is your permanent master signature stored in Employee Master. It is automatically loaded when you sign Committee Minutes.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Banner: Admin viewing another employee -->
+                    <div class="alert alert-info d-flex align-items-center mb-3" role="alert" invisible="is_current_user or not can_edit_signature">
+                        <i class="fa fa-shield fa-2x me-3 text-primary" title="HR Admin Override"/>
+                        <div>
+                            <strong>Administrator View</strong>
+                            <div class="small text-muted">
+                                You are viewing this signature with HR Administrator privileges.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Banner: Read-only for peer users -->
+                    <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="can_edit_signature">
+                        <i class="fa fa-lock fa-2x me-3 text-warning" title="Protected Signature"/>
+                        <div>
+                            <strong>Master Signature Protected (Read-Only)</strong>
+                            <div class="small text-muted">
+                                Digital signatures are personal credentials and can only be updated by the employee themselves or an HR Administrator.
+                            </div>
+                        </div>
+                    </div>
+
+                    <group string="Master Digital Signature">
+                        <group>
+                            <!-- Signature Display -->
+                            <field name="digital_signature" widget="image" options="{'size': [380, 120]}" readonly="1" invisible="not digital_signature"/>
+                            <div invisible="digital_signature" class="alert alert-light border text-muted py-3 px-3 mb-2" style="max-width: 380px;">
+                                <i class="fa fa-info-circle me-1"/> No digital signature saved yet. Click the button below to draw or upload your signature.
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="mt-2" invisible="not can_edit_signature">
+                                <button name="action_open_signature_dialog" string="✍️ Draw / Update Digital Signature" type="object" class="btn btn-primary btn-sm me-2"/>
+                                <button name="action_clear_signature" string="Clear Signature" type="object" class="btn btn-outline-danger btn-sm"
+                                        invisible="not digital_signature"
+                                        confirm="Are you sure you want to clear this employee's digital signature?"/>
+                            </div>
+                        </group>
+                        <group>
+                            <field name="digital_signature_updated_on" readonly="1"/>
+                        </group>
+                    </group>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

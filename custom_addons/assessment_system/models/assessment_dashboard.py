@@ -15,7 +15,12 @@ class AssessmentDashboard(models.Model):
         today = fields.Date.context_today(self)
 
         def _get_model(name):
-            return self.env[name] if name in self.env else False
+            return self.env[name] if name in self.env else None
+
+        def _count(model, domain=None):
+            if model is None:
+                return 0
+            return model.sudo().search_count(domain or [])
 
         # ── 1. Models ───────────────────────────────────────────────────────
         exam_session_model = _get_model("exam.session")
@@ -24,96 +29,94 @@ class AssessmentDashboard(models.Model):
         cbis_session_model = _get_model("cbis.interview.session")
         interview_session_model = _get_model("interview.session")
         cbis_candidate_model = _get_model("cbis.interview.candidate")
+        cbis_eval_model = _get_model("cbis.interviewer.evaluation")
         interview_candidate_model = _get_model("interview.candidate.assessment")
         interview_eval_model = _get_model("interview.assessment")
         transfer_model = _get_model("transfer.assessment.record")
         pub_model = _get_model("assessment.result.publication")
 
         # ── 2. Build Date Domains ───────────────────────────────────────────
-        attempt_domain = []
-        exam_session_domain = []
-        cbis_session_domain = []
-        cbis_eval_domain = []
-        transfer_domain = []
-
+        base_date_domain = []
         if date_from:
-            attempt_domain.append(("create_date", ">=", date_from))
-            exam_session_domain.append(("create_date", ">=", date_from))
-            cbis_session_domain.append(("create_date", ">=", date_from))
-            cbis_eval_domain.append(("create_date", ">=", date_from))
-            transfer_domain.append(("create_date", ">=", date_from))
+            base_date_domain.append(("create_date", ">=", date_from))
         if date_to:
-            attempt_domain.append(("create_date", "<=", date_to + " 23:59:59"))
-            exam_session_domain.append(("create_date", "<=", date_to + " 23:59:59"))
-            cbis_session_domain.append(("create_date", "<=", date_to + " 23:59:59"))
-            cbis_eval_domain.append(("create_date", "<=", date_to + " 23:59:59"))
-            transfer_domain.append(("create_date", "<=", date_to + " 23:59:59"))
+            base_date_domain.append(("create_date", "<=", date_to + " 23:59:59"))
+
+        attempt_domain = list(base_date_domain)
+        exam_session_domain = list(base_date_domain)
+        cbis_session_domain = list(base_date_domain)
+        cbis_eval_domain = list(base_date_domain)
+        transfer_domain = list(base_date_domain)
+        grading_task_domain = list(base_date_domain)
+        pub_domain = list(base_date_domain)
 
         # ── 3. Written Exam KPIs ────────────────────────────────────────────
-        total_exam_sessions = exam_session_model.sudo().search_count(exam_session_domain) if exam_session_model else 0
-        draft_exam_sessions = exam_session_model.sudo().search_count(exam_session_domain + [("state", "=", "draft")]) if exam_session_model else 0
-        active_exam_sessions = exam_session_model.sudo().search_count(exam_session_domain + [("state", "=", "active")]) if exam_session_model else 0
+        total_exam_sessions = _count(exam_session_model, exam_session_domain)
+        draft_exam_sessions = _count(exam_session_model, exam_session_domain + [("state", "=", "draft")])
+        active_exam_sessions = _count(exam_session_model, exam_session_domain + [("state", "=", "active")])
         
-        total_sittings = attempt_model.sudo().search_count(attempt_domain) if attempt_model else 0
-        completed_sittings = attempt_model.sudo().search_count(attempt_domain + [("state", "=", "completed")]) if attempt_model else 0
-        active_sittings = attempt_model.sudo().search_count(attempt_domain + [("state", "=", "in_progress")]) if attempt_model else 0
-        disqualified_sittings = attempt_model.sudo().search_count(attempt_domain + [("state", "=", "disqualified")]) if attempt_model else 0
+        total_sittings = _count(attempt_model, attempt_domain)
+        completed_sittings = _count(attempt_model, attempt_domain + [("state", "=", "completed")])
+        active_sittings = _count(attempt_model, attempt_domain + [("state", "=", "in_progress")])
+        disqualified_sittings = _count(attempt_model, attempt_domain + [("state", "=", "disqualified")])
         
-        passed_sittings = attempt_model.sudo().search_count(attempt_domain + [("state", "=", "completed"), ("is_passed", "=", True)]) if attempt_model else 0
-        failed_sittings = attempt_model.sudo().search_count(attempt_domain + [("state", "=", "completed"), ("is_passed", "=", False)]) if attempt_model else 0
+        passed_sittings = _count(attempt_model, attempt_domain + [("state", "=", "completed"), ("is_passed", "=", True)])
+        failed_sittings = _count(attempt_model, attempt_domain + [("state", "=", "completed"), ("is_passed", "=", False)])
 
-        pending_grading_tasks = grading_task_model.sudo().search_count([("state", "=", "pending")]) if grading_task_model else 0
-        overdue_grading_tasks = grading_task_model.sudo().search_count([("state", "=", "pending"), ("is_overdue", "=", True)]) if grading_task_model else 0
-        my_grading_tasks = grading_task_model.sudo().search_count([("assigned_grader_id", "=", uid), ("state", "=", "pending")]) if grading_task_model else 0
+        pending_grading_tasks = _count(grading_task_model, grading_task_domain + [("state", "=", "pending")])
+        overdue_grading_tasks = _count(grading_task_model, grading_task_domain + [("state", "=", "pending"), ("is_overdue", "=", True)])
+        my_grading_tasks = _count(grading_task_model, grading_task_domain + [("assigned_grader_id", "=", uid), ("state", "=", "pending")])
 
         # ── 4. CBIS Interview KPIs ──────────────────────────────────────────
-        total_interview_sessions = 0
-        if cbis_session_model:
-            total_interview_sessions += cbis_session_model.sudo().search_count(cbis_session_domain)
-        if interview_session_model:
-            total_interview_sessions += interview_session_model.sudo().search_count(cbis_session_domain)
-
-        total_scheduled_candidates = 0
-        if cbis_candidate_model:
-            total_scheduled_candidates += cbis_candidate_model.sudo().search_count([])
-        if interview_candidate_model:
-            total_scheduled_candidates += interview_candidate_model.sudo().search_count([])
+        total_interview_sessions = _count(cbis_session_model, cbis_session_domain) + _count(interview_session_model, cbis_session_domain)
+        total_scheduled_candidates = _count(cbis_candidate_model, cbis_session_domain) + _count(interview_candidate_model, cbis_session_domain)
 
         total_evaluations_submitted = 0
         total_evaluations_pending = 0
         my_pending_evaluations = 0
 
-        if interview_eval_model:
-            total_evaluations_submitted += interview_eval_model.sudo().search_count(cbis_eval_domain + [("state", "=", "submitted")])
-            total_evaluations_pending += interview_eval_model.sudo().search_count(cbis_eval_domain + [("state", "in", ["draft", "pending"])])
+        # Primary: CBIS interviewer evaluation model
+        if cbis_eval_model is not None:
+            total_evaluations_submitted += _count(cbis_eval_model, cbis_eval_domain + [("state", "=", "submitted")])
+            total_evaluations_pending += _count(cbis_eval_model, cbis_eval_domain + [("state", "=", "draft")])
+            my_pending_evaluations += _count(cbis_eval_model, [("interviewer_user_id", "=", uid), ("state", "=", "draft")])
+        elif interview_eval_model is not None:
+            total_evaluations_submitted += _count(interview_eval_model, cbis_eval_domain + [("state", "=", "submitted")])
+            total_evaluations_pending += _count(interview_eval_model, cbis_eval_domain + [("state", "in", ["draft", "pending"])])
             emp_id = user.employee_id.id if user.employee_id else False
             my_domain = [("state", "in", ["draft", "pending"])]
             if emp_id:
                 my_domain.append(("assessor_name", "=", emp_id))
             else:
                 my_domain.append(("create_uid", "=", uid))
-            my_pending_evaluations += interview_eval_model.sudo().search_count(my_domain)
-
-        if cbis_candidate_model:
-            total_evaluations_submitted += cbis_candidate_model.sudo().search_count([("state", "=", "evaluated")])
-            total_evaluations_pending += cbis_candidate_model.sudo().search_count([("state", "=", "pending")])
+            my_pending_evaluations += _count(interview_eval_model, my_domain)
 
         # ── 5. Transfer Assessment KPIs ─────────────────────────────────────
-        total_transfers = transfer_model.sudo().search_count(transfer_domain) if transfer_model else 0
-        approved_transfers = transfer_model.sudo().search_count(transfer_domain + [("state", "=", "approved")]) if transfer_model else 0
-        pending_transfers = transfer_model.sudo().search_count(transfer_domain + [("state", "in", ["draft", "submitted", "under_review"])]) if transfer_model else 0
-        total_publications = pub_model.sudo().search_count([]) if pub_model else 0
+        total_transfers = _count(transfer_model, transfer_domain)
+        approved_transfers = _count(transfer_model, transfer_domain + [("state", "=", "approved")])
+        pending_transfers = _count(transfer_model, transfer_domain + [("state", "in", ["draft", "submitted", "under_review"])])
+        total_publications = _count(pub_model, pub_domain)
 
         # ── 6. Action Queues ────────────────────────────────────────────────
         my_action_evals = []
-        if interview_eval_model:
+        if cbis_eval_model is not None:
+            ev_domain = [("interviewer_user_id", "=", uid), ("state", "=", "draft")]
+            for ev in cbis_eval_model.sudo().search(ev_domain, limit=5):
+                my_action_evals.append({
+                    "id": ev.id,
+                    "candidate_code": ev.candidate_code or f"INT-{ev.id:04d}",
+                    "candidate_name": ev.candidate_name or _("Candidate"),
+                    "job_title": ev.job_id.name if ev.job_id else "—",
+                    "session_name": ev.session_id.name if ev.session_id else "—",
+                })
+        elif interview_eval_model is not None:
             emp_id = user.employee_id.id if user.employee_id else False
             ev_domain = [("state", "in", ["draft", "pending"])]
             if emp_id:
                 ev_domain.append(("assessor_name", "=", emp_id))
             else:
                 ev_domain.append(("create_uid", "=", uid))
-            for ev in interview_eval_model.search(ev_domain, limit=5):
+            for ev in interview_eval_model.sudo().search(ev_domain, limit=5):
                 my_action_evals.append({
                     "id": ev.id,
                     "candidate_code": getattr(ev, "code", False) or getattr(ev, "reference", False) or f"INT-{ev.id:04d}",

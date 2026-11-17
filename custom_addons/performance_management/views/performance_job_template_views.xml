@@ -12,6 +12,7 @@
                 <field name="job_id"/>
                 <field name="work_unit_type"/>
                 <field name="is_branch_unit"/>
+                <field name="is_district_area_unit"/>
                 <field name="total_weight"/>
                 <field name="weight_status"/>
                 <field name="line_count"/>
@@ -79,6 +80,7 @@
                 <field name="total_weight" string="Total Weight (%)" sum="Total Weight" decoration-success="total_weight == 100.0" decoration-danger="total_weight != 100.0"/>
                 <field name="weight_status" string="Status" widget="badge" decoration-success="weight_status == 'complete'" decoration-danger="weight_status == 'exceeded'" decoration-warning="weight_status == 'incomplete'"/>
                 <field name="is_branch_unit" string="Branch Cascade" widget="boolean_toggle" optional="show"/>
+                <field name="is_district_area_unit" string="District/Area Cascade" widget="boolean_toggle" optional="show"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
         </field>
@@ -110,6 +112,7 @@
                                         <field name="job_id" string="Job Position" options="{'no_create': True}" required="1"/>
                                         <field name="work_unit_type" readonly="1" invisible="not work_unit_type"/>
                                         <field name="is_branch_unit" readonly="1" invisible="not is_branch_unit"/>
+                                        <field name="is_district_area_unit" readonly="1" invisible="not is_district_area_unit"/>
                                         <field name="active"/>
                                     </group>
                                 </div>
@@ -170,6 +173,7 @@
                 <filter string="Complete (100%)" name="complete" domain="[('weight_status', '=', 'complete')]"/>
                 <filter string="Incomplete Weight" name="incomplete" domain="[('weight_status', '!=', 'complete')]"/>
                 <filter string="Branch Positions" name="branch_only" domain="[('is_branch_unit', '=', True)]"/>
+                <filter string="District/Area Positions" name="district_area_only" domain="[('is_district_area_unit', '=', True)]"/>
                 <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                 <group name="group_by">
                     <filter string="Work Unit" name="group_unit" context="{'group_by': 'operating_unit_id'}"/>

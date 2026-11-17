@@ -8,40 +8,40 @@
             <field name="sequence">10</field>
         </record>
 
-        <!-- 1. Audit (Read-Only Visibility Across Entire System) -->
+        <!-- 1. Initiative Lead (Feedback Line 95: View all projects and non-projects) -->
         <record id="group_pm_audit" model="res.groups">
-            <field name="name">Audit (Read Only)</field>
+            <field name="name">Initiative Lead</field>
             <field name="privilege_id" ref="res_groups_privilege_pm"/>
             <field name="sequence">10</field>
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-            <field name="comment">Read-only visibility across all initiatives, projects, deliverables, milestones, tasks, and reports.</field>
+            <field name="comment">Executive oversight: View all projects, non-projects, initiatives, dashboards, and reports.</field>
         </record>
 
-        <!-- 2. Assignee (Team Member / Task Executor) -->
+        <!-- 2. Task Manager (Feedback Line 94: Manage assigned tasks on given projects, view involved projects, reporting, non-project tasks) -->
         <record id="group_pm_user" model="res.groups">
-            <field name="name">Assignee</field>
+            <field name="name">Task Manager</field>
             <field name="privilege_id" ref="res_groups_privilege_pm"/>
             <field name="sequence">20</field>
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-            <field name="comment">Access restricted to their own assigned tasks, subtasks, and progress logs.</field>
+            <field name="comment">Manage assigned tasks on given projects, view involved projects, reporting, and manage non-project tasks.</field>
         </record>
 
-        <!-- 3. Project Manager (Manages Own Projects) -->
+        <!-- 3. Project Manager (Feedback Line 93: Manage everything except configuration on self-projects) -->
         <record id="group_pm_project_manager" model="res.groups">
             <field name="name">Project Manager</field>
             <field name="privilege_id" ref="res_groups_privilege_pm"/>
             <field name="sequence">30</field>
             <field name="implied_ids" eval="[(4, ref('project_management.group_pm_user'))]"/>
-            <field name="comment">Full access to manage their own projects, deliverables, milestones, risks, and tasks.</field>
+            <field name="comment">Manage everything except configuration on self-projects; access to dashboards, reporting, tasks, project tasks on self-projects.</field>
         </record>
 
-        <!-- 4. Program Manager (Global PMO / Administrator) -->
+        <!-- 4. Admin (Feedback Line 92: Admin everything) -->
         <record id="group_pm_manager" model="res.groups">
-            <field name="name">Program Manager</field>
+            <field name="name">Administrator</field>
             <field name="privilege_id" ref="res_groups_privilege_pm"/>
             <field name="sequence">40</field>
             <field name="implied_ids" eval="[(4, ref('project_management.group_pm_project_manager'))]"/>
-            <field name="comment">Unrestricted access across all initiatives, projects, tasks, and configurations.</field>
+            <field name="comment">Full administrator access across all initiatives, projects, documents, tasks, and configurations.</field>
         </record>
     </data>
 </odoo>

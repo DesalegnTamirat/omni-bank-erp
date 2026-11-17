@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_helpdesk_ticket_review_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.review.wizard.form</field>
+        <field name="model">helpdesk.ticket.review.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Back-Line Quality &amp; Audit Review">
+                <field name="ticket_id" invisible="1"/>
+                <div class="alert alert-info py-2 mb-3" role="alert">
+                    <i class="fa fa-info-circle me-1" title="Audit Information"/>
+                    <strong>Back-Line Audit Process:</strong> This ticket was resolved by Front-Line Support and is in the <strong>Review Stage</strong>. As a Back-Line specialist, please review the case registration, root cause analysis, and resolution provided to ensure quality, completeness, and adherence to bank standards.
+                </div>
+
+                <div class="row">
+                    <div class="col-12 col-md-6">
+                        <group string="1. Ticket &amp; Customer Overview">
+                            <field name="ticket_number" string="Ticket #"/>
+                            <field name="ticket_name" string="Subject"/>
+                            <field name="partner_name" string="Customer"/>
+                            <field name="partner_phone" string="Phone"/>
+                            <field name="account_number" string="Account #" invisible="not account_number"/>
+                            <field name="operating_unit_id" string="Operating Unit"/>
+                            <field name="service_name" string="Service Category"/>
+                        </group>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <group string="2. Front-Line Resolution Summary">
+                            <field name="review_submitted_by_id" string="Resolved By" widget="many2one_avatar_user"/>
+                            <field name="review_submitted_at" string="Resolution Date"/>
+                            <field name="customer_request_details" string="Customer Inquiry" readonly="1"/>
+                            <field name="frontline_root_cause" string="Identified Root Cause" readonly="1"/>
+                            <field name="frontline_resolution" string="Front-Line Action / Resolution" readonly="1"/>
+                        </group>
+                    </div>
+                </div>
+
+                <separator string="3. Back-Line Quality Audit &amp; Feedback"/>
+
+                <group>
+                    <field name="decision" widget="radio" options="{'horizontal': true}"/>
+                </group>
+
+                <group>
+                    <field name="registration_feedback" placeholder="Provide evaluation/feedback on whether the customer details, inquiry classification, and case data were properly documented..." rows="3"/>
+                    <field name="root_cause_feedback" placeholder="Provide evaluation/feedback on whether the root cause identified is accurate and corresponds to the issue..." rows="3"/>
+                    <field name="resolution_feedback" placeholder="Provide evaluation/feedback on whether the resolution steps and advice given to customer are appropriate..." rows="3"/>
+                    <field name="general_comments" placeholder="Optional audit comments, coaching tips, or notes for the front-line agent..." rows="2"/>
+                </group>
+
+                <group string="Customer Notification (SMS / Email)" invisible="decision != 'approved'">
+                    <group>
+                        <field name="notify_customer" widget="boolean_toggle" string="Notify Customer (ON/OFF)"/>
+                    </group>
+                    <group>
+                        <field name="notification_channel" widget="selection" string="Notification Channel" invisible="not notify_customer"/>
+                    </group>
+                </group>
+
+                <footer>
+                    <button name="action_confirm_review" string="Submit Audit &amp; Confirm" type="object" class="btn-primary" icon="fa-check"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_review_wizard" model="ir.actions.act_window">
+        <field name="name">Back-Line Audit &amp; Review</field>
+        <field name="res_model">helpdesk.ticket.review.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

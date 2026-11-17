@@ -49,6 +49,7 @@ def run_e2e_tests(env):
     pomd_user = EmpModel.get_secretary_user() or admin_user
 
     today = date.today()
+    dummy_sig = base64.b64encode(b"PNG Signature Sample that is sufficiently long to represent a genuine handwritten digital signature on a canvas").decode('ascii')
 
     # --------------------------------------------------------------------------
     # TEST 1: Direct Enforcement Lifecycle (Non-Managerial Minor Offense)
@@ -67,6 +68,9 @@ def run_e2e_tests(env):
     case1.action_initiate()
     assert case1.state == 'initiated', f"Expected initiated, got {case1.state}"
     print(f"  ✓ Case initiated -> '{case1.state}'")
+
+    dummy_sig = base64.b64encode(b"PNG Signature Sample that is sufficiently long to represent a genuine handwritten digital signature on a canvas").decode('ascii')
+    case1.write({'signatory_signature': dummy_sig})
 
     # Enforce sanction directly
     case1.action_approve_and_enforce()
@@ -140,6 +144,7 @@ def run_e2e_tests(env):
 
     # CEO executes final enforcement
     original_job = emp_mgr.job_id
+    case2.write({'signatory_signature': dummy_sig})
     case2.with_user(ceo_user).action_approve_and_enforce()
     assert case2.state in ('enforced', 'closed'), f"Expected enforced/closed, got {case2.state}"
     print(f"  ✓ CEO approved and enforced sanction -> case state: '{case2.state}'")
@@ -173,6 +178,7 @@ def run_e2e_tests(env):
         'decision_outcome': 'upheld',
         'appeal_decision_notes': 'Appeal reviewed by Appellate Board; sanction upheld.',
         'decision_date': today,
+        'reviewer_signature': dummy_sig,
     })
     appeal.with_user(reviewer_user).action_render_decision()
     assert appeal.state == 'decided', f"Expected decided, got {appeal.state}"
@@ -194,3 +200,4 @@ def run_e2e_tests(env):
     print("\n" + "=" * 80)
     print("ALL 4 END-TO-END WORKFLOW TESTS COMPLETED SUCCESSFULLY WITH 100% PASS RATE!")
     print("=" * 80)
+    return True

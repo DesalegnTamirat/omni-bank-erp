@@ -2,3 +2,12 @@ from . import helpdesk_ticket_duplicate_wizard
 from . import helpdesk_ticket_merge_wizard
 from . import helpdesk_ticket_convert_wizard
 from . import helpdesk_ticket_escalate_wizard
+from . import helpdesk_ticket_notify_wizard
+from . import helpdesk_api_key_wizard
+from . import helpdesk_ticket_reject_wizard
+from . import helpdesk_ticket_done_wizard
+from . import helpdesk_ticket_reopen_wizard
+from . import helpdesk_ticket_cancel_wizard
+from . import helpdesk_ticket_pending_wizard
+from . import helpdesk_ticket_inprogress_wizard
+from . import helpdesk_ticket_review_wizard

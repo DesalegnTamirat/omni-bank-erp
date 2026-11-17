@@ -5,9 +5,10 @@ from odoo.exceptions import UserError
 class HrExitInterviewTemplate(models.Model):
     _name = 'hr.exit.interview.template'
     _description = 'Exit Interview Template'
-    _order = 'name'
+    _order = 'sequence, name, id'
 
-    name = fields.Char(string='Template Name', required=True, translate=True)
+    sequence = fields.Integer(string='Sequence', default=10)
+    name = fields.Char(string='Template Name', required=True)
     active = fields.Boolean(default=True)
 
     # Dynamic Questions list
@@ -20,6 +21,36 @@ class HrExitInterviewTemplate(models.Model):
     text_2_label = fields.Char(string='Text Question 2 (Deprecated)', default='FEEDBACK ON MANAGEMENT AND WORK EXPERIENCE')
     text_3_label = fields.Char(string='Text Question 3 (Deprecated)', default='SUGGESTIONS FOR IMPROVEMENT')
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        active_vals = [v for v in vals_list if v.get('active', True)]
+        if active_vals:
+            # Enforce single active template: deactivate all existing templates
+            self.with_context(active_test=False).search([('active', '=', True)]).write({'active': False})
+            for v in active_vals[:-1]:
+                v['active'] = False
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if vals.get('active'):
+            # Enforce single active template: deactivate all other templates
+            other_active = self.with_context(active_test=False).search([('id', 'not in', self.ids), ('active', '=', True)])
+            if other_active:
+                other_active.write({'active': False})
+            if len(self) > 1:
+                self[1:].write({'active': False})
+                return super(HrExitInterviewTemplate, self[:1]).write(vals)
+        return super().write(vals)
+
+    @api.constrains('active')
+    def _check_single_active_template(self):
+        for rec in self:
+            if rec.active:
+                active_count = self.with_context(active_test=False).search_count([('active', '=', True)])
+                if active_count > 1:
+                    raise UserError(_('Only one Exit Interview Template can be active at a time.'))
+
+
 
 class HrExitInterviewQuestion(models.Model):
     _name = 'hr.exit.interview.question'
@@ -28,7 +59,7 @@ class HrExitInterviewQuestion(models.Model):
 
     template_id = fields.Many2one('hr.exit.interview.template', string='Template', required=True, ondelete='cascade')
     sequence = fields.Integer(string='Sequence', default=10)
-    name = fields.Char(string='Question Text', required=True, translate=True)
+    name = fields.Char(string='Question Text', required=True)
     question_type = fields.Selection([
         ('rating',       'Rating'),
         ('satisfaction', 'Satisfaction'),
@@ -49,7 +80,7 @@ class HrExitInterviewQuestion(models.Model):
                 rec.preview_text = "Example: [Employee enters their detailed text response here...]"
             else:
                 rec.preview_text = ""
-    section = fields.Char(string='Section', help='Group heading for the portal form', translate=True)
+    section = fields.Char(string='Section', help='Group heading for the portal form')
 
     option_ids = fields.One2many(
         'hr.exit.interview.question.option', 'question_id',
@@ -78,7 +109,7 @@ class HrExitInterviewQuestionOption(models.Model):
 
     question_id = fields.Many2one('hr.exit.interview.question', string='Question', ondelete='cascade', required=True)
     sequence = fields.Integer(string='Sequence', default=10)
-    name = fields.Char(string='Option Text', required=True, translate=True)
+    name = fields.Char(string='Option Text', required=True)
 
 
 
@@ -233,6 +264,7 @@ class HrExitInterview(models.Model):
                     ])
 
             # 2. Clean up duplicate questions that don't have XML IDs on the default template to heal database duplicates using SQL
+            default_template_id = default_template.id if default_template else 0
             self.env.cr.execute("""
                 WITH ranked_questions AS (
                     SELECT q.id,
@@ -243,13 +275,11 @@ class HrExitInterview(models.Model):
                     FROM hr_exit_interview_question q
                     JOIN hr_exit_interview_template t ON q.template_id = t.id
                     LEFT JOIN ir_model_data m ON m.model = 'hr.exit.interview.question' AND m.res_id = q.id AND m.module = 'hr_resignation'
-                    WHERE t.name->>'en_US' = 'Standard Exit Interview'
-                       OR t.name->>'en' = 'Standard Exit Interview'
-                       OR t.name->>'' = 'Standard Exit Interview'
+                    WHERE (t.id = %s OR t.name::text = 'Standard Exit Interview' OR t.name::text LIKE '%%Standard Exit Interview%%')
                 )
                 DELETE FROM hr_exit_interview_question
                 WHERE id IN (SELECT id FROM ranked_questions WHERE rn > 1);
-            """)
+            """, (default_template_id,))
 
         self.env.cr.execute("SELECT 1 FROM information_schema.tables WHERE table_name = 'hr_exit_interview_line'")
         if self.env.cr.fetchone():
@@ -315,6 +345,21 @@ class HrExitInterview(models.Model):
             'type': 'ir.actions.act_url',
             'url': f'/exit_interview/{self.id}',
             'target': 'new',
+        }
+
+    def action_save_interview(self):
+        """Save the interview responses as draft so the user can continue later."""
+        for rec in self:
+            rec.line_ids._compute_answer()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Saved'),
+                'message': _('Exit interview answers saved.'),
+                'type': 'success',
+                'sticky': False,
+            }
         }
 
     def action_submit(self):
@@ -516,8 +561,8 @@ class HrExitInterviewLine(models.Model):
     question_id = fields.Many2one('hr.exit.interview.question', string='Question Template', ondelete='set null')
     available_option_ids = fields.One2many(related='question_id.option_ids')
     sequence = fields.Integer(string='Sequence', default=10)
-    section = fields.Char(string='Section', translate=True)
-    question_name = fields.Char(string='Question', required=True, translate=True)
+    section = fields.Char(string='Section')
+    question_name = fields.Char(string='Question', required=True)
     is_mandatory = fields.Boolean(string='Mandatory', default=False)
     question_type = fields.Selection([
         ('rating',       'Rating'),
@@ -578,6 +623,13 @@ class HrExitInterviewLine(models.Model):
 
     answer = fields.Char(string='Answer', compute='_compute_answer', store=True)
 
+    @api.onchange('question_type', 'rating_value', 'satisfaction_value',
+                  'agreement_value', 'boolean_value', 'boolean_agree_value',
+                  'choice_id', 'choice_ids', 'text_value')
+    def _onchange_compute_answer(self):
+        for rec in self:
+            rec._compute_answer()
+
     @api.depends('question_type', 'rating_value', 'satisfaction_value',
                  'agreement_value', 'boolean_value', 'boolean_agree_value',
                  'choice_id', 'choice_ids', 'choice_ids.name', 'text_value')
@@ -594,10 +646,19 @@ class HrExitInterviewLine(models.Model):
             elif rec.question_type == 'boolean_agree':
                 rec.answer = dict(rec._fields['boolean_agree_value'].selection).get(rec.boolean_agree_value, '')
             elif rec.question_type == 'custom':
-                rec.answer = rec.choice_id.name or ''
+                rec.answer = rec.choice_id.display_name or rec.choice_id.name or ''
             elif rec.question_type == 'checkbox':
-                rec.answer = ', '.join(rec.choice_ids.mapped('name'))
+                rec.answer = ', '.join(rec.choice_ids.mapped(lambda o: o.display_name or o.name or ''))
             elif rec.question_type == 'text':
                 rec.answer = rec.text_value or ''
             else:
                 rec.answer = ''
+
+    def write(self, vals):
+        res = super().write(vals)
+        if any(f in vals for f in ('question_type', 'rating_value', 'satisfaction_value',
+                                   'agreement_value', 'boolean_value', 'boolean_agree_value',
+                                   'choice_id', 'choice_ids', 'text_value')):
+            for rec in self:
+                rec._compute_answer()
+        return res

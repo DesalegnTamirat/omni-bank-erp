@@ -8,6 +8,11 @@
               groups="bunna_hr_payroll.group_hr_payroll_user"
               web_icon="bunna_hr_payroll,static/description/icon.png"/>
 
+    <menuitem id="menu_hr_payroll_report"
+              name="Reporting" parent="menu_hr_payroll_root"
+              sequence="90"
+              groups="bunna_hr_payroll.group_hr_payroll_user"/>
+
     <menuitem id="menu_hr_payroll_configuration"
               name="Configuration" parent="menu_hr_payroll_root"
               sequence="100"

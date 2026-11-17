@@ -82,8 +82,8 @@
         <field name="res_model">pbms.target.cascade.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
-        <field name="binding_model_id" ref="model_pbms_planning_category"/>
-        <field name="binding_view_types">list,form</field>
+        <field name="binding_model_id" eval="False"/>
+        <field name="binding_view_types" eval="False"/>
         <field name="context">{'default_cascade_level': 'ho_to_district'}</field>
     </record>
 
@@ -93,8 +93,8 @@
         <field name="res_model">pbms.target.cascade.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
-        <field name="binding_model_id" ref="model_pbms_planning_category"/>
-        <field name="binding_view_types">list,form</field>
+        <field name="binding_model_id" eval="False"/>
+        <field name="binding_view_types" eval="False"/>
         <field name="context">{'default_cascade_level': 'district_to_branch'}</field>
     </record>
 </odoo>

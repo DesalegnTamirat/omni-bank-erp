@@ -79,6 +79,7 @@ class HrPayslip(models.Model):
     period_id = fields.Many2one(
         'hr.payroll.period',
         string='Period',
+        index=True,
         domain="[('state', '=', 'open')]",
         help='Select an open payroll period to automatically set start date, end date, and payment date.'
     )
@@ -130,7 +131,7 @@ class HrPayslip(models.Model):
                                                       string='Details by Salary Rule Category')
     credit_note = fields.Boolean(string='Credit Note',
                                  help="Indicates this payslip has a refund of another")
-    payslip_run_id = fields.Many2one('hr.payslip.run', string='Payslip Batches', copy=False)
+    payslip_run_id = fields.Many2one('hr.payslip.run', string='Payslip Batches', copy=False, index=True)
     payslip_count = fields.Integer(compute='_compute_payslip_count', string="Payslip Computation Details")
 
     def _compute_details_by_salary_rule_category(self):
@@ -147,77 +148,99 @@ class HrPayslip(models.Model):
             raise ValidationError(_("Payslip 'Date From' must be earlier 'Date To'."))
 
     def action_payslip_draft(self):
-        for slip in self:
-            if slip.state == 'done':
-                cs_line = slip.line_ids.filtered(lambda l: l.code == 'CS')
-                cs_amt = (cs_line[0].total or cs_line[0].amount) if cs_line else 0.0
-                if cs_amt > 0 and slip.version_id:
-                    contract = slip.version_id
-                    self.env.cr.execute(
-                        "SELECT COALESCE(cost_sharing, 0.0), COALESCE(cost_sharing_period, 0) FROM hr_version WHERE id = %s",
-                        (contract.id,)
-                    )
-                    row = self.env.cr.fetchone()
-                    curr_paid = float(row[0]) if row else (contract.cost_sharing or 0.0)
-                    curr_period = int(row[1]) if row else (contract.cost_sharing_period or 0)
+        slips_to_draft = self.filtered(lambda s: s.state != 'draft')
+        if not slips_to_draft:
+            return True
 
-                    new_paid = max(0.0, curr_paid - cs_amt)
-                    new_period = max(0, curr_period - 1)
-                    contract.sudo().write({
-                        'cost_sharing': new_paid,
-                        'cost_sharing_period': new_period,
-                    })
-            slip.write({'state': 'draft'})
+        done_slips = slips_to_draft.filtered(lambda s: s.state == 'done' and s.version_id)
+        if done_slips:
+            self.env.cr.execute("""
+                SELECT pl.slip_id, COALESCE(pl.amount, 0.0), p.version_id
+                FROM hr_payslip_line pl
+                JOIN hr_payslip p ON p.id = pl.slip_id
+                WHERE pl.slip_id IN %s AND pl.code = 'CS' AND COALESCE(pl.amount, 0.0) > 0
+            """, (tuple(done_slips.ids),))
+            for slip_id, cs_amt, version_id in self.env.cr.fetchall():
+                if cs_amt > 0 and version_id:
+                    self.env.cr.execute("""
+                        UPDATE hr_version
+                        SET cost_sharing = GREATEST(0.0, COALESCE(cost_sharing, 0.0) - %s),
+                            cost_sharing_period = GREATEST(0, COALESCE(cost_sharing_period, 0) - 1)
+                        WHERE id = %s
+                    """, (float(cs_amt), version_id))
+
+        slips_to_draft.with_context(
+            tracking_disable=True,
+            mail_create_nolog=True,
+            mail_create_nosubscribe=True,
+            no_audit=True,
+        ).write({'state': 'draft'})
         return True
 
     def action_payslip_done(self):
-        for slip in self:
-            if slip.state == 'done':
-                continue
-            slip.compute_sheet()
-            cs_line = slip.line_ids.filtered(lambda l: l.code == 'CS')
-            cs_amt = (cs_line[0].total or cs_line[0].amount) if cs_line else 0.0
-            if cs_amt > 0 and slip.version_id:
-                contract = slip.version_id
-                self.env.cr.execute(
-                    "SELECT COALESCE(cost_sharing, 0.0), COALESCE(cost_sharing_period, 0) FROM hr_version WHERE id = %s",
-                    (contract.id,)
-                )
-                row = self.env.cr.fetchone()
-                curr_paid = float(row[0]) if row else (contract.cost_sharing or 0.0)
-                curr_period = int(row[1]) if row else (contract.cost_sharing_period or 0)
+        slips_to_done = self.filtered(lambda s: s.state != 'done')
+        if not slips_to_done:
+            return True
 
-                new_paid = curr_paid + cs_amt
-                new_period = curr_period + 1
-                contract.sudo().write({
-                    'cost_sharing': new_paid,
-                    'cost_sharing_period': new_period,
-                })
-            slip.write({'state': 'done'})
+        # Only compute uncomputed slips (skip re-computation if lines already exist)
+        uncomputed = slips_to_done.filtered(lambda s: not s.line_ids)
+        if uncomputed:
+            uncomputed.compute_sheet()
+
+        # Bulk Cost Sharing update for slips that have CS > 0
+        cs_slips = slips_to_done.filtered(lambda s: s.version_id)
+        if cs_slips:
+            self.env.cr.execute("""
+                SELECT pl.slip_id, COALESCE(pl.amount, 0.0), p.version_id
+                FROM hr_payslip_line pl
+                JOIN hr_payslip p ON p.id = pl.slip_id
+                WHERE pl.slip_id IN %s AND pl.code = 'CS' AND COALESCE(pl.amount, 0.0) > 0
+            """, (tuple(cs_slips.ids),))
+            for slip_id, cs_amt, version_id in self.env.cr.fetchall():
+                if cs_amt > 0 and version_id:
+                    self.env.cr.execute("""
+                        UPDATE hr_version
+                        SET cost_sharing = COALESCE(cost_sharing, 0.0) + %s,
+                            cost_sharing_period = COALESCE(cost_sharing_period, 0) + 1
+                        WHERE id = %s
+                    """, (float(cs_amt), version_id))
+
+        slips_to_done.with_context(
+            tracking_disable=True,
+            mail_create_nolog=True,
+            mail_create_nosubscribe=True,
+            no_audit=True,
+        ).write({'state': 'done'})
         return True
 
     def action_payslip_cancel(self):
-        for slip in self:
-            if slip.state == 'done':
-                cs_line = slip.line_ids.filtered(lambda l: l.code == 'CS')
-                cs_amt = (cs_line[0].total or cs_line[0].amount) if cs_line else 0.0
-                if cs_amt > 0 and slip.version_id:
-                    contract = slip.version_id
-                    self.env.cr.execute(
-                        "SELECT COALESCE(cost_sharing, 0.0), COALESCE(cost_sharing_period, 0) FROM hr_version WHERE id = %s",
-                        (contract.id,)
-                    )
-                    row = self.env.cr.fetchone()
-                    curr_paid = float(row[0]) if row else (contract.cost_sharing or 0.0)
-                    curr_period = int(row[1]) if row else (contract.cost_sharing_period or 0)
+        slips_to_cancel = self.filtered(lambda s: s.state != 'cancel')
+        if not slips_to_cancel:
+            return True
 
-                    new_paid = max(0.0, curr_paid - cs_amt)
-                    new_period = max(0, curr_period - 1)
-                    contract.sudo().write({
-                        'cost_sharing': new_paid,
-                        'cost_sharing_period': new_period,
-                    })
-            slip.write({'state': 'cancel'})
+        done_slips = slips_to_cancel.filtered(lambda s: s.state == 'done' and s.version_id)
+        if done_slips:
+            self.env.cr.execute("""
+                SELECT pl.slip_id, COALESCE(pl.amount, 0.0), p.version_id
+                FROM hr_payslip_line pl
+                JOIN hr_payslip p ON p.id = pl.slip_id
+                WHERE pl.slip_id IN %s AND pl.code = 'CS' AND COALESCE(pl.amount, 0.0) > 0
+            """, (tuple(done_slips.ids),))
+            for slip_id, cs_amt, version_id in self.env.cr.fetchall():
+                if cs_amt > 0 and version_id:
+                    self.env.cr.execute("""
+                        UPDATE hr_version
+                        SET cost_sharing = GREATEST(0.0, COALESCE(cost_sharing, 0.0) - %s),
+                            cost_sharing_period = GREATEST(0, COALESCE(cost_sharing_period, 0) - 1)
+                        WHERE id = %s
+                    """, (float(cs_amt), version_id))
+
+        slips_to_cancel.with_context(
+            tracking_disable=True,
+            mail_create_nolog=True,
+            mail_create_nosubscribe=True,
+            no_audit=True,
+        ).write({'state': 'cancel'})
         return True
 
     def refund_sheet(self):
@@ -316,13 +339,17 @@ class HrPayslip(models.Model):
         ]) if 'hr.payroll.adjustment.line' in self.env else self.env['hr.payroll.adjustment.line']
         adj_by_emp = {}
         for l in all_emp_lines:
-            adj_by_emp.setdefault(l.employee_id.id, []).append(l)
+            if l.employee_id.id not in adj_by_emp:
+                adj_by_emp[l.employee_id.id] = l
+            else:
+                adj_by_emp[l.employee_id.id] |= l
 
         # 3. Rule cache for the batch
         rules_cache = {}
 
         allowance_field_map = {
             'HOUSING': 'housing_allowance',
+            'HOUSERENT': 'housing_allowance',
             'FUEL': 'fuel_allowance',
             'RA': 'representation_allowance',
             'TRANSPORT': 'transportation_allowance',
@@ -354,8 +381,157 @@ class HrPayslip(models.Model):
                 raise ValidationError(
                     _("No running version/contract found for the employee: %s or no version in the given period" % payslip.employee_id.name))
 
-            emp_lines = adj_by_emp.get(payslip.employee_id.id, [])
-            od_amt = sum(l.amount for l in emp_lines if l.code == 'OD' or (l.adjustment_id and l.adjustment_id.code == 'OD'))
+            emp_lines = adj_by_emp.get(payslip.employee_id.id, self.env['hr.payroll.adjustment.line'])
+
+            def _adj_period(l):
+                adj = l.adjustment_id
+                return getattr(adj, 'payroll_period_id', False) or getattr(adj, 'period_id', False) or getattr(l, 'payroll_period_id', False) or getattr(l, 'period_id', False)
+
+            # Helper to identify OD lines
+            def _is_od_line(line):
+                if line.code == 'OD':
+                    return True
+                if line.adjustment_id:
+                    adj = line.adjustment_id
+                    if adj.code == 'OD':
+                        return True
+                    name_words = (adj.name or '').upper().split()
+                    if 'OD' in name_words or (adj.name or '').upper().startswith('OD'):
+                        return True
+                return False
+
+            # Strict period scoping for OD adjustments:
+            # A payslip must strictly consider only its period's OD adjustment (e.g. June payslip takes only June OD).
+            od_lines = [l for l in emp_lines if _is_od_line(l)]
+            if od_lines:
+                # 1. Match by explicit period_id or payroll_period_id
+                period_matched_od = [
+                    l for l in od_lines
+                    if payslip.period_id and _adj_period(l) == payslip.period_id
+                ]
+                # 2. Match by period name if period was not explicitly linked on the adjustment record
+                if not period_matched_od and payslip.period_id and payslip.period_id.name:
+                    p_name = payslip.period_id.name.strip().lower()
+                    period_matched_od = [
+                        l for l in od_lines
+                        if p_name in (l.adjustment_id.name or '').strip().lower()
+                    ]
+
+                if period_matched_od:
+                    selected_od = period_matched_od
+                else:
+                    # Exclude any OD lines that explicitly belong to other periods
+                    foreign_period_od = [
+                        l for l in od_lines
+                        if payslip.period_id and _adj_period(l) and _adj_period(l) != payslip.period_id
+                    ]
+                    candidate_od = [l for l in od_lines if l not in foreign_period_od]
+                    if candidate_od:
+                        # Fallback: take only the latest active OD adjustment batch (never sum multiple batches)
+                        latest_adj_id = max(l.adjustment_id.id for l in candidate_od if l.adjustment_id)
+                        selected_od = [l for l in candidate_od if l.adjustment_id and l.adjustment_id.id == latest_adj_id]
+                    else:
+                        selected_od = []
+
+                non_od_lines = [l for l in emp_lines if not _is_od_line(l)]
+                scoped_lines = non_od_lines + selected_od
+                emp_lines = self.env['hr.payroll.adjustment.line'].browse([l.id for l in scoped_lines])
+
+            # Helper to identify Cash Indemnity lines
+            def _is_ci_line(line):
+                if line.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY'):
+                    return True
+                if line.adjustment_id:
+                    adj = line.adjustment_id
+                    if adj.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY'):
+                        return True
+                    name_upper = (adj.name or '').upper()
+                    if 'CASH INDEMNITY' in name_upper or 'CIAB' in name_upper:
+                        return True
+                if line.ciamount and line.ciamount > 0:
+                    return True
+                return False
+
+            # Strict period scoping for Cash Indemnity adjustments:
+            # A payslip must strictly consider only its period's Cash Indemnity adjustment.
+            ci_lines = [l for l in emp_lines if _is_ci_line(l)]
+            if ci_lines:
+                # 1. Match by explicit period_id or payroll_period_id
+                period_matched_ci = [
+                    l for l in ci_lines
+                    if payslip.period_id and _adj_period(l) == payslip.period_id
+                ]
+                # 2. Match by period name if period was not explicitly linked on the adjustment record
+                if not period_matched_ci and payslip.period_id and payslip.period_id.name:
+                    p_name = payslip.period_id.name.strip().lower()
+                    period_matched_ci = [
+                        l for l in ci_lines
+                        if p_name in (l.adjustment_id.name or '').strip().lower()
+                    ]
+
+                if period_matched_ci:
+                    selected_ci = period_matched_ci
+                else:
+                    # Exclude any CI lines that explicitly belong to other periods
+                    foreign_period_ci = [
+                        l for l in ci_lines
+                        if payslip.period_id and _adj_period(l) and _adj_period(l) != payslip.period_id
+                    ]
+                    candidate_ci = [l for l in ci_lines if l not in foreign_period_ci]
+                    if candidate_ci:
+                        # Fallback: take only the latest active CI adjustment batch
+                        latest_adj_id = max(l.adjustment_id.id for l in candidate_ci if l.adjustment_id)
+                        selected_ci = [l for l in candidate_ci if l.adjustment_id and l.adjustment_id.id == latest_adj_id]
+                    else:
+                        selected_ci = []
+
+                non_ci_lines = [l for l in emp_lines if not _is_ci_line(l)]
+                scoped_lines = non_ci_lines + selected_ci
+                emp_lines = self.env['hr.payroll.adjustment.line'].browse([l.id for l in scoped_lines])
+
+            # Helper to identify ASBEZA lines
+            def _is_asbeza_line(line):
+                if line.code == 'ASBEZA':
+                    return True
+                if line.adjustment_id and (line.adjustment_id.code == 'ASBEZA' or 'ASBEZA' in (line.adjustment_id.name or '').upper().split()):
+                    return True
+                return False
+
+            # Strict period scoping for ASBEZA adjustments
+            asbeza_lines = [l for l in emp_lines if _is_asbeza_line(l)]
+            if asbeza_lines:
+                period_matched_asbeza = [
+                    l for l in asbeza_lines
+                    if payslip.period_id and _adj_period(l) == payslip.period_id
+                ]
+                if not period_matched_asbeza and payslip.period_id and payslip.period_id.name:
+                    p_name = payslip.period_id.name.strip().lower()
+                    period_matched_asbeza = [
+                        l for l in asbeza_lines
+                        if p_name in (l.adjustment_id.name or '').strip().lower()
+                    ]
+                if period_matched_asbeza:
+                    selected_asbeza = period_matched_asbeza
+                else:
+                    foreign_period_asbeza = [
+                        l for l in asbeza_lines
+                        if payslip.period_id and _adj_period(l) and _adj_period(l) != payslip.period_id
+                    ]
+                    candidate_asbeza = [l for l in asbeza_lines if l not in foreign_period_asbeza]
+                    if candidate_asbeza:
+                        latest_adj_id = max(l.adjustment_id.id for l in candidate_asbeza if l.adjustment_id)
+                        selected_asbeza = [l for l in candidate_asbeza if l.adjustment_id and l.adjustment_id.id == latest_adj_id]
+                    else:
+                        selected_asbeza = []
+
+                non_asbeza_lines = [l for l in emp_lines if not _is_asbeza_line(l)]
+                scoped_lines = non_asbeza_lines + selected_asbeza
+                emp_lines = self.env['hr.payroll.adjustment.line'].browse([l.id for l in scoped_lines])
+
+            slip_adj_by_emp = dict(adj_by_emp)
+            slip_adj_by_emp[payslip.employee_id.id] = emp_lines
+
+            od_amt = sum(l.amount for l in emp_lines if _is_od_line(l))
             asbeza_amt = sum(l.amount for l in emp_lines if l.code == 'ASBEZA' or (l.adjustment_id and l.adjustment_id.code == 'ASBEZA'))
             other_amt = sum(l.amount for l in emp_lines if not l.code or l.code == 'OTHER' or (l.adjustment_id and l.adjustment_id.code == 'OTHER'))
             lu_amt = sum(l.amount for l in emp_lines if l.code == 'LU' or (l.adjustment_id and l.adjustment_id.code == 'LU'))
@@ -376,12 +552,12 @@ class HrPayslip(models.Model):
                 version_vals['cash_indemnity'] = cia_all_amt
 
             # Compute payslip lines passing pre-fetched adjustments and rule cache
-            lines_data = self.with_context(adj_by_emp=adj_by_emp, _rules_cache=rules_cache)._get_payslip_lines(version_ids, payslip.id)
+            lines_data = self.with_context(adj_by_emp=slip_adj_by_emp, _rules_cache=rules_cache)._get_payslip_lines(version_ids, payslip.id)
             lines = [(0, 0, line) for line in lines_data]
             payslip.write({'line_ids': lines, 'number': number})
 
             # Synchronize computed allowances and deductions back to employee's version/contract (single write only if changed)
-            if versions:
+            if not self.env.context.get('skip_version_sync') and versions:
                 lines_by_code = {l['code']: l.get('amount', 0.0) for l in lines_data}
                 for code, fname in allowance_field_map.items():
                     if hasattr(versions[0], fname) and code in lines_by_code:
@@ -617,7 +793,7 @@ class HrPayslip(models.Model):
             def sum(self, code, from_date, to_date=None):
                 if to_date is None:
                     to_date = fields.Date.today()
-                self.env.cr.execute("""SELECT sum(case when hp.credit_note = False then (pl.total) else (-pl.total) end)
+                self.env.cr.execute("""SELECT sum(case when hp.credit_note = False then (COALESCE(pl.amount, 0.0)) else (-COALESCE(pl.amount, 0.0)) end)
                             FROM hr_payslip as hp, hr_payslip_line as pl
                             WHERE hp.employee_id = %s AND hp.state = 'done'
                             AND hp.date_from >= %s AND hp.date_to <= %s AND hp.id = pl.slip_id AND pl.code = %s""",
@@ -648,6 +824,7 @@ class HrPayslip(models.Model):
             'payslip': payslips,
             'worked_days': worked_days,
             'inputs': inputs,
+            'adj_lines': False,
             'getattr': getattr,
             'hasattr': hasattr,
             'len': len,
@@ -685,7 +862,8 @@ class HrPayslip(models.Model):
 
         for version in versions:
             employee = version.employee_id
-            emp_adj = adj_by_emp.get(employee.id, []) if adj_by_emp is not None else False
+            empty_adj = self.env['hr.payroll.adjustment.line'] if 'hr.payroll.adjustment.line' in self.env else False
+            emp_adj = adj_by_emp.get(employee.id, empty_adj) if adj_by_emp is not None else False
 
             # MIGRATION: CRITICAL CHANGE
             # We pass 'contract': version to the dict.
@@ -715,6 +893,12 @@ class HrPayslip(models.Model):
                     # sum the amount for its salary category
                     localdict = _sum_salary_rule_category(localdict, rule.category_id, tot_rule - previous_amount)
 
+                    emp_obj = version.employee_id
+                    ou_obj = emp_obj.default_operating_unit_id or getattr(version, 'operating_unit_id', False)
+                    is_ifb_val = bool(ou_obj and getattr(ou_obj, 'is_ifb', False))
+                    rule_acc_deb = rule.get_rule_account_debit(is_ifb=is_ifb_val)
+                    rule_acc_cred = rule.get_rule_account_credit(is_ifb=is_ifb_val)
+
                     result_dict[key] = {
                         'salary_rule_id': rule.id,
                         'version_id': version.id,  # MIGRATION
@@ -738,8 +922,10 @@ class HrPayslip(models.Model):
                         'employee_id': version.employee_id.id,
                         'quantity': qty,
                         'rate': rate,
-                        'account_debit': rule.account_debit.id,
-                        'account_credit': rule.account_credit.id,
+                        'account_debit': rule_acc_deb.id if rule_acc_deb else False,
+                        'account_credit': rule_acc_cred.id if rule_acc_cred else False,
+                        'account_debit_ifb': rule.account_debit_ifb.id if rule.account_debit_ifb else False,
+                        'account_credit_ifb': rule.account_credit_ifb.id if rule.account_credit_ifb else False,
                         'analytic_account_id': rule.analytic_account_id.id,
                         'account_tax_id': rule.account_tax_id.id,
                     }
@@ -875,7 +1061,7 @@ class HrPayslipLine(models.Model):
     _description = 'Payslip Line'
     _order = 'version_id, sequence'  # MIGRATION
 
-    slip_id = fields.Many2one('hr.payslip', string='Pay Slip', required=True, ondelete='cascade')
+    slip_id = fields.Many2one('hr.payslip', string='Pay Slip', required=True, ondelete='cascade', index=True)
     salary_rule_id = fields.Many2one('hr.salary.rule', string='Rule', required=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True)
     # MIGRATION: Contract to Version
@@ -976,15 +1162,34 @@ class HrPayslipRun(models.Model):
             if not self.name:
                 self.name = self.period_id.name
 
+    def action_compute_sheet(self):
+        """Computes payslip sheets for all draft payslips in this batch with high-performance settings."""
+        for run in self:
+            draft_slips = run.slip_ids.filtered(lambda s: s.state == 'draft')
+            if draft_slips:
+                draft_slips.with_context(
+                    tracking_disable=True,
+                    mail_create_nolog=True,
+                    mail_create_nosubscribe=True,
+                    no_audit=True,
+                    skip_version_sync=True,
+                ).compute_sheet()
+        return True
+
     def draft_payslip_run(self):
+        for run in self:
+            run.slip_ids.action_payslip_draft()
         return self.write({'state': 'draft'})
+
+    def action_payslip_run(self):
+        return self.draft_payslip_run()
 
     def close_payslip_run(self):
         return self.write({'state': 'close'})
 
     def done_payslip_run(self):
-        for line in self.slip_ids:
-            line.action_payslip_done()
+        for run in self:
+            run.slip_ids.action_payslip_done()
         return self.write({'state': 'done'})
 
     def unlink(self):
@@ -1326,7 +1531,7 @@ class HrPayslipRun(models.Model):
 #             def sum(self, code, from_date, to_date=None):
 #                 if to_date is None:
 #                     to_date = fields.Date.today()
-#                 self.env.cr.execute("""SELECT sum(case when hp.credit_note = False then (pl.total) else (-pl.total) end)
+#                 self.env.cr.execute("""SELECT sum(case when hp.credit_note = False then (COALESCE(pl.amount, 0.0)) else (-COALESCE(pl.amount, 0.0)) end)
 #                             FROM hr_payslip as hp, hr_payslip_line as pl
 #                             WHERE hp.employee_id = %s AND hp.state = 'done'
 #                             AND hp.date_from >= %s AND hp.date_to <= %s AND hp.id = pl.slip_id AND pl.code = %s""",
@@ -1965,7 +2170,7 @@ class HrPayslipRun(models.Model):
 #             def sum(self, code, from_date, to_date=None):
 #                 if to_date is None:
 #                     to_date = fields.Date.today()
-#                 self.env.cr.execute("""SELECT sum(case when hp.credit_note = False then (pl.total) else (-pl.total) end)
+#                 self.env.cr.execute("""SELECT sum(case when hp.credit_note = False then (COALESCE(pl.amount, 0.0)) else (-COALESCE(pl.amount, 0.0)) end)
 #                             FROM hr_payslip as hp, hr_payslip_line as pl
 #                             WHERE hp.employee_id = %s AND hp.state = 'done'
 #                             AND hp.date_from >= %s AND hp.date_to <= %s AND hp.id = pl.slip_id AND pl.code = %s""",

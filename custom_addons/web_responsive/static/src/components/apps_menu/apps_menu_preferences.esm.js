@@ -34,6 +34,6 @@ AppsMenuPreferences.template = xml`
     </div>
 `;
 
-registry
-    .category("systray")
-    .add("AppMenuTheme", {Component: AppsMenuPreferences}, {sequence: 100});
+// registry
+//     .category("systray")
+//     .add("AppMenuTheme", {Component: AppsMenuPreferences}, {sequence: 100});

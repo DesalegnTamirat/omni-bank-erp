@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree / List View -->
+    <record id="view_hr_recruitment_policy_list" model="ir.ui.view">
+        <field name="name">hr.recruitment.policy.list</field>
+        <field name="model">hr.recruitment.policy</field>
+        <field name="arch" type="xml">
+            <list string="HR Policies" decoration-muted="not active">
+                <field name="name"/>
+                <field name="minimum_number_years_in_company"/>
+                <field name="current_location_exp"/>
+                <field name="no_of_months_since_last_written_notice"/>
+                <field name="no_of_months_since_last_promotion"/>
+                <field name="minimum_pms_score"/>
+                <field name="weightage_written_exam"/>
+                <field name="weightage_interview"/>
+                <field name="weightage_pms"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_hr_recruitment_policy_form" model="ir.ui.view">
+        <field name="name">hr.recruitment.policy.form</field>
+        <field name="model">hr.recruitment.policy</field>
+        <field name="arch" type="xml">
+            <form string="HR Policies Configuration">
+                <header>
+                    <button name="action_sync_to_all_jobs"
+                            string="Apply to All Job Positions"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-refresh"
+                            confirm="Are you sure you want to push these HR Policies to all Job Positions in the Bank?"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Policy Name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Bank Central HR Policy"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Configuration Scope">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="HR Policies">
+                            <group>
+                                <group>
+                                    <field name="minimum_number_years_in_company"/>
+                                    <field name="current_location_exp"/>
+                                    <field name="no_of_months_since_last_written_notice"/>
+                                    <field name="no_of_months_since_last_promotion"/>
+                                    <field name="minimum_pms_score"/>
+                                    <field name="demoted_employee"/>
+                                    <field name="promotion_revoked"/>
+                                </group>
+                                <group>
+                                    <field name="weightage_written_exam"/>
+                                    <field name="weightage_interview"/>
+                                    <field name="weightage_pms"/>
+                                    <field name="non_experienced_applicant"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+
+                    <div class="alert alert-info mt-3" role="alert">
+                        <strong>ℹ️ Centralized HR Policies:</strong>
+                        These HR policies apply centrally to all Job Positions across Bunna Bank. When saved or by clicking <strong>Apply to All Job Positions</strong>, these criteria (service tenure, disciplinary duration, PMS threshold, and evaluation weightages) are automatically synchronized across all positions and utilized for recruitment eligibility, transfer validation, and candidate ranking.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_hr_recruitment_policy_search" model="ir.ui.view">
+        <field name="name">hr.recruitment.policy.search</field>
+        <field name="model">hr.recruitment.policy</field>
+        <field name="arch" type="xml">
+            <search string="Search HR Policies">
+                <field name="name"/>
+                <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="filter_archived" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_hr_recruitment_policy" model="ir.actions.act_window">
+        <field name="name">HR Policies</field>
+        <field name="res_model">hr.recruitment.policy</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hr_recruitment_policy_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Manage Central HR Policies
+            </p>
+            <p>
+                Configure tenure rules, disciplinary notice restrictions, minimum PMS scores, and assessment weightages centrally for all Job Positions.
+            </p>
+        </field>
+    </record>
+
+</odoo>
+

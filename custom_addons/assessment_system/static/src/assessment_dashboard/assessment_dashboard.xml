@@ -9,15 +9,18 @@
                 <div class="d-flex align-items-center gap-2">
                     <!-- Period filter -->
                     <select class="form-select o_period_select" style="width:150px;"
+                            t-model="state.period"
                             t-on-change="onPeriodChange">
+                        <option value="year">This Year</option>
                         <option value="today">Today</option>
                         <option value="week">This Week</option>
                         <option value="month">This Month</option>
-                        <option value="year">This Year</option>
+                        <option value="all">All Time</option>
                         <option value="custom">Custom Range</option>
                     </select>
                     <!-- Assessment module filter -->
                     <select class="form-select o_period_select" style="width:170px;"
+                            t-model="state.assessmentType"
                             t-on-change="onTypeChange">
                         <option value="all">All Assessments</option>
                         <option value="exam">Written Exams</option>
@@ -45,56 +48,59 @@
             <div t-else="" class="px-4 pb-4">
 
                 <!-- ── SECTION 1: Written Exam System Stat Cards ── -->
-                <div class="o_dashboard_section_title mb-2">Written Exams (EXM)</div>
-                <div class="row g-3 mb-4">
-                    <div class="col-6 col-sm-4 col-md-3 col-xl">
-                        <div class="o_stat_card o_stat_total" t-on-click="openSittingsAll">
-                            <div class="o_stat_label">Total Sittings</div>
-                            <div class="o_stat_value v-total"><t t-esc="state.stats.total_sittings"/></div>
+                <t t-if="state.assessmentType === 'all' || state.assessmentType === 'exam'">
+                    <div class="o_dashboard_section_title mb-2">Written Exams (EXM)</div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-6 col-sm-4 col-md-3 col-xl">
+                            <div class="o_stat_card o_stat_total" t-on-click="openSittingsAll">
+                                <div class="o_stat_label">Total Sittings</div>
+                                <div class="o_stat_value v-total"><t t-esc="state.stats.total_sittings"/></div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-4 col-md-3 col-xl">
+                            <div class="o_stat_card" t-on-click="openSessionsDraft">
+                                <div class="o_stat_label">Draft Sessions</div>
+                                <div class="o_stat_value v-draft"><t t-esc="state.stats.draft_exam_sessions"/></div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-4 col-md-3 col-xl">
+                            <div class="o_stat_card" t-on-click="openSittingsLive">
+                                <div class="o_stat_label">Live / In Progress</div>
+                                <div class="o_stat_value v-progress"><t t-esc="state.stats.active_sittings"/></div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-4 col-md-3 col-xl">
+                            <div class="o_stat_card o_stat_positive" t-on-click="openSittingsCompleted">
+                                <div class="o_stat_label">Completed</div>
+                                <div class="o_stat_value v-completed"><t t-esc="state.stats.completed_sittings"/></div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-4 col-md-3 col-xl">
+                            <div class="o_stat_card" t-on-click="openSittingsPassed">
+                                <div class="o_stat_label">Passed (&gt;= 50%)</div>
+                                <div class="o_stat_value v-external"><t t-esc="state.stats.passed_sittings"/></div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-4 col-md-3 col-xl">
+                            <div class="o_stat_card" t-on-click="openSittingsDisqualified">
+                                <div class="o_stat_label">Disqualified</div>
+                                <div class="o_stat_value v-closed"><t t-esc="state.stats.disqualified_sittings"/></div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-4 col-md-3 col-xl">
+                            <div class="o_stat_card" t-on-click="openGradingQueue">
+                                <div class="o_stat_label">Grading Queue</div>
+                                <div class="o_stat_value v-published"><t t-esc="state.stats.pending_grading_tasks"/></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-6 col-sm-4 col-md-3 col-xl">
-                        <div class="o_stat_card" t-on-click="openSessionsDraft">
-                            <div class="o_stat_label">Draft Sessions</div>
-                            <div class="o_stat_value v-draft"><t t-esc="state.stats.draft_exam_sessions"/></div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-sm-4 col-md-3 col-xl">
-                        <div class="o_stat_card" t-on-click="openSittingsLive">
-                            <div class="o_stat_label">Live / In Progress</div>
-                            <div class="o_stat_value v-progress"><t t-esc="state.stats.active_sittings"/></div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-sm-4 col-md-3 col-xl">
-                        <div class="o_stat_card o_stat_positive" t-on-click="openSittingsCompleted">
-                            <div class="o_stat_label">Completed</div>
-                            <div class="o_stat_value v-completed"><t t-esc="state.stats.completed_sittings"/></div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-sm-4 col-md-3 col-xl">
-                        <div class="o_stat_card" t-on-click="openSittingsPassed">
-                            <div class="o_stat_label">Passed (&gt;= 50%)</div>
-                            <div class="o_stat_value v-external"><t t-esc="state.stats.passed_sittings"/></div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-sm-4 col-md-3 col-xl">
-                        <div class="o_stat_card" t-on-click="openSittingsDisqualified">
-                            <div class="o_stat_label">Disqualified</div>
-                            <div class="o_stat_value v-closed"><t t-esc="state.stats.disqualified_sittings"/></div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-sm-4 col-md-3 col-xl">
-                        <div class="o_stat_card" t-on-click="openGradingQueue">
-                            <div class="o_stat_label">Grading Queue</div>
-                            <div class="o_stat_value v-published"><t t-esc="state.stats.pending_grading_tasks"/></div>
-                        </div>
-                    </div>
-                </div>
+                </t>
 
                 <!-- ── SECTION 2: CBIS Interviews + Transfer Assessments ── -->
-                <div class="row g-3 mb-4">
+                <div class="row g-3 mb-4" t-if="state.assessmentType === 'all' || state.assessmentType === 'interview' || state.assessmentType === 'transfer'">
                     <!-- CBIS Interviews -->
-                    <div class="col-12 col-md-6">
+                    <div t-if="state.assessmentType === 'all' || state.assessmentType === 'interview'"
+                         t-attf-class="{{ state.assessmentType === 'interview' ? 'col-12' : 'col-12 col-md-6' }}">
                         <div class="o_dashboard_section_title mb-2">Competency-Based Interviews (CBIS)</div>
                         <div class="row g-3">
                             <div class="col-4">
@@ -104,13 +110,13 @@
                                 </div>
                             </div>
                             <div class="col-4">
-                                <div class="o_stat_card o_stat_positive" t-on-click="openMyEvaluationsDone">
+                                <div class="o_stat_card o_stat_positive" t-on-click="openEvaluationsDone">
                                     <div class="o_stat_label">Evaluations Done</div>
                                     <div class="o_stat_value v-completed"><t t-esc="state.stats.interview_completed"/></div>
                                 </div>
                             </div>
                             <div class="col-4">
-                                <div class="o_stat_card" t-on-click="openMyEvaluationsPending">
+                                <div class="o_stat_card" t-on-click="openEvaluationsPending">
                                     <div class="o_stat_label">Pending Eval</div>
                                     <div class="o_stat_value v-progress"><t t-esc="state.stats.interview_pending"/></div>
                                 </div>
@@ -118,7 +124,8 @@
                         </div>
                     </div>
                     <!-- Transfer Assessments -->
-                    <div class="col-12 col-md-6">
+                    <div t-if="state.assessmentType === 'all' || state.assessmentType === 'transfer'"
+                         t-attf-class="{{ state.assessmentType === 'transfer' ? 'col-12' : 'col-12 col-md-6' }}">
                         <div class="o_dashboard_section_title mb-2">Transfer Assessments</div>
                         <div class="row g-3">
                             <div class="col-4">
@@ -172,7 +179,7 @@
                 </div>
 
                 <!-- ── SECTION 4: Pending Evaluator Action Table ── -->
-                <div class="row g-3" t-if="state.my_action_evals.length">
+                <div class="row g-3" t-if="(state.assessmentType === 'all' || state.assessmentType === 'interview') and state.my_action_evals.length">
                     <div class="col-12">
                         <div class="o_chart_card">
                             <div class="d-flex justify-content-between align-items-center mb-3">

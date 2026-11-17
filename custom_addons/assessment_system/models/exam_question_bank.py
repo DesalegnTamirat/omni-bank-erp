@@ -32,6 +32,19 @@ class ExamQuestionBank(models.Model):
     operating_unit_id = fields.Many2one("operating.unit", string="Submitting Work Unit", default=lambda self: self.env.user.employee_id.operating_unit_id, tracking=True, index=True)
     department_id = fields.Many2one("hr.department", string="Department", tracking=True)
     competency_id = fields.Many2one("competency.competency", string="Competency Area", tracking=True, index=True)
+    competency_pillar = fields.Selection([
+        ("core", "Core Competencies"),
+        ("leadership", "Leadership Competencies"),
+        ("technical", "Technical Competencies"),
+    ], string="Competency Pillar", compute="_compute_pillar", store=True, readonly=False, tracking=True, index=True)
+
+    @api.depends("competency_id", "competency_id.pillar")
+    def _compute_pillar(self):
+        for rec in self:
+            if rec.competency_id and rec.competency_id.pillar:
+                rec.competency_pillar = rec.competency_id.pillar
+            elif not rec.competency_pillar:
+                rec.competency_pillar = False
     
     difficulty = fields.Selection([
         ("basic", "Basic"),
@@ -54,178 +67,159 @@ class ExamQuestionBank(models.Model):
     submission_file = fields.Binary(string="Question Document (PDF/Word)", attachment=True)
     submission_filename = fields.Char(string="Attachment Filename")
 
-    eligible_job_ids = fields.Many2many("hr.job", compute="_compute_eligible_job_ids")
-    eligible_competency_ids = fields.Many2many("competency.competency", compute="_compute_eligible_competency_ids")
+    eligible_job_ids = fields.Json(string="Eligible Job IDs", compute="_compute_eligible_job_ids", default=[])
+    eligible_competency_ids = fields.Json(string="Eligible Competency IDs", compute="_compute_eligible_competency_ids", default=[])
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        ou_id = res.get("operating_unit_id")
+        ou = self.env["operating.unit"].browse(ou_id) if ou_id else False
+        res["eligible_job_ids"] = self._get_active_ou_jobs(ou).ids or []
+
+        job_id = res.get("job_id")
+        job = self.env["hr.job"].browse(job_id) if job_id else False
+        res["eligible_competency_ids"] = self._get_job_competencies(job, ou).ids or []
+        return res
+
+    def _resolve_record_id(self, rec):
+        """Safely extract integer database ID from a record or NewId in memory."""
+        if not rec:
+            return False
+        return getattr(rec, "_origin", rec).id or (isinstance(rec.id, int) and rec.id) or (rec.ids and rec.ids[0]) or False
+
+    def _get_active_ou_jobs(self, ou):
+        """Return only active job positions configured or held by employees in the given operating unit."""
+        ou_id = self._resolve_record_id(ou)
+        if not ou_id:
+            return self.env["hr.job"].search([("active", "=", True)])
+
+        ou_positions = self.env["operating.unit.job.position"].search([
+            ("operating_unit_id", "=", ou_id)
+        ]).mapped("job_position_id").filtered(lambda j: j.active)
+
+        emp_positions = self.env["hr.employee"].search([
+            ("active", "=", True),
+            "|",
+            ("default_operating_unit_id", "=", ou_id),
+            ("operating_unit_id", "=", ou_id),
+        ]).mapped("job_position").filtered(lambda j: j.active)
+
+        jobs = (ou_positions | emp_positions)
+        if not jobs:
+            depts = self.env["hr.department"].search([
+                ("operating_unit_id", "=", ou_id)
+            ])
+            if depts:
+                jobs = self.env["hr.job"].search([
+                    ("department_id", "in", depts.ids),
+                    ("active", "=", True)
+                ])
+        return jobs or self.env["hr.job"].search([("active", "=", True)])
+
+    def _get_job_competencies(self, job=None, ou=None):
+        """Return competencies mapped to the selected job position from Competency Role Mapping,
+        Recruitment Vacancies, and HR Job competencies. If no job is selected, returns competencies
+        for all jobs in the operating unit.
+        """
+        jid = self._resolve_record_id(job)
+        comps = self.env["competency.competency"].browse([])
+
+        if jid:
+            # 1. From Competency Management Module: Competence Role Mapping (competency.role.mapping)
+            mappings = self.env["competency.role.mapping"].search([
+                ("job_position_id", "=", jid),
+                ("state", "in", ["approved", "draft", "under_approval"]),
+            ])
+            if not mappings:
+                mappings = self.env["competency.role.mapping"].search([
+                    ("job_position_id", "=", jid),
+                ])
+            comps |= mappings.mapped("line_ids.competency_id")
+
+            # 2. From Recruitment Module: Job Vacancy Competencies (job.vacancy.competency)
+            vac_comps = self.env["job.vacancy.competency"].search([
+                ("vacancy_id.job_position", "=", jid),
+            ]).mapped("competency_id")
+            comps |= vac_comps
+
+            # 3. From HR Job direct competencies (hr_competencies_info_job)
+            job_rec = self.env["hr.job"].browse(jid)
+            comp_rel = getattr(job_rec, "competencies_id", False) or getattr(job_rec, "competencies_ids", False)
+            if comp_rel:
+                for line in comp_rel:
+                    c = getattr(line, "competencies", False) or getattr(line, "competency_id", False)
+                    if c:
+                        comps |= c
+
+            active_comps = comps.filtered(
+                lambda c: getattr(c, "active", True) and getattr(c, "status", "active") in ("active", False)
+            )
+            if active_comps:
+                return active_comps
+
+        # If job is not selected, fallback to jobs in the operating unit
+        ou_id = self._resolve_record_id(ou)
+        if ou_id:
+            active_jobs = self._get_active_ou_jobs(ou)
+            if active_jobs:
+                mappings = self.env["competency.role.mapping"].search([
+                    ("job_position_id", "in", active_jobs.ids),
+                ])
+                comps |= mappings.mapped("line_ids.competency_id")
+                vac_comps = self.env["job.vacancy.competency"].search([
+                    ("vacancy_id.job_position", "in", active_jobs.ids),
+                ]).mapped("competency_id")
+                comps |= vac_comps
+                active_comps = comps.filtered(
+                    lambda c: getattr(c, "active", True) and getattr(c, "status", "active") in ("active", False)
+                )
+                if active_comps:
+                    return active_comps
+
+        # Fallback to all active competencies if none found
+        return self.env["competency.competency"].search([("active", "=", True)], limit=100)
 
     @api.depends("operating_unit_id")
     def _compute_eligible_job_ids(self):
         for rec in self:
-            if rec.operating_unit_id:
-                ou_positions = self.env["operating.unit.job.position"].search([
-                    ("operating_unit_id", "=", rec.operating_unit_id.id)
-                ]).mapped("job_position_id")
-                if ou_positions:
-                    rec.eligible_job_ids = ou_positions
-                else:
-                    depts = self.env["hr.department"].search([
-                        ("operating_unit_id", "=", rec.operating_unit_id.id)
-                    ])
-                    dept_jobs = self.env["hr.job"].search([("department_id", "in", depts.ids)]) if depts else False
-                    rec.eligible_job_ids = dept_jobs if dept_jobs else self.env["hr.job"].search([])
-            else:
-                rec.eligible_job_ids = self.env["hr.job"].search([])
+            rec.eligible_job_ids = self._get_active_ou_jobs(rec.operating_unit_id).ids or []
 
-    @api.depends("job_id")
+    @api.depends("job_id", "operating_unit_id")
     def _compute_eligible_competency_ids(self):
         for rec in self:
-            if rec.job_id:
-                all_comps = self.env["competency.competency"]
-
-                # 1. Primary table: hr_competencies_info_job
-                info_job_lines = self.env["hr_competencies_info_job"].search([
-                    ("job_id", "=", rec.job_id.id)
-                ])
-                if info_job_lines:
-                    comps = info_job_lines.mapped("competencies")
-                    if comps and comps._name == "competency.competency":
-                        all_comps |= comps.filtered(
-                            lambda c: getattr(c, "status", None) == "active" and getattr(c, "pillar", None) in ["core", "leadership", "technical"]
-                        )
-                    elif comps and comps._name == "recruitment.competency":
-                        comp_names = [c.competency for c in comps if getattr(c, "competency", False)]
-                        if comp_names:
-                            all_comps |= self.env["competency.competency"].search([
-                                ("name", "in", comp_names),
-                                ("status", "=", "active"),
-                                ("pillar", "in", ["core", "leadership", "technical"])
-                            ])
-
-                # 2. Applicable jobs on competency.competency
-                comp1 = self.env["competency.competency"].search([
-                    ("applicable_job_ids", "in", rec.job_id.id),
-                    ("status", "=", "active"),
-                    ("pillar", "in", ["core", "leadership", "technical"])
-                ])
-                all_comps |= comp1
-
-                # 3. Job Competency Profiles (assessment.competency.job.rel)
-                rel_lines = self.env["assessment.competency.job.rel"].search([
-                    ("job_id", "=", rec.job_id.id)
-                ])
-                all_comps |= rel_lines.mapped("competency_id").filtered(
-                    lambda c: c.status == "active" and c.pillar in ["core", "leadership", "technical"]
-                )
-
-                # 4. Role Mappings (competency.role.mapping)
-                mappings = self.env["competency.role.mapping"].search([
-                    ("job_position_id", "=", rec.job_id.id)
-                ])
-                all_comps |= mappings.mapped("line_ids.competency_id").filtered(
-                    lambda c: c.status == "active" and c.pillar in ["core", "leadership", "technical"]
-                )
-
-                if not all_comps:
-                    all_comps = self.env["competency.competency"].search([
-                        ("pillar", "in", ["core", "leadership", "technical"]),
-                        ("status", "=", "active")
-                    ])
-
-                # Pick 1 representative competency for each Pillar Category existing for this position
-                pillar_comps = self.env["competency.competency"]
-                for p in ["core", "leadership", "technical"]:
-                    p_match = all_comps.filtered(lambda c: c.pillar == p)
-                    if p_match:
-                        pillar_comps |= p_match[0]
-
-                rec.eligible_competency_ids = pillar_comps
-            else:
-                pillar_comps = self.env["competency.competency"]
-                for p in ["core", "leadership", "technical"]:
-                    p_match = self.env["competency.competency"].search([
-                        ("pillar", "=", p),
-                        ("status", "=", "active")
-                    ], limit=1)
-                    if p_match:
-                        pillar_comps |= p_match
-                rec.eligible_competency_ids = pillar_comps
+            rec.eligible_competency_ids = self._get_job_competencies(rec.job_id, rec.operating_unit_id).ids or []
 
     @api.onchange("operating_unit_id")
     def _onchange_operating_unit_id(self):
-        if self.operating_unit_id:
-            ou_positions = self.env["operating.unit.job.position"].search([
-                ("operating_unit_id", "=", self.operating_unit_id.id)
-            ]).mapped("job_position_id")
-
-            job_ids = list(set(ou_positions.ids))
-            if not job_ids:
-                depts = self.env["hr.department"].search([
-                    ("operating_unit_id", "=", self.operating_unit_id.id)
-                ])
-                if depts:
-                    dept_jobs = self.env["hr.job"].search([
-                        ("department_id", "in", depts.ids)
-                    ])
-                    job_ids = list(set(dept_jobs.ids))
-
-            if job_ids and self.job_id and self.job_id.id not in job_ids:
-                self.job_id = False
-            elif not job_ids:
-                self.job_id = False
+        active_jobs = self._get_active_ou_jobs(self.operating_unit_id)
+        self.eligible_job_ids = active_jobs.ids or []
+        jid = self._resolve_record_id(self.job_id)
+        if jid and jid not in active_jobs.ids:
+            self.job_id = False
+            self.competency_id = False
+        comps = self._get_job_competencies(self.job_id, self.operating_unit_id)
+        self.eligible_competency_ids = comps.ids or []
+        return {
+            "domain": {
+                "job_id": [("id", "in", active_jobs.ids or []), ("active", "=", True)],
+                "competency_id": [("id", "in", comps.ids or []), ("active", "=", True)],
+            }
+        }
 
     @api.onchange("job_id")
     def _onchange_job_id(self):
-        if self.job_id:
-            all_comps = self.env["competency.competency"]
-
-            info_job_lines = self.env["hr_competencies_info_job"].search([
-                ("job_id", "=", self.job_id.id)
-            ])
-            if info_job_lines:
-                comps = info_job_lines.mapped("competencies")
-                if comps and comps._name == "competency.competency":
-                    all_comps |= comps.filtered(
-                        lambda c: getattr(c, "status", None) == "active" and getattr(c, "pillar", None) in ["core", "leadership", "technical"]
-                    )
-                elif comps and comps._name == "recruitment.competency":
-                    comp_names = [c.competency for c in comps if getattr(c, "competency", False)]
-                    if comp_names:
-                        all_comps |= self.env["competency.competency"].search([
-                            ("name", "in", comp_names),
-                            ("status", "=", "active"),
-                            ("pillar", "in", ["core", "leadership", "technical"])
-                        ])
-
-            comp1 = self.env["competency.competency"].search([
-                ("applicable_job_ids", "in", self.job_id.id),
-                ("status", "=", "active"),
-                ("pillar", "in", ["core", "leadership", "technical"])
-            ])
-            all_comps |= comp1
-
-            rel_lines = self.env["assessment.competency.job.rel"].search([
-                ("job_id", "=", self.job_id.id)
-            ])
-            all_comps |= rel_lines.mapped("competency_id").filtered(
-                lambda c: c.status == "active" and c.pillar in ["core", "leadership", "technical"]
-            )
-
-            mappings = self.env["competency.role.mapping"].search([
-                ("job_position_id", "=", self.job_id.id)
-            ])
-            all_comps |= mappings.mapped("line_ids.competency_id").filtered(
-                lambda c: c.status == "active" and c.pillar in ["core", "leadership", "technical"]
-            )
-
-            pillar_comps = self.env["competency.competency"]
-            for p in ["core", "leadership", "technical"]:
-                p_match = all_comps.filtered(lambda c: c.pillar == p)
-                if p_match:
-                    pillar_comps |= p_match[0]
-
-            if pillar_comps and self.competency_id and self.competency_id.id not in pillar_comps.ids:
-                self.competency_id = False
-            elif not pillar_comps and self.competency_id:
-                self.competency_id = False
+        comps = self._get_job_competencies(self.job_id, self.operating_unit_id)
+        self.eligible_competency_ids = comps.ids or []
+        cid = self._resolve_record_id(self.competency_id)
+        if cid and cid not in comps.ids:
+            self.competency_id = False
+        return {
+            "domain": {
+                "competency_id": [("id", "in", comps.ids or []), ("active", "=", True)],
+            }
+        }
+    
     submission_notes = fields.Text(string="Work Unit Notes / Submission Details")
     rejection_reason = fields.Text(string="HR Rejection Reason / Revision Notes", tracking=True)
 
@@ -324,6 +318,7 @@ class ExamQuestionOption(models.Model):
     _name = "exam.question.option"
     _description = "Exam Question Option Choice"
     _order = "sequence asc, id asc"
+    _rec_name = "option_text"
 
     question_id = fields.Many2one("exam.question", string="Question", required=True, ondelete="cascade")
     sequence = fields.Integer(string="Sequence", default=10)
@@ -334,3 +329,8 @@ class ExamQuestionOption(models.Model):
         default=1.0,
         help="For partial credit in multiple-choice questions (e.g., 0.5 for 2 correct answers)"
     )
+
+    @api.depends("option_text")
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.option_text or _("Option #%s") % rec.id

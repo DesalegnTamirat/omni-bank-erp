@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ============================================================
+             MANAGER CAREER DISCUSSION VIEWS (FR-MHT-003)
+        ============================================================ -->
+
+        <record id="view_career_discussion_list" model="ir.ui.view">
+            <field name="name">succession.career.discussion.list</field>
+            <field name="model">succession.career.discussion</field>
+            <field name="arch" type="xml">
+                <list string="Career Discussions" default_order="create_date desc, id desc"
+                      decoration-success="state == 'confirmed'"
+                      decoration-muted="state == 'draft'">
+                    <field name="employee_id"/>
+                    <field name="candidate_id"/>
+                    <field name="manager_id"/>
+                    <field name="discussion_date"/>
+                    <field name="discussion_type"/>
+                    <field name="outcome_id" widget="badge"/>
+                    <field name="follow_up_date"/>
+                    <field name="state" widget="badge"
+                           decoration-success="state == 'confirmed'"
+                           decoration-muted="state == 'draft'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_career_discussion_form" model="ir.ui.view">
+            <field name="name">succession.career.discussion.form</field>
+            <field name="model">succession.career.discussion</field>
+            <field name="arch" type="xml">
+                <form string="Career Discussion Record">
+                    <header>
+                        <button name="action_confirm" string="Confirm &amp; Sign Off"
+                                type="object" class="btn-primary"
+                                invisible="state == 'confirmed'"/>
+                        <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fw-bold"
+                              invisible="state != 'confirmed'">
+                            <i class="fa fa-lock me-1"/>Confirmed &amp; Signed Off
+                        </span>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,confirmed"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="display_name" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group string="Participants">
+                                <field name="can_select_all_employees" invisible="1"/>
+                                <field name="employee_id" required="1"
+                                       readonly="state == 'confirmed'"
+                                       domain="['|', '&amp;', ('active', '=', True), ('active', '=', can_select_all_employees), '|', ('parent_id.user_id', '=', uid), ('coach_id.user_id', '=', uid)]"/>
+                                <field name="manager_id" required="1" readonly="state == 'confirmed'"/>
+                                <field name="candidate_id" required="1" domain="[('state', 'in', ('approved', 'placed'))]" options="{'no_create': True}" readonly="state == 'confirmed'"/>
+                                <field name="discussion_date" required="1" readonly="state == 'confirmed'"/>
+                                <field name="discussion_type" required="1" readonly="state == 'confirmed'"/>
+                            </group>
+                            <group string="Outcome">
+                                <field name="outcome_id" required="1" options="{'no_create': True}" readonly="state == 'confirmed'"/>
+                                <field name="follow_up_date" required="1" readonly="state == 'confirmed'"/>
+                                <field name="employee_acknowledgement" readonly="state == 'confirmed'"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Discussion Content" name="content">
+                                <group>
+                                    <field name="career_interests" required="1"
+                                           readonly="state == 'confirmed'"
+                                           placeholder="Employee's stated career interests and aspirations..."/>
+                                    <field name="strengths_discussed" required="1"
+                                           readonly="state == 'confirmed'"
+                                           placeholder="Key strengths discussed..."/>
+                                    <field name="development_areas" required="1"
+                                           readonly="state == 'confirmed'"
+                                           placeholder="Development areas identified..."/>
+                                </group>
+                            </page>
+                            <page string="Action Commitments" name="action_commitments">
+                                <group>
+                                    <field name="agreed_actions" readonly="state == 'confirmed'"/>
+                                    <field name="manager_guidance" readonly="state == 'confirmed'"/>
+                                    <field name="follow_up_notes" readonly="state == 'confirmed'"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_career_discussion" model="ir.actions.act_window">
+            <field name="name">Career Discussions</field>
+            <field name="res_model">succession.career.discussion</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Manager view: only their team's discussions -->
+        <record id="action_my_team_career_discussions" model="ir.actions.act_window">
+            <field name="name">My Team Career Discussions</field>
+            <field name="res_model">succession.career.discussion</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('manager_id.user_id', '=', uid)]</field>
+        </record>
+
+    </data>
+</odoo>

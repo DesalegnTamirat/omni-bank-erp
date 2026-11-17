@@ -53,10 +53,16 @@ class ExternalDefaultShortlistCriteria(models.Model):
     # ── Notes ────────────────────────────────────────────────────────────────
     notes = fields.Text(string='Notes / Description')
 
-    _sql_constraints = [
-        ('unique_active_default', 'UNIQUE(active) WHERE active = TRUE',
-         'Only one active Default Criteria record is allowed.'),
-    ]
+    @api.constrains('active')
+    def _check_unique_active_default(self):
+        for rec in self:
+            if rec.active:
+                duplicate = self.search([
+                    ('active', '=', True),
+                    ('id', '!=', rec.id)
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_('Only one active Default Criteria record is allowed.'))
 
     def action_set_as_default(self):
         """Deactivate all other records and set this one as the active default."""

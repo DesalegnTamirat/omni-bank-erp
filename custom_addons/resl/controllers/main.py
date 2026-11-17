@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import Forbidden, NotFound
 
 from odoo import http
 from odoo.exceptions import AccessError, UserError
@@ -20,11 +20,7 @@ class ReslAgreementController(http.Controller):
         loan.check_access('read')          # AccessError -> 403
         return loan
 
-    @http.route('/resl/agreement/<int:loan_id>', type='http', auth='user')
-    def agreement_page(self, loan_id, g=None, **kw):
-        loan = self._loan(loan_id)
-        loan._agr_mark_viewed()
-        cfg = loan._agr_config(int(g) if (g or '').isdigit() else None)
+    def _render_page(self, cfg):
         cfg['csrf'] = request.csrf_token()
         with file_open(PAGE, 'rb') as fh:
             html = fh.read().decode('utf-8')
@@ -34,6 +30,29 @@ class ReslAgreementController(http.Controller):
             ('Content-Type', 'text/html; charset=utf-8'),
             ('Cache-Control', 'no-store'),
         ])
+
+    @http.route('/resl/agreement/new', type='http', auth='user')
+    def agreement_page_new(self, amt='0', term='1', agreed='', **kw):
+        """Part A of a request that does not exist yet (opened from the New
+        form). Read-only: nothing is created or saved here."""
+        try:
+            amount, months = float(amt), int(float(term))
+        except ValueError:
+            amount, months = 0.0, 1
+        cfg = request.env['resl.loan']._agr_config_new(amount, months, agreed=(agreed == '1'))
+        return self._render_page(cfg)
+
+    @http.route('/resl/agreement/<int:loan_id>', type='http', auth='user')
+    def agreement_page(self, loan_id, g=None, **kw):
+        loan = self._loan(loan_id)
+        # requestor: not before the guarantor(s) accepted
+        if not loan._agr_requester_unlocked():
+            raise Forbidden("The agreement is available after the guarantee has been accepted.")
+        loan._agr_mark_viewed()
+        cfg = loan._agr_config(int(g) if (g or '').isdigit() else None)
+        # ?print=1 (only honoured for approvers / admins): open the print dialog
+        cfg['autoPrint'] = bool(kw.get('print')) and bool(cfg.get('canPrint'))
+        return self._render_page(cfg)
 
     @http.route('/resl/agreement/<int:loan_id>/save', type='http', auth='user',
                 methods=['POST'], csrf=True)
@@ -99,4 +118,3 @@ class ReslAgreementController(http.Controller):
                 ('Cache-Control', 'no-store'),
             ]
         )
-

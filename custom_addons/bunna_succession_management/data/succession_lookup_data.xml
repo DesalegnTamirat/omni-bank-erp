@@ -62,23 +62,6 @@
             <field name="color">9</field>
         </record>
 
-        <!-- Review Cycles -->
-        <record id="cycle_quarterly" model="succession.review.cycle">
-            <field name="name">Quarterly</field>
-            <field name="months">3</field>
-            <field name="sequence">10</field>
-        </record>
-        <record id="cycle_biannual" model="succession.review.cycle">
-            <field name="name">Bi-Annually</field>
-            <field name="months">6</field>
-            <field name="sequence">20</field>
-        </record>
-        <record id="cycle_annual" model="succession.review.cycle">
-            <field name="name">Annually</field>
-            <field name="months">12</field>
-            <field name="sequence">30</field>
-        </record>
-
         <!-- Development Urgency Levels -->
         <record id="urgency_level_low" model="succession.development.urgency.level">
             <field name="name">Low</field>

@@ -64,6 +64,10 @@ class ResPartner(models.Model):
     )
     branch_name = fields.Char(string="Branch Name")
     district_name = fields.Char(string="District Name")
+    sol_id = fields.Char(string="SOL ID / Branch Code")
+    acct_opn_date = fields.Date(string="Account Opening Date")
+    mode_of_oper_code = fields.Char(string="Mode of Operation")
+    account_ownership = fields.Char(string="Account Ownership")
     age = fields.Integer(string="Age")
     customer_type = fields.Char(string="Customer Type")
 

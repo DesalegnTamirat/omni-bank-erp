@@ -10,3 +10,7 @@ access_hr_leave_type_manager,hr.leave.type.manager,hr_holidays.model_hr_leave_ty
 access_hr_employee_custom_user,hr.employee.custom.user,hr.model_hr_employee,base.group_user,1,0,0,0
 access_hr_employee_custom_manager,hr.employee.custom.manager,hr.model_hr_employee,hr.group_hr_manager,1,1,1,1
 access_hr_leave_dashboard_user,hr.leave.dashboard.user,model_hr_leave_dashboard,base.group_user,1,1,1,1
+access_hr_leave_balance_report_wizard_user,hr.leave.balance.report.wizard.user,model_hr_leave_balance_report_wizard,base.group_user,1,1,1,1
+access_hr_leave_balance_report_line_user,hr.leave.balance.report.line.user,model_hr_leave_balance_report_line,base.group_user,1,1,1,1
+access_hr_sick_leave_threshold_report_wizard_user,hr.sick.leave.threshold.report.wizard.user,model_hr_sick_leave_threshold_report_wizard,base.group_user,1,1,1,1
+access_hr_sick_leave_threshold_report_line_user,hr.sick.leave.threshold.report.line.user,model_hr_sick_leave_threshold_report_line,base.group_user,1,1,1,1

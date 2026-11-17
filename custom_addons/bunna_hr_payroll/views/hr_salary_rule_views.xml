@@ -408,15 +408,29 @@
                     </page>
                     <page string="Accounting" name="accounting">
                         <group>
-                            <group>
-                                <field name="account_debit"
-                                       domain="[('account_type', 'in', ('debit', 'both'))]"/>
-                                <field name="account_credit"
-                                       domain="[('account_type', 'in', ('credit', 'both'))]"/>
+                            <group string="Conventional Banking GL">
+                                <field name="account_debit" string="Debit Account (Conventional)"
+                                       domain="[('account_type', 'in', ('debit', 'both')), '|', ('banking_type', '=', False), ('banking_type', 'in', ('conventional', 'both'))]"/>
+                                <field name="account_credit" string="Credit Account (Conventional)"
+                                       domain="[('account_type', 'in', ('credit', 'both')), '|', ('banking_type', '=', False), ('banking_type', 'in', ('conventional', 'both'))]"/>
                                 <field name="analytic_account_id"/>
                                 <field name="account_tax_id"/>
                             </group>
+                            <group string="Interest-Free Banking (IFB) GL">
+                                <field name="account_debit_ifb" string="Debit Account (IFB)"
+                                       domain="[('account_type', 'in', ('debit', 'both')), '|', ('banking_type', '=', False), ('banking_type', 'in', ('ifb', 'both'))]"/>
+                                <field name="account_credit_ifb" string="Credit Account (IFB)"
+                                       domain="[('account_type', 'in', ('credit', 'both')), '|', ('banking_type', '=', False), ('banking_type', 'in', ('ifb', 'both'))]"/>
+                            </group>
                         </group>
+                        <div class="alert alert-info mt-2" role="alert">
+                            <i class="fa fa-info-circle"/> <strong>GL Routing Rules:</strong>
+                            <ul class="mb-0">
+                                <li>Employees in an <strong>IFB Operating Unit</strong> will automatically route postings to the <strong>IFB GL</strong> account.</li>
+                                <li>Employees in a <strong>Conventional Operating Unit</strong> will route postings to the <strong>Conventional GL</strong> account.</li>
+                                <li>If an IFB account is not specified (or an account is configured with Banking Type <em>'Both'</em>), it will be shared by both operating unit types.</li>
+                            </ul>
+                        </div>
                     </page>
                     <page string="Inputs">
                         <field name="input_ids" mode="list">

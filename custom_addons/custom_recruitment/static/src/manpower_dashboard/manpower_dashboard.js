@@ -317,7 +317,10 @@ export class ManpowerDashboard extends Component {
     }
 
     onClickApprovedPlan() {
-        const domain = [["approved_plan_count", ">", 0]];
+        const matchingIds = (this.state.tableRows || [])
+            .filter(r => (r.approved_plan_count || 0) > 0)
+            .map(r => r.id);
+        const domain = [["id", "in", matchingIds.length > 0 ? matchingIds : [-1]]];
         if (this.state.matchedOuIds && this.state.matchedOuIds.length > 0) {
             domain.push(["operating_unit_id", "in", this.state.matchedOuIds]);
         }
@@ -332,7 +335,10 @@ export class ManpowerDashboard extends Component {
     }
 
     onClickVacantPosts() {
-        const domain = [["vacant_position_count", ">", 0]];
+        const matchingIds = (this.state.tableRows || [])
+            .filter(r => (r.vacant_position_count || 0) > 0)
+            .map(r => r.id);
+        const domain = [["id", "in", matchingIds.length > 0 ? matchingIds : [-1]]];
         if (this.state.matchedOuIds && this.state.matchedOuIds.length > 0) {
             domain.push(["operating_unit_id", "in", this.state.matchedOuIds]);
         }
@@ -353,6 +359,9 @@ export class ManpowerDashboard extends Component {
         ];
         if (this.state.matchedOuIds && this.state.matchedOuIds.length > 0) {
             domain.push(["operating_unit_id", "in", this.state.matchedOuIds]);
+        }
+        if (this.state.selectedCycle) {
+            domain.push(["workforce_plan_id.cycle_id", "=", parseInt(this.state.selectedCycle)]);
         }
         this.actionService.doAction({
             name: _t("In-Flight Recruitment Requests"),

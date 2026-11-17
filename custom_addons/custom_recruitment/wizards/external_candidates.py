@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from dateutil import relativedelta
 
@@ -66,13 +67,21 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
     )
 
     # ── Experience ──────────────────────────────────────────────────────────────
+    minimum_banking_experience = fields.Float(
+        string='Banking Experience (Yrs)',
+        help='Candidates with Banking Sector experience >= this value pass. Set 0 to skip.'
+    )
+    minimum_non_banking_experience = fields.Float(
+        string='Non-Banking Experience (Yrs)',
+        help='Candidates with Non-Banking Sector experience >= this value pass. Set 0 to skip.'
+    )
+    minimum_total_experience_years = fields.Float(
+        string='Total Experience In Years',
+        help='Candidates with Total Experience >= this value pass. Set 0 to skip.'
+    )
     minimum_experience_years = fields.Float(
         string='Minimum Relevant Experience (Years)',
         help='Candidates with Relevant Experience >= this value pass. Set 0 to skip.'
-    )
-    minimum_banking_experience = fields.Float(
-        string='Minimum Banking Experience (Years)',
-        help='Candidates with Banking Sector experience >= this value pass. Set 0 to skip.'
     )
     minimum_supervisory_experience = fields.Float(
         string='Minimum Supervisory Experience (Years)',
@@ -167,6 +176,18 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
         self._sync_master_data()
+        rec_id = res.get('recruitment_id') or self.env.context.get('default_recruitment_id') or self.env.context.get('active_id')
+        if rec_id:
+            try:
+                recruitment = self.env['employee.recruitment.external'].browse(rec_id)
+                if recruitment.exists() and recruitment.vacancy_id:
+                    vac = recruitment.vacancy_id
+                    if 'minimum_banking_experience' in fields_list and not res.get('minimum_banking_experience'):
+                        res['minimum_banking_experience'] = getattr(vac, 'banking_experience_required', 0.0) or 0.0
+                    if 'minimum_total_experience_years' in fields_list and not res.get('minimum_total_experience_years'):
+                        res['minimum_total_experience_years'] = getattr(vac, 'minimum_experience_years', 0.0) or 0.0
+            except Exception:
+                pass
         return res
 
     @api.model
@@ -264,33 +285,65 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
                     vals_to_update['highest_cgpa'] = prof.latest_cgpa
                 if not candidate.banking_experience and prof.banking_experience:
                     vals_to_update['banking_experience'] = prof.banking_experience
-                if not candidate.total_experience and prof.total_experience_years:
-                    vals_to_update['total_experience'] = prof.total_experience_years
+                if not candidate.non_banking_experience and prof.non_banking_experience:
+                    vals_to_update['non_banking_experience'] = prof.non_banking_experience
+                if not candidate.total_experience and (prof.total_experience_years or prof.total_experience):
+                    vals_to_update['total_experience'] = prof.total_experience_years or prof.total_experience
                 if not candidate.relevant_experience:
-                    vals_to_update['relevant_experience'] = (candidate.applicant_name.total_experience_years if candidate.applicant_name and hasattr(candidate.applicant_name, 'total_experience_years') and candidate.applicant_name.total_experience_years else prof.total_experience_years) or 0.0
+                    vals_to_update['relevant_experience'] = (candidate.applicant_name.total_experience_years if candidate.applicant_name and hasattr(candidate.applicant_name, 'total_experience_years') and candidate.applicant_name.total_experience_years else (prof.total_experience_years or prof.total_experience)) or 0.0
                 if not candidate.gender and prof.gender:
                     vals_to_update['gender'] = prof.gender
-                if not candidate.working_status and prof.current_employment_status:
-                    vals_to_update['working_status'] = prof.current_employment_status
+                if not candidate.working_status and prof:
+                    if prof.working_status:
+                        vals_to_update['working_status'] = prof.working_status if prof.working_status in ['employed', 'unemployed', 'active', 'notice_period'] else 'employed'
+                    elif prof.current_company:
+                        vals_to_update['working_status'] = 'employed'
                 if not candidate.current_company and prof.current_company:
                     vals_to_update['current_company'] = prof.current_company
-                if not candidate.date_of_birth and prof.date_of_birth:
-                    vals_to_update['date_of_birth'] = prof.date_of_birth
+                if not candidate.join_immediately:
+                    cand_ji = 'yes' if (
+                        (prof and getattr(prof, 'join_immediately', False)) or
+                        (candidate.applicant_name and getattr(candidate.applicant_name, 'willing_to_join_immediately', False)) or
+                        not getattr(candidate, 'date_of_availability', False)
+                    ) else 'no'
+                    vals_to_update['join_immediately'] = cand_ji
+                if candidate.ex_bunna is None or candidate.ex_bunna is False:
+                    is_ex = True if (prof and getattr(prof, 'worked_in_bunna_earlier', '') == 'yes') else False
+                    vals_to_update['ex_bunna'] = is_ex
+                cand_dob = getattr(prof, 'dob', False) or getattr(prof, 'birth_date', False) or False
+                if not candidate.date_of_birth and cand_dob:
+                    vals_to_update['date_of_birth'] = cand_dob
                 if not candidate.age and prof.age:
                     vals_to_update['age'] = prof.age
-                if not candidate.applicant_phone and prof.mobile_phone:
-                    vals_to_update['applicant_phone'] = prof.mobile_phone
+                cand_phone = getattr(prof, 'phone', False) or getattr(prof, 'alternative_mobile', False) or False
+                if not candidate.applicant_phone and cand_phone:
+                    vals_to_update['applicant_phone'] = cand_phone
                 if not candidate.applicant_email and prof.email:
                     vals_to_update['applicant_email'] = prof.email
                 if not candidate.education_ids and prof.education_ids:
+                    edu_level_map = {
+                        'highschool': 'diploma',
+                        'diploma': 'diploma',
+                        'ba': 'ba',
+                        'bsc': 'bsc',
+                        'bachelor': 'bsc',
+                        'ma_msc': 'msc',
+                        'msc': 'msc',
+                        'master': 'msc',
+                        'mba': 'mba',
+                        'phd': 'phd',
+                        'doctorate': 'phd',
+                    }
                     edu_cmds = []
                     for edu in prof.education_ids:
+                        target_level = edu_level_map.get(edu.education_level, 'bsc')
+                        grad_date = edu.end_date or getattr(edu, 'graduation_year', False) or False
                         edu_cmds.append((0, 0, {
-                            'level': edu.education_level if edu.education_level in ['diploma', 'bachelor', 'master', 'phd'] else 'bachelor',
+                            'level': target_level,
                             'field_of_study': edu.field_of_study or edu.other_field_of_study or edu.qualification_name or '',
                             'institution_name': edu.institution or edu.other_institution or '',
-                            'graduation_date': edu.end_date or False,
-                            'graduation_year': edu.end_date or False,
+                            'graduation_date': grad_date,
+                            'graduation_year': grad_date,
                             'cgpa': edu.cgpa or 0.0,
                         }))
                     if edu_cmds:
@@ -300,10 +353,10 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
                     for crt in prof.certification_ids:
                         cert_cmds.append((0, 0, {
                             'name': crt.name or '',
-                            'issuing_organization': crt.issuing_organization or '',
+                            'issuing_institution': getattr(crt, 'issuing_organization', '') or getattr(crt, 'issuing_institution', '') or '',
                             'issue_date': crt.issue_date or False,
                             'expiry_date': crt.expiry_date or False,
-                            'cert_url': crt.cert_url or '',
+                            'certificate_url': getattr(crt, 'cert_url', '') or getattr(crt, 'certificate_url', '') or '',
                         }))
                     if cert_cmds:
                         vals_to_update['certification_ids'] = cert_cmds
@@ -312,7 +365,8 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
                     for sk in prof.skill_ids:
                         skill_cmds.append((0, 0, {
                             'skill_name': sk.name or '',
-                            'proficiency': 'Proficient',
+                            'skill_category': 'business',
+                            'proficiency': 'intermediate',
                         }))
                     if skill_cmds:
                         vals_to_update['skill_ids'] = skill_cmds
@@ -321,12 +375,11 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
                     for exp in prof.experience_ids:
                         hist_cmds.append((0, 0, {
                             'company_name': exp.organization or '',
-                            'position_title': exp.position or '',
+                            'job_title': exp.position or '',
                             'start_date': exp.start_date or False,
                             'end_date': exp.end_date or False,
                             'is_current': exp.is_current or False,
-                            'is_banking': exp.is_banking or False,
-                            'reason_for_leaving': exp.reason_for_leaving or '',
+                            'responsibilities': exp.responsibilities or '',
                         }))
                     if hist_cmds:
                         vals_to_update['work_history_ids'] = hist_cmds
@@ -354,19 +407,26 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
                 if max_cgpa > 0 and max_cgpa < self.minimum_cgpa:
                     continue
 
-            # 2. Relevant experience check (only if minimum_experience_years > 0)
-            if self.minimum_experience_years > 0:
-                exp = candidate.relevant_experience or candidate.total_experience or (candidate.applicant_name.total_experience_years if candidate.applicant_name and hasattr(candidate.applicant_name, 'total_experience_years') else 0.0) or (prof.total_experience_years if prof else 0.0) or 0.0
-                if exp > 0 and exp < self.minimum_experience_years:
-                    continue
-
-            # 3. Banking experience check (only if minimum_banking_experience > 0)
+            # 2. Banking experience check (only if minimum_banking_experience > 0)
             if self.minimum_banking_experience > 0:
                 b_exp = candidate.banking_experience or (prof.banking_experience if prof else 0.0) or 0.0
-                if b_exp > 0 and b_exp < self.minimum_banking_experience:
+                if b_exp < self.minimum_banking_experience:
                     continue
 
-            # 4. Supervisory experience check
+            # 3. Non-Banking experience check (only if minimum_non_banking_experience > 0)
+            if self.minimum_non_banking_experience > 0:
+                nb_exp = candidate.non_banking_experience or (prof.non_banking_experience if prof else 0.0) or 0.0
+                if nb_exp < self.minimum_non_banking_experience:
+                    continue
+
+            # 4. Total experience in years check (only if minimum_total_experience_years > 0 or minimum_experience_years > 0)
+            min_tot = self.minimum_total_experience_years or self.minimum_experience_years or 0.0
+            if min_tot > 0:
+                t_exp = candidate.total_experience or (candidate.applicant_name.total_experience_years if candidate.applicant_name and hasattr(candidate.applicant_name, 'total_experience_years') else 0.0) or (prof.total_experience_years if prof else 0.0) or (prof.total_experience if prof else 0.0) or candidate.relevant_experience or 0.0
+                if t_exp < min_tot:
+                    continue
+
+            # 5. Supervisory experience check (if set)
             if self.minimum_supervisory_experience > 0:
                 sup_exp = candidate.supervisory_experience or (prof.supervisory_experience if prof else 0.0) or 0.0
                 if sup_exp < self.minimum_supervisory_experience:
@@ -398,8 +458,21 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
 
                 match_qual = False
                 for req in req_quals:
-                    if any(req in s or s in req for s in cand_strings if s):
-                        match_qual = True
+                    for s in cand_strings:
+                        if not s:
+                            continue
+                        if req in s or s in req:
+                            match_qual = True
+                            break
+                        # Token/stem matching (handles typos e.g. enginering vs engineering)
+                        r_words = [w for w in re.sub(r'[^\w\s]', ' ', req).split() if len(w) >= 3]
+                        s_words = [w for w in re.sub(r'[^\w\s]', ' ', s).split() if len(w) >= 3]
+                        if r_words and s_words:
+                            matched = sum(1 for rw in r_words if any(rw == sw or (len(rw) >= 5 and rw[:5] == sw[:5]) for sw in s_words))
+                            if matched >= max(1, len(r_words) - 1):
+                                match_qual = True
+                                break
+                    if match_qual:
                         break
                 if not match_qual:
                     continue
@@ -422,8 +495,21 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
 
                 match_inst = False
                 for req in req_insts:
-                    if any(req in ci or ci in req for ci in cand_insts if ci):
-                        match_inst = True
+                    for ci in cand_insts:
+                        if not ci:
+                            continue
+                        if req in ci or ci in req:
+                            match_inst = True
+                            break
+                        # Token matching (handles parentheses like AAU, etc.)
+                        r_words = [w for w in re.sub(r'[^\w\s]', ' ', req).split() if len(w) >= 3]
+                        c_words = [w for w in re.sub(r'[^\w\s]', ' ', ci).split() if len(w) >= 3]
+                        if r_words and c_words:
+                            matched = sum(1 for rw in r_words if any(rw == cw or (len(rw) >= 5 and rw[:5] == cw[:5]) for cw in c_words))
+                            if matched >= max(1, len(r_words) - 1):
+                                match_inst = True
+                                break
+                    if match_inst:
                         break
                 if not match_inst:
                     continue
@@ -475,24 +561,43 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
 
             # 8. Gender check
             if self.gender and self.gender != 'any':
-                if candidate.gender != self.gender:
+                cand_gender = candidate.gender or (prof.gender if prof else False)
+                if cand_gender != self.gender:
                     continue
 
             # 9. Working Status check
             if self.working_status and self.working_status != 'any':
-                if candidate.working_status != self.working_status:
+                cand_ws = candidate.working_status or (prof.working_status if prof else False)
+                if not cand_ws and candidate.current_company:
+                    cand_ws = 'employed'
+                if self.working_status == 'employed':
+                    if cand_ws not in ('employed', 'active', 'notice_period'):
+                        continue
+                elif cand_ws != self.working_status:
                     continue
 
             # 10. Join Immediately check
             if self.join_immediately and self.join_immediately != 'any':
-                if candidate.join_immediately != self.join_immediately:
+                cand_ji = candidate.join_immediately
+                if not cand_ji:
+                    if (prof and getattr(prof, 'join_immediately', False)) or (candidate.applicant_name and getattr(candidate.applicant_name, 'willing_to_join_immediately', False)):
+                        cand_ji = 'yes'
+                    elif not getattr(candidate, 'date_of_availability', False):
+                        cand_ji = 'yes'
+                    else:
+                        cand_ji = 'no'
+                if self.join_immediately == 'yes' and cand_ji != 'yes':
+                    continue
+                elif self.join_immediately == 'no' and cand_ji == 'yes':
                     continue
 
             # 11. Ex-Bunna check
-            if self.ex_bunna == 'yes' and not candidate.ex_bunna:
-                continue
-            elif self.ex_bunna == 'no' and candidate.ex_bunna:
-                continue
+            if self.ex_bunna and self.ex_bunna != 'any':
+                cand_ex = candidate.ex_bunna or (True if prof and getattr(prof, 'worked_in_bunna_earlier', '') == 'yes' else False)
+                if self.ex_bunna == 'yes' and not cand_ex:
+                    continue
+                elif self.ex_bunna == 'no' and cand_ex:
+                    continue
 
             # 12. Max Age check
             if self.max_age > 0:
@@ -541,15 +646,21 @@ class ExternalRecruitmentShortlistWizard(models.TransientModel):
             delegation_lines = []
             if recruitment.vacancy_id:
                 for member in recruitment.vacancy_id.vac_del_team_id:
-                    role_map = 'member'
+                    role_map = 'panel_member'
                     if member.role:
-                        role_clean = member.role.lower().replace(' ', '_')
-                        if role_clean in ['chair_person', 'member', 'secretary', 'member_secretary']:
-                            role_map = role_clean
+                        role_clean = str(member.role).lower().replace(' ', '_').replace('&', '').strip()
+                        if 'chair' in role_clean:
+                            role_map = 'chairperson'
+                        elif 'sec' in role_clean:
+                            role_map = 'secretary'
+                        elif 'obs' in role_clean or 'labor' in role_clean:
+                            role_map = 'observer'
+                        else:
+                            role_map = 'panel_member'
                     delegation_lines.append((0, 0, {
                         'role': role_map,
-                        'employee_name': member.employee_name.id,
-                        'alternate_committee_member': member.alternate_committee_member.id,
+                        'employee_name': member.employee_name.id if member.employee_name else False,
+                        'alternate_committee_member': member.alternate_committee_member.id if member.alternate_committee_member else False,
                         'status': 'active',
                     }))
 

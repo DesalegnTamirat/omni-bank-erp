@@ -9,7 +9,7 @@
                 <form string="Send Bulk Candidate Communication">
                     <group col="2">
                         <group string="Candidate Target Selection">
-                            <field name="vacancy_id" options="{'no_create': True}"/>
+                            <field name="vacancy_id" options="{'no_create': True}" domain="[('reference', 'ilike', 'EXT')]"/>
                             <field name="bunna_app_status"/>
                             <field name="applicant_count" class="fw-bold text-primary"/>
                         </group>

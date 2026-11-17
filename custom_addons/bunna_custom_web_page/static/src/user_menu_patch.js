@@ -28,12 +28,13 @@ safeRemove(menu, "odoo_account");    // My Odoo.com Account
 safeRemove(menu, "install_pwa");     // Install App
 
 // ---------- Systray (header icons) ----------
-safeRemove(systray, "AppMenuTheme"); // theme switcher droplet icon (guessed key)
+safeRemove(systray, "AppMenuTheme"); // theme switcher droplet icon
+safeRemove(systray, "Calculator");   // calculator icon
 //safeRemove(systray, "mail.messaging_menu");             // message bubble icon
 safeRemove(systray, "mail.activity_menu");              // circular arrows / activity icon
 
 // My Preferences
-// safeRemove(menu, "preferences");
+safeRemove(menu, "preferences");
 
 // Online status
 // safeRemove(menu, "im_status");

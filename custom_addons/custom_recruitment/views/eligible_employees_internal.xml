@@ -1,11 +1,34 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
 
+    <record id="internal_recruitment_eligible_employees_search_view" model="ir.ui.view">
+        <field name="name">internal.recruitment.eligible.employees.search</field>
+        <field name="model">internal.recruitment.eligible.employees</field>
+        <field name="arch" type="xml">
+            <search string="Search Eligible Employees">
+                <field name="emp_name" string="Employee Name"/>
+                <field name="emp_grade" string="Grade"/>
+                <field name="emp_position" string="Position"/>
+                <field name="current_work_unit" string="Work Unit / Location"/>
+                <field name="current_department" string="Department"/>
+                <separator/>
+                <filter string="Selected" name="filter_selected" domain="[('select_flag', '=', True)]"/>
+                <filter string="Not Selected" name="filter_unselected" domain="[('select_flag', '=', False)]"/>
+                <group name="group_by">
+                    <filter string="Selection Status" name="group_select" context="{'group_by': 'select_flag'}"/>
+                    <filter string="Grade" name="group_grade" context="{'group_by': 'emp_grade'}"/>
+                    <filter string="Location" name="group_location" context="{'group_by': 'current_work_unit'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_internal_recruitment_eligible_employees" model="ir.actions.act_window">
         <field name="name">Internal Recruitment Eligible Employees</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">internal.recruitment.eligible.employees</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="internal_recruitment_eligible_employees_search_view"/>
         <field name="context">{}</field>
         <field name="domain">[]</field>
         <field name="help" type="html">

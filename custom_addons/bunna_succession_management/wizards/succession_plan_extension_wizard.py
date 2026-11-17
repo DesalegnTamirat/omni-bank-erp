@@ -13,13 +13,13 @@ class SuccessionPlanExtensionWizard(models.TransientModel):
     _name = 'succession.plan.extension.wizard'
     _description = 'Extend Successor Development Plan'
 
-    plan_id = fields.Many2one('succession.development.plan', required=True, readonly=True)
+    plan_id = fields.Many2one('succession.development.plan', required=True, readonly=True, index=True)
     candidate_id = fields.Many2one(
-        related='plan_id.candidate_id', string='Candidate', readonly=True)
+        related='plan_id.candidate_id', string='Candidate', readonly=True, index=True)
     employee_id = fields.Many2one(
-        related='plan_id.employee_id', string='Employee', readonly=True)
+        related='plan_id.employee_id', string='Employee', readonly=True, index=True)
     critical_position_id = fields.Many2one(
-        related='plan_id.critical_position_id', string='Target Critical Position', readonly=True)
+        related='plan_id.critical_position_id', string='Target Critical Position', readonly=True, index=True)
     current_end_date = fields.Date(
         related='plan_id.end_date', string='Current End Date', readonly=True)
     original_end_date = fields.Date(
@@ -128,24 +128,22 @@ class SuccessionPlanExtensionWizard(models.TransientModel):
             'extension_remedial_plan': self.remedial_plan,
         })
 
-        plan.message_post(body=_(
-            '<b>Successor Development Plan Extended</b><br/>'
-            '<ul>'
-            '<li><b>Revised End Date:</b> %(new_date)s (+%(days)d days)</li>'
-            '<li><b>Extension Cycle:</b> #%(cycle)d</li>'
-            '<li><b>Applied By:</b> %(user)s (%(role)s)</li>'
-            '<li><b>Justification:</b> %(reason)s</li>'
-            '<li><b>Remedial Plan:</b> %(remedial)s</li>'
-            '</ul>'
-        ) % {
-            'new_date': self.proposed_end_date,
-            'days': days_added,
-            'cycle': new_count,
-            'user': submitted_by.name,
-            'role': 'Manager' if plan.employee_id.parent_id.user_id == submitted_by else 'PPDD Officer',
-            'reason': self.justification,
-            'remedial': self.remedial_plan or 'None documented',
-        })
+        msg_lines = [
+            '<b>%s</b><br/>' % _('Successor Development Plan Extended'),
+            '<ul>',
+            '<li><b>%s:</b> %s (+%d days)</li>' % (_('Revised End Date'), self.proposed_end_date, days_added),
+            '<li><b>%s:</b> #%d</li>' % (_('Extension Cycle'), new_count),
+            '<li><b>%s:</b> %s (%s)</li>' % (
+                _('Applied By'),
+                submitted_by.name,
+                'Manager' if plan.employee_id.parent_id.user_id == submitted_by else 'PPDD Officer'
+            ),
+            '<li><b>%s:</b> %s</li>' % (_('Justification'), self.justification),
+        ]
+        if self.remedial_plan:
+            msg_lines.append('<li><b>%s:</b> %s</li>' % (_('Remedial Plan'), self.remedial_plan))
+        msg_lines.append('</ul>')
+        plan.message_post(body=''.join(msg_lines))
 
         # Log candidate governance event
         if hasattr(plan.candidate_id, '_log_candidate_event'):
@@ -155,4 +153,14 @@ class SuccessionPlanExtensionWizard(models.TransientModel):
                     plan.name, self.proposed_end_date, days_added, submitted_by.name, self.justification)
             )
 
-        return {'type': 'ir.actions.act_window_close'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Plan Extension Applied'),
+                'message': _('Development Plan %s extension applied. Revised End Date: %s (+%d days).') % (plan.name, self.proposed_end_date, days_added),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }

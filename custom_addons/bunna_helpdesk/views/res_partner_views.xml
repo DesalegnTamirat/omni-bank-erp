@@ -32,12 +32,16 @@
                                 decoration-danger="account_status in ('frozen', 'closed')"
                                 decoration-warning="account_status == 'dormant'"
                             />
+                            <field name="acct_opn_date" />
+                            <field name="mode_of_oper_code" />
+                            <field name="account_ownership" />
                         </group>
                         <group string="CBS Demographics &amp; Branch">
                             <field name="customer_type" />
                             <field name="age" />
                             <field name="district_name" />
                             <field name="branch_name" />
+                            <field name="sol_id" />
                             <field name="branch_id" />
                             <field name="customer_segment" />
                             <field name="preferred_language" />

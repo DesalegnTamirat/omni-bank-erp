@@ -16,20 +16,20 @@
         <template id="announcement_list_page" name="Announcements List">
             <t t-call="website.layout">
                 <style>
-                    .bunna-ann-title { color: #4a1515; font-weight: 800; font-size: clamp(1.4rem, 3.2vh, 2rem); line-height: 1.15; }
+                    .bunna-ann-title { color: #4a1515; font-weight: 800; font-size: clamp(1.2rem, 2.6vh, 1.6rem); line-height: 1.15; }
                     .bunna-ann-title::after {
-                        content: ''; display: block; width: 56px; height: 4px; margin-top: 6px;
+                        content: ''; display: block; width: 48px; height: 3px; margin-top: 4px;
                         background: #c17540; border-radius: 4px;
                     }
                     .bunna-ann-pill {
                         border: 1px solid #1d2b32; color: #1d2b32; border-radius: 50rem;
-                        padding: 0.25rem 0.9rem; text-decoration: none; font-size: 0.9rem; font-weight: 600;
+                        padding: 0.15rem 0.8rem; text-decoration: none; font-size: 0.85rem; font-weight: 600;
                     }
                     .bunna-ann-pill { transition: all 0.2s ease; }
                     .bunna-ann-pill:hover, .bunna-ann-pill.active {
                         background: #1d2b32; color: #ffffff; box-shadow: 0 3px 8px rgba(29,43,50,0.25);
                     }
-                    .bunna-ann-page { background: linear-gradient(180deg, #f3f6f8 0%, #fbfbfb 45%); padding: 1.25rem 0 1.5rem; }
+                    .bunna-ann-page { background: linear-gradient(180deg, #f3f6f8 0%, #fbfbfb 45%); padding: 0.6rem 0 0.8rem; }
                     .bunna-ann-container {
                         padding-left: var(--bunna-ann-left, clamp(1rem, 5vw, 6rem));
                         padding-right: var(--bunna-ann-right, clamp(1rem, 5vw, 6rem));
@@ -89,6 +89,23 @@
                     @media (prefers-reduced-motion: reduce) {
                         .bunna-ann-card.is-new { animation: none; }
                     }
+                    .bunna-ann-controls { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
+                    .bunna-ann-search { max-width: 250px; flex: 1 1 170px; }
+                    .bunna-ann-controls .form-control, .bunna-ann-controls .btn {
+                        font-size: 0.8rem; padding-top: 0.18rem; padding-bottom: 0.18rem; line-height: 1.4;
+                    }
+                    .bunna-ann-controls .btn .fa { font-size: 0.8rem; }
+                    .bunna-ann-controls .bunna-ann-count { font-size: 0.8rem; }
+                    .bunna-ann-count { color: #6c757d; font-size: 0.9rem; }
+                    .bunna-ann-chip {
+                        background: #e9eef2; color: #1d2b32; border-radius: 50rem; padding: 0.15rem 0.7rem;
+                        font-size: 0.8rem; font-weight: 600; text-decoration: none; white-space: nowrap;
+                    }
+                    .bunna-ann-chip:hover { background: #c17540; color: #ffffff; }
+                    .bunna-ann-card.is-expired { border-left-color: #9aa5ad !important; background: #f6f7f8; animation: none; }
+                    .bunna-ann-card.is-expired .bunna-ann-card-title { color: #6c757d; }
+                    .bunna-ann-badge-expired { background: #6c757d; }
+                    .bunna-ann-card[data-href] { cursor: pointer; }
                     .bunna-ann-pager { flex: 0 0 auto; display: flex; justify-content: center; padding-top: 0.5rem; }
                     .bunna-ann-pager .pagination { margin: 0; }
                     .bunna-ann-pager .page-link { color: #1d2b32; border-radius: 50rem; margin: 0 2px; border: none; }
@@ -117,30 +134,95 @@
                         }
                         .bunna-ann-fit > .container-fluid { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
                         .bunna-ann-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; gap: clamp(0.4rem, 1.2vh, 0.8rem); }
-                        .bunna-ann-card { flex: 1 1 0; min-height: 90px; max-height: 150px; }
+                        .bunna-ann-card { flex: 1 1 0; min-height: 84px; max-height: 150px; }
                     }
                 </style>
                 <div id="wrap" class="bunna-ann-fit bunna-ann-page">
                     <div class="container-fluid bunna-ann-container">
-                        <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3" style="flex: 0 0 auto;">
+                        <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-2" style="flex: 0 0 auto;">
                             <div>
                                 <h2 class="bunna-ann-title mb-1">News &amp; Announcements</h2>
                                 <p class="text-muted mb-0 small">Latest news and notifications from Human Resources.</p>
                             </div>
                             <div class="d-flex gap-2 flex-wrap">
-                                <a href="/announcements" t-attf-class="bunna-ann-pill #{'active' if not selected_category else ''}">All</a>
+                                <a t-att-href="all_url" t-attf-class="bunna-ann-pill #{'active' if not selected_category else ''}">All</a>
                                 <t t-foreach="categories" t-as="c">
-                                    <a t-attf-href="/announcements?category=#{c.id}"
+                                    <a t-att-href="category_urls[c.id]"
                                        t-attf-class="bunna-ann-pill #{'active' if selected_category and selected_category.id == c.id else ''}"
                                        t-out="c.name"/>
                                 </t>
                             </div>
                         </div>
 
+                        <form action="/announcements" method="get" class="bunna-ann-controls" role="search">
+                            <input t-if="selected_category" type="hidden" name="category" t-att-value="selected_category.id"/>
+                            <div class="input-group input-group-sm bunna-ann-search">
+                                <input type="search" name="q" class="form-control" maxlength="80"
+                                       placeholder="Search announcements" aria-label="Search announcements"
+                                       t-att-value="params.get('q', '')"/>
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" aria-label="Search">
+                                    <i class="fa fa-search"/>
+                                </button>
+                            </div>
+                            <div class="dropdown">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                    <i class="fa fa-sliders me-1"/> Filters
+                                </button>
+                                <div class="dropdown-menu p-3" style="min-width: 290px;">
+                                    <label class="form-label small fw-bold mb-1" for="ann_range">Date</label>
+                                    <select id="ann_range" name="range" class="form-select form-select-sm mb-2">
+                                        <option value="">Any time</option>
+                                        <t t-foreach="range_options" t-as="opt">
+                                            <option t-att-value="opt[0]" t-att-selected="params.get('range') == opt[0]" t-out="opt[1]"/>
+                                        </t>
+                                    </select>
+                                    <div class="row g-2 mb-1">
+                                        <div class="col-6">
+                                            <label class="form-label small mb-1" for="ann_from">From</label>
+                                            <input id="ann_from" type="date" name="from" class="form-control form-control-sm"
+                                                   t-att-value="params.get('from', '')"/>
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small mb-1" for="ann_to">To</label>
+                                            <input id="ann_to" type="date" name="to" class="form-control form-control-sm"
+                                                   t-att-value="params.get('to', '')"/>
+                                        </div>
+                                    </div>
+                                    <div class="form-text mb-2">Pick a quick range, or From / To dates (a quick range wins).</div>
+                                    <label class="form-label small fw-bold mb-1" for="ann_sort">Sort by</label>
+                                    <select id="ann_sort" name="sort" class="form-select form-select-sm mb-2">
+                                        <t t-foreach="sort_options" t-as="opt">
+                                            <option t-att-value="opt[0]" t-att-selected="params.get('sort', 'newest') == opt[0]" t-out="opt[1]"/>
+                                        </t>
+                                    </select>
+                                    <div t-if="archive_enabled" class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="ann_archive" name="archive" value="1"
+                                               t-att-checked="params.get('archive')"/>
+                                        <label class="form-check-label" for="ann_archive">Include expired</label>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-3">
+                                        <a href="/announcements" class="btn btn-sm btn-light">Clear all</a>
+                                        <button type="submit" class="btn btn-sm btn-primary"
+                                                style="background-color: #1d2b32; border-color: #1d2b32;">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <span t-if="has_filters" class="bunna-ann-count">
+                                <t t-out="total"/> <t t-out="'announcement' if total == 1 else 'announcements'"/> found
+                            </span>
+                            <t t-foreach="chips" t-as="chip">
+                                <a t-att-href="chip['url']" class="bunna-ann-chip" title="Remove this filter">
+                                    <t t-out="chip['label']"/> <i class="fa fa-times ms-1"/>
+                                </a>
+                            </t>
+                        </form>
+
                         <t t-if="announcements">
                             <div class="bunna-ann-list">
                                 <t t-foreach="announcements" t-as="a">
-                                    <div t-attf-class="bunna-ann-card #{'is-new' if a.is_new else ''}"
+                                    <div t-attf-class="bunna-ann-card #{'is-new' if a.is_new else ''} #{'is-expired' if a.live_status == 'expired' else ''}"
+                                         t-attf-data-href="/announcements/#{a.id}"
                                          t-att-style="('border-left-color: %s; background: #fffafa;' % (a.priority_id.color or '#b32d2e')) if a.is_highlighted else None">
                                         <a t-attf-href="/announcements/#{a.id}" class="bunna-ann-visual text-decoration-none">
                                             <img t-if="a.has_image" t-attf-src="/announcements/#{a.id}/image?size=small"
@@ -159,12 +241,16 @@
                                                       t-attf-style="background-color: #{a.priority_id.color or '#b32d2e'};">
                                                     <i class="fa fa-exclamation-circle me-1"/><t t-out="a.priority_id.name"/>
                                                 </span>
+                                                <span t-if="a.live_status == 'expired'" class="bunna-ann-badge bunna-ann-badge-expired">Expired</span>
                                                 <a t-attf-href="/announcements/#{a.id}" class="bunna-ann-card-title" t-out="a.name"/>
                                             </div>
                                             <p class="bunna-ann-excerpt" t-out="a.excerpt"/>
                                         </div>
                                         <div class="bunna-ann-side">
                                             <small class="text-muted">
+                                                <span t-if="a.photo_count" class="me-2">
+                                                    <i class="fa fa-camera me-1"/><t t-out="a.photo_count"/>
+                                                </span>
                                                 <span t-if="a.attachment_count" class="me-2">
                                                     <i class="fa fa-paperclip me-1"/><t t-out="a.attachment_count"/>
                                                 </span>
@@ -185,7 +271,12 @@
                         <t t-else="">
                             <div class="text-center py-5">
                                 <i class="fa fa-bell-o fa-3x text-muted mb-3"/>
-                                <h5 class="text-muted">There are no announcements at the moment.</h5>
+                                <h5 t-if="not has_filters" class="text-muted">There are no announcements at the moment.</h5>
+                                <t t-else="">
+                                    <h5 class="text-muted mb-3">No announcements match your search or filters.</h5>
+                                    <a href="/announcements" class="btn btn-sm btn-primary"
+                                       style="background-color: #1d2b32; border-color: #1d2b32;">Clear filters</a>
+                                </t>
                             </div>
                         </t>
                     </div>
@@ -229,6 +320,32 @@
                     })();
                     ]]>
                 </script>
+                <script type="text/javascript">
+                    <![CDATA[
+                    (function () {
+                        function init() {
+                            var list = document.querySelector('.bunna-ann-list');
+                            if (!list) { return; }
+                            list.addEventListener('click', function (event) {
+                                var card = event.target.closest('.bunna-ann-card');
+                                if (!card) { return; }
+                                // links and buttons keep their own behaviour
+                                if (event.target.closest('a, button, input, select, textarea, label')) { return; }
+                                // someone selecting text to copy it should not be sent away
+                                var selection = window.getSelection ? window.getSelection().toString() : '';
+                                if (selection) { return; }
+                                var href = card.getAttribute('data-href');
+                                if (href) { window.location.href = href; }
+                            });
+                        }
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', init);
+                        } else {
+                            init();
+                        }
+                    })();
+                    ]]>
+                </script>
             </t>
         </template>
 
@@ -241,6 +358,11 @@
                         box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden;
                     }
                     .bunna-ann-head { padding: 2rem 2.2rem 1.2rem; border-bottom: 1px solid #eee; }
+                    .bunna-ann-comments { padding: 1.2rem 2.2rem 1.4rem; border-top: 1px solid #eee; }
+                    .bunna-ann-comments h6 { color: #4a1515; font-weight: 700; }
+                    .bunna-ann-comment { background: #f8f9fa; border-radius: 10px; padding: 0.7rem 1rem; margin-bottom: 0.6rem; }
+                    .bunna-ann-hp { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+                    .bunna-ann-expired-banner { background: #fff3cd; color: #664d03; padding: 0.6rem 2.2rem; font-weight: 600; }
                     .bunna-ann-cover { background: #f3f4f6; text-align: center; }
                     .bunna-ann-cover img { max-width: 100%; max-height: 420px; width: auto; height: auto; display: block; margin: 0 auto; }
                     .bunna-ann-icon {
@@ -254,6 +376,24 @@
                     .bunna-ann-content table { width: 100%; margin-bottom: 1rem; border-collapse: collapse; }
                     .bunna-ann-content table td, .bunna-ann-content table th { border: 1px solid #dee2e6; padding: 0.4rem 0.6rem; }
                     .bunna-ann-content img { max-width: 100%; height: auto; }
+                    .bunna-ann-gallery { padding: 0 2.2rem 1.4rem; }
+                    .bunna-ann-gallery h6 { color: #4a1515; font-weight: 700; }
+                    .bunna-ann-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.6rem; }
+                    .bunna-ann-thumbbtn {
+                        border: 0; padding: 0; background: #f3f4f6; border-radius: 10px; overflow: hidden;
+                        aspect-ratio: 1 / 1; cursor: zoom-in; box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+                    }
+                    .bunna-ann-thumbbtn img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.2s ease; }
+                    .bunna-ann-thumbbtn:hover img { transform: scale(1.05); }
+                    .bunna-ann-photo-stage { position: relative; background: #111; height: 78vh; display: flex; align-items: center; justify-content: center; }
+                    .bunna-ann-photo-stage img { max-width: 100%; max-height: 100%; }
+                    .bunna-ann-photo-nav {
+                        position: absolute; top: 50%; transform: translateY(-50%); border: 0; color: #fff;
+                        background: rgba(0,0,0,0.45); width: 44px; height: 44px; border-radius: 50%; font-size: 1.2rem;
+                    }
+                    .bunna-ann-photo-nav.prev { left: 0.75rem; }
+                    .bunna-ann-photo-nav.next { right: 0.75rem; }
+                    .bunna-ann-photo-nav:hover { background: rgba(193,117,64,0.9); }
                     .bunna-ann-attach { padding: 0 2.2rem 1.4rem; }
                     .bunna-ann-attach h6 { color: #4a1515; font-weight: 700; }
                     .bunna-ann-attrow {
@@ -290,6 +430,9 @@
                                 </a>
                                 <div class="bunna-ann-detail"
                                      t-att-style="('border-top-color: %s;' % (announcement.priority_id.color or '#b32d2e')) if announcement.is_highlighted else None">
+                                    <div t-if="announcement.live_status == 'expired'" class="bunna-ann-expired-banner">
+                                        <i class="fa fa-clock-o me-1"/> This announcement has expired and is shown for reference only.
+                                    </div>
                                     <!-- COVER IMAGE (optional) -->
                                     <div t-if="announcement.has_image" class="bunna-ann-cover">
                                         <img t-attf-src="/announcements/#{announcement.id}/image" alt=""/>
@@ -322,6 +465,23 @@
                                     </div>
                                     <!-- CONTENT -->
                                     <div class="bunna-ann-content" t-field="announcement.body"/>
+                                    <!-- PHOTO GALLERY -->
+                                    <t t-set="photos" t-value="announcement.photo_ids.filtered('has_image')"/>
+                                    <div t-if="photos" class="bunna-ann-gallery">
+                                        <h6 class="mb-2"><i class="fa fa-camera me-1"/> Photos (<t t-out="len(photos)"/>)</h6>
+                                        <div class="bunna-ann-grid">
+                                            <t t-foreach="photos" t-as="photo">
+                                                <button type="button" class="bunna-ann-thumbbtn"
+                                                        data-bs-toggle="modal" data-bs-target="#annPhotoViewer"
+                                                        t-attf-data-full="/announcements/#{announcement.id}/photo/#{photo.id}?size=full&amp;v=#{photo.cache_key}"
+                                                        t-att-data-caption="photo.caption or ''">
+                                                    <img loading="lazy" decoding="async"
+                                                         t-attf-src="/announcements/#{announcement.id}/photo/#{photo.id}?size=thumb&amp;v=#{photo.cache_key}"
+                                                         t-att-alt="photo.caption or 'Photo'"/>
+                                                </button>
+                                            </t>
+                                        </div>
+                                    </div>
                                     <!-- ATTACHMENTS -->
                                     <div t-if="announcement.attachment_ids" class="bunna-ann-attach">
                                         <t t-set="view_suffix" t-value="'' if announcement.allow_download else '#toolbar=0&amp;navpanes=0'"/>
@@ -373,6 +533,69 @@
                                             <i class="fa fa-pencil me-1" style="color: #c17540;"/>
                                             <t t-out="announcement.signed_by"/>
                                         </p>
+                                    </div>
+                                    <!-- ANONYMOUS COMMENTS -->
+                                    <div t-if="show_comments" id="comments" class="bunna-ann-comments">
+                                        <h6 class="mb-2">
+                                            <i class="fa fa-comments-o me-1"/> Comments (<t t-out="len(approved_comments)"/>)
+                                        </h6>
+                                        <div t-if="comment_notice" t-attf-class="alert alert-#{comment_notice[0]} py-2 mb-3"
+                                             role="status" t-out="comment_notice[1]"/>
+                                        <p t-if="not approved_comments" class="text-muted small">No comments yet.</p>
+                                        <t t-foreach="approved_comments" t-as="c">
+                                            <div class="bunna-ann-comment">
+                                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                                    <span><i class="fa fa-user-secret me-1"/> Anonymous</span>
+                                                    <span t-out="c.submitted_on and c.submitted_on.strftime('%d %b %Y')"/>
+                                                </div>
+                                                <p class="mb-1" style="white-space: pre-line;" t-out="c.body"/>
+                                                <form t-if="comments_open" method="post"
+                                                      t-attf-action="/announcements/comment/#{c.id}/report" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                    <button type="submit" class="btn btn-link btn-sm p-0 text-muted"
+                                                            title="Tell the moderators this comment is inappropriate">
+                                                        <i class="fa fa-flag-o me-1"/> Report
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </t>
+                                        <t t-if="comments_open">
+                                            <form method="post" t-attf-action="/announcements/#{announcement.id}/comment" class="mt-3">
+                                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                <input type="hidden" name="ts" t-att-value="challenge['ts']"/>
+                                                <input type="hidden" name="token" t-att-value="challenge['token']"/>
+                                                <div class="bunna-ann-hp" aria-hidden="true">
+                                                    <label>Leave this field empty
+                                                        <input type="text" name="website" tabindex="-1" autocomplete="off"/>
+                                                    </label>
+                                                </div>
+                                                <label class="form-label small fw-bold" for="ann_comment">Add an anonymous comment</label>
+                                                <textarea id="ann_comment" name="comment" class="form-control" rows="3"
+                                                          required="required" t-att-maxlength="comment_max"></textarea>
+                                                <div class="row g-2 align-items-center mt-2">
+                                                    <div class="col-auto">
+                                                        <label class="col-form-label small" for="ann_answer">
+                                                            What is <t t-out="challenge['question']"/>?
+                                                        </label>
+                                                    </div>
+                                                    <div class="col-auto">
+                                                        <input id="ann_answer" type="text" inputmode="numeric" name="answer"
+                                                               class="form-control form-control-sm" style="width: 80px;"
+                                                               required="required" autocomplete="off"/>
+                                                    </div>
+                                                    <div class="col-auto">
+                                                        <button type="submit" class="bunna-ann-btn-sm">Send comment</button>
+                                                    </div>
+                                                </div>
+                                                <p class="form-text mb-0 mt-2">
+                                                    Comments are anonymous: no name, account or IP address is saved with your comment.
+                                                    A comment appears only after it has been reviewed. Please do not write personal or
+                                                    confidential information. To limit spam, a one-way code that changes every day is counted
+                                                    for up to two hours; it is never linked to your comment.
+                                                </p>
+                                            </form>
+                                        </t>
+                                        <p t-else="" class="text-muted small mt-2">Comments are closed for this announcement.</p>
                                     </div>
                                 </div>
                             </div>
@@ -426,6 +649,64 @@
                             frame.removeAttribute('src');
                             img.removeAttribute('src');
                         });
+                    }
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', init);
+                    } else {
+                        init();
+                    }
+                })();
+                ]]>
+            </script>
+            <!-- PHOTO VIEWER (same page, with next / previous) -->
+            <div t-if="announcement.photo_ids.filtered('has_image')" class="modal fade" id="annPhotoViewer" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-centered">
+                    <div class="modal-content bg-dark text-white">
+                        <div class="modal-header border-0">
+                            <span class="small" id="annPhotoCounter"></span>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="bunna-ann-photo-stage">
+                            <button type="button" class="bunna-ann-photo-nav prev" aria-label="Previous photo"><i class="fa fa-chevron-left"/></button>
+                            <img id="annPhotoFull" alt=""/>
+                            <button type="button" class="bunna-ann-photo-nav next" aria-label="Next photo"><i class="fa fa-chevron-right"/></button>
+                        </div>
+                        <div class="p-3 text-center" id="annPhotoCaption" style="min-height: 3rem;"></div>
+                    </div>
+                </div>
+            </div>
+            <script type="text/javascript">
+                <![CDATA[
+                (function () {
+                    function init() {
+                        var modal = document.getElementById('annPhotoViewer');
+                        if (!modal) { return; }
+                        var buttons = Array.prototype.slice.call(document.querySelectorAll('.bunna-ann-thumbbtn'));
+                        var img = document.getElementById('annPhotoFull');
+                        var caption = document.getElementById('annPhotoCaption');
+                        var counter = document.getElementById('annPhotoCounter');
+                        var current = 0;
+                        function show(index) {
+                            if (index < 0) { index = buttons.length - 1; }
+                            if (index >= buttons.length) { index = 0; }
+                            current = index;
+                            img.src = buttons[index].getAttribute('data-full');
+                            caption.textContent = buttons[index].getAttribute('data-caption') || '';
+                            counter.textContent = (index + 1) + ' / ' + buttons.length;
+                            var next = buttons[(index + 1) % buttons.length];
+                            new Image().src = next.getAttribute('data-full');
+                        }
+                        buttons.forEach(function (button, index) {
+                            button.addEventListener('click', function () { show(index); });
+                        });
+                        modal.querySelector('.prev').addEventListener('click', function () { show(current - 1); });
+                        modal.querySelector('.next').addEventListener('click', function () { show(current + 1); });
+                        document.addEventListener('keydown', function (event) {
+                            if (!modal.classList.contains('show')) { return; }
+                            if (event.key === 'ArrowLeft') { show(current - 1); }
+                            if (event.key === 'ArrowRight') { show(current + 1); }
+                        });
+                        modal.addEventListener('hidden.bs.modal', function () { img.removeAttribute('src'); });
                     }
                     if (document.readyState === 'loading') {
                         document.addEventListener('DOMContentLoaded', init);

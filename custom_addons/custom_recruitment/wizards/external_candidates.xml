@@ -72,17 +72,17 @@
                     <separator string="Experience Requirements"/>
                     <group>
                         <group>
-                            <field name="minimum_experience_years"
-                                   string="Min. Relevant Experience (Yrs)"
-                                   help="Minimum relevant experience in years. Set to 0 to skip."/>
                             <field name="minimum_banking_experience"
-                                   string="Min. Banking Sector Experience (Yrs)"
-                                   help="Minimum years in banking sector. Set to 0 to skip."/>
+                                   string="Banking Experience (Yrs)"
+                                   help="Minimum banking experience in years. Set to 0 to skip."/>
+                            <field name="minimum_non_banking_experience"
+                                   string="Non-Banking Experience (Yrs)"
+                                   help="Minimum non-banking experience in years. Set to 0 to skip."/>
                         </group>
                         <group>
-                            <field name="minimum_supervisory_experience"
-                                   string="Min. Supervisory Experience (Yrs)"
-                                   help="Minimum supervisory/managerial experience in years. Set to 0 to skip."/>
+                            <field name="minimum_total_experience_years"
+                                   string="Total Experience In Years"
+                                   help="Minimum total experience in years. Set to 0 to skip."/>
                         </group>
                     </group>
 

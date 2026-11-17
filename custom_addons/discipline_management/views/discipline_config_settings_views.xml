@@ -9,15 +9,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//form" position="inside">
                     <app data-string="Discipline" string="Discipline" name="discipline_management" groups="discipline_management.group_discipline_admin">
-                        <block title="Disciplinary Governance &amp; SLA Settings" id="discipline_governance_settings">
-                            <setting id="discipline_sla_setting" string="Disciplinary SLA Resolution Target" help="Default resolution SLA in working days.">
-                                <div class="content-group">
-                                    <div class="row mt16">
-                                        <label for="discipline_sla_target_days" class="col-lg-4 o_light_label"/>
-                                        <field name="discipline_sla_target_days" class="col-lg-3"/>
-                                    </div>
-                                </div>
-                            </setting>
+                        <block title="Disciplinary Governance &amp; Appeal Settings" id="discipline_governance_settings">
                             <setting id="discipline_appeal_setting" string="Appeal Submission Window" help="Working days allowed for employee appeal submission.">
                                 <div class="content-group">
                                     <div class="row mt16">
@@ -34,6 +26,14 @@
                                     </div>
                                 </div>
                             </setting>
+                            <setting id="discipline_investigation_setting" string="Audit Investigation Target Window" help="Standard investigation completion SLA in working days for internal audit inquiries.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_investigation_target_days" class="col-lg-4 o_light_label"/>
+                                        <field name="discipline_investigation_target_days" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
                             <setting id="discipline_coach_authority_setting" string="Coach Enforcement Authority Limit" help="Maximum disciplinary sanction a Direct Coach or Line Manager can directly initiate and enforce without committee referral.">
                                 <div class="content-group">
                                     <div class="row mt16">
@@ -42,9 +42,15 @@
                                     </div>
                                 </div>
                             </setting>
+                            <setting id="discipline_email_notifications_setting" string="External Email Notifications" help="Dispatch external SMTP emails for formal disciplinary notices, directives, and chatter updates. Keep disabled on development/demo environments without an active mail server.">
+                                <field name="discipline_enable_email_notifications"/>
+                            </setting>
                         </block>
 
                         <block title="Attendance &amp; Absence Escalation Rules" id="discipline_attendance_rules">
+                            <setting id="enable_attendance_discipline_cases_setting" string="Automated Attendance Disciplinary Cases" help="Enable background scanning and automated disciplinary case generation for unpunched shifts and excessive lateness. Keep disabled on test and demo databases.">
+                                <field name="enable_attendance_discipline_cases"/>
+                            </setting>
                             <setting id="lateness_setting" string="Cumulative Late Time Threshold (Minutes)" help="Total cumulative late duration in minutes across evaluation period triggering minor discipline case.">
                                 <div class="content-group">
                                     <div class="row mt16">
@@ -138,6 +144,24 @@
                                 </div>
                             </setting>
                         </block>
+                        <block title="Official Notice Letter &amp; Branding Settings" id="discipline_branding_settings">
+                            <setting id="discipline_notice_language_setting" string="Default Notice Letter Language" help="Official standard language for disciplinary warning letters and notice memos across the bank.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_notice_language" class="col-lg-5 o_light_label"/>
+                                        <field name="discipline_notice_language" class="col-lg-4"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="discipline_bank_stamp_setting" string="Official Circular Bank Stamp" help="Upload the official circular Bunna Bank seal once. It will be automatically stamped onto all formal warning and decision letters across the bank.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_bank_stamp" class="col-lg-4 o_light_label"/>
+                                        <field name="discipline_bank_stamp" widget="image" class="col-lg-4" style="max-width: 140px;"/>
+                                    </div>
+                                </div>
+                            </setting>
+                        </block>
                     </app>
                 </xpath>
             </field>
@@ -150,6 +174,27 @@
             <field name="view_mode">form</field>
             <field name="target">current</field>
             <field name="context">{'module' : 'discipline_management', 'bin_size': False}</field>
+        </record>
+
+        <!-- Executive Assistant & Secretary Mapping in User Form -->
+        <record id="view_users_form_discipline_inherit" model="ir.ui.view">
+            <field name="name">res.users.form.discipline.inherit</field>
+            <field name="model">res.users</field>
+            <field name="inherit_id" ref="base.view_users_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//notebook" position="inside">
+                    <page string="Discipline Governance" groups="discipline_management.group_discipline_admin,base.group_erp_manager,discipline_management.group_discipline_secretary">
+                        <group>
+                            <group string="Executive Assistant Mapping">
+                                <field name="discipline_assigned_executive_id" string="Assigned Executive Principal"/>
+                            </group>
+                            <group string="Saved Digital Signature">
+                                <field name="discipline_digital_signature" widget="image"/>
+                            </group>
+                        </group>
+                    </page>
+                </xpath>
+            </field>
         </record>
     </data>
 </odoo>

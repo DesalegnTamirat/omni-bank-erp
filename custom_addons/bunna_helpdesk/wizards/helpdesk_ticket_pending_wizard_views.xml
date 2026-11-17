@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_helpdesk_ticket_pending_wizard_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.pending.wizard.form</field>
+        <field name="model">helpdesk.ticket.pending.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Ticket In-Progress - Reason &amp; Findings" class="o_helpdesk_wizard">
+                <sheet>
+                    <div class="alert alert-warning py-2 mb-3" role="alert">
+                        <i class="fa fa-clock-o me-1" title="In-Progress Notice" aria-label="In-Progress Notice" />
+                        <strong>In-Progress Notice:</strong> Reflects cases that require additional time to resolve. Select a mandatory In-Progress Reason and document the actions taken so far.
+                    </div>
+                    <group>
+                        <group string="Ticket Information">
+                            <field name="ticket_id" invisible="1" />
+                            <field name="target_stage_id" invisible="1" />
+                            <field name="ticket_number" string="Ticket #" />
+                            <field name="ticket_name" string="Sub Service" />
+                            <field name="current_stage_id" string="Current Stage" />
+                        </group>
+                    </group>
+                    <group string="In-Progress Reason &amp; Findings">
+                        <field
+                            name="pending_reason_type"
+                            widget="selection"
+                            string="In-Progress Reason"
+                            required="1"
+                        />
+                        <field
+                            name="pending_reason"
+                            string="Reason Summary"
+                            placeholder="e.g. Waiting for Customer Information / KYC / Documents..."
+                            required="1"
+                        />
+                        <field
+                            name="pending_notes"
+                            string="In-Progress Findings &amp; Details"
+                            placeholder="Detail what is required, actions taken, contact attempts made, and expected next action..."
+                            required="1"
+                        />
+                    </group>
+                </sheet>
+                <footer>
+                    <button
+                        name="action_confirm_pending"
+                        type="object"
+                        string="Confirm In-Progress Status"
+                        class="btn-warning text-dark fw-bold"
+                    />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_helpdesk_ticket_pending_wizard" model="ir.actions.act_window">
+        <field name="name">Ticket In-Progress</field>
+        <field name="res_model">helpdesk.ticket.pending.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

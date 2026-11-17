@@ -41,10 +41,11 @@
     <!-- ── Roles ─────────────────────────────────────────────────── -->
 
 
-    <!-- Manager: sees their direct reports' requests -->
+    <!-- Manager: kept for DB compatibility — no privilege_id so it does NOT appear
+         in user settings. Any employee's coach (or direct manager) acts as their manager automatically. -->
     <record id="group_resignation_manager" model="res.groups">
-        <field name="name">Manager</field>
-        <field name="privilege_id" ref="privilege_hr_resignation"/>
+        <field name="name">Manager (Legacy)</field>
+        <field name="privilege_id" eval="False"/>
         <field name="implied_ids" eval="[
             (4, ref('base.group_user')),
         ]"/>
@@ -122,17 +123,17 @@
          separate groups prevents accidental cross-visibility.
     ════════════════════════════════════════════════════════════════ -->
 
-    <!-- Employees see only their own requests -->
-    <record id="hr_resignation_rule_employee" model="ir.rule">
-        <field name="name">Resignation: Employee sees own records</field>
-        <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
-        <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
-        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
-        <field name="perm_read"   eval="True"/>
-        <field name="perm_write"  eval="True"/>
-        <field name="perm_create" eval="True"/>
-        <field name="perm_unlink" eval="False"/>
-    </record>
+    <!-- Employees see own requests, and managers/coaches see direct reports -->
+<record id="hr_resignation_rule_employee" model="ir.rule">
+    <field name="name">Resignation: Employee sees own records and team</field>
+    <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
+    <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('coach_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('clearance_line_ids.work_unit_id.manager_id.user_id', '=', user.id)]</field>
+    <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    <field name="perm_read"   eval="True"/>
+    <field name="perm_write"  eval="True"/>
+    <field name="perm_create" eval="True"/>
+    <field name="perm_unlink" eval="True"/> <!-- Changed from False to True -->
+</record>
 
     <!--
         Clearance Officers see hr.resignation records where they are
@@ -162,7 +163,7 @@
     <record id="hr_resignation_rule_manager" model="ir.rule">
         <field name="name">Resignation: Manager sees team requests and managed clearance</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
-        <field name="domain_force">['|', ('coach_id.user_id', '=', user.id), ('clearance_line_ids.work_unit_id.manager_id.user_id', '=', user.id)]</field>
+        <field name="domain_force">['|', '|', ('coach_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('clearance_line_ids.work_unit_id.manager_id.user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_manager'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
@@ -199,7 +200,7 @@
     <record id="hr_resignation_rule_hr_manager_team" model="ir.rule">
         <field name="name">Resignation: HR Manager sees own direct reports at all states</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
-        <field name="domain_force">[('coach_id.user_id', '=', user.id)]</field>
+        <field name="domain_force">['|', ('coach_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_hr_manager'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
@@ -212,7 +213,19 @@
         <field name="name">Resignation: HR sees all records</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
         <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_hr_manager'))]"/>
+        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_hr_manager')), (4, ref('hr.group_hr_manager'))]"/>
+    </record>
+
+    <!-- Acting Delegate sees delegated resignations -->
+    <record id="hr_resignation_rule_delegate" model="ir.rule">
+        <field name="name">Resignation: Delegate sees delegated resignations</field>
+        <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
+        <field name="domain_force">[('id', 'in', user.env['hr.resignation']._get_delegation_visible_resignation_ids())]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read"   eval="True"/>
+        <field name="perm_write"  eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
     </record>
 
     <!-- ════════════════════════════════════════════════════════════════
@@ -242,12 +255,12 @@
         <field name="perm_unlink" eval="False"/>
     </record>
 
-    <!-- Manager sees clearance lines for their team OR lines they need to approve as work unit manager -->
+    <!-- Coach and manager see clearance lines for their team OR lines they manage -->
     <record id="hr_clearance_rule_manager" model="ir.rule">
-        <field name="name">Clearance Line: Manager sees team's lines OR lines they manage</field>
+        <field name="name">Clearance Line: Coach/Manager sees team lines OR lines they manage</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance"/>
-        <field name="domain_force">['|', ('resignation_id.coach_id.user_id', '=', user.id), ('work_unit_id.manager_id.user_id', '=', user.id)]</field>
-        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_manager'))]"/>
+        <field name="domain_force">['|', '|', ('resignation_id.coach_id.user_id', '=', user.id), ('resignation_id.employee_id.parent_id.user_id', '=', user.id), ('work_unit_id.manager_id.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
         <field name="perm_create" eval="False"/>
@@ -292,6 +305,18 @@
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance"/>
         <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+    </record>
+
+    <!-- Acting Delegate sees delegated clearance lines -->
+    <record id="hr_clearance_rule_delegate" model="ir.rule">
+        <field name="name">Clearance Line: Delegate sees delegated lines</field>
+        <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance"/>
+        <field name="domain_force">[('id', 'in', user.env['hr.resignation.clearance']._get_delegation_visible_clearance_ids())]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read"   eval="True"/>
+        <field name="perm_write"  eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
     </record>
 
 
@@ -353,10 +378,10 @@
     </record>
 
     <record id="hr_clearance_item_rule_manager" model="ir.rule">
-        <field name="name">Clearance Item: Manager sees team's items OR items they manage</field>
+        <field name="name">Clearance Item: Coach/Manager sees team's items OR items they manage</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_line_item"/>
-        <field name="domain_force">['|', ('clearance_line_id.resignation_id.coach_id.user_id', '=', user.id), ('clearance_line_id.work_unit_id.manager_id.user_id', '=', user.id)]</field>
-        <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_manager'))]"/>
+        <field name="domain_force">['|', '|', '|', ('clearance_line_id.resignation_id.coach_id.user_id', '=', user.id), ('clearance_line_id.resignation_id.employee_id.parent_id.user_id', '=', user.id), ('clearance_line_id.work_unit_id.manager_id.user_id', '=', user.id), ('clearance_line_id.responsible_user', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
         <field name="perm_create" eval="False"/>
@@ -402,6 +427,18 @@
         <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
     </record>
 
+    <!-- Acting Delegate sees delegated clearance items -->
+    <record id="hr_clearance_item_rule_delegate" model="ir.rule">
+        <field name="name">Clearance Item: Delegate sees delegated items</field>
+        <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_line_item"/>
+        <field name="domain_force">[('id', 'in', user.env['hr.resignation.clearance.line.item']._get_delegation_visible_item_ids())]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read"   eval="True"/>
+        <field name="perm_write"  eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
 
 
     <!-- ════════════════════════════════════════════════════════════════
@@ -439,6 +476,22 @@
         <field name="model_id" ref="hr_resignation.model_hr_exit_interview"/>
         <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+        <field name="perm_read"   eval="True"/>
+        <field name="perm_write"  eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- HR Manager, Admin, and Auditor see all exit interviews -->
+    <record id="hr_exit_interview_rule_hr_manager" model="ir.rule">
+        <field name="name">Exit Interview: HR Manager, Admin, and Auditor see all</field>
+        <field name="model_id" ref="hr_resignation.model_hr_exit_interview"/>
+        <field name="domain_force">[]</field>
+        <field name="groups" eval="[
+            (4, ref('hr_resignation.group_resignation_hr_manager')),
+            (4, ref('hr_resignation.group_resignation_admin')),
+            (4, ref('hr_resignation.group_resignation_auditor')),
+        ]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
         <field name="perm_create" eval="True"/>

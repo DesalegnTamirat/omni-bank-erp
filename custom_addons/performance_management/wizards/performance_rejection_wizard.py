@@ -36,6 +36,7 @@ class PerformanceRejectionWizard(models.TransientModel):
         record.write({
             'state': 'rejected',
             'rejection_reason': reason_text,
+            'manager_rejection_reply': False,
         })
 
         # Clear existing activities for employee

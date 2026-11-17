@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.documents.lite</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Documents" string="Documents" name="documents_lite" groups="documents_lite.group_dms_manager">
+                    
+                    <block title="File Sizing &amp; Upload Limits" name="dms_file_size_limits_block">
+                        <setting string="Maximum File Size (MB)" help="Configure maximum upload size in megabytes for all documents across the system.">
+                            <div class="content-group">
+                                <div class="mt8">
+                                    <field name="dms_max_file_size_mb" class="oe_inline" style="width: 80px;"/>
+                                    <span class="o_form_label ms-2">MB</span>
+                                </div>
+                            </div>
+                        </setting>
+
+                        <setting string="Maximum Files Per Folder" help="Enforce limit on maximum number of documents allowed per folder to maintain optimal performance and indexing (0 for unlimited).">
+                            <div class="content-group">
+                                <div class="mt8">
+                                    <field name="dms_max_files_per_folder" class="oe_inline" style="width: 80px;"/>
+                                    <span class="o_form_label ms-2">Files</span>
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+
+                    <block title="Allowed File Types" name="dms_file_types_block">
+                        <setting string="Allowed File Extensions" help="Specify the file extensions users are permitted to upload. Comma-separated (e.g. pdf, docx, xlsx, png, jpg).">
+                            <div class="content-group">
+                                <div class="mt8">
+                                    <field name="dms_allowed_extensions" placeholder="pdf, png, jpg, jpeg, docx, xlsx, pptx, txt, csv" class="w-100"/>
+                                </div>
+                                <div class="text-muted small mt4">
+                                    Supported formats: PDF, Images (PNG, JPG, JPEG, GIF, WEBP, BMP), Office (DOC, DOCX, XLS, XLSX, PPT, PPTX, ODT, ODS, ODP, RTF), Text (TXT, CSV).
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+
+                    <block title="Database Storage Optimization" name="dms_storage_optimization_block">
+                        <setting string="Filestore Binary Storage" help="Store document binaries in the file store with SHA1 checksum deduplication instead of storing huge base64 bytea records directly in the database. Improves PostgreSQL performance, backup speed, and vacuuming.">
+                            <field name="dms_storage_optimization"/>
+                        </setting>
+                    </block>
+
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_dms_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module': 'documents_lite', 'bin_size': False}</field>
+    </record>
+</odoo>

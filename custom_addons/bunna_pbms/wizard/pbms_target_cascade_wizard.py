@@ -10,6 +10,7 @@ import logging
 from markupsafe import Markup
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools.float_utils import float_is_zero
 from ..models.pbms_plan_line_mixin import MONTH_FIELDS
 
 _logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class PbmsTargetCascadeWizard(models.TransientModel):
             ("new_acquisition", "New Customer Acquisition"),
             ("dormant_reduction", "Dormant Account Reduction"),
         ],
-        string="Customer Base Type", default="new_acquisition",
+        string="Customer Category", default="new_acquisition",
     )
 
     distribution_method = fields.Selection(
@@ -140,18 +141,18 @@ class PbmsTargetCascadeWizard(models.TransientModel):
             "digital_banking": plan.digital_banking_approved_total or plan.digital_banking_annual_total,
             "general_expense": plan.expense_approved_total or plan.expense_annual_total,
         }
-        if category in cat_summary_map and cat_summary_map[category] > 0:
+        if category in cat_summary_map and not float_is_zero(cat_summary_map[category] or 0.0, precision_digits=2):
             return float(cat_summary_map[category])
 
         # Fallback to lines sum
         tot_appr = sum(lines.mapped("approved_annual_total"))
-        if tot_appr > 0:
+        if not float_is_zero(tot_appr, precision_digits=2):
             return float(tot_appr)
         tot_ann = sum(lines.mapped("annual_total"))
-        if tot_ann > 0:
+        if not float_is_zero(tot_ann, precision_digits=2):
             return float(tot_ann)
         tot_prop = sum(lines.mapped("proposed_annual_total"))
-        if tot_prop > 0:
+        if not float_is_zero(tot_prop, precision_digits=2):
             return float(tot_prop)
         return 0.0
 
@@ -184,6 +185,14 @@ class PbmsTargetCascadeWizard(models.TransientModel):
 
             lines = plan.line_ids.filtered(lambda l: l.line_type == category)
             deposit_type = lines.mapped("deposit_type_id")[:1]
+            if not deposit_type and category == "customer_base":
+                cust_type = lines.mapped("customer_type_id")[:1]
+                if cust_type:
+                    found_dep = self.env["pbms.deposit.type"].search([
+                        "|", ("code", "=", cust_type.code), ("name", "=", cust_type.name)
+                    ], limit=1)
+                    if found_dep:
+                        deposit_type = found_dep
             if deposit_type:
                 res["deposit_type_id"] = deposit_type.id
 
@@ -273,6 +282,12 @@ class PbmsTargetCascadeWizard(models.TransientModel):
         elif self.category == "customer_base":
             if not self.deposit_type_id or self.deposit_type_id not in lines.mapped("deposit_type_id"):
                 dep_type = lines.mapped("deposit_type_id")[:1]
+                if not dep_type:
+                    cust_type = lines.mapped("customer_type_id")[:1]
+                    if cust_type:
+                        dep_type = self.env["pbms.deposit.type"].search([
+                            "|", ("code", "=", cust_type.code), ("name", "=", cust_type.name)
+                        ], limit=1)
                 self.deposit_type_id = dep_type.id if dep_type else False
         elif self.category == "fx":
             if not self.fx_source_type or self.fx_source_type not in lines.mapped("fx_source_type"):
@@ -380,6 +395,7 @@ class PbmsTargetCascadeWizard(models.TransientModel):
             lines_by_plan[l.plan_id.id] |= l
         # ─────────────────────────────────────────────────────────────────────
 
+        planned_unit_ids = set()
         baselines = {}
         for unit in recipient_units:
             uid = unit.id
@@ -396,7 +412,10 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                     unit_lines = unit_lines.filtered(lambda l: l.deposit_type_id == deposit_type)
                 elif category == "customer_base":
                     if deposit_type:
-                        unit_lines = unit_lines.filtered(lambda l: l.deposit_type_id == deposit_type)
+                        unit_lines = unit_lines.filtered(
+                            lambda l: (l.deposit_type_id and l.deposit_type_id == deposit_type)
+                            or (l.customer_type_id and (l.customer_type_id.code == deposit_type.code or l.customer_type_id.name == deposit_type.name))
+                        )
                     if base_type:
                         unit_lines = unit_lines.filtered(lambda l: l.base_type == base_type)
                 elif category == "fx" and fx_source:
@@ -408,6 +427,7 @@ class PbmsTargetCascadeWizard(models.TransientModel):
 
             total_val = 0.0
             if unit_lines:
+                planned_unit_ids.add(uid)
                 for l in unit_lines:
                     val = (
                         l.annual_total
@@ -418,17 +438,22 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                     )
                     total_val += val
 
-            if total_val <= 0.0 and unit_plans:
+            if float_is_zero(total_val, precision_digits=2) and unit_plans:
                 cat_summary_field = f"{category}_annual_total"
                 cat_prop_field = f"{category}_proposed_total"
-                total_val = sum(getattr(p, cat_summary_field, 0.0) or getattr(p, cat_prop_field, 0.0) or 0.0 for p in unit_plans)
+                for p in unit_plans:
+                    s_val = getattr(p, cat_summary_field, 0.0) or getattr(p, cat_prop_field, 0.0) or 0.0
+                    if not float_is_zero(s_val, precision_digits=2):
+                        planned_unit_ids.add(uid)
+                        total_val += s_val
 
             baselines[unit.id] = total_val
 
-        total_baseline = sum(baselines.values())
-
-        # Only cascade to units that have planned their plan (baseline > 0.0)
-        planned_units = [u for u in recipient_units if baselines.get(u.id, 0.0) > 0.0]
+        # Only cascade to units that have actually planned their plan (have lines or non-zero baseline)
+        planned_units = [
+            u for u in recipient_units
+            if u.id in planned_unit_ids or not float_is_zero(baselines.get(u.id, 0.0), precision_digits=2)
+        ]
         if planned_units:
             effective_units = planned_units
         else:
@@ -436,11 +461,18 @@ class PbmsTargetCascadeWizard(models.TransientModel):
             effective_units = recipient_units
 
         unit_count = len(effective_units)
+        total_baseline = sum(baselines.get(u.id, 0.0) for u in effective_units)
         lines_data = []
 
         for unit in effective_units:
             base_amt = baselines.get(unit.id, 0.0)
-            if method == "proportional" and total_baseline > 0:
+            if unit_count == 1:
+                pct = 100.0
+                alloc_amt = total_target
+            elif method == "proportional" and not float_is_zero(total_baseline, precision_digits=2) and (
+                (total_baseline > 0 and all(baselines.get(u.id, 0.0) >= 0 for u in effective_units)) or
+                (total_baseline < 0 and all(baselines.get(u.id, 0.0) <= 0 for u in effective_units))
+            ):
                 pct = (base_amt / total_baseline) * 100.0
                 alloc_amt = (total_target * (pct / 100.0))
             elif method == "equal" and unit_count > 0:
@@ -485,6 +517,57 @@ class PbmsTargetCascadeWizard(models.TransientModel):
             "target": "new",
         }
 
+    def _get_cascade_unit_manager(self, unit):
+        """Resolve ONLY the manager user for target cascading notification.
+        - ho_to_district: District Manager of the recipient district office.
+        - district_to_branch: Branch Manager of the recipient branch.
+        Strictly excludes other employees, reviewers, or team members of that unit.
+        """
+        if not unit:
+            return self.env["res.users"]
+
+        unit_sudo = unit.sudo()
+        mgr_user = self.env["res.users"]
+
+        # 1. Primary: operating.unit.manager_id (hr.employee) -> user_id
+        if hasattr(unit_sudo, "manager_id") and unit_sudo.manager_id:
+            emp = unit_sudo.manager_id
+            if emp.user_id and emp.user_id.active:
+                mgr_user = emp.user_id
+            else:
+                user = self.env["res.users"].sudo().search([
+                    ("active", "=", True),
+                    "|",
+                    ("employee_id", "=", emp.id),
+                    ("employee_ids", "in", [emp.id]),
+                ], limit=1)
+                if user:
+                    mgr_user = user
+
+        # 2. Check manager_user_id on operating.unit if defined
+        if not mgr_user and hasattr(unit_sudo, "manager_user_id") and unit_sudo.manager_user_id and unit_sudo.manager_user_id.active:
+            mgr_user = unit_sudo.manager_user_id
+
+        # 3. Check hr.department manager if unit is mapped to department
+        if not mgr_user and hasattr(unit_sudo, "department_id") and unit_sudo.department_id and unit_sudo.department_id.manager_id:
+            d_emp = unit_sudo.department_id.manager_id
+            if d_emp.user_id and d_emp.user_id.active:
+                mgr_user = d_emp.user_id
+
+        # 4. Search hr.employee manager for this unit
+        if not mgr_user:
+            emp_mgr = self.env["hr.employee"].sudo().search([
+                ("operating_unit_id", "=", unit.id),
+                ("user_id", "!=", False),
+                ("active", "=", True),
+            ], order="id asc", limit=1)
+            if emp_mgr and emp_mgr.user_id and emp_mgr.user_id.active:
+                mgr_user = emp_mgr.user_id
+
+        if mgr_user and mgr_user.active and mgr_user._pbms_has_access():
+            return mgr_user
+        return self.env["res.users"]
+
     def action_apply_cascade(self):
         """Apply the cascaded targets to each recipient operating unit's plan."""
         self.ensure_one()
@@ -522,7 +605,10 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                 source_lines = source_lines.filtered(lambda l: l.deposit_type_id == self.deposit_type_id)
             elif self.category == "customer_base":
                 if self.deposit_type_id:
-                    source_lines = source_lines.filtered(lambda l: l.deposit_type_id == self.deposit_type_id)
+                    source_lines = source_lines.filtered(
+                        lambda l: (l.deposit_type_id and l.deposit_type_id == self.deposit_type_id)
+                        or (l.customer_type_id and (l.customer_type_id.code == self.deposit_type_id.code or l.customer_type_id.name == self.deposit_type_id.name))
+                    )
                 if self.base_type:
                     source_lines = source_lines.filtered(lambda l: l.base_type == self.base_type)
             elif self.category == "fx" and self.fx_source_type:
@@ -556,12 +642,17 @@ class PbmsTargetCascadeWizard(models.TransientModel):
 
         # ── OPTIMIZATION: Batch-prefetch all recipient plans + lines (2 queries) ──
         all_unit_ids = self.line_ids.mapped("org_unit_id").ids
-        all_rec_plans = Plan.search([
+        rec_domain = [
             ("cycle_id", "=", self.cycle_id.id),
             ("org_unit_id", "in", all_unit_ids),
             ("category", "=", self.category),
             ("active", "=", True),
-        ])
+        ]
+        if self.cascade_level == "ho_to_district":
+            rec_domain.append(("is_consolidated_district_plan", "=", True))
+        elif self.cascade_level == "district_to_branch":
+            rec_domain.extend([("is_consolidated_district_plan", "=", False), ("is_consolidated_ho_plan", "=", False)])
+        all_rec_plans = Plan.search(rec_domain)
         rec_plans_by_unit = {}
         for rp in all_rec_plans:
             rec_plans_by_unit[rp.org_unit_id.id] = rp
@@ -615,6 +706,7 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                     "org_unit_id": unit.id,
                     "category": self.category,
                     "state": "draft" if self.cascade_level == "district_to_branch" else "district_approved",
+                    "is_consolidated_district_plan": (self.cascade_level == "ho_to_district"),
                     "active": True,
                 })
                 rec_plans_by_unit[unit.id] = rec_plan
@@ -645,14 +737,10 @@ class PbmsTargetCascadeWizard(models.TransientModel):
 
                 if existing_lines:
                     target_line = existing_lines[0]
-                    # Snapshot proposed targets if not already snapshotted
-                    if hasattr(target_line, "_snapshot_proposed_targets"):
-                        target_line._snapshot_proposed_targets()
-
                     # Preserve the original proposed target as the baseline
                     orig_proposed = target_line.proposed_annual_total or target_line.annual_total or 0.0
 
-                    # Update both active monthly targets and approved target fields on the existing row
+                    # Update both active monthly targets and approved target fields on the existing row (DO NOT alter proposed targets!)
                     update_vals = {
                         "is_cascaded": True,
                         "annual_total": prod_alloc_total,
@@ -663,10 +751,6 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                     }
                     if self.category == "deposit" and getattr(s_line, "opening_balance", False):
                         update_vals["approved_opening_balance"] = round((getattr(s_line, "approved_opening_balance", 0.0) or s_line.opening_balance or 0.0) * unit_pct, 2)
-
-                    for m in MONTH_FIELDS:
-                        if not getattr(target_line, f"proposed_{m}", False):
-                            update_vals[f"proposed_{m}"] = getattr(target_line, m, 0.0) or 0.0
 
                     target_line.write(update_vals)
 
@@ -680,12 +764,13 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                         "plan_id": rec_plan.id,
                         "line_type": self.category,
                         "deposit_type_id": s_line.deposit_type_id.id if s_line.deposit_type_id else False,
+                        "customer_type_id": s_line.customer_type_id.id if (self.category == "customer_base" and hasattr(s_line, "customer_type_id") and s_line.customer_type_id) else False,
                         "channel_id": s_line.channel_id.id if s_line.channel_id else False,
                         "fx_source_type": s_line.fx_source_type.id if s_line.fx_source_type else False,
                         "expense_account_id": s_line.expense_account_id.id if s_line.expense_account_id else False,
                         "base_type": s_line.base_type if self.category == "customer_base" else False,
                         "is_cascaded": True,
-                        "proposed_annual_total": prod_alloc_total,
+                        "proposed_annual_total": 0.0,
                         "annual_total": prod_alloc_total,
                         "approved_annual_total": prod_alloc_total,
                         **m_vals,
@@ -716,131 +801,75 @@ class PbmsTargetCascadeWizard(models.TransientModel):
             updated_plans |= rec_plan
 
             # ── Notification data (built in-loop but email deferred) ─────────
-            currency_sym = rec_plan.currency_id.symbol or "ETB"
+            is_monetary = getattr(rec_plan, "is_category_monetary", True)
+            if self.category in ("customer_base", "manpower") or not is_monetary:
+                currency_sym = ""
+            else:
+                sym = rec_plan.currency_id.symbol or "ETB"
+                currency_sym = "" if sym == "$" else sym
             formatted_amt = "{:,.2f}".format(wizard_line.allocated_amount)
-
-            action_url = f"{base_url}/web#id={rec_plan.id}&model=pbms.planning.category&view_type=form"
-            card_table_html = f"""
-                <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #FAFAFA; border-radius: 6px;">
-                    <tr style="border-bottom: 1px solid #EEEEEE;">
-                        <td style="padding: 10px; font-weight: bold; width: 35%; color: #555555;">Work Unit:</td>
-                        <td style="padding: 10px; font-weight: bold; color: #541718;">{unit.display_name}</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #EEEEEE;">
-                        <td style="padding: 10px; font-weight: bold; color: #555555;">Category:</td>
-                        <td style="padding: 10px;">{cat_name}</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #EEEEEE;">
-                        <td style="padding: 10px; font-weight: bold; color: #555555;">Product / Metric:</td>
-                        <td style="padding: 10px; font-weight: bold; color: #425727;">{product_label}</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #EEEEEE;">
-                        <td style="padding: 10px; font-weight: bold; color: #555555;">Allocated Target:</td>
-                        <td style="padding: 10px; font-weight: bold; color: #198754; font-size: 15px;">{formatted_amt} {currency_sym}</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #EEEEEE;">
-                        <td style="padding: 10px; font-weight: bold; color: #555555;">Allocation Share:</td>
-                        <td style="padding: 10px; font-weight: bold; color: #C17540;">{wizard_line.allocation_percentage:.2f}%</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #EEEEEE;">
-                        <td style="padding: 10px; font-weight: bold; color: #555555;">Source Unit:</td>
-                        <td style="padding: 10px;">{source_name}</td>
-                    </tr>
-                </table>
-            """
-
-            full_email_body = f"""
-                <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
-                    <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
-                        <tr><td align="center">
-                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                                <tr><td style="padding-bottom: 20px; border-bottom: 2.5px solid #541718;">
-                                    <h2 style="color: #541718; margin: 0; font-weight: 700;">Bunna Bank - Plan &amp; Budget Management System</h2>
-                                    <p style="color: #C17540; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">🎯 Official Business Target Cascaded Notification</p>
-                                </td></tr>
-                                <tr><td style="padding: 20px 0;">
-                                    <p>Dear Colleague / Unit Manager,</p>
-                                    <p>Official business targets have been allocated and cascaded to <b>{unit.display_name}</b> for the <b>{self.cycle_id.name}</b> planning cycle.</p>
-                                    {card_table_html}
-                                    <p style="margin-top: 16px;">The approved annual and monthly targets have been populated and updated in your planning matrix.</p>
-                                    <div style="text-align: center; margin: 30px 0;">
-                                        <a href="{action_url}" style="background-color: #541718; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
-                                            View Planning Matrix
-                                        </a>
-                                    </div>
-                                </td></tr>
-                                <tr><td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
-                                    Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD)<br/>
-                                    This is an automated system notification from Bunna PBMS.
-                                </td></tr>
-                            </table>
-                        </td></tr>
-                    </table>
-                </div>
-            """
+            target_display = f"{formatted_amt} {currency_sym}".strip() if currency_sym else formatted_amt
 
             subject = _("🎯 Official Target Cascaded: %s - %s (%s)") % (
                 cat_name, unit.display_name, self.cycle_id.name
             )
 
-            # Post Bunna Bank branded template card to chatter
+            cascade_note = _(
+                "Official target of %(target)s (%(pct).2f%% share) has been allocated and cascaded to %(unit)s for %(product)s by %(source)s."
+            ) % {
+                "target": target_display,
+                "pct": wizard_line.allocation_percentage,
+                "unit": unit.display_name,
+                "product": product_label,
+                "source": source_name,
+            }
+
+            # Post clean, simple log note to chatter without bulky HTML template card
             rec_plan.message_post(
-                subject=subject,
-                body=Markup(full_email_body),
+                body=Markup(f"<p>{cascade_note}</p>"),
                 message_type="notification",
                 subtype_xmlid="mail.mt_note",
             )
 
-            # ── OPTIMIZATION: Collect email for async send (no blocking SMTP per unit) ──
-            rec_users = self.env["res.users"]
-            if self.cascade_level == "ho_to_district":
-                dist_reviewers = self.plan_id._get_users_with_group("bunna_pbms.group_pbms_district_reviewer").filtered(
-                    lambda u: u.active and (unit.id in u._pbms_operating_unit_ids() or not u.assigned_operating_unit_ids)
-                )
-                rec_users |= dist_reviewers
+            # ── Target Cascading Notifications: ONLY to District Manager (when ho_to_district) or Branch Manager (when district_to_branch) ──
+            # Strictly do not notify all employees, team members, or other reviewers in the unit.
+            mgr_user = self._get_cascade_unit_manager(unit)
+            if mgr_user and mgr_user.active and mgr_user._pbms_has_access():
+                rec_users = mgr_user
             else:
-                branch_planners = self.plan_id._get_users_with_group("bunna_pbms.group_pbms_branch_user").filtered(
-                    lambda u: u.active and (unit.id in u._pbms_operating_unit_ids() or not u.assigned_operating_unit_ids)
-                )
-                rec_users |= branch_planners
-
-            if rec_plan.submitted_by:
-                rec_users |= rec_plan.submitted_by
-            if rec_plan.create_uid:
-                rec_users |= rec_plan.create_uid
-            if unit:
-                mgr = self.plan_id._get_unit_manager_user(unit)
-                if mgr:
-                    rec_users |= mgr
-                if hasattr(unit, "user_ids") and unit.user_ids:
-                    rec_users |= unit.user_ids
-                unit_assigned_users = self.env["res.users"].search([
-                    ("active", "=", True),
-                    "|",
-                    ("assigned_operating_unit_ids", "in", [unit.id]),
-                    ("default_operating_unit_id", "=", unit.id),
-                ])
-                rec_users |= unit_assigned_users
+                # Safe fallback only if no manager with PBMS access is assigned to the unit: notify plan owner if they have PBMS access
+                rec_users = (rec_plan.submitted_by if rec_plan.submitted_by and rec_plan.submitted_by.active and rec_plan.submitted_by._pbms_has_access() else False) or                             (rec_plan.create_uid if rec_plan.create_uid and rec_plan.create_uid.active and rec_plan.create_uid._pbms_has_access() else self.env["res.users"])
 
             rec_partners = rec_users.mapped("partner_id")
+
+            if rec_users:
+                from odoo.addons.bunna_pbms.models.pbms_access import send_pbms_inbox_notification
+                send_pbms_inbox_notification(
+                    self.env,
+                    rec_plan,
+                    rec_users,
+                    subject,
+                    Markup(f"<p>{cascade_note}</p>"),
+                )
 
             if rec_partners:
                 mail_vals_list.append({
                     "subject": subject,
-                    "body_html": full_email_body,
+                    "body_html": f"<p>{cascade_note}</p>",
                     "recipient_ids": [(6, 0, rec_partners.ids)],
                     "auto_delete": True,
                 })
 
-            # Schedule Activity in the Clock Systray icon for recipient work unit users
+            # Schedule Activity in the Clock Systray icon ONLY for the recipient unit manager
             if rec_users and hasattr(rec_plan, "_schedule_pbms_activity"):
                 cascade_action_label = _("Review & Cascade Target to Branches") if self.cascade_level == "ho_to_district" else _("Review Cascaded Annual Target")
+                # Clear any previous duplicate activities on this recipient plan
+                rec_plan._clear_pbms_activities()
                 rec_plan._schedule_pbms_activity(
                     users=rec_users,
                     summary=_("%s: %s (%s)") % (cascade_action_label, product_label, unit.display_name),
-                    note=_("Official target of %s %s (%.2f%% share) has been allocated to %s by %s. Please review and cascade as applicable.") % (
-                        formatted_amt,
-                        currency_sym,
+                    note=_("Official target of %s (%.2f%% share) has been allocated to %s by %s. Please review and cascade as applicable.") % (
+                        target_display,
                         wizard_line.allocation_percentage,
                         unit.display_name,
                         source_name,
@@ -854,10 +883,9 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                         self.env["bus.bus"]._sendone(partner, "simple_notification", {
                             "type": "info",
                             "title": _("🎯 Target Cascaded: %s") % product_label,
-                            "message": _("%s has been allocated %s %s (%.2f%%) for %s.") % (
+                            "message": _("%s has been allocated %s (%.2f%%) for %s.") % (
                                 unit.display_name,
-                                formatted_amt,
-                                currency_sym,
+                                target_display,
                                 wizard_line.allocation_percentage,
                                 cat_name,
                             ),
@@ -900,6 +928,7 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                 ),
                 "type": "success",
                 "sticky": False,
+                "next": {"type": "ir.actions.act_window_close"},
             },
         }
 
@@ -914,8 +943,17 @@ class PbmsTargetCascadeWizard(models.TransientModel):
             if s_line.deposit_type_id:
                 matched = matched.filtered(lambda l: l.deposit_type_id.id == s_line.deposit_type_id.id)
         elif category == "customer_base":
-            if s_line.deposit_type_id:
-                matched = matched.filtered(lambda l: l.deposit_type_id.id == s_line.deposit_type_id.id)
+            if hasattr(s_line, "customer_type_id") and s_line.customer_type_id:
+                matched = matched.filtered(
+                    lambda l: (hasattr(l, "customer_type_id") and l.customer_type_id and l.customer_type_id.id == s_line.customer_type_id.id)
+                    or (l.deposit_type_id and s_line.deposit_type_id and l.deposit_type_id.id == s_line.deposit_type_id.id)
+                    or (hasattr(l, "customer_type_id") and l.customer_type_id and s_line.deposit_type_id and (l.customer_type_id.code == s_line.deposit_type_id.code or l.customer_type_id.name == s_line.deposit_type_id.name))
+                )
+            elif s_line.deposit_type_id:
+                matched = matched.filtered(
+                    lambda l: (l.deposit_type_id and l.deposit_type_id.id == s_line.deposit_type_id.id)
+                    or (hasattr(l, "customer_type_id") and l.customer_type_id and (l.customer_type_id.code == s_line.deposit_type_id.code or l.customer_type_id.name == s_line.deposit_type_id.name))
+                )
             if s_line.base_type:
                 matched = matched.filtered(lambda l: l.base_type == s_line.base_type)
         elif category == "fx":
@@ -975,5 +1013,5 @@ class PbmsTargetCascadeWizardLine(models.TransientModel):
 
     @api.onchange("allocated_amount")
     def _onchange_allocated_amount(self):
-        if self.wizard_id and self.wizard_id.total_target_amount and self.wizard_id.total_target_amount > 0:
+        if self.wizard_id and self.wizard_id.total_target_amount and not float_is_zero(self.wizard_id.total_target_amount, precision_digits=2):
             self.allocation_percentage = round((self.allocated_amount / self.wizard_id.total_target_amount) * 100.0, 2)

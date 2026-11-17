@@ -1,175 +1,126 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="hr_resignation.Dashboard">
-        <div class="o_resignation_dashboard pb-5">
-            <!-- Header -->
-            <div class="o_resignation_header d-flex justify-content-between align-items-center bg-white p-4 mb-4 shadow-sm rounded-bottom-4" style="border-bottom: 2px solid #e9ecef;">
-                <h2 class="m-0 font-weight-bold text-dark fs-3">Resignation Dashboard</h2>
+        <div class="o_resignation_dashboard">
+            <!-- Header matching Succession & Talent Dashboard style -->
+            <div class="o_succ_header">
+                <h1>Resignation Dashboard</h1>
+                <p>Employee Separation &amp; Clearance Overview</p>
             </div>
 
-            <div class="container-fluid px-4">
-                <!-- Section 1: Key Metrics -->
-                <h6 class="text-uppercase fw-bold text-muted mb-3 fs-7 letter-spacing-1">Key Metrics</h6>
-                <div class="row g-4 mb-4">
-                    
-                    <!-- Total Requests -->
-                    <div class="col-12 col-md-4 col-xl-2">
-                        <div t-on-click="onKpiClick" data-domain="all" class="o_stat_card card shadow-sm border-0 h-100 white-card p-2" style="cursor: pointer; background: #fff; border-radius: 0.75rem;">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div>
-                                        <h2 class="fw-bolder m-0 display-6 text-dark" t-esc="state.stats.total_requests || 0"/>
-                                        <div class="text-muted fw-bold mt-1 fs-6" style="white-space: nowrap;">Total Requests</div>
-                                    </div>
-                                    <div class="icon-circle icon-light-purple shadow-sm" style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background-color: #e5eadb; color: #425727;">
-                                        <i class="fa fa-folder-open-o"/>
-                                    </div>
-                                </div>
-                                <div class="trend-indicator text-muted fs-7 fw-bold" style="padding-top: 0.5rem; border-top: 1px solid #f3f4f6; margin-top: 0.5rem;">
-                                    <i class="fa fa-users me-1"/> All Time
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Draft / Submitted -->
-                    <div class="col-12 col-md-4 col-xl-2">
-                        <div t-on-click="onKpiClick" data-domain="draft" class="o_stat_card card shadow-sm border-0 h-100 white-card p-2" style="cursor: pointer; background: #fff; border-radius: 0.75rem;">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div>
-                                        <h2 class="fw-bolder m-0 display-6 text-dark" t-esc="state.stats.draft_requests || 0"/>
-                                        <div class="text-muted fw-bold mt-1 fs-6" style="white-space: nowrap;">Draft / Submitted</div>
-                                    </div>
-                                    <div class="icon-circle icon-light-blue shadow-sm" style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background-color: #f8ebe3; color: #c17540;">
-                                        <i class="fa fa-pencil"/>
-                                    </div>
-                                </div>
-                                <div class="trend-indicator text-muted fs-7 fw-bold" style="padding-top: 0.5rem; border-top: 1px solid #f3f4f6; margin-top: 0.5rem;">
-                                    <i class="fa fa-clock-o me-1"/> Pending Action
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-
-
-                    <!-- HR Approved -->
-                    <div class="col-12 col-md-4 col-xl-2">
-                        <div t-on-click="onKpiClick" data-domain="approved" class="o_stat_card card shadow-sm border-0 h-100 white-card p-2" style="cursor: pointer; background: #fff; border-radius: 0.75rem;">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div>
-                                        <h2 class="fw-bolder m-0 display-6 text-dark" t-esc="state.stats.approved || 0"/>
-                                        <div class="text-muted fw-bold mt-1 fs-6" style="white-space: nowrap;">HR Approved</div>
-                                    </div>
-                                    <div class="icon-circle shadow-sm" style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background-color: #ead3d4; color: #541718;">
-                                        <i class="fa fa-user-md"/>
-                                    </div>
-                                </div>
-                                <div class="trend-indicator text-danger fs-7 fw-bold" style="padding-top: 0.5rem; border-top: 1px solid #f3f4f6; margin-top: 0.5rem;">
-                                    <i class="fa fa-arrow-right me-1"/> To Clearance
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-
-
-                    <!-- Cleared (Awaiting Settlement) -->
-                    <div class="col-12 col-md-4 col-xl-2">
-                        <div t-on-click="onKpiClick" data-domain="cleared_awaiting_settlement" class="o_stat_card card shadow-sm border-0 h-100 white-card p-2" style="cursor: pointer; background: #fff; border-radius: 0.75rem;">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div>
-                                        <h2 class="fw-bolder m-0 display-6 text-dark" t-esc="state.stats.cleared_awaiting_settlement || 0"/>
-                                        <div class="text-muted fw-bold mt-1 fs-6" style="white-space: nowrap;">Cleared</div>
-                                    </div>
-                                    <div class="icon-circle shadow-sm" style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background-color: #fff3e0; color: #e65100;">
-                                        <i class="fa fa-hourglass-half"/>
-                                    </div>
-                                </div>
-                                <div class="trend-indicator text-warning fs-7 fw-bold" style="padding-top: 0.5rem; border-top: 1px solid #f3f4f6; margin-top: 0.5rem;">
-                                    <i class="fa fa-money me-1"/> Awaiting Settlement
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Completed -->
-                    <div class="col-12 col-md-4 col-xl-2">
-                        <div t-on-click="onKpiClick" data-domain="completed" class="o_stat_card card shadow-sm border-0 h-100 white-card p-2" style="cursor: pointer; background: #fff; border-radius: 0.75rem;">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div>
-                                        <h2 class="fw-bolder m-0 display-6 text-dark" t-esc="state.stats.completed_requests || 0"/>
-                                        <div class="text-muted fw-bold mt-1 fs-6" style="white-space: nowrap;">Completed</div>
-                                    </div>
-                                    <div class="icon-circle shadow-sm" style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background-color: #e8f5e9; color: #2e7d32;">
-                                        <i class="fa fa-check"/>
-                                    </div>
-                                </div>
-                                <div class="trend-indicator text-success fs-7 fw-bold" style="padding-top: 0.5rem; border-top: 1px solid #f3f4f6; margin-top: 0.5rem;">
-                                    <i class="fa fa-check-circle me-1"/> Fully Settled
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Overdue Clearances -->
-                    <div class="col-12 col-md-4 col-xl-2">
-                        <div t-on-click="onKpiClick" data-domain="overdue" class="o_stat_card card shadow-sm border-0 h-100 white-card p-2" style="cursor: pointer; background: #fff; border-radius: 0.75rem;">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div>
-                                        <h2 class="fw-bolder m-0 display-6 text-dark" t-esc="state.stats.overdue_clearances || 0"/>
-                                        <div class="text-muted fw-bold mt-1 fs-6" style="white-space: nowrap;">Overdue Clearance</div>
-                                    </div>
-                                    <div class="icon-circle shadow-sm" style="width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background-color: #fee2e2; color: #b91c1c;">
-                                        <i class="fa fa-exclamation"/>
-                                    </div>
-                                </div>
-                                <div class="trend-indicator text-danger fs-7 fw-bold" style="padding-top: 0.5rem; border-top: 1px solid #f3f4f6; margin-top: 0.5rem;">
-                                    <i class="fa fa-warning me-1"/> Needs Action
-                                </div>
-                            </div>
+            <!-- KPI Cards Row 1 -->
+            <div class="row o_succ_kpi_row mb-3">
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="o_succ_kpi_card o_card_primary" t-on-click="onKpiClick" data-domain="all" style="cursor: pointer;">
+                        <div class="o_kpi_icon"><i class="fa fa-folder-open-o"/></div>
+                        <div class="o_kpi_info">
+                            <h3><t t-esc="state.stats.total_requests || 0"/></h3>
+                            <span>Total Requests</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="row g-4 mb-5">
-                    <!-- Resignations By Type (Pie) -->
-                    <div class="col-md-4">
-                        <div class="card shadow-sm border-0 h-100 white-card p-3" style="background: #fff; border-radius: 0.75rem;">
-                            <div class="card-body">
-                                <h6 class="text-uppercase fw-bold text-muted mb-4 fs-7 letter-spacing-1">Resignations By Type</h6>
-                                <div style="height: 250px; position: relative;">
-                                    <t t-if="!state.charts.pie or !state.charts.pie.data or state.charts.pie.data.length == 0">
-                                        <div class="h-100 d-flex align-items-center justify-content-center text-muted">No Data Available</div>
-                                    </t>
-                                    <canvas t-ref="pieChartCanvas"></canvas>
-                                </div>
-                            </div>
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="o_succ_kpi_card o_card_warning" t-on-click="onKpiClick" data-domain="draft" style="cursor: pointer;">
+                        <div class="o_kpi_icon"><i class="fa fa-pencil"/></div>
+                        <div class="o_kpi_info">
+                            <h3><t t-esc="state.stats.draft_requests || 0"/></h3>
+                            <span>Draft / Submitted</span>
                         </div>
                     </div>
-
-                    <!-- Resignations By Department (Bar) -->
-                    <div class="col-md-8">
-                        <div class="card shadow-sm border-0 h-100 white-card p-3" style="background: #fff; border-radius: 0.75rem;">
-                            <div class="card-body">
-                                <h6 class="text-uppercase fw-bold text-muted mb-4 fs-7 letter-spacing-1">Resignations By Department</h6>
-                                <div style="height: 250px; position: relative;">
-                                    <t t-if="!state.charts.bar or !state.charts.bar.data or state.charts.bar.data.length == 0">
-                                        <div class="h-100 d-flex align-items-center justify-content-center text-muted">No Data Available</div>
-                                    </t>
-                                    <canvas t-ref="barChartCanvas"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
 
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="o_succ_kpi_card o_card_success" t-on-click="onKpiClick" data-domain="approved" style="cursor: pointer;">
+                        <div class="o_kpi_icon"><i class="fa fa-user-md"/></div>
+                        <div class="o_kpi_info">
+                            <h3><t t-esc="state.stats.approved || 0"/></h3>
+                            <span>HR Approved</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="o_succ_kpi_card" style="border-left-color: #726732; cursor: pointer;" t-on-click="onKpiClick" data-domain="clearance_in_progress">
+                        <div class="o_kpi_icon" style="color: #726732;"><i class="fa fa-hourglass-half"/></div>
+                        <div class="o_kpi_info">
+                            <h3><t t-esc="state.stats.clearance_in_progress || 0"/></h3>
+                            <span>Clearance In Progress</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI Cards Row 2 -->
+            <div class="row o_succ_kpi_row mb-4">
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="o_succ_kpi_card" style="border-left-color: #1e2917; cursor: pointer;" t-on-click="onKpiClick" data-domain="settlement_in_progress">
+                        <div class="o_kpi_icon" style="color: #1e2917;"><i class="fa fa-calculator"/></div>
+                        <div class="o_kpi_info">
+                            <h3><t t-esc="state.stats.settlement_in_progress || 0"/></h3>
+                            <span>Settlement In Progress</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="o_succ_kpi_card o_card_warning" t-on-click="onKpiClick" data-domain="waiting_payment" style="cursor: pointer;">
+                        <div class="o_kpi_icon"><i class="fa fa-credit-card"/></div>
+                        <div class="o_kpi_info">
+                            <h3><t t-esc="state.stats.waiting_payment || 0"/></h3>
+                            <span>Waiting Payment</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="o_succ_kpi_card o_card_success" t-on-click="onKpiClick" data-domain="completed" style="cursor: pointer;">
+                        <div class="o_kpi_icon"><i class="fa fa-check-circle"/></div>
+                        <div class="o_kpi_info">
+                            <h3><t t-esc="state.stats.completed_requests || 0"/></h3>
+                            <span>Completed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="o_succ_kpi_card o_card_danger" t-on-click="onKpiClick" data-domain="overdue" style="cursor: pointer;">
+                        <div class="o_kpi_icon"><i class="fa fa-exclamation-triangle"/></div>
+                        <div class="o_kpi_info">
+                            <h3><t t-esc="state.stats.overdue_clearances || 0"/></h3>
+                            <span>Overdue Clearance</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row g-4 mb-4">
+                <!-- Resignations By Type (Pie / Donut) -->
+                <div class="col-12 col-lg-5">
+                    <div class="o_succ_panel h-100">
+                        <h4><i class="fa fa-pie-chart me-2"/> Resignations By Type</h4>
+                        <div style="height: 310px; position: relative;">
+                            <t t-if="!state.charts.pie or !state.charts.pie.data or state.charts.pie.data.length == 0">
+                                <div class="h-100 d-flex align-items-center justify-content-center text-muted">No Data Available</div>
+                            </t>
+                            <canvas t-ref="pieChartCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resignations By Department (Bar) -->
+                <div class="col-12 col-lg-7">
+                    <div class="o_succ_panel h-100">
+                        <h4><i class="fa fa-bar-chart me-2"/> Resignations By Department</h4>
+                        <div style="height: 310px; position: relative;">
+                            <t t-if="!state.charts.bar or !state.charts.bar.data or state.charts.bar.data.length == 0">
+                                <div class="h-100 d-flex align-items-center justify-content-center text-muted">No Data Available</div>
+                            </t>
+                            <canvas t-ref="barChartCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </t>

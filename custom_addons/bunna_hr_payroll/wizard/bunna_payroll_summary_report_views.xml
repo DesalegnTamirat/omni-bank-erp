@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Wizard Form View -->
+    <record id="view_bunna_payroll_summary_report_wizard_form" model="ir.ui.view">
+        <field name="name">bunna.payroll.summary.report.wizard.form</field>
+        <field name="model">bunna.payroll.summary.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Summary Report">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Payroll Summary Report</h1>
+                        <p class="text-muted">
+                            Generate comprehensive horizontal payroll reports with full employee earnings, allowances, taxes, deductions, and batch details.
+                        </p>
+                    </div>
+                    <group>
+                        <group string="Payroll Period &amp; Batch">
+                            <field name="period_id" options="{'no_create': True}"/>
+                            <field name="payslip_run_id" options="{'no_create': True}" placeholder="All Batches (leave blank for entire payroll)"/>
+                            <field name="state" widget="radio" options="{'horizontal': true}"/>
+                        </group>
+                        <group string="Dates &amp; Timing">
+                            <field name="date_from" readonly="True"/>
+                            <field name="date_to" readonly="True"/>
+                            <field name="payment_date"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_view_list" string="View List" type="object" class="btn-primary" icon="fa-list"/>
+                    <button name="action_export_excel" string="Export Excel (.xlsx)" type="object" class="btn-success" icon="fa-file-excel-o"/>
+                    <button name="action_print_pdf" string="Print PDF" type="object" class="btn-secondary" icon="fa-file-pdf-o"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Report Line List View (Horizontal Sheet) -->
+    <record id="view_bunna_payroll_summary_report_line_list" model="ir.ui.view">
+        <field name="name">bunna.payroll.summary.report.line.list</field>
+        <field name="model">bunna.payroll.summary.report.line</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Summary Sheet" create="0" edit="0" delete="0">
+                <field name="employee_code"/>
+                <field name="employee_name"/>
+                <field name="batch_name" optional="show"/>
+                <field name="operating_unit_name" optional="show"/>
+                <field name="department_name" optional="hide"/>
+                <field name="period_name" optional="show"/>
+                <field name="date_from" optional="hide"/>
+                <field name="date_to" optional="hide"/>
+                <field name="payment_date" optional="show"/>
+                <field name="state" optional="hide"/>
+                <field name="bank_acc" optional="show"/>
+                <field name="basic" sum="Total Basic" optional="show"/>
+                <field name="house_rent" sum="Total Housing" optional="hide"/>
+                <field name="fuel" sum="Total Fuel" optional="hide"/>
+                <field name="rep_alw" sum="Total Rep" optional="hide"/>
+                <field name="transport" sum="Total Transport" optional="show"/>
+                <field name="hardship" sum="Total Hardship" optional="show"/>
+                <field name="cia" sum="Total CIA" optional="show"/>
+                <field name="mobile" sum="Total Mobile" optional="hide"/>
+                <field name="acting" sum="Total Acting" optional="hide"/>
+                <field name="disturb" sum="Total Disturb" optional="hide"/>
+                <field name="overtime" sum="Total Overtime" optional="hide"/>
+                <field name="other_alw" sum="Total Other Alw" optional="hide"/>
+                <field name="gross" sum="Total Gross" optional="show"/>
+                <field name="totexe" sum="Total Tax Exemption" optional="hide"/>
+                <field name="taxinc" sum="Total Taxable" optional="show"/>
+                <field name="income_tax" sum="Total Tax" optional="show"/>
+                <field name="pension_emp" sum="Total Pension 7pct" optional="show"/>
+                <field name="pension_bnk" sum="Total Pension 11pct" optional="hide"/>
+                <field name="pf" sum="Total PF 2pct" optional="hide"/>
+                <field name="ciab" sum="Total CIA Bank" optional="hide"/>
+                <field name="cost_sharing" sum="Total Cost Sharing" optional="show"/>
+                <field name="labour_union" sum="Total Labour Union" optional="hide"/>
+                <field name="penalty" sum="Total Penalty" optional="hide"/>
+                <field name="cod" sum="Total COD" optional="hide"/>
+                <field name="other_ded" sum="Total Other Ded" optional="hide"/>
+                <field name="total_ded" sum="Total Deductions" optional="show"/>
+                <field name="net" sum="Total Net" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Window Action to Open Wizard -->
+    <record id="action_bunna_payroll_summary_report_wizard" model="ir.actions.act_window">
+        <field name="name">Payroll Summary Report</field>
+        <field name="res_model">bunna.payroll.summary.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menu Item under Reporting -->
+    <menuitem id="menu_bunna_payroll_summary_report"
+              name="Payroll Summary Report"
+              parent="bunna_hr_payroll.menu_hr_payroll_report"
+              action="action_bunna_payroll_summary_report_wizard"
+              sequence="10"
+              groups="bunna_hr_payroll.group_hr_payroll_user"/>
+
+</odoo>

@@ -93,6 +93,7 @@ class PopulateT2ScorecardWizard(models.TransientModel):
         incomplete_units = []
         unit_measure_ids_map = {}
 
+        incomplete_unit_ids = set()
         for ou_id, objs in unit_objs_map.items():
             ou = OperatingUnit.browse(ou_id)
             active_measures = objs.mapped('measure_ids').filtered(lambda m: m.active)
@@ -101,32 +102,45 @@ class PopulateT2ScorecardWizard(models.TransientModel):
                 valid_unit_ids.add(ou_id)
                 unit_measure_ids_map[ou_id] = active_measures.ids
             else:
+                incomplete_unit_ids.add(ou_id)
                 incomplete_units.append(f"{ou.name} ({round(total_weight, 2)}%)")
 
         if not valid_unit_ids:
             msg = "No Operating Units with active Performance Objectives totaling exactly 100% weight were found."
             if incomplete_units:
-                msg += "\n\nThe following Work Units have incomplete weights:\n- " + "\n- ".join(incomplete_units[:5])
+                msg += "\n\nThe following Work Units have incomplete weights (< 100%):\n- " + "\n- ".join(incomplete_units[:5])
                 msg += "\n\nPlease adjust the measures so the total weight equals 100% before populating."
             raise UserError(msg)
 
         # 3. Collect Target Managers / Employees for Tier 2 Scorecards
         branch_types = ('branch', 'sub_branch', 'service_center')
+        district_area_types = ('district_office', 'area_office', 'district', 'area')
+        def _is_dist_area(u):
+            if not u:
+                return False
+            w = getattr(u, 'work_unit_type', '') or ''
+            if w in district_area_types:
+                return True
+            nm = (u.name or '').lower()
+            return 'district' in nm or 'area' in nm
 
-        # Find branch template measure IDs if available
+        # Find branch and district/area template measure IDs if available
         branch_template_measure_ids = []
+        district_area_template_measure_ids = []
         for ou_id in valid_unit_ids:
-            if OperatingUnit.browse(ou_id).work_unit_type in branch_types:
+            ou_rec = OperatingUnit.browse(ou_id)
+            if ou_rec.work_unit_type in branch_types and not branch_template_measure_ids:
                 branch_template_measure_ids = unit_measure_ids_map[ou_id]
-                break
+            elif _is_dist_area(ou_rec) and not district_area_template_measure_ids:
+                district_area_template_measure_ids = unit_measure_ids_map[ou_id]
 
         # Map target employee -> (operating_unit_rec, measure_ids)
         target_emp_map = {}
 
-        # A. Non-branch units with valid 100% objectives
+        # A. Units with direct valid 100% objectives
         for ou_id in valid_unit_ids:
             ou = OperatingUnit.browse(ou_id)
-            if ou.work_unit_type not in branch_types:
+            if ou.work_unit_type not in branch_types and not _is_dist_area(ou):
                 mgr = ou.manager_id
                 if not mgr:
                     objs = unit_objs_map[ou_id]
@@ -140,6 +154,9 @@ class PopulateT2ScorecardWizard(models.TransientModel):
                 ('work_unit_type', 'in', branch_types)
             ])
             for b_ou in all_branch_ous:
+                if b_ou.id in incomplete_unit_ids:
+                    # Incomplete custom objectives on this branch - skip to avoid generating incomplete scorecard
+                    continue
                 b_mgr = b_ou.manager_id
                 if not b_mgr:
                     b_mgr = Employee.search([
@@ -154,6 +171,30 @@ class PopulateT2ScorecardWizard(models.TransientModel):
             for ou_id in valid_unit_ids:
                 ou = OperatingUnit.browse(ou_id)
                 if ou.work_unit_type in branch_types:
+                    mgr = ou.manager_id or unit_objs_map[ou_id].mapped('employee_id')[:1]
+                    if mgr:
+                        target_emp_map[mgr] = (ou, unit_measure_ids_map[ou_id])
+
+        # C. District and Area units
+        if district_area_template_measure_ids:
+            all_dist_area_ous = OperatingUnit.search([]).filtered(lambda u: _is_dist_area(u))
+            for d_ou in all_dist_area_ous:
+                if d_ou.id in incomplete_unit_ids:
+                    # Incomplete custom objectives on this district/area - skip
+                    continue
+                d_mgr = d_ou.manager_id
+                if not d_mgr:
+                    d_mgr = Employee.search([
+                        ('default_operating_unit_id', '=', d_ou.id),
+                        ('coach_id', '!=', False),
+                    ], limit=1)
+                if d_mgr:
+                    d_measures = unit_measure_ids_map.get(d_ou.id, district_area_template_measure_ids)
+                    target_emp_map[d_mgr] = (d_ou, d_measures)
+        else:
+            for ou_id in valid_unit_ids:
+                ou = OperatingUnit.browse(ou_id)
+                if _is_dist_area(ou):
                     mgr = ou.manager_id or unit_objs_map[ou_id].mapped('employee_id')[:1]
                     if mgr:
                         target_emp_map[mgr] = (ou, unit_measure_ids_map[ou_id])
@@ -222,6 +263,7 @@ class PopulateT2ScorecardWizard(models.TransientModel):
             raise UserError('No new Tier 2 Scorecards were created — they may already exist or are locked.')
 
         new_scorecards = self.env['t2.scorecard'].create(vals_list)
+        new_scorecards._compute_total_weight()
 
         # 7. Strict validation: Ensure every created scorecard has exactly 100% total weight
         incomplete_scs = new_scorecards.filtered(lambda sc: round(sc.total_weight, 2) != 100.0)
@@ -234,7 +276,7 @@ class PopulateT2ScorecardWizard(models.TransientModel):
             valid_new_scs = new_scorecards - incomplete_scs
             if not valid_new_scs:
                 raise UserError(
-                    "Tier 2 Scorecard generation restricted: The generated scorecard(s) did not reach exactly 100% total weight:\n- "
+                    "Tier 2 Scorecard generation restricted: None of the generated scorecard(s) reached exactly 100% total weight:\n- "
                     + "\n- ".join(error_details)
                     + "\n\nPlease check the Strategic Objectives and ensure all assigned measures sum to exactly 100%."
                 )

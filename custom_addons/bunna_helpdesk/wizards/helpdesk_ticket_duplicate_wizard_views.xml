@@ -4,7 +4,7 @@
         <field name="name">helpdesk.ticket.duplicate.wizard.form</field>
         <field name="model">helpdesk.ticket.duplicate.wizard</field>
         <field name="arch" type="xml">
-            <form>
+            <form string="Mark Ticket as Duplicate" class="o_helpdesk_wizard">
                 <group>
                     <field name="ticket_id" invisible="1" />
                     <field

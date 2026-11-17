@@ -30,7 +30,46 @@
             <field name="sequence" eval="3"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">housing_map = {
+            <field name="amount_python_compute"><![CDATA[# 1. POSITION RULE PRIORITY
+pos_val = 0.0
+emp_pos = (contract.job_id if 'job_id' in contract._fields else False) or (employee.job_id if 'job_id' in employee._fields else False)
+if emp_pos and rule and rule.position_rules:
+    matching_pos = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching_pos:
+        pos_val = matching_pos[0].value or 0.0
+
+# 2. GRADE RULE PRIORITY
+grade_val = 0.0
+emp_grade = (
+    (contract.grade_id if 'grade_id' in contract._fields and contract.grade_id else False)
+    or (contract.job_grade if 'job_grade' in contract._fields and contract.job_grade else False)
+    or (employee.grade_id if 'grade_id' in employee._fields and employee.grade_id else False)
+    or (employee.job_grade if 'job_grade' in employee._fields and employee.job_grade else False)
+)
+
+if emp_grade and rule and rule.grade_rules:
+    emp_code = (
+        (emp_grade.grade_code if 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+        or (emp_grade.code if 'code' in emp_grade._fields and emp_grade.code else '')
+        or (emp_grade.grade_name if 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+        or (emp_grade.name if 'name' in emp_grade._fields and emp_grade.name else '')
+    ).strip().upper()
+
+    matching_grade = rule.grade_rules.filtered(
+        lambda r: r.grade2 == emp_grade or (
+            r.grade2 and emp_code and (
+                (r.grade2.grade_code if 'grade_code' in r.grade2._fields and r.grade2.grade_code else '')
+                or (r.grade2.grade_name if 'grade_name' in r.grade2._fields and r.grade2.grade_name else '')
+                or (r.grade2.code if 'code' in r.grade2._fields and r.grade2.code else '')
+                or (r.grade2.name if 'name' in r.grade2._fields and r.grade2.name else '')
+            ).strip().upper() == emp_code
+        )
+    )
+    if matching_grade:
+        grade_val = matching_grade[0].value or matching_grade[0].base_salary or 0.0
+
+# 3. HOUSING MAP FALLBACK
+housing_map = {
     'I': 500, 'II': 500, 'III': 500, 'IV': 500, 'V': 500, 'VI': 500,
     'VII': 1000, 'VIII': 1000, 'IX': 1000, 'X': 1000,
     'XI': 1500, 'XII': 1500,
@@ -42,22 +81,28 @@
     '13': 3000, '14': 3000,
     '15': 5000, '16': 6000, '17': 12000, '18': 12000,
 }
-raw_code = ((contract.grade_id and contract.grade_id.grade_code) or (employee.grade_id and employee.grade_id.grade_code) or '').strip().upper()
-clean_code = raw_code.replace('GRADE', '').strip()
-emp_grade = contract.grade_id or employee.grade_id
-grade_tab_val = 0.0
-if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
-    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
-    if matching:
-        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
-grade_val = grade_tab_val or housing_map.get(clean_code, 0.0)
-emp_pos = contract.job_id or employee.job_id
-pos_tab_val = 0.0
-if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
-    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
-    if matching:
-        pos_tab_val = matching[0].value or 0.0
-result = pos_tab_val if pos_tab_val &gt; 0 else grade_val</field>
+
+raw_code = (
+    (emp_grade.grade_code if emp_grade and 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+    or (emp_grade.code if emp_grade and 'code' in emp_grade._fields and emp_grade.code else '')
+    or (emp_grade.grade_name if emp_grade and 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+    or (emp_grade.name if emp_grade and 'name' in emp_grade._fields and emp_grade.name else '')
+    or ''
+).strip().upper()
+
+clean_code = raw_code.replace('GRADE', '').replace('LEVEL', '').replace('G-', '').replace('-', '').strip()
+if clean_code.isdigit():
+    clean_code = str(int(clean_code))
+
+map_val = housing_map.get(clean_code, 0.0)
+
+# Final Result: Position rule -> Grade rule -> Housing map
+if pos_val > 0:
+    result = pos_val
+elif grade_val > 0:
+    result = grade_val
+else:
+    result = map_val]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_housing"/>
             <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155020010"/>
             <field name="appears_on_payslip" eval="True"/>
@@ -72,8 +117,46 @@ result = pos_tab_val if pos_tab_val &gt; 0 else grade_val</field>
             <field name="sequence" eval="5"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">raw_code = ((contract.grade_id and contract.grade_id.grade_code) or (employee.grade_id and employee.grade_id.grade_code) or '').strip().upper()
-clean_code = raw_code.replace('GRADE', '').strip()
+            <field name="amount_python_compute">
+                <![CDATA[# 1. POSITION RULE PRIORITY
+pos_val = 0.0
+emp_pos = (contract.job_id if 'job_id' in contract._fields else False) or (employee.job_id if 'job_id' in employee._fields else False)
+if emp_pos and rule and rule.position_rules:
+    matching_pos = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching_pos:
+        pos_val = matching_pos[0].value or 0.0
+
+# 2. GRADE RULE PRIORITY
+grade_val = 0.0
+emp_grade = (
+    (contract.grade_id if 'grade_id' in contract._fields and contract.grade_id else False)
+    or (contract.job_grade if 'job_grade' in contract._fields and contract.job_grade else False)
+    or (employee.grade_id if 'grade_id' in employee._fields and employee.grade_id else False)
+    or (employee.job_grade if 'job_grade' in employee._fields and employee.job_grade else False)
+)
+
+if emp_grade and rule and rule.grade_rules:
+    emp_code = (
+        (emp_grade.grade_code if 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+        or (emp_grade.code if 'code' in emp_grade._fields and emp_grade.code else '')
+        or (emp_grade.grade_name if 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+        or (emp_grade.name if 'name' in emp_grade._fields and emp_grade.name else '')
+    ).strip().upper()
+
+    matching_grade = rule.grade_rules.filtered(
+        lambda r: r.grade2 == emp_grade or (
+            r.grade2 and emp_code and (
+                (r.grade2.grade_code if 'grade_code' in r.grade2._fields and r.grade2.grade_code else '')
+                or (r.grade2.grade_name if 'grade_name' in r.grade2._fields and r.grade2.grade_name else '')
+                or (r.grade2.code if 'code' in r.grade2._fields and r.grade2.code else '')
+                or (r.grade2.name if 'name' in r.grade2._fields and r.grade2.name else '')
+            ).strip().upper() == emp_code
+        )
+    )
+    if matching_grade:
+        grade_val = matching_grade[0].value or matching_grade[0].base_salary or 0.0
+
+# 3. FUEL MAP FALLBACK (liters * 86.0 ETB)
 liters_map = {
     'I': 40, 'II': 40, 'III': 40, 'IV': 40, 'V': 40,
     'VI': 60, 'VII': 60,
@@ -84,22 +167,35 @@ liters_map = {
     '8': 80, '9': 80, '10': 80,
     '11': 100, '12': 125, '13': 175, '14': 175,
 }
+
+raw_code = (
+    (emp_grade.grade_code if emp_grade and 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+    or (emp_grade.code if emp_grade and 'code' in emp_grade._fields and emp_grade.code else '')
+    or (emp_grade.grade_name if emp_grade and 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+    or (emp_grade.name if emp_grade and 'name' in emp_grade._fields and emp_grade.name else '')
+    or ''
+).strip().upper()
+
+clean_code = raw_code.replace('GRADE', '').replace('LEVEL', '').replace('G-', '').replace('-', '').strip()
+if clean_code.isdigit():
+    clean_code = str(int(clean_code))
+
 fuel_calc = 86.0 * liters_map.get(clean_code, 0)
-emp_grade = contract.grade_id or employee.grade_id
-grade_tab_val = 0.0
-if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
-    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
-    if matching:
-        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
-grade_val = grade_tab_val or fuel_calc
-emp_pos = contract.job_id or employee.job_id
-pos_tab_val = 0.0
-if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
-    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
-    if matching:
-        pos_tab_val = matching[0].value or 0.0
-fuel_result = pos_tab_val if pos_tab_val &gt; 0 else grade_val
-result = 0.0 if (contract.special_car_allowance and contract.special_car_allowance &gt; 0) else fuel_result</field>
+
+# Priority: Position rule -> Grade rule -> Fuel Map
+if pos_val > 0:
+    fuel_result = pos_val
+elif grade_val > 0:
+    fuel_result = grade_val
+else:
+    fuel_result = fuel_calc
+
+has_special_car = bool(
+    contract.special_car_allowance and contract.special_car_allowance > 0
+    if 'special_car_allowance' in contract._fields else False
+)
+
+result = 0.0 if has_special_car else fuel_result]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_fuel"/>
             <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010100"/>
             <field name="appears_on_payslip" eval="True"/>
@@ -114,26 +210,70 @@ result = 0.0 if (contract.special_car_allowance and contract.special_car_allowan
             <field name="sequence" eval="6"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">rep_map = {
+            <field name="amount_python_compute"><![CDATA[# 1. POSITION RULE PRIORITY
+pos_val = 0.0
+emp_pos = (contract.job_id if 'job_id' in contract._fields else False) or (employee.job_id if 'job_id' in employee._fields else False)
+if emp_pos and rule and rule.position_rules:
+    matching_pos = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching_pos:
+        pos_val = matching_pos[0].value or 0.0
+
+# 2. GRADE RULE PRIORITY
+grade_val = 0.0
+emp_grade = (
+    (contract.grade_id if 'grade_id' in contract._fields and contract.grade_id else False)
+    or (contract.job_grade if 'job_grade' in contract._fields and contract.job_grade else False)
+    or (employee.grade_id if 'grade_id' in employee._fields and employee.grade_id else False)
+    or (employee.job_grade if 'job_grade' in employee._fields and employee.job_grade else False)
+)
+
+if emp_grade and rule and rule.grade_rules:
+    emp_code = (
+        (emp_grade.grade_code if 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+        or (emp_grade.code if 'code' in emp_grade._fields and emp_grade.code else '')
+        or (emp_grade.grade_name if 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+        or (emp_grade.name if 'name' in emp_grade._fields and emp_grade.name else '')
+    ).strip().upper()
+
+    matching_grade = rule.grade_rules.filtered(
+        lambda r: r.grade2 == emp_grade or (
+            r.grade2 and emp_code and (
+                (r.grade2.grade_code if 'grade_code' in r.grade2._fields and r.grade2.grade_code else '')
+                or (r.grade2.grade_name if 'grade_name' in r.grade2._fields and r.grade2.grade_name else '')
+                or (r.grade2.code if 'code' in r.grade2._fields and r.grade2.code else '')
+                or (r.grade2.name if 'name' in r.grade2._fields and r.grade2.name else '')
+            ).strip().upper() == emp_code
+        )
+    )
+    if matching_grade:
+        grade_val = matching_grade[0].value or matching_grade[0].base_salary or 0.0
+
+# 3. REPRESENTATION MAP FALLBACK
+rep_map = {
     'XIII': 4342.0, 'XIV': 5052.0, 'XV': 6273.0, 'XVI': 8790.0, 'XVII': 14359.0, 'XVIII': 32717.0,
     '13': 4342.0, '14': 5052.0, '15': 6273.0, '16': 8790.0, '17': 14359.0, '18': 32717.0,
 }
-raw_code = ((contract.grade_id and contract.grade_id.grade_code) or (employee.grade_id and employee.grade_id.grade_code) or '').strip().upper()
-clean_code = raw_code.replace('GRADE', '').strip()
-emp_grade = contract.grade_id or employee.grade_id
-grade_tab_val = 0.0
-if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
-    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
-    if matching:
-        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
-grade_val = grade_tab_val or rep_map.get(clean_code, 0.0)
-emp_pos = contract.job_id or employee.job_id
-pos_tab_val = 0.0
-if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
-    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
-    if matching:
-        pos_tab_val = matching[0].value or 0.0
-result = pos_tab_val if pos_tab_val &gt; 0 else grade_val</field>
+
+raw_code = (
+    (emp_grade.grade_code if emp_grade and 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+    or (emp_grade.code if emp_grade and 'code' in emp_grade._fields and emp_grade.code else '')
+    or (emp_grade.grade_name if emp_grade and 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+    or (emp_grade.name if emp_grade and 'name' in emp_grade._fields and emp_grade.name else '')
+    or ''
+).strip().upper()
+
+clean_code = raw_code.replace('GRADE', '').replace('LEVEL', '').replace('G-', '').replace('-', '').strip()
+if clean_code.isdigit():
+    clean_code = str(int(clean_code))
+
+map_val = rep_map.get(clean_code, 0.0)
+
+if pos_val > 0:
+    result = pos_val
+elif grade_val > 0:
+    result = grade_val
+else:
+    result = map_val]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_representation"/>
             <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010120"/>
             <field name="appears_on_payslip" eval="True"/>
@@ -148,20 +288,50 @@ result = pos_tab_val if pos_tab_val &gt; 0 else grade_val</field>
             <field name="sequence" eval="7"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">emp_grade = contract.grade_id or employee.grade_id
-grade_tab_val = 0.0
-if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
-    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
-    if matching:
-        grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
-grade_val = grade_tab_val
-emp_pos = contract.job_id or employee.job_id
-pos_tab_val = 0.0
-if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
-    matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
-    if matching:
-        pos_tab_val = matching[0].value or 0.0
-result = pos_tab_val if pos_tab_val &gt; 0 else grade_val</field>
+            <field name="amount_python_compute"><![CDATA[# 1. POSITION RULE PRIORITY
+pos_val = 0.0
+emp_pos = (contract.job_id if 'job_id' in contract._fields else False) or (employee.job_id if 'job_id' in employee._fields else False)
+if emp_pos and rule and rule.position_rules:
+    matching_pos = rule.position_rules.filtered(lambda r: r.position == emp_pos)
+    if matching_pos:
+        pos_val = matching_pos[0].value or 0.0
+
+# 2. GRADE RULE PRIORITY
+grade_val = 0.0
+emp_grade = (
+    (contract.grade_id if 'grade_id' in contract._fields and contract.grade_id else False)
+    or (contract.job_grade if 'job_grade' in contract._fields and contract.job_grade else False)
+    or (employee.grade_id if 'grade_id' in employee._fields and employee.grade_id else False)
+    or (employee.job_grade if 'job_grade' in employee._fields and employee.job_grade else False)
+)
+
+if emp_grade and rule and rule.grade_rules:
+    emp_code = (
+        (emp_grade.grade_code if 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+        or (emp_grade.code if 'code' in emp_grade._fields and emp_grade.code else '')
+        or (emp_grade.grade_name if 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+        or (emp_grade.name if 'name' in emp_grade._fields and emp_grade.name else '')
+    ).strip().upper()
+
+    matching_grade = rule.grade_rules.filtered(
+        lambda r: r.grade2 == emp_grade or (
+            r.grade2 and emp_code and (
+                (r.grade2.grade_code if 'grade_code' in r.grade2._fields and r.grade2.grade_code else '')
+                or (r.grade2.grade_name if 'grade_name' in r.grade2._fields and r.grade2.grade_name else '')
+                or (r.grade2.code if 'code' in r.grade2._fields and r.grade2.code else '')
+                or (r.grade2.name if 'name' in r.grade2._fields and r.grade2.name else '')
+            ).strip().upper() == emp_code
+        )
+    )
+    if matching_grade:
+        grade_val = matching_grade[0].value or matching_grade[0].base_salary or 0.0
+
+if pos_val > 0:
+    result = pos_val
+elif grade_val > 0:
+    result = grade_val
+else:
+    result = rule.value or 0.0]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_transport"/>
             <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010110"/>
             <field name="appears_on_payslip" eval="True"/>
@@ -213,9 +383,26 @@ else:
             <field name="sequence" eval="10"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute"><![CDATA[all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-cia_lines = all_lines.filtered(lambda l: l.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and l.adjustment_id.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY')) or (l.ciamount and l.ciamount > 0)) if all_lines else False
-result = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (contract.cash_indemnity if hasattr(contract, 'cash_indemnity') and contract.cash_indemnity else 0.0)]]></field>
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+cia_lines = [l for l in (all_lines or []) if (l.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and l.adjustment_id.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY')) or (l.ciamount and l.ciamount > 0))]
+if p_id and cia_lines:
+    matched = [l for l in cia_lines if (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched:
+        cia_lines = matched
+    else:
+        unassigned = [l for l in cia_lines if not l.adjustment_id.period_id or l.adjustment_id.period_id == p_id]
+        if unassigned:
+            latest_id = max(l.adjustment_id.id for l in unassigned if l.adjustment_id)
+            cia_lines = [l for l in unassigned if l.adjustment_id and l.adjustment_id.id == latest_id]
+        else:
+            cia_lines = []
+result = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (contract.cash_indemnity if 'cash_indemnity' in contract._fields and contract.cash_indemnity else 0.0)]]></field>
             <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0155010080"/>
             <field name="appears_on_payslip" eval="True"/>
         </record>
@@ -229,19 +416,32 @@ result = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (con
             <field name="sequence" eval="11"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">emp_pos = contract.job_id or employee.job_id
+            <field name="amount_python_compute"><![CDATA[emp_pos = (contract.job_id if 'job_id' in contract._fields else False) or (employee.job_id if 'job_id' in employee._fields else False)
 pos_tab_val = 0.0
-if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+if emp_pos and rule and rule.position_rules:
     matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
     if matching:
         pos_tab_val = matching[0].value or 0.0
-emp_grade = contract.grade_id or employee.grade_id
+
+emp_grade = (
+    (contract.grade_id if 'grade_id' in contract._fields and contract.grade_id else False)
+    or (contract.job_grade if 'job_grade' in contract._fields and contract.job_grade else False)
+    or (employee.grade_id if 'grade_id' in employee._fields and employee.grade_id else False)
+    or (employee.job_grade if 'job_grade' in employee._fields and employee.job_grade else False)
+)
 grade_tab_val = 0.0
-if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
-    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+if emp_grade and rule and rule.grade_rules:
+    emp_code = (
+        (emp_grade.grade_code if 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+        or (emp_grade.code if 'code' in emp_grade._fields and emp_grade.code else '')
+        or (emp_grade.grade_name if 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+        or (emp_grade.name if 'name' in emp_grade._fields and emp_grade.name else '')
+    ).strip().upper()
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_code and ((r.grade2.grade_code or r.grade2.code or '').strip().upper() == emp_code)))
     if matching:
         grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
-result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val &gt; 0 else (rule.value or 0.0))</field>
+
+result = pos_tab_val if pos_tab_val > 0 else (grade_tab_val if grade_tab_val > 0 else (rule.value or 0.0))]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_mobile"/>
             <field name="appears_on_payslip" eval="True"/>
         </record>
@@ -255,19 +455,32 @@ result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val 
             <field name="sequence" eval="12"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">emp_pos = contract.job_id or employee.job_id
+            <field name="amount_python_compute"><![CDATA[emp_pos = (contract.job_id if 'job_id' in contract._fields else False) or (employee.job_id if 'job_id' in employee._fields else False)
 pos_tab_val = 0.0
-if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+if emp_pos and rule and rule.position_rules:
     matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
     if matching:
         pos_tab_val = matching[0].value or 0.0
-emp_grade = contract.grade_id or employee.grade_id
+
+emp_grade = (
+    (contract.grade_id if 'grade_id' in contract._fields and contract.grade_id else False)
+    or (contract.job_grade if 'job_grade' in contract._fields and contract.job_grade else False)
+    or (employee.grade_id if 'grade_id' in employee._fields and employee.grade_id else False)
+    or (employee.job_grade if 'job_grade' in employee._fields and employee.job_grade else False)
+)
 grade_tab_val = 0.0
-if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
-    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+if emp_grade and rule and rule.grade_rules:
+    emp_code = (
+        (emp_grade.grade_code if 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+        or (emp_grade.code if 'code' in emp_grade._fields and emp_grade.code else '')
+        or (emp_grade.grade_name if 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+        or (emp_grade.name if 'name' in emp_grade._fields and emp_grade.name else '')
+    ).strip().upper()
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_code and ((r.grade2.grade_code or r.grade2.code or '').strip().upper() == emp_code)))
     if matching:
         grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
-result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val &gt; 0 else (rule.value or 0.0))</field>
+
+result = pos_tab_val if pos_tab_val > 0 else (grade_tab_val if grade_tab_val > 0 else (rule.value or 0.0))]]></field>
             <field name="appears_on_payslip" eval="True"/>
         </record>
 
@@ -280,19 +493,32 @@ result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val 
             <field name="sequence" eval="13"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">emp_pos = contract.job_id or employee.job_id
+            <field name="amount_python_compute"><![CDATA[emp_pos = (contract.job_id if 'job_id' in contract._fields else False) or (employee.job_id if 'job_id' in employee._fields else False)
 pos_tab_val = 0.0
-if emp_pos and rule and hasattr(rule, 'position_rules') and rule.position_rules:
+if emp_pos and rule and rule.position_rules:
     matching = rule.position_rules.filtered(lambda r: r.position == emp_pos)
     if matching:
         pos_tab_val = matching[0].value or 0.0
-emp_grade = contract.grade_id or employee.grade_id
+
+emp_grade = (
+    (contract.grade_id if 'grade_id' in contract._fields and contract.grade_id else False)
+    or (contract.job_grade if 'job_grade' in contract._fields and contract.job_grade else False)
+    or (employee.grade_id if 'grade_id' in employee._fields and employee.grade_id else False)
+    or (employee.job_grade if 'job_grade' in employee._fields and employee.job_grade else False)
+)
 grade_tab_val = 0.0
-if emp_grade and rule and hasattr(rule, 'grade_rules') and rule.grade_rules:
-    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_grade and (r.grade2.grade_code or '').strip().upper() == (emp_grade.grade_code or '').strip().upper()))
+if emp_grade and rule and rule.grade_rules:
+    emp_code = (
+        (emp_grade.grade_code if 'grade_code' in emp_grade._fields and emp_grade.grade_code else '')
+        or (emp_grade.code if 'code' in emp_grade._fields and emp_grade.code else '')
+        or (emp_grade.grade_name if 'grade_name' in emp_grade._fields and emp_grade.grade_name else '')
+        or (emp_grade.name if 'name' in emp_grade._fields and emp_grade.name else '')
+    ).strip().upper()
+    matching = rule.grade_rules.filtered(lambda r: r.grade2 == emp_grade or (r.grade2 and emp_code and ((r.grade2.grade_code or r.grade2.code or '').strip().upper() == emp_code)))
     if matching:
         grade_tab_val = matching[0].value or matching[0].base_salary or 0.0
-result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val &gt; 0 else (rule.value or 0.0))</field>
+
+result = pos_tab_val if pos_tab_val > 0 else (grade_tab_val if grade_tab_val > 0 else (rule.value or 0.0))]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_disturb"/>
             <field name="appears_on_payslip" eval="True"/>
         </record>
@@ -338,7 +564,33 @@ result = pos_tab_val if pos_tab_val &gt; 0 else (grade_tab_val if grade_tab_val 
             <field name="sequence" eval="25"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">result = categories.BASIC + categories.ALW + categories.COMP</field>
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([
+        ('employee_id', '=', employee.id),
+        ('active', '=', True),
+        ('adjustment_id.active', '=', True)
+    ]) if 'hr.payroll.adjustment.line' in employee.env else False
+
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+cia_lines = [l for l in (all_lines or []) if (l.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and l.adjustment_id.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY')) or (l.ciamount and l.ciamount > 0))]
+ciab_lines = [l for l in (all_lines or []) if (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0)) and l.amount > 0]
+
+if p_id:
+    matched_cia = [l for l in cia_lines if ((getattr(l.adjustment_id, 'payroll_period_id', False) and l.adjustment_id.payroll_period_id == p_id) or (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id)) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched_cia:
+        cia_lines = matched_cia
+    matched_ciab = [l for l in ciab_lines if ((getattr(l.adjustment_id, 'payroll_period_id', False) and l.adjustment_id.payroll_period_id == p_id) or (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id)) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched_ciab:
+        ciab_lines = matched_ciab
+
+cia_amt = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (contract.cash_indemnity if 'cash_indemnity' in contract._fields and contract.cash_indemnity else 0.0)
+adj_amt = sum(l.amount for l in ciab_lines) if ciab_lines else (contract.cash_indemnity_bank if 'cash_indemnity_bank' in contract._fields and contract.cash_indemnity_bank else 0.0)
+
+result = round(categories.BASIC + categories.ALW - cia_amt + adj_amt, 2)]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_gross"/>
             <field name="appears_on_payslip" eval="True"/>
         </record>
@@ -407,10 +659,29 @@ result = round(hardship_exempt + fuel_exempt + trans_exempt + other_exempt, 2)</
             <field name="sequence" eval="27"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute"><![CDATA[all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-cia_lines = all_lines.filtered(lambda l: l.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and l.adjustment_id.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY')) or (l.ciamount and l.ciamount > 0)) if all_lines else False
-cia_amt = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (contract.cash_indemnity if hasattr(contract, 'cash_indemnity') and contract.cash_indemnity else 0.0)
-earn = (categories.BASIC + categories.ALW) - cia_amt
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+cia_lines = [l for l in (all_lines or []) if (l.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and l.adjustment_id.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY')) or (l.ciamount and l.ciamount > 0))]
+ciab_lines = [l for l in (all_lines or []) if (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0)) and l.amount > 0]
+
+if p_id:
+    matched_cia = [l for l in cia_lines if ((getattr(l.adjustment_id, 'payroll_period_id', False) and l.adjustment_id.payroll_period_id == p_id) or (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id)) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched_cia:
+        cia_lines = matched_cia
+    matched_ciab = [l for l in ciab_lines if ((getattr(l.adjustment_id, 'payroll_period_id', False) and l.adjustment_id.payroll_period_id == p_id) or (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id)) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched_ciab:
+        ciab_lines = matched_ciab
+
+cia_amt = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (contract.cash_indemnity if 'cash_indemnity' in contract._fields and contract.cash_indemnity else 0.0)
+adj_amt = sum(l.amount for l in ciab_lines) if ciab_lines else (contract.cash_indemnity_bank if 'cash_indemnity_bank' in contract._fields and contract.cash_indemnity_bank else 0.0)
+
+earn = (categories.BASIC + categories.ALW) - cia_amt + adj_amt
 exe = 0.0
 try:
     exe = float(TOTEXE)
@@ -429,14 +700,43 @@ result = max(0.0, round(earn - exe, 2))]]></field>
             <field name="sequence" eval="40"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute"><![CDATA[base_tax = round((((categories.TAXINC*.35)-2050) if categories.TAXINC > 14000 else
-                ((categories.TAXINC*.30)-1350) if categories.TAXINC >= 10001 and categories.TAXINC <= 14000 else
-                ((categories.TAXINC*.25)-850) if categories.TAXINC >= 7001 and categories.TAXINC <= 10000 else
-                ((categories.TAXINC*.20)-500) if categories.TAXINC >= 4001 and categories.TAXINC <= 7000 else
-                ((categories.TAXINC*.15)-300) if categories.TAXINC >= 2001 and categories.TAXINC <= 4000 else
-                0), 2)
-all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-cia_tax = sum(l.tax_amount for l in all_lines if l.tax_amount) if all_lines else 0.0
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([
+        ('employee_id', '=', employee.id),
+        ('active', '=', True),
+        ('adjustment_id.active', '=', True)
+    ]) if 'hr.payroll.adjustment.line' in employee.env else False
+
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+ciab_lines = [l for l in (all_lines or []) if (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0)) and l.amount > 0]
+if p_id and ciab_lines:
+    matched = [l for l in ciab_lines if ((getattr(l.adjustment_id, 'payroll_period_id', False) and l.adjustment_id.payroll_period_id == p_id) or (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id)) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched:
+        ciab_lines = matched
+    else:
+        unassigned = [l for l in ciab_lines if not l.adjustment_id.period_id or l.adjustment_id.period_id == p_id]
+        if unassigned:
+            latest_id = max(l.adjustment_id.id for l in unassigned if l.adjustment_id)
+            ciab_lines = [l for l in unassigned if l.adjustment_id and l.adjustment_id.id == latest_id]
+        else:
+            ciab_lines = []
+
+adj_amt = sum(l.amount for l in ciab_lines) if ciab_lines else (contract.cash_indemnity_bank if 'cash_indemnity_bank' in contract._fields and contract.cash_indemnity_bank else 0.0)
+
+taxable = max(0.0, round(categories.TAXINC - adj_amt, 2))
+
+base_tax = round((((taxable * 0.35) - 2050) if taxable > 14000 else
+                 ((taxable * 0.30) - 1350) if taxable >= 10001 and taxable <= 14000 else
+                 ((taxable * 0.25) - 850) if taxable >= 7001 and taxable <= 10000 else
+                 ((taxable * 0.20) - 500) if taxable >= 4001 and taxable <= 7000 else
+                 ((taxable * 0.15) - 300) if taxable >= 2001 and taxable <= 4000 else
+                 0), 2)
+
+cia_tax = sum(l.tax_amount for l in ciab_lines if l.tax_amount) if ciab_lines else 0.0
 result = round(base_tax + cia_tax, 2)]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_income_tax"/>
             <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127010020"/>
@@ -467,10 +767,27 @@ result = round(base_tax + cia_tax, 2)]]></field>
             <field name="sequence" eval="43"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute"><![CDATA[all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-ciab_lines = all_lines.filtered(lambda l: (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0)) and l.amount > 0) if all_lines else False
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+ciab_lines = [l for l in (all_lines or []) if (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0)) and l.amount > 0]
+if p_id and ciab_lines:
+    matched = [l for l in ciab_lines if ((getattr(l.adjustment_id, 'payroll_period_id', False) and l.adjustment_id.payroll_period_id == p_id) or (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id)) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched:
+        ciab_lines = matched
+    else:
+        unassigned = [l for l in ciab_lines if not l.adjustment_id.period_id or l.adjustment_id.period_id == p_id]
+        if unassigned:
+            latest_id = max(l.adjustment_id.id for l in unassigned if l.adjustment_id)
+            ciab_lines = [l for l in unassigned if l.adjustment_id and l.adjustment_id.id == latest_id]
+        else:
+            ciab_lines = []
 result = sum(l.amount for l in ciab_lines) if ciab_lines else 0.0]]></field>
-            <field name="account_debit" ref="bunna_hr_payroll.account_payroll_0127020305"/>
+            <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020305"/>
             <field name="appears_on_payslip" eval="True"/>
         </record>
 
@@ -527,8 +844,13 @@ else:
             <field name="sequence" eval="46"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-manual_amt = sum(all_lines.filtered(lambda l: not l.code or l.code == 'OTHER' or (l.adjustment_id and l.adjustment_id.code == 'OTHER')).mapped('amount')) if all_lines else 0.0
+            <field name="amount_python_compute">try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+manual_amt = sum(l.amount for l in all_lines if not l.code or l.code == 'OTHER' or (l.adjustment_id and l.adjustment_id.code == 'OTHER')) if all_lines else 0.0
 result = manual_amt</field>
             <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020021"/>
             <field name="appears_on_payslip" eval="True"/>
@@ -543,8 +865,26 @@ result = manual_amt</field>
             <field name="sequence" eval="47"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-manual_amt = sum(all_lines.filtered(lambda l: l.code == 'OD' or (l.adjustment_id and l.adjustment_id.code == 'OD')).mapped('amount')) if all_lines else 0.0
+            <field name="amount_python_compute">try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+od_candidates = [l for l in (all_lines or []) if l.code == 'OD' or (l.adjustment_id and l.adjustment_id.code == 'OD') or (l.adjustment_id and 'OD' in (l.adjustment_id.name or '').upper().split())]
+if p_id and od_candidates:
+    matched = [l for l in od_candidates if (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched:
+        od_candidates = matched
+    else:
+        unassigned = [l for l in od_candidates if not l.adjustment_id.period_id or l.adjustment_id.period_id == p_id]
+        if unassigned:
+            latest_id = max(l.adjustment_id.id for l in unassigned if l.adjustment_id)
+            od_candidates = [l for l in unassigned if l.adjustment_id and l.adjustment_id.id == latest_id]
+        else:
+            od_candidates = []
+manual_amt = sum(l.amount for l in od_candidates) if od_candidates else 0.0
 result = manual_amt</field>
             <field name="appears_on_payslip" eval="True"/>
         </record>
@@ -558,9 +898,27 @@ result = manual_amt</field>
             <field name="sequence" eval="48"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-manual_amt = sum(all_lines.filtered(lambda l: l.code == 'ASBEZA' or (l.adjustment_id and l.adjustment_id.code == 'ASBEZA')).mapped('amount')) if all_lines else 0.0
-result = manual_amt</field>
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+asbeza_candidates = [l for l in (all_lines or []) if l.code == 'ASBEZA' or (l.adjustment_id and l.adjustment_id.code == 'ASBEZA') or (l.adjustment_id and 'ASBEZA' in (l.adjustment_id.name or '').upper().split())]
+if p_id and asbeza_candidates:
+    matched = [l for l in asbeza_candidates if ((getattr(l.adjustment_id, 'payroll_period_id', False) and l.adjustment_id.payroll_period_id == p_id) or (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id)) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched:
+        asbeza_candidates = matched
+    else:
+        unassigned = [l for l in asbeza_candidates if (not getattr(l.adjustment_id, 'payroll_period_id', False) and not l.adjustment_id.period_id) or l.adjustment_id.payroll_period_id == p_id or l.adjustment_id.period_id == p_id]
+        if unassigned:
+            latest_id = max(l.adjustment_id.id for l in unassigned if l.adjustment_id)
+            asbeza_candidates = [l for l in unassigned if l.adjustment_id and l.adjustment_id.id == latest_id]
+        else:
+            asbeza_candidates = []
+manual_amt = sum(l.amount for l in asbeza_candidates) if asbeza_candidates else 0.0
+result = manual_amt]]></field>
             <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020021"/>
             <field name="appears_on_payslip" eval="True"/>
         </record>
@@ -588,8 +946,13 @@ result = manual_amt</field>
             <field name="sequence" eval="49"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-manual_amt = sum(all_lines.filtered(lambda l: l.code == 'COD' or (l.adjustment_id and l.adjustment_id.code == 'COD')).mapped('amount')) if all_lines else 0.0
+            <field name="amount_python_compute">try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+manual_amt = sum(l.amount for l in all_lines if l.code == 'COD' or (l.adjustment_id and l.adjustment_id.code == 'COD')) if all_lines else 0.0
 result = manual_amt</field>
             <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020021"/>
             <field name="appears_on_payslip" eval="True"/>
@@ -604,9 +967,28 @@ result = manual_amt</field>
             <field name="sequence" eval="50"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute"><![CDATA[all_lines = adj_lines if 'adj_lines' in locals() and adj_lines is not False else (employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False)
-cia_salary = sum(l.salary_amount for l in all_lines if l.salary_amount) if all_lines else 0.0
-result = round(((categories.BASIC + categories.ALW) - (categories.Emp_cont + categories.DED + categories.ADHDED)) + cia_salary, 2)]]></field>
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+ci_lines = [l for l in (all_lines or []) if (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0))]
+if p_id and ci_lines:
+    matched = [l for l in ci_lines if ((getattr(l.adjustment_id, 'payroll_period_id', False) and l.adjustment_id.payroll_period_id == p_id) or (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id)) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched:
+        ci_lines = matched
+    else:
+        unassigned = [l for l in ci_lines if (not getattr(l.adjustment_id, 'payroll_period_id', False) and not l.adjustment_id.period_id) or l.adjustment_id.payroll_period_id == p_id or l.adjustment_id.period_id == p_id]
+        if unassigned:
+            latest_id = max(l.adjustment_id.id for l in unassigned if l.adjustment_id)
+            ci_lines = [l for l in unassigned if l.adjustment_id and l.adjustment_id.id == latest_id]
+        else:
+            ci_lines = []
+cia_salary = sum(l.salary_amount for l in ci_lines if l.salary_amount) if ci_lines else 0.0
+tax_amount = sum(l.tax_amount for l in ci_lines if l.tax_amount) if ci_lines else 0.0
+result = round(((categories.BASIC + categories.ALW) - (categories.Emp_cont + categories.DED + categories.ADHDED)) + tax_amount + cia_salary, 2)]]></field>
             <field name="register_id" ref="bunna_hr_payroll.contrib_register_net"/>
             <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020310"/>
             <field name="appears_on_payslip" eval="True"/>
@@ -617,7 +999,6 @@ result = round(((categories.BASIC + categories.ALW) - (categories.Emp_cont + cat
              ======================================================== -->
 
         <!-- Common rule list macro helper -->
-
         <record id="structure_bunna_standard" model="hr.payroll.structure">
             <field name="code">BUNNA_REGULAR</field>
             <field name="name">Bunna Bank Standard Salary Structure</field>

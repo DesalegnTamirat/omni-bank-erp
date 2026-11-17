@@ -28,9 +28,11 @@
                     <button name="action_load_from_vacancy" string="Load Panel &amp; Candidates" type="object" class="btn-secondary" icon="fa-refresh" invisible="state == 'approved'" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
                     <button name="action_generate_signature_lines" string="Re-generate Committee Roles" type="object" class="btn-secondary" icon="fa-users" invisible="state != 'draft'" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
                     <button name="action_notify_panel_members" string="Notify Panel for Digital Sign-Off" type="object" class="btn-secondary" icon="fa-envelope" invisible="state in ('draft', 'approved') or panel_notified == True" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_sign_my_minute_line" string="✍️ Sign Minute" type="object" class="btn-success" invisible="not current_user_can_sign"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,pending_approval,approved"/>
                 </header>
                 <sheet>
+                    <field name="current_user_can_sign" invisible="1"/>
                     <field name="panel_notified" invisible="1"/>
                     <widget name="web_ribbon" title="APPROVED" bg_color="text-bg-success" invisible="state != 'approved'"/>
                     <widget name="web_ribbon" title="PENDING APPROVAL" bg_color="text-bg-warning" invisible="state != 'pending_approval'"/>
@@ -45,33 +47,70 @@
                             <field name="vacancy_id" readonly="state != 'draft'"/>
                             <field name="recruitment_type"/>
                             <field name="meeting_date" readonly="state != 'draft'"/>
+                            <field name="meeting_place" invisible="recruitment_type != 'external'"/>
+                            <field name="meeting_time" invisible="recruitment_type != 'external'"/>
+                            <field name="meeting_end_time" invisible="recruitment_type != 'external'"/>
                             <field name="is_fully_signed" widget="boolean"/>
                         </group>
                         <group string="Approval Hierarchy &amp; Committee Roles">
+                            <field name="allowed_chairperson_user_ids" invisible="1"/>
+                            <field name="allowed_panel_member_user_ids" invisible="1"/>
+                            <field name="allowed_secretary_user_ids" invisible="1"/>
+                            <field name="allowed_observer_user_ids" invisible="1"/>
                             <field name="approval_hierarchy_type" widget="radio" readonly="state != 'draft'"/>
 
                             <!-- Head Office & District Grade II and above -->
-                            <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
-                            <field name="panel_member_id" string="Respective Senior Management (Panel Member)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
-                            <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                            <field name="chairperson_id" string="Chief People and Culture Officer (Chairperson)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                            <field name="panel_member_id" string="Respective Senior Management (Panel Member)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
+                            <field name="secretary_id" string="Director People Operation Management Directorate (Panel Member &amp; Secretary)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'ho_district_grade2_plus'"/>
 
                             <!-- For all non-managerial head office -->
-                            <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                            <field name="panel_member_id" string="Head Office / District Director (Panel Member)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                            <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
-                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                            <field name="chairperson_id" string="Director People Operation Management Directorate (Chairperson)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                            <field name="panel_member_id" string="Head Office / District Director (Panel Member)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                            <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
+                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'non_managerial_ho'"/>
 
                             <!-- For all non-managerial district -->
-                            <field name="chairperson_id" string="District Director (Chairperson)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                            <field name="panel_member_id" string="District Division Member (Panel Member)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                            <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
-                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'" invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                            <field name="chairperson_id" string="District Director (Chairperson)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                            <field name="panel_member_id" string="District Division Member (Panel Member)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                            <field name="secretary_id" string="Principal HR (Panel Member &amp; Secretary)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'non_managerial_district'"/>
+                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type != 'non_managerial_district'"/>
 
                             <!-- Default fallback if unassigned -->
-                            <field name="chairperson_id" string="Chairperson" readonly="state != 'draft'" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                            <field name="panel_member_id" string="Panel Member" readonly="state != 'draft'" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                            <field name="secretary_id" string="Panel Member &amp; Secretary" readonly="state != 'draft'" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
-                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'" invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                            <field name="chairperson_id" string="Chairperson" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_chairperson_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                            <field name="panel_member_id" string="Panel Member" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_panel_member_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                            <field name="secretary_id" string="Panel Member &amp; Secretary" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_secretary_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
+                            <field name="observer_id" string="Labor Representative (Observer)" readonly="state != 'draft'"
+                                   domain="[('id', 'in', allowed_observer_user_ids)]" options="{'no_create': True, 'no_open': True}"
+                                   invisible="approval_hierarchy_type in ('ho_district_grade2_plus', 'non_managerial_ho', 'non_managerial_district')"/>
                         </group>
                     </group>
                     <notebook>
@@ -99,12 +138,13 @@
                                     <field name="role_label" readonly="1" string="Role Title"/>
                                     <field name="user_id" readonly="1" string="Signatory User"/>
                                     <field name="is_mandatory" readonly="1" widget="boolean_toggle" string="Mandatory?"/>
-                                    <field name="digital_signature" widget="signature"/>
+                                    <field name="digital_signature" widget="image" options="{'size': [140, 45]}" readonly="1" invisible="not digital_signature"/>
+                                    <button name="action_sign_digitally" string="✍️ Click to Sign" type="object" class="btn btn-outline-warning btn-sm" invisible="digital_signature" help="Click here to open the digital signature wizard"/>
                                     <field name="signed_on" readonly="1" string="Signed Date &amp; Time"/>
                                     <field name="state" widget="badge"
                                            decoration-success="state == 'signed'"
                                            decoration-warning="state == 'pending'"/>
-                                    <button name="action_sign_digitally" string="Confirm Sign" type="object" class="btn-primary" invisible="state == 'signed'"/>
+                                    <button name="action_sign_digitally" string="✍️ Sign" type="object" class="btn-primary" invisible="state == 'signed'"/>
                                 </list>
                             </field>
                         </page>
@@ -129,4 +169,5 @@
             </p>
         </field>
     </record>
-</odoo>
+    <!-- Committee Signature Wizard View -->
+        </odoo>

@@ -1,10 +1,44 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api, _
 from markupsafe import Markup
+
+_logger = logging.getLogger(__name__)
 
 
 class DisciplineCaseNotifications(models.Model):
     _inherit = 'discipline.case'
+
+    def _send_discuss_direct_message(self, sender_user, target_partner, msg_html):
+        """Safely dispatch 1-on-1 Odoo Discuss direct chat message on discipline.case."""
+        if not target_partner or not sender_user:
+            return
+        try:
+            partner = target_partner.partner_id if hasattr(target_partner, 'partner_id') and target_partner.partner_id else target_partner
+            sender_partner = sender_user.partner_id if hasattr(sender_user, 'partner_id') else sender_user
+            if not partner or not sender_partner:
+                return
+
+            channel = False
+            DiscussChannel = self.env['discuss.channel'].sudo()
+            if hasattr(DiscussChannel, '_get_or_create_chat'):
+                channel = DiscussChannel.with_user(sender_user)._get_or_create_chat(
+                    partners_to=[partner.id]
+                )
+            elif hasattr(DiscussChannel, 'channel_get'):
+                channel_info = DiscussChannel.channel_get(partners_to=[sender_partner.id, partner.id])
+                if channel_info and 'id' in channel_info:
+                    channel = DiscussChannel.browse(channel_info['id'])
+
+            if channel:
+                channel.sudo().with_user(sender_user).message_post(
+                    body=Markup(msg_html) if not isinstance(msg_html, Markup) else msg_html,
+                    message_type='comment',
+                    subtype_xmlid='mail.mt_comment',
+                    author_id=sender_partner.id,
+                )
+        except Exception as e:
+            _logger.warning("Failed to dispatch Discuss direct message for case: %s", str(e))
 
     def _post_discuss_dm(self, sender_user, recipient_user, msg_body, subscribe_case=True):
         """Shared helper to post a 1-on-1 Odoo Discuss direct message from sender_user to recipient_user."""
@@ -74,6 +108,7 @@ class DisciplineCaseNotifications(models.Model):
                     penalty_details.append(_('%d Day(s) Salary Fine') % int(rec.fine_days))
                 penalty_sub = (' (' + ', '.join(penalty_details) + ')') if penalty_details else ''
 
+                appeal_days_text = f"{rec.get_appeal_window_days()} working days" if hasattr(rec, 'get_appeal_window_days') else "5 working days"
                 msg_body = Markup(_(
                     '<p><strong>Official Disciplinary Decision &amp; Warning Notice</strong></p>'
                     '<p>Dear %s,</p>'
@@ -82,9 +117,9 @@ class DisciplineCaseNotifications(models.Model):
                     '<li><strong>Misconduct Clause:</strong> %s</li>'
                     '<li><strong>Enforced Sanction:</strong> %s%s</li>'
                     '<li><strong>Decision Date:</strong> %s</li>'
-                    '<li><strong>Statutory Appeal Deadline:</strong> %s (10-calendar-day statutory window)</li>'
+                    '<li><strong>Statutory Appeal Deadline:</strong> %s (%s statutory window)</li>'
                     '</ul>'
-                    '<p>You have the right to lodge a formal written appeal in Bunna Bank ERP within 10 calendar days.</p>'
+                    '<p>You have the right to lodge a formal written appeal in Bunna Bank ERP within %s.</p>'
                 ) % (
                     emp.name,
                     rec.name,
@@ -92,10 +127,79 @@ class DisciplineCaseNotifications(models.Model):
                     sanction_name,
                     penalty_sub,
                     rec.final_decision_date.strftime('%B %d, %Y') if rec.final_decision_date else fields.Date.today(),
-                    rec.appeal_deadline.strftime('%B %d, %Y') if rec.appeal_deadline else _('10 calendar days from receipt'),
+                    rec.appeal_deadline.strftime('%B %d, %Y') if rec.appeal_deadline else _('%s from receipt') % appeal_days_text,
+                    appeal_days_text,
+                    appeal_days_text,
                 ))
 
             rec._post_discuss_dm(manager_user, emp_user, msg_body, subscribe_case=True)
+
+    def _dispatch_cc_stakeholder_notifications(self):
+        """Dispatches CC notifications to designated governance stakeholders upon case enforcement:
+        1. People Operations Management Directorate (POMD) - for personnel file record
+        2. Coach of Coach (e.g. Directorate Director Derese) - for division management oversight
+        3. Internal Audit Directorate - for compliance tracking
+        """
+        for rec in self:
+            sender_user = rec.approver_id or rec.enforced_by_id or self.env.user
+            emp = rec.employee_id.sudo() if rec.employee_id else False
+            emp_name = rec.employee_name_amharic or (emp.name if emp else _('Employee'))
+            sanction_name = rec.get_sanction_display_text_amharic() if hasattr(rec, 'get_sanction_display_text_amharic') else (rec.punishment_type or '')
+            eth_date_str = rec.get_ethiopian_date_long(rec.final_decision_date) if hasattr(rec, 'get_ethiopian_date_long') else str(rec.final_decision_date or '')
+
+            # CC Recipients
+            cc_recipients = []
+
+            # 1. POMD (Personnel Operations Management Directorate)
+            pomd_user = self.env['hr.employee'].sudo().get_pomd_user()
+            if pomd_user and pomd_user.id != sender_user.id:
+                cc_recipients.append((pomd_user, 'ለሰው ኃይል ኦፕሬሽንስ አስተዳደር ዳይሬክቶሬት (POMD)'))
+
+            # 2. Coach of Coach (e.g. Directorate Director Derese)
+            coach_of_coach = rec._get_coach_of_coach() if hasattr(rec, '_get_coach_of_coach') else False
+            if coach_of_coach and coach_of_coach.user_id and coach_of_coach.user_id.id != sender_user.id:
+                job_title = coach_of_coach.job_id.name if coach_of_coach.job_id else 'ዳይሬክተር'
+                cc_recipients.append((coach_of_coach.user_id, f'ለ{coach_of_coach.name} ({job_title})'))
+
+            # 3. Internal Audit Directorate (Only for Committee / Escalated cases, not direct enforcement)
+            if rec.case_action_track != 'direct_enforce':
+                audit_user = self.env['hr.employee'].sudo().get_audit_director_user()
+                if audit_user and audit_user.id != sender_user.id:
+                    cc_recipients.append((audit_user, 'ለውስጥ ኦዲት ዳይሬክቶሬት'))
+
+            # Send Discuss DM and log in chatter
+            notified_labels = []
+            for recipient_user, role_desc in cc_recipients:
+                if not recipient_user.partner_id:
+                    continue
+                notified_labels.append(f"{recipient_user.name} ({role_desc})")
+                msg_body = Markup(_(
+                    '<p><strong>የዲሲፕሊን ውሳኔ ማሳወቂያ ግልባጭ (CC: Formal Disciplinary Notice Notification)</strong></p>'
+                    '<p>ክቡር/ክብርት %s፣</p>'
+                    '<p>በሠራተኛ <strong>%s</strong> ላይ የተላለፈው ይፋዊ የዲሲፕሊን ውሳኔ ተፈጻሚ ተደርጓል (Case Ref: <strong>%s</strong>)።</p>'
+                    '<ul>'
+                    '<li><strong>የጥፋት ዓይነት፡</strong> %s</li>'
+                    '<li><strong>የተወሰነው ቅጣት፡</strong> %s</li>'
+                    '<li><strong>የተወሰነበት ቀን፡</strong> %s</li>'
+                    '<li><strong>የይግባኝ ማቅረቢያ ጊዜ፡</strong> %s የሥራ ቀናት</li>'
+                    '</ul>'
+                    '<p>ይህ የዲሲፕሊን ውሳኔ በቡና ባንክ የሰው ኃይል አስተዳደር ሥርዓት ውስጥ በግልባጭ (CC) ለእርስዎ እንዲደርስ የተደረገ ነው።</p>'
+                ) % (
+                    recipient_user.name,
+                    emp_name,
+                    rec.name,
+                    rec.offense_id.name if rec.offense_id else _('የዲሲፕሊን ጥፋት'),
+                    sanction_name,
+                    eth_date_str,
+                    rec.get_appeal_window_days() if hasattr(rec, 'get_appeal_window_days') else 10,
+                ))
+                rec._post_discuss_dm(sender_user, recipient_user, msg_body, subscribe_case=True)
+
+            if notified_labels:
+                rec.message_post(
+                    body=Markup(_('<strong>CC Stakeholder Notifications Dispatched:</strong><br/>%s') % '<br/>'.join(f'• {lbl}' for lbl in notified_labels)),
+                    subtype_xmlid='mail.mt_note'
+                )
 
     def _send_chief_submission_discuss_notification(self):
         """Send 1-on-1 Odoo Discuss direct message to the Respective Chief Officer upon case submission."""
@@ -502,6 +606,7 @@ class DisciplineCaseNotifications(models.Model):
             penalty_details.append(_('%d Day(s) Salary Fine') % int(self.fine_days))
         penalty_sub = (' (' + ', '.join(penalty_details) + ')') if penalty_details else ''
 
+        appeal_days_text = f"{self.get_appeal_window_days()} working days" if hasattr(self, 'get_appeal_window_days') else "5 working days"
         body_html = Markup(_(
             '<p><strong>Official Disciplinary Decision &amp; Warning Notice</strong></p>'
             '<p>A formal disciplinary action has been enforced by <strong>%s</strong> (%s).</p>'
@@ -511,7 +616,7 @@ class DisciplineCaseNotifications(models.Model):
             '<li><strong>Misconduct Clause:</strong> %s</li>'
             '<li><strong>Enforced Sanction:</strong> %s%s</li>'
             '<li><strong>Decision Date:</strong> %s</li>'
-            '<li><strong>Statutory Appeal Deadline:</strong> %s (10-calendar-day window)</li>'
+            '<li><strong>Statutory Appeal Deadline:</strong> %s (%s window)</li>'
             '</ul>'
             '<p>The official warning letter can be viewed and printed directly using the <strong>Print Disciplinary Notice</strong> button at the top header.</p>'
         ) % (
@@ -523,7 +628,8 @@ class DisciplineCaseNotifications(models.Model):
             sanction_name,
             penalty_sub,
             self.final_decision_date.strftime('%B %d, %Y') if self.final_decision_date else fields.Date.today(),
-            self.appeal_deadline.strftime('%B %d, %Y') if self.appeal_deadline else _('10 days from receipt')
+            self.appeal_deadline.strftime('%B %d, %Y') if self.appeal_deadline else _('%s from receipt') % appeal_days_text,
+            appeal_days_text
         ))
 
         partner_ids = []
@@ -561,3 +667,159 @@ class DisciplineCaseNotifications(models.Model):
         ])
         for case in expired_cases:
             case.message_post(body=_('Appeal submission window of 10 calendar days has expired for Case %s.') % case.name)
+
+    def _send_committee_enforcement_ceo_notification(self):
+        """Send executive briefing directly to the CEO when a committee decision is enforced by the CPCO."""
+        for rec in self:
+            # Strictly restricted to Disciplinary Committee track cases (never direct coach cases)
+            if rec.case_action_track == 'direct_enforce':
+                continue
+            if rec.case_action_track != 'committee' and not rec.committee_meeting_ids:
+                continue
+
+            EmpModel = self.env['hr.employee'].sudo()
+            ceo_user = EmpModel.get_ceo_user()
+            if not ceo_user:
+                continue
+
+            # If CEO themselves enforced it, no briefing needed
+            if rec.env.user.id == ceo_user.id or rec.is_ceo_user:
+                continue
+
+            # Strictly verify enforcing authority is CPCO / Committee Chairman
+            cpco_user = EmpModel.get_cpco_user()
+            is_cpco = (cpco_user and rec.env.user.id == cpco_user.id) or rec.env.user.has_group('discipline_management.group_discipline_cpco')
+            if not is_cpco:
+                continue
+
+            ceo_name = (ceo_user.partner_id.name or ceo_user.name or _('CEO')).strip()
+            cpco_name = rec.env.user.name
+            emp = rec.sudo().employee_id
+            emp_name = emp.name if emp else _('Staff')
+            emp_job = emp.job_id.name if emp and emp.job_id else ''
+            dept_name = rec.sudo().department_id.name if rec.sudo().department_id else ''
+            sanction_display = rec.get_sanction_display_text()
+            article_display = rec.legal_article_display or (rec.offense_id and rec.offense_id.name) or _('Policy Clause')
+            today_str = fields.Date.context_today(self).strftime('%B %d, %Y')
+
+            msg_body = Markup(
+                f"<p><strong>EXECUTIVE BRIEFING: COMMITTEE CASE ENFORCED BY CPCO</strong></p>"
+                f"<p>Dear {ceo_name},</p>"
+                f"<p>The Disciplinary Committee decision on Case <strong>{rec.name}</strong> has been officially approved and enforced by the Disciplinary Committee Chairman (CPCO):</p>"
+                f"<ul>"
+                f"<li><strong>Subject Employee:</strong> {emp_name}" + (f" ({emp_job}, {dept_name})" if emp_job else f" ({dept_name})") + f"</li>"
+                f"<li><strong>Violated Clause:</strong> {article_display}</li>"
+                f"<li><strong>Enforced Sanction:</strong> <strong>{sanction_display}</strong></li>"
+                f"<li><strong>Enforcing Authority:</strong> {cpco_name} (CPCO / Committee Chairman)</li>"
+                f"<li><strong>Enforcement Date:</strong> {today_str}</li>"
+                f"</ul>"
+                f"<p>The statutory appeal window is now active. Full committee minutes and resolution are accessible on the case record.</p>"
+            )
+
+            rec.message_post(
+                body=msg_body,
+                partner_ids=[ceo_user.partner_id.id] if ceo_user.partner_id else False,
+                subtype_xmlid='mail.mt_comment',
+            )
+            rec._post_discuss_dm(rec.env.user, ceo_user, msg_body, subscribe_case=True)
+
+    @api.model
+    def _cron_check_case_sla_deadlines(self):
+        """Daily cron check to monitor stage SLAs and statutory prescription deadlines, alerting secretaries and reviewers."""
+        active_cases = self.search([
+            ('state', 'not in', ['closed', 'revoked', 'enforced'])
+        ])
+        for case in active_cases:
+            case._compute_stage_sla_tracking()
+            if case.sla_status in ('warning', 'overdue'):
+                status_label = _('CRITICAL: CASE EXPIRING / OVERDUE') if case.sla_status == 'overdue' else _('WARNING: APPROACHING SLA DEADLINE')
+                deadline_date = case.stage_deadline or case.prescription_deadline
+                case.message_post(
+                    body=Markup(_(
+                        '<strong>%(status)s</strong><br/>'
+                        'Disciplinary Case <strong>%(case_name)s</strong> (Current Stage: <strong>%(stage)s</strong>) '
+                        'has been in this stage for %(days)d day(s). Target deadline: <strong>%(deadline)s</strong>.<br/>'
+                        'Executive secretaries and reviewers are requested to expedite action to prevent prescription.'
+                    ) % {
+                        'status': status_label,
+                        'case_name': case.name,
+                        'stage': dict(case._fields['state'].selection).get(case.state, case.state),
+                        'days': case.days_in_stage,
+                        'deadline': deadline_date.strftime('%B %d, %Y') if deadline_date else 'Immediate',
+                    }),
+                    message_type='notification',
+                    subtype_xmlid='mail.mt_comment',
+                )
+
+        # Dispatch consolidated executive & assistant morning digest via Discuss DM
+        if hasattr(self, '_cron_case_expiration_followup_alerts'):
+            self._cron_case_expiration_followup_alerts()
+
+    def _notify_assigned_secretaries_on_routing(self, target_executive, stage_name=None):
+        """
+        Notify assigned secretaries when a case routes to their executive.
+        Dispatches a confidential Discuss notification containing milestone flow and deadlines only.
+        """
+        for rec in self:
+            if not target_executive:
+                continue
+            sec_users = target_executive.get_assigned_secretary_users()
+            if not sec_users:
+                continue
+
+            base_url = rec.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+            action_url = f"{base_url}/web#id={rec.id}&model=discipline.case&view_type=form" if base_url else f"/web#id={rec.id}&model=discipline.case&view_type=form"
+            stage_display = stage_name or (dict(rec._fields['state'].selection).get(rec.state, rec.state) if 'state' in rec._fields else rec.state)
+            deadline_str = rec.stage_deadline.strftime('%B %d, %Y') if rec.stage_deadline else _('Immediate')
+            presc_str = rec.prescription_deadline.strftime('%B %d, %Y') if rec.prescription_deadline else _('Imminent')
+            sender = rec.env.user or rec.env.ref('base.user_root')
+
+            for sec in sec_users:
+                if sec.id == target_executive.id:
+                    continue
+                body = Markup(
+                    f"<div style='font-family: Arial, sans-serif; max-width: 650px;'>"
+                    f"<p style='color: #856404; font-weight: bold; font-size: 14px;'>🔔 NEW CASE PENDING YOUR EXECUTIVE ({target_executive.name})</p>"
+                    f"<p>Dear {sec.name},</p>"
+                    f"<p>Disciplinary Case <strong>{rec.name}</strong> has been routed to <strong>{target_executive.name}</strong> for review and executive action in stage <strong>{stage_display}</strong>.</p>"
+                    f"<table style='width: 100%; border: 1px solid #dee2e6; border-collapse: collapse; font-size: 13px; margin: 10px 0;'>"
+                    f"  <tr style='background: #f8f9fa; border-bottom: 1px solid #dee2e6;'><td style='padding: 6px; font-weight: bold;'>Subject Employee</td><td style='padding: 6px;'>{rec.employee_id.name or '-'}</td></tr>"
+                    f"  <tr style='border-bottom: 1px solid #dee2e6;'><td style='padding: 6px; font-weight: bold;'>Department / Branch</td><td style='padding: 6px;'>{rec.department_id.name or '-'}</td></tr>"
+                    f"  <tr style='border-bottom: 1px solid #dee2e6;'><td style='padding: 6px; font-weight: bold;'>Current Stage</td><td style='padding: 6px;'>{stage_display}</td></tr>"
+                    f"  <tr style='border-bottom: 1px solid #dee2e6;'><td style='padding: 6px; font-weight: bold;'>Stage SLA Target</td><td style='padding: 6px;'>{rec.stage_target_days} day(s) (Deadline: {deadline_str})</td></tr>"
+                    f"  <tr style='border-bottom: 1px solid #dee2e6;'><td style='padding: 6px; font-weight: bold;'>Statutory Prescription Deadline</td><td style='padding: 6px; color: #dc3545; font-weight: bold;'>{presc_str}</td></tr>"
+                    f"</table>"
+                    f"<p style='margin-top: 12px;'>"
+                    f"  <a href='{action_url}' style='background-color: #795548; color: #ffffff; padding: 7px 14px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block; font-size: 12px;'>"
+                    f"      👉 Open Case {rec.name} in Follow-up Tracker"
+                    f"  </a>"
+                    f"</p>"
+                    f"<p style='color: #6c757d; font-size: 11px; margin-top: 10px; font-style: italic;'>"
+                    f"  🔒 Confidentiality Mandate: Detailed misconduct allegations and evidence dossiers remain confidential to the reviewing executive."
+                    f"</p>"
+                    f"</div>"
+                )
+                rec._post_discuss_dm(sender, sec, body, subscribe_case=False)
+
+
+class MailThread(models.AbstractModel):
+    _inherit = 'mail.thread'
+
+    def _notify_thread_by_email(self, message, recipients_data, **kwargs):
+        """
+        Discipline Management Email Notification Gate:
+        When email notifications are disabled in Discipline Settings,
+        suppress external SMTP emails for all discipline models (discipline.*)
+        to prevent SMTP delivery errors on test/dev environments without mail servers.
+        In-app Discuss and Chatter activity remain fully functional.
+        """
+        is_discipline_record = (
+            (self._name and self._name.startswith('discipline.')) or
+            (message and message.model and message.model.startswith('discipline.'))
+        )
+        if is_discipline_record:
+            ICP = self.env['ir.config_parameter'].sudo()
+            enable_email = ICP.get_param('discipline.enable_email_notifications', default='False').strip().lower() in ('true', '1')
+            if not enable_email:
+                return True
+        return super()._notify_thread_by_email(message, recipients_data, **kwargs)

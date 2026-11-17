@@ -36,7 +36,7 @@ class AutomaticAppraisalAcceptWizard(models.TransientModel):
         help='Appraisals in Notified status with an Accept By deadline on or before this date will be auto-accepted.',
     )
     cutoff_date = fields.Date(
-        string='Cutoff Date',
+        string='Accept By Deadline',
         related='accept_by_deadline',
         readonly=False,
         store=True,

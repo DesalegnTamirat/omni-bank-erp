@@ -72,9 +72,9 @@
                                                 <td style="padding:10px 14px;background:#fafaf9;font-weight:600;color:#64748b;font-size:12px;border-bottom:1px solid #e2e8f0;">Account Number</td>
                                                 <td style="padding:10px 14px;color:#1e293b;font-size:13px;border-bottom:1px solid #e2e8f0;"><t t-out="object.account_number" /></td>
                                             </tr>
-                                            <tr t-if="object.team_id">
-                                                <td style="padding:10px 14px;background:#fafaf9;font-weight:600;color:#64748b;font-size:12px;border-bottom:1px solid #e2e8f0;">Assigned Team</td>
-                                                <td style="padding:10px 14px;color:#1e293b;font-size:13px;border-bottom:1px solid #e2e8f0;"><t t-out="object.team_id.name" /></td>
+                                            <tr t-if="object.operating_unit_id or object.team_id">
+                                                <td style="padding:10px 14px;background:#fafaf9;font-weight:600;color:#64748b;font-size:12px;border-bottom:1px solid #e2e8f0;">Responsible Work Unit</td>
+                                                <td style="padding:10px 14px;color:#1e293b;font-size:13px;border-bottom:1px solid #e2e8f0;"><t t-out="object.operating_unit_id.name or object.team_id.name" /></td>
                                             </tr>
                                             <tr>
                                                 <td style="padding:10px 14px;background:#fafaf9;font-weight:600;color:#64748b;font-size:12px;border-bottom:1px solid #e2e8f0;">Current Status</td>
@@ -179,9 +179,9 @@
                                                 <td style="padding:10px 14px;background:#fafaf9;font-weight:600;color:#64748b;font-size:12px;border-bottom:1px solid #e2e8f0;">Account Number</td>
                                                 <td style="padding:10px 14px;color:#1e293b;font-size:13px;border-bottom:1px solid #e2e8f0;"><t t-out="object.account_number" /></td>
                                             </tr>
-                                            <tr t-if="object.team_id">
-                                                <td style="padding:10px 14px;background:#fafaf9;font-weight:600;color:#64748b;font-size:12px;border-bottom:1px solid #e2e8f0;">Assigned Team</td>
-                                                <td style="padding:10px 14px;color:#1e293b;font-size:13px;border-bottom:1px solid #e2e8f0;"><t t-out="object.team_id.name" /></td>
+                                            <tr t-if="object.operating_unit_id or object.team_id">
+                                                <td style="padding:10px 14px;background:#fafaf9;font-weight:600;color:#64748b;font-size:12px;border-bottom:1px solid #e2e8f0;">Responsible Work Unit</td>
+                                                <td style="padding:10px 14px;color:#1e293b;font-size:13px;border-bottom:1px solid #e2e8f0;"><t t-out="object.operating_unit_id.name or object.team_id.name" /></td>
                                             </tr>
                                             <tr>
                                                 <td style="padding:10px 14px;background:#fafaf9;font-weight:600;color:#64748b;font-size:12px;border-bottom:1px solid #e2e8f0;">Current Status</td>

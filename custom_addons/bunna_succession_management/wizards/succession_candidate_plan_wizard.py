@@ -12,10 +12,10 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
     _name = 'succession.candidate.plan.wizard'
     _description = 'Configure Succession Assessment Plan & Evaluators'
 
-    candidate_id = fields.Many2one('succession.candidate', required=True, readonly=True)
-    employee_id = fields.Many2one(related='candidate_id.employee_id', string='Candidate', readonly=True)
+    candidate_id = fields.Many2one('succession.candidate', string='Succession Candidate', required=True, readonly=True, index=True)
+    employee_id = fields.Many2one(related='candidate_id.employee_id', string='Candidate (Employee)', readonly=True, index=True)
     critical_position_id = fields.Many2one(
-        related='candidate_id.critical_position_id', string='Target Critical Position', readonly=True)
+        related='candidate_id.critical_position_id', string='Target Critical Position', readonly=True, index=True)
 
     def name_get(self):
         result = []
@@ -29,9 +29,7 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
     # =========================================================================
     assessment_scope = fields.Selection([
         ('manager_only', 'Manager Evaluation Only'),
-        ('manager_self', 'Manager + Candidate Self-Assessment'),
         ('manager_spmc', 'Manager + SPMC Committee Evaluation'),
-        ('full_360', 'Comprehensive Multi-Rater (Manager, Self & SPMC)'),
         ('custom', 'Custom Evaluator Selection'),
     ], string='Competency Evaluation Scope', default='manager_only')
 
@@ -40,10 +38,22 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
         help='Include direct manager evaluation on role competencies.')
     plan_include_self = fields.Boolean(
         string='Candidate Self-Assessment', default=False,
-        help='Include candidate self-reflection on competency levels.')
+        help='Self-assessment is disabled.')
     plan_include_spmc = fields.Boolean(
         string='SPMC Committee Evaluation', default=False,
         help='Include executive committee deliberation and rating.')
+    spmc_assessor_ids = fields.Many2many(
+        'res.users',
+        'succession_cand_plan_wiz_spmc_user_rel',
+        'wizard_id',
+        'user_id',
+        string='Assigned SPMC Assessors',
+        domain=lambda self: self._domain_spmc_users(),
+        help='Designated SPMC Committee Members who will evaluate this candidate separately.')
+
+    def _domain_spmc_users(self):
+        group = self.env.ref('bunna_succession_management.group_succession_spmc', raise_if_not_found=False)
+        return [('all_group_ids', 'in', [group.id])] if group else []
 
     competency_formula_notice = fields.Char(
         string='Calculation Method', compute='_compute_formula_notice')
@@ -64,16 +74,17 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
             active_lines = rec.line_ids.filtered(lambda l: not l.waived)
             rec.plan_total_weight = round(sum(active_lines.mapped('weight')), 2)
 
-    @api.depends('plan_include_manager', 'plan_include_self', 'plan_include_spmc')
+    @api.depends('plan_include_manager', 'plan_include_spmc', 'spmc_assessor_ids')
     def _compute_formula_notice(self):
         for rec in self:
             evaluators = []
             if rec.plan_include_manager:
                 evaluators.append('Manager')
-            if rec.plan_include_self:
-                evaluators.append('Self-Assessment')
             if rec.plan_include_spmc:
-                evaluators.append('SPMC Committee')
+                if rec.spmc_assessor_ids:
+                    evaluators.append(f'SPMC Committee ({len(rec.spmc_assessor_ids)} Assessors - separate submissions)')
+                else:
+                    evaluators.append('SPMC Committee')
 
             if not evaluators:
                 rec.competency_formula_notice = "Warning: Select at least one evaluator."
@@ -99,8 +110,9 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
             res['candidate_id'] = cand.id
             res['assessment_scope'] = cand.assessment_scope or 'manager_only'
             res['plan_include_manager'] = cand.plan_include_manager
-            res['plan_include_self'] = cand.plan_include_self
+            res['plan_include_self'] = False  # Self-assessment disabled
             res['plan_include_spmc'] = cand.plan_include_spmc
+            res['spmc_assessor_ids'] = [(6, 0, cand.spmc_assessor_ids.ids)]
 
             eval_map = dict(self.env['succession.assessment.component']._fields.get('evaluation_type', self.env['succession.assessment.component']._fields['source']).selection or [])
             lines_data = []
@@ -130,29 +142,17 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
             self.plan_include_manager = True
             self.plan_include_self = False
             self.plan_include_spmc = False
-        elif scope == 'manager_self':
-            self.plan_include_manager = True
-            self.plan_include_self = True
-            self.plan_include_spmc = False
         elif scope == 'manager_spmc':
             self.plan_include_manager = True
             self.plan_include_self = False
             self.plan_include_spmc = True
-        elif scope == 'full_360':
-            self.plan_include_manager = True
-            self.plan_include_self = True
-            self.plan_include_spmc = True
 
-    @api.onchange('plan_include_manager', 'plan_include_self', 'plan_include_spmc')
+    @api.onchange('plan_include_manager', 'plan_include_spmc')
     def _onchange_competency_pillars(self):
-        if self.plan_include_manager and not self.plan_include_self and not self.plan_include_spmc:
+        if self.plan_include_manager and not self.plan_include_spmc:
             new_scope = 'manager_only'
-        elif self.plan_include_manager and self.plan_include_self and not self.plan_include_spmc:
-            new_scope = 'manager_self'
-        elif self.plan_include_manager and not self.plan_include_self and self.plan_include_spmc:
+        elif self.plan_include_manager and self.plan_include_spmc:
             new_scope = 'manager_spmc'
-        elif self.plan_include_manager and self.plan_include_self and self.plan_include_spmc:
-            new_scope = 'full_360'
         else:
             new_scope = 'custom'
         if self.assessment_scope != new_scope:
@@ -212,8 +212,14 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
             raise UserError(_("The assessment plan is locked and cannot be modified."))
 
         # Enforce validations
-        if not (self.plan_include_manager or self.plan_include_self or self.plan_include_spmc):
-            raise UserError(_("At least one evaluator (Manager, Self, or SPMC Committee) must be selected for Succession Competency Assessment."))
+        if not (self.plan_include_manager or self.plan_include_spmc):
+            raise UserError(_("At least one evaluator (Manager or SPMC Committee) must be selected for Succession Competency Assessment."))
+
+        if self.plan_include_spmc and not self.spmc_assessor_ids:
+            raise UserError(_(
+                "SPMC Committee Evaluation is enabled, but no Designated SPMC Committee Assessors have been assigned.\n\n"
+                "Please assign at least one SPMC Committee Member under 'Designated SPMC Committee Assessors'."
+            ))
 
         # Check waiver reasons if required
         cfg = self.env['succession.assessment.config'].get_config()
@@ -254,8 +260,10 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
         cand_vals = {
             'assessment_scope': self.assessment_scope,
             'plan_include_manager': self.plan_include_manager,
-            'plan_include_self': self.plan_include_self,
+            'plan_include_self': False,  # Self-assessment disabled
             'plan_include_spmc': self.plan_include_spmc,
+            'spmc_assessor_ids': [(6, 0, self.spmc_assessor_ids.ids)],
+            'spmc_assigned_user_id': self.spmc_assessor_ids[0].id if self.spmc_assessor_ids else False,
             'assessment_plan_defined_by_id': self.env.user.id,
             'assessment_plan_defined_date': fields.Datetime.now(),
         }
@@ -270,16 +278,26 @@ class SuccessionCandidatePlanWizard(models.TransientModel):
 
         cand.with_context(skip_apply_scope=True).write(cand_vals)
         cand._refresh_assessment_scores()
-        return {'type': 'ir.actions.act_window_close'}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Assessment Plan Configured'),
+                'message': _('Assessment plan and evaluators successfully updated for %s.') % (cand.employee_id.name or cand.display_name),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }
 
 
 class SuccessionCandidatePlanWizardLine(models.TransientModel):
     _name = 'succession.candidate.plan.wizard.line'
     _description = 'Plan Wizard Component Line'
 
-    wizard_id = fields.Many2one('succession.candidate.plan.wizard', required=True, ondelete='cascade')
-    result_id = fields.Many2one('succession.candidate.assessment.result', string='Candidate Result')
-    component_id = fields.Many2one('succession.assessment.component', string='Component')
+    wizard_id = fields.Many2one('succession.candidate.plan.wizard', required=True, ondelete='cascade', index=True)
+    result_id = fields.Many2one('succession.candidate.assessment.result', string='Candidate Result', index=True)
+    component_id = fields.Many2one('succession.assessment.component', string='Component', index=True)
     component_name = fields.Char(
         string='Assessment Component',
         compute='_compute_component_info', store=True, readonly=True)

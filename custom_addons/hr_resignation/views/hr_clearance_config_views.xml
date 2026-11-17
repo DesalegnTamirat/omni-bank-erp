@@ -66,8 +66,6 @@
                                     <field name="sequence" widget="handle"/>
                                     <field name="name" string="Task"
                                            placeholder="e.g. Return company laptop"/>
-                                    <field name="is_mandatory" string="Mandatory"
-                                           widget="boolean_toggle"/>
                                     <field name="note" string="Description"
                                            placeholder="Optional details or instructions..."/>
                                 </list>

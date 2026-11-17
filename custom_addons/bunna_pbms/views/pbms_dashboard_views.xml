@@ -1,7 +1,173 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- =================================================== -->
+    <!-- NATIVE ODOO XML DASHBOARD: KANBAN VIEW              -->
+    <!-- Fast, pure Odoo XML - zero custom JS/OWL overhead   -->
+    <!-- =================================================== -->
+    <record id="view_pbms_dashboard_kanban" model="ir.ui.view">
+        <field name="name">pbms.dashboard.kanban</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="category" action="action_open_plan_form" type="object" class="o_kanban_mobile" sample="1">
+                <field name="request_number"/>
+                <field name="plan_category_badge_html"/>
+                <field name="category"/>
+                <field name="state"/>
+                <field name="org_unit_id"/>
+                <field name="cycle_id"/>
+                <field name="annual_total"/>
+                <field name="total_manpower_cost"/>
+                <field name="currency_id"/>
+                <field name="is_category_monetary"/>
+                <field name="kanban_breakdown_html"/>
+                <field name="can_reset_to_draft"/>
+                <progressbar field="state" colors='{"approved": "success", "submitted": "warning", "district_approved": "info", "district_endorsed": "info", "ho_reviewed": "info", "draft": "secondary", "returned": "danger"}'/>
+                <templates>
+                    <t t-name="card">
+                        <div class="card-body cursor-pointer" type="object" name="action_open_plan_form" role="button">
+                            <!-- Header: Request Number & State Badge -->
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <a type="object" name="action_open_plan_form" class="fw-bold text-primary fs-6 text-decoration-none">
+                                    <field name="request_number"/>
+                                </a>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'approved'"
+                                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested')"
+                                       decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                                       decoration-muted="state == 'draft'"/>
+                            </div>
+                            <!-- Operating Unit -->
+                            <div class="fw-bold text-truncate text-dark mb-1" style="font-size: 0.92rem;">
+                                <a type="object" name="action_open_plan_form" class="text-dark text-decoration-none">
+                                    <field name="org_unit_id"/>
+                                </a>
+                            </div>
+                            <!-- Category Badge Pill & Cycle -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <a type="object" name="action_open_plan_form" class="text-decoration-none">
+                                    <field name="plan_category_badge_html" widget="html"/>
+                                </a>
+                                <span class="text-muted small fw-medium"><field name="cycle_id"/></span>
+                            </div>
+                            <!-- Category Requirement Breakdown -->
+                            <field name="kanban_breakdown_html" widget="html"/>
+                            <!-- Card Total Row -->
+                            <div class="d-flex justify-content-between align-items-baseline mt-2 pt-1 border-top">
+                                <span class="text-muted fw-bold small text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">Annual Total</span>
+                                <span class="fs-5 fw-bold text-primary">
+                                    <field name="annual_total" widget="integer" invisible="is_category_monetary"/>
+                                    <field name="annual_total" widget="monetary" options="{'no_symbol': True}" invisible="not is_category_monetary"/>
+                                </span>
+                            </div>
+                            <!-- Interactive Card Footer: Activities & Quick Actions -->
+                            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                                <div class="d-flex align-items-center gap-1">
+                                    <field name="activity_ids" widget="kanban_activity"/>
+                                    <field name="create_uid" widget="many2one_avatar_user"/>
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button name="action_submit" type="object" class="btn btn-sm btn-primary py-0 px-2" invisible="state != 'draft'" title="Submit Plan for Review">
+                                        <i class="fa fa-paper-plane me-1"/>Submit
+                                    </button>
+                                    <button name="action_reset_to_draft" type="object" class="btn btn-sm btn-outline-warning py-0 px-2" invisible="not can_reset_to_draft" title="Reset Plan to Draft">
+                                        <i class="fa fa-undo me-1"/>Reset
+                                    </button>
+                                    <button name="action_open_plan_form" type="object" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Open Full Details">
+                                        <i class="fa fa-external-link"/>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- =================================================== -->
+    <!-- NATIVE ODOO XML DASHBOARD: GRAPH VIEW               -->
+    <!-- =================================================== -->
+    <record id="view_pbms_dashboard_graph" model="ir.ui.view">
+        <field name="name">pbms.dashboard.graph</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <graph string="Plan &amp; Budget Status Distribution" type="bar" sample="1">
+                <field name="category"/>
+                <field name="state"/>
+                <field name="annual_total" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- =================================================== -->
+    <!-- NATIVE ODOO XML DASHBOARD: PIVOT VIEW               -->
+    <!-- =================================================== -->
+    <record id="view_pbms_dashboard_pivot" model="ir.ui.view">
+        <field name="name">pbms.dashboard.pivot</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <pivot string="Planning &amp; Budget Analytics" sample="1">
+                <field name="category" type="row"/>
+                <field name="state" type="col"/>
+                <field name="annual_total" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Client action record for OWL dashboard -->
     <record id="action_pbms_dashboard" model="ir.actions.client">
         <field name="name">Planning &amp; Budget Dashboard</field>
         <field name="tag">pbms_dashboard</field>
+    </record>
+
+    <!-- =================================================== -->
+    <!-- DASHBOARD WINDOW ACTION (NATIVE ODOO ACT_WINDOW)    -->
+    <!-- Opens instantly on click with native views          -->
+    <!-- =================================================== -->
+    <record id="action_pbms_dashboard_window" model="ir.actions.act_window">
+        <field name="name">Planning &amp; Budget Dashboard</field>
+        <field name="res_model">pbms.planning.category</field>
+        <field name="view_mode">kanban,graph,pivot,list,form</field>
+        <field name="search_view_id" ref="view_pbms_planning_category_search"/>
+        <field name="context">{
+            'search_default_group_category': 1,
+            'search_default_filter_active_cycle': 1
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Plan &amp; Budget Dashboard Overview
+            </p>
+            <p>
+                Track all annual plans, submission progress, review stages, and budget totals across all categories in real time.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_pbms_dashboard_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_dashboard_kanban"/>
+        <field name="act_window_id" ref="action_pbms_dashboard_window"/>
+    </record>
+
+    <record id="action_pbms_dashboard_view_graph" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">graph</field>
+        <field name="view_id" ref="view_pbms_dashboard_graph"/>
+        <field name="act_window_id" ref="action_pbms_dashboard_window"/>
+    </record>
+
+    <record id="action_pbms_dashboard_view_pivot" model="ir.actions.act_window.view">
+        <field name="sequence" eval="3"/>
+        <field name="view_mode">pivot</field>
+        <field name="view_id" ref="view_pbms_dashboard_pivot"/>
+        <field name="act_window_id" ref="action_pbms_dashboard_window"/>
+    </record>
+
+    <record id="action_pbms_dashboard_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="4"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_planning_category_list"/>
+        <field name="act_window_id" ref="action_pbms_dashboard_window"/>
     </record>
 </odoo>

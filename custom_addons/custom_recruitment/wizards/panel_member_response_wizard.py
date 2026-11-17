@@ -48,50 +48,52 @@ class PanelMemberResponseWizard(models.TransientModel):
         member = self.panel_member_id or self.ext_panel_member_id
         if not member:
             raise UserError(_("No panel member record specified."))
+        if hasattr(member, '_check_current_user_is_panel_member'):
+            member._check_current_user_is_panel_member()
 
         rec = getattr(member, 'new_int_panel', False) or getattr(member, 'ext_panel', False)
         name_str = member.emp_name.name if member.emp_name else _("Panel Member")
 
         if self.response_type == 'accept':
-            member.write({
+            member.sudo().write({
                 'response_status': 'accepted',
                 'accepted': True,
                 'response_reason': self.reason or _("Schedule accepted."),
             })
             if rec:
-                rec.message_post(body=_("Interview panel member <b>%s</b> accepted the interview schedule.") % name_str)
+                rec.sudo().message_post(body=_("Interview panel member <b>%s</b> accepted the interview schedule.") % name_str)
 
         elif self.response_type == 'unavailable':
             if not self.reason:
                 raise UserError(_("Please provide a reason for unavailability."))
-            member.write({
+            member.sudo().write({
                 'response_status': 'unavailable',
                 'accepted': False,
                 'response_reason': self.reason,
             })
             if rec:
-                rec.message_post(body=_(
+                rec.sudo().message_post(body=_(
                     "Interview panel member <b>%s</b> declared unavailability. Reason: %s"
                 ) % (name_str, self.reason))
 
         elif self.response_type == 'reschedule':
             if not self.reason or not self.proposed_datetime:
                 raise UserError(_("Please provide both proposed date/time and reason for rescheduling."))
-            member.write({
+            member.sudo().write({
                 'response_status': 'reschedule_requested',
                 'accepted': False,
                 'response_reason': self.reason,
                 'proposed_interview_date': self.proposed_datetime,
             })
             if rec:
-                rec.message_post(body=_(
+                rec.sudo().message_post(body=_(
                     "Interview panel member <b>%s</b> requested rescheduling to <b>%s</b>. Reason: %s"
                 ) % (name_str, self.proposed_datetime, self.reason))
 
         elif self.response_type == 'delegate':
             if not self.delegate_employee_id or not self.reason:
                 raise UserError(_("Please specify the substitute panel member and provide a reason."))
-            member.write({
+            member.sudo().write({
                 'response_status': 'delegation_requested',
                 'accepted': False,
                 'response_reason': self.reason,
@@ -99,7 +101,7 @@ class PanelMemberResponseWizard(models.TransientModel):
                 'delegation_state': 'pending_hr',
             })
             if rec:
-                rec.message_post(body=_(
+                rec.sudo().message_post(body=_(
                     "Interview panel member <b>%s</b> requested delegation to <b>%s</b> (Pending HR Approval). Reason: %s"
                 ) % (name_str, self.delegate_employee_id.name, self.reason))
 

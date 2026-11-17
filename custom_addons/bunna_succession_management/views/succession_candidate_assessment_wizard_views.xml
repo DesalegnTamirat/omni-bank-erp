@@ -23,7 +23,7 @@
                         <notebook>
                             <!-- Tab 1: Test & Exam Scores -->
                             <page string="Test &amp; Exam Marks" name="testing_scores">
-                                <div class="alert alert-info py-2 px-3 small mb-3">
+                                <div class="alert alert-info py-2 px-3 small mb-3" role="alert">
                                     <i class="fa fa-info-circle me-1" role="img" aria-label="Info"/>
                                     Record verified marks for manual testing components (e.g. Written Exam, Interview). Component applicability and weights are governed by the position's <strong>Assessment &amp; Exam Plan</strong>. Any component configured as Not Applicable (N/A) displays its documented justification from the plan.
                                 </div>

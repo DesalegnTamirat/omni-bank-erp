@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <!-- FR-SWP-004: Cron Job for Critical Position Reviews -->
-        <record id="ir_cron_check_critical_position_reviews" model="ir.cron">
-            <field name="name">Succession: Check Critical Position Reviews</field>
-            <field name="model_id" ref="model_succession_critical_position"/>
-            <field name="state">code</field>
-            <field name="code">model._cron_check_critical_position_reviews()</field>
-            <field name="interval_number">1</field>
-            <field name="interval_type">days</field>
-            <field name="active" eval="True"/>
-        </record>
 
         <!-- FR-NOT-006: Succession Risk Alert — fires weekly -->
         <!-- Alerts PPDD when a critical position has zero Ready Now successors -->
@@ -20,6 +10,16 @@
             <field name="state">code</field>
             <field name="code">model._cron_succession_risk_alert()</field>
             <field name="interval_number">7</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+        <!-- Daily Cron Job: Automatically expire overdue succession candidate invitations -->
+        <record id="ir_cron_expire_succession_invitations" model="ir.cron">
+            <field name="name">Succession: Expire Overdue Candidate Invitations</field>
+            <field name="model_id" ref="model_succession_candidate_invitation"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_expire_pending_invitations()</field>
+            <field name="interval_number">1</field>
             <field name="interval_type">days</field>
             <field name="active" eval="True"/>
         </record>

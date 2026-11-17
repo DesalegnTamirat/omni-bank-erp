@@ -1,0 +1,130 @@
+/* ==========================================================================
+   Bunna Bank Helpdesk — Form View Notebook Tabs Layout & Styling
+   Guarantees maximum visibility, distinct pill-tab boundaries, and prevents
+   any text squishing, wrapping, or overlapping across all screen sizes.
+   Strictly scoped to Bunna Helpdesk Ticket forms only.
+   ========================================================================== */
+
+$bunna-maroon: #541718;
+$bunna-maroon-dark: #3a0d0e;
+$bunna-maroon-light: #FEF2F2;
+$bunna-slate: #1D2B32;
+$bunna-border: #CBD5E1;
+
+/* ──────────────────────────────────────────────────────────────────────────
+   1. Headers container: horizontal scroll, sleek scrollbar, clean header bar
+   ────────────────────────────────────────────────────────────────────────── */
+.o_form_view.o_helpdesk_ticket_form .o_notebook .o_notebook_headers,
+.o_form_view.o_helpdesk_ticket_form .o_notebook .nav-tabs,
+.o_notebook.o_helpdesk_ticket_notebook .o_notebook_headers,
+.o_notebook.o_helpdesk_ticket_notebook .nav-tabs {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    background: #F8FAFC !important;
+    border-radius: 8px 8px 0 0 !important;
+    border-bottom: 2px solid $bunna-border !important;
+    padding: 6px 8px !important;
+    white-space: nowrap !important;
+    scroll-behavior: smooth !important;
+    gap: 8px !important;
+}
+
+/* Custom sleek horizontal scrollbar */
+.o_form_view.o_helpdesk_ticket_form .o_notebook .o_notebook_headers::-webkit-scrollbar,
+.o_notebook.o_helpdesk_ticket_notebook .o_notebook_headers::-webkit-scrollbar {
+    height: 5px !important;
+    display: block !important;
+}
+.o_form_view.o_helpdesk_ticket_form .o_notebook .o_notebook_headers::-webkit-scrollbar-thumb,
+.o_notebook.o_helpdesk_ticket_notebook .o_notebook_headers::-webkit-scrollbar-thumb {
+    background-color: rgba(84, 23, 24, 0.4) !important;
+    border-radius: 4px !important;
+}
+.o_form_view.o_helpdesk_ticket_form .o_notebook .o_notebook_headers::-webkit-scrollbar-track,
+.o_notebook.o_helpdesk_ticket_notebook .o_notebook_headers::-webkit-scrollbar-track {
+    background: #EDF2F7 !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   2. Nav Items: flex: 0 0 auto !important — NEVER squeeze or overlap
+   ────────────────────────────────────────────────────────────────────────── */
+.o_form_view.o_helpdesk_ticket_form .o_notebook .o_notebook_headers .nav-item:not(.dropdown):not(.o_notebook_more):not(.o_nav_entry_dropdown),
+.o_form_view.o_helpdesk_ticket_form .o_notebook .nav-tabs .nav-item:not(.dropdown):not(.o_notebook_more):not(.o_nav_entry_dropdown),
+.o_notebook.o_helpdesk_ticket_notebook .o_notebook_headers .nav-item:not(.dropdown):not(.o_notebook_more):not(.o_nav_entry_dropdown),
+.o_notebook.o_helpdesk_ticket_notebook .nav-tabs .nav-item:not(.dropdown):not(.o_notebook_more):not(.o_nav_entry_dropdown),
+.o_notebook.o_helpdesk_ticket_notebook .nav-tabs .nav-item {
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+    display: inline-block !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3. Nav Links: Distinct Bunna Bank pill buttons for maximum visibility
+   ────────────────────────────────────────────────────────────────────────── */
+.o_form_view.o_helpdesk_ticket_form .o_notebook .o_notebook_headers .nav-link,
+.o_form_view.o_helpdesk_ticket_form .o_notebook .nav-tabs .nav-link,
+.o_notebook.o_helpdesk_ticket_notebook .nav-tabs .nav-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    font-weight: 600 !important;
+    font-size: 0.84rem !important;
+    letter-spacing: 0.01em !important;
+    padding: 8px 16px !important;
+    border-radius: 6px !important;
+    border: 1px solid #E2E8F0 !important;
+    background-color: #FFFFFF !important;
+    color: #475569 !important;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    cursor: pointer !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    margin: 0 !important;
+}
+
+/* Hover state */
+.o_form_view.o_helpdesk_ticket_form .o_notebook .nav-tabs .nav-link:hover,
+.o_notebook.o_helpdesk_ticket_notebook .nav-tabs .nav-link:hover {
+    color: $bunna-maroon !important;
+    background-color: $bunna-maroon-light !important;
+    border-color: #FECACA !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(84, 23, 24, 0.12) !important;
+}
+
+/* Active state: Prominent Bunna Maroon pill */
+.o_form_view.o_helpdesk_ticket_form .o_notebook .nav-tabs .nav-link.active,
+.o_form_view.o_helpdesk_ticket_form .o_notebook .nav-tabs .nav-link[aria-selected="true"],
+.o_notebook.o_helpdesk_ticket_notebook .nav-tabs .nav-link.active {
+    color: #FFFFFF !important;
+    background-color: $bunna-maroon !important;
+    border: 1px solid $bunna-maroon-dark !important;
+    border-bottom: 1px solid $bunna-maroon-dark !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 6px rgba(84, 23, 24, 0.35) !important;
+    transform: translateY(-1px) !important;
+}

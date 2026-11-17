@@ -196,7 +196,311 @@
                     </div>
                 </div>
 
-                <!-- Tier Lifecycle & Governance Breakdown (Planning vs HR Directorate) -->
+                <!-- ==================== Compact Scorecard Coverage Ribbon ==================== -->
+                <div class="mb-4" t-if="state.data.position_coverage">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa fa-shield text-success"/>
+                            <span class="fw-bold text-dark" style="font-size: 13.5px; letter-spacing: 0.2px;">Scorecard Position &amp; Unit Coverage</span>
+                        </div>
+                        <span class="text-muted small" style="font-size: 11px;">Click any card or pill to see which positions/units have or are missing scorecards</span>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Tier 1 Compact Card -->
+                        <div class="col-12 col-md-4"
+                             t-if="state.filters.tier == 'all' or state.filters.tier == 't1'">
+                            <div class="pms-coverage-compact-card pms-coverage-t1-border"
+                                 style="cursor: pointer;"
+                                 t-on-click="() => this.openCoverageModal('t1', 'all')">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="fa fa-building text-dark fa-sm"/>
+                                        <span class="fw-bold text-dark" style="font-size: 12.5px;">Corporate (CEO)</span>
+                                    </div>
+                                    <span class="badge bg-dark" style="font-size: 9.5px; letter-spacing: 0.5px;">TIER 1</span>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <!-- Mini Ring -->
+                                        <div class="pms-coverage-mini-ring">
+                                            <svg class="pms-coverage-mini-svg" width="44" height="44" viewBox="0 0 44 44">
+                                                <circle class="pms-coverage-mini-ring-bg" cx="22" cy="22" r="17"/>
+                                                <circle class="pms-coverage-mini-ring-fill"
+                                                        t-att-stroke="state.data.position_coverage.tier1.coverage_pct >= 100 ? '#166534' : '#ea580c'"
+                                                        cx="22" cy="22" r="17"
+                                                        t-att-stroke-dasharray="(state.data.position_coverage.tier1.coverage_pct / 100 * 106.8).toFixed(1) + ' 106.8'"/>
+                                            </svg>
+                                            <div class="pms-coverage-mini-pct">
+                                                <t t-esc="state.data.position_coverage.tier1.coverage_pct"/>%
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark" style="font-size: 13.5px;">
+                                                <t t-esc="state.data.position_coverage.tier1.covered_count"/> / <t t-esc="state.data.position_coverage.tier1.total"/> Position
+                                            </div>
+                                            <div class="text-muted" style="font-size: 10.5px;">Chief Executive Officer</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-end gap-1">
+                                        <span class="pms-cov-pill covered"
+                                              t-on-click.stop="() => this.openCoverageModal('t1', 'covered')">
+                                            <i class="fa fa-check-circle fa-xs"/> <t t-esc="state.data.position_coverage.tier1.covered_count"/> Covered
+                                        </span>
+                                        <span class="pms-cov-pill missing"
+                                              t-on-click.stop="() => this.openCoverageModal('t1', 'missing')">
+                                            <i class="fa fa-times-circle fa-xs"/> <t t-esc="state.data.position_coverage.tier1.uncovered_count"/> Missing
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tier 2 Compact Card -->
+                        <div class="col-12 col-md-4"
+                             t-if="state.filters.tier == 'all' or state.filters.tier == 't2'">
+                            <div class="pms-coverage-compact-card pms-coverage-t2-border"
+                                 style="cursor: pointer;"
+                                 t-on-click="() => this.openCoverageModal('t2', 'all')">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="fa fa-sitemap fa-sm" style="color: #425727;"/>
+                                        <span class="fw-bold text-dark" style="font-size: 12.5px;">Operating Units</span>
+                                    </div>
+                                    <span class="badge" style="background-color: #425727; font-size: 9.5px; letter-spacing: 0.5px;">TIER 2</span>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <!-- Mini Ring -->
+                                        <div class="pms-coverage-mini-ring">
+                                            <svg class="pms-coverage-mini-svg" width="44" height="44" viewBox="0 0 44 44">
+                                                <circle class="pms-coverage-mini-ring-bg" cx="22" cy="22" r="17"/>
+                                                <circle class="pms-coverage-mini-ring-fill"
+                                                        t-att-stroke="state.data.position_coverage.tier2.coverage_pct >= 80 ? '#166534' : (state.data.position_coverage.tier2.coverage_pct >= 50 ? '#d97706' : '#ea580c')"
+                                                        cx="22" cy="22" r="17"
+                                                        t-att-stroke-dasharray="(state.data.position_coverage.tier2.coverage_pct / 100 * 106.8).toFixed(1) + ' 106.8'"/>
+                                            </svg>
+                                            <div class="pms-coverage-mini-pct">
+                                                <t t-esc="state.data.position_coverage.tier2.coverage_pct"/>%
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark" style="font-size: 13.5px;">
+                                                <t t-esc="state.data.position_coverage.tier2.covered_count"/> / <t t-esc="state.data.position_coverage.tier2.total"/> Units
+                                            </div>
+                                            <div class="text-muted" style="font-size: 10.5px;">Active operating units</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-end gap-1">
+                                        <span class="pms-cov-pill covered"
+                                              t-on-click.stop="() => this.openCoverageModal('t2', 'covered')">
+                                            <i class="fa fa-check-circle fa-xs"/> <t t-esc="state.data.position_coverage.tier2.covered_count"/> Covered
+                                        </span>
+                                        <span class="pms-cov-pill missing"
+                                              t-on-click.stop="() => this.openCoverageModal('t2', 'missing')">
+                                            <i class="fa fa-times-circle fa-xs"/> <t t-esc="state.data.position_coverage.tier2.uncovered_count"/> Missing
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tier 3 Compact Card -->
+                        <div class="col-12 col-md-4"
+                             t-if="state.filters.tier == 'all' or state.filters.tier == 't3'">
+                            <div class="pms-coverage-compact-card pms-coverage-t3-border"
+                                 style="cursor: pointer;"
+                                 t-on-click="() => this.openCoverageModal('t3', 'all')">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="fa fa-users fa-sm" style="color: #541718;"/>
+                                        <span class="fw-bold text-dark" style="font-size: 12.5px;">Job Positions</span>
+                                    </div>
+                                    <span class="badge" style="background-color: #541718; font-size: 9.5px; letter-spacing: 0.5px;">TIER 3</span>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <!-- Mini Ring -->
+                                        <div class="pms-coverage-mini-ring">
+                                            <svg class="pms-coverage-mini-svg" width="44" height="44" viewBox="0 0 44 44">
+                                                <circle class="pms-coverage-mini-ring-bg" cx="22" cy="22" r="17"/>
+                                                <circle class="pms-coverage-mini-ring-fill"
+                                                        t-att-stroke="state.data.position_coverage.tier3.coverage_pct >= 80 ? '#166534' : (state.data.position_coverage.tier3.coverage_pct >= 50 ? '#d97706' : '#ea580c')"
+                                                        cx="22" cy="22" r="17"
+                                                        t-att-stroke-dasharray="(state.data.position_coverage.tier3.coverage_pct / 100 * 106.8).toFixed(1) + ' 106.8'"/>
+                                            </svg>
+                                            <div class="pms-coverage-mini-pct">
+                                                <t t-esc="state.data.position_coverage.tier3.coverage_pct"/>%
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark" style="font-size: 13.5px;">
+                                                <t t-esc="state.data.position_coverage.tier3.covered_count"/> / <t t-esc="state.data.position_coverage.tier3.total"/> Positions
+                                            </div>
+                                            <div class="text-muted" style="font-size: 10.5px;">Distinct positions</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-end gap-1">
+                                        <span class="pms-cov-pill covered"
+                                              t-on-click.stop="() => this.openCoverageModal('t3', 'covered')">
+                                            <i class="fa fa-check-circle fa-xs"/> <t t-esc="state.data.position_coverage.tier3.covered_count"/> Covered
+                                        </span>
+                                        <span class="pms-cov-pill missing"
+                                              t-on-click.stop="() => this.openCoverageModal('t3', 'missing')">
+                                            <i class="fa fa-times-circle fa-xs"/> <t t-esc="state.data.position_coverage.tier3.uncovered_count"/> Missing
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ==================== End Compact Coverage Ribbon ==================== -->
+
+                <!-- ==================== Coverage Detail Modal Dialog ==================== -->
+                <t t-if="state.coverageModal and state.coverageModal.isOpen and state.data.position_coverage">
+                    <div class="pms-modal-backdrop" t-on-click.self="() => this.closeCoverageModal()">
+                        <div class="pms-modal-window shadow-lg">
+                            <!-- Modal Header -->
+                            <div class="pms-modal-header" t-att-style="state.coverageModal.tier == 't1' ? 'background: linear-gradient(135deg, #1d2b32, #2c3e50);' : (state.coverageModal.tier == 't2' ? 'background: linear-gradient(135deg, #425727, #2f3e1b);' : 'background: linear-gradient(135deg, #541718, #3b1011);')">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="p-2 rounded-3 bg-white bg-opacity-20 text-white">
+                                        <i t-att-class="state.coverageModal.tier == 't1' ? 'fa fa-building' : (state.coverageModal.tier == 't2' ? 'fa fa-sitemap' : 'fa fa-users')"/>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-white" style="font-size: 15px;">
+                                            <t t-if="state.coverageModal.tier == 't1'">Tier 1 Corporate Scorecard Coverage (CEO)</t>
+                                            <t t-elif="state.coverageModal.tier == 't2'">Tier 2 Operating Units Scorecard Coverage</t>
+                                            <t t-else="">Tier 3 Job Positions Scorecard Coverage</t>
+                                        </h6>
+                                        <div class="small text-white-50" style="font-size: 11px;">
+                                            Follow up on positions &amp; units with or without active scorecards
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-light rounded-circle" style="width: 30px; height: 30px; padding: 0;" t-on-click="() => this.closeCoverageModal()" title="Close">
+                                    <i class="fa fa-times"/>
+                                </button>
+                            </div>
+
+                            <!-- Filter & Search Bar -->
+                            <div class="p-3 bg-light border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span t-att-class="'pms-tab-pill ' + (state.coverageModal.filter == 'all' ? 'active' : '')"
+                                          t-on-click="() => this.setCoverageModalFilter('all')">
+                                        All (<t t-esc="(state.data.position_coverage[state.coverageModal.tier == 't1' ? 'tier1' : (state.coverageModal.tier == 't2' ? 'tier2' : 'tier3')].all || []).length"/>)
+                                    </span>
+                                    <span t-att-class="'pms-tab-pill ' + (state.coverageModal.filter == 'covered' ? 'active' : '')"
+                                          t-on-click="() => this.setCoverageModalFilter('covered')">
+                                        <i class="fa fa-check-circle me-1 text-success"/> Covered (<t t-esc="(state.data.position_coverage[state.coverageModal.tier == 't1' ? 'tier1' : (state.coverageModal.tier == 't2' ? 'tier2' : 'tier3')].covered || []).length"/>)
+                                    </span>
+                                    <span t-att-class="'pms-tab-pill ' + (state.coverageModal.filter == 'missing' ? 'active' : '')"
+                                          t-on-click="() => this.setCoverageModalFilter('missing')">
+                                        <i class="fa fa-exclamation-circle me-1 text-danger"/> Missing (<t t-esc="(state.data.position_coverage[state.coverageModal.tier == 't1' ? 'tier1' : (state.coverageModal.tier == 't2' ? 'tier2' : 'tier3')].uncovered || []).length"/>)
+                                    </span>
+                                </div>
+                                <div style="min-width: 220px;">
+                                    <input type="text" class="form-control form-control-sm" placeholder="Search title, dept, manager..."
+                                           t-att-value="state.coverageModal.search"
+                                           t-on-input="(ev) => this.onCoverageModalSearch(ev)"/>
+                                </div>
+                            </div>
+
+                            <!-- Modal Body -->
+                            <div class="pms-modal-body">
+                                <t t-set="modalItems" t-value="this.getFilteredCoverageItems()"/>
+                                <t t-if="modalItems and modalItems.length > 0">
+                                    <t t-foreach="modalItems" t-as="item" t-key="item.id or item.title">
+                                        <div class="pms-coverage-row-item">
+                                            <!-- Left Details -->
+                                            <div class="d-flex align-items-center gap-3 min-w-0">
+                                                <div class="p-2 rounded-circle flex-shrink-0"
+                                                     t-att-style="item.has_scorecard ? 'background: #f0fdf4; color: #166534;' : 'background: #fff7ed; color: #c2410c;'">
+                                                    <i t-att-class="item.has_scorecard ? 'fa fa-check-circle' : 'fa fa-exclamation-circle'"/>
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div class="row-title text-truncate" t-att-title="item.title">
+                                                        <t t-esc="item.title"/>
+                                                    </div>
+                                                    <div class="row-subtitle">
+                                                        <t t-if="item.department">
+                                                            <span class="me-2"><i class="fa fa-building-o me-1"/> <t t-esc="item.department"/></span>
+                                                        </t>
+                                                        <t t-if="item.work_unit_type">
+                                                            <span class="badge bg-light text-dark border me-2"><t t-esc="item.work_unit_type"/></span>
+                                                        </t>
+                                                        <t t-if="item.manager_name">
+                                                            <span class="me-2"><i class="fa fa-user me-1"/> <t t-esc="item.manager_name"/></span>
+                                                        </t>
+                                                        <t t-if="item.employee_count !== undefined">
+                                                            <span><i class="fa fa-users me-1"/> <t t-esc="item.employee_count"/> emp</span>
+                                                        </t>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Right Status & Action Button -->
+                                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                                <t t-if="item.has_scorecard">
+                                                    <span class="badge bg-success" style="font-size: 11px;">
+                                                        <i class="fa fa-check me-1"/> Covered
+                                                    </span>
+                                                    <t t-if="state.coverageModal.tier == 't3'">
+                                                        <button class="btn btn-sm btn-outline-success fw-semibold" style="font-size: 11px; padding: 3px 9px;"
+                                                                t-on-click="() => this.openScorecardsForJob(item.id, item.title)">
+                                                            View Scorecards (<t t-esc="item.scorecard_count"/>)
+                                                        </button>
+                                                    </t>
+                                                    <t t-elif="state.coverageModal.tier == 't2' and item.scorecard_id">
+                                                        <button class="btn btn-sm btn-outline-success fw-semibold" style="font-size: 11px; padding: 3px 9px;"
+                                                                t-on-click="() => this.openScorecardDirect('t2.scorecard', item.scorecard_id)">
+                                                            Open Scorecard
+                                                        </button>
+                                                    </t>
+                                                    <t t-elif="state.coverageModal.tier == 't1' and item.scorecard_id">
+                                                        <button class="btn btn-sm btn-outline-success fw-semibold" style="font-size: 11px; padding: 3px 9px;"
+                                                                t-on-click="() => this.openScorecardDirect('corporate.scorecard', item.scorecard_id)">
+                                                            Open Scorecard
+                                                        </button>
+                                                    </t>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="badge bg-danger" style="font-size: 11px;">
+                                                        <i class="fa fa-times me-1"/> Missing Scorecard
+                                                    </span>
+                                                    <button class="btn btn-sm btn-primary fw-semibold text-white shadow-sm" style="font-size: 11px; padding: 3px 9px; background-color: #425727; border-color: #425727;"
+                                                            t-on-click="() => this.createNewScorecardFor(state.coverageModal.tier, item)">
+                                                        <i class="fa fa-plus me-1"/> Create Scorecard
+                                                    </button>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <div class="text-center py-5 text-muted">
+                                        <i class="fa fa-check-circle fa-2x mb-2 text-success opacity-75"/>
+                                        <div class="fw-semibold">No records found matching this filter.</div>
+                                    </div>
+                                </t>
+                            </div>
+
+                            <!-- Modal Footer -->
+                            <div class="pms-modal-footer">
+                                <div class="small text-muted">
+                                    Showing <strong><t t-esc="(this.getFilteredCoverageItems() || []).length"/></strong> records
+                                </div>
+                                <button class="btn btn-sm btn-secondary fw-semibold" t-on-click="() => this.closeCoverageModal()">
+                                    Done
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+                <!-- ==================== End Modal Dialog ==================== -->
+
+                <!-- Tier Lifecycle &amp; Governance Breakdown (Planning vs HR Directorate) -->
+
                 <div class="row g-3 mb-4" t-if="state.data.tier_governance">
                     <!-- Planning Directorate Hub: Tier 1 (Corporate) & Tier 2 (Division) -->
                     <div class="col-12 col-xl-7" t-if="state.filters.tier == 'all' or state.filters.tier == 't1' or state.filters.tier == 't2'">

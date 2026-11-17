@@ -13,7 +13,7 @@ class HelpdeskTicketPolicy(models.Model):
     auto_close_tickets = fields.Boolean(
         string="Automatic Ticket Closure",
         default=True,
-        help="Automatically move tickets from Done to Closed stage after customer notification and elapsed time.",
+        help="Automatically move tickets from Resolved to Closed stage after customer notification and elapsed time.",
     )
     auto_close_delay = fields.Integer(
         string="Closure Grace Period",

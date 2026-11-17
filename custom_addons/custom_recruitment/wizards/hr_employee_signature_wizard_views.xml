@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_employee_signature_wizard_form" model="ir.ui.view">
+        <field name="name">hr.employee.signature.wizard.form</field>
+        <field name="model">hr.employee.signature.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Draw / Update Master Digital Signature">
+                <sheet>
+                    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                        <i class="fa fa-pencil-square-o fa-2x me-3 text-primary" title="Signature Setup"/>
+                        <div>
+                            <h5 class="mb-1 font-weight-bold">
+                                Employee Master Digital Signature: <field name="employee_name" readonly="1" class="fw-bold"/>
+                            </h5>
+                            <div class="text-muted small">
+                                User Account: <strong><field name="user_id" readonly="1" options="{'no_open': True}"/></strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-muted">
+                        Draw your signature using your mouse, trackpad, or touchscreen in the box below, or upload a scanned signature image. Once saved, this master signature will be securely stored in your profile and can be automatically applied to Committee Minutes.
+                    </p>
+
+                    <div class="bg-white border rounded p-3 text-center mb-3">
+                        <field name="digital_signature" widget="signature" class="w-100"/>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_save_signature" string="💾 Save Signature" type="object" class="btn-primary" icon="fa-check"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

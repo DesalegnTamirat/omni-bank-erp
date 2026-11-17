@@ -32,12 +32,17 @@ class PmMilestone(models.Model):
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled')
     ], string='Status', compute='_compute_milestone_state', store=True, readonly=False, default='draft', tracking=True)
+    is_state_manual = fields.Boolean(string='Manual Status Override', default=False)
     
     description = fields.Html(string='Milestone Scope & Objectives')
-    color = fields.Integer(string='Color', default=0)
+    color = fields.Integer(default=0)
+    active = fields.Boolean(string='Active', default=True)
 
     deliverable_ids = fields.One2many('pm.deliverable', 'milestone_id', string='Deliverables')
     task_ids = fields.One2many('pm.task', 'milestone_id', string='Tasks')
+    subtask_ids = fields.One2many('pm.task.subtask', 'milestone_id', string='Sub-tasks')
+    test_case_ids = fields.One2many('pm.test.case', 'milestone_id', string='Test Cases & Results')
+    document_ids = fields.One2many('pm.project.document', 'milestone_id', string='Requirements & Gap Analysis')
     
     deliverable_count = fields.Integer(string='Total Deliverables', compute='_compute_task_stats', store=True)
     task_count = fields.Integer(string='Total Tasks', compute='_compute_task_stats', store=True)
@@ -92,8 +97,8 @@ class PmMilestone(models.Model):
                         "Milestone '%s': Allocated weight (%.2f%%) cannot be less than the total weight of its deliverables (%.2f%%)!"
                     ) % (rec.name, rec.weight, total_deliv_weight))
 
-    @api.depends('deliverable_ids', 'deliverable_ids.progress_rate', 'deliverable_ids.weight',
-                 'task_ids', 'task_ids.is_closed', 'task_ids.progress_rate', 'task_ids.weight')
+    @api.depends('deliverable_ids', 'deliverable_ids.progress_rate', 'deliverable_ids.weight', 'deliverable_ids.state',
+                 'task_ids', 'task_ids.is_closed', 'task_ids.progress_rate', 'task_ids.weight', 'state')
     def _compute_task_stats(self):
         for rec in self:
             total_tasks = len(rec.task_ids)
@@ -102,6 +107,10 @@ class PmMilestone(models.Model):
             rec.closed_task_count = closed_tasks
             rec.deliverable_count = len(rec.deliverable_ids)
             
+            if rec.state == 'completed':
+                rec.progress_rate = 100.0
+                continue
+
             # Weighted rollup: Deliverables -> Milestone
             if rec.deliverable_ids:
                 total_d_weight = sum(d.weight for d in rec.deliverable_ids)
@@ -118,15 +127,42 @@ class PmMilestone(models.Model):
             else:
                 rec.progress_rate = 0.0
 
-    @api.depends('task_count', 'closed_task_count', 'progress_rate')
+    @api.depends('task_count', 'closed_task_count', 'progress_rate', 'date_deadline', 'is_state_manual',
+                 'deliverable_ids.state', 'task_ids.is_blocked', 'task_ids.is_closed')
     def _compute_milestone_state(self):
+        today = fields.Date.today()
         for rec in self:
-            if rec.state == 'cancelled':
+            if rec.is_state_manual and rec.state:
                 continue
-            if (rec.task_count > 0 and rec.closed_task_count == rec.task_count) or rec.progress_rate >= 100.0:
+            if rec.state in ('completed', 'cancelled'):
+                continue
+            if (rec.progress_rate >= 100.0) or (rec.task_count > 0 and rec.closed_task_count == rec.task_count and rec.deliverable_count > 0 and all(d.state == 'completed' for d in rec.deliverable_ids)):
                 rec.state = 'completed'
-            elif rec.progress_rate > 0.0 or (rec.task_count > 0 and any(not t.is_closed and t.stage_id.name != 'To Do' for t in rec.task_ids)):
+                continue
+            has_at_risk_deliv = any(d.state == 'at_risk' for d in rec.deliverable_ids)
+            has_blocked_task = any(t.is_blocked and not t.is_closed for t in rec.task_ids)
+            is_overdue = rec.date_deadline and rec.date_deadline < today and rec.progress_rate < 100.0
+            
+            if has_at_risk_deliv or has_blocked_task or is_overdue:
+                rec.state = 'at_risk'
+            elif rec.progress_rate > 0.0 or any(d.state == 'in_progress' for d in rec.deliverable_ids) or any(not t.is_closed and (t.stage_id.name or '').strip().lower() != 'to do' for t in rec.task_ids):
                 rec.state = 'in_progress'
-            elif rec.task_count == 0 or rec.closed_task_count == 0:
-                if rec.state != 'in_progress':
-                    rec.state = 'draft'
+            else:
+                rec.state = 'draft'
+
+    @api.onchange('state')
+    def _onchange_state(self):
+        if self.state == 'completed':
+            self.progress_rate = 100.0
+            self.is_state_manual = True
+        elif self.state:
+            self.is_state_manual = True
+
+    def write(self, vals):
+        if 'state' in vals and 'is_state_manual' not in vals and not self.env.context.get('skip_state_manual'):
+            vals['is_state_manual'] = True
+        return super().write(vals)
+
+    def unlink(self):
+        """Soft delete: archive milestone instead of permanent deletion."""
+        return self.write({'active': False})

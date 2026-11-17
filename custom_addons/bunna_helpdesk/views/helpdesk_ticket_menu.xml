@@ -11,17 +11,20 @@
         <field name="path">helpdesk-dashboard</field>
     </record>
     <record id="helpdesk_ticket_action" model="ir.actions.act_window">
-        <field name="name">Tickets</field>
+        <field name="name">All Tickets</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">helpdesk.ticket</field>
         <field name="view_mode">list,kanban,form,pivot,graph</field>
-        <field name="path">helpdesk-tickets</field>
+        <field name="context">{'default_order': 'create_date desc, id desc'}</field>
+        <field name="path">all-helpdesk-tickets</field>
     </record>
     <record id="helpdesk_my_tickets_action" model="ir.actions.act_window">
         <field name="name">My Tickets</field>
         <field name="res_model">helpdesk.ticket</field>
-        <field name="view_mode">kanban,list,pivot,graph,form</field>
-        <field name="domain">[('user_id', '=', uid)]</field>
+        <field name="view_mode">list,kanban,form,pivot,graph</field>
+        <field name="search_view_id" ref="helpdesk_ticket_view_search"/>
+        <field name="context">{'search_default_mytickets': 1}</field>
+        <field name="domain">['|', '|', ('user_id', '=', uid), ('escalated_to_user_id', '=', uid), ('escalated_to_level_3_user_id', '=', uid)]</field>
         <field name="path">my-helpdesk-tickets</field>
     </record>
     <record id="helpdesk_ticket_reporting_action" model="ir.actions.act_window">
@@ -46,12 +49,13 @@
         <field name="path">helpdesk-categories</field>
     </record>
     <record id="helpdesk_ticket_team_action" model="ir.actions.act_window">
-        <field name="name">Teams</field>
+        <field name="name">Responsible Operating Units</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">helpdesk.ticket.team</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="view_id" ref="view_helpdesk_team_tree"/>
-        <field name="path">helpdesk-teams</field>
+        <field name="context">{'create': False}</field>
+        <field name="path">helpdesk-operating-units</field>
     </record>
     <record id="helpdesk_ticket_team_action_view_tree" model="ir.actions.act_window.view">
         <field name="sequence" eval="1"/>
@@ -135,14 +139,18 @@
         sequence="10"
         groups="group_helpdesk_user_own"
     />
-    <menuitem
-        id="helpdesk_all_ticket_menu"
-        name="All Tickets"
-        parent="helpdesk_ticket_menu"
-        action="helpdesk_ticket_action"
-        sequence="20"
-        groups="group_helpdesk_user_own"
-    />
+    <!-- All Tickets: accessible to all Helpdesk users (record rules strictly filter tickets by operating unit privilege) -->
+    <record id="helpdesk_all_ticket_menu" model="ir.ui.menu">
+        <field name="name">All Tickets</field>
+        <field name="parent_id" ref="helpdesk_ticket_menu" />
+        <field name="action" ref="helpdesk_ticket_action" />
+        <field name="sequence">20</field>
+        <field name="group_ids" eval="[
+            (6, 0, [
+                ref('group_helpdesk_user'),
+            ])
+        ]" />
+    </record>
     <menuitem
         id="helpdesk_nbe_complaints_menu"
         name="NBE Complaints"
@@ -157,6 +165,14 @@
         parent="helpdesk_ticket_menu"
         action="action_helpdesk_ticket_escalated"
         sequence="40"
+        groups="group_helpdesk_user_own"
+    />
+    <menuitem
+        id="helpdesk_escalation_popup_menu"
+        name="Escalation Alerts"
+        parent="helpdesk_ticket_menu"
+        action="action_helpdesk_ticket_escalation_popup"
+        sequence="45"
         groups="group_helpdesk_user_own"
     />
 
@@ -223,20 +239,6 @@
         sequence="5"
     />
     <menuitem
-        id="helpdesk_ticket_case_type_menu"
-        name="Case Types"
-        parent="helpdesk_ticket_config_main_menu"
-        action="action_helpdesk_ticket_case_type"
-        sequence="7"
-    />
-    <menuitem
-        id="helpdesk_ticket_customer_type_menu"
-        name="Customer Types"
-        parent="helpdesk_ticket_config_main_menu"
-        action="action_helpdesk_ticket_customer_type"
-        sequence="8"
-    />
-    <menuitem
         id="helpdesk_ticket_category_menu"
         name="Categories"
         parent="helpdesk_ticket_config_main_menu"
@@ -251,25 +253,39 @@
         sequence="25"
     />
     <menuitem
+        id="helpdesk_auto_close_policy_menu"
+        name="Auto-Close Policy"
+        parent="helpdesk_ticket_config_main_menu"
+        action="action_helpdesk_policy_auto_close"
+        sequence="28"
+    />
+    <menuitem
         id="helpdesk_ticket_team_menu"
-        name="Teams"
+        name="Responsible Operating Units"
         parent="helpdesk_ticket_config_main_menu"
         action="helpdesk_ticket_team_action"
         sequence="35"
     />
     <menuitem
-        id="helpdesk_team_operation_menu"
-        name="Operations List"
+        id="helpdesk_assignment_policy_menu"
+        name="Ticket Assignment Policy"
         parent="helpdesk_ticket_config_main_menu"
-        action="action_helpdesk_team_operation"
-        sequence="36"
+        action="action_helpdesk_policy_assignment"
+        sequence="38"
     />
     <menuitem
         id="helpdesk_ticket_tag_menu"
-        name="Ticket Tags"
+        name="communicated language"
         parent="helpdesk_ticket_config_main_menu"
         action="helpdesk_ticket_tag_action"
         sequence="45"
+    />
+    <menuitem
+        id="helpdesk_duplicate_policy_menu"
+        name="Duplicate Tracking"
+        parent="helpdesk_ticket_config_main_menu"
+        action="action_helpdesk_policy_duplicate"
+        sequence="48"
     />
     <menuitem
         id="helpdesk_sla_menu"
@@ -287,25 +303,18 @@
         sequence="55"
     />
     <menuitem
-        id="helpdesk_service_family_menu"
-        name="Service Families"
-        parent="helpdesk_catalogue_menu"
-        action="action_helpdesk_service_family"
-        sequence="1"
-    />
-    <menuitem
         id="helpdesk_service_menu"
         name="Services"
         parent="helpdesk_catalogue_menu"
         action="action_helpdesk_service"
-        sequence="2"
+        sequence="1"
     />
     <menuitem
         id="helpdesk_service_sub_category_menu"
-        name="Sub-Categories / Issue Types"
+        name="Sub Services"
         parent="helpdesk_catalogue_menu"
         action="action_helpdesk_service_sub_category"
-        sequence="3"
+        sequence="2"
     />
     <menuitem
         id="helpdesk_ola_menu"

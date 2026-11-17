@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- Agreement buttons / banners on the loan form.
-         Requester : fills + signs Part A BEFORE finding a guarantor.
-         Guarantor : fills + signs Part B BEFORE accepting.
+         Guarantor : accepts/rejects first, then agrees as the guarantor.
+         Requester : agrees as the borrower after all guarantors accepted + agreed.
          Approver  : signs before approving.
          Everyone else with access can open the agreement to read it. -->
     <record id="view_resl_loan_form_agreement" model="ir.ui.view">
@@ -18,15 +18,14 @@
                 <field name="agr_role" invisible="1"/>
                 <field name="agr_todo" invisible="1"/>
                 <field name="agr_view_pending" invisible="1"/>
+                <field name="agr_pre_agreed" invisible="1"/>
+                <field name="agr_can_print" invisible="1"/>
             </xpath>
 
             <!-- The "Nominate Replacement Guarantor" header button is not used -->
             <xpath expr="//button[@name='action_nominate_replacement']" position="replace"/>
 
-            <!-- The guarantor can only Accept once Part B is filled and signed -->
-            <xpath expr="//button[@name='action_guarantor_accept']" position="attributes">
-                <attribute name="invisible">not can_respond_as_guarantor or agr_todo</attribute>
-            </xpath>
+            <!-- Guarantor: Accept / Reject are available immediately; the agreement is agreed AFTER accepting -->
 
             <!-- Next-step banners -->
             <xpath expr="//header" position="after">
@@ -40,41 +39,64 @@
                     <button name="action_open_agreement" type="object" string="Open Agreement"
                             class="btn btn-danger btn-sm fw-bold" icon="fa-file-text-o"/>
                 </div>
+                <!-- New, unsaved request: nothing is saved until Save is pressed
+                     or a guarantor is selected. The borrower agrees from the
+                     "Agreement (Borrower)" button, which creates nothing. -->
+                <div class="alert alert-info my-2" role="alert"
+                     invisible="agr_role != 'requester' or agr_todo or status != 'draft'">
+                    <i class="fa fa-info-circle me-2"/>
+                    Use <strong>Find Guarantor</strong> to select your guarantor. The guarantor must
+                    <strong>accept</strong> and agree the agreement first; you will be notified, then agree it as the borrower.
+                </div>
                 <div class="alert alert-warning d-flex align-items-center justify-content-between my-2" role="alert"
-                     invisible="agr_role != 'requester' or not agr_todo">
+                     invisible="agr_role != 'requester' or not agr_todo or not agr_can_open">
                     <div>
                         <i class="fa fa-pencil-square-o me-2" style="font-size:1.2rem;"/>
-                        <strong>Step 1:</strong> fill in and sign your <strong>Loan Agreement (Part A)</strong>.
-                        <strong>Step 2:</strong> then use <strong>Find Guarantor</strong> to send it to your guarantor.
-                        <span invisible="id"> (A new request is saved when you press the button.)</span>
+                        <strong>Your guarantor(s) have accepted.</strong> Open the <strong>Loan Agreement (Borrower)</strong> and press
+                        <strong>Agree and continue</strong>, then submit to the manager.
                     </div>
-                    <button name="action_open_agreement" type="object" string="Fill Agreement (Part A)"
+                    <button name="action_open_agreement" type="object" string="Agreement (Borrower)"
                             class="btn btn-warning btn-sm fw-bold" icon="fa-pencil-square-o"/>
                 </div>
                 <div class="alert alert-warning d-flex align-items-center justify-content-between my-2" role="alert"
                      invisible="agr_role != 'guarantor' or not agr_todo">
                     <div>
                         <i class="fa fa-pencil-square-o me-2" style="font-size:1.2rem;"/>
-                        <strong>Next step:</strong> open the agreement, fill in and sign <strong>Part B</strong>,
-                        then come back and press <strong>Accept</strong>.
+                        <strong>Next step:</strong> you accepted this guarantee. Open the agreement and press
+                        <strong>Agree and continue</strong> as the guarantor. The requestor is then notified.
                     </div>
-                    <button name="action_open_agreement" type="object" string="Fill Agreement (Part B)"
+                    <button name="action_open_agreement" type="object" string="Agreement (Guarantor)"
                             class="btn btn-warning btn-sm fw-bold" icon="fa-pencil-square-o"/>
                 </div>
             </xpath>
 
+            <!-- "Replace Guarantor" must not show for a guarantor (guarantor page) -->
+            <xpath expr="(//button[@name='action_request_replacement'])[1]" position="attributes">
+                <attribute name="invisible">agr_role == 'guarantor' or not has_replaceable_guarantor or not employee_active or not is_eligible or not is_employee_user or status not in ('draft','guarantor_pending','manager_review')</attribute>
+            </xpath>
+            <xpath expr="(//button[@name='action_request_replacement'])[2]" position="attributes">
+                <attribute name="invisible">agr_role == 'guarantor' or not has_replaceable_guarantor or not can_ho_replace or (is_employee_user and employee_active and is_eligible and status in ('draft','guarantor_pending','manager_review')) or (is_employee_user and status not in ('draft','guarantor_pending','manager_review'))</attribute>
+            </xpath>
+
             <!-- Header buttons -->
             <xpath expr="//button[@name='action_submit_manager']" position="before">
-                <button name="action_open_agreement" type="object"
-                    string="Fill Agreement (Part A)" icon="fa-pencil-square-o" class="btn-primary"
+                <!-- New, unsaved request: agree as the borrower without saving anything -->
+                <widget name="resl_agreement_new_button" groups="base.group_user"/>
+                <!-- Approvers / admin: print the agreement -->
+                <button name="action_print_agreement" type="object"
+                    string="Print Agreement" icon="fa-print" class="btn-secondary"
                     groups="base.group_user"
-                    invisible="agr_role != 'requester' or not agr_todo"/>
+                    invisible="not agr_can_print"/>
                 <button name="action_open_agreement" type="object"
-                    string="Fill Agreement (Part B)" icon="fa-pencil-square-o" class="btn-primary"
+                    string="Agreement (Borrower)" icon="fa-pencil-square-o" class="btn-primary"
+                    groups="base.group_user"
+                    invisible="agr_role != 'requester' or not agr_todo or not agr_can_open"/>
+                <button name="action_open_agreement" type="object"
+                    string="Agreement (Guarantor)" icon="fa-pencil-square-o" class="btn-primary"
                     groups="base.group_user"
                     invisible="agr_role != 'guarantor' or not agr_todo"/>
                 <button name="action_open_agreement" type="object"
-                    string="Sign Agreement" icon="fa-pencil-square-o" class="btn-primary"
+                    string="Agreement (Approver)" icon="fa-pencil-square-o" class="btn-primary"
                     groups="base.group_user"
                     invisible="agr_role != 'approver' or not agr_todo"/>
                 <button name="action_open_agreement" type="object"

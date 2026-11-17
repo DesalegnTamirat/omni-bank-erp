@@ -163,7 +163,7 @@ class PbmsPlanningWorkspace(models.Model):
         default=lambda self: self._default_org_unit(),
     )
     work_unit_type = fields.Selection(
-        WORK_UNIT_TYPES, related="org_unit_id.work_unit_type", store=True, readonly=True,
+        related="org_unit_id.work_unit_type", store=True, readonly=True,
     )
 
     enable_deposit = fields.Boolean(compute="_compute_eligibility")

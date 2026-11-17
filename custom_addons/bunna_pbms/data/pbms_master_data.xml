@@ -4,22 +4,45 @@
     <!-- Deposit product types (BRD 8.1 Deposit Mobilization Plan) -->
     <record id="deposit_type_savings" model="pbms.deposit.type">
         <field name="name">Savings Deposit</field>
-        <field name="code">SAV</field>
+        <field name="code">DT_001</field>
         <field name="sequence">10</field>
     </record>
     <record id="deposit_type_demand" model="pbms.deposit.type">
         <field name="name">Demand Deposit</field>
-        <field name="code">DEM</field>
+        <field name="code">DT_002</field>
         <field name="sequence">20</field>
     </record>
     <record id="deposit_type_time" model="pbms.deposit.type">
         <field name="name">Time Deposit</field>
-        <field name="code">TIME</field>
+        <field name="code">DT_003</field>
         <field name="sequence">30</field>
     </record>
     <record id="deposit_type_ifb" model="pbms.deposit.type">
         <field name="name">IFB Deposit</field>
-        <field name="code">IFB</field>
+        <field name="code">DT_004</field>
+        <field name="sequence">40</field>
+        <field name="is_ifb">True</field>
+    </record>
+
+    <!-- Customer Type (for Customer Base) -->
+    <record id="customer_type_savings" model="pbms.customer.type">
+        <field name="name">Savings</field>
+        <field name="code">DT_001</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="customer_type_demand" model="pbms.customer.type">
+        <field name="name">Demand</field>
+        <field name="code">DT_002</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="customer_type_time" model="pbms.customer.type">
+        <field name="name">Time</field>
+        <field name="code">DT_003</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="customer_type_ifb" model="pbms.customer.type">
+        <field name="name">IFB</field>
+        <field name="code">DT_004</field>
         <field name="sequence">40</field>
         <field name="is_ifb">True</field>
     </record>
@@ -27,61 +50,61 @@
     <!-- Fixed asset categories (BRD 8.1 Fixed Asset Requirement Plan) -->
     <record id="fa_category_computer" model="pbms.fixed.asset.category">
         <field name="name">Computer and Accessories</field>
-        <field name="code">FA-COMP</field>
+        <field name="code">FA_001</field>
         <field name="sequence">10</field>
     </record>
     <record id="fa_category_building" model="pbms.fixed.asset.category">
         <field name="name">Buildings</field>
-        <field name="code">FA-BLDG</field>
+        <field name="code">FA_002</field>
         <field name="sequence">20</field>
     </record>
     <record id="fa_category_furniture" model="pbms.fixed.asset.category">
         <field name="name">Office Furniture and Fittings</field>
-        <field name="code">FA-FURN</field>
+        <field name="code">FA_003</field>
         <field name="sequence">30</field>
     </record>
     <record id="fa_category_equipment" model="pbms.fixed.asset.category">
         <field name="name">Office Equipment</field>
-        <field name="code">FA-EQUIP</field>
+        <field name="code">FA_004</field>
         <field name="sequence">40</field>
     </record>
     <record id="fa_category_it" model="pbms.fixed.asset.category">
         <field name="name">Digital and IT Equipment</field>
-        <field name="code">FA-IT</field>
+        <field name="code">FA_005</field>
         <field name="sequence">50</field>
     </record>
     <record id="fa_category_renovation" model="pbms.fixed.asset.category">
         <field name="name">Office Renovation</field>
-        <field name="code">FA-RENOV</field>
+        <field name="code">FA_006</field>
         <field name="sequence">60</field>
     </record>
     <record id="fa_category_initiative" model="pbms.fixed.asset.category">
         <field name="name">Initiatives</field>
-        <field name="code">FA-INIT</field>
+        <field name="code">FA_007</field>
         <field name="sequence">70</field>
     </record>
     <!-- Digital banking channels (BRD 8.1 Digital Banking Plan) -->
     <record id="digital_channel_mobile_activation" model="pbms.digital.channel">
         <field name="name">Mobile Banking Activation</field>
-        <field name="code">DIG-MOB</field>
+        <field name="code">DC_001</field>
         <field name="sequence">10</field>
         <field name="unit_of_measure">count</field>
     </record>
     <record id="digital_channel_atm_activation" model="pbms.digital.channel">
         <field name="name">ATM Card Activation</field>
-        <field name="code">DIG-ATM</field>
+        <field name="code">DC_002</field>
         <field name="sequence">20</field>
         <field name="unit_of_measure">count</field>
     </record>
     <record id="digital_channel_active_merchant" model="pbms.digital.channel">
         <field name="name">Active Merchant</field>
-        <field name="code">DIG-MERCH-ACT</field>
+        <field name="code">DC_003</field>
         <field name="sequence">30</field>
         <field name="unit_of_measure">count</field>
     </record>
     <record id="digital_channel_quality_merchant" model="pbms.digital.channel">
         <field name="name">Quality Merchant</field>
-        <field name="code">DIG-MERCH-QLY</field>
+        <field name="code">DC_004</field>
         <field name="sequence">40</field>
         <field name="unit_of_measure">count</field>
     </record>
@@ -89,17 +112,17 @@
     <!-- FX Source Types (Configurable Master Data) -->
     <record id="fx_source_remittance_swift" model="pbms.fx.source.type">
         <field name="name">Remittance - SWIFT</field>
-        <field name="code">remittance_swift</field>
+        <field name="code">FS_001</field>
         <field name="sequence">10</field>
     </record>
     <record id="fx_source_cash_export" model="pbms.fx.source.type">
         <field name="name">Cash Purchase - Export</field>
-        <field name="code">cash_export</field>
+        <field name="code">FS_002</field>
         <field name="sequence">20</field>
     </record>
     <record id="fx_source_purchase_nbe_other" model="pbms.fx.source.type">
         <field name="name">Purchase from NBE / Other Bank</field>
-        <field name="code">purchase_nbe_other</field>
+        <field name="code">FS_003</field>
         <field name="sequence">30</field>
     </record>
 
@@ -259,53 +282,53 @@
     <!-- Conventional Loan Products (BB-APF-7 and BB-APF-8) -->
     <record id="loan_product_term" model="pbms.loan.product">
         <field name="name">Term Loan</field>
-        <field name="code">TL</field>
+        <field name="code">LP_001</field>
         <field name="category_type">term_loan</field>
         <field name="applies_to">disbursement_collection</field>
         <field name="sequence">10</field>
     </record>
     <record id="loan_product_st" model="pbms.loan.product">
         <field name="name">Short Term Loan</field>
-        <field name="code">STL</field>
+        <field name="code">LP_002</field>
         <field name="category_type">term_loan</field>
         <field name="applies_to">outstanding</field>
         <field name="sequence">15</field>
     </record>
     <record id="loan_product_mt" model="pbms.loan.product">
         <field name="name">Medium Term Loan</field>
-        <field name="code">MTL</field>
+        <field name="code">LP_003</field>
         <field name="category_type">term_loan</field>
         <field name="applies_to">outstanding</field>
         <field name="sequence">20</field>
     </record>
     <record id="loan_product_lt" model="pbms.loan.product">
         <field name="name">Long Term Loan</field>
-        <field name="code">LTL</field>
+        <field name="code">LP_004</field>
         <field name="category_type">term_loan</field>
         <field name="applies_to">outstanding</field>
         <field name="sequence">25</field>
     </record>
     <record id="loan_product_overdraft" model="pbms.loan.product">
         <field name="name">Overdraft</field>
-        <field name="code">OD</field>
+        <field name="code">LP_005</field>
         <field name="category_type">overdraft</field>
         <field name="applies_to">both</field>
         <field name="sequence">30</field>
     </record>
     <record id="loan_product_advances" model="pbms.loan.product">
         <field name="name">Advances</field>
-        <field name="code">ADV</field>
+        <field name="code">LP_006</field>
         <field name="category_type">advances</field>
         <field name="applies_to">both</field>
         <field name="sequence">40</field>
     </record>
-    <record id="loan_product_provisions" model="pbms.loan.product">
-        <field name="name">Outstanding Provisions</field>
-        <field name="code">PROV</field>
-        <field name="category_type">provisions</field>
-        <field name="applies_to">both</field>
-        <field name="sequence">50</field>
-    </record>
+<!--    <record id="loan_product_provisions" model="pbms.loan.product">-->
+<!--        <field name="name">Outstanding Provisions</field>-->
+<!--        <field name="code">PROV</field>-->
+<!--        <field name="category_type">provisions</field>-->
+<!--        <field name="applies_to">both</field>-->
+<!--        <field name="sequence">50</field>-->
+<!--    </record>-->
 
     <!-- Clear currency symbol so amounts format without 'Br' prefix -->
     <record id="base.ETB" model="res.currency">

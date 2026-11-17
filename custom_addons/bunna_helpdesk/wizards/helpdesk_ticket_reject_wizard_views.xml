@@ -4,7 +4,7 @@
         <field name="name">helpdesk.ticket.reject.wizard.form</field>
         <field name="model">helpdesk.ticket.reject.wizard</field>
         <field name="arch" type="xml">
-            <form string="Reject Helpdesk Ticket">
+            <form string="Reject Helpdesk Ticket" class="o_helpdesk_wizard">
                 <sheet>
                     <div class="alert alert-warning py-2 mb-3" role="alert">
                         <i class="fa fa-exclamation-triangle me-1" title="Rejection Notice" aria-label="Rejection Notice" />
@@ -14,7 +14,7 @@
                         <group string="Ticket Information">
                             <field name="ticket_id" invisible="1" />
                             <field name="ticket_number" string="Ticket #" />
-                            <field name="ticket_name" string="Subject" />
+                            <field name="ticket_name" string="Sub Service" />
                             <field name="current_stage_id" string="Current Stage" />
                         </group>
                     </group>

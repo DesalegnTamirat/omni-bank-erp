@@ -47,6 +47,31 @@ class HrPayrollAdjustment(models.Model):
         help='Select the salary rule that represents this adjustment in the payroll computation',
         ondelete='set null'
     )
+    payroll_period_id = fields.Many2one(
+        'hr.payroll.period',
+        string='Payroll Period',
+        help='Payroll Period associated with this adjustment batch',
+        ondelete='set null',
+        index=True
+    )
+    period_id = fields.Many2one(
+        'hr.payroll.period',
+        string='Payroll Period',
+        compute='_compute_period_id',
+        inverse='_inverse_period_id',
+        store=True,
+        index=True
+    )
+
+    @api.depends('payroll_period_id')
+    def _compute_period_id(self):
+        for rec in self:
+            rec.period_id = rec.payroll_period_id
+
+    def _inverse_period_id(self):
+        for rec in self:
+            if rec.period_id and not rec.payroll_period_id:
+                rec.payroll_period_id = rec.period_id
     default_bank_account = fields.Char(
         string='Default Deduction Account',
         size=13,
@@ -207,31 +232,80 @@ class HrPayrollAdjustment(models.Model):
         return res
 
     @api.model
-    def sync_payroll_adjustments(self, particulars, records, code='OTHER', rule_id=False, default_account=False):
+    def sync_payroll_adjustments(self, particulars, records, code='OTHER', rule_id=False, default_account=False, period_id=False):
         """
         API Method to synchronize or create a batch adjustment with employee lines from an external DB.
         """
         self_api = self.with_context(from_api=True)
         norm_code = (code or 'OTHER').strip().upper()
 
+        # Resolve period_id if not explicitly provided
+        resolved_period_id = False
+        if period_id:
+            if isinstance(period_id, int):
+                resolved_period_id = period_id
+            elif hasattr(period_id, 'id'):
+                resolved_period_id = period_id.id
+            elif isinstance(period_id, str):
+                p_rec = self.env['hr.payroll.period'].search([
+                    '|', ('name', '=', period_id.strip()),
+                         ('name', 'ilike', period_id.strip())
+                ], limit=1)
+                if p_rec:
+                    resolved_period_id = p_rec.id
+
+        if not resolved_period_id and particulars:
+            all_periods = self.env['hr.payroll.period'].search([])
+            for p in all_periods:
+                if p.name and p.name.strip().lower() in particulars.lower():
+                    resolved_period_id = p.id
+                    break
+
+        if not resolved_period_id:
+            open_periods = self.env['hr.payroll.period'].search([('state', '=', 'open')], limit=1)
+            if open_periods:
+                resolved_period_id = open_periods.id
+
         adjustment = self_api.search([('name', '=', particulars)], limit=1)
         if not adjustment:
-            adjustment = self_api.create({
+            create_vals = {
                 'name': particulars,
                 'code': norm_code,
                 'salary_rule_id': rule_id or False,
                 'default_bank_account': default_account or False,
                 'is_api_synced': True,
-            })
+                'active': True,
+            }
+            if resolved_period_id:
+                create_vals['payroll_period_id'] = resolved_period_id
+                create_vals['period_id'] = resolved_period_id
+            adjustment = self_api.create(create_vals)
         else:
             vals = {
                 'code': norm_code,
                 'is_api_synced': True,
+                'active': True,
                 'last_change_date': fields.Datetime.now()
             }
             if default_account:
                 vals['default_bank_account'] = default_account
+            if resolved_period_id and (not adjustment.payroll_period_id or not adjustment.period_id):
+                vals['payroll_period_id'] = resolved_period_id
+                vals['period_id'] = resolved_period_id
             adjustment.write(vals)
+
+        # Deactivate previous OD adjustments & lines when a new OD adjustment is synced
+        is_od = (norm_code == 'OD' or 'OD' in particulars.upper().split() or particulars.upper().startswith('OD'))
+        if is_od:
+            other_ods = self_api.search([
+                ('id', '!=', adjustment.id),
+                ('active', '=', True),
+                '|', ('code', '=', 'OD'),
+                     ('name', 'ilike', 'OD')
+            ])
+            if other_ods:
+                other_ods.write({'active': False})
+                other_ods.mapped('line_ids').write({'active': False})
 
         for rec in records:
             emp = False
@@ -287,11 +361,15 @@ class HrPayrollAdjustment(models.Model):
 
         return adjustment.id
 
+    def _run_init_sql(self, sql):
+        with self.env.cr.savepoint():
+            self.env.cr.execute(sql)
+
     @api.model
     def init(self):
         super().init()
         try:
-            self.env.cr.execute("""
+            self._run_init_sql("""
                 DO $$
                 BEGIN
                     IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hr_other_deduction') THEN
@@ -331,22 +409,58 @@ class HrPayrollAdjustment(models.Model):
                 END;
                 $$;
 
-                UPDATE hr_payroll_adjustment 
-                SET is_api_synced = True, api_sync_label = 'Synced' 
-                WHERE code IN ('OD', 'ASBEZA', 'CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') 
-                   OR name ILIKE '%OD%' 
-                   OR name ILIKE '%ASBEZA%' 
-                   OR name ILIKE '%Cash Indemnity%';
-                
-                UPDATE hr_payroll_adjustment 
-                SET is_api_synced = False, api_sync_label = 'Manual' 
-                WHERE is_api_synced IS NULL OR is_api_synced = False;
+                DO $$
+                BEGIN
+                    IF to_regclass('public.hr_payroll_adjustment') IS NOT NULL THEN
+                        IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'hr_payroll_adjustment' AND column_name = 'payroll_period_id') THEN
+                            ALTER TABLE hr_payroll_adjustment ADD COLUMN payroll_period_id integer;
+                        END IF;
 
-                ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS net_amount numeric(16, 2) DEFAULT 0.0;
-                ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS balance numeric(16, 2) DEFAULT 0.0;
-                ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS salary_amount numeric(16, 2) DEFAULT 0.0;
-                ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS tax_amount numeric(16, 2) DEFAULT 0.0;
-                ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS ciamount numeric(16, 2) DEFAULT 0.0;
+                        IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'hr_payroll_adjustment' AND column_name = 'period_id') THEN
+                            ALTER TABLE hr_payroll_adjustment ADD COLUMN period_id integer;
+                        END IF;
+
+                        UPDATE hr_payroll_adjustment 
+                        SET payroll_period_id = period_id 
+                        WHERE payroll_period_id IS NULL AND period_id IS NOT NULL;
+
+                        UPDATE hr_payroll_adjustment 
+                        SET period_id = payroll_period_id 
+                        WHERE period_id IS NULL AND payroll_period_id IS NOT NULL;
+
+                        UPDATE hr_payroll_adjustment 
+                        SET is_api_synced = True, api_sync_label = 'Synced' 
+                        WHERE code IN ('OD', 'ASBEZA', 'CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') 
+                           OR name ILIKE '%OD%' 
+                           OR name ILIKE '%ASBEZA%' 
+                           OR name ILIKE '%Cash Indemnity%';
+                        
+                        UPDATE hr_payroll_adjustment 
+                        SET is_api_synced = False, api_sync_label = 'Manual' 
+                        WHERE is_api_synced IS NULL OR is_api_synced = False;
+                    END IF;
+                END $$;
+
+                DO $$
+                BEGIN
+                    IF to_regclass('public.hr_payroll_adjustment_line') IS NOT NULL THEN
+                        ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS net_amount numeric(16, 2) DEFAULT 0.0;
+                        ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS balance numeric(16, 2) DEFAULT 0.0;
+                        ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS salary_amount numeric(16, 2) DEFAULT 0.0;
+                        ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS tax_amount numeric(16, 2) DEFAULT 0.0;
+                        ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS ciamount numeric(16, 2) DEFAULT 0.0;
+                        ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS payroll_period_id integer;
+                        ALTER TABLE hr_payroll_adjustment_line ADD COLUMN IF NOT EXISTS period_id integer;
+
+                        UPDATE hr_payroll_adjustment_line l
+                        SET payroll_period_id = a.payroll_period_id,
+                            period_id = a.payroll_period_id
+                        FROM hr_payroll_adjustment a
+                        WHERE l.adjustment_id = a.id
+                          AND (l.payroll_period_id IS NULL OR l.period_id IS NULL)
+                          AND a.payroll_period_id IS NOT NULL;
+                    END IF;
+                END $$;
             """)
         except Exception as e:
             _logger.warning("Could not initialize pgcrypto / migration in hr.payroll.adjustment: %s", e)
@@ -478,16 +592,32 @@ class HrPayrollAdjustmentLine(models.Model):
     _description = 'Payroll Adjustment Employee Line'
     _order = 'adjustment_id, employee_id'
 
-    _unique_adjustment_employee = models.Constraint(
-        'unique(adjustment_id, employee_id)',
-        'An employee can only appear once in a given adjustment detail batch!'
-    )
+    _sql_constraints = [
+        ('unique_adjustment_employee', 'unique(adjustment_id, employee_id)',
+         'An employee can only appear once in a given adjustment detail batch!')
+    ]
 
     adjustment_id = fields.Many2one(
         'hr.payroll.adjustment',
         string='Adjustment Batch',
         required=True,
         ondelete='cascade',
+        index=True
+    )
+    payroll_period_id = fields.Many2one(
+        'hr.payroll.period',
+        string='Payroll Period',
+        related='adjustment_id.payroll_period_id',
+        store=True,
+        readonly=True,
+        index=True
+    )
+    period_id = fields.Many2one(
+        'hr.payroll.period',
+        string='Payroll Period',
+        related='adjustment_id.period_id',
+        store=True,
+        readonly=True,
         index=True
     )
     employee_id = fields.Many2one(

@@ -20,6 +20,12 @@
                 <filter string="Debit (D)" name="filter_debit" domain="[('flag', '=', 'D')]"/>
                 <filter string="Credit (C)" name="filter_credit" domain="[('flag', '=', 'C')]"/>
                 <separator/>
+                <filter string="IFB Entries" name="filter_ifb" domain="[('is_ifb', '=', True)]"/>
+                <filter string="Conventional Entries" name="filter_conv" domain="[('is_ifb', '=', False)]"/>
+                <separator/>
+                <filter string="⚠ Unbalanced Groups" name="filter_unbalanced" domain="[('is_group_unbalanced', '=', True)]"/>
+                <filter string="✔ Balanced Groups" name="filter_balanced" domain="[('is_group_unbalanced', '=', False)]"/>
+                <separator/>
                 <filter string="Net Salary (Grp 20)" name="filter_net" domain="[('group_code', '=', '20')]"/>
                 <filter string="Overdraft (Grp 30)" name="filter_od" domain="[('group_code', '=', '30')]"/>
                 <filter string="Provident Fund (Grp 40)" name="filter_pf" domain="[('group_code', '=', '40')]"/>
@@ -30,6 +36,7 @@
                 <group>
                     <filter string="Group Code" name="group_by_group_code" context="{'group_by': 'group_code'}"/>
                     <filter string="Branch / Operating Unit" name="group_by_ou" context="{'group_by': 'operating_unit_id'}"/>
+                    <filter string="IFB vs Conventional" name="group_by_ifb" context="{'group_by': 'is_ifb'}"/>
                     <filter string="Debit / Credit (Flag)" name="group_by_flag" context="{'group_by': 'flag'}"/>
                     <filter string="Payroll Period" name="group_by_period" context="{'group_by': 'period_id'}"/>
                 </group>
@@ -44,7 +51,7 @@
         <field name="name">bunna.payroll.journal.entry.list</field>
         <field name="model">bunna.payroll.journal.entry</field>
         <field name="arch" type="xml">
-            <list string="CBS Journal Entries">
+            <list string="CBS Journal Entries" decoration-danger="is_group_unbalanced">
                 <header>
                     <button name="%(bunna_hr_payroll.action_bunna_payroll_journal_wizard)d"
                             string="Generate Journal Entries"
@@ -52,6 +59,9 @@
                             display="always"
                             class="btn-primary"/>
                 </header>
+                <field name="is_group_unbalanced" column_invisible="1"/>
+                <field name="is_ifb" column_invisible="1"/>
+                <field name="banking_type_label" widget="badge" decoration-info="is_ifb" decoration-muted="not is_ifb" string="Banking" optional="show"/>
                 <field name="group_code" widget="badge"/>
                 <field name="period_id"/>
                 <field name="sol_id"/>
@@ -62,6 +72,9 @@
                 <field name="flag" widget="badge" decoration-info="flag == 'D'" decoration-success="flag == 'C'"/>
                 <field name="amount" sum="Total Amount"/>
                 <field name="currency"/>
+                <field name="salary_rule_id" string="Salary Rule" optional="hide"/>
+                <field name="group_balance_diff" string="Group Diff (D-C)" optional="show"
+                       decoration-danger="is_group_unbalanced" decoration-success="not is_group_unbalanced"/>
                 <field name="report_code" optional="show"/>
                 <field name="date" optional="hide"/>
                 <field name="employee_identification" optional="hide"/>
@@ -101,6 +114,7 @@
                             <field name="account_name"/>
                             <field name="sol_id"/>
                             <field name="operating_unit_id"/>
+                            <field name="is_ifb"/>
                             <field name="ou_name"/>
                             <field name="report_code"/>
                             <field name="company_id" groups="base.group_multi_company"/>
@@ -112,6 +126,15 @@
                         <field name="employee_identification"/>
                         <field name="payslip_id"/>
                     </group>
+                    <group string="Group Balance Status">
+                        <field name="is_group_unbalanced" string="Group Unbalanced?"
+                               decoration-danger="is_group_unbalanced"
+                               decoration-success="not is_group_unbalanced"/>
+                        <field name="group_balance_diff" string="Group Diff (Debit - Credit)"
+                               decoration-danger="is_group_unbalanced"
+                               decoration-success="not is_group_unbalanced"/>
+                    </group>
+
                 </sheet>
             </form>
         </field>

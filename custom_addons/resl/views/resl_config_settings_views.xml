@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_resl_config_settings_form" model="ir.ui.view">
+        <field name="name">resl.config.settings.form</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <form string="RESL Settings" class="oe_form_configuration" create="0" edit="1">
+                <header>
+                    <button string="Save" type="object" name="execute" class="btn-primary"/>
+                    <button string="Discard" type="object" name="cancel" special="cancel"/>
+                </header>
+                <sheet>
+                    <h2>Guarantors</h2>
+                    <group>
+                        <field name="resl_max_guarantors"/>
+                    </group>
+                    <div class="text-muted">
+                        Default is 2. One guarantor is enough when his / her salary covers the
+                        borrower; another is asked for only while the salaries selected so far
+                        do not, up to this number.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_resl_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_resl_config_settings_form"/>
+        <field name="target">current</field>
+        <field name="context">{}</field>
+    </record>
+
+    <menuitem id="menu_resl_config_settings" name="Number of guarantors"
+        parent="resl.menu_resl_config_root"
+        action="action_resl_config_settings" sequence="5"/>
+</odoo>

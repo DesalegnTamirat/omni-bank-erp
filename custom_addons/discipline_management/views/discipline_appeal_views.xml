@@ -5,12 +5,22 @@
             <field name="name">discipline.appeal.list</field>
             <field name="model">discipline.appeal</field>
             <field name="arch" type="xml">
-                <list>
+                <list decoration-danger="is_sla_overdue" decoration-success="state == 'decided'">
                     <field name="name"/>
                     <field name="case_id"/>
                     <field name="employee_id"/>
+                    <field name="appeal_level"/>
+                    <field name="designated_appeal_authority_display" string="Authority"/>
                     <field name="submission_date"/>
+                    <field name="sla_review_deadline" optional="show"/>
+                    <field name="is_sla_overdue" invisible="1"/>
                     <field name="decision_outcome"/>
+                    <field name="acceptance_state" widget="badge"
+                           decoration-info="acceptance_state == 'pending'"
+                           decoration-success="acceptance_state in ('accepted', 'window_closed')"
+                           decoration-muted="acceptance_state == 'not_applicable'"
+                           decoration-warning="acceptance_state == 'appealed_further'"
+                           optional="show"/>
                     <field name="state"/>
                 </list>
             </field>
@@ -22,29 +32,69 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_submit_appeal" string="Submit Appeal" type="object" class="btn-primary"
-                                invisible="state != 'draft'"/>
-                        <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info"
-                                invisible="state != 'submitted' or not can_user_review_current_stage"/>
-                        <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success"
-                                invisible="state != 'under_review' or not can_user_review_current_stage"/>
-                        <button name="action_create_next_appeal" string="Submit Escalated Appeal" type="object" class="btn-warning"
-                                invisible="not can_submit_next_appeal"
-                                help="Submit an appeal escalation to the next designated higher authority."/>
+                        <button name="action_submit_appeal" string="Submit Appeal" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                        <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info text-white" invisible="state != 'submitted' or not can_user_review_current_stage"/>
+                        <button name="action_ceo_refer_to_committee" string="Refer to Committee for Review" type="object" class="btn-warning text-dark" invisible="state != 'under_review' or appeal_target_authority != 'ceo' or not can_user_review_current_stage or is_direct_enforce_case"/>
+                        <button name="action_committee_submit_appeal_recommendation" string="Submit Recommendation to CEO" type="object" class="btn-primary" invisible="state != 'committee_review' or not can_user_review_current_stage"/>
+                        <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success" invisible="state not in ('under_review', 'committee_review') or not can_user_review_current_stage"/>
+                        <button name="action_employee_accept_decision" string="Accept Appeal Decision" type="object" class="btn-success"
+                                invisible="not can_employee_accept_decision"/>
+                        <button name="action_create_next_appeal" string="Submit Appeal" type="object" class="btn-warning" invisible="not can_submit_next_appeal"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,under_review,decided"/>
                     </header>
                     <sheet>
+                        <field name="is_direct_enforce_case" invisible="1"/>
                         <field name="can_submit_next_appeal" invisible="1"/>
+                        <field name="can_employee_accept_decision" invisible="1"/>
                         <field name="can_submit_second_appeal" invisible="1"/>
                         <field name="next_appeal_button_label" invisible="1"/>
                         <field name="is_appeal_reviewer_or_admin" invisible="1"/>
                         <field name="can_user_review_current_stage" invisible="1"/>
                         <field name="is_appellant_employee" invisible="1"/>
+                        <field name="is_sla_overdue" invisible="1"/>
+
+                        <!-- Notification Banners -->
+                        <div class="alert alert-danger d-flex align-items-center mb-3" role="alert" invisible="not is_sla_overdue">
+                            <i class="fa fa-exclamation-triangle fa-2x me-3" title="SLA Overdue Alert"/>
+                            <div>
+                                <strong>Review SLA Overdue:</strong> The review deadline for this stage was <field name="sla_review_deadline" readonly="1" class="oe_inline font-weight-bold"/>. 
+                                If unaddressed, this appeal will be automatically escalated to the next supervisory authority tier.
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="status" invisible="state not in ('decided', 'closed') or acceptance_state != 'pending'">
+                            <i class="fa fa-clock-o fa-2x me-3" title="Pending Acceptance Notice"/>
+                            <div>
+                                <strong>Appeal Decision Rendered (Pending Acceptance):</strong> 
+                                The appellant may formally accept this decision or lodge an escalation within the appeal window (Deadline: <strong><field name="appeal_window_deadline" readonly="1" class="oe_inline"/></strong>).
+                                <span invisible="held_refund_amount &lt;= 0">
+                                    A payroll reimbursement difference of <strong>ETB <field name="held_refund_amount" readonly="1" class="oe_inline"/></strong> will be transmitted to payroll upon acceptance or window closure.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-success d-flex align-items-center mb-3" role="status" invisible="acceptance_state != 'accepted'">
+                            <i class="fa fa-check-circle fa-2x me-3" title="Decision Accepted Confirmation"/>
+                            <div>
+                                <strong>Decision Accepted:</strong> The appeal decision was formally accepted by the appellant. Any applicable payroll reimbursements have been released for payroll processing.
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning d-flex align-items-center mb-3" role="status" invisible="acceptance_state != 'appealed_further'">
+                            <i class="fa fa-arrow-circle-up fa-2x me-3" title="Escalated to Next Appeal Level"/>
+                            <div>
+                                <strong>Escalated to Next Appeal Level:</strong> The appellant has escalated this case to a higher authority tier. Held payroll adjustments remain deferred pending the subsequent appeal outcome.
+                            </div>
+                        </div>
+
                         <group>
                             <group string="Appeal Information &amp; Stage">
                                 <field name="name" readonly="1"/>
-                                <field name="case_id" readonly="1" force_save="1"
-                                       domain="[('state', 'in', ['enforced', 'closed'])]"/>
+                                <field name="allowed_case_ids" invisible="1"/>
+                                <field name="is_case_readonly" invisible="1"/>
+                                <field name="case_id" readonly="is_case_readonly or state != 'draft'" force_save="1"
+                                       domain="[('id', 'in', allowed_case_ids)]"
+                                       options="{'no_create': True, 'no_open': True}"/>
                                 <field name="employee_id" readonly="1"/>
                                 <field name="appeal_level" readonly="1"/>
                                 <field name="parent_appeal_id" invisible="appeal_level == 'first'" readonly="1"/>
@@ -53,9 +103,19 @@
                                 <field name="case_origin_type" invisible="1"/>
                                 <field name="designated_appeal_authority_display" string="Designated Appeal Authority" readonly="1"/>
                                 <field name="appeal_target_authority" invisible="1"/>
+                                <field name="is_auto_escalated" readonly="1" invisible="not is_auto_escalated"/>
                             </group>
                             <group string="Appeal Submission &amp; Authority">
                                 <field name="submission_date" readonly="state != 'draft'"/>
+                                <field name="sla_review_deadline" readonly="1" invisible="state not in ('submitted', 'under_review')"/>
+                                <field name="acceptance_state" readonly="1" widget="badge"
+                                       decoration-info="acceptance_state == 'pending'"
+                                       decoration-success="acceptance_state in ('accepted', 'window_closed')"
+                                       decoration-muted="acceptance_state == 'not_applicable'"
+                                       decoration-warning="acceptance_state == 'appealed_further'"
+                                       invisible="state not in ('decided', 'closed')"/>
+                                <field name="appeal_window_deadline" readonly="1" invisible="state not in ('decided', 'closed')"/>
+                                <field name="held_refund_amount" readonly="1" invisible="held_refund_amount &lt;= 0"/>
                                 <field name="is_submitted_on_behalf"
                                        groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
                                        invisible="not is_submitted_on_behalf and not is_appeal_reviewer_or_admin"
@@ -71,8 +131,32 @@
                             </group>
                         </group>
                         <notebook>
+                            <page string="Case &amp; Misconduct Summary" name="case_summary">
+                                <group>
+                                    <group string="Misconduct &amp; Statutory Legal Provision">
+                                        <field name="case_action_track" readonly="1"/>
+                                        <field name="case_incident_date" readonly="1"/>
+                                        <field name="original_offense_id" readonly="1"/>
+                                        <field name="case_legal_article_display" readonly="1"/>
+                                        <field name="case_severity_level_id" readonly="1" widget="badge"/>
+                                        <field name="case_occurrence_count" readonly="1"/>
+                                    </group>
+                                    <group string="Original Decision &amp; Reporting Channel">
+                                        <field name="original_decision_date" readonly="1"/>
+                                        <field name="original_punishment_type" readonly="1" widget="badge"/>
+                                        <field name="case_initiator_id" readonly="1"/>
+                                    </group>
+                                </group>
+                                <separator string="Summary of Case Facts / Details"/>
+                                <field name="case_description" readonly="1" class="w-100" style="min-height: 80px;"/>
+                            </page>
                             <page string="Appeal Grounds">
                                 <field name="appeal_grounds" readonly="state != 'draft'" placeholder="Explain grounds for appeal, new evidence, or mitigating circumstances..."/>
+                            </page>
+                            <page string="Committee Review &amp; Recommendations" invisible="state not in ('committee_review', 'under_review', 'decided') or (not committee_appeal_recommendation and state != 'committee_review')">
+                                <group>
+                                    <field name="committee_appeal_recommendation" readonly="state != 'committee_review'" placeholder="Record Disciplinary Committee deliberations and recommended outcome for CEO final decision..."/>
+                                </group>
                             </page>
                             <page string="Decision Outcome &amp; Revised Actions" invisible="state in ('draft', 'submitted')">
                                 <field name="is_managerial" invisible="1"/>
@@ -83,14 +167,17 @@
                                         <field name="original_fine_days" readonly="1" invisible="not is_managerial"/>
                                     </group>
                                     <group string="Revised Appeal Decision">
-                                        <field name="decision_outcome" readonly="state != 'under_review' or not can_user_review_current_stage"/>
-                                        <field name="revised_punishment_type" readonly="state != 'under_review' or not can_user_review_current_stage" invisible="decision_outcome != 'penalty_reduced'" required="decision_outcome == 'penalty_reduced'"/>
-                                        <field name="revised_penalty_percentage" readonly="state != 'under_review' or not can_user_review_current_stage" invisible="is_managerial or decision_outcome != 'penalty_reduced'"/>
-                                        <field name="revised_fine_days" readonly="state != 'under_review' or not can_user_review_current_stage" invisible="not is_managerial or decision_outcome != 'penalty_reduced'"/>
+                                        <field name="decision_outcome" readonly="state not in ('under_review', 'committee_review') or not can_user_review_current_stage"/>
+                                        <field name="revised_punishment_type" readonly="state not in ('under_review', 'committee_review') or not can_user_review_current_stage" invisible="decision_outcome != 'penalty_reduced'" required="decision_outcome == 'penalty_reduced'"/>
+                                        <field name="revised_penalty_percentage" readonly="state not in ('under_review', 'committee_review') or not can_user_review_current_stage" invisible="is_managerial or decision_outcome != 'penalty_reduced'"/>
+                                        <field name="revised_fine_days" readonly="state not in ('under_review', 'committee_review') or not can_user_review_current_stage" invisible="not is_managerial or decision_outcome != 'penalty_reduced'"/>
                                     </group>
                                 </group>
                                 <separator string="Decision Justification &amp; Rationale"/>
-                                <field name="appeal_decision_notes" placeholder="Appeal authority justification for upholding, overturning, or reducing penalty..." readonly="state != 'under_review' or not can_user_review_current_stage" class="w-100" style="min-height: 120px;"/>
+                                <field name="appeal_decision_notes" placeholder="Appeal authority justification for upholding, overturning, or reducing penalty..." readonly="state not in ('under_review', 'committee_review') or not can_user_review_current_stage" required="state in ('under_review', 'committee_review')" class="w-100" style="min-height: 120px;"/>
+                                <group string="Appellate Authority Digital Sign-off" invisible="state in ('draft', 'submitted')">
+                                    <field name="reviewer_signature" widget="signature" string="Digital Signature" readonly="state in ('decided', 'closed') or not can_user_review_current_stage" required="state in ('under_review', 'committee_review') and decision_outcome in ('upheld', 'penalty_reduced')" help="Draw your digital signature to authenticate the official appeal decision notice."/>
+                                </group>
                             </page>
                         </notebook>
                     </sheet>
@@ -103,6 +190,7 @@
             <field name="name">Appeals &amp; Reviews</field>
             <field name="res_model">discipline.appeal</field>
             <field name="view_mode">list,form</field>
+            <field name="context">{'discipline_scope': True}</field>
         </record>
     </data>
 </odoo>

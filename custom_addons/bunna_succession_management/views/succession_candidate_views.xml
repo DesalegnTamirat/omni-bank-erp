@@ -2,137 +2,824 @@
 <odoo>
     <data>
 
-        <!-- CANDIDATE LIST -->
+        <!-- ================================================================
+             BEHAVIORAL RATING MODAL (Image 2 Interactive Indicator Selector)
+        ================================================================ -->
+        <record id="view_succession_candidate_eval_line_modal_form" model="ir.ui.view">
+            <field name="name">succession.candidate.eval.line.modal.form</field>
+            <field name="model">succession.candidate.eval.line</field>
+            <field name="arch" type="xml">
+                <form string="Competency Behavioral Guidance &amp; Rating" create="false" edit="true" delete="false" duplicate="false">
+                    <sheet>
+                        <field name="is_last_competency" invisible="1"/>
+                        <field name="is_first_competency" invisible="1"/>
+                        <field name="competency_progress_label" invisible="1"/>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="oe_title">
+                                <h2 style="color: #541718; font-weight: 700; margin-bottom: 4px;">
+                                    <field name="competency_name" readonly="1"/>
+                                </h2>
+                                <h5 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h5>
+                            </div>
+                            <span class="badge bg-primary text-white px-3 py-2 fs-6 rounded-pill">
+                                <field name="competency_progress_label" readonly="1"/>
+                            </span>
+                        </div>
+                        
+                        <!-- Competency Definition Box (Exact Image 2 Callout Styling) -->
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #541718; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px;">
+                            <div style="font-size: 11px; font-weight: 700; color: #726732; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                Competency Definition
+                            </div>
+                            <div style="font-size: 13.5px; color: #1d2b32; line-height: 1.6;">
+                                <field name="competency_definition" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; margin-bottom: 12px;">
+                            <h4 style="color: #1d2b32; font-weight: 600; border-bottom: 2px solid #541718; padding-bottom: 6px;">
+                                📖 Behavioral Options — Click the Level matching Candidate's demonstrated performance
+                            </h4>
+                            <p class="text-muted small mb-0">Select the description below that best reflects the candidate's actual observed performance:</p>
+                        </div>
+
+                        <!-- 4 Clickable Behavioral Indicator Boxes (Image 2 Burgundy Cards) -->
+                        <div class="d-flex flex-column gap-3 mb-4">
+                            <!-- Level 1 Card -->
+                            <div class="p-3 bg-white rounded shadow-sm" style="border: 1.5px solid #541718 !important; border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0 fw-bold" style="color: #541718;">
+                                        Level 1 — Basic
+                                    </h6>
+                                    <div>
+                                        <button name="action_select_level_1" string="✓ Selected (Level 1)" type="object" class="btn btn-sm btn-success fw-bold" invisible="current_user_score != '1' or not can_edit_current_user"/>
+                                        <button name="action_select_level_1" string="✓ Select Level 1 (Basic)" type="object" class="btn btn-sm btn-outline-danger fw-bold" invisible="current_user_score == '1' or not can_edit_current_user"/>
+                                        <span class="badge bg-success fw-bold px-3 py-1" invisible="current_user_score != '1' or can_edit_current_user"><i class="fa fa-lock me-1"/>Rated (Level 1) [Submitted]</span>
+                                    </div>
+                                </div>
+                                <div style="color: #2b2d42; line-height: 1.6; font-size: 13px;">
+                                    <field name="indicator_level_1" readonly="1" nolabel="1"/>
+                                </div>
+                            </div>
+
+                            <!-- Level 2 Card -->
+                            <div class="p-3 bg-white rounded shadow-sm" style="border: 1.5px solid #541718 !important; border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0 fw-bold" style="color: #541718;">
+                                        Level 2 — Intermediate
+                                    </h6>
+                                    <div>
+                                        <button name="action_select_level_2" string="✓ Selected (Level 2)" type="object" class="btn btn-sm btn-success fw-bold" invisible="current_user_score != '2' or not can_edit_current_user"/>
+                                        <button name="action_select_level_2" string="✓ Select Level 2 (Intermediate)" type="object" class="btn btn-sm btn-outline-danger fw-bold" invisible="current_user_score == '2' or not can_edit_current_user"/>
+                                        <span class="badge bg-success fw-bold px-3 py-1" invisible="current_user_score != '2' or can_edit_current_user"><i class="fa fa-lock me-1"/>Rated (Level 2) [Submitted]</span>
+                                    </div>
+                                </div>
+                                <div style="color: #2b2d42; line-height: 1.6; font-size: 13px;">
+                                    <field name="indicator_level_2" readonly="1" nolabel="1"/>
+                                </div>
+                            </div>
+
+                            <!-- Level 3 Card -->
+                            <div class="p-3 bg-white rounded shadow-sm" style="border: 1.5px solid #541718 !important; border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0 fw-bold" style="color: #541718;">
+                                        Level 3 — Advanced
+                                    </h6>
+                                    <div>
+                                        <button name="action_select_level_3" string="✓ Selected (Level 3)" type="object" class="btn btn-sm btn-success fw-bold" invisible="current_user_score != '3' or not can_edit_current_user"/>
+                                        <button name="action_select_level_3" string="✓ Select Level 3 (Advanced)" type="object" class="btn btn-sm btn-outline-danger fw-bold" invisible="current_user_score == '3' or not can_edit_current_user"/>
+                                        <span class="badge bg-success fw-bold px-3 py-1" invisible="current_user_score != '3' or can_edit_current_user"><i class="fa fa-lock me-1"/>Rated (Level 3) [Submitted]</span>
+                                    </div>
+                                </div>
+                                <div style="color: #2b2d42; line-height: 1.6; font-size: 13px;">
+                                    <field name="indicator_level_3" readonly="1" nolabel="1"/>
+                                </div>
+                            </div>
+
+                            <!-- Level 4 Card -->
+                            <div class="p-3 bg-white rounded shadow-sm" style="border: 1.5px solid #541718 !important; border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0 fw-bold" style="color: #541718;">
+                                        Level 4 — Expert
+                                    </h6>
+                                    <div>
+                                        <button name="action_select_level_4" string="✓ Selected (Level 4)" type="object" class="btn btn-sm btn-success fw-bold" invisible="current_user_score != '4' or not can_edit_current_user"/>
+                                        <button name="action_select_level_4" string="✓ Select Level 4 (Expert)" type="object" class="btn btn-sm btn-outline-danger fw-bold" invisible="current_user_score == '4' or not can_edit_current_user"/>
+                                        <span class="badge bg-success fw-bold px-3 py-1" invisible="current_user_score != '4' or can_edit_current_user"><i class="fa fa-lock me-1"/>Rated (Level 4) [Submitted]</span>
+                                    </div>
+                                </div>
+                                <div style="color: #2b2d42; line-height: 1.6; font-size: 13px;">
+                                    <field name="indicator_level_4" readonly="1" nolabel="1"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <field name="plan_include_manager" invisible="1"/>
+                        <field name="plan_include_self" invisible="1"/>
+                        <field name="plan_include_spmc" invisible="1"/>
+                        <field name="current_user_score" invisible="1"/>
+                        <field name="can_edit_manager" invisible="1"/>
+                        <field name="can_edit_self" invisible="1"/>
+                        <field name="can_edit_spmc" invisible="1"/>
+                        <field name="can_edit_current_user" invisible="1"/>
+                        <field name="can_submit_current_role" invisible="1"/>
+
+                        <div class="p-2 bg-light rounded border mb-3 small text-muted d-flex align-items-center" invisible="not plan_include_spmc or not spmc_eval_breakdown">
+                            <i class="fa fa-users text-warning me-2 fs-6" title="Users"/>
+                            <div><strong>SPMC Committee Ratings:</strong> <field name="spmc_eval_breakdown" readonly="1" class="d-inline ms-1 fw-semibold text-dark"/></div>
+                        </div>
+
+                        <!-- Consensus & Effective Score Summary Box -->
+                        <div class="p-3 bg-white rounded border d-flex justify-content-between align-items-center mb-3 shadow-sm">
+                            <div>
+                                <span class="text-muted small d-block">Evaluated / Consensus Level:</span>
+                                <span class="fs-5 fw-bold text-dark"><field name="eval_display" readonly="1"/></span>
+                            </div>
+                            <div class="d-flex gap-3 text-end">
+                                <div>
+                                    <span class="text-muted small d-block">Required Level:</span>
+                                    <span class="fw-bold"><field name="required_proficiency" readonly="1"/></span>
+                                </div>
+                                <div>
+                                    <span class="text-muted small d-block">Variance:</span>
+                                    <span class="fw-bold"><field name="gap_display" readonly="1"/></span>
+                                </div>
+                                <div>
+                                    <span class="text-muted small d-block">Match Status:</span>
+                                    <field name="achievement_status" widget="badge" readonly="1"
+                                           decoration-success="achievement_status == 'meets'"
+                                           decoration-info="achievement_status == 'exceeds'"
+                                           decoration-danger="achievement_status == 'below'"/>
+                                </div>
+                            </div>
+                        </div>
+                    </sheet>
+                    <footer>
+                        <button name="action_save_and_next" string="Save &amp; Next Competency ➔" type="object" class="btn btn-primary" invisible="is_last_competency or not can_edit_current_user"/>
+                        <button name="action_save_and_next" string="Save &amp; Finish Evaluation ✓" type="object" class="btn btn-success fw-bold" invisible="not is_last_competency or not can_edit_current_user"/>
+                        <button name="action_save_and_submit" string="Save &amp; Submit Evaluation ✓" type="object" class="btn btn-primary fw-bold" invisible="not is_last_competency or not can_submit_current_role"/>
+                        <button name="action_save_and_prev" string="← Back" type="object" class="btn btn-outline-secondary" invisible="is_first_competency"/>
+                        <button name="action_save_and_close" string="Save &amp; Close" type="object" class="btn btn-secondary" invisible="not can_edit_current_user"/>
+                        <button string="Close" class="btn btn-link text-muted" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- ================================================================
+             CANDIDATE LIST
+        ================================================================ -->
         <record id="view_succession_candidate_list" model="ir.ui.view">
             <field name="name">succession.candidate.list</field>
             <field name="model">succession.candidate</field>
             <field name="priority">1</field>
             <field name="arch" type="xml">
-                <list sample="1" decoration-success="readiness_level == 'ready_now'"
-                      decoration-warning="readiness_level == 'ready_1_2_yrs'"
-                      decoration-muted="state in ('rejected','waitlisted')">
-                    <field name="employee_id"/>
-                    <field name="critical_position_id"/>
-                    <field name="talent_pool_id"/>
-                    <field name="readiness_level" widget="badge"
-                           decoration-success="readiness_level == 'ready_now'"
-                           decoration-warning="readiness_level == 'ready_1_2_yrs'"
-                           decoration-danger="readiness_level == 'ready_3_5_yrs'"/>
-                    <field name="system_readiness_suggestion"/>
-                    <field name="competency_match_percent" widget="progressbar"/>
-                    <field name="latest_pms_score"/>
-                    <field name="current_tenure_months"/>
-                    <field name="state" widget="badge"
+                <list sample="1"
+                      default_order="create_date desc, id desc"
+                      decoration-muted="state in ('rejected','waitlisted')"
+                      decoration-danger="state == 'resigned'"
+                      decoration-success="state == 'approved'"
+                      decoration-info="state == 'assessed'"
+                      decoration-primary="state == 'placed'"
+                      decoration-warning="state == 'nominated'">
+                    <field name="employee_id" class="fw-bold" string="Candidate"/>
+                    <field name="critical_position_id" class="fw-bold text-primary" string="Critical Position"/>
+                    <field name="job_id" string="Current Position"/>
+                    <field name="department_id" string="Department" optional="show"/>
+                    <field name="final_assessment_score" string="Assessment Score (%)" class="fw-bold text-primary"/>
+                    <field name="assessment_result" widget="badge" string="Result"
+                           decoration-success="assessment_result == 'pass'"
+                           decoration-info="assessment_result == 'waived'"
+                           decoration-danger="assessment_result == 'fail'"/>
+                    <field name="readiness_level_id" widget="badge" string="Readiness"/>
+                    <field name="state" widget="badge" string="Status"
                            decoration-success="state == 'approved'"
                            decoration-info="state == 'assessed'"
+                           decoration-primary="state == 'placed'"
+                           decoration-danger="state == 'resigned'"
                            decoration-warning="state == 'nominated'"
                            decoration-muted="state in ('rejected','waitlisted')"/>
                 </list>
             </field>
         </record>
 
-        <!-- CANDIDATE FORM -->
+        <!-- ================================================================
+             CANDIDATE FORM
+        ================================================================ -->
         <record id="view_succession_candidate_form" model="ir.ui.view">
             <field name="name">succession.candidate.form</field>
             <field name="model">succession.candidate</field>
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_compute_gap_analysis"
-                                string="🔄 Run Gap Analysis"
-                                type="object" class="btn-secondary"
-                                invisible="state in ('approved','rejected')"
-                                groups="bunna_succession_management.group_succession_ppdd"/>
-                        <button name="action_assess"
-                                string="Mark as Assessed"
+                        <button name="action_nominate"
+                                string="Nominate Candidate"
                                 type="object" class="oe_highlight"
-                                invisible="state != 'nominated'"
-                                groups="bunna_succession_management.group_succession_ppdd"/>
+                                invisible="state != 'draft'"
+                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+
+
+
+                        <button name="action_reopen_assessment"
+                                string="Reopen Assessment"
+                                type="object" class="btn-secondary"
+                                invisible="state != 'assessed'"
+                                groups="bunna_succession_management.group_succession_spmc"/>
+
+
+                        <!-- Start / Continue Evaluation Button -->
+                        <button name="action_start_competency_evaluation"
+                                string="Evaluate Competencies"
+                                type="object" class="btn-primary"
+                                icon="fa-check-square-o"
+                                invisible="state != 'nominated' or not eval_line_ids or not can_evaluate_competencies"/>
+
+                        <!-- Submit Manager Evaluation Button -->
+                        <button name="action_submit_manager_evaluation"
+                                string="Submit Manager Evaluation"
+                                type="object" class="oe_highlight btn-success"
+                                icon="fa-paper-plane"
+                                invisible="not can_submit_manager_eval"/>
+
+                        <!-- Submit SPMC Evaluation Button -->
+                        <button name="action_submit_spmc_evaluation"
+                                string="Submit Evaluation"
+                                type="object" class="oe_highlight btn-warning"
+                                icon="fa-check-circle"
+                                invisible="not can_submit_spmc_eval"/>
+
+                        <!-- Evaluation Submitted Status Badges (Header) -->
+                        <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fw-bold"
+                              invisible="not has_competency_assessment or not manager_evaluation_submitted or is_spmc_user and not is_direct_manager">
+                            <i class="fa fa-lock me-1"/>Manager Evaluation Submitted
+                        </span>
+                        <span class="badge bg-warning-subtle text-warning border border-warning px-3 py-2 fw-bold"
+                              invisible="not has_competency_assessment or not spmc_evaluation_submitted or is_direct_manager and not is_spmc_user">
+                            <i class="fa fa-lock me-1"/>SPMC Evaluation Submitted
+                        </span>
+
+
+                        <!-- Complete Assessment & Set Readiness (PPDD Decision) -->
+                        <button name="action_open_set_readiness_wizard"
+                                string="Complete Assessment &amp; Set Readiness"
+                                type="object" class="oe_highlight btn-success"
+                                icon="fa-check-circle"
+                                invisible="state != 'nominated' or not can_set_readiness"
+                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
                         <button name="action_spmc_approve"
-                                string="✓ SPMC Approve"
+                                string="SPMC Approve"
                                 type="object" class="btn-success"
                                 invisible="state != 'assessed'"
                                 groups="bunna_succession_management.group_succession_spmc"/>
-                        <button name="action_waitlist"
-                                string="Waitlist"
-                                type="object"
-                                invisible="state not in ('nominated','assessed')"
-                                groups="bunna_succession_management.group_succession_ppdd"/>
-                        <button name="action_reject"
-                                string="Reject"
-                                type="object"
-                                invisible="state in ('approved','rejected', 'placed')"
-                                groups="bunna_succession_management.group_succession_ppdd"/>
-                                
-                        <!-- Deployment Workflow Buttons -->
-                        <button name="action_initiate_deployment"
-                                string="Initiate Deployment"
-                                type="object" class="oe_highlight"
-                                invisible="state != 'approved'"
-                                groups="bunna_succession_management.group_succession_ppdd"/>
-                        <button name="action_deployment_lm_approve"
-                                string="Line Manager Approve"
-                                type="object" class="oe_highlight"
-                                invisible="state != 'deployment_lm'"/>
-                        <button name="action_deployment_po_approve"
-                                string="Principal Officer Approve"
-                                type="object" class="oe_highlight"
-                                invisible="state != 'deployment_po'"/>
-                        <button name="action_deployment_ppdd_approve"
-                                string="PPDD Approve"
-                                type="object" class="oe_highlight"
-                                invisible="state != 'deployment_ppdd'"
-                                groups="bunna_succession_management.group_succession_ppdd"/>
-                        <button name="action_execute_placement"
-                                string="Final SPMC Placement"
+
+                        <button name="action_deploy_candidate"
+                                string="Deploy"
                                 type="object" class="btn-success"
-                                invisible="state != 'deployment_spmc'"
-                                groups="bunna_succession_management.group_succession_spmc"/>
+                                icon="fa-rocket"
+                                invisible="not can_deploy_from_pool"
+                                groups="hr.group_hr_manager,bunna_succession_management.group_succession_admin"
+                                confirm="Deploy this Ready Now successor from the Talent Pool? Their status will change to Deployed and one successor will be subtracted from the active pool count."/>
+
+                        <!-- Workflow Step Submitted / Approved Status Badges -->
+                        <span class="badge bg-info-subtle text-info border border-info px-3 py-2 fw-bold"
+                              invisible="state != 'nominated'">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Nomination Submitted
+                        </span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-2 fw-bold"
+                              invisible="state != 'assessed'">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Assessment Submitted
+                        </span>
+                        <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fw-bold"
+                              invisible="state != 'approved'">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Approved by SPMC
+                        </span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-2 fw-bold"
+                              invisible="state != 'placed'">
+                            <i class="fa fa-check-circle me-1" title="Accepted"/>Deployed
+                        </span>
+                        <span class="badge bg-danger-subtle text-danger border border-danger px-3 py-2 fw-bold"
+                              invisible="state != 'resigned'">
+                            <i class="fa fa-user-times me-1"/>Employee Resigned
+                        </span>
 
                         <field name="state" widget="statusbar"
-                               statusbar_visible="nominated,assessed,approved,placed"/>
+                               statusbar_visible="draft,nominated,assessed,approved,placed"/>
                     </header>
-                    <sheet>
-                        <!-- Readiness Banner -->
-                        <div class="alert alert-success" role="alert"
-                             invisible="readiness_level != 'ready_now'">
-                            <strong>✅ READY NOW:</strong>
-                            This candidate is assessed as ready to step into the critical role immediately.
-                        </div>
-                        <div class="alert alert-warning" role="alert"
-                             invisible="readiness_level != 'ready_1_2_yrs'">
-                            <strong>⚠️ READY IN 1-2 YEARS:</strong>
-                            Targeted development required. Active development plan recommended.
-                        </div>
-                        <div class="alert alert-danger" role="alert"
-                             invisible="readiness_level != 'ready_3_5_yrs'">
-                            <strong>🕐 READY IN 3-5 YEARS:</strong>
-                            Significant gaps identified. Long-term development investment needed.
-                        </div>
 
+                    <sheet>
+                        <field name="active" invisible="1"/>
+                        <field name="can_deploy_from_pool" invisible="1"/>
+                        <field name="can_set_readiness" invisible="1"/>
+                        <field name="assessment_criteria_synced" invisible="1"/>
+                        <field name="assessment_criteria_synced_date" invisible="1"/>
+                        <field name="assessment_criteria_synced_by_id" invisible="1"/>
+                        <field name="has_competency_assessment" invisible="1"/>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_development_plans" type="object"
+                                    class="oe_stat_button" icon="fa-graduation-cap"
+                                    invisible="state not in ('approved', 'placed')">
+                                <field name="dev_plan_count" widget="statinfo" string="Dev Plans"/>
+                            </button>
+                            <button name="action_view_career_discussions" type="object"
+                                    class="oe_stat_button" icon="fa-comments-o"
+                                    invisible="state not in ('approved', 'placed')">
+                                <field name="career_discussion_count" widget="statinfo" string="Discussions"/>
+                            </button>
+                            <button type="object" name="action_compute_gap_analysis"
+                                    class="oe_stat_button" icon="fa-bullseye"
+                                    invisible="not has_competency_assessment">
+                                <field name="competency_gap_count" widget="statinfo" string="Gaps"/>
+                            </button>
+                        </div>
                         <group>
-                            <group string="Nomination">
-                                <field name="employee_id" readonly="state != 'nominated'"/>
-                                <field name="critical_position_id" readonly="state != 'nominated'"/>
-                                <field name="talent_pool_id"/>
+                            <group string="Nomination &amp; Assessors">
+                                <field name="employee_id"
+                                       readonly="not is_ppdd_user or state not in ('draft','nominated')"/>
+                                <field name="job_id" string="Current Position" readonly="1"/>
+                                <field name="critical_position_id"
+                                       readonly="not is_ppdd_user or state not in ('draft','nominated')"/>
+                                <field name="coach_id" readonly="1"/>
+                                <field name="parent_id" readonly="1" string="Line Manager"/>
+                                <field name="spmc_assigned_user_id" widget="many2one_avatar_user"
+                                       readonly="1"
+                                       options="{'no_create': True}" invisible="not has_competency_assessment or not spmc_assigned_user_id or spmc_assessor_ids"/>
+                                <field name="spmc_assessor_ids" widget="many2many_tags"
+                                       options="{'no_create': True, 'color_field': 'color'}"
+                                       readonly="1"
+                                       domain="[('all_group_ids', 'in', [%(bunna_succession_management.group_succession_spmc)d])]"
+                                       string="Assigned SPMC Assessors"
+                                       required="has_competency_assessment and plan_include_spmc"
+                                       invisible="not has_competency_assessment or not plan_include_spmc"/>
                                 <field name="nominated_by_id" readonly="1"/>
                                 <field name="nomination_date" readonly="1"/>
                             </group>
-                            <group string="Readiness Assessment">
-                                <field name="readiness_level"/>
-                                <field name="competency_match_percent" widget="progressbar"/>
-                                <field name="latest_pms_score" readonly="1"/>
-                                <field name="current_tenure_months" readonly="1"/>
+                            <group string="Readiness &amp; Assessment">
+                                <field name="final_assessment_score" readonly="1" class="fw-bold fs-5 text-primary"/>
+                                <field name="assessment_result" widget="badge"
+                                       decoration-success="assessment_result == 'pass'"
+                                       decoration-danger="assessment_result == 'fail'"
+                                       decoration-info="assessment_result == 'waived'"/>
+                                <field name="assessment_status" widget="badge"
+                                       decoration-success="assessment_status == 'finalized'"
+                                       decoration-info="assessment_status == 'ready'"
+                                       decoration-warning="assessment_status in ('pending','partial')"/>
+                                <field name="latest_pms_score" string="Latest PMS Score" readonly="1" class="fw-bold text-dark"/>
+                                <field name="competency_match_percent" readonly="1" class="fw-bold text-dark" invisible="not has_competency_assessment"/>
+
                             </group>
                         </group>
 
+<field name="has_confirmed_career_discussion" invisible="1"/>
+
                         <notebook>
-                            <!-- TAB 1: Competency Gap Analysis -->
-                            <page string="🔬 Competency Gap Analysis" name="gaps">
-                                <p class="text-muted" invisible="competency_gap_ids">
-                                    No gap analysis computed yet.
-                                    Click <strong>"🔄 Run Gap Analysis"</strong> to compute.
+
+                            <!-- ============================================
+                                 TAB 1: ASSESSMENT SCORECARD (Configurable)
+                            ============================================ -->
+                            <page string="Assessment" name="assessment">
+
+                                <field name="is_ppdd_user" invisible="1"/>
+                                <field name="assessment_plan_locked" invisible="1"/>
+                                <field name="has_config_pms" invisible="1"/>
+                                <field name="has_config_exam" invisible="1"/>
+                                <field name="plan_include_exam" invisible="1"/>
+                                <field name="plan_include_pms" invisible="1"/>
+                                <field name="plan_include_manager" invisible="1"/>
+                                <field name="plan_include_spmc" invisible="1"/>
+                                <field name="can_submit_manager_eval" invisible="1"/>
+                                <field name="can_submit_spmc_eval" invisible="1"/>
+                                <field name="manager_evaluation_submitted" invisible="1"/>
+                                <field name="spmc_evaluation_submitted" invisible="1"/>
+                                <field name="can_evaluate_competencies" invisible="1"/>
+                                <field name="is_current_user_eval_submitted" invisible="1"/>
+                                <field name="is_direct_manager" invisible="1"/>
+                                <field name="is_spmc_user" invisible="1"/>
+                                <field name="is_self_user" invisible="1"/>
+                                <!-- Per-assessor SPMC tracking for the current user -->
+                                <field name="my_spmc_eval_id" invisible="1"/>
+                                <field name="my_spmc_eval_submitted" invisible="1"/>
+                                <field name="my_spmc_eval_progress" invisible="1"/>
+                                <field name="can_rate_spmc_competencies" invisible="1"/>
+
+                                <div class="alert alert-info d-flex align-items-center mb-3" role="alert" invisible="state != 'draft'">
+                                    <i class="fa fa-info-circle me-2 fs-5" title="Info"/>
+                                    <div>
+                                        This candidate is currently in <strong>Draft</strong> status. Please click <strong>Nominate Candidate</strong> in the header toolbar to officially nominate this candidate before proceeding with assessment.
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="state != 'nominated' or assessment_criteria_synced">
+                                    <i class="fa fa-exclamation-triangle me-2 fs-5" title="Warning"/>
+                                    <div>
+                                        Assessment criteria have not been populated yet. Please go to <strong>Assessment &amp; Exam Plans</strong>, configure the plan and click <strong>Sync to Nominated Candidates</strong> to initialize the evaluation criteria.
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-success d-flex align-items-center justify-content-between py-2 px-3 mb-3" role="alert" invisible="state != 'nominated' or not assessment_criteria_synced">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fa fa-check-circle text-success me-2 fs-5" title="Success"/>
+                                        <div class="small">
+                                            <strong>Official Assessment Plan Synced &amp; Active.</strong>
+                                            Evaluation criteria and weights are synchronized from <strong class="text-dark"><field name="critical_position_id" readonly="1" class="d-inline"/></strong>. Evaluators can now score competency lines and exam components.
+                                        </div>
+                                    </div>
+                                    <div class="text-muted small ms-2 text-nowrap" invisible="not assessment_criteria_synced_date">
+                                        <i class="fa fa-calendar-check-o me-1"/>Synced: <field name="assessment_criteria_synced_date" readonly="1" class="d-inline"/>
+                                    </div>
+                                </div>
+
+                                <!-- === ASSESSMENT SUMMARY (EXECUTIVE KPI STRIP) === -->
+                                <div class="card border-0 shadow-sm rounded-3 mb-3 bg-light" invisible="not assessment_result_ids">
+                                    <div class="card-body p-3">
+                                        <div class="row align-items-center g-3">
+                                            <div class="col-6 col-md-3 border-end">
+                                                <span class="text-muted small d-block text-uppercase fw-bold">Final Assessment Score</span>
+                                                <div class="d-flex align-items-baseline gap-1">
+                                                    <span class="fs-2 fw-bold text-primary"><field name="final_assessment_score" readonly="1"/></span>
+                                                    <span class="text-muted fw-semibold">/ 100</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-2 border-end">
+                                                <span class="text-muted small d-block text-uppercase fw-bold">Pass Mark</span>
+                                                <span class="fs-4 fw-bold text-dark"><field name="assessment_pass_mark" readonly="1"/>%</span>
+                                            </div>
+                                            <div class="col-6 col-md-3 border-end">
+                                                <span class="text-muted small d-block text-uppercase fw-bold mb-1">Assessment Result</span>
+                                                <div>
+                                                    <field name="assessment_result" widget="badge"
+                                                           decoration-success="assessment_result == 'pass'"
+                                                           decoration-info="assessment_result == 'waived'"
+                                                           decoration-danger="assessment_result == 'fail'"/>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-4">
+                                                <span class="text-muted small d-block text-uppercase fw-bold mb-1">Evaluation Status</span>
+                                                <div>
+                                                    <field name="assessment_status" widget="badge"
+                                                           decoration-success="assessment_status == 'finalized'"
+                                                           decoration-info="assessment_status == 'ready'"
+                                                           decoration-warning="assessment_status in ('pending','partial')"/>
+                                                </div>
+                                                <div class="small text-muted mt-1" invisible="not assessment_done">
+                                                    <i class="fa fa-lock me-1 text-success"/>Assessed by <field name="assessment_by_id" readonly="1" class="d-inline"/> on <field name="assessment_date" readonly="1" class="d-inline"/>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2 pt-2 border-top small text-muted d-flex align-items-center">
+                                             <i class="fa fa-calculator text-primary me-2" title="Calculation"/>
+                                             <span><strong>Calculation:</strong> <field name="assessment_breakdown_display" readonly="1" class="d-inline"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- === CANDIDATE ASSESSMENT SCORECARD === -->
+                                <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded border" invisible="state == 'draft' and not assessment_result_ids">
+                                    <div>
+                                        <h6 class="mb-0 text-primary fw-bold">
+                                            <i class="fa fa-clipboard-check me-2"/>Candidate Assessment Scorecard
+                                        </h6>
+                                        <p class="text-muted small mb-0" invisible="assessment_done">
+                                            Summary of assessment components, weights, and scores. Click <strong>Record Assessment Scores</strong> to record or modify marks.
+                                        </p>
+                                        <p class="text-success small mb-0 fw-bold" invisible="not assessment_done">
+                                            <i class="fa fa-lock me-1"/>Assessment finalized and locked under governance policy.
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <button name="action_open_assessment_entry_wizard"
+                                                string="Record Assessment Scores"
+                                                icon="fa-pencil-square-o"
+                                                type="object" class="btn btn-primary shadow-sm"
+                                                invisible="state != 'nominated' or assessment_done or not assessment_criteria_synced"
+                                                groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-info py-2 px-3 mb-3 d-flex align-items-center" invisible="assessment_criteria_synced" role="alert">
+                                    <i class="fa fa-info-circle me-2 fs-5" title="Info"/>
+                                    <div>
+                                        <strong>Assessment Plan Not Synchronized:</strong> The Score Card and evaluation matrix will be activated once the official Assessment Plan is synchronized with this candidate.
+                                    </div>
+                                </div>
+
+                                <p class="text-muted" invisible="assessment_result_ids">
+                                    No assessment components loaded. Go to <strong>Assessment &amp; Exam Plans</strong>, configure the plan and click <strong>Re-Sync to Employees</strong>.
                                 </p>
+                                <field name="assessment_result_ids" readonly="1">
+                                    <list create="0" delete="0" edit="0"
+                                          decoration-muted="waived">
+                                        <field name="component_id" readonly="1" string="Assessment Component"/>
+                                        <field name="weight" readonly="1" string="Weight (%)" class="fw-bold"/>
+                                        <field name="max_score" readonly="1" string="Max Score"/>
+                                        <field name="applicability_status" widget="badge" string="Plan Applicability"
+                                               decoration-success="applicability_status == 'applicable'"
+                                               decoration-muted="applicability_status == 'not_applicable'"/>
+                                        <field name="waiver_reason" string="Plan Justification / Exemption Reason"/>
+                                        <field name="display_score" readonly="1" string="Score (0–100)" class="fw-bold text-primary"/>
+                                    </list>
+                                </field>
+
+                                <!-- === MULTI-RATER COMPETENCY BREAKDOWN === -->
+                                <field name="has_competency_assessment" invisible="1"/>
+                                <div class="mt-4 mb-3 p-3 bg-light rounded border" invisible="not has_competency_assessment">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <h5 class="mb-1 text-primary fw-bold">
+                                                 <i class="fa fa-users me-2"/>Succession Competency Assessment — Multi-Rater Breakdown
+                                            </h5>
+                                            <p class="text-muted small mb-0">
+                                                Equal-average composite of all active evaluators, contributing to the <strong><field name="weight_competency" readonly="1" class="d-inline"/>% Competency Pillar</strong>.
+                                            </p>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-success-subtle text-success border border-success fs-6 px-3 py-2">
+                                                Competency Pillar Score: <field name="succession_competency_score" readonly="1" class="fw-bold d-inline"/>%
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-secondary py-2 px-3 mb-0 d-flex align-items-center" role="status">
+                                        <i class="fa fa-calculator text-primary me-2 fs-5" title="Calculation"/>
+                                        <div class="small">
+                                            <strong>Formula:</strong> <field name="competency_breakdown_display" readonly="1" class="fw-bold text-dark"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-3" invisible="not has_competency_assessment">
+                                    <!-- 1. Coach / Manager Evaluation KPI Card -->
+                                    <div class="col-md-4" invisible="not plan_include_manager">
+                                        <div class="p-3 bg-white rounded border border-primary-subtle shadow-sm h-100">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="fw-bold text-primary small text-uppercase">
+                                                    <i class="fa fa-user-tie me-1"/> 1. Coach / Line Manager
+                                                    <span class="badge bg-success text-white ms-1" invisible="not manager_evaluation_submitted"><i class="fa fa-check me-1"/>Submitted</span>
+                                                </span>
+                                                <span class="badge bg-primary-subtle text-primary border border-primary text-nowrap flex-shrink-0">
+                                                    Weight: <field name="competency_rater_weight_display" readonly="1"/>
+                                                </span>
+                                            </div>
+                                            <div class="d-flex align-items-baseline gap-2">
+                                                <span class="fs-4 fw-bold text-primary"><field name="competency_eval_score" readonly="1"/>%</span>
+                                                <span class="small text-muted">Evaluated Score</span>
+                                            </div>
+                                            <div class="small text-muted mt-1">
+                                                <field name="manager_eval_status_display" readonly="1"/>
+                                            </div>
+                                            <div class="small text-muted mt-1" invisible="not coach_id and not parent_id">
+                                                <i class="fa fa-id-badge me-1"/>Assessor: <strong><field name="coach_id" readonly="1" nolabel="1" invisible="not coach_id"/><field name="parent_id" readonly="1" nolabel="1" invisible="coach_id"/></strong>
+                                            </div>
+                                        </div>
+                                    </div>
+
+
+
+                                    <!-- 3. SPMC Committee KPI Card -->
+                                    <div class="col-md-4" invisible="not plan_include_spmc">
+                                        <div class="p-3 bg-white rounded border border-warning-subtle shadow-sm h-100">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="fw-bold text-warning-emphasis small text-uppercase">
+                                                    <i class="fa fa-institution me-1"/> 3. SPMC Committee
+                                                    <span class="badge bg-success text-white ms-1" invisible="not spmc_evaluation_submitted"><i class="fa fa-check me-1"/>Submitted</span>
+                                                </span>
+                                                <span class="badge bg-warning-subtle text-dark border border-warning text-nowrap flex-shrink-0">
+                                                    Weight: <field name="competency_rater_weight_display" readonly="1"/>
+                                                </span>
+                                            </div>
+                                            <div class="d-flex align-items-baseline gap-2">
+                                                <span class="fs-4 fw-bold text-warning-emphasis"><field name="spmc_score" readonly="1"/>%</span>
+                                                <span class="small text-muted">Committee Score</span>
+                                            </div>
+                                            <div class="small text-muted mt-1">
+                                                <field name="spmc_eval_status_display" readonly="1"/>
+                                            </div>
+                                            <div class="mt-2" invisible="not spmc_assessor_summary_html">
+                                                <field name="spmc_assessor_summary_html" readonly="1" nolabel="1"/>
+                                            </div>
+                                            <div class="small text-muted mt-1" invisible="spmc_assessor_summary_html or not spmc_assigned_user_id">
+                                                <i class="fa fa-user-circle-o me-1"/>Assigned Assessor: <strong><field name="spmc_assigned_user_id" readonly="1" nolabel="1"/></strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 mb-2 p-3 bg-light rounded border" invisible="not has_competency_assessment">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1 text-primary fw-bold">
+                                                <i class="fa fa-check-square-o me-2"/>Succession Competency Evaluation Matrix
+                                            </h6>
+                                            <p class="text-muted small mb-0">
+                                                <field name="competency_eval_method_display" readonly="1" class="fw-bold me-2"/>— Click any row or the Rate button to evaluate behavioral performance.
+                                            </p>
+                                        </div>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <button name="action_start_competency_evaluation" string="Evaluate Competencies"
+                                                    type="object" class="btn btn-primary btn-sm"
+                                                    invisible="assessment_done or not eval_line_ids or not can_evaluate_competencies"/>
+                                            <span class="badge bg-info-subtle text-info border border-info py-1 px-3 fw-semibold"
+                                                  invisible="state != 'draft'">
+                                                <i class="fa fa-info-circle me-1"/>Nominate Candidate to Evaluate
+                                            </span>
+                                            <span class="badge bg-success-subtle text-success border border-success py-1 px-3 fw-bold"
+                                                  invisible="can_evaluate_competencies or assessment_done or state != 'nominated' or not is_current_user_eval_submitted">
+                                                <i class="fa fa-lock me-1"/>Evaluation Formally Submitted &amp; Locked
+                                            </span>
+                                            <button name="action_submit_manager_evaluation" string="Submit Manager Evaluation"
+                                                    type="object" class="btn btn-success btn-sm fw-bold"
+                                                    invisible="not can_submit_manager_eval"/>
+                                            <button name="action_submit_spmc_evaluation" string="Submit Evaluation"
+                                                    type="object" class="btn btn-warning btn-sm fw-bold"
+                                                    invisible="not can_submit_spmc_eval"/>
+
+                                            <button name="action_populate_competency_eval_lines" string="Load Role Competencies"
+                                                    type="object" class="btn btn-outline-primary btn-sm"
+                                                    invisible="assessment_done"
+                                                    groups="bunna_succession_management.group_succession_ppdd"/>
+                                            <button name="action_reset_competency_eval_lines" string="Reset Ratings"
+                                                    type="object" class="btn btn-outline-secondary btn-sm"
+                                                    invisible="assessment_done"
+                                                    confirm="Clear all competency ratings for this candidate to evaluate fresh?"
+                                                    groups="bunna_succession_management.group_succession_ppdd,bunna_succession_management.group_succession_admin"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <field name="has_competency_mapping" invisible="1"/>
+                                <div class="alert alert-warning d-flex align-items-center mb-3 p-3 border rounded shadow-sm" role="alert" invisible="has_competency_mapping or not has_competency_assessment">
+                                    <i class="fa fa-exclamation-triangle fa-2x me-3 text-warning" title="Warning"/>
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-dark">No Competency Mapping Available for this Position</h6>
+                                        <p class="mb-0 text-muted small">
+                                            There is currently no approved Competency Role Mapping configured for <strong><field name="critical_position_id" readonly="1" options="{'no_open': True}"/></strong>. 
+                                            Please configure and approve competencies under <em>Talent &amp; Competency &gt; Competency Role Mapping</em> before evaluating candidates.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <field name="eval_line_ids" readonly="assessment_done" invisible="not has_competency_assessment">
+                                    <list string="Competency Ratings"
+                                          action="action_open_eval_modal"
+                                          type="object"
+                                          create="0" delete="0">
+                                        <field name="candidate_assessment_done" column_invisible="1"/>
+                                        <field name="plan_include_manager" column_invisible="1"/>
+                                        <field name="plan_include_spmc" column_invisible="1"/>
+                                        <field name="manager_score" column_invisible="1"/>
+                                        <field name="self_score" column_invisible="1"/>
+                                        <field name="spmc_score" column_invisible="1"/>
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="competency_id" readonly="1" options="{'no_open': True}"/>
+                                        <field name="pillar" readonly="1"/>
+                                        <field name="weight" string="Weight" readonly="1"/>
+                                        <field name="required_proficiency" string="Expected / Required Level" readonly="1"/>
+                                        
+                                        <!-- Dynamic Evaluator Columns (Driven by Assessment Plan Toggles) -->
+
+                                        <field name="manager_eval_display" string="Manager Rating" widget="badge"
+                                               column_invisible="not parent.plan_include_manager"
+                                               decoration-primary="manager_score"
+                                               decoration-muted="not manager_score"/>
+                                        <field name="spmc_eval_breakdown" string="SPMC Individual Ratings"
+                                               column_invisible="not parent.plan_include_spmc"/>
+                                        <field name="spmc_eval_display" string="SPMC Consensus" widget="badge"
+                                               column_invisible="not parent.plan_include_spmc"
+                                               decoration-warning="spmc_score"
+                                               decoration-muted="not spmc_score"/>
+
+                                        <!-- Consensus Evaluated Level & Gap Analysis -->
+                                        <field name="score" column_invisible="1"/>
+                                        <field name="eval_display" string="Evaluated Level" widget="badge"
+                                               decoration-success="score"
+                                               decoration-warning="not score"/>
+                                        <field name="gap_display" string="Variance (+/-)" readonly="1"/>
+                                        <field name="achievement_status" widget="badge" string="Match Status" readonly="1"
+                                               decoration-success="achievement_status == 'meets'"
+                                               decoration-info="achievement_status == 'exceeds'"
+                                               decoration-danger="achievement_status == 'below'"/>
+                                        <field name="evidence" string="Observations" readonly="1"/>
+                                        <button name="action_open_eval_modal" type="object" string="Rate"
+                                                class="btn btn-sm btn-primary fw-bold" icon="fa-pencil"
+                                                invisible="candidate_assessment_done or not parent.can_evaluate_competencies"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <!-- ============================================
+                                 TAB: SPMC COMMITTEE EVALUATION
+                            ============================================ -->
+                            <page string="SPMC Committee Evaluation" name="spmc_evaluation" invisible="not has_competency_assessment or not plan_include_spmc">
+
+                                <!-- Summary header -->
+                                <div class="alert alert-warning-subtle border border-warning d-flex justify-content-between align-items-center mb-3 p-3 rounded" role="alert">
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-dark"><i class="fa fa-university text-warning me-2"/>SPMC Executive Committee Evaluation</h6>
+                                        <p class="mb-0 text-muted small">
+                                            Each assigned committee member must submit their evaluation <strong>separately and independently</strong>. The combined committee score is the equal average of all submitted member ratings.
+                                        </p>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-warning text-dark fs-6 px-3 py-2">
+                                            Committee Score: <field name="spmc_score" readonly="1"/>%
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- MY EVALUATION PANEL: shown only to assigned SPMC members who are not yet submitted -->
+                                <div class="p-3 mb-4 rounded border border-primary bg-primary-subtle"
+                                     invisible="not is_spmc_user">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="fw-bold text-primary mb-1">
+                                                <i class="fa fa-user-circle me-1"/>My Individual Evaluation
+                                            </h6>
+                                            <p class="mb-1 text-muted small">
+                                                Rate each required competency for this candidate, then click <strong>Submit Evaluation</strong> when complete.
+                                                Your submission is recorded separately from other committee members.
+                                            </p>
+                                            <!-- Progress when assigned -->
+                                            <span class="badge bg-info text-dark me-2"
+                                                  invisible="not my_spmc_eval_id or my_spmc_eval_submitted">
+                                                <i class="fa fa-tasks me-1"/>Progress: <field name="my_spmc_eval_progress" readonly="1" class="d-inline fw-bold"/>
+                                            </span>
+                                            <!-- Submitted badge -->
+                                            <span class="badge bg-success px-3 py-2"
+                                                  invisible="not my_spmc_eval_submitted">
+                                                <i class="fa fa-check-circle me-1" title="Accepted"/>Your Evaluation Submitted
+                                            </span>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <!-- Rate / Continue button -->
+                                            <button name="action_open_my_spmc_evaluation"
+                                                    string="Rate Competencies"
+                                                    type="object"
+                                                    class="btn btn-primary btn-sm fw-bold"
+                                                    icon="fa-pencil-square-o"
+                                                    invisible="not can_rate_spmc_competencies"/>
+                                            <!-- Submit button (only when all lines rated) -->
+                                            <button name="action_submit_spmc_evaluation"
+                                                    string="Submit My Evaluation"
+                                                    type="object"
+                                                    class="btn btn-warning btn-sm fw-bold"
+                                                    icon="fa-paper-plane"
+                                                    invisible="not can_submit_spmc_eval"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ALL ASSESSORS OVERVIEW TABLE -->
+                                <div class="mb-3">
+                                    <h6 class="fw-bold text-primary mb-2"><i class="fa fa-users me-1" title="Candidates"/>Committee Member Submissions</h6>
+                                    <p class="text-muted small mb-2">
+                                        All <strong><field name="spmc_assessor_ids" widget="many2many_tags" readonly="1" options="{'no_open': True}"/></strong> assigned committee members must submit individually.
+                                        The overall SPMC evaluation is considered complete only when every member has submitted.
+                                    </p>
+                                    <field name="spmc_eval_ids" readonly="assessment_done">
+                                        <list create="0" delete="0"
+                                              decoration-success="submitted"
+                                              decoration-muted="not submitted">
+                                            <field name="user_id" string="Committee Member" widget="many2one_avatar_user"/>
+                                            <field name="score" string="Assessor Score (%)" class="fw-bold text-primary"/>
+                                            <field name="status_display" string="Status"/>
+                                            <field name="submitted" string="Submitted" widget="boolean_toggle" readonly="1"/>
+                                            <field name="submitted_date" string="Submission Date"/>
+                                            <field name="deliberation_notes" string="Evaluation Remarks / Notes"/>
+                                            <button name="action_reopen_evaluation"
+                                                    string="Reopen / Revise"
+                                                    type="object"
+                                                    class="btn btn-sm btn-outline-warning"
+                                                    icon="fa-unlock"
+                                                    invisible="not submitted"
+                                                    confirm="Reopen this committee member's submission to allow modifications?"
+                                                    groups="bunna_succession_management.group_succession_spmc,bunna_succession_management.group_succession_admin"/>
+                                        </list>
+                                    </field>
+                                </div>
+
+                                <!-- SPMC Decision Notes (visible to SPMC group only) -->
+                                <group string="SPMC Committee Decision Notes"
+                                       groups="bunna_succession_management.group_succession_spmc">
+                                    <field name="spmc_decision_notes" string="Consensus Rationale &amp; Recommendation"
+                                           placeholder="Document the committee's deliberation, consensus rationale, and recommendation for this candidate..."
+                                           nolabel="1"/>
+                                </group>
+                            </page>
+
+                            <!-- ============================================
+                                 TAB 2: COMPETENCY GAP ANALYSIS
+                            ============================================ -->
+                            <page string="Competency Gap Review" name="gaps" invisible="not has_competency_assessment">
+                                <div class="alert alert-light border d-flex justify-content-between align-items-center mb-3 p-3 rounded" role="alert">
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-dark"><i class="fa fa-bar-chart text-primary me-2"/>Competency Gap Review</h6>
+                                        <p class="mb-0 text-muted small">
+                                            Side-by-side comparison of required proficiency vs evaluated level from the Succession Assessment. Competencies below requirement are automatically prioritized for the Successor Development Plan.
+                                        </p>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <span class="badge bg-primary fs-6 px-3 py-2">Match: <field name="competency_match_percent" readonly="1"/>%</span>
+                                    </div>
+                                </div>
                                 <field name="competency_gap_ids" readonly="1">
                                     <list decoration-success="achievement_status in ('meets','exceeds')"
                                           decoration-danger="achievement_status == 'below'">
@@ -141,7 +828,8 @@
                                         <field name="weight"/>
                                         <field name="current_score"/>
                                         <field name="required_score"/>
-                                        <field name="variance_display" string="Gap Size" class="text-end fw-bold"/>
+                                        <field name="variance_display"
+                                               string="Gap" class="fw-bold"/>
                                         <field name="achievement_status" widget="badge"
                                                decoration-success="achievement_status in ('meets','exceeds')"
                                                decoration-danger="achievement_status == 'below'"/>
@@ -149,27 +837,30 @@
                                 </field>
                             </page>
 
-                            <!-- TAB 2: Justification -->
-                            <page string="📝 Justification &amp; Notes" name="notes">
+
+
+
+
+                            <!-- ============================================
+                                 TAB 3: APPROVAL
+                            ============================================ -->
+                            <page string="Approval" name="approval">
                                 <group>
-                                    <field name="manager_justification"
-                                           placeholder="Explain why this employee is a strong successor..."/>
-                                    <field name="ppdd_notes" string="PPDD Assessment Notes"
-                                           placeholder="PPDD assessment observations..."
-                                           groups="bunna_succession_management.group_succession_ppdd"/>
-                                    <field name="spmc_decision_notes" string="SPMC Decision Notes"
-                                           placeholder="SPMC rationale for approval/rejection..."
-                                           groups="bunna_succession_management.group_succession_spmc"/>
+                                    <group string="Critical Position Governance">
+                                        <field name="position_created_by_id" string="Position Created By" readonly="1"/>
+                                        <field name="position_create_date" string="Position Creation Date &amp; Time" readonly="1"/>
+                                        <field name="position_approved_by_id" string="Position Approved By (SPMC)" readonly="1"/>
+                                        <field name="position_approval_date" string="Position Approval Date &amp; Time" readonly="1"/>
+                                    </group>
+                                    <group string="Candidate Evaluation &amp; Approval">
+                                        <field name="assessment_by_id" string="Evaluation Finalized By" readonly="1"/>
+                                        <field name="assessment_date" string="Evaluation Date &amp; Time" readonly="1"/>
+                                        <field name="approved_by_id" string="Evaluation Approved By (SPMC)" readonly="1"/>
+                                        <field name="approval_date" string="Evaluation Approval Date &amp; Time" readonly="1"/>
+                                    </group>
                                 </group>
                             </page>
 
-                            <!-- TAB 3: Approval Info -->
-                            <page string="Approval" name="approval">
-                                <group>
-                                    <field name="approved_by_id" readonly="1"/>
-                                    <field name="approval_date" readonly="1"/>
-                                </group>
-                            </page>
                         </notebook>
                     </sheet>
                     <chatter/>
@@ -177,7 +868,9 @@
             </field>
         </record>
 
-        <!-- CANDIDATE SEARCH -->
+        <!-- ================================================================
+             SEARCH
+        ================================================================ -->
         <record id="view_succession_candidate_search" model="ir.ui.view">
             <field name="name">succession.candidate.search</field>
             <field name="model">succession.candidate</field>
@@ -185,40 +878,91 @@
                 <search>
                     <field name="employee_id"/>
                     <field name="critical_position_id"/>
+                    <field name="coach_id"/>
+                    <field name="parent_id" string="Line Manager"/>
+                    <field name="spmc_assigned_user_id"/>
                     <field name="department_id"/>
-                    
-                    <filter string="Ready Now" name="ready_now"
-                            domain="[('readiness_level','=','ready_now')]"/>
-                    <filter string="Approved" name="approved"
-                            domain="[('state','=','approved')]"/>
-                    <filter string="Pending Assessment" name="pending"
-                            domain="[('state','=','nominated')]"/>
                     <separator/>
+                    <filter string="My Coached &amp; Managed Candidates" name="filter_my_reports"
+                            domain="['|', ('employee_id.coach_id.user_id', '=', uid), ('employee_id.parent_id.user_id', '=', uid)]"/>
+                    <filter string="Assigned to Me (SPMC)" name="filter_my_spmc"
+                            domain="['|', ('spmc_assigned_user_id', '=', uid), ('spmc_assessor_ids', 'in', [uid])]"/>
+                    <filter string="Pending Coach/Manager Rating" name="filter_pending_coach_eval"
+                            domain="[('plan_include_manager', '=', True), ('manager_evaluation_submitted', '=', False)]"/>
+                    <filter string="Pending SPMC Evaluation" name="filter_pending_spmc_eval"
+                            domain="[('plan_include_spmc', '=', True), ('spmc_evaluation_submitted', '=', False)]"/>
+                    <filter string="Ready Now" name="ready_now"
+                            domain="[('readiness_level_id.is_ready_for_deployment','=',True)]"/>
+                    <filter string="Ready Soon (1–2 Yrs)" name="ready_soon"
+                            domain="[('readiness_level_id.name','ilike','1-2')]"/>
+                    <filter string="High Potential Stars" name="high_potential"
+                            domain="[('is_high_potential','=',True)]"/>
+                    <filter string="Approved"  name="approved"
+                            domain="[('state','=','approved')]"/>
+                    <filter string="Nominated" name="pending"
+                            domain="[('state','=','nominated')]"/>
+                    <filter string="Assessed" name="assessed_done"
+                            domain="[('state','=','assessed')]"/>
+                    <filter string="Deployed" name="filter_deployed"
+                            domain="[('state','=','placed')]"/>
+                    <filter string="Employee Resigned" name="filter_resigned"
+                            domain="[('state','=','resigned')]"/>
+                    <filter string="Waitlisted" name="filter_waitlisted"
+                            domain="[('state','=','waitlisted')]"/>
+                    <filter string="Awaiting Assessment Results" name="awaiting_results"
+                            domain="[('assessment_status','in',('pending','partial'))]"/>
+                    <filter string="Below Pass Mark" name="below_pass"
+                            domain="[('assessment_result','=','fail')]"/>
+                    <filter string="Passed Assessment" name="passed_assessment"
+                            domain="[('assessment_result','=','pass')]"/>
+                    <filter string="Assessment Exempt / Waived" name="assessment_waived"
+                            domain="[('assessment_result','=','waived')]"/>
+                    <separator/>
+                    <filter string="⚠️ Positions Needing More Successors" name="filter_pos_deficit"
+                            domain="[('position_bench_deficit','&gt;',0)]"/>
+                    <filter string="🚨 Positions with No Immediate Successor" name="filter_pos_no_ready_now"
+                            domain="[('position_ready_now_count','=',0)]"/>
+                    <filter string="Positions with Successor Shortage" name="filter_role_deficit"
+                            domain="[('position_bench_health','=','deficit')]"/>
+                    <filter string="Positions with No Nominated Successors" name="filter_role_at_risk"
+                            domain="[('position_bench_health','in',('at_risk','critical'))]"/>
+                    <separator/>
+                    <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                     <group name="group_by">
                         <filter string="Critical Position" name="group_position"
                                 context="{'group_by':'critical_position_id'}"/>
-                        <filter string="Readiness" name="group_readiness"
-                                context="{'group_by':'readiness_level'}"/>
-                        <filter string="Department" name="group_dept"
+                        <filter string="Readiness Level"   name="group_readiness"
+                                context="{'group_by':'readiness_level_id'}"/>
+                        <filter string="Successor Pipeline Status" name="group_pos_bench_health"
+                                context="{'group_by':'position_bench_health'}"/>
+                        <filter string="Department"        name="group_dept"
                                 context="{'group_by':'department_id'}"/>
-                        <filter string="Status" name="group_state"
+                        <filter string="Pipeline Status"   name="group_state"
                                 context="{'group_by':'state'}"/>
                     </group>
+                    <searchpanel>
+                        <field name="critical_position_id" icon="fa-briefcase" enable_counters="1" select="multi"/>
+                        <field name="readiness_level_id" icon="fa-tachometer" enable_counters="1"/>
+                        <field name="state" icon="fa-tasks" enable_counters="1"/>
+                        <field name="department_id" icon="fa-building" enable_counters="1"/>
+                    </searchpanel>
                 </search>
             </field>
         </record>
 
-        <!-- CANDIDATE KANBAN (Pipeline View) -->
+        <!-- ================================================================
+             KANBAN — Pipeline
+        ================================================================ -->
         <record id="view_succession_candidate_kanban" model="ir.ui.view">
             <field name="name">succession.candidate.kanban</field>
             <field name="model">succession.candidate</field>
             <field name="arch" type="xml">
-                <kanban default_group_by="readiness_level" class="o_kanban_small_column">
+                <kanban default_group_by="readiness_level_id"
+                        class="o_kanban_small_column">
                     <field name="employee_id"/>
                     <field name="critical_position_id"/>
-                    <field name="competency_match_percent"/>
-                    <field name="latest_pms_score"/>
-                    <field name="readiness_level"/>
+                    <field name="final_assessment_score"/>
+                    <field name="readiness_level_id"/>
                     <field name="state"/>
                     <templates>
                         <t t-name="card">
@@ -227,9 +971,9 @@
                                     <strong><field name="employee_id"/></strong>
                                 </div>
                                 <div class="o_kanban_record_body">
-                                    <div><b>Target: </b><field name="critical_position_id"/></div>
-                                    <div><b>Match: </b><field name="competency_match_percent"/>%</div>
-                                    <div><b>PMS: </b><field name="latest_pms_score"/></div>
+                                    <div><b>Position: </b><field name="critical_position_id"/></div>
+                                    <div><b>Final Score: </b><field name="final_assessment_score"/>%</div>
+                                    <div><field name="readiness_level_id" widget="badge"/></div>
                                     <div><field name="state" widget="badge"/></div>
                                 </div>
                             </div>
@@ -239,16 +983,17 @@
             </field>
         </record>
 
-        <!-- 9-BOX GRID KANBAN VIEW (FR-TAL-005) -->
+        <!-- ================================================================
+             9-BOX KANBAN
+        ================================================================ -->
         <record id="view_succession_candidate_9box" model="ir.ui.view">
             <field name="name">succession.candidate.9box</field>
             <field name="model">succession.candidate</field>
             <field name="arch" type="xml">
-                <kanban default_group_by="performance_rating" class="o_kanban_small_column" create="0">
+                <kanban default_group_by="performance_rating"
+                        class="o_kanban_small_column" create="0">
                     <field name="employee_id"/>
                     <field name="critical_position_id"/>
-                    <field name="competency_match_percent"/>
-                    <field name="latest_pms_score"/>
                     <field name="performance_rating"/>
                     <field name="potential_rating"/>
                     <templates>
@@ -259,8 +1004,8 @@
                                 </div>
                                 <div class="o_kanban_record_body">
                                     <div><b>Target: </b><field name="critical_position_id"/></div>
-                                    <div><b>Pot.: </b><field name="potential_rating"/></div>
-                                    <div><b>Perf.: </b><field name="performance_rating"/></div>
+                                    <div><b>Potential: </b><field name="potential_rating"/></div>
+                                    <div><b>Performance: </b><field name="performance_rating"/></div>
                                 </div>
                             </div>
                         </t>
@@ -269,18 +1014,174 @@
             </field>
         </record>
 
-        <!-- ACTION -->
+        <!-- ================================================================
+             ACTIONS
+        ================================================================ -->
         <record id="action_succession_candidate" model="ir.actions.act_window">
-            <field name="name">Succession Pipeline</field>
+            <field name="name">Candidate Assessment</field>
             <field name="res_model">succession.candidate</field>
-            <field name="view_mode">list,kanban,form</field>
+            <field name="view_mode">list,kanban,form,pivot</field>
             <field name="search_view_id" ref="view_succession_candidate_search"/>
+            <field name="context">{'search_default_group_position': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Active Succession Pipeline &amp; Talent Bench
+                </p>
+                <p>
+                    Manage nominated successors through formal assessment, competency multi-rater ratings, gap analysis, and SPMC executive approval.
+                </p>
+                <div class="row mt-3 text-start">
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <strong><i class="fa fa-user-plus text-primary me-1"/>1. Nominated</strong>
+                            <div class="small text-muted">Candidate enrolled; assessment plan synchronized.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <strong><i class="fa fa-pencil-square-o text-info me-1"/>2. Assessed</strong>
+                            <div class="small text-muted">Written exams, PMS, and competency ratings.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <strong><i class="fa fa-university text-warning me-1"/>3. SPMC Approved</strong>
+                            <div class="small text-muted">Executive committee endorsement &amp; readiness.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <strong><i class="fa fa-graduation-cap text-success me-1"/>4. IDP &amp; Placed</strong>
+                            <div class="small text-muted">Development plans, mentoring, and deployment.</div>
+                        </div>
+                    </div>
+                </div>
+            </field>
+        </record>
+
+                <!-- TALENT POOL LIST VIEW (Clean, Professional & Executive) -->
+        <record id="view_succession_talent_pool_list" model="ir.ui.view">
+            <field name="name">succession.candidate.talent.pool.list</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <list string="Talent Pool" sample="1"
+                      default_order="create_date desc, id desc"
+                      decoration-success="state == 'approved'"
+                      decoration-info="state == 'assessed'"
+                      decoration-primary="state == 'placed'"
+                      decoration-danger="state == 'resigned'">
+                    <field name="can_deploy_from_pool" column_invisible="1"/>
+                    <field name="critical_position_id" class="fw-bold text-primary" string="Target Critical Position"/>
+                    <field name="position_bench_strength" string="Nominated / Required" class="fw-bold text-dark"/>
+                    <field name="position_bench_health" widget="badge" string="Successor Pipeline Status"
+                           decoration-success="position_bench_health in ('strong', 'adequate')"
+                           decoration-warning="position_bench_health == 'deficit'"
+                           decoration-danger="position_bench_health in ('at_risk', 'critical')"/>
+                    <field name="position_bench_deficit" string="Successors Needed"
+                           decoration-danger="position_bench_deficit &gt; 0"
+                           decoration-success="position_bench_deficit == 0"/>
+                    <field name="employee_id" class="fw-bold" string="Candidate Name"/>
+                    <field name="job_id" string="Current Position"/>
+                    <field name="department_id" string="Department" optional="show"/>
+                    <field name="readiness_level_id" widget="badge" string="Candidate Readiness"/>
+                    <field name="position_readiness_summary" string="Role Successor Breakdown" optional="show"/>
+                    <field name="final_assessment_score" string="Assessment Score (%)" class="fw-bold text-primary"/>
+                    <field name="assessment_result" widget="badge" string="Result"
+                           decoration-success="assessment_result == 'pass'"/>
+                    <field name="state" widget="badge" string="Pipeline Status"
+                           decoration-success="state == 'approved'"
+                           decoration-info="state == 'assessed'"
+                           decoration-primary="state == 'placed'"
+                           decoration-danger="state == 'resigned'"/>
+                    <field name="nomination_date" string="Nominated On" optional="show"/>
+                    <button name="action_deploy_candidate"
+                            type="object"
+                            string="Deploy"
+                            class="btn-success btn-sm"
+                            icon="fa-rocket"
+                            groups="hr.group_hr_manager,bunna_succession_management.group_succession_admin"
+                            invisible="not can_deploy_from_pool"
+                            confirm="Deploy this Ready Now candidate? Their status will change to Deployed and one successor will be subtracted from the active pool count."/>
+                </list>
+            </field>
+        </record>
+
+        <!-- TALENT POOL ACTION: Exam & Assessment Passed Candidates Listed by Critical Position (Readiness Level is one column) -->
+        <record id="action_succession_talent_pool" model="ir.actions.act_window">
+            <field name="name">Talent Pool</field>
+            <field name="res_model">succession.candidate</field>
+            <field name="view_mode">list,kanban,form,pivot,graph</field>
+            <field name="view_id" ref="view_succession_talent_pool_list"/>
+            <field name="search_view_id" ref="view_succession_candidate_search"/>
+            <field name="domain">[('assessment_result', '=', 'pass')]</field>
+            <field name="context">{'search_default_group_position': 1, 'search_default_passed_assessment': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No candidates currently in the Talent Pool.
+                </p>
+                <p>
+                    Candidates who successfully pass the written exam and diagnostic assessment plan for their target Critical Position appear here in the active leadership Talent Pool.
+                </p>
+            </field>
+        </record>
+
+        <!-- READINESS LEVEL LIST VIEW: Clean Candidate List Grouped by Readiness Level -->
+        <record id="view_succession_readiness_level_candidate_list" model="ir.ui.view">
+            <field name="name">succession.candidate.readiness.level.list</field>
+            <field name="model">succession.candidate</field>
+            <field name="arch" type="xml">
+                <list string="Readiness Level Overview" sample="1"
+                      default_order="create_date desc, id desc"
+                      decoration-success="state == 'approved'"
+                      decoration-info="state == 'assessed'"
+                      decoration-primary="state == 'placed'"
+                      decoration-danger="state == 'resigned'">
+                    <field name="critical_position_id" class="fw-bold text-primary" string="Target Critical Position"/>
+                    <field name="position_bench_strength" string="Nominated / Required" class="fw-bold"/>
+                    <field name="position_bench_health" widget="badge" string="Successor Pipeline Status"
+                           decoration-success="position_bench_health in ('strong', 'adequate')"
+                           decoration-warning="position_bench_health == 'deficit'"
+                           decoration-danger="position_bench_health in ('at_risk', 'critical')"/>
+                    <field name="readiness_level_id" widget="badge" string="Readiness Level"/>
+                    <field name="employee_id" class="fw-bold" string="Candidate Name"/>
+                    <field name="job_id" string="Current Position"/>
+                    <field name="department_id" string="Department" optional="show"/>
+                    <field name="final_assessment_score" string="Assessment Score (%)" class="fw-bold text-primary"/>
+                    <field name="assessment_result" widget="badge" string="Result"
+                           decoration-success="assessment_result == 'pass'"/>
+                    <field name="state" widget="badge" string="Pipeline Status"
+                           decoration-success="state == 'approved'"
+                           decoration-info="state == 'assessed'"
+                           decoration-primary="state == 'placed'"
+                           decoration-danger="state == 'resigned'"/>
+                    <field name="nomination_date" string="Nominated On" optional="show"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- READINESS LEVEL ACTION: Grouped by Critical Position then Readiness Level -->
+        <record id="action_succession_readiness_level_overview" model="ir.actions.act_window">
+            <field name="name">Readiness Level</field>
+            <field name="res_model">succession.candidate</field>
+            <field name="view_mode">list,kanban,form,pivot,graph</field>
+            <field name="view_id" ref="view_succession_readiness_level_candidate_list"/>
+            <field name="search_view_id" ref="view_succession_candidate_search"/>
+            <field name="domain">[('assessment_result', '=', 'pass')]</field>
+            <field name="context">{'search_default_group_position': 1, 'search_default_group_readiness': 2, 'search_default_passed_assessment': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No candidates currently categorized by Readiness Level.
+                </p>
+                <p>
+                    Candidates who successfully pass the written exam and diagnostic assessment appear here categorized into their official Readiness Levels (Ready Now, Ready in 1–2 Years, Ready in 3–5 Years).
+                </p>
+            </field>
         </record>
 
         <record id="action_succession_pipeline" model="ir.actions.act_window">
             <field name="name">Approved Candidates</field>
             <field name="res_model">succession.candidate</field>
-            <field name="view_mode">list,form</field>
+            <field name="view_mode">list,kanban,form,pivot</field>
             <field name="search_view_id" ref="view_succession_candidate_search"/>
             <field name="context">{'search_default_approved': 1}</field>
         </record>
@@ -289,10 +1190,9 @@
             <field name="name">succession.candidate.9box.pivot</field>
             <field name="model">succession.candidate</field>
             <field name="arch" type="xml">
-                <pivot string="9-Box Grid" disable_linking="True" display_quantity="True">
-                    <!-- Potential on the Y-axis (Rows) -->
-                    <field name="potential_rating" type="row"/>
-                    <!-- Performance on the X-axis (Columns) -->
+                <pivot string="9-Box Grid" disable_linking="True"
+                       display_quantity="True">
+                    <field name="potential_rating"   type="row"/>
                     <field name="performance_rating" type="col"/>
                 </pivot>
             </field>
@@ -302,6 +1202,10 @@
             <field name="name">9-Box Grid</field>
             <field name="tag">bunna_succession_management.nine_box_action</field>
         </record>
+
+        <function model="succession.candidate" name="_repair_missing_spmc_plans"/>
+        <function model="succession.candidate" name="_repair_resigned_candidates"/>
+        <function model="succession.candidate" name="_repair_legacy_deployment_states"/>
 
     </data>
 </odoo>

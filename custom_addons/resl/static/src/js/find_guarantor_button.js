@@ -4,6 +4,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { user } from "@web/core/user";
 import { Component } from "@odoo/owl";
+import { clearPreAgreed } from "./agreement_new_button";
 
 /**
  * Replaces the native <button type="action"> for "Find Guarantor".
@@ -23,6 +24,10 @@ import { Component } from "@odoo/owl";
  * record hasn't been saved yet — the wizard and action_select both handle
  * that case).
  */
+function record_isSaved(record) {
+    return !!record.resId;
+}
+
 export class ReslFindGuarantorButton extends Component {
     static template = "resl.FindGuarantorButton";
     static props = ["*"];
@@ -43,10 +48,6 @@ export class ReslFindGuarantorButton extends Component {
         if (data.status === "draft" && !data.is_eligible) {
             return false;
         }
-        // Requester must fill and sign the agreement (Part A) before finding a guarantor
-        if (!data.agr_borrower_complete) {
-            return false;
-        }
         return true;
     }
 
@@ -58,7 +59,10 @@ export class ReslFindGuarantorButton extends Component {
         // the form never stays on "New" while the request already exists.
         const startedAt = new Date(Date.now() - 5000).toISOString().replace("T", " ").slice(0, 19);
         await this.action.doAction("resl.action_resl_guarantor_lookup", {
-            additionalContext: { default_loan_id: record.resId || false },
+            additionalContext: {
+                default_loan_id: record.resId || false,
+                default_pre_agreed: !record.resId && !!record.data.agr_pre_agreed,
+            },
             onClose: async (closeInfo) => {
                 let newLoanId = closeInfo && closeInfo.new_loan_id;
                 if (!newLoanId && !record.resId) {
@@ -77,6 +81,8 @@ export class ReslFindGuarantorButton extends Component {
                     }
                 }
                 if (newLoanId) {
+                    // the request exists now and carries the agreement
+                    clearPreAgreed();
                     // A brand-new loan was created by the wizard (the form
                     // behind it was still on "New"). Navigate to it now
                     // that the dialog has fully closed - doing this from

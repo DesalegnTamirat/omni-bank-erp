@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_bunna_announcement_dashboard" model="ir.actions.client">
+        <field name="name">Dashboard</field>
+        <field name="tag">bunna_announcement_dashboard</field>
+    </record>
+
+    <!-- Top header Dashboard menuitem (sequence 5, before Announcements list) -->
+    <menuitem id="menu_bunna_announcement_dashboard" name="Dashboard"
+              parent="menu_bunna_announcement_root" action="action_bunna_announcement_dashboard" sequence="5"/>
+</odoo>

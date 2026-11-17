@@ -17,9 +17,13 @@ $bunna-primary: $bunna-primary-maroon;
 $bunna-secondary: $bunna-secondary-pine;
 $bunna-light: #F4F6F7;
 
-// Global Odoo & Bootstrap CSS Theme Variables (Bunna Bank Brand)
-:root {
-    accent-color: #541718 !important;
+// PBMS Brand CSS Theme Variables (Scoped strictly to PBMS views & dashboards)
+body.o_pbms_app,
+.o_pbms_form,
+.o_pbms_view,
+.o_pbms_notebook,
+.o_pbms_dashboard {
+    accent-color: #541718;
     --primary: #541718;
     --bs-primary: #541718;
     --bs-primary-rgb: 84, 24, 24;
@@ -45,14 +49,10 @@ $bunna-light: #F4F6F7;
     --o-color-6: #1D2B32;
 }
 
-*,
-*::before,
-*::after {
-    accent-color: #541718 !important;
-}
-
-/* Form Sheet & Header Styling for PBMS */
-.o_form_view {
+/* Form Sheet & Header Styling for PBMS (Scoped strictly to PBMS form views) */
+.o_pbms_form,
+.o_form_view.o_pbms_form,
+.o_view_controller.o_pbms_view .o_form_view {
     // -------------------------------------------------------------------------
     // Header Statusbar & Buttons
     // -------------------------------------------------------------------------
@@ -273,41 +273,96 @@ $bunna-light: #F4F6F7;
     // -------------------------------------------------------------------------
     // Notebook Tabs Styling (PBMS Categories)
     // -------------------------------------------------------------------------
-    .o_notebook {
+    .o_notebook,
+    .o_pbms_notebook {
         margin-top: 1rem;
 
         .o_notebook_headers {
             background: #F1F5F9;
             border-radius: 8px 8px 0 0;
-            padding: 0.4rem 0.6rem 0 0.6rem;
+            padding: 0.5rem 0.6rem 0.5rem 0.6rem;
             border-bottom: 2px solid #CBD5E1;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            white-space: nowrap !important;
+            scroll-behavior: smooth;
+            scrollbar-width: auto;
+            scrollbar-color: #8899A6 #EDF2F7;
+
+            // Sleek horizontal scrollbar with visible arrows / track
+            &::-webkit-scrollbar {
+                height: 8px !important;
+                display: block !important;
+            }
+            &::-webkit-scrollbar-track {
+                background: #EDF2F7 !important;
+                border-radius: 4px;
+            }
+            &::-webkit-scrollbar-thumb {
+                background: #8899A6 !important;
+                border-radius: 4px;
+                border: 1px solid #CBD5E1;
+                &:hover {
+                    background: #541718 !important;
+                }
+            }
+            &::-webkit-scrollbar-button {
+                display: block !important;
+                width: 12px;
+                background-color: #EDF2F7;
+            }
         }
 
-        .nav-tabs {
-            border-bottom: none;
-            gap: 0.3rem;
+        .nav-tabs,
+        .nav-tabs.flex-nowrap {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            width: max-content !important;
+            min-width: max-content !important;
+            border-bottom: none !important;
+            gap: 0.4rem !important;
+            padding: 0 0 2px 0 !important;
+            margin: 0 !important;
 
-            .nav-item {
-                margin-bottom: -2px;
+            .nav-item,
+            .nav-item.flex-nowrap {
+                flex: 0 0 auto !important;
+                flex-grow: 0 !important;
+                flex-shrink: 0 !important;
+                width: auto !important;
+                min-width: max-content !important;
+                max-width: none !important;
+                margin: 0 !important;
 
                 .nav-link {
-                    border: 1px solid transparent;
-                    border-bottom: 2px solid transparent;
-                    border-radius: 6px 6px 0 0;
-                    padding: 0.65rem 1.15rem;
-                    font-size: 0.92rem;
-                    font-weight: 600;
-                    color: #475569;
-                    background: transparent;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    flex: 0 0 auto !important;
+                    flex-shrink: 0 !important;
+                    width: auto !important;
+                    min-width: max-content !important;
+                    max-width: none !important;
+                    white-space: nowrap !important;
+                    overflow: visible !important;
+                    text-overflow: clip !important;
+                    border: 1px solid #CBD5E1 !important;
+                    border-radius: 6px !important;
+                    padding: 0.5rem 1.05rem !important;
+                    font-size: 0.88rem !important;
+                    font-weight: 600 !important;
+                    color: #475569 !important;
+                    background: #E2E8F0 !important;
                     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.45rem;
+                    gap: 0.45rem !important;
 
                     &:hover:not(.active) {
-                        background-color: #E2E8F0;
-                        color: #541718;
-                        border-color: transparent;
+                        background-color: #CBD5E1 !important;
+                        color: #541718 !important;
+                        border-color: #94A3B8 !important;
                     }
 
                     // Active Tab - Crisp White Card with Top Deep Maroon Accent & Shadow
@@ -316,9 +371,8 @@ $bunna-light: #F4F6F7;
                         color: #541718 !important;
                         border: 1px solid #CBD5E1 !important;
                         border-top: 3.5px solid #541718 !important;
-                        border-bottom: 2px solid #FFFFFF !important;
-                        box-shadow: 0 -3px 8px rgba(84, 24, 24, 0.08);
-                        font-weight: 700;
+                        box-shadow: 0 2px 6px rgba(84, 24, 24, 0.12) !important;
+                        font-weight: 700 !important;
                     }
                 }
             }
@@ -331,18 +385,69 @@ $bunna-light: #F4F6F7;
             .o_notebook_headers {
                 background: #E8EEF5;
                 border-radius: 6px 6px 0 0;
-                padding: 0.3rem 0.5rem 0 0.5rem;
+                padding: 0.35rem 0.5rem 0.35rem 0.5rem;
                 border-bottom: 2px solid #B0C4DE;
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: auto !important;
+                overflow-y: hidden !important;
+                white-space: nowrap !important;
+                scroll-behavior: smooth;
+                scrollbar-width: auto;
+                scrollbar-color: #8899A6 #E2E8F0;
+
+                &::-webkit-scrollbar {
+                    height: 6px !important;
+                    display: block !important;
+                }
+                &::-webkit-scrollbar-track {
+                    background: #E2E8F0;
+                }
+                &::-webkit-scrollbar-thumb {
+                    background: #8899A6;
+                    border-radius: 3px;
+                }
             }
 
-            .nav-tabs .nav-item .nav-link {
-                padding: 0.5rem 1rem;
-                font-size: 0.875rem;
+            .nav-tabs,
+            .nav-tabs.flex-nowrap {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                width: max-content !important;
+                min-width: max-content !important;
+                border-bottom: none !important;
+                gap: 0.35rem !important;
 
-                &.active {
-                    border-top: 3.5px solid #541718 !important;
-                    color: #541718 !important;
-                    border-bottom: 2px solid #FFFFFF !important;
+                .nav-item,
+                .nav-item.flex-nowrap {
+                    flex: 0 0 auto !important;
+                    flex-grow: 0 !important;
+                    flex-shrink: 0 !important;
+                    width: auto !important;
+                    min-width: max-content !important;
+                    max-width: none !important;
+                    margin: 0 !important;
+
+                    .nav-link {
+                        display: inline-flex !important;
+                        align-items: center !important;
+                        flex: 0 0 auto !important;
+                        flex-shrink: 0 !important;
+                        width: auto !important;
+                        min-width: max-content !important;
+                        max-width: none !important;
+                        white-space: nowrap !important;
+                        overflow: visible !important;
+                        padding: 0.4rem 0.9rem !important;
+                        font-size: 0.84rem !important;
+
+                        &.active {
+                            border-top: 3.5px solid #541718 !important;
+                            color: #541718 !important;
+                            background-color: #FFFFFF !important;
+                        }
+                    }
                 }
             }
         }
@@ -404,9 +509,11 @@ $bunna-light: #F4F6F7;
 }
 
 /* ========================================================================= */
-/* Bunna Bank PBMS Kanban View & Card Styling                                */
+/* Bunna Bank PBMS Kanban View & Card Styling (Scoped to PBMS)               */
 /* ========================================================================= */
-.o_kanban_view {
+.o_pbms_kanban,
+.o_kanban_view.o_pbms_kanban,
+.o_view_controller.o_pbms_view .o_kanban_view {
     // Kanban card container
     .o_kanban_record {
         border-radius: 8px !important;
@@ -558,264 +665,272 @@ $bunna-light: #F4F6F7;
 }
 
 /* ========================================================================= */
-/* Bunna Bank PBMS Global Controls, Toggles & Typography Colors              */
+/* Bunna Bank PBMS Controls, Toggles & Typography Colors (Scoped to PBMS)    */
 /* ========================================================================= */
-
 // -------------------------------------------------------------------------
 // 1. Boolean Toggle Switches (Active Enable/Disable in Form, List & Config)
+// Strictly scoped to PBMS views
 // -------------------------------------------------------------------------
-.form-check.form-switch .form-check-input,
-.form-switch .form-check-input,
-.o_field_boolean_toggle .form-check-input,
-.o_field_boolean_toggle input[type="checkbox"],
-.o_boolean_toggle input[type="checkbox"] {
-    // Disabled / Unchecked state: Clean Slate Muted Gray
-    background-color: #CBD5E1 !important;
-    border-color: #94A3B8 !important;
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+body.o_pbms_app,
+.o_pbms_view,
+.o_pbms_form,
+.o_pbms_list {
+    .form-check.form-switch .form-check-input,
+    .form-switch .form-check-input,
+    .o_field_boolean_toggle .form-check-input,
+    .o_field_boolean_toggle input[type="checkbox"],
+    .o_boolean_toggle input[type="checkbox"] {
+        background-color: #CBD5E1 !important;
+        border-color: #94A3B8 !important;
+        cursor: pointer;
+        transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 
-    // Enabled / Checked state: Bunna Secondary Forest Olive (#425727)
-    &:checked {
-        background-color: #425727 !important;
-        border-color: #2F3E1C !important;
-        box-shadow: 0 0 0 0.2rem rgba(66, 87, 39, 0.25) !important;
-    }
+        &:checked {
+            background-color: #425727 !important;
+            border-color: #2F3E1C !important;
+            box-shadow: 0 0 0 0.2rem rgba(66, 87, 39, 0.25) !important;
+        }
 
-    &:focus {
-        border-color: #425727 !important;
-        box-shadow: 0 0 0 0.2rem rgba(66, 87, 39, 0.25) !important;
+        &:focus {
+            border-color: #425727 !important;
+            box-shadow: 0 0 0 0.2rem rgba(66, 87, 39, 0.25) !important;
+        }
     }
 }
 
 // Standard Checkbox & Radio Buttons
-.form-check-input {
-    &:checked[type="checkbox"]:not(.form-switch .form-check-input) {
-        background-color: #425727 !important;
-        border-color: #2F3E1C !important;
+body.o_pbms_app,
+.o_pbms_view,
+.o_pbms_form {
+    .form-check-input {
+        &:checked[type="checkbox"]:not(.form-switch .form-check-input) {
+            background-color: #425727 !important;
+            border-color: #2F3E1C !important;
+        }
+
+        &:checked[type="radio"] {
+            background-color: #1D2B32 !important;
+            border-color: #1D2B32 !important;
+        }
     }
 
-    &:checked[type="radio"] {
-        background-color: #1D2B32 !important;
-        border-color: #1D2B32 !important;
+    // -------------------------------------------------------------------------
+    // 2. Approved Plan & Brand Text Colors (High Contrast & Official Palette)
+    // -------------------------------------------------------------------------
+    .text-success,
+    span.text-success,
+    div.text-success,
+    td.text-success,
+    p.text-success,
+    strong.text-success,
+    .o_field_monetary.text-success,
+    .o_field_integer.text-success {
+        color: #425727 !important;
+        font-weight: 700;
     }
-}
 
-// -------------------------------------------------------------------------
-// 2. Approved Target & Brand Text Colors (High Contrast & Official Palette)
-// -------------------------------------------------------------------------
-// Approved Targets & Success Metrics: Secondary Forest Olive (#425727)
-.text-success,
-span.text-success,
-div.text-success,
-td.text-success,
-p.text-success,
-strong.text-success,
-.o_field_monetary.text-success,
-.o_field_integer.text-success {
-    color: #425727 !important;
-    font-weight: 700;
-}
+    .text-primary,
+    span.text-primary,
+    div.text-primary,
+    td.text-primary,
+    p.text-primary,
+    strong.text-primary,
+    .o_field_monetary.text-primary,
+    .o_field_integer.text-primary {
+        color: #541718 !important;
+        font-weight: 700;
+    }
 
-// Primary Brand Metrics & Active Annual Totals: Primary Deep Maroon (#541718)
-.text-primary,
-span.text-primary,
-div.text-primary,
-td.text-primary,
-p.text-primary,
-strong.text-primary,
-.o_field_monetary.text-primary,
-.o_field_integer.text-primary {
-    color: #541718 !important;
-    font-weight: 700;
-}
+    .text-warning,
+    .text-warning-emphasis,
+    span.text-warning,
+    div.text-warning,
+    td.text-warning {
+        color: #C17540 !important;
+        font-weight: 700;
+    }
 
-// Revision / Return / Warning Indicators: Secondary Terracotta (#C17540)
-.text-warning,
-.text-warning-emphasis,
-span.text-warning,
-div.text-warning,
-td.text-warning {
-    color: #C17540 !important;
-    font-weight: 700;
-}
+    .text-danger,
+    span.text-danger,
+    div.text-danger,
+    td.text-danger {
+        color: #541718 !important;
+        font-weight: 700;
+    }
 
-// Rejections & Critical Alerts: Primary Deep Maroon (#541718)
-.text-danger,
-span.text-danger,
-div.text-danger,
-td.text-danger {
-    color: #541718 !important;
-    font-weight: 700;
-}
-
-// Informational & Alternate Category Metrics: Secondary Bronze Olive (#726732)
-.text-info,
-span.text-info,
-div.text-info,
-td.text-info {
-    color: #726732 !important;
-    font-weight: 700;
+    .text-info,
+    span.text-info,
+    div.text-info,
+    td.text-info {
+        color: #726732 !important;
+        font-weight: 700;
+    }
 }
 
 // -------------------------------------------------------------------------
 // 3. Planning Configuration & Master Data Tags (Many2Many Badges)
 // -------------------------------------------------------------------------
-.o_field_many2many_tags {
-    .badge,
-    .o_tag {
-        background-color: #EDF3E8 !important;
-        color: #1D2B32 !important;
-        border: 1px solid #C8DCB8 !important;
-        border-radius: 4px;
-        font-weight: 600;
-        font-size: 0.82rem;
-        padding: 0.3rem 0.6rem;
-
-        .o_delete {
+body.o_pbms_app,
+.o_pbms_view,
+.o_pbms_form,
+.o_pbms_list {
+    .o_field_many2many_tags {
+        .badge,
+        .o_tag {
+            background-color: #EDF3E8 !important;
             color: #1D2B32 !important;
-            opacity: 0.7;
-            transition: opacity 0.15s ease, color 0.15s ease;
+            border: 1px solid #C8DCB8 !important;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.82rem;
+            padding: 0.3rem 0.6rem;
 
-            &:hover {
+            .o_delete {
+                color: #1D2B32 !important;
+                opacity: 0.7;
+                transition: opacity 0.15s ease, color 0.15s ease;
+
+                &:hover {
+                    color: #541718 !important;
+                    opacity: 1;
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. List View Table Headers & Aggregation Footers
+    // -------------------------------------------------------------------------
+    .o_list_table {
+        thead th {
+            color: #1D2B32 !important;
+            font-weight: 700 !important;
+            background-color: #F8FAFC !important;
+
+            &[data-name="opening_balance"] {
+                min-width: 175px;
+            }
+
+            &[data-name^="quarter"] {
+                min-width: 105px;
+            }
+        }
+
+        td[name="opening_balance"],
+        td[name^="quarter"] {
+            min-width: 105px;
+        }
+
+        thead th[data-name="opening_balance"],
+        thead th[data-name^="quarter"] {
+            white-space: normal !important;
+            line-height: 1.15;
+            vertical-align: middle;
+        }
+
+        tfoot {
+            background-color: #F1F5F9 !important;
+            font-weight: 700 !important;
+
+            td {
+                color: #1D2B32 !important;
+                border-top: 2px solid #CBD5E1 !important;
+            }
+
+            .text-success {
+                color: #425727 !important;
+            }
+
+            .text-primary {
                 color: #541718 !important;
-                opacity: 1;
+            }
+
+            .text-danger {
+                color: #541718 !important;
             }
         }
     }
 }
 
-
 // -------------------------------------------------------------------------
-// 5. List View Table Headers & Aggregation Footers
+// 6. PBMS Text Selection & Focus Styling (Bunna Primary Maroon #541718)
 // -------------------------------------------------------------------------
-.o_list_table {
-    thead th {
-        color: #1D2B32 !important;
-        font-weight: 700 !important;
-        background-color: #F8FAFC !important;
-
-        // Keep the planning grid readable when the list view is narrower
-        // than the full monthly form table.
-        &[data-name="opening_balance"] {
-            min-width: 175px;
-        }
-
-        &[data-name^="quarter"] {
-            min-width: 105px;
-        }
+.o_pbms_view,
+.o_pbms_form,
+.o_pbms_dashboard {
+    *::selection {
+        background-color: #541718 !important;
+        color: #FFFFFF !important;
     }
-
-    td[name="opening_balance"],
-    td[name^="quarter"] {
-        min-width: 105px;
+    *::-moz-selection {
+        background-color: #541718 !important;
+        color: #FFFFFF !important;
     }
-
-    thead th[data-name="opening_balance"],
-    thead th[data-name^="quarter"] {
-        white-space: normal !important;
-        line-height: 1.15;
-        vertical-align: middle;
-    }
-
-    tfoot {
-        background-color: #F1F5F9 !important;
-        font-weight: 700 !important;
-
-        td {
-            color: #1D2B32 !important;
-            border-top: 2px solid #CBD5E1 !important;
-        }
-
-        .text-success {
-            color: #425727 !important;
-        }
-
-        .text-primary {
-            color: #541718 !important;
-        }
-
-        .text-danger {
-            color: #541718 !important;
-        }
-    }
-}
-
-// -------------------------------------------------------------------------
-// 6. Global Text Selection & Focus Styling (Bunna Primary Maroon #541718)
-// -------------------------------------------------------------------------
-::selection {
-    background-color: #541718 !important;
-    color: #FFFFFF !important;
-}
-
-::-moz-selection {
-    background-color: #541718 !important;
-    color: #FFFFFF !important;
-}
-
-*::selection {
-    background-color: #541718 !important;
-    color: #FFFFFF !important;
-}
-
-*::-moz-selection {
-    background-color: #541718 !important;
-    color: #FFFFFF !important;
 }
 
 // Inputs, textareas & editable fields text selection
-input::selection,
-textarea::selection,
-select::selection,
-.form-control::selection,
-.o_input::selection {
-    background-color: #541718 !important;
-    color: #FFFFFF !important;
+body.o_pbms_app,
+.o_pbms_view,
+.o_pbms_form {
+    input::selection,
+    textarea::selection,
+    select::selection,
+    .form-control::selection,
+    .o_input::selection {
+        background-color: #541718 !important;
+        color: #FFFFFF !important;
+    }
 }
 
 // Input focus rings - Bunna Primary Maroon (#541718)
-.form-control:focus,
-.o_input:focus,
-.form-select:focus,
-input:focus,
-textarea:focus,
-select:focus {
-    border-color: #541718 !important;
-    box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.25) !important;
-    outline: none !important;
-}
+body.o_pbms_app,
+.o_pbms_view,
+.o_pbms_form {
+    .form-control:focus,
+    .o_input:focus,
+    .form-select:focus,
+    input:focus,
+    textarea:focus,
+    select:focus {
+        border-color: #541718 !important;
+        box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.25) !important;
+        outline: none !important;
+    }
 
-// Dropdown & Autocomplete item active / selected state
-.dropdown-item:active,
-.dropdown-item.active,
-.dropdown-item:hover,
-.dropdown-item:focus,
-.o-autocomplete--dropdown-item.active,
-.o-autocomplete--dropdown-item:hover,
-.ui-menu-item.ui-state-focus,
-.ui-menu-item .ui-menu-item-wrapper.ui-state-active {
-    background-color: #EDF3E8 !important;
-    color: #1D2B32 !important;
-    font-weight: 600 !important;
-}
+    // Dropdown & Autocomplete item active / selected state
+    .dropdown-item:active,
+    .dropdown-item.active,
+    .dropdown-item:hover,
+    .dropdown-item:focus,
+    .o-autocomplete--dropdown-item.active,
+    .o-autocomplete--dropdown-item:hover,
+    .ui-menu-item.ui-state-focus,
+    .ui-menu-item .ui-menu-item-wrapper.ui-state-active {
+        background-color: #FAF1EB !important;
+        color: #541718 !important;
+        font-weight: 600 !important;
+    }
 
-// Selected table rows in List View
-.o_list_table {
-    tr.o_data_row.o_is_selected,
-    tr.o_data_row.o_is_selected td,
-    tr.o_data_row.table-info,
-    tr.o_data_row.table-info td {
-        background-color: #EDF3E8 !important;
-        color: #1D2B32 !important;
+    // Selected table rows in List View
+    .o_list_table {
+        tr.o_data_row.o_is_selected,
+        tr.o_data_row.o_is_selected td,
+        tr.o_data_row.table-info,
+        tr.o_data_row.table-info td {
+            background-color: #FAF1EB !important;
+            color: #541718 !important;
+        }
     }
 }
 
 // -------------------------------------------------------------------------
 // 7. Modal & Wizard Action Buttons (Primary Maroon #541718)
 // -------------------------------------------------------------------------
-.modal-footer,
-footer {
+body.o_pbms_app .modal-footer,
+body.o_pbms_app footer,
+.o_pbms_view .modal-footer,
+.modal:has(.o_pbms_view) .modal-footer,
+.modal:has(.o_pbms_form) .modal-footer {
     .btn-primary {
         background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
         border: 1px solid #3E101120 !important;
@@ -858,55 +973,64 @@ footer {
 // -------------------------------------------------------------------------
 // 8. Alert Boxes & Callouts (Bunna Bank Palette)
 // -------------------------------------------------------------------------
-.alert-info {
-    background-color: #EDF3E8 !important;
-    border-color: #C8DCB8 !important;
-    color: #1D2B32 !important;
+body.o_pbms_app,
+.o_pbms_view,
+.o_pbms_form {
+    .alert-info {
+        background-color: #EDF3E8 !important;
+        border-color: #C8DCB8 !important;
+        color: #1D2B32 !important;
 
-    i, .fa {
-        color: #425727 !important;
+        i, .fa {
+            color: #425727 !important;
+        }
     }
-}
 
-.alert-warning {
-    background-color: #FAF1EB !important;
-    border-color: #EAD0BC !important;
-    color: #C17540 !important;
-
-    i, .fa {
+    .alert-warning {
+        background-color: #FAF1EB !important;
+        border-color: #EAD0BC !important;
         color: #C17540 !important;
+
+        i, .fa {
+            color: #C17540 !important;
+        }
     }
-}
 
-.alert-danger {
-    background-color: #F6EBEB !important;
-    border-color: #DDB8B8 !important;
-    color: #541718 !important;
-
-    i, .fa {
+    .alert-danger {
+        background-color: #F6EBEB !important;
+        border-color: #DDB8B8 !important;
         color: #541718 !important;
+
+        i, .fa {
+            color: #541718 !important;
+        }
     }
-}
 
-.alert-success {
-    background-color: #EDF3E8 !important;
-    border-color: #C8DCB8 !important;
-    color: #425727 !important;
-
-    i, .fa {
+    .alert-success {
+        background-color: #EDF3E8 !important;
+        border-color: #C8DCB8 !important;
         color: #425727 !important;
+
+        i, .fa {
+            color: #425727 !important;
+        }
     }
 }
 
 // -------------------------------------------------------------------------
 // 9. Global State Badges (Kanban, List, Form, and Line Tables)
 // -------------------------------------------------------------------------
-.badge,
-.o_badge,
-.o_tag,
-.o_kanban_view .badge,
-.o_list_view .badge,
-.o_form_view .badge {
+body.o_pbms_app,
+.o_pbms_view,
+.o_pbms_form,
+.o_pbms_list,
+.o_pbms_kanban {
+    .badge,
+    .o_badge,
+    .o_tag,
+    .o_kanban_view .badge,
+    .o_list_view .badge,
+    .o_form_view .badge {
     font-weight: 600 !important;
 
     &.text-bg-warning,
@@ -959,60 +1083,199 @@ footer {
         border: 1px solid #EAD0BC !important;
     }
 }
+}
 
 // -------------------------------------------------------------------------
-// 10. Global Select Controls, Options & Dropdown Hover Highlighting
+// 10. PBMS Select Controls, Options & Dropdown Hover Highlighting
 // -------------------------------------------------------------------------
-select,
-.form-select,
-select.form-control,
-select.o_input {
-    border-color: #CBD5E1 !important;
-    color: #1D2B32 !important;
-    background-color: #FFFFFF !important;
-    font-weight: 500;
-    cursor: pointer;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-
-    &:hover {
-        border-color: #541718 !important;
-        box-shadow: 0 2px 6px rgba(84, 24, 24, 0.15) !important;
-    }
-
-    &:focus {
-        border-color: #541718 !important;
-        box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.25) !important;
-        outline: none !important;
-    }
-
-    option {
-        background-color: #FFFFFF !important;
+body.o_pbms_app,
+.o_pbms_form,
+.o_pbms_view,
+.o_pbms_list,
+.o_pbms_kanban,
+.o_pbms_dashboard {
+    select,
+    .form-select,
+    select.form-control,
+    select.o_input {
+        border-color: #CBD5E1 !important;
         color: #1D2B32 !important;
-        padding: 6px 10px;
+        background-color: #FFFFFF !important;
+        font-weight: 500;
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-        &:hover,
-        &:focus,
-        &:active,
-        &:checked {
-            background-color: #541718 !important;
-            background: #541718 !important;
-            color: #FFFFFF !important;
+        &:hover {
+            border-color: #541718 !important;
+            box-shadow: 0 2px 6px rgba(84, 24, 24, 0.15) !important;
+        }
+
+        &:focus {
+            border-color: #541718 !important;
+            box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.25) !important;
+            outline: none !important;
+        }
+
+        option {
+            background-color: #FFFFFF !important;
+            color: #1D2B32 !important;
+            padding: 6px 10px;
+
+            &:hover,
+            &:focus,
+            &:active,
+            &:checked {
+                background-color: #541718 !important;
+                background: #541718 !important;
+                color: #FFFFFF !important;
+            }
         }
     }
 }
 
-// Universal Dropdown Menus, Submenus, Popovers & Autocomplete
-.dropdown-menu,
-.o_dropdown_menu,
-.o-dropdown--menu,
-.o_popover,
-.popover,
-.o_select_menu_menu,
-.ui-autocomplete {
+// -------------------------------------------------------------------------
+// Top Navigation Bar (Bunna Deep Slate Navy #1D2B32 - Exact match to user screenshot)
+// Uniform dark slate header with crisp white text and seamless items
+// -------------------------------------------------------------------------
+body.o_pbms_app .o_navbar,
+body.o_pbms_app .o_main_navbar,
+body.o_pbms_app header.o_navbar,
+.o_main_navbar.o_pbms_navbar,
+.o_navbar.o_pbms_navbar,
+.o_main_navbar:has([data-menu-xmlid^="bunna_pbms."]),
+.o_navbar:has([data-menu-xmlid^="bunna_pbms."]) {
+    background: #1D2B32 !important;
+    background-color: #1D2B32 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+
+    // Reset Odoo navbar CSS variables for Bunna Deep Slate Navy
+    --NavBar-entry-backgroundColor: transparent !important;
+    --NavBar-entry-backgroundColor--hover: rgba(255, 255, 255, 0.1) !important;
+    --NavBar-entry-backgroundColor--focus: rgba(255, 255, 255, 0.1) !important;
+    --NavBar-entry-backgroundColor--active: rgba(255, 255, 255, 0.15) !important;
+    --NavBar-entry-borderColor-active: transparent !important;
+    --NavBar-entry-color: #FFFFFF !important;
+    --NavBar-entry-color--hover: #FFFFFF !important;
+    --NavBar-entry-color--active: #FFFFFF !important;
+    --NavBar-brand-color: #FFFFFF !important;
+
+    .o_navbar_apps_menu,
+    .o_menu_sections,
+    .o_menu_systray {
+        background: transparent !important;
+        background-color: transparent !important;
+    }
+
+    .o_menu_brand {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+        letter-spacing: 0.3px;
+        background: transparent !important;
+        background-color: transparent !important;
+
+        &:hover,
+        &:focus,
+        &:active {
+            color: #FFFFFF !important;
+            background: transparent !important;
+            background-color: transparent !important;
+        }
+    }
+
+    // Top navbar buttons, links and dropdown toggles (Planning, Dashboard, Review, Config)
+    .o_nav_entry,
+    .o_menu_sections,
+    .o_menu_sections button,
+    .o_menu_sections a,
+    .o_menu_sections .dropdown-toggle,
+    .o_menu_sections .dropdown,
+    .o_menu_sections .o-dropdown,
+    .o_menu_sections > *,
+    .o_menu_sections > * > button,
+    .o_menu_sections > * > a,
+    .o_menu_sections .btn {
+        background: transparent !important;
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+        font-weight: 500 !important;
+        font-size: 0.9rem !important;
+        border: none !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        border-radius: 4px !important;
+        transition: all 0.15s ease;
+
+        &:hover,
+        &:focus {
+            color: #FFFFFF !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            border: none !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+
+        &:active,
+        &.active,
+        &.show,
+        &[aria-expanded="true"] {
+            color: #FFFFFF !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            border: none !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+
+        &::after {
+            color: inherit !important;
+        }
+    }
+
+    // Systray items and icons in top navbar
+    .o_menu_systray {
+        .o_nav_entry,
+        button,
+        a,
+        i,
+        .btn {
+            color: #FFFFFF !important;
+            background: transparent !important;
+
+            &:hover,
+            &:focus {
+                color: #FFFFFF !important;
+                background: rgba(255, 255, 255, 0.1) !important;
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// Top Navbar Dropdown Menus & Submenus (Exact match to user screenshot)
+// Scoped to PBMS app and PBMS menu items so other modules are NEVER affected
+// -------------------------------------------------------------------------
+.o-dropdown--menu:has([data-menu-xmlid^="bunna_pbms."]),
+.dropdown-menu:has([data-menu-xmlid^="bunna_pbms."]),
+body.o_pbms_app .o_menu_sections .dropdown-menu,
+body.o_pbms_app .o_menu_sections .o-dropdown--menu,
+body.o_pbms_app .o_navbar .dropdown-menu,
+body.o_pbms_app .o_navbar .o-dropdown--menu,
+body.o_pbms_app .dropdown-menu,
+body.o_pbms_app .o-dropdown--menu,
+.o_pbms_view .dropdown-menu,
+.o_pbms_form .dropdown-menu {
     border-radius: 8px !important;
-    border: 1.5px solid #CBD5E1 !important;
-    box-shadow: 0 8px 24px rgba(84, 24, 24, 0.12) !important;
-    padding: 0.35rem 0 !important;
+    border: 1px solid #E2E8F0 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+    padding: 6px 0 !important;
+    margin-top: 4px !important;
+    min-width: 220px !important;
     background-color: #FFFFFF !important;
 
     .dropdown-item,
@@ -1025,10 +1288,18 @@ select.o_input {
     [role="menuitem"],
     [role="option"] {
         color: #1D2B32 !important;
-        font-weight: 500;
-        padding: 0.5rem 1rem;
+        font-weight: 500 !important;
+        font-size: 0.88rem !important;
+        padding: 8px 18px !important;
+        line-height: 1.4 !important;
         transition: background-color 0.15s ease, color 0.15s ease;
 
+        &:not(:hover):not(:focus):not(:active):not(.active) {
+            color: #1D2B32 !important;
+            background-color: transparent !important;
+        }
+
+        // Hover, Focus, and Active states (Light cream bg, maroon text)
         &:hover,
         &:focus,
         &:active,
@@ -1042,106 +1313,87 @@ select.o_input {
             background-color: #FAF1EB !important;
             background: #FAF1EB !important;
             color: #541718 !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
         }
     }
 }
 
-// Universal Hover Override for Any Dropdown Item in the Backend
-.dropdown-item:hover,
-.dropdown-item:focus,
-.dropdown-item:active,
-.dropdown-item.active,
-.o_dropdown_item:hover,
-.o_dropdown_item:focus,
-.o_dropdown_item.active,
-.o-dropdown-item:hover,
-.o-dropdown-item:focus,
-.o-dropdown-item.active,
-.o_menu_item:hover,
-.o_menu_item:focus,
-.o_menu_item.active,
-.o_select_menu_item:hover,
-.o_select_menu_item:focus,
-.o_select_menu_item.active,
-[role="menuitem"]:hover,
-[role="menuitem"]:focus,
-[role="menuitem"].active,
-[role="option"]:hover,
-[role="option"]:focus,
-[role="option"].active {
-    background-color: #FAF1EB !important;
-    background: #FAF1EB !important;
-    color: #541718 !important;
-}
-
-// Bunna PBMS branding for items inside the opened navigation dropdown.
-.o_main_navbar .o_menu_sections {
-    .o-dropdown--menu [data-menu-xmlid^="bunna_pbms.menu_pbms"],
-    .o_dropdown_menu [data-menu-xmlid^="bunna_pbms.menu_pbms"] {
-        color: #1D2B32 !important;
-        background-color: #FFFFFF !important;
-        border-left: 3px solid transparent !important;
-        font-weight: 600 !important;
-        transition: background-color 0.15s ease, color 0.15s ease;
-    }
-
-    .o-dropdown--menu [data-menu-xmlid^="bunna_pbms.menu_pbms"]:hover,
-    .o-dropdown--menu [data-menu-xmlid^="bunna_pbms.menu_pbms"]:focus,
-    .o-dropdown--menu [data-menu-xmlid^="bunna_pbms.menu_pbms"].active,
-    .o_dropdown_menu [data-menu-xmlid^="bunna_pbms.menu_pbms"]:hover,
-    .o_dropdown_menu [data-menu-xmlid^="bunna_pbms.menu_pbms"]:focus,
-    .o_dropdown_menu [data-menu-xmlid^="bunna_pbms.menu_pbms"].active {
-        color: #541718 !important;
-        background-color: #F4E8E8 !important;
-        border-left-color: #541718 !important;
-    }
-}
-
-// Normalize remaining Bootstrap classes used by PBMS list actions.
-.o_list_renderer.o_pbms_list .o_data_row,
-.o_list_renderer.o_pbms_list .o_list_table .o_data_row,
-.o_list_renderer .o_data_row:has(.btn-pbms-submit),
-.o_list_table .o_data_row:has(.btn-pbms-submit),
-.o_pbms_exceptional_list .o_data_row {
-    .btn-primary {
-        @extend %btn-pbms-base;
+// Normalize button colors across ALL PBMS list view rows and tables
+.o_pbms_view .o_data_row,
+.o_pbms_list .o_data_row,
+.o_pbms_exceptional_list .o_data_row,
+body.o_pbms_app .o_list_renderer .o_data_row {
+    .btn-primary,
+    button.btn-primary,
+    .btn.btn-primary {
+        background: linear-gradient(135deg, #541718 0%, #6E1E20 100%) !important;
         background-color: #541718 !important;
-        border-color: #541718 !important;
+        border-color: #3E1011 !important;
         color: #FFFFFF !important;
+        font-weight: 600 !important;
+
+        i, span {
+            color: #FFFFFF !important;
+        }
+
+        &:hover,
+        &:focus {
+            background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+            background-color: #3E1011 !important;
+            border-color: #2D0B0C !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 3px 8px rgba(84, 24, 24, 0.35) !important;
+        }
+    }
+
+    .btn-secondary,
+    button.btn-secondary,
+    .btn.btn-secondary {
+        background-color: #FFFFFF !important;
+        border-color: #CBD5E1 !important;
+        color: #1D2B32 !important;
+
+        &:hover,
+        &:focus {
+            background-color: #FAF1EB !important;
+            border-color: #541718 !important;
+            color: #541718 !important;
+        }
     }
 
     .btn-success {
-        @extend %btn-pbms-base;
         background-color: #425727 !important;
-        border-color: #425727 !important;
+        border-color: #2F3E1C !important;
         color: #FFFFFF !important;
     }
 
     .btn-warning,
     .btn-outline-warning {
-        @extend %btn-pbms-base;
         background-color: #C17540 !important;
-        border-color: #C17540 !important;
+        border-color: #A65F2F !important;
         color: #FFFFFF !important;
     }
 
     .btn-danger {
-        @extend %btn-pbms-base;
-        background-color: #541718 !important;
-        border-color: #541718 !important;
+        background-color: #991B1B !important;
+        border-color: #7F1D1D !important;
         color: #FFFFFF !important;
     }
 
     .btn-info,
     .btn-outline-info {
-        @extend %btn-pbms-base;
         background-color: #1D2B32 !important;
-        border-color: #1D2B32 !important;
+        border-color: #141E23 !important;
         color: #FFFFFF !important;
     }
 }
 
+body.o_pbms_app,
+.o_view_controller.o_pbms_view,
+.o_action_manager:has(.o_pbms_view),
+.o_pbms_view,
+.o_pbms_form,
+.o_pbms_list {
 // -------------------------------------------------------------------------
 // 11. Search View, Filters & Group By Branding (Bunna Bank Palette)
 // -------------------------------------------------------------------------
@@ -1298,9 +1550,14 @@ select.o_input {
     }
 }
 
-// Search Autocomplete Results Dropdown
-.o_searchview_autocomplete {
-    .o-autocomplete--dropdown-item {
+body.o_pbms_app,
+.o_pbms_view,
+.o_pbms_list,
+.o_pbms_kanban,
+.o_pbms_form {
+    // Search Autocomplete Results Dropdown
+    .o_searchview_autocomplete {
+        .o-autocomplete--dropdown-item {
         .o_search_match {
             color: #541718 !important;
             font-weight: 700 !important;
@@ -1746,11 +2003,16 @@ select.o_input {
         border: 1px solid #E2E8F0;
     }
 }
+}
+
+}
 
 // -------------------------------------------------------------------------
-// 16. Control Panel, Breadcrumbs & View Switcher Buttons
+// 16. Control Panel, Breadcrumbs & View Switcher Buttons (Scoped to PBMS)
 // -------------------------------------------------------------------------
-.o_control_panel {
+body.o_pbms_app .o_control_panel,
+.o_view_controller.o_pbms_view .o_control_panel,
+.o_action_manager:has(.o_pbms_view) .o_control_panel {
     background-color: #FFFFFF !important;
     border-bottom: 1.5px solid #E2E8F0 !important;
 
@@ -1801,31 +2063,87 @@ select.o_input {
         }
     }
 
-    // Control Panel Action Buttons (New, Save, Discard, Action Menu)
-    .o_cp_buttons {
-        .btn-primary {
-            background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+    // Control Panel Action Buttons (+ New, Save, Discard, Actions, Filters)
+    .o_control_panel_main_buttons,
+    .o_control_panel_breadcrumbs_actions,
+    .o_control_panel_actions,
+    .o_control_panel_navigation,
+    .o_cp_buttons,
+    .o_cp_action_menus,
+    .o_list_buttons,
+    .o_form_buttons_view,
+    .o_form_buttons_edit {
+        .btn-primary,
+        button.btn-primary,
+        .btn.btn-primary,
+        .o_list_button_add,
+        .o_form_button_create {
+            background: linear-gradient(135deg, #541718 0%, #6E1E20 100%) !important;
+            background-color: #541718 !important;
             border: 1px solid #3E1011 !important;
             color: #FFFFFF !important;
-            font-weight: 700;
+            font-weight: 600 !important;
+            box-shadow: 0 2px 4px rgba(84, 24, 24, 0.2) !important;
+            transition: all 0.2s ease !important;
 
-            &:hover {
+            i, span, strong {
+                color: #FFFFFF !important;
+            }
+
+            &:hover,
+            &:focus {
                 background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
-                box-shadow: 0 4px 12px rgba(84, 24, 24, 0.35);
+                background-color: #3E1011 !important;
+                border-color: #2D0B0C !important;
+                color: #FFFFFF !important;
+                box-shadow: 0 4px 12px rgba(84, 24, 24, 0.35) !important;
+                transform: translateY(-1px);
+            }
+
+            &:active,
+            &.active {
+                background: #3E1011 !important;
+                color: #FFFFFF !important;
+                transform: translateY(0);
             }
         }
 
-        .btn-secondary {
-            background: #EAECE8 !important;
-            border: 1px solid #CCD3C5 !important;
-            color: #1E2917 !important;
-            font-weight: 600;
+        .btn-secondary,
+        .btn-default,
+        .btn-light,
+        button.btn-secondary,
+        .btn.btn-secondary {
+            background: #FFFFFF !important;
+            background-color: #FFFFFF !important;
+            border: 1px solid #CBD5E1 !important;
+            color: #1D2B32 !important;
+            font-weight: 600 !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+            transition: all 0.2s ease !important;
 
-            &:hover {
-                background: #1E2917 !important;
-                border-color: #1E2917 !important;
-                color: #FFFFFF !important;
-                box-shadow: 0 2px 6px rgba(30, 41, 23, 0.25);
+            i, span {
+                color: inherit !important;
+            }
+
+            &:hover,
+            &:focus {
+                background-color: #FAF1EB !important;
+                background: #FAF1EB !important;
+                border-color: #541718 !important;
+                color: #541718 !important;
+                box-shadow: 0 2px 6px rgba(84, 24, 24, 0.15) !important;
+                transform: translateY(-1px);
+
+                i, span {
+                    color: #541718 !important;
+                }
+            }
+
+            &:active,
+            &.active {
+                background-color: #F3E4D8 !important;
+                border-color: #541718 !important;
+                color: #541718 !important;
             }
         }
     }
@@ -1846,10 +2164,9 @@ select.o_input {
 // Reactive Header Save Button Show/Hide Rules:
 // Appear when editing or creating, disappear when saved or clean
 // =========================================================================
-.o_form_view_container.o_form_is_editing .o_form_statusbar,
-.o_form_view.o_form_is_editing .o_form_statusbar,
-.o_form_view_container:has(.o_form_status_indicator_buttons:not(.invisible)) .o_form_statusbar,
-.o_action_manager:has(.o_form_status_indicator_buttons:not(.invisible)) .o_form_statusbar {
+.o_pbms_form.o_form_is_editing .o_form_statusbar,
+.o_view_controller.o_pbms_view .o_form_statusbar,
+.o_pbms_form:has(.o_form_status_indicator_buttons:not(.invisible)) .o_form_statusbar {
     .o_statusbar_buttons {
         .o_pbms_save_btn:not(.d-none),
         button[name="action_save_plan"]:not(.d-none),
@@ -1890,11 +2207,82 @@ select.o_input {
     }
 }
 
-// Shared wrapper: applies to every row, list view, and group header within PBMS
-.o_list_renderer,
-.o_list_table,
+// Shared wrapper: applies to every row, list view, group header, and everywhere within PBMS
+.o_pbms_list,
+.o_pbms_form,
+.o_pbms_view,
+.o_pbms_kanban,
+.o_pbms_dashboard,
 .o_group_header,
-.o_pbms_group_actions {
+.o_group_buttons,
+.o_pbms_group_actions,
+.o_view_controller.o_pbms_view,
+body.o_pbms_app .o_action_manager {
+
+    // ?? Primary Buttons in All PBMS Views (+ New, Start Consolidation, Submit, Save) ??
+    .btn-primary,
+    button.btn-primary,
+    .btn.btn-primary,
+    [name="action_start_consolidation"],
+    [name="action_start_budget_call"],
+    [name="action_open_for_input"],
+    [name="action_send_to_board"],
+    [name="action_approve"] {
+        background: linear-gradient(135deg, #541718 0%, #6E1E20 100%) !important;
+        background-color: #541718 !important;
+        border-color: #3E1011 !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        box-shadow: 0 2px 4px rgba(84, 24, 24, 0.2) !important;
+
+        i, span, strong {
+            color: #FFFFFF !important;
+        }
+
+        &:hover,
+        &:focus:not(:disabled) {
+            background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+            background-color: #3E1011 !important;
+            border-color: #2D0B0C !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 4px 10px rgba(84, 24, 24, 0.35) !important;
+        }
+
+        &:active,
+        &.active {
+            background: #3E1011 !important;
+            color: #FFFFFF !important;
+        }
+    }
+
+    // ?? Secondary Buttons in All PBMS Views (Close, Discard, Cancel) ??
+    .btn-secondary,
+    button.btn-secondary,
+    .btn.btn-secondary,
+    [name="action_close"] {
+        background-color: #FFFFFF !important;
+        background: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+        color: #1D2B32 !important;
+        font-weight: 500 !important;
+
+        i, span {
+            color: inherit !important;
+        }
+
+        &:hover,
+        &:focus:not(:disabled) {
+            background-color: #FAF1EB !important;
+            background: #FAF1EB !important;
+            border-color: #541718 !important;
+            color: #541718 !important;
+            box-shadow: 0 2px 6px rgba(84, 24, 24, 0.15) !important;
+
+            i, span {
+                color: #541718 !important;
+            }
+        }
+    }
 
     // ── Submit (Official Bunna Maroon) ───────────────────────────────────────
     .btn-pbms-submit {
@@ -1906,6 +2294,20 @@ select.o_input {
         &:hover {
             background-color: #3e1011 !important;
             border-color:     #3e1011 !important;
+            color: #ffffff !important;
+        }
+    }
+
+    // ── District Approve (Bunna Deep Forest Green) ───────────────────────────
+    .btn-pbms-district-approve {
+        @extend %btn-pbms-base;
+        background-color: #2d6a4f !important;
+        border-color:     #2d6a4f !important;
+        color:            #ffffff !important;
+
+        &:hover {
+            background-color: #1b4332 !important;
+            border-color:     #1b4332 !important;
             color: #ffffff !important;
         }
     }

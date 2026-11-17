@@ -6,13 +6,41 @@
 
 
         <record id="hr_rule_taxable" model="hr.salary.rule">
-            <field name="name">Gross</field>
-            <field name="sequence" eval="100"/>
+            <field name="name">Gross Salary</field>
+            <field name="sequence" eval="25"/>
             <field name="code">GROSS</field>
             <field name="category_id" ref="bunna_hr_payroll.GROSS"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">result = categories.BASIC + categories.ALW</field>
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([
+        ('employee_id', '=', employee.id),
+        ('active', '=', True),
+        ('adjustment_id.active', '=', True)
+    ]) if 'hr.payroll.adjustment.line' in employee.env else False
+
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+cia_lines = [l for l in (all_lines or []) if (l.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and l.adjustment_id.code in ('CIA', 'CIA-ALL', 'CASH_INDEMNITY')) or (l.ciamount and l.ciamount > 0))]
+ciab_lines = [l for l in (all_lines or []) if (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0)) and l.amount > 0]
+
+if p_id:
+    matched_cia = [l for l in cia_lines if (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched_cia:
+        cia_lines = matched_cia
+    matched_ciab = [l for l in ciab_lines if (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched_ciab:
+        ciab_lines = matched_ciab
+
+cia_amt = sum(l.ciamount for l in cia_lines if l.ciamount) if cia_lines else (contract.cash_indemnity if 'cash_indemnity' in contract._fields and contract.cash_indemnity else 0.0)
+adj_amt = sum(l.amount for l in ciab_lines) if ciab_lines else (contract.cash_indemnity_bank if 'cash_indemnity_bank' in contract._fields and contract.cash_indemnity_bank else 0.0)
+
+result = round(categories.BASIC + categories.ALW - cia_amt + adj_amt, 2)]]></field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_gross"/>
+            <field name="appears_on_payslip" eval="True"/>
         </record>
 
         <record id="hr_rule_da" model="hr.salary.rule">
@@ -62,8 +90,29 @@
             <field name="category_id" ref="bunna_hr_payroll.NET"/>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
-            <field name="amount_python_compute">result = ((categories.BASIC + categories.ALW) - (categories.Emp_cont + categories.DED + categories.ADHDED))</field>
-            <field name="register_id" ref="contrib_register_employees"/>
+            <field name="amount_python_compute"><![CDATA[try:
+    all_lines = adj_lines
+except Exception:
+    all_lines = False
+if all_lines is False or all_lines is None:
+    all_lines = employee.env['hr.payroll.adjustment.line'].search([('employee_id', '=', employee.id), ('active', '=', True), ('adjustment_id.active', '=', True)]) if 'hr.payroll.adjustment.line' in employee.env else False
+p_id = payslip.period_id if hasattr(payslip, 'period_id') and payslip.period_id else False
+ci_lines = [l for l in (all_lines or []) if (l.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or (l.adjustment_id and (l.adjustment_id.code in ('CIAB', 'CIA', 'CIA-ALL', 'CASH_INDEMNITY') or 'CASH INDEMNITY' in (l.adjustment_id.name or '').upper())) or (l.ciamount and l.ciamount > 0))]
+if p_id and ci_lines:
+    matched = [l for l in ci_lines if (l.adjustment_id.period_id and l.adjustment_id.period_id == p_id) or (p_id.name and p_id.name.lower() in (l.adjustment_id.name or '').lower())]
+    if matched:
+        ci_lines = matched
+    else:
+        unassigned = [l for l in ci_lines if not l.adjustment_id.period_id or l.adjustment_id.period_id == p_id]
+        if unassigned:
+            latest_id = max(l.adjustment_id.id for l in unassigned if l.adjustment_id)
+            ci_lines = [l for l in unassigned if l.adjustment_id and l.adjustment_id.id == latest_id]
+        else:
+            ci_lines = []
+cia_salary = sum(l.salary_amount for l in ci_lines if l.salary_amount) if ci_lines else 0.0
+tax_amount = sum(l.tax_amount for l in ci_lines if l.tax_amount) if ci_lines else 0.0
+result = round(((categories.BASIC + categories.ALW) - (categories.Emp_cont + categories.DED + categories.ADHDED)) + tax_amount + cia_salary, 2)]]></field>
+            <field name="register_id" ref="bunna_hr_payroll.contrib_register_net"/>
             <field name="account_credit" ref="bunna_hr_payroll.account_payroll_0127020310"/>
         </record>
 

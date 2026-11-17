@@ -24,7 +24,8 @@
                     </group>
                     <group string="Eligibility Thresholds">
                         <field name="transfer_min_pms_score"/>
-                        <field name="transfer_min_service_years"/>
+                        <field name="transfer_min_position_service_years"/>
+                        <field name="transfer_min_location_service_years"/>
                         <field name="transfer_refusal_penalty_months"/>
                     </group>
                     <group string="Pending Request Expiry">

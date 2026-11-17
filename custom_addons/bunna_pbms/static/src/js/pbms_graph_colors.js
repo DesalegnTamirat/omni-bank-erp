@@ -45,6 +45,10 @@ export function getBunnaGraphColor(index) {
 
 patch(GraphRenderer.prototype, {
     getBarChartData() {
+        const resModel = this.model?.metaData?.resModel;
+        if (!resModel || !resModel.startsWith("pbms.")) {
+            return super.getBarChartData(...arguments);
+        }
         const { stacked } = this.model.metaData;
         const { data, lineOverlayDataset } = this.model;
         const currentColorScheme = cookie.get("color_scheme");
@@ -83,6 +87,10 @@ patch(GraphRenderer.prototype, {
     },
 
     getLineChartData() {
+        const resModel = this.model?.metaData?.resModel;
+        if (!resModel || !resModel.startsWith("pbms.")) {
+            return super.getLineChartData(...arguments);
+        }
         const { cumulated } = this.model.metaData;
         const data = this.model.data;
         const currentColorScheme = cookie.get("color_scheme");
@@ -120,6 +128,10 @@ patch(GraphRenderer.prototype, {
     },
 
     getPieChartData() {
+        const resModel = this.model?.metaData?.resModel;
+        if (!resModel || !resModel.startsWith("pbms.")) {
+            return super.getPieChartData(...arguments);
+        }
         const data = this.model.data;
         const currentColorScheme = cookie.get("color_scheme");
         const colors = data.labels.map((_, index) => getBunnaGraphColor(index));
@@ -155,6 +167,10 @@ patch(GraphRenderer.prototype, {
     },
 
     getLegendOptions() {
+        const resModel = this.model?.metaData?.resModel;
+        if (!resModel || !resModel.startsWith("pbms.")) {
+            return super.getLegendOptions(...arguments);
+        }
         const { mode } = this.model.metaData;
         const legendOptions = {
             onHover: this.onLegendHover.bind(this),

@@ -6,7 +6,7 @@
             <!-- ── Header ── -->
             <div class="o_dashboard_header d-flex align-items-center justify-content-between mb-3 px-4 pt-4">
                 <div>
-                    <h2 class="o_dashboard_title mb-0">Recruitment Request &amp; Manpower Tracking Dashboard</h2>
+                    <h2 class="o_dashboard_title mb-0">Recruitment Request &amp; Workforce Tracking Dashboard</h2>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <!-- Level filter -->
@@ -75,8 +75,8 @@
             <!-- ── Dashboard Content ── -->
             <div t-else="" class="px-4 pb-5 mb-5">
 
-                <!-- ── SECTION 1: Manpower Establishment Overview ── -->
-                <div class="o_dashboard_section_title mb-2">Manpower Establishment</div>
+                <!-- ── SECTION 1: Workforce Establishment Overview ── -->
+                <div class="o_dashboard_section_title mb-2">Workforce Establishment</div>
                 <div class="row g-3 mb-4">
                     <div class="col-6 col-sm-4 col-md-2">
                         <div class="o_stat_card o_stat_total" t-on-click="onClickAuthorized" title="Total Authorized Establishment">

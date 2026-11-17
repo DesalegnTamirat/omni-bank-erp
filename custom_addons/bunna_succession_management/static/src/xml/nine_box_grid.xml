@@ -3,32 +3,24 @@
     <t t-name="bunna_succession_management.NineBoxGrid" owl="1">
         <div class="o_nine_box_dashboard container-fluid h-100 overflow-auto py-4" style="background-color: #f4f6f9;">
             
-            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary-subtle">
-                <h2 class="fw-bold mb-0 text-dark" style="letter-spacing: -0.5px;">Nine-Box Talent Grid</h2>
-                <div class="me-2">
-                    <select class="form-select border shadow-sm fw-bold text-dark cursor-pointer" 
-                            style="min-width: 250px; background-color: #ffffff;"
-                            t-on-change="(e) => this.setTrack(e.target.value)">
-                        <t t-foreach="state.trackDefs" t-as="tDef" t-key="tDef.key">
-                            <option t-att-value="tDef.key" t-att-selected="tDef.key === state.activeTrack">
-                                <t t-esc="tDef.label"/>
-                            </option>
-                        </t>
-                    </select>
+            <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-secondary-subtle flex-wrap gap-2">
+                <div>
+                    <h2 class="fw-bold mb-1 text-dark" style="letter-spacing: -0.5px;">Nine-Box Talent Grid</h2>
+                    <div class="text-muted small">
+                        <i class="fa fa-info-circle text-primary me-1"/>
+                        <strong>Executive Calibration Matrix:</strong> Assess potential vs. performance across your leadership bench. Drag &amp; drop candidate cards between grid cells to calibrate ratings, or click any candidate to review their profile and position coverage.
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-white text-dark border shadow-sm px-3 py-2">
+                        <i class="fa fa-users text-primary me-1"/><strong t-esc="state.people.length"/> Nominees Plotted
+                    </span>
                 </div>
             </div>
 
             <div class="row g-4">
                 <!-- 9-Box Grid Column (Left) -->
                 <div class="col-xl-8 col-lg-7">
-                    <div class="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded shadow-sm border">
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input cursor-pointer" type="checkbox" id="critOnlySwitch" t-model="state.critOnlyFlag" style="width: 2.5em; height: 1.25em;"/>
-                            <label class="form-check-label fw-semibold text-dark ms-2 pt-1 cursor-pointer" for="critOnlySwitch">
-                                <i class="fa fa-shield text-warning me-1"></i> Focus on Critical Position Successors
-                            </label>
-                        </div>
-                    </div>
 
                     <!-- The Grid -->
                     <div class="d-flex" style="gap: 15px;">
@@ -66,6 +58,9 @@
                                                              draggable="true"
                                                              t-on-dragstart="(e) => this.onDragStart(e, p)"
                                                              t-on-click="() => this.selectPerson(p.id)"
+                                                             t-on-mouseenter="(e) => this.showTip(e, p, def)"
+                                                             t-on-mousemove="(e) => this.moveTip(e)"
+                                                             t-on-mouseleave="() => this.hideTip()"
                                                              data-bs-toggle="tooltip" t-att-title="p.name">
                                                             <img t-attf-src="/web/image?model=hr.employee&amp;field=avatar_128&amp;id={{p.emp_id || 0}}" 
                                                                  t-attf-class="rounded-circle o_9box_avatar {{ p.readyClass }} {{ state.selectedId === p.id ? 'selected' : '' }} shadow-sm"/>
@@ -87,12 +82,20 @@
                         </div>
                     </div>
                     
-                    <!-- Legend -->
+                    <!-- Dynamic Legend from Configuration -->
                     <div class="mt-4 p-3 bg-white rounded shadow-sm border d-flex justify-content-center flex-wrap gap-4 small fw-semibold text-secondary">
-                        <div class="d-flex align-items-center"><span class="o_ring_sample r-now me-2"></span> Ready Now</div>
-                        <div class="d-flex align-items-center"><span class="o_ring_sample r-soon me-2"></span> Ready Soon (1-2 yrs)</div>
-                        <div class="d-flex align-items-center"><span class="o_ring_sample r-later me-2"></span> Ready Later (3-5 yrs)</div>
-                        <div class="d-flex align-items-center"><div class="o_9box_flag position-relative me-2" style="bottom:0;right:0;"><i class="fa fa-star text-white" style="font-size: 8px;"></i></div> Critical Position Successor</div>
+                        <t t-foreach="this.getLegendItems()" t-as="item" t-key="item.id">
+                            <div class="d-flex align-items-center">
+                                <span t-attf-class="o_ring_sample {{ item.ringClass }} me-2"></span>
+                                <t t-esc="item.name"/>
+                            </div>
+                        </t>
+                        <div class="d-flex align-items-center">
+                            <div class="o_9box_flag position-relative me-2" style="bottom:0;right:0;">
+                                <i class="fa fa-star text-white" style="font-size: 8px;"></i>
+                            </div>
+                            Critical Position Successor
+                        </div>
                     </div>
                 </div>
 
@@ -149,21 +152,69 @@
                             </div>
                             <div class="card-body p-0">
                                 <ul class="list-group list-group-flush bg-transparent">
-                                    <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-3 px-4">
-                                        <span class="small fw-semibold" style="color: #6b7280;">Career Track</span>
-                                        <span class="fw-bold" style="color: #1d2b32;"><t t-esc="this.getTrackLabel(selP.track)"/></span>
+                                    <!-- 9-Box Placement Badge & Info -->
+                                    <li class="list-group-item bg-transparent py-3 px-4 border-bottom">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="small fw-bold text-muted text-uppercase" style="letter-spacing: 0.5px;">9-Box Placement</span>
+                                            <span class="badge rounded-pill px-3 py-2 fw-bold shadow-sm" t-attf-style="background-color: {{ selP.tierColor }}; color: #ffffff; font-size: 0.85rem;">
+                                                <i class="fa fa-th-large me-1"/>
+                                                <t t-esc="selP.nineBoxLabel || (state.boxDefs[selP.pot] and state.boxDefs[selP.pot][selP.perf] ? state.boxDefs[selP.pot][selP.perf].name : '')"/>
+                                            </span>
+                                        </div>
                                     </li>
+
+                                    <!-- Competency Match (Potential Axis) -->
                                     <li class="list-group-item bg-transparent py-3 px-4">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="small fw-semibold" style="color: #6b7280;">Competency Match</span>
-                                            <span class="fw-bold" style="color: #1d2b32;"><t t-esc="100 - selP.gap"/>%</span>
+                                            <div>
+                                                <span class="small fw-semibold d-block" style="color: #4b5563;">Potential (Competency Match)</span>
+                                                <span class="badge bg-light text-secondary border small mt-1">
+                                                    <t t-esc="selP.potLabel"/>
+                                                </span>
+                                            </div>
+                                            <div class="text-end">
+                                                <span class="fw-bold fs-5" style="color: #1d2b32;"><t t-esc="selP.compMatch"/>%</span>
+                                            </div>
                                         </div>
                                         <div class="progress rounded-pill shadow-sm" style="height: 8px; background-color: #e5e7eb;">
-                                            <div class="progress-bar bg-success rounded-pill" role="progressbar" t-att-style="'width: ' + (100 - selP.gap) + '%'"/>
+                                            <div class="progress-bar bg-success rounded-pill" role="progressbar" t-att-style="'width: ' + selP.compMatch + '%'"/>
+                                        </div>
+                                        <div class="d-flex justify-content-between small text-muted mt-1" style="font-size: 0.72rem;">
+                                            <span>Configured Match Range:</span>
+                                            <span class="fw-semibold">
+                                                <t t-esc="selP.cellMinPot !== undefined ? selP.cellMinPot : (state.boxDefs[selP.pot] and state.boxDefs[selP.pot][selP.perf] ? state.boxDefs[selP.pot][selP.perf].min_pot : 0)"/>% – <t t-esc="selP.cellMaxPot !== undefined ? selP.cellMaxPot : (state.boxDefs[selP.pot] and state.boxDefs[selP.pot][selP.perf] ? state.boxDefs[selP.pot][selP.perf].max_pot : 100)"/>%
+                                            </span>
                                         </div>
                                     </li>
+
+                                    <!-- PMS Score (Performance Axis) -->
+                                    <li class="list-group-item bg-transparent py-3 px-4 border-top">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div>
+                                                <span class="small fw-semibold d-block" style="color: #4b5563;">Performance (PMS Appraisal)</span>
+                                                <span class="badge bg-light text-secondary border small mt-1">
+                                                    <t t-esc="selP.perfLabel"/>
+                                                </span>
+                                            </div>
+                                            <div class="text-end">
+                                                <span class="fw-bold fs-5" style="color: #1d2b32;"><t t-esc="selP.pmsFormatted"/></span>
+                                                <span class="small text-muted" t-if="selP.pms &lt;= 5.0"> / 5.0</span>
+                                                <span class="small text-muted" t-else=""> / 100</span>
+                                            </div>
+                                        </div>
+                                        <div class="progress rounded-pill shadow-sm" style="height: 8px; background-color: #e5e7eb;">
+                                            <div class="progress-bar bg-primary rounded-pill" role="progressbar" t-att-style="'width: ' + selP.pmsPct + '%'"/>
+                                        </div>
+                                        <div class="d-flex justify-content-between small text-muted mt-1" style="font-size: 0.72rem;">
+                                            <span>Configured PMS Range:</span>
+                                            <span class="fw-semibold">
+                                                [<t t-esc="selP.cellMinPms !== undefined ? selP.cellMinPms : (state.boxDefs[selP.pot] and state.boxDefs[selP.pot][selP.perf] ? state.boxDefs[selP.pot][selP.perf].min_pms : 0)"/> – <t t-esc="selP.cellMaxPms !== undefined ? selP.cellMaxPms : (state.boxDefs[selP.pot] and state.boxDefs[selP.pot][selP.perf] ? state.boxDefs[selP.pot][selP.perf].max_pms : 100)"/>]
+                                            </span>
+                                        </div>
+                                    </li>
+
                                     <t t-if="selP.critical">
-                                        <li class="list-group-item bg-transparent py-3 px-4">
+                                        <li class="list-group-item bg-transparent py-3 px-4 border-top">
                                             <div class="small mb-1 fw-bold" style="color: #c17540;"><i class="fa fa-star"></i> Designated Successor For</div>
                                             <div class="fw-bold" style="font-size: 1.1rem; color: #1d2b32;"><t t-esc="selP.critical"/></div>
                                         </li>
@@ -181,6 +232,16 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Custom Hover Floating Tooltip -->
+            <div t-if="state.tipShow" class="shadow-lg p-2 rounded bg-dark text-white position-fixed"
+                 t-attf-style="left: {{state.tipX}}px; top: {{state.tipY}}px; z-index: 9999; pointer-events: none; max-width: 280px; font-size: 0.82rem;">
+                <div class="fw-bold"><t t-esc="state.tipTitle"/></div>
+                <div class="text-white-50"><t t-esc="state.tipSub"/></div>
+                <div class="mt-1 small" t-if="state.tipReady"><i class="fa fa-clock-o me-1"/> <t t-esc="state.tipReady"/></div>
+                <div class="mt-1 small text-warning" t-if="state.tipCritical"><i class="fa fa-star me-1"/> <t t-esc="state.tipCritical"/></div>
+            </div>
+
         </div>
     </t>
 </templates>

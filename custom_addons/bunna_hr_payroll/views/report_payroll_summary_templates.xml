@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="report_payroll_summary_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="wiz">
+                <t t-call="web.basic_layout">
+                    <div class="page" style="font-size: 8px; font-family: sans-serif;">
+                        <style>
+                            .table-custom {
+                                width: 100%;
+                                border-collapse: collapse;
+                                margin-top: 10px;
+                            }
+                            .table-custom th {
+                                background-color: #541718;
+                                color: white;
+                                border: 1px solid #3b1011;
+                                padding: 3px 2px;
+                                text-align: center;
+                                font-size: 7.5px;
+                            }
+                            .table-custom td {
+                                border: 1px solid #d3d3d3;
+                                padding: 2px;
+                                font-size: 7.5px;
+                            }
+                            .text-right { text-align: right; }
+                            .text-center { text-align: center; }
+                            .font-bold { font-weight: bold; }
+                            .bg-light-gray { background-color: #f8f9fa; }
+                        </style>
+
+                        <div class="row">
+                            <div class="col-8">
+                                <h3 style="color: #541718; margin-bottom: 2px;">BUNNA BANK S.C.</h3>
+                                <h5 style="margin-top: 0; margin-bottom: 5px;">PAYROLL SUMMARY REPORT - <t t-esc="wiz.period_id.name"/></h5>
+                                <p style="margin: 0; color: #555;">
+                                    <strong>Period:</strong> <t t-esc="wiz.date_from"/> to <t t-esc="wiz.date_to"/> |
+                                    <strong>Payment Date:</strong> <t t-esc="wiz.payment_date or wiz.period_id.payment_date or wiz.date_to"/> |
+                                    <strong>Total Employees:</strong> <t t-esc="wiz.total_employees"/>
+                                    <t t-if="wiz.payslip_run_id">
+                                        | <strong>Batch:</strong> <t t-esc="wiz.payslip_run_id.name"/>
+                                    </t>
+                                </p>
+                            </div>
+                            <div class="col-4 text-right">
+                                <p style="margin: 0; color: #777;">
+                                    <em>Printed: <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></em>
+                                </p>
+                            </div>
+                        </div>
+
+                        <table class="table-custom">
+                            <thead>
+                                <tr>
+                                    <th>No.</th>
+                                    <th>Emp ID</th>
+                                    <th>Employee Name</th>
+                                    <th>Payslip Batch</th>
+                                    <th>Branch / Unit</th>
+                                    <th>Basic</th>
+                                    <th>Transport</th>
+                                    <th>Hardship</th>
+                                    <th>CIA</th>
+                                    <th>Other Alw</th>
+                                    <th>Gross</th>
+                                    <th>Taxable Inc</th>
+                                    <th>Income Tax</th>
+                                    <th>Pension 7%</th>
+                                    <th>Pension 11%</th>
+                                    <th>Cost Share</th>
+                                    <th>Other Ded</th>
+                                    <th>Total Ded</th>
+                                    <th>Net Salary</th>
+                                    <th>Bank Account</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="idx" t-value="1"/>
+                                <t t-foreach="wiz.line_ids" t-as="l">
+                                    <tr>
+                                        <td class="text-center"><t t-esc="idx"/></td>
+                                        <td class="text-center"><t t-esc="l.employee_code"/></td>
+                                        <td><t t-esc="l.employee_name"/></td>
+                                        <td><t t-esc="l.batch_name"/></td>
+                                        <td><t t-esc="l.operating_unit_name"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.basic)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.transport)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.hardship)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.cia)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.other_alw)"/></td>
+                                        <td class="text-right font-bold"><t t-esc="'{:,.2f}'.format(l.gross)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.taxinc)"/></td>
+                                        <td class="text-right text-danger"><t t-esc="'{:,.2f}'.format(l.income_tax)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.pension_emp)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.pension_bnk)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.cost_sharing)"/></td>
+                                        <td class="text-right"><t t-esc="'{:,.2f}'.format(l.other_ded)"/></td>
+                                        <td class="text-right font-bold text-danger"><t t-esc="'{:,.2f}'.format(l.total_ded)"/></td>
+                                        <td class="text-right font-bold" style="color: #541718;"><t t-esc="'{:,.2f}'.format(l.net)"/></td>
+                                        <td class="text-center"><t t-esc="l.bank_acc"/></td>
+                                    </tr>
+                                    <t t-set="idx" t-value="idx + 1"/>
+                                </t>
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-light-gray font-bold">
+                                    <td colspan="5" class="text-right font-bold">Grand Total (<t t-esc="wiz.total_employees"/> Employees):</td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(sum(wiz.line_ids.mapped('basic')))"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(sum(wiz.line_ids.mapped('transport')))"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(sum(wiz.line_ids.mapped('hardship')))"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(sum(wiz.line_ids.mapped('cia')))"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(sum(wiz.line_ids.mapped('other_alw')))"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(wiz.total_gross)"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(sum(wiz.line_ids.mapped('taxinc')))"/></td>
+                                    <td class="text-right text-danger"><t t-esc="'{:,.2f}'.format(wiz.total_tax)"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(wiz.total_pension_emp)"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(wiz.total_pension_bnk)"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(sum(wiz.line_ids.mapped('cost_sharing')))"/></td>
+                                    <td class="text-right"><t t-esc="'{:,.2f}'.format(sum(wiz.line_ids.mapped('other_ded')))"/></td>
+                                    <td class="text-right text-danger"><t t-esc="'{:,.2f}'.format(wiz.total_deductions)"/></td>
+                                    <td class="text-right" style="color: #541718;"><t t-esc="'{:,.2f}'.format(wiz.total_net)"/></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

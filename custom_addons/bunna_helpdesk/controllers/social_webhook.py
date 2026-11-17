@@ -172,11 +172,97 @@ class HelpdeskSocialWebhookController(http.Controller):
                 status=500,
             )
 
+    # ── Website Chatbot / Tidio Live Chat Webhook ──────────────────────────────
+
+    @http.route(
+        ["/helpdesk/chatbot/ticket", "/helpdesk/tidio/webhook"],
+        type="http",
+        auth="public",
+        methods=["POST", "OPTIONS"],
+        csrf=False,
+        cors="*",
+    )
+    def website_chatbot_webhook(self, **kwargs):
+        """Receive ticket creation requests from Bunna Bank public website chatbot (Tidio / Custom bot)."""
+        cors_headers = [
+            ("Content-Type", "application/json"),
+            ("Access-Control-Allow-Origin", "*"),
+            ("Access-Control-Allow-Methods", "POST, OPTIONS"),
+            ("Access-Control-Allow-Headers", "Content-Type, X-Chatbot-Key, Authorization"),
+        ]
+
+        if request.httprequest.method == "OPTIONS":
+            return request.make_response(json.dumps({"status": "OK"}), headers=cors_headers, status=200)
+
+        icp = request.env["ir.config_parameter"].sudo()
+        active = icp.get_param("bunna_helpdesk.chatbot_ticket_active", "True") == "True"
+        if not active:
+            return request.make_response(
+                json.dumps({"error": "Public chatbot ticket creation is currently disabled in Helpdesk Settings."}),
+                headers=cors_headers,
+                status=403,
+            )
+
+        # Check API key if configured
+        expected_key = (icp.get_param("bunna_helpdesk.chatbot_api_key") or "").strip()
+        if expected_key:
+            auth_header = request.httprequest.headers.get("Authorization", "")
+            sent_key = (
+                request.httprequest.headers.get("X-Chatbot-Key")
+                or (auth_header.split(" ", 1)[1] if auth_header.startswith("Bearer ") else "")
+                or kwargs.get("api_key")
+                or kwargs.get("token")
+            )
+            if sent_key != expected_key:
+                return request.make_response(
+                    json.dumps({"error": "Unauthorized: Invalid or missing Chatbot API Key."}),
+                    headers=cors_headers,
+                    status=401,
+                )
+
+        try:
+            raw_data = request.httprequest.data
+            payload = json.loads(raw_data.decode("utf-8")) if raw_data else {}
+        except Exception:
+            payload = {}
+
+        if kwargs:
+            payload.update(kwargs)
+
+        try:
+            social_channel = request.env["helpdesk.social.channel"].sudo()
+            ticket = social_channel.process_chatbot_request(payload)
+            if ticket:
+                response_data = {
+                    "success": True,
+                    "status": "created",
+                    "ticket_id": ticket.id,
+                    "ticket_number": ticket.number,
+                    "ticket_name": ticket.name,
+                    "channel": ticket.channel_type,
+                    "partner_name": ticket.partner_name,
+                    "cbs_status": ticket.cbs_lookup_status or "unverified",
+                }
+                return request.make_response(json.dumps(response_data), headers=cors_headers, status=201)
+            else:
+                return request.make_response(
+                    json.dumps({"error": "No message, description, or subject provided in request."}),
+                    headers=cors_headers,
+                    status=400,
+                )
+        except Exception as e:
+            _logger.exception("Error processing chatbot webhook: %s", str(e))
+            return request.make_response(
+                json.dumps({"error": str(e)}),
+                headers=cors_headers,
+                status=500,
+            )
+
     # ── Simulation Endpoint (Local / Developer Testing) ───────────────────────
 
     @http.route(
         "/helpdesk/social/simulate",
-        type="json",
+        type="jsonrpc",
         auth="user",
         methods=["POST"],
     )

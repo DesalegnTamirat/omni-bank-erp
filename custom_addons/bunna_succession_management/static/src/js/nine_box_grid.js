@@ -4,24 +4,12 @@ import { useService } from "@web/core/utils/hooks";
 import { Component, onWillStart, useState } from "@odoo/owl";
 
 const BOX_DEFS = [
-  [
-    {name:"Underperformer", tier:"brick", desc:"Failing current role and lacks potential for future roles. Requires immediate intervention or managed exit."},
-    {name:"Solid Contributor", tier:"teal", desc:"Meets basic expectations but has reached their capability ceiling. Best kept in current role."},
-    {name:"Solid Professional", tier:"teal", desc:"Expert in current role (high results) but lacks strategic skills/desire for next level. Great for mentoring."}
-  ],
-  [
-    {name:"Inconsistent", tier:"brick", desc:"Has some potential but fails to deliver reliable results. Requires a structured performance improvement plan."},
-    {name:"Core Employee", tier:"teal", desc:"The reliable backbone of the team. Meets expectations and has moderate potential for gradual growth."},
-    {name:"High Performer", tier:"gold", desc:"Outstanding current contributor but lacks specific competencies for the next level. Needs targeted development."}
-  ],
-  [
-    {name:"Rough Diamond", tier:"teal", desc:"Has high potential for future roles but currently underperforming. Needs coaching, reassignment, or motivation."},
-    {name:"High Potential", tier:"gold", desc:"Meets current expectations and shows strong capability for upward movement within 1-2 years."},
-    {name:"Star Performer", tier:"gold", desc:"Consistently exceeds expectations and possesses all competencies for the next level. Ready for immediate promotion."}
-  ]
+  [{name:"", tier:"teal", desc:""}, {name:"", tier:"teal", desc:""}, {name:"", tier:"teal", desc:""}],
+  [{name:"", tier:"teal", desc:""}, {name:"", tier:"teal", desc:""}, {name:"", tier:"teal", desc:""}],
+  [{name:"", tier:"teal", desc:""}, {name:"", tier:"teal", desc:""}, {name:"", tier:"teal", desc:""}]
 ];
 
-const TIER_COLOR = { gold:"#726732", teal:"#425727", brick:"#541718" };
+const TIER_COLOR = { gold:"#726732", teal:"#425727", brick:"#541718", purple:"#6B21A8", amber:"#B45309", slate:"#475569" };
 const READY_CLASS = { ready_now:"r-now", ready_1_2:"r-soon", ready_3_5:"r-later" };
 const READY_LABEL = { ready_now:"Ready Now", ready_1_2:"Ready Soon (1–2 yrs)", ready_3_5:"Ready Later (3–5 yrs)" };
 const CRITICAL_CATEGORIES = ["Executive Leadership","Specialized Technical","High Regulatory / Business-Risk","Key Operational Management"];
@@ -34,8 +22,6 @@ export class NineBoxGrid extends Component {
         this.state = useState({
             people: [],
             activeRole: "ppdd",
-            activeTrack: "all",
-            critOnlyFlag: false,
             selectedId: null,
             tipShow: false,
             tipX: 0,
@@ -48,26 +34,16 @@ export class NineBoxGrid extends Component {
             boxDefs: BOX_DEFS,
             roleDefs: [
               {key:"ppdd", label:"PPDD / SPMC"},
-              {key:"manager", label:"Line Manager"},
+              {key:"manager", label:"Manager"},
               {key:"employee", label:"Employee"},
             ],
             roleNotes: {
               ppdd:"",
-              manager:"Viewing as Line Manager: names outside your reporting line are masked as initials only, per role-based access control (FR-GOV-002).",
+              manager:"Viewing as Manager: names outside your reporting line are masked as initials only, per role-based access control (FR-GOV-002).",
               employee:"Viewing as Employee: succession readiness and critical-position linkage are confidential and hidden. Employees have view-only access to career paths (Business Rule, §1.3).",
             },
-            trackDefs: [
-              {key:"all", label:"All tracks"},
-              {key:"leadership", label:"Managerial / Leadership"},
-              {key:"technical", label:"Professional / Technical Specialist"},
-              {key:"valuestream", label:"Value-Stream / Project (TOM)"},
-            ],
-            trackNotes: {
-              all:"Showing all three parallel career tracks together, per FR-CFW-005 (equal grading, compensation and development access across tracks).",
-              leadership:"Managerial/Leadership track — potential is assessed against people-leadership and cross-functional scope (FR-CFW-003).",
-              technical:"Professional/Technical Specialist track — potential is assessed against depth of expertise, not headcount managed (Dual Career Path, FR-CFW-004).",
-              valuestream:"Value-Stream / Project (TOM) track — potential is assessed against customer-value contribution, agility and outcome accountability (FR-CFW-004 value-stream grading).",
-            }
+            readinessLevels: [],
+            criticalCategories: CRITICAL_CATEGORIES,
         });
 
         onWillStart(async () => {
@@ -76,12 +52,42 @@ export class NineBoxGrid extends Component {
     }
 
     async loadData() {
-        // Fetch 9-box cell definitions from Odoo model succession.ninebox.cell
+        // 2. Fetch dynamic Readiness Levels from Odoo model succession.readiness.level
+        try {
+            const dbReadiness = await this.orm.searchRead(
+                "succession.readiness.level",
+                [],
+                ["id", "name", "sequence", "is_ready_for_deployment"],
+                { order: "sequence, id" }
+            );
+            if (dbReadiness && dbReadiness.length > 0) {
+                this.state.readinessLevels = dbReadiness;
+            }
+        } catch (e) {
+            console.warn("Using default readiness levels.", e);
+        }
+
+        // 2b. Fetch dynamic Criticality Categories from Odoo model succession.criticality.category
+        try {
+            const dbCategories = await this.orm.searchRead(
+                "succession.criticality.category",
+                [],
+                ["id", "name"]
+            );
+            if (dbCategories && dbCategories.length > 0) {
+                this.state.criticalCategories = dbCategories.map(c => c.name);
+            }
+        } catch (e) {
+            console.warn("Could not load criticality categories from database.", e);
+        }
+
+        // 3. Fetch dynamic 9-box cell definitions from Odoo model succession.ninebox.cell
         try {
             const cells = await this.orm.searchRead(
                 "succession.ninebox.cell",
                 [],
-                ["performance_rating", "potential_rating", "name", "tier_color", "description"]
+                ["performance_rating", "potential_rating", "name", "tier_color", "description", "min_pms_score", "max_pms_score", "min_potential_match", "max_potential_match"],
+                { order: "sequence, id" }
             );
             if (cells && cells.length > 0) {
                 const perfMap = {'low': 0, 'medium': 1, 'high': 2};
@@ -91,10 +97,15 @@ export class NineBoxGrid extends Component {
                     const r = potMap[c.potential_rating];
                     const col = perfMap[c.performance_rating];
                     if (r !== undefined && col !== undefined && newDefs[r] && newDefs[r][col]) {
+                        const rangeInfo = `Qualifying Range: PMS [${c.min_pms_score || 0} - ${c.max_pms_score || 100}] | Competency Match [${c.min_potential_match || 0}% - ${c.max_potential_match || 100}%]`;
                         newDefs[r][col] = {
                             name: c.name,
                             tier: c.tier_color || 'teal',
-                            desc: c.description || ''
+                            desc: c.description ? `${c.description}\n\n${rangeInfo}` : rangeInfo,
+                            min_pms: c.min_pms_score,
+                            max_pms: c.max_pms_score,
+                            min_pot: c.min_potential_match,
+                            max_pot: c.max_potential_match
                         };
                     }
                 });
@@ -104,77 +115,128 @@ export class NineBoxGrid extends Component {
             console.warn("Could not load custom 9-box cell definitions, falling back to defaults.", e);
         }
 
-        // Fetch candidates from Odoo model succession.candidate
+        // 4. Fetch candidates from Odoo model succession.candidate
         const candidates = await this.orm.searchRead(
             "succession.candidate",
             [],
-            ["id", "display_name", "job_id", "performance_rating", "potential_rating", "readiness_level", "critical_position_id", "competency_match_percent", "write_date", "employee_id"]
+            [
+                "id", "display_name", "job_id", "performance_rating", "potential_rating",
+                "readiness_level_id", "critical_position_id", "competency_match_percent",
+                "latest_pms_score", "nine_box_label", "write_date", "employee_id"
+            ]
         );
 
         const perfMap = {'low': 0, 'medium': 1, 'high': 2};
         const potMap = {'low': 0, 'medium': 1, 'high': 2};
+        const perfLabels = { low: "Low Performance", medium: "Medium Performance", high: "High Performance" };
+        const potLabels = { low: "Low Potential", medium: "Medium Potential", high: "High Potential" };
         
         const people = [];
         
-        if (candidates.length === 0) {
-            // Provide dummy test data so the grid is never empty for testing purposes
-            const testData = [
-              {name:"Meron Alemu", role:"District Manager, Addis Region", track:"leadership", perf:2, pot:0, ready:"ready_now", critical:"Executive Leadership", gap:8, idp:"On track — Q4 milestone due", lastCal:"12 Aug 2026"},
-              {name:"Yared Getachew", role:"Senior Credit Risk Officer", track:"technical", perf:2, pot:0, ready:"ready_now", critical:"High Regulatory / Business-Risk", gap:12, idp:"Certification (CFA L3) in progress", lastCal:"12 Aug 2026"},
-              {name:"Selam Tesfaye", role:"Branch Operations Supervisor", track:"leadership", perf:1, pot:0, ready:"ready_1_2", critical:null, gap:22, idp:"Stretch assignment: acting branch mgr", lastCal:"09 Aug 2026"},
-              {name:"Dawit Bekele", role:"Core Banking Systems Lead", track:"technical", perf:2, pot:1, ready:"ready_now", critical:"Specialized Technical", gap:6, idp:"No open actions", lastCal:"14 Aug 2026"},
-              {name:"Hanna Mulugeta", role:"Product Owner — Digital Channels", track:"valuestream", perf:2, pot:0, ready:"ready_1_2", critical:"Executive Leadership", gap:15, idp:"Leadership program (cohort 4)", lastCal:"11 Aug 2026"},
-              {name:"Abel Girma", role:"Branch Manager, Bahir Dar", track:"leadership", perf:1, pot:1, ready:null, critical:null, gap:28, idp:"Coaching — quarterly review", lastCal:"05 Aug 2026"},
-              {name:"Ruth Haile", role:"IT Security Specialist", track:"technical", perf:0, pot:0, ready:null, critical:"Specialized Technical", gap:34, idp:"Skills gap analysis pending", lastCal:"—"},
-              {name:"Kalkidan Fikru", role:"Value-Stream Manager, Retail", track:"valuestream", perf:2, pot:2, ready:null, critical:null, gap:10, idp:"No open actions", lastCal:"14 Aug 2026"},
-              {name:"Biruk Tadesse", role:"Compliance Officer", track:"technical", perf:1, pot:0, ready:"ready_3_5", critical:"High Regulatory / Business-Risk", gap:26, idp:"Job rotation — AML unit (Q1 2027)", lastCal:"09 Aug 2026"},
-              {name:"Marta Assefa", role:"HR Business Partner", track:"leadership", perf:2, pot:1, ready:"ready_now", critical:null, gap:9, idp:"Mentoring 2 junior HRBPs", lastCal:"13 Aug 2026"},
-              {name:"Eyob Wondimu", role:"Data & Analytics Lead", track:"technical", perf:0, pot:2, ready:null, critical:null, gap:31, idp:"Skills gap analysis — competency review", lastCal:"—"},
-              {name:"Sara Mekonnen", role:"SAT Leader, Loan Origination", track:"valuestream", perf:1, pot:2, ready:null, critical:null, gap:19, idp:"Stretch: cross-functional pilot", lastCal:"06 Aug 2026"}
-            ];
-            testData.forEach((d, i) => {
-                people.push({
-                    id: -i, // negative IDs to prevent accidental save clicks
-                    name: d.name,
-                    role: d.role,
-                    track: d.track,
-                    perf: d.perf,
-                    pot: d.pot,
-                    ready: d.ready,
-                    readyClass: d.ready ? READY_CLASS[d.ready] : "",
-                    readyLabel: d.ready ? READY_LABEL[d.ready] : "",
-                    critical: d.critical,
-                    gap: d.gap,
-                    idp: d.idp,
-                    lastCal: d.lastCal,
-                    tierColor: TIER_COLOR[BOX_DEFS[d.pot][d.perf].tier],
-                    isManagerMasked: (i % 3 !== 0), emp_id: c ? (c.employee_id ? c.employee_id[0] : 0) : 0
-                });
-            });
-        } else {
-            // Tracks are assigned pseudo-randomly for demo purposes if not available in real model
-            const tracks = ["leadership", "technical", "valuestream"];
-            
-            for (let i = 0; i < candidates.length; i++) {
-                let c = candidates[i];
-                people.push({
-                    id: c.id,
-                    name: c.display_name || "Unknown",
-                    role: c.job_id ? c.job_id[1] : "No Title",
-                    track: tracks[i % 3],
-                    perf: perfMap[c.performance_rating || 'low'],
-                    pot: potMap[c.potential_rating || 'low'],
-                    ready: c.readiness_level,
-                    readyClass: c.readiness_level ? READY_CLASS[c.readiness_level] : "",
-                    readyLabel: c.readiness_level ? READY_LABEL[c.readiness_level] : "",
-                    critical: c.critical_position_id ? c.critical_position_id[1] : null,
-                    gap: Math.max(0, 100 - (c.competency_match_percent || 0)),
-                    idp: "No open actions",
-                    lastCal: c.write_date ? c.write_date.split(' ')[0] : "—",
-                    tierColor: TIER_COLOR[BOX_DEFS[potMap[c.potential_rating || 'low']][perfMap[c.performance_rating || 'low']].tier],
-                    isManagerMasked: (i % 3 !== 0), emp_id: c ? (c.employee_id ? c.employee_id[0] : 0) : 0
-                });
+        for (let i = 0; i < candidates.length; i++) {
+            let c = candidates[i];
+            const pmsVal = c.latest_pms_score || 0.0;
+            const compMatch = Math.round(c.competency_match_percent || 0);
+
+            // Automatically place employee into the grid cell matching configured min/max
+            let perfVal = perfMap[c.performance_rating || 'low'] ?? 0;
+            let potVal = potMap[c.potential_rating || 'low'] ?? 0;
+
+            let matchedR = -1;
+            let matchedCol = -1;
+            for (let r = 2; r >= 0; r--) {
+                for (let col = 2; col >= 0; col--) {
+                    const def = this.state.boxDefs[r] && this.state.boxDefs[r][col];
+                    if (def && def.min_pms !== undefined && def.max_pms !== undefined &&
+                        def.min_pot !== undefined && def.max_pot !== undefined) {
+                        if (pmsVal >= def.min_pms && pmsVal <= def.max_pms &&
+                            compMatch >= def.min_pot && compMatch <= def.max_pot) {
+                            matchedR = r;
+                            matchedCol = col;
+                            break;
+                        }
+                    }
+                }
+                if (matchedR !== -1) break;
             }
+
+            if (matchedR !== -1 && matchedCol !== -1) {
+                potVal = matchedR;
+                perfVal = matchedCol;
+            }
+
+            const cellPerfRating = perfVal === 2 ? 'high' : (perfVal === 1 ? 'medium' : 'low');
+            const cellPotRating = potVal === 2 ? 'high' : (potVal === 1 ? 'medium' : 'low');
+
+            const cellDef = (this.state.boxDefs[potVal] && this.state.boxDefs[potVal][perfVal])
+                ? this.state.boxDefs[potVal][perfVal]
+                : null;
+            const cellTier = cellDef ? cellDef.tier : 'teal';
+
+            let rClass = "";
+            let rLabel = "";
+            let rCode = "";
+            if (c.readiness_level_id) {
+                rLabel = c.readiness_level_id[1];
+                const rId = c.readiness_level_id[0];
+                const rMatch = this.state.readinessLevels.find(rl => rl.id === rId);
+                if (rMatch) {
+                    if (rMatch.is_ready_for_deployment) {
+                        rClass = "r-now";
+                        rCode = "ready_now";
+                    } else if ((rMatch.sequence && rMatch.sequence <= 20) || rMatch.name.includes("1-2")) {
+                        rClass = "r-soon";
+                        rCode = "ready_soon";
+                    } else {
+                        rClass = "r-later";
+                        rCode = "ready_later";
+                    }
+                } else {
+                    const rLower = (rLabel || "").toLowerCase();
+                    if (rLower.includes("now") || rLower.includes("0-6")) {
+                        rClass = "r-now";
+                        rCode = "ready_now";
+                    } else if (rLower.includes("1-2")) {
+                        rClass = "r-soon";
+                        rCode = "ready_soon";
+                    } else {
+                        rClass = "r-later";
+                        rCode = "ready_later";
+                    }
+                }
+            }
+
+            people.push({
+                id: c.id,
+                name: c.display_name || "Unknown",
+                role: c.job_id ? c.job_id[1] : "No Title",
+                track: "all",
+                perf: perfVal,
+                pot: potVal,
+                perfRating: cellPerfRating,
+                potRating: cellPotRating,
+                perfLabel: perfLabels[cellPerfRating] || "Low Performance",
+                potLabel: potLabels[cellPotRating] || "Low Potential",
+                pms: pmsVal,
+                pmsFormatted: pmsVal ? (pmsVal % 1 === 0 ? pmsVal.toFixed(0) : pmsVal.toFixed(1)) : "0.0",
+                pmsPct: pmsVal <= 5.0 ? Math.min(100, Math.round((pmsVal / 5.0) * 100)) : Math.min(100, Math.round(pmsVal)),
+                compMatch: compMatch,
+                nineBoxLabel: (cellDef ? cellDef.name : "") || c.nine_box_label || "",
+                cellMinPms: cellDef ? cellDef.min_pms : 0,
+                cellMaxPms: cellDef ? cellDef.max_pms : 100,
+                cellMinPot: cellDef ? cellDef.min_pot : 0,
+                cellMaxPot: cellDef ? cellDef.max_pot : 100,
+                ready: rCode,
+                readyClass: rClass,
+                readyLabel: rLabel || "Not assessed",
+                critical: c.critical_position_id ? c.critical_position_id[1] : null,
+                gap: Math.max(0, 100 - compMatch),
+                idp: "No open actions",
+                lastCal: c.write_date ? c.write_date.split(' ')[0] : "—",
+                tierColor: TIER_COLOR[cellTier] || "#425727",
+                isManagerMasked: false,
+                emp_id: c && c.employee_id ? c.employee_id[0] : 0
+            });
         }
         
         this.state.people = people;
@@ -209,13 +271,15 @@ export class NineBoxGrid extends Component {
         // Map 0,1,2 to strings
         const perfMapRev = {0: 'low', 1: 'medium', 2: 'high'};
         const potMapRev = {0: 'low', 1: 'medium', 2: 'high'};
+        const targetPerf = perfMapRev[c];
+        const targetPot = potMapRev[r];
         
         // If it's a real record (id > 0), update it
         if (id > 0) {
             try {
                 await this.orm.write("succession.candidate", [id], {
-                    performance_rating: perfMapRev[c],
-                    potential_rating: potMapRev[r]
+                    performance_rating: targetPerf,
+                    potential_rating: targetPot
                 });
             } catch (err) {
                 console.error("Failed to update candidate ratings", err);
@@ -224,16 +288,28 @@ export class NineBoxGrid extends Component {
         }
         
         // Update local state
+        const perfLabels = { low: "Low Performance", medium: "Medium Performance", high: "High Performance" };
+        const potLabels = { low: "Low Potential", medium: "Medium Potential", high: "High Potential" };
         person.pot = r;
         person.perf = c;
+        person.perfRating = targetPerf;
+        person.potRating = targetPot;
+        person.perfLabel = perfLabels[targetPerf] || "Low Performance";
+        person.potLabel = potLabels[targetPot] || "Low Potential";
         
-        // Re-calculate tier color
-        person.tierColor = TIER_COLOR[this.state.boxDefs[r][c].tier];
+        const cellDef = (this.state.boxDefs[r] && this.state.boxDefs[r][c]) ? this.state.boxDefs[r][c] : null;
+        if (cellDef) {
+            person.nineBoxLabel = cellDef.name;
+            person.tierColor = TIER_COLOR[cellDef.tier] || "#425727";
+            person.cellMinPms = cellDef.min_pms;
+            person.cellMaxPms = cellDef.max_pms;
+            person.cellMinPot = cellDef.min_pot;
+            person.cellMaxPot = cellDef.max_pot;
+        }
     }
     
     // --- Actions ---
     setRole(key) { this.state.activeRole = key; this.state.selectedId = null; }
-    setTrack(key) { this.state.activeTrack = key; this.state.selectedId = null; }
     selectPerson(id) { this.state.selectedId = id; }
     openForm(id) {
         this.action.doAction({
@@ -247,10 +323,7 @@ export class NineBoxGrid extends Component {
     
     // --- Getters ---
     getVisiblePeople() {
-        return this.state.people.filter(p => 
-            (this.state.activeTrack === "all" || p.track === this.state.activeTrack) &&
-            (!this.state.critOnlyFlag || p.critical)
-        );
+        return this.state.people;
     }
     
     getDisplayName(p, isAvatar) {
@@ -273,7 +346,7 @@ export class NineBoxGrid extends Component {
     getStarsCount() { return this.getVisiblePeople().filter(p => p.pot === 2 && p.perf === 2).length; }
     getReadyNowCount() { return this.getVisiblePeople().filter(p => p.ready === "ready_now").length; }
     getCriticalLinkedCount() { return this.getVisiblePeople().filter(p => p.critical).length; }
-    getAtRiskCount() { return this.getVisiblePeople().filter(p => p.pot === 2 && p.perf === 0).length; } // high pot, low perf ? (user code used 2,0)
+    getAtRiskCount() { return this.getVisiblePeople().filter(p => p.pot === 2 && p.perf === 0).length; }
     
     getCalibrationText() {
         const vis = this.getVisiblePeople();
@@ -293,9 +366,27 @@ export class NineBoxGrid extends Component {
         return this.state.people.find(p => p.id === this.state.selectedId);
     }
     
-    getTrackLabel(trackKey) {
-        let t = this.state.trackDefs.find(t => t.key === trackKey);
-        return t ? t.label : "";
+    getLegendItems() {
+        if (this.state.readinessLevels && this.state.readinessLevels.length > 0) {
+            return this.state.readinessLevels.map(rl => {
+                let ringClass = "r-later";
+                if (rl.is_ready_for_deployment) {
+                    ringClass = "r-now";
+                } else if ((rl.sequence && rl.sequence <= 20) || rl.name.includes("1-2")) {
+                    ringClass = "r-soon";
+                }
+                return {
+                    id: rl.id,
+                    name: rl.name,
+                    ringClass: ringClass,
+                };
+            });
+        }
+        return [
+            { id: 'rn', name: "Ready Now (0-6 Months)", ringClass: "r-now" },
+            { id: 'rs', name: "Ready in 1-2 Years", ringClass: "r-soon" },
+            { id: 'rl', name: "Ready in 3-5 Years", ringClass: "r-later" },
+        ];
     }
     
     getPipelineCoverage() {
@@ -322,13 +413,13 @@ export class NineBoxGrid extends Component {
                 pct: total ? pct : 0,
                 hasGap: (pct < 100 && total > 0)
             };
-        }).slice(0, 5); // Limit to top 5
+        }).slice(0, 5);
     }
 
     // --- Tooltip ---
     showTip(e, p, def) {
         this.state.tipTitle = (this.state.activeRole === "employee" ? this.getDisplayName(p, true) : p.name) + " — " + def.name;
-        this.state.tipSub = p.role;
+        this.state.tipSub = `${p.role} | PMS: ${p.pmsFormatted} | Competency: ${p.compMatch}%`;
         this.state.tipReady = p.readyLabel || "Not yet assessed for readiness";
         this.state.tipCritical = this.state.activeRole !== "employee" ? p.critical : "";
         this.state.tipShow = true;

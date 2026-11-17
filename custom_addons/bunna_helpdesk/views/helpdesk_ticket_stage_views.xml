@@ -48,7 +48,7 @@
                     <group name="main">
                         <group name="main_left">
                             <field name="mail_template_id" />
-                            <field name="team_ids" widget="many2many_tags" />
+                            <field name="team_ids" widget="many2many_tags" domain="company_id and ['|', ('company_id', '=', False), ('company_id', '=', company_id)] or []" placeholder="Select Operating Units / Teams (leave empty for all)..." />
                             <field
                                 name="company_id"
                                 groups="base.group_multi_company"
@@ -61,6 +61,15 @@
                             <field name="close_from_portal" invisible="not closed" />
                             <field name="fold" />
                             <field name="unattended" />
+                        </group>
+                    </group>
+                    <group string="Customer SMS / Email Notification" name="sms_notification">
+                        <group>
+                            <field name="enable_sms" widget="boolean_toggle" string="Notification Active (ON/OFF)"/>
+                        </group>
+                        <group>
+                            <field name="notification_channel" widget="selection" string="Notification Channel" invisible="not enable_sms"/>
+                            <field name="sms_template_type" invisible="not enable_sms" required="enable_sms"/>
                         </group>
                     </group>
                     <field name="description" widget="html" />
@@ -76,6 +85,8 @@
                 <field name="sequence" widget="handle" />
                 <field name="name" />
                 <field name="mail_template_id" />
+                <field name="enable_sms" widget="boolean_toggle" string="SMS/Email Active" optional="show"/>
+                <field name="notification_channel" string="Channel" optional="show"/>
                 <field name="team_ids" widget="many2many_tags" />
                 <field
                     name="company_id"

@@ -7,8 +7,11 @@
             ─────────────────
             Employee: own loans + loans where they are a guarantor.
             Managers / approvers: loans of their own work unit only.
-            Head Office roles (HO Approver, HR Officer/Approver, POMD,
-            Head Office), HR Auditor, HR Accountant: all loans.
+            Head Office roles (HR Officer/Approver, POMD, Head Office),
+            HR Auditor, HR Accountant: all loans.
+            HO Approver: NOT organization-wide. Sees only loans of its own
+            work unit (Head Office), loans routed to it as approver or
+            disbursement officer, and loans where it is borrower / guarantor.
         -->
 
         <!-- Soft-deleted loans must never show up on the front end, even in
@@ -45,7 +48,9 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <!-- HEAD OFFICE ONLY sees every loan of the company.
+        <!-- HEAD OFFICE roles see every loan of the company (HO Approver is
+             deliberately NOT in this list: it only sees its own work unit and
+             the loans it is involved in, through the rules below).
              The old rule gave this to group_resl_manager, but that group is
              implied by EVERY approver role (RESL District, Branch Manager /
              District Director assigned as Loan Manager, ...), so a district
@@ -56,7 +61,6 @@
             <field name="name">RESL Loan: Head Office roles see all</field>
             <field name="model_id" ref="model_resl_loan"/>
             <field name="groups" eval="[(6, 0, [
-                ref('resl.group_resl_ho_approver'),
                 ref('resl.group_resl_hr'),
                 ref('resl.group_resl_hr_senior'),
                 ref('resl.group_resl_pomd'),
@@ -109,7 +113,6 @@
             <field name="name">RESL Guarantee: Head Office roles see all</field>
             <field name="model_id" ref="model_resl_loan_guarantee"/>
             <field name="groups" eval="[(6, 0, [
-                ref('resl.group_resl_ho_approver'),
                 ref('resl.group_resl_hr'),
                 ref('resl.group_resl_hr_senior'),
                 ref('resl.group_resl_pomd'),
@@ -170,7 +173,7 @@
             <field name="name">RESL Loan: Disbursement officer sees assigned loans</field>
             <field name="model_id" ref="model_resl_loan"/>
             <field name="groups" eval="[(4, ref('resl.group_resl_employee'))]"/>
-            <field name="domain_force">[('disbursement_officer_id', 'in', user.resl_effective_user_ids.ids)]</field>
+            <field name="domain_force">['|', ('disbursement_officer_id', 'in', user.resl_effective_user_ids.ids), ('disbursement_officer_ids', 'in', user.resl_effective_user_ids.ids)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="False"/>

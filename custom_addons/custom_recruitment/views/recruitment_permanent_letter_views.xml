@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Permanent Letters Tree / List View -->
+    <record id="view_probation_permanent_letter_tree" model="ir.ui.view">
+        <field name="name">hr.employee.probation.permanent.letter.tree</field>
+        <field name="model">hr.employee.probation</field>
+        <field name="arch" type="xml">
+            <list create="false" string="Permanent Letters" sample="1" decoration-success="permanent_letter_sent == True" decoration-info="permanent_letter_sent == False">
+                <field name="permanent_letter_ref" string="Letter Reference"/>
+                <field name="outcome_date" string="Letter Date"/>
+                <field name="employee_id" string="Employee Name"/>
+                <field name="job_position_id" string="Position Title"/>
+                <field name="operating_unit_id" string="Place of Assignment"/>
+                <field name="department_id" string="Department"/>
+                <field name="employee_category" string="Category"/>
+                <field name="duration_days" string="Probation Days"/>
+                <field name="employee_email" string="Outlook / Work Email"/>
+                <field name="permanent_letter_sent" string="Sent" widget="boolean_toggle"/>
+                <field name="permanent_letter_sent_date" string="Dispatched On"/>
+                <field name="state" widget="badge" decoration-success="state == 'completed'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Permanent Letters Form View -->
+    <record id="view_probation_permanent_letter_form" model="ir.ui.view">
+        <field name="name">hr.employee.probation.permanent.letter.form</field>
+        <field name="model">hr.employee.probation</field>
+        <field name="arch" type="xml">
+            <form create="false" string="Permanent Letter">
+                <header>
+                    <button name="action_send_permanent_letter"
+                            string="Send Letter"
+                            type="object"
+                            class="btn-success oe_highlight"
+                            icon="fa-envelope"/>
+                    <button name="action_print_permanent_letter"
+                            string="Print Letter"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-print"/>
+                    <field name="state" widget="statusbar" statusbar_visible="completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box"/>
+
+                    <!-- Header Title matching official Bunna Bank Letterhead -->
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold" style="letter-spacing: 1px; color: #6d382d;">Bunna Bank S.C.</h2>
+                        <h3 class="fw-bold text-uppercase">Confirmation of Permanent Employment Letter</h3>
+                        <h5 class="text-muted">People Operations &amp; Talent Management Directorate</h5>
+                    </div>
+
+                    <div class="oe_title mb-3">
+                        <label for="permanent_letter_ref" string="Official Letter Reference"/>
+                        <h1><field name="permanent_letter_ref" readonly="state == 'completed'"/></h1>
+                    </div>
+
+                    <!-- Letter & Employee Details -->
+                    <div class="card p-3 mb-4 bg-light">
+                        <group>
+                            <group string="Employee &amp; Position Details">
+                                <field name="employee_id" string="Employee Name" readonly="1"/>
+                                <field name="job_position_id" string="Position Title" readonly="1"/>
+                                <field name="job_description" string="Position Description" placeholder="Position Description fetched from Job Position..."/>
+                                <field name="employee_category" string="Category" readonly="1"/>
+                                <field name="duration_days" string="Probation Days" readonly="1"/>
+                            </group>
+                            <group string="Assignment &amp; Dates">
+                                <field name="outcome_date" string="Letter Date" readonly="1"/>
+                                <field name="operating_unit_id" string="Place of Assignment" readonly="1"/>
+                                <field name="department_id" string="Department" readonly="1"/>
+                                <field name="probation_start_date" string="Employment Start Date" readonly="1"/>
+                                <field name="probation_end_date" string="Probation Completed Date" readonly="1"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <!-- Outlook Dispatch & Communication -->
+                    <div class="card p-3 mb-4">
+                        <h4 class="fw-bold mb-3" style="color: #253315;">Outlook Email Dispatch</h4>
+                        <group>
+                            <group string="Recipients">
+                                <field name="employee_email" string="Employee Email (Outlook)" placeholder="e.g. employee@bunnabanksc.com"/>
+                                <field name="supervisor_id" string="Supervisor / Evaluator" readonly="1"/>
+                                <field name="supervisor_email" string="Supervisor Email" placeholder="e.g. supervisor@bunnabanksc.com"/>
+                            </group>
+                            <group string="Dispatch Status">
+                                <field name="permanent_letter_sent" string="Permanent Letter Sent" readonly="1" widget="boolean_toggle"/>
+                                <field name="permanent_letter_sent_date" string="Dispatched On" readonly="1"/>
+                            </group>
+                        </group>
+                    </div>
+
+
+
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for Permanent Letters -->
+    <record id="action_probation_permanent_letter" model="ir.actions.act_window">
+        <field name="name">Permanent Letters</field>
+        <field name="res_model">hr.employee.probation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', '=', 'completed'), ('outcome', '=', 'satisfactory')]</field>
+        <field name="context">{'default_state': 'completed', 'default_outcome': 'satisfactory'}</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_probation_permanent_letter_tree')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_probation_permanent_letter_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Permanent Employment Confirmation Letters</p>
+            <p>Official Bunna Bank S.C. Permanent Letters issued for employees who successfully completed their statutory probation period (60 days Non-Managerial / 75 days Managerial). Send to employee and supervisor Outlook emails or print official signed PDF.</p>
+        </field>
+    </record>
+</odoo>

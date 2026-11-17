@@ -1,27 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
     <t t-inherit="web.ListRenderer" t-inherit-mode="extension">
-        <xpath expr="//th[@t-if=&quot;column.type === 'field'&quot;]//div[1]" position="replace">
+        <xpath expr="//th[@t-if=&quot;column.type === 'field'&quot;]" position="inside">
             <t t-if="column.name === 'is_selected'">
-                <div class="d-flex align-items-center justify-content-center">
-                    <input type="checkbox"
-                           class="form-check-input cursor-pointer my-0"
-                           style="transform: scale(1.2); margin-top: 2px;"
-                           title="Select All / Deselect All"
-                           t-att-checked="isAutoMatchAllSelected(column)"
-                           t-on-click.stop="(ev) => this.toggleAutoMatchSelectAll(column, ev)"/>
+                <div class="o_automatch_select_all_cell d-flex align-items-center justify-content-center m-0 p-0 w-100 h-100">
+                    <div class="o-checkbox form-check d-flex align-items-center justify-content-center m-0 p-0">
+                        <input type="checkbox"
+                               class="form-check-input cursor-pointer m-0"
+                               title="Select All / Deselect All"
+                               t-att-checked="isAutoMatchAllSelected(column) ? 'checked' : undefined"
+                               t-on-click.stop="(ev) => this.toggleAutoMatchSelectAll(column, ev)"/>
+                    </div>
                 </div>
             </t>
-            <t t-else="">
-                <div class="d-flex align-items-center"
-                    t-att-data-tooltip-template="isDebugMode ? 'web.FieldTooltip' : 'web.ListHeaderTooltip'"
-                    t-att-data-tooltip-info="makeTooltip(column)">
-                    <span class="d-block min-w-0 text-truncate flex-grow-1 flex-shrink-1" t-att-class="isNumeric ? 'o_list_number_th' : ''"
-                          t-esc="column.label"/>
-                    <div class="o_list_header_label_spacer"/>
-                    <i class="o_list_sortable_icon" t-att-class="getSortableIconClass(column)"/>
+        </xpath>
+        <xpath expr="//th[@t-if=&quot;column.type === 'field'&quot;]//t[@t-if=&quot;column.hasLabel and column.widget !== 'handle'&quot;]" position="attributes">
+            <attribute name="t-if">column.name !== 'is_selected' and column.hasLabel and column.widget !== 'handle'</attribute>
+        </xpath>
+    </t>
+
+    <t t-inherit="web.ListRenderer.RecordRow" t-inherit-mode="extension">
+        <xpath expr="//Field[@name='column.name']" position="replace">
+            <t t-elif="column.name === 'is_selected'">
+                <div class="o_automatch_row_checkbox_cell d-flex align-items-center justify-content-center m-0 p-0 w-100 h-100"
+                     t-on-click.stop="(ev) => this.toggleAutoMatchRecord(record, column, ev)">
+                    <div class="o-checkbox form-check d-flex align-items-center justify-content-center m-0 p-0">
+                        <input type="checkbox"
+                               class="form-check-input cursor-pointer m-0"
+                               t-att-checked="record.data.is_selected ? 'checked' : undefined"
+                               t-on-click.stop="(ev) => this.toggleAutoMatchRecord(record, column, ev)"/>
+                    </div>
                 </div>
             </t>
+            <Field t-else="" name="column.name" record="record" type="column.widget" class="getFieldClass(column)" fieldInfo="column" t-props="getFieldProps(record, column)"/>
         </xpath>
     </t>
 </templates>

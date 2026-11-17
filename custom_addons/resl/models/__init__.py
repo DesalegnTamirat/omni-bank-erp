@@ -5,6 +5,9 @@ from . import resl_ir_rule
 from . import resl_loan_guarantee
 from . import resl_agreement
 from . import hr_employee_inherit
+from . import hr_employee_scope_label
+from . import hr_job_list
+from . import hr_employee_list
 from . import resl_loan_replacement_log
 from . import resl_validations
 from . import resl_loan_replacement_wizard
@@ -13,4 +16,8 @@ from . import guarantor_lookup_wizard
 from . import resl_disbursement_wizard
 from . import resl_cbs_client
 from . import resl_pdf_config
+from . import resl_routing_rule
+from . import resl_routing_unit
 from . import resl_loan_extras
+from . import resl_mail_message
+from . import resl_config_settings

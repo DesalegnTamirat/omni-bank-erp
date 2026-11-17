@@ -43,7 +43,7 @@ class PbmsConsolidationLine(models.Model):
             ("fixed_asset", "Fixed Asset Requirement"),
             ("loan_disbursement_collection", "Loan Disbursement & Collection"),
             ("loan_outstanding", "Loan & Advances Outstanding"),
-            ("credit_portfolio", "Credit Portfolio (BB-APF-15)"),
+            ("credit_portfolio", "Income Plan (BB-APF-15)"),
             ("initiative_budget", "Initiative Budget"),
         ],
         readonly=True,
@@ -113,7 +113,7 @@ class PbmsConsolidationLine(models.Model):
                             WHEN p.category = 'fixed_asset' THEN 'Fixed Asset'
                             WHEN p.category = 'loan_disbursement_collection' THEN 'Loan Disbursement & Collection'
                             WHEN p.category = 'loan_outstanding' THEN 'Loan Outstanding'
-                            WHEN p.category = 'credit_portfolio' THEN 'Credit Portfolio'
+                            WHEN p.category = 'credit_portfolio' THEN 'Income Plan'
                             WHEN p.category = 'initiative_budget' THEN 'Initiative Budget'
                         END, '') AS account_name,
                     p.state AS state,
@@ -253,7 +253,7 @@ class PbmsConsolidationLine(models.Model):
         row_cur = 6
         for rec in self:
             unit_name = rec.org_unit_id.display_name if rec.org_unit_id else ""
-            dist_name = rec.district_id.name if rec.district_id else ""
+            dist_name = rec.district_id.display_name if rec.district_id else ""
             unit_type = dict(rec._fields["org_unit_type"].selection).get(rec.org_unit_type, rec.org_unit_type or "")
             cat_label = dict(rec._fields["source_model"].selection).get(rec.source_model, rec.source_model or "")
             acc_name = rec.account_name or ""

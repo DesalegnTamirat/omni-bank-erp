@@ -74,10 +74,11 @@
                         <group string="Categorization">
                             <field name="eligible_job_ids" invisible="1"/>
                             <field name="eligible_competency_ids" invisible="1"/>
-                            <field name="operating_unit_id"/>
-                            <field name="job_id" domain="[('id', 'in', eligible_job_ids)]"/>
+                            <field name="operating_unit_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="job_id" domain="[('id', 'in', eligible_job_ids)]" options="{'no_create': True, 'no_open': True}"/>
                             <field name="question_type"/>
-                            <field name="competency_id" domain="[('id', 'in', eligible_competency_ids)]" context="{'show_pillar_only': 1}"/>
+                            <field name="competency_pillar" string="Competence Pillar" readonly="1"/>
+                            <field name="competency_id" domain="[('id', 'in', eligible_competency_ids)]" options="{'no_create': True, 'no_open': True}"/>
                         </group>
                         <group string="Level &amp; Allocation">
                             <field name="difficulty"/>
@@ -189,9 +190,9 @@
                     <group string="Categorization &amp; Attribution">
                         <field name="eligible_job_ids" invisible="1"/>
                         <field name="eligible_competency_ids" invisible="1"/>
-                        <field name="operating_unit_id"/>
-                        <field name="job_id" domain="[('id', 'in', eligible_job_ids)]"/>
-                        <field name="competency_id" domain="[('id', 'in', eligible_competency_ids)]" context="{'show_pillar_only': 1}"/>
+                        <field name="operating_unit_id" options="{'no_create': True, 'no_open': True}"/>
+                        <field name="job_id" domain="[('id', 'in', eligible_job_ids)]" options="{'no_create': True, 'no_open': True}"/>
+                        <field name="competency_id" string="Competence Pillar" domain="[('id', 'in', eligible_competency_ids)]" options="{'no_create': True, 'no_open': True}" context="{'show_competency_pillar_only': 1}"/>
                         <field name="difficulty"/>
                         <field name="default_marks"/>
                     </group>

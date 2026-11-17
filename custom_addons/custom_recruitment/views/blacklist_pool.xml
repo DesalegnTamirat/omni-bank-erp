@@ -1,5 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
+    <!-- ── Blacklist Pool List View (Matches Official Bank Template) ──────── -->
     <record id="blacklist_pool_tree" model="ir.ui.view">
         <field name="name">blacklist.pool.list</field>
         <field name="model">blacklist.pool</field>
@@ -8,21 +9,68 @@
                 <header>
                     <button name="action_open_import_wizard" string="📤 Import Blacklist Excel/CSV" type="object" class="btn-primary"/>
                 </header>
-                <field name="candidate"/>
-                <field name="national_id"/>
-                <field name="gender"/>
-                <field name="email"/>
-                <field name="phone"/>
-                <field name="reason"/>
-                <field name="blacklisted_date"/>
+                <field name="candidate" string="Name"/>
+                <field name="name_of_bank" string="Name of the Bank"/>
+                <field name="reason" string="Reasons For Termination"/>
+                <field name="date_of_termination" string="Date of Termination"/>
             </list>
         </field>
     </record>
 
+    <!-- ── Blacklist Pool Form View ───────────────────────────────────────── -->
+    <record id="blacklist_pool_form" model="ir.ui.view">
+        <field name="name">blacklist.pool.form</field>
+        <field name="model">blacklist.pool</field>
+        <field name="arch" type="xml">
+            <form string="Blacklisted Personnel Record">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="candidate" string="Full Name"/>
+                        <h1>
+                            <field name="candidate" placeholder="e.g. Belay Mekonnen Taye"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Termination Details">
+                            <field name="name_of_bank" placeholder="e.g. Wegagen Bank"/>
+                            <field name="date_of_termination"/>
+                        </group>
+                        <group string="Reasons &amp; Justification">
+                            <field name="reason" placeholder="e.g. Fraud, Forged Work Experience..."/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Blacklist Pool Search View ─────────────────────────────────────── -->
+    <record id="blacklist_pool_search" model="ir.ui.view">
+        <field name="name">blacklist.pool.search</field>
+        <field name="model">blacklist.pool</field>
+        <field name="arch" type="xml">
+            <search string="Search Blacklist Pool">
+                <field name="candidate" string="Name" filter_domain="[('candidate', 'ilike', self)]"/>
+                <field name="name_of_bank" string="Bank" filter_domain="[('name_of_bank', 'ilike', self)]"/>
+                <field name="reason" string="Reason" filter_domain="[('reason', 'ilike', self)]"/>
+                <separator/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter string="Name of the Bank" name="group_bank" context="{'group_by': 'name_of_bank'}"/>
+                    <filter string="Date of Termination" name="group_date" context="{'group_by': 'date_of_termination'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Action Window ──────────────────────────────────────────────────── -->
     <record id="blacklist_pool_form_tree" model="ir.actions.act_window">
         <field name="name">Blacklist Pool</field>
         <field name="res_model">blacklist.pool</field>
         <field name="context">{}</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="blacklist_pool_search"/>
     </record>
 </odoo>

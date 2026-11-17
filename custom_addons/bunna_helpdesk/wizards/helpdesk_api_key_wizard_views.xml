@@ -4,7 +4,7 @@
         <field name="name">helpdesk.api.key.wizard.form</field>
         <field name="model">helpdesk.api.key.wizard</field>
         <field name="arch" type="xml">
-            <form string="Generate Helpdesk REST API Key">
+            <form string="Generate Helpdesk REST API Key" class="o_helpdesk_wizard">
                 <field name="state" invisible="1" />
                 
                 <div class="alert alert-info" role="alert" invisible="state != 'draft'">

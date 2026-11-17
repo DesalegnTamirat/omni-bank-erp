@@ -110,6 +110,47 @@
         <field name="domain_force">[(1, '=', 1)]</field>
     </record>
 
+    <!-- ================= Record rules: photos follow their announcement ================= -->
+    <record id="rule_photo_drafter_read" model="ir.rule">
+        <field name="name">Announcement photo: drafters see their own</field>
+        <field name="model_id" ref="model_bunna_announcement_photo"/>
+        <field name="groups" eval="[(4, ref('group_announcement_drafter'))]"/>
+        <field name="domain_force">[('announcement_id.create_uid', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_photo_drafter_edit" model="ir.rule">
+        <field name="name">Announcement photo: drafters edit photos of their own drafts</field>
+        <field name="model_id" ref="model_bunna_announcement_photo"/>
+        <field name="groups" eval="[(4, ref('group_announcement_drafter'))]"/>
+        <field name="domain_force">[('announcement_id.create_uid', '=', user.id), ('announcement_id.state', '=', 'draft')]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_photo_publisher_read" model="ir.rule">
+        <field name="name">Announcement photo: publishers see all</field>
+        <field name="model_id" ref="model_bunna_announcement_photo"/>
+        <field name="groups" eval="[(4, ref('group_announcement_publisher'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_photo_admin_all" model="ir.rule">
+        <field name="name">Announcement photo: administrators full access</field>
+        <field name="model_id" ref="model_bunna_announcement_photo"/>
+        <field name="groups" eval="[(4, ref('group_announcement_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
     <!-- Show the three roles on the user form (Odoo 19 lists groups through privileges) -->
     <function model="res.groups" name="_bunna_announcement_setup_privileges"/>
 </odoo>

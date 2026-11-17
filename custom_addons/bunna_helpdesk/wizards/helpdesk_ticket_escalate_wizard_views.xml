@@ -4,24 +4,125 @@
         <field name="name">helpdesk.ticket.escalate.wizard.form</field>
         <field name="model">helpdesk.ticket.escalate.wizard</field>
         <field name="arch" type="xml">
-            <form string="Escalate Ticket to Higher Level Work Unit">
+            <form string="Helpdesk Escalation Journey" class="o_helpdesk_wizard">
                 <sheet>
-                    <div class="alert alert-warning" role="alert" invisible="escalation_target_level != 'level_2'">
-                        <i class="fa fa-exclamation-circle me-1" />
-                        Escalating to <strong>2nd-level Work Unit / Directorate</strong> transfers resolution responsibility and activates the <strong>Operational Level Agreement (OLA)</strong> clock.
+                    <div class="alert alert-info py-2 mb-3" role="alert" style="font-size: 0.86rem; line-height: 1.45;">
+                        <div class="fw-bold mb-1"><i class="fa fa-sitemap me-1" title="Escalation Journey" /> Helpdesk Escalation Journey Map</div>
+                        <div class="small">
+                            <strong>• Primary Unit Journey:</strong> Contact Center (Front Line / Backline / Team Leader) &amp;rarr; Front line (Tier 1) &amp;rarr; Back line (Tier 2) &amp;rarr; Team Leader (Tier 3) &amp;rarr; Directorate &amp;rarr; Deputy Chief &amp;rarr; Chief &amp;rarr; CEO
+                            <br invisible="hide_other_journey" />
+                            <span invisible="hide_other_journey">
+                                <strong>• Other Operating Unit Track:</strong> Other Operating Unit &amp;rarr; Tier 1 &amp;rarr; Tier 2 &amp;rarr; Tier 3 &amp;rarr; Directorate &amp;rarr; Deputy Chief/Chief &amp;rarr; CEO
+                            </span>
+                        </div>
                     </div>
-                    <div class="alert alert-danger" role="alert" invisible="escalation_target_level != 'level_3'">
-                        <i class="fa fa-shield me-1" />
-                        Escalating to <strong>3rd-level Executive / External Vendor Unit</strong> escalates to top-tier executive authority, vendor taskforce, or compliance.
+
+                    <field name="target_user_is_on_leave" invisible="1" />
+                    <field name="target_user_leave_status" invisible="1" />
+                    <field name="operating_unit_user_ids" invisible="1" />
+                    <div class="alert alert-warning py-2 mb-3" role="alert" invisible="not target_user_is_on_leave">
+                        <i class="fa fa-exclamation-triangle me-1" title="Agent on Leave" aria-label="Agent on Leave" />
+                        <strong>Agent on Leave Notice:</strong> The selected assignee is currently <field name="target_user_leave_status" readonly="1" class="fw-bold" />. Escalating to this user may delay resolution.
                     </div>
+
                     <group>
-                        <field name="ticket_id" invisible="1" />
-                        <field name="escalation_target_level" widget="radio" />
-                        <field name="target_team_id" options="{'no_create': True}" placeholder="Select target team or directorate..." />
-                        <field name="target_user_id" options="{'no_create': True}" placeholder="Optional: direct specialist or executive user..." />
+                        <group string="Current Ticket State">
+                            <field name="ticket_id" invisible="1" />
+                            <field name="operating_unit_id" readonly="1" string="Sub Service Provider" />
+                            <field name="current_user_id" readonly="1" string="Current Assignee" widget="many2one_avatar_user" invisible="not current_user_id" />
+                            <field name="current_assignee_name" readonly="1" string="Current Assignee" invisible="current_user_id" />
+                            <field name="current_role" readonly="1" string="Current Assignee Role" />
+                        </group>
+                        <group string="Escalation Journey Track">
+                            <field name="hide_other_journey" invisible="1" />
+                            <div class="text-muted small mb-2" invisible="not hide_other_journey">
+                                <i class="fa fa-arrow-circle-right text-primary me-1" title="Primary Journey Track" aria-label="Primary Journey Track" /><strong>Track:</strong> Primary Operating Unit Journey
+                            </div>
+                            <field name="escalation_journey" widget="radio" options="{'horizontal': true}" invisible="hide_other_journey" />
+                            <field name="escalation_type" invisible="1" />
+                            <field name="is_frontline" invisible="1" />
+                            <field name="is_director" invisible="1" />
+                            <!-- 1. Primary Track: Frontline Privileges -->
+                            <field
+                                name="escalation_type_primary_frontline"
+                                widget="selection"
+                                string="Escalation Level"
+                                invisible="escalation_journey != 'primary_journey' or not is_frontline"
+                                required="escalation_journey == 'primary_journey' and is_frontline"
+                            />
+                            <!-- 2. Primary Track: Non-Director Privileges (Deputy Chief / Chief / CEO Hidden) -->
+                            <field
+                                name="escalation_type_primary_non_director"
+                                widget="selection"
+                                string="Escalation Level"
+                                invisible="escalation_journey != 'primary_journey' or is_frontline or is_director"
+                                required="escalation_journey == 'primary_journey' and not is_frontline and not is_director"
+                            />
+                            <!-- 3. Primary Track: Directorate Privilege (Deputy Chief / Chief / CEO Visible) -->
+                            <field
+                                name="escalation_type_primary"
+                                widget="selection"
+                                string="Escalation Level"
+                                invisible="escalation_journey != 'primary_journey' or is_frontline or not is_director"
+                                required="escalation_journey == 'primary_journey' and not is_frontline and is_director"
+                            />
+                            <!-- 4. Other Track: Non-Director Privileges (Deputy Chief / Chief / CEO Hidden) -->
+                            <field
+                                name="escalation_type_other_non_director"
+                                widget="selection"
+                                string="Escalation Level"
+                                invisible="escalation_journey != 'other_work_journey' or is_director"
+                                required="escalation_journey == 'other_work_journey' and not is_director"
+                            />
+                            <!-- 5. Other Track: Directorate Privilege (Deputy Chief / Chief / CEO Visible) -->
+                            <field
+                                name="escalation_type_other"
+                                widget="selection"
+                                string="Escalation Level"
+                                invisible="escalation_journey != 'other_work_journey' or not is_director"
+                                required="escalation_journey == 'other_work_journey' and is_director"
+                            />
+                        </group>
                     </group>
-                    <group string="Escalation Reason &amp; Findings">
-                        <field name="reason" placeholder="Describe why this case requires higher-level intervention and detailed findings..." nolabel="1" />
+
+                    <group string="Assigned Recipient &amp; Responsible Operating Unit">
+                        <group>
+                            <field
+                                name="target_operating_unit_id"
+                                string="Target Responsible Operating Unit"
+                                placeholder="Select target operating unit..."
+                                options="{'no_create': True, 'no_open': True}"
+                                invisible="escalation_journey != 'other_work_journey' or is_frontline"
+                                required="escalation_journey == 'other_work_journey' and not is_frontline"
+                            />
+                            <field
+                                name="target_user_id"
+                                string="Assign To"
+                                placeholder="Select team member from operating unit..."
+                                options="{'no_create': True, 'no_create_edit': True}"
+                                widget="many2one_avatar_user"
+                                required="escalation_journey == 'other_work_journey'"
+                            />
+                            <field name="target_user_position" string="Current Position" readonly="1" invisible="not target_user_id" />
+                            <field name="target_user_phone" string="Phone Number" readonly="1" invisible="not target_user_id" />
+                            <field name="target_user_status" string="Status" readonly="1" invisible="not target_user_id" />
+                        </group>
+                        <group>
+                            <field name="suggested_recipient_name" readonly="1" string="Auto-Detected Candidate" />
+                        </group>
+                    </group>
+
+                    <group string="Escalation Reason" invisible="is_frontline">
+                        <field name="reason" placeholder="Describe the findings, root cause, and why this ticket requires higher-level or cross-unit resolution..." nolabel="1" required="not is_frontline" />
+                    </group>
+
+                    <group string="Customer Notification (SMS / Email)">
+                        <group>
+                            <field name="notify_customer" widget="boolean_toggle" string="Notify Customer (ON/OFF)"/>
+                        </group>
+                        <group>
+                            <field name="notification_channel" widget="selection" string="Notification Channel" invisible="not notify_customer"/>
+                        </group>
                     </group>
                 </sheet>
                 <footer>
@@ -30,6 +131,7 @@
                         string="Confirm Escalation"
                         type="object"
                         class="btn-danger"
+                        icon="fa-level-up"
                     />
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
